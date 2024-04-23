@@ -1,0 +1,1 @@
+Added boxblur, tentblur, fast gaussian, fast gaussian next, gaussian blur
