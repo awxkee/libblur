@@ -11,6 +11,7 @@ documentation = "../../README.md"
 categories = ["multimedia::images", "multimedia::video"]
 homepage = "https://github.com/awxkee/fastblur"
 repository = "https://github.com/awxkee/fastblur.git"
+exclude = ["*.jpg"]
 
 [lib]
 name = "fastblur"
