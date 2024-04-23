@@ -23,7 +23,7 @@ On my M3 4K photo blurred in 10ms that means it is 4K 100fps blur :)
 O(r) complexity (almost constant).
 
 ```rust
-fastblur::fast_gaussian( & mut bytes, stride, width0, height, 70, Channels3);
+fastblur::fast_gaussian( & mut bytes, stride, width0, height, radius, Channels3);
 ```
 
 ### Fast gaussian next
@@ -34,7 +34,7 @@ If 4K photo blurred in 10 ms this method will be done in 15 ms. Max radius ~150-
 O(r) complexity (almost constant).
 
 ```rust
-fastblur::fast_gaussian_next(&mut bytes, stride, width0, height, 70, FastBlurChannels::Channels3);
+fastblur::fast_gaussian_next(&mut bytes, stride, width0, height, radius, FastBlurChannels::Channels3);
 ```
 
 ### Tent blur
