@@ -1,7 +1,6 @@
 # Fast blur algorithms library for Rust
 
-I wrote this when I tried to learn Rust after C++. There are some very good ( and sometimes fast )
-algorithms that do blurring uint images.
+There are some very good ( and sometimes blazing fast ) algorithms that do blurring uint images.
 
 You may receive gaussian blur in 100 FPS for 4K photo.
 
