@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rust-lang/setup-rust-toolchain@v1
-      - name: Save cargo token
+      - name: Make a release
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_TOKEN }}
         run: cargo publish --manifest-path src/lib/Cargo.toml
@@ -27,7 +27,7 @@ jobs:
     permissions:
       contents: write
     needs:
-      - build
+      - build_and_publish
     steps:
       - uses: actions/checkout@v3
       - uses: ncipollo/release-action@v1
