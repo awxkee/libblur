@@ -1,7 +1,7 @@
-use fastblur::FastBlurChannels;
 use image::io::Reader as ImageReader;
 use image::{EncodableLayout, GenericImageView};
 use std::time::Instant;
+use libblur::FastBlurChannels;
 
 fn main() {
     let img = ImageReader::open("assets/test_image_1.jpg")
@@ -20,8 +20,8 @@ fn main() {
     let mut dst_bytes: Vec<u8> = Vec::with_capacity((dimensions.0 * dimensions.1 * 3) as usize);
     dst_bytes.resize((dimensions.0 * dimensions.1 * 3) as usize, 0);
     let start_time = Instant::now();
-    // fastblur::fast_gaussian_next(&mut bytes, dimensions.0 * 3, dimensions.0, dimensions.1, 125, FastBlurChannels::Channels3);
-    fastblur::gaussian_blur(
+    // libblur::fast_gaussian_next(&mut bytes, dimensions.0 * 3, dimensions.0, dimensions.1, 125, FastBlurChannels::Channels3);
+    libblur::gaussian_blur(
         &bytes,
         dimensions.0 * 3,
         &mut dst_bytes,

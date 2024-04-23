@@ -12,4 +12,4 @@ path = "src/main.rs"
 
 [dependencies]
 image = "0.25.1"
-fastblur = {path = "src/lib"}
+libblur = {path = "src/lib"}
