@@ -1,0 +1,15 @@
+workspace = { members = ["src/lib"] }
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[package]
+name = "fast-blur"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "fast-blur"
+path = "src/main.rs"
+
+[dependencies]
+image = "0.25.1"
+fastblur = {path = "src/lib"}

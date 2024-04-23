@@ -1,0 +1,21 @@
+[package]
+name = "fastblur"
+version = "0.9.0"
+edition = "2021"
+description = "High performance blur in pure rust"
+readme = "../../README.md"
+keywords = ["blur", "gauss_blur", "image_blur", "fast_blur", "box_blur"]
+license = "Apache-2.0 or BSD-3"
+authors = ["Radzivon Bartoshyk"]
+documentation = "../../README.md"
+categories = ["multimedia::images", "multimedia::video"]
+homepage = "https://github.com/awxkee/fastblur"
+repository = "https://github.com/awxkee/fastblur.git"
+
+[lib]
+name = "fastblur"
+edition = "2021"
+path = "lib.rs"
+
+[dependencies]
+num-traits = "0.2.18"
