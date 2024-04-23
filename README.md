@@ -60,7 +60,7 @@ FFT analysis etc.
 Kernel size must be odd. Will panic if kernel size is not odd.
 
 ```rust
-fastblur::gaussian_blur( & bytes, src_stride, &mut dst_bytes, dst_stride, width, height, kernel_size, sigma, FastBlurChannels::Channels3);
+fastblur::gaussian_blur(&bytes, src_stride, &mut dst_bytes, dst_stride, width, height, kernel_size, sigma, FastBlurChannels::Channels3);
 ```
 
 ### Gaussian box blur
