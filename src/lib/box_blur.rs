@@ -84,7 +84,7 @@ fn box_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<u32> + Send +
             let next = std::cmp::min(x + half_kernel, width - 1) as usize * channels_count;
             let previous =
                 std::cmp::max(x as i64 - half_kernel as i64, 0) as usize * channels_count;
-            let px = x as usize * channels_count as usize;
+            let px = x as usize * channels_count;
             // Prune previous and add next and compute mean
 
             kernel[0] += src[y_src_shift + next].into();
