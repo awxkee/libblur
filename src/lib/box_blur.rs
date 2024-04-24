@@ -44,7 +44,7 @@ fn box_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<u32> + Send +
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
     let kernel_size = radius * 2 + 1;
-    let edge_count = (kernel_size / 2) as u32 + 1;
+    let edge_count = (kernel_size / 2) + 1;
     let half_kernel = kernel_size / 2;
     let kernel_scale = 1f32 / (radius * 2) as f32;
     let channels_count = match box_channels {
@@ -245,8 +245,8 @@ fn box_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<u32> + Sync + S
             match box_channels {
                 FastBlurChannels::Channels3 => {}
                 FastBlurChannels::Channels4 => {
-                    kernel[3] += src[next + next + 3].into();
-                    kernel[3] -= src[previous + previous + 3].into();
+                    kernel[3] += src[next + px + 3].into();
+                    kernel[3] -= src[previous + px + 3].into();
                 }
             }
 

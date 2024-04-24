@@ -22,28 +22,28 @@ fn main() {
     dst_bytes.resize(dimensions.1 as usize * stride, 0);
     let start_time = Instant::now();
     // libblur::fast_gaussian_next(&mut bytes, dimensions.0 * 3, dimensions.0, dimensions.1, 125, FastBlurChannels::Channels3);
-    libblur::gaussian_blur(
-        &bytes,
-        stride as u32,
-        &mut dst_bytes,
-        stride as u32,
-        dimensions.0,
-        dimensions.1,
-        17,
-        16f32 / 6f32,
-        FastBlurChannels::Channels4,
-    );
-    // fastblur::median_blur(
+    // libblur::gaussian_blur(
     //     &bytes,
-    //     dimensions.0 * 3,
+    //     stride as u32,
     //     &mut dst_bytes,
-    //     dimensions.0 * 3,
+    //     stride as u32,
     //     dimensions.0,
     //     dimensions.1,
-    //     175,
-    //     FastBlurChannels::Channels3,
+    //     17,
+    //     16f32 / 6f32,
+    //     FastBlurChannels::Channels4,
     // );
-    // libblur::tent_blur(&bytes, dimensions.0 * 3, &mut dst_bytes, dimensions.0 * 3, dimensions.0, dimensions.1, 71, FastBlurChannels::Channels3);
+    // libblur::median_blur(
+    //     &bytes,
+    //     stride as u32,
+    //     &mut dst_bytes,
+    //     stride as u32,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     15,
+    //     FastBlurChannels::Channels4,
+    // );
+    libblur::tent_blur(&bytes, stride as u32, &mut dst_bytes, stride as u32, dimensions.0, dimensions.1, 71, FastBlurChannels::Channels4);
 
     let elapsed_time = start_time.elapsed();
     // Print the elapsed time in milliseconds
