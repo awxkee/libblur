@@ -4,7 +4,7 @@ use std::time::Instant;
 use libblur::FastBlurChannels;
 
 fn main() {
-    let img = ImageReader::open("assets/test_image_1.jpg")
+    let img = ImageReader::open("assets/test_image_2.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -13,24 +13,25 @@ fn main() {
 
     println!("{:?}", img.color());
     let src_bytes = img.as_bytes();
-    let mut bytes: Vec<u8> = Vec::with_capacity((dimensions.0 * dimensions.1 * 3) as usize);
-    for i in 0..(dimensions.0 * dimensions.1 * 3) as usize {
+    let stride = dimensions.0 as usize * 4;
+    let mut bytes: Vec<u8> = Vec::with_capacity(dimensions.1 as usize * stride);
+    for i in 0..dimensions.1 as usize * stride {
         bytes.push(src_bytes[i]);
     }
-    let mut dst_bytes: Vec<u8> = Vec::with_capacity((dimensions.0 * dimensions.1 * 3) as usize);
-    dst_bytes.resize((dimensions.0 * dimensions.1 * 3) as usize, 0);
+    let mut dst_bytes: Vec<u8> = Vec::with_capacity(dimensions.1 as usize * stride);
+    dst_bytes.resize(dimensions.1 as usize * stride, 0);
     let start_time = Instant::now();
     // libblur::fast_gaussian_next(&mut bytes, dimensions.0 * 3, dimensions.0, dimensions.1, 125, FastBlurChannels::Channels3);
     libblur::gaussian_blur(
         &bytes,
-        dimensions.0 * 3,
+        stride as u32,
         &mut dst_bytes,
-        dimensions.0 * 3,
+        stride as u32,
         dimensions.0,
         dimensions.1,
-        121,
-        121f32 / 6f32,
-        FastBlurChannels::Channels3,
+        17,
+        16f32 / 6f32,
+        FastBlurChannels::Channels4,
     );
     // fastblur::median_blur(
     //     &bytes,
@@ -49,11 +50,11 @@ fn main() {
     println!("Elapsed time: {:.2?}", elapsed_time);
 
     image::save_buffer(
-        "blurred.jpg",
+        "blurred.png",
         dst_bytes.as_bytes(),
         dimensions.0,
         dimensions.1,
-        image::ExtendedColorType::Rgb8,
+        image::ExtendedColorType::Rgba8,
     )
     .unwrap();
 }

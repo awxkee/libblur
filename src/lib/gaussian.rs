@@ -26,11 +26,13 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::channels_configuration::FastBlurChannels;
-use crate::gaussian_neon::{gaussian_blur_horizontal_pass_impl_neon_3channels_u8, gaussian_blur_vertical_pass_impl_neon_3channels_u8};
 use crate::unsafe_slice::UnsafeSlice;
+#[allow(unused_imports)]
 use crate::FastBlurChannels::Channels3;
 use num_traits::cast::FromPrimitive;
 use std::thread;
+#[allow(unused_imports)]
+use crate::gaussian_neon::neon_support;
 
 fn get_gaussian_kernel_1d(width: u32, sigma: f32) -> Vec<f32> {
     let mut sum_norm: f32 = 0f32;
@@ -68,27 +70,28 @@ fn gaussian_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<f32> + S
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
     #[cfg(target_arch = "aarch64")]
-    match gaussian_channels {
-        Channels3 => {
-            #[cfg(target_arch = "aarch64")]
-            if std::any::type_name::<T>() == "u8" {
-                let u8_slice: &Vec<u8> = unsafe { std::mem::transmute(src) };
-                let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
-                gaussian_blur_horizontal_pass_impl_neon_3channels_u8(
-                    u8_slice,
-                    src_stride,
-                    slice,
-                    dst_stride,
-                    width,
-                    kernel_size,
-                    kernel,
-                    start_y,
-                    end_y,
-                );
+    {
+        match gaussian_channels {
+            Channels3 => {
+                if std::any::type_name::<T>() == "u8" {
+                    let u8_slice: &Vec<u8> = unsafe { std::mem::transmute(src) };
+                    let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
+                    neon_support::gaussian_blur_horizontal_pass_impl_neon_3channels_u8(
+                        u8_slice,
+                        src_stride,
+                        slice,
+                        dst_stride,
+                        width,
+                        kernel_size,
+                        kernel,
+                        start_y,
+                        end_y,
+                    );
+                }
+                return;
             }
-            return;
+            FastBlurChannels::Channels4 => {}
         }
-        FastBlurChannels::Channels4 => {}
     }
     let half_kernel = (kernel_size / 2) as i32;
     let channels_count = match gaussian_channels {
@@ -209,28 +212,29 @@ fn gaussian_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<f32> + Sen
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
     #[cfg(target_arch = "aarch64")]
-    match gaussian_channels {
-        Channels3 => {
-            #[cfg(target_arch = "aarch64")]
-            if std::any::type_name::<T>() == "u8" {
-                let u8_slice: &Vec<u8> = unsafe { std::mem::transmute(src) };
-                let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
-                gaussian_blur_vertical_pass_impl_neon_3channels_u8(
-                    u8_slice,
-                    src_stride,
-                    slice,
-                    dst_stride,
-                    width,
-                    height,
-                    kernel_size,
-                    kernel,
-                    start_y,
-                    end_y,
-                );
+    {
+        match gaussian_channels {
+            Channels3 => {
+                if std::any::type_name::<T>() == "u8" {
+                    let u8_slice: &Vec<u8> = unsafe { std::mem::transmute(src) };
+                    let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
+                    neon_support::gaussian_blur_vertical_pass_impl_neon_3channels_u8(
+                        u8_slice,
+                        src_stride,
+                        slice,
+                        dst_stride,
+                        width,
+                        height,
+                        kernel_size,
+                        kernel,
+                        start_y,
+                        end_y,
+                    );
+                }
+                return;
             }
-            return;
+            FastBlurChannels::Channels4 => {}
         }
-        FastBlurChannels::Channels4 => {}
     }
     let half_kernel = (kernel_size / 2) as i32;
     let channels_count = match gaussian_channels {
