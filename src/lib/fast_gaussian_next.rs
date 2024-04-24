@@ -25,17 +25,17 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use std::thread;
-use num_traits::FromPrimitive;
-use crate::FastBlurChannels;
 use crate::unsafe_slice::UnsafeSlice;
+use crate::FastBlurChannels;
+use num_traits::FromPrimitive;
+use std::thread;
 
 fn fast_gaussian_next_vertical_pass<T: FromPrimitive + Default + Into<i32>>(
     bytes: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
     height: u32,
-    radius: i32,
+    radius: u32,
     start: u32,
     end: u32,
     channels: FastBlurChannels,
@@ -82,9 +82,12 @@ fn fast_gaussian_next_vertical_pass<T: FromPrimitive + Default + Into<i32>>(
                 let d_arr_index_1 = ((y + radius_64) & 1023) as usize;
                 let d_arr_index_2 = ((y - radius_64) & 1023) as usize;
                 let d_arr_index = (y & 1023) as usize;
-                dif_r += 3 * (buffer_r[d_arr_index] - buffer_r[d_arr_index_1]) - buffer_r[d_arr_index_2];
-                dif_g += 3 * (buffer_g[d_arr_index] - buffer_g[d_arr_index_1]) - buffer_g[d_arr_index_2];
-                dif_b += 3 * (buffer_b[d_arr_index] - buffer_b[d_arr_index_1]) - buffer_b[d_arr_index_2];
+                dif_r +=
+                    3 * (buffer_r[d_arr_index] - buffer_r[d_arr_index_1]) - buffer_r[d_arr_index_2];
+                dif_g +=
+                    3 * (buffer_g[d_arr_index] - buffer_g[d_arr_index_1]) - buffer_g[d_arr_index_2];
+                dif_b +=
+                    3 * (buffer_b[d_arr_index] - buffer_b[d_arr_index_1]) - buffer_b[d_arr_index_2];
             } else if y + radius_64 >= 0 {
                 let arr_index = (y & 1023) as usize;
                 let arr_index_1 = ((y + radius_64) & 1023) as usize;
@@ -98,8 +101,10 @@ fn fast_gaussian_next_vertical_pass<T: FromPrimitive + Default + Into<i32>>(
                 dif_b -= 3 * buffer_b[arr_index];
             }
 
-            let next_row_y = (std::cmp::min(std::cmp::max(y + ((3 * radius_64) >> 1), 0), height_wide - 1)
-                as usize)
+            let next_row_y = (std::cmp::min(
+                std::cmp::max(y + ((3 * radius_64) >> 1), 0),
+                height_wide - 1,
+            ) as usize)
                 * (stride as usize);
             let next_row_x = (x * channels_count) as usize;
 
@@ -134,7 +139,7 @@ fn fast_gaussian_next_horizontal_pass<T: FromPrimitive + Default + Into<i32> + S
     stride: u32,
     width: u32,
     height: u32,
-    radius: i32,
+    radius: u32,
     start: u32,
     end: u32,
     channels: FastBlurChannels,
@@ -180,9 +185,12 @@ fn fast_gaussian_next_horizontal_pass<T: FromPrimitive + Default + Into<i32> + S
                 let d_arr_index_1 = ((x + radius_64) & 1023) as usize;
                 let d_arr_index_2 = ((x - radius_64) & 1023) as usize;
                 let d_arr_index = (x & 1023) as usize;
-                dif_r += 3 * (buffer_r[d_arr_index] - buffer_r[d_arr_index_1]) - buffer_r[d_arr_index_2];
-                dif_g += 3 * (buffer_g[d_arr_index] - buffer_g[d_arr_index_1]) - buffer_g[d_arr_index_2];
-                dif_b += 3 * (buffer_b[d_arr_index] - buffer_b[d_arr_index_1]) - buffer_b[d_arr_index_2];
+                dif_r +=
+                    3 * (buffer_r[d_arr_index] - buffer_r[d_arr_index_1]) - buffer_r[d_arr_index_2];
+                dif_g +=
+                    3 * (buffer_g[d_arr_index] - buffer_g[d_arr_index_1]) - buffer_g[d_arr_index_2];
+                dif_b +=
+                    3 * (buffer_b[d_arr_index] - buffer_b[d_arr_index_1]) - buffer_b[d_arr_index_2];
             } else if x + radius_64 >= 0 {
                 let arr_index = (x & 1023) as usize;
                 let arr_index_1 = ((x + radius_64) & 1023) as usize;
@@ -205,7 +213,7 @@ fn fast_gaussian_next_horizontal_pass<T: FromPrimitive + Default + Into<i32> + S
             let ug8 = bytes[next_row_y + next_row_x + 1];
             let ub8 = bytes[next_row_y + next_row_x + 2];
 
-            let arr_index = ((x + 2*radius_64) & 1023) as usize;
+            let arr_index = ((x + 2 * radius_64) & 1023) as usize;
 
             dif_r += ur8.into();
             der_r += dif_r;
@@ -230,10 +238,10 @@ fn fast_gaussian_next_impl<T: FromPrimitive + Default + Into<i32> + Send + Sync>
     stride: u32,
     width: u32,
     height: u32,
-    radius: i32,
+    radius: u32,
     channels: FastBlurChannels,
 ) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy
+    T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
     let acq_radius = std::cmp::min(radius, 160);
     if radius <= 0 {
@@ -283,7 +291,14 @@ fn fast_gaussian_next_impl<T: FromPrimitive + Default + Into<i32> + Send + Sync>
             }
             let handle = scope.spawn(move || {
                 fast_gaussian_next_horizontal_pass(
-                    &unsafe_image, stride, width, height, acq_radius, start_y, end_y, channels,
+                    &unsafe_image,
+                    stride,
+                    width,
+                    height,
+                    acq_radius,
+                    start_y,
+                    end_y,
+                    channels,
                 );
             });
             handles.push(handle);
@@ -301,7 +316,7 @@ pub extern "C" fn fast_gaussian_next(
     stride: u32,
     width: u32,
     height: u32,
-    radius: i32,
+    radius: u32,
     channels: FastBlurChannels,
 ) {
     fast_gaussian_next_impl(bytes, stride, width, height, radius, channels);
@@ -314,7 +329,7 @@ pub extern "C" fn fast_gaussian_next_u16(
     stride: u32,
     width: u32,
     height: u32,
-    radius: i32,
+    radius: u32,
     channels: FastBlurChannels,
 ) {
     fast_gaussian_next_impl(bytes, stride, width, height, radius, channels);

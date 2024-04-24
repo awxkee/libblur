@@ -121,7 +121,7 @@ fn init_histogram(
     y: u32,
     width: u32,
     height: u32,
-    radius: usize,
+    radius: u32,
     median_channels: FastBlurChannels,
     histogram: &mut MedianHistogram,
 ) {
@@ -131,7 +131,7 @@ fn init_histogram(
     histogram.a = [0; 256];
     histogram.n = 0;
 
-    for j in 0..std::cmp::min(radius, width as usize) {
+    for j in 0..std::cmp::min(radius, width) {
         add_rgb_pixels(
             src,
             src_stride,
@@ -139,7 +139,7 @@ fn init_histogram(
             j as i64,
             width,
             height,
-            radius as u32,
+            radius,
             median_channels,
             histogram,
         );
@@ -167,7 +167,7 @@ fn median_blur_impl(
     dst_stride: u32,
     width: u32,
     height: u32,
-    radius: usize,
+    radius: u32,
     median_channels: FastBlurChannels,
     start_y: u32,
     end_y: u32,
@@ -274,7 +274,7 @@ pub extern "C" fn median_blur(
     dst_stride: u32,
     width: u32,
     height: u32,
-    radius: usize,
+    radius: u32,
     median_channels: FastBlurChannels,
 ) {
     let unsafe_dst = UnsafeSlice::new(dst);

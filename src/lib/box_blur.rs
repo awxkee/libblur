@@ -36,7 +36,7 @@ fn box_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<u32> + Send +
     unsafe_dst: &UnsafeSlice<T>,
     dst_stride: u32,
     width: u32,
-    radius: usize,
+    radius: u32,
     box_channels: FastBlurChannels,
     start_y: u32,
     end_y: u32,
@@ -46,11 +46,11 @@ fn box_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<u32> + Send +
     let kernel_size = radius * 2 + 1;
     let edge_count = (kernel_size / 2) as u32 + 1;
     let half_kernel = kernel_size / 2;
-    let kernel_scale = radius * 2;
+    let kernel_scale = 1f32 / (radius * 2) as f32;
     let channels_count = match box_channels {
         FastBlurChannels::Channels3 => 3,
         FastBlurChannels::Channels4 => 4,
-    };
+    } as usize;
 
     for y in start_y..end_y {
         let mut kernel: [u32; 4] = [0; 4];
@@ -67,8 +67,8 @@ fn box_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<u32> + Send +
             }
         }
 
-        for x in 1..std::cmp::min(half_kernel, width as usize) {
-            let px = x * channels_count;
+        for x in 1..std::cmp::min(half_kernel, width) {
+            let px = x as usize * channels_count;
             kernel[0] += src[y_src_shift + px].into();
             kernel[1] += src[y_src_shift + px + 1].into();
             kernel[2] += src[y_src_shift + px + 2].into();
@@ -81,10 +81,10 @@ fn box_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<u32> + Send +
         }
 
         for x in 0..width {
-            let next = std::cmp::min(x + half_kernel as u32, width - 1) as usize * channels_count;
+            let next = std::cmp::min(x + half_kernel, width - 1) as usize * channels_count;
             let previous =
                 std::cmp::max(x as i64 - half_kernel as i64, 0) as usize * channels_count;
-            let px = x as usize * channels_count;
+            let px = x as usize * channels_count as usize;
             // Prune previous and add next and compute mean
 
             kernel[0] += src[y_src_shift + next].into();
@@ -106,15 +106,15 @@ fn box_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<u32> + Send +
             unsafe {
                 unsafe_dst.write(
                     y_dst_shift + px + 0,
-                    T::from_usize((kernel[0] + 1) as usize / kernel_scale).unwrap_or_default(),
+                    T::from_f32(kernel[0] as f32 * kernel_scale).unwrap_or_default(),
                 );
                 unsafe_dst.write(
                     y_dst_shift + px + 1,
-                    T::from_usize((kernel[1] + 1) as usize / kernel_scale).unwrap_or_default(),
+                    T::from_f32(kernel[1] as f32 * kernel_scale).unwrap_or_default(),
                 );
                 unsafe_dst.write(
                     y_dst_shift + px + 2,
-                    T::from_usize((kernel[2] + 1) as usize / kernel_scale).unwrap_or_default(),
+                    T::from_f32(kernel[2] as f32 * kernel_scale).unwrap_or_default(),
                 );
 
                 match box_channels {
@@ -122,7 +122,7 @@ fn box_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<u32> + Send +
                     FastBlurChannels::Channels4 => {
                         unsafe_dst.write(
                             y_dst_shift + px + 3,
-                            T::from_usize((kernel[3] + 1) as usize / kernel_scale)
+                            T::from_f32(kernel[3] as f32 * kernel_scale)
                                 .unwrap_or_default(),
                         );
                     }
@@ -139,7 +139,7 @@ fn box_blur_horizontal_pass<T: FromPrimitive + Default + Into<u32> + Send + Sync
     dst_stride: u32,
     width: u32,
     height: u32,
-    radius: usize,
+    radius: u32,
     box_channels: FastBlurChannels,
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
@@ -183,7 +183,7 @@ fn box_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<u32> + Sync + S
     unsafe_dst: &UnsafeSlice<T>,
     dst_stride: u32,
     height: u32,
-    radius: usize,
+    radius: u32,
     box_channels: FastBlurChannels,
     start_x: u32,
     end_x: u32,
@@ -191,8 +191,8 @@ fn box_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<u32> + Sync + S
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
     let kernel_size = radius * 2 + 1;
-    let kernel_scale = radius * 2;
-    let edge_count = (kernel_size / 2) as u32 + 1;
+    let kernel_scale = 1f32 / (radius * 2) as f32;
+    let edge_count = (kernel_size / 2) + 1;
     let half_kernel = kernel_size / 2;
     let channels_count = match box_channels {
         FastBlurChannels::Channels3 => 3,
@@ -213,8 +213,8 @@ fn box_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<u32> + Sync + S
             }
         }
 
-        for y in 1..std::cmp::min(half_kernel, height as usize) {
-            let y_src_shift = y * src_stride as usize;
+        for y in 1..std::cmp::min(half_kernel, height) {
+            let y_src_shift = y as usize * src_stride as usize;
             kernel[0] += src[y_src_shift + px].into();
             kernel[1] += src[y_src_shift + px + 1].into();
             kernel[2] += src[y_src_shift + px + 2].into();
@@ -228,7 +228,7 @@ fn box_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<u32> + Sync + S
 
         for y in 0..height {
             let next =
-                std::cmp::min(y + half_kernel as u32, height - 1) as usize * src_stride as usize;
+                std::cmp::min(y + half_kernel, height - 1) as usize * src_stride as usize;
             let previous =
                 std::cmp::max(y as i64 - half_kernel as i64, 0) as usize * src_stride as usize;
             let y_dst_shift = dst_stride as usize * y as usize;
@@ -253,22 +253,22 @@ fn box_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<u32> + Sync + S
             unsafe {
                 unsafe_dst.write(
                     y_dst_shift + px + 0,
-                    T::from_usize((kernel[0] + 1) as usize / kernel_scale).unwrap_or_default(),
+                    T::from_f32(kernel[0] as f32 * kernel_scale).unwrap_or_default(),
                 );
                 unsafe_dst.write(
                     y_dst_shift + px + 1,
-                    T::from_usize((kernel[1] + 1) as usize / kernel_scale).unwrap_or_default(),
+                    T::from_f32(kernel[1] as f32 * kernel_scale).unwrap_or_default(),
                 );
                 unsafe_dst.write(
                     y_dst_shift + px + 2,
-                    T::from_usize((kernel[2] + 1) as usize / kernel_scale).unwrap_or_default(),
+                    T::from_f32(kernel[2] as f32 * kernel_scale).unwrap_or_default(),
                 );
                 match box_channels {
                     FastBlurChannels::Channels3 => {}
                     FastBlurChannels::Channels4 => {
                         unsafe_dst.write(
                             y_dst_shift + px + 3,
-                            T::from_usize((kernel[3] + 1) as usize / kernel_scale)
+                            T::from_f32(kernel[3] as f32 * kernel_scale)
                                 .unwrap_or_default(),
                         );
                     }
@@ -285,7 +285,7 @@ fn box_blur_vertical_pass<T: FromPrimitive + Default + Into<u32> + Sync + Send +
     dst_stride: u32,
     width: u32,
     height: u32,
-    radius: usize,
+    radius: u32,
     box_channels: FastBlurChannels,
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
@@ -331,7 +331,7 @@ fn box_blur_impl<T: FromPrimitive + Default + Into<u32> + Sync + Send + Copy>(
     dst_stride: u32,
     width: u32,
     height: u32,
-    radius: usize,
+    radius: u32,
     channels: FastBlurChannels,
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy, {
@@ -368,7 +368,7 @@ pub extern "C" fn box_blur(
     dst_stride: u32,
     width: u32,
     height: u32,
-    radius: usize,
+    radius: u32,
     channels: FastBlurChannels,
 ) {
     box_blur_impl(src, src_stride, dst, dst_stride, width, height, radius, channels);
@@ -383,7 +383,7 @@ pub extern "C" fn box_blur_u16(
     dst_stride: u32,
     width: u32,
     height: u32,
-    radius: usize,
+    radius: u32,
     channels: FastBlurChannels,
 ) {
     box_blur_impl(src, src_stride, dst, dst_stride, width, height, radius, channels);
@@ -396,7 +396,7 @@ fn tent_blur_impl<T: FromPrimitive + Default + Into<u32> + Sync + Send + Copy>(
     dst_stride: u32,
     width: u32,
     height: u32,
-    radius: usize,
+    radius: u32,
     channels: FastBlurChannels,
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy, {
@@ -433,7 +433,7 @@ pub extern "C" fn tent_blur(
     dst_stride: u32,
     width: u32,
     height: u32,
-    radius: usize,
+    radius: u32,
     channels: FastBlurChannels,
 ) {
     tent_blur_impl(src, src_stride, dst, dst_stride, width, height, radius, channels);
@@ -448,7 +448,7 @@ pub extern "C" fn tent_blur_u16(
     dst_stride: u32,
     width: u32,
     height: u32,
-    radius: usize,
+    radius: u32,
     channels: FastBlurChannels,
 ) {
     tent_blur_impl(src, src_stride, dst, dst_stride, width, height, radius, channels);
@@ -461,7 +461,7 @@ fn gaussian_box_blur_impl<T: FromPrimitive + Default + Into<u32> + Sync + Send +
     dst_stride: u32,
     width: u32,
     height: u32,
-    radius: usize,
+    radius: u32,
     box_channels: FastBlurChannels,
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy, {
@@ -510,7 +510,7 @@ pub extern "C" fn gaussian_box_blur(
     dst_stride: u32,
     width: u32,
     height: u32,
-    radius: usize,
+    radius: u32,
     channels: FastBlurChannels,
 ) {
     gaussian_box_blur_impl(src, src_stride, dst, dst_stride, width, height, radius, channels);
@@ -525,7 +525,7 @@ pub extern "C" fn gaussian_box_blur_u16(
     dst_stride: u32,
     width: u32,
     height: u32,
-    radius: usize,
+    radius: u32,
     channels: FastBlurChannels,
 ) {
     gaussian_box_blur_impl(src, src_stride, dst, dst_stride, width, height, radius, channels);

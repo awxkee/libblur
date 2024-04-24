@@ -26,13 +26,15 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::channels_configuration::FastBlurChannels;
+use crate::gaussian_neon::{gaussian_blur_horizontal_pass_impl_neon_3channels_u8, gaussian_blur_vertical_pass_impl_neon_3channels_u8};
 use crate::unsafe_slice::UnsafeSlice;
+use crate::FastBlurChannels::Channels3;
 use num_traits::cast::FromPrimitive;
 use std::thread;
 
-fn get_gaussian_kernel_1d(width: usize, sigma: f32) -> Vec<f32> {
+fn get_gaussian_kernel_1d(width: u32, sigma: f32) -> Vec<f32> {
     let mut sum_norm: f32 = 0f32;
-    let mut kernel: Vec<f32> = Vec::with_capacity(width);
+    let mut kernel: Vec<f32> = Vec::with_capacity(width as usize);
     let scale = 1f32 / (f32::sqrt(2f32 * std::f32::consts::PI) * sigma);
     let mean = (width / 2) as f32;
 
@@ -43,7 +45,7 @@ fn get_gaussian_kernel_1d(width: usize, sigma: f32) -> Vec<f32> {
     }
 
     if sum_norm != 0f32 {
-        for x in 0..width {
+        for x in 0..width as usize {
             kernel[x] = kernel[x] / sum_norm;
         }
     }
@@ -65,6 +67,28 @@ fn gaussian_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<f32> + S
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
+    #[cfg(target_arch = "aarch64")]
+    match gaussian_channels {
+        Channels3 => {
+            if std::any::type_name::<T>() == "u8" {
+                let u8_slice: &Vec<u8> = unsafe { std::mem::transmute(src) };
+                let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
+                gaussian_blur_horizontal_pass_impl_neon_3channels_u8(
+                    u8_slice,
+                    src_stride,
+                    slice,
+                    dst_stride,
+                    width,
+                    kernel_size,
+                    kernel,
+                    start_y,
+                    end_y,
+                );
+            }
+            return;
+        }
+        FastBlurChannels::Channels4 => {}
+    }
     let half_kernel = (kernel_size / 2) as i32;
     let channels_count = match gaussian_channels {
         FastBlurChannels::Channels3 => 3,
@@ -183,6 +207,29 @@ fn gaussian_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<f32> + Sen
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
+    #[cfg(target_arch = "aarch64")]
+    match gaussian_channels {
+        Channels3 => {
+            if std::any::type_name::<T>() == "u8" {
+                let u8_slice: &Vec<u8> = unsafe { std::mem::transmute(src) };
+                let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
+                gaussian_blur_vertical_pass_impl_neon_3channels_u8(
+                    u8_slice,
+                    src_stride,
+                    slice,
+                    dst_stride,
+                    width,
+                    height,
+                    kernel_size,
+                    kernel,
+                    start_y,
+                    end_y,
+                );
+            }
+            return;
+        }
+        FastBlurChannels::Channels4 => {}
+    }
     let half_kernel = (kernel_size / 2) as i32;
     let channels_count = match gaussian_channels {
         FastBlurChannels::Channels3 => 3,
@@ -291,17 +338,21 @@ fn gaussian_blur_impl<T: FromPrimitive + Default + Into<f32> + Send + Sync>(
     dst_stride: u32,
     width: u32,
     height: u32,
-    kernel_size: usize,
+    kernel_size: u32,
     sigma: f32,
     box_channels: FastBlurChannels,
 ) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy, {
+    T: std::ops::AddAssign + std::ops::SubAssign + Copy,
+{
     let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
     if kernel_size % 2 == 0 {
         panic!("kernel size must be odd");
     }
     let mut transient: Vec<T> = Vec::with_capacity(dst_stride as usize * height as usize);
-    transient.resize(dst_stride as usize * height as usize, T::from_u32(0).unwrap_or_default());
+    transient.resize(
+        dst_stride as usize * height as usize,
+        T::from_u32(0).unwrap_or_default(),
+    );
     gaussian_blur_horizontal_pass(
         &src,
         src_stride,
@@ -335,7 +386,7 @@ pub extern "C" fn gaussian_blur(
     dst_stride: u32,
     width: u32,
     height: u32,
-    kernel_size: usize,
+    kernel_size: u32,
     sigma: f32,
     channels: FastBlurChannels,
 ) {
@@ -361,7 +412,7 @@ pub extern "C" fn gaussian_blur_u16(
     dst_stride: u32,
     width: u32,
     height: u32,
-    kernel_size: usize,
+    kernel_size: u32,
     sigma: f32,
     channels: FastBlurChannels,
 ) {

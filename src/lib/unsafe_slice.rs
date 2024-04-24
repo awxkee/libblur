@@ -30,7 +30,7 @@ use std::ops::{Index};
 
 #[derive(Copy, Clone)]
 pub struct UnsafeSlice<'a, T> {
-    slice: &'a [UnsafeCell<T>],
+    pub slice: &'a [UnsafeCell<T>],
 }
 
 unsafe impl<'a, T: Send + Sync> Send for UnsafeSlice<'a, T> {}

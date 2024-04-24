@@ -25,17 +25,17 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use crate::channels_configuration::FastBlurChannels;
 use crate::unsafe_slice::UnsafeSlice;
 use num_traits::cast::FromPrimitive;
 use std::thread;
-use crate::channels_configuration::FastBlurChannels;
 
 fn fast_gaussian_vertical_pass<T: FromPrimitive + Default + Into<i32>>(
     bytes: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
     height: u32,
-    radius: i32,
+    radius: u32,
     start: u32,
     end: u32,
     channels: FastBlurChannels,
@@ -54,11 +54,11 @@ fn fast_gaussian_vertical_pass<T: FromPrimitive + Default + Into<i32>>(
     };
     for x in start..std::cmp::min(width, end) {
         let mut dif_r: i32 = 0;
-        let mut sum_r: i32 = (radius * radius) >> 1;
+        let mut sum_r: i32 = ((radius * radius) >> 1) as i32;
         let mut dif_g: i32 = 0;
-        let mut sum_g: i32 = (radius * radius) >> 1;
+        let mut sum_g: i32 = ((radius * radius) >> 1) as i32;
         let mut dif_b: i32 = 0;
-        let mut sum_b: i32 = (radius * radius) >> 1;
+        let mut sum_b: i32 = ((radius * radius) >> 1) as i32;
 
         let current_px = (x * channels_count) as usize;
 
@@ -121,7 +121,7 @@ fn fast_gaussian_horizontal_pass<T: FromPrimitive + Default + Into<i32> + Send +
     stride: u32,
     width: u32,
     height: u32,
-    radius: i32,
+    radius: u32,
     start: u32,
     end: u32,
     channels: FastBlurChannels,
@@ -140,11 +140,11 @@ fn fast_gaussian_horizontal_pass<T: FromPrimitive + Default + Into<i32> + Send +
     };
     for y in start..std::cmp::min(height, end) {
         let mut dif_r: i32 = 0;
-        let mut sum_r: i32 = (radius * radius) >> 1;
+        let mut sum_r: i32 = ((radius * radius) >> 1) as i32;
         let mut dif_g: i32 = 0;
-        let mut sum_g: i32 = (radius * radius) >> 1;
+        let mut sum_g: i32 = ((radius * radius) >> 1) as i32;
         let mut dif_b: i32 = 0;
-        let mut sum_b: i32 = (radius * radius) >> 1;
+        let mut sum_b: i32 = ((radius * radius) >> 1) as i32;
 
         let current_y = ((y as i64) * (stride as i64)) as usize;
 
@@ -204,10 +204,10 @@ fn fast_gaussian_impl<T: FromPrimitive + Default + Into<i32> + Send + Sync>(
     stride: u32,
     width: u32,
     height: u32,
-    radius: i32,
+    radius: u32,
     channels: FastBlurChannels,
 ) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy
+    T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
     let acq_radius = std::cmp::min(radius, 256);
     if radius <= 0 {
@@ -256,7 +256,14 @@ fn fast_gaussian_impl<T: FromPrimitive + Default + Into<i32> + Send + Sync>(
             }
             let handle = scope.spawn(move || {
                 fast_gaussian_horizontal_pass(
-                    &unsafe_image, stride, width, height, acq_radius, start_y, end_y, channels,
+                    &unsafe_image,
+                    stride,
+                    width,
+                    height,
+                    acq_radius,
+                    start_y,
+                    end_y,
+                    channels,
                 );
             });
             handles.push(handle);
@@ -274,7 +281,7 @@ pub extern "C" fn fast_gaussian(
     stride: u32,
     width: u32,
     height: u32,
-    radius: i32,
+    radius: u32,
     channels: FastBlurChannels,
 ) {
     fast_gaussian_impl(bytes, stride, width, height, radius, channels);
@@ -287,7 +294,7 @@ pub extern "C" fn fast_gaussian_u16(
     stride: u32,
     width: u32,
     height: u32,
-    radius: i32,
+    radius: u32,
     channels: FastBlurChannels,
 ) {
     fast_gaussian_impl(bytes, stride, width, height, radius, channels);

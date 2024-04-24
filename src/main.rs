@@ -28,8 +28,8 @@ fn main() {
         dimensions.0 * 3,
         dimensions.0,
         dimensions.1,
-        151,
-        151f32 / 3f32,
+        121,
+        121f32 / 6f32,
         FastBlurChannels::Channels3,
     );
     // fastblur::median_blur(
@@ -42,7 +42,7 @@ fn main() {
     //     175,
     //     FastBlurChannels::Channels3,
     // );
-    // fastblur::tent_blur(&bytes, dimensions.0 * 3, &mut dst_bytes, dimensions.0 * 3, dimensions.0, dimensions.1, 71, FastBlurChannels::Channels3);
+    // libblur::tent_blur(&bytes, dimensions.0 * 3, &mut dst_bytes, dimensions.0 * 3, dimensions.0, dimensions.1, 71, FastBlurChannels::Channels3);
 
     let elapsed_time = start_time.elapsed();
     // Print the elapsed time in milliseconds
