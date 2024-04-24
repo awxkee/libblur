@@ -1,4 +1,5 @@
 use crate::unsafe_slice::UnsafeSlice;
+#[cfg(target_arch = "aarch64")]
 use std::arch::aarch64::{
     float32x4_t, uint8x8_t, vaddq_f32, vcombine_u16, vcvtq_f32_u32, vcvtq_u32_f32, vdupq_n_f32,
     vget_low_u16, vld1_u8, vld1q_f32, vmovl_u16, vmovl_u8, vmulq_f32, vqmovn_u16, vqmovn_u32,

@@ -70,6 +70,7 @@ fn gaussian_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<f32> + S
     #[cfg(target_arch = "aarch64")]
     match gaussian_channels {
         Channels3 => {
+            #[cfg(target_arch = "aarch64")]
             if std::any::type_name::<T>() == "u8" {
                 let u8_slice: &Vec<u8> = unsafe { std::mem::transmute(src) };
                 let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
@@ -210,6 +211,7 @@ fn gaussian_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<f32> + Sen
     #[cfg(target_arch = "aarch64")]
     match gaussian_channels {
         Channels3 => {
+            #[cfg(target_arch = "aarch64")]
             if std::any::type_name::<T>() == "u8" {
                 let u8_slice: &Vec<u8> = unsafe { std::mem::transmute(src) };
                 let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
