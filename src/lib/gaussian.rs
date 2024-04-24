@@ -69,11 +69,11 @@ fn gaussian_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<f32> + S
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
-    #[cfg(target_arch = "aarch64")]
-    {
-        match gaussian_channels {
-            Channels3 => {
-                if std::any::type_name::<T>() == "u8" {
+    if std::mem::size_of::<T>() == std::mem::size_of::<u8>() {
+        #[cfg(target_arch = "aarch64")]
+        {
+            match gaussian_channels {
+                Channels3 => {
                     let u8_slice: &Vec<u8> = unsafe { std::mem::transmute(src) };
                     let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
                     neon_support::gaussian_blur_horizontal_pass_impl_neon_3channels_u8(
@@ -87,10 +87,25 @@ fn gaussian_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<f32> + S
                         start_y,
                         end_y,
                     );
+                    return;
                 }
-                return;
+                FastBlurChannels::Channels4 => {
+                    let u8_slice: &Vec<u8> = unsafe { std::mem::transmute(src) };
+                    let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
+                    neon_support::gaussian_blur_horizontal_pass_impl_neon_4channels_u8(
+                        u8_slice,
+                        src_stride,
+                        slice,
+                        dst_stride,
+                        width,
+                        kernel_size,
+                        kernel,
+                        start_y,
+                        end_y,
+                    );
+                    return;
+                }
             }
-            FastBlurChannels::Channels4 => {}
         }
     }
     let half_kernel = (kernel_size / 2) as i32;
@@ -211,11 +226,11 @@ fn gaussian_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<f32> + Sen
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
-    #[cfg(target_arch = "aarch64")]
-    {
-        match gaussian_channels {
-            Channels3 => {
-                if std::any::type_name::<T>() == "u8" {
+    if std::mem::size_of::<T>() == std::mem::size_of::<u8>() {
+        #[cfg(target_arch = "aarch64")]
+        {
+            match gaussian_channels {
+                Channels3 => {
                     let u8_slice: &Vec<u8> = unsafe { std::mem::transmute(src) };
                     let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
                     neon_support::gaussian_blur_vertical_pass_impl_neon_3channels_u8(
@@ -230,10 +245,26 @@ fn gaussian_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<f32> + Sen
                         start_y,
                         end_y,
                     );
+                    return;
                 }
-                return;
+                FastBlurChannels::Channels4 => {
+                    let u8_slice: &Vec<u8> = unsafe { std::mem::transmute(src) };
+                    let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
+                    neon_support::gaussian_blur_vertical_pass_impl_neon_4channels_u8(
+                        u8_slice,
+                        src_stride,
+                        slice,
+                        dst_stride,
+                        width,
+                        height,
+                        kernel_size,
+                        kernel,
+                        start_y,
+                        end_y,
+                    );
+                    return;
+                }
             }
-            FastBlurChannels::Channels4 => {}
         }
     }
     let half_kernel = (kernel_size / 2) as i32;
