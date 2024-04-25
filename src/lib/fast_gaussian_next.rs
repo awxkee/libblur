@@ -65,7 +65,7 @@ fn fast_gaussian_next_vertical_pass<T: FromPrimitive + Default + Into<i32>>(
 
         let current_px = (x * channels_count) as usize;
 
-        let start_y = (0 - 3 * radius) as i64;
+        let start_y = 0 - 3 * radius as i64;
         for y in start_y..height_wide {
             let current_y = (y * (stride as i64)) as usize;
             if y >= 0 {
@@ -205,7 +205,7 @@ fn fast_gaussian_next_horizontal_pass<T: FromPrimitive + Default + Into<i32> + S
             }
 
             let next_row_y = (y as usize) * (stride as usize);
-            let next_row_x = ((std::cmp::min(std::cmp::max(x + radius_64, 0), width_wide - 1)
+            let next_row_x = ((std::cmp::min(std::cmp::max(x + 3 * radius_64 / 2, 0), width_wide - 1)
                 as u32)
                 * channels_count) as usize;
 

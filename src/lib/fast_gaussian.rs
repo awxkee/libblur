@@ -62,7 +62,7 @@ fn fast_gaussian_vertical_pass<T: FromPrimitive + Default + Into<i32>>(
 
         let current_px = (x * channels_count) as usize;
 
-        let start_y = (0 - 2 * radius) as i64;
+        let start_y = 0 - 2 * radius as i64;
         for y in start_y..height_wide {
             let current_y = (y * (stride as i64)) as usize;
             if y >= 0 {
@@ -148,7 +148,8 @@ fn fast_gaussian_horizontal_pass<T: FromPrimitive + Default + Into<i32> + Send +
 
         let current_y = ((y as i64) * (stride as i64)) as usize;
 
-        for x in (0 - 2 * radius_64)..(width as i64) {
+        let start_x = 0 - 2 * radius_64;
+        for x in start_x..(width as i64) {
             if x >= 0 {
                 let current_px = ((std::cmp::max(x, 0) as u32) * channels_count) as usize;
                 let new_r = T::from_u32(((sum_r as f32) * weight) as u32).unwrap_or_default();

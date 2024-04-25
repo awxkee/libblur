@@ -21,7 +21,7 @@ fn main() {
     let mut dst_bytes: Vec<u8> = Vec::with_capacity(dimensions.1 as usize * stride);
     dst_bytes.resize(dimensions.1 as usize * stride, 0);
     let start_time = Instant::now();
-    // libblur::fast_gaussian_next(&mut bytes, dimensions.0 * 3, dimensions.0, dimensions.1, 125, FastBlurChannels::Channels3);
+    // libblur::fast_gaussian(&mut bytes, stride as u32, dimensions.0, dimensions.1, 175, FastBlurChannels::Channels3);
     // libblur::gaussian_blur(
     //     &bytes,
     //     stride as u32,
@@ -40,10 +40,10 @@ fn main() {
     //     stride as u32,
     //     dimensions.0,
     //     dimensions.1,
-    //     15,
-    //     FastBlurChannels::Channels4,
+    //     36,
+    //     FastBlurChannels::Channels3,
     // );
-    libblur::gaussian_box_blur(&bytes, stride as u32, &mut dst_bytes, stride as u32, dimensions.0, dimensions.1, 36, FastBlurChannels::Channels3);
+    libblur::gaussian_box_blur(&bytes, stride as u32, &mut dst_bytes, stride as u32, dimensions.0, dimensions.1, 128, FastBlurChannels::Channels3);
 
     let elapsed_time = start_time.elapsed();
     // Print the elapsed time in milliseconds
