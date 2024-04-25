@@ -31,6 +31,7 @@ use crate::unsafe_slice::UnsafeSlice;
 use num_traits::cast::FromPrimitive;
 use std::thread;
 
+#[allow(unused_imports)]
 fn box_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<u32> + Send + Sync>(
     src: &Vec<T>,
     src_stride: u32,
@@ -196,6 +197,7 @@ fn box_blur_horizontal_pass<T: FromPrimitive + Default + Into<u32> + Send + Sync
     });
 }
 
+#[allow(unused_imports)]
 fn box_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<u32> + Sync + Send + Copy>(
     src: &Vec<T>,
     src_stride: u32,
