@@ -41,7 +41,7 @@ Faster than stack blur.
 O(1) complexity.
 
 ```rust
-libblur::fast_gaussian_next(& mut bytes, stride, width0, height, radius, FastBlurChannels::Channels3);
+libblur::fast_gaussian_next(& mut bytes, stride, width, height, radius, FastBlurChannels::Channels3);
 ```
 
 ### Tent blur

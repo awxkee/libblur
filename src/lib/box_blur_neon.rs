@@ -28,10 +28,14 @@
 #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
 #[cfg(target_feature = "neon")]
 pub mod neon_support {
+    use crate::neon_utils::neon_utils::{load_u8_u16, load_u8_u32};
     use crate::unsafe_slice::UnsafeSlice;
-    use std::arch::aarch64::{uint32x4_t, vaddq_u32, vcombine_u16, vcvtq_f32_u32, vcvtq_u32_f32, vdupq_n_f32, vdupq_n_u32, vget_low_u16, vld1_u8, vld1q_u32, vmovl_u16, vmovl_u8, vmulq_f32, vmulq_u32, vqmovn_u16, vqmovn_u32, vst1_u8, vsubq_u32};
-    use std::ptr;
     use crate::FastBlurChannels;
+    use std::arch::aarch64::{
+        uint32x4_t, vaddw_u16, vcombine_u16, vcvtq_f32_u32, vcvtq_u32_f32, vdupq_n_f32,
+        vdupq_n_u32, vld1q_u32, vmulq_f32, vmulq_u32, vqmovn_u16, vqmovn_u32, vst1_u8,
+        vsubw_u16,
+    };
 
     #[allow(dead_code)]
     pub(crate) fn box_blur_horizontal_pass_4channels_u8_impl(
@@ -46,8 +50,8 @@ pub mod neon_support {
         channels: FastBlurChannels,
     ) {
         let safe_pixel_count_x = match channels {
-            FastBlurChannels::Channels3 => { 3 }
-            FastBlurChannels::Channels4 => { 2 }
+            FastBlurChannels::Channels3 => 3,
+            FastBlurChannels::Channels4 => 2,
         };
 
         let eraser_store: [u32; 4] = [1u32, 1u32, 1u32, 0u32];
@@ -62,8 +66,8 @@ pub mod neon_support {
         let mut safe_transient_store: [u8; 8] = [0; 8];
 
         let channels_count: u32 = match channels {
-            FastBlurChannels::Channels3 => { 3 }
-            FastBlurChannels::Channels4 => { 4 }
+            FastBlurChannels::Channels3 => 3,
+            FastBlurChannels::Channels4 => 4,
         };
         let half_kernel = kernel_size / 2;
 
@@ -73,44 +77,21 @@ pub mod neon_support {
 
             let mut store: uint32x4_t;
             {
-                let edge_wh_ptr: *const u8;
                 let s_ptr = unsafe { src.as_ptr().add(y_src_shift) };
-                if safe_pixel_count_x < width {
-                    edge_wh_ptr = s_ptr;
-                } else {
-                    unsafe {
-                        ptr::copy_nonoverlapping(
-                            s_ptr,
-                            safe_transient_store.as_mut_ptr(),
-                            channels_count as usize,
-                        );
-                    }
-                    edge_wh_ptr = safe_transient_store.as_ptr();
-                }
                 let edge_colors =
-                    unsafe { vmovl_u16(vget_low_u16(vmovl_u8(vld1_u8(edge_wh_ptr)))) };
+                    load_u8_u32(s_ptr, safe_pixel_count_x < width, channels_count as usize);
                 store = unsafe { vmulq_u32(edge_colors, v_edge_count) };
             }
 
             for x in 1..std::cmp::min(half_kernel, width) {
                 let px = x as usize * channels_count as usize;
-                let edge_wh_ptr: *const u8;
                 let s_ptr = unsafe { src.as_ptr().add(y_src_shift + px) };
-                if safe_pixel_count_x < width {
-                    edge_wh_ptr = s_ptr;
-                } else {
-                    unsafe {
-                        ptr::copy_nonoverlapping(
-                            s_ptr,
-                            safe_transient_store.as_mut_ptr(),
-                            channels_count as usize,
-                        );
-                    }
-                    edge_wh_ptr = safe_transient_store.as_ptr();
-                }
-                let edge_colors =
-                    unsafe { vmovl_u16(vget_low_u16(vmovl_u8(vld1_u8(edge_wh_ptr)))) };
-                store = unsafe { vaddq_u32(store, edge_colors) };
+                let edge_colors = load_u8_u16(
+                    s_ptr,
+                    x + safe_pixel_count_x < width,
+                    channels_count as usize,
+                );
+                store = unsafe { vaddw_u16(store, edge_colors) };
             }
 
             for x in 0..width {
@@ -124,44 +105,24 @@ pub mod neon_support {
 
                 // subtract previous
                 {
-                    let edge_wh_ptr: *const u8;
                     let s_ptr = unsafe { src.as_ptr().add(y_src_shift + previous) };
-                    if x + safe_pixel_count_x < width {
-                        edge_wh_ptr = s_ptr;
-                    } else {
-                        unsafe {
-                            ptr::copy_nonoverlapping(
-                                s_ptr,
-                                safe_transient_store.as_mut_ptr(),
-                                channels_count as usize,
-                            );
-                        }
-                        edge_wh_ptr = safe_transient_store.as_ptr();
-                    }
-                    let edge_colors =
-                        unsafe { vmovl_u16(vget_low_u16(vmovl_u8(vld1_u8(edge_wh_ptr)))) };
-                    store = unsafe { vsubq_u32(store, edge_colors) };
+                    let edge_colors = load_u8_u16(
+                        s_ptr,
+                        x + safe_pixel_count_x < width,
+                        channels_count as usize,
+                    );
+                    store = unsafe { vsubw_u16(store, edge_colors) };
                 }
 
                 // add next
                 {
-                    let edge_wh_ptr: *const u8;
                     let s_ptr = unsafe { src.as_ptr().add(y_src_shift + next) };
-                    if x + safe_pixel_count_x < width {
-                        edge_wh_ptr = s_ptr;
-                    } else {
-                        unsafe {
-                            ptr::copy_nonoverlapping(
-                                s_ptr,
-                                safe_transient_store.as_mut_ptr(),
-                                channels_count as usize,
-                            );
-                        }
-                        edge_wh_ptr = safe_transient_store.as_ptr();
-                    }
-                    let edge_colors =
-                        unsafe { vmovl_u16(vget_low_u16(vmovl_u8(vld1_u8(edge_wh_ptr)))) };
-                    store = unsafe { vaddq_u32(store, edge_colors) };
+                    let edge_colors = load_u8_u16(
+                        s_ptr,
+                        x + safe_pixel_count_x < width,
+                        channels_count as usize,
+                    );
+                    store = unsafe { vaddw_u16(store, edge_colors) };
                 }
 
                 let px = x as usize * channels_count as usize;
@@ -217,8 +178,8 @@ pub mod neon_support {
         channels: FastBlurChannels,
     ) {
         let safe_pixel_count_x = match channels {
-            FastBlurChannels::Channels3 => { 3 }
-            FastBlurChannels::Channels4 => { 2 }
+            FastBlurChannels::Channels3 => 3,
+            FastBlurChannels::Channels4 => 2,
         };
 
         let eraser_store: [u32; 4] = [1u32, 1u32, 1u32, 0u32];
@@ -233,8 +194,8 @@ pub mod neon_support {
         let mut safe_transient_store: [u8; 8] = [0; 8];
 
         let channels_count: u32 = match channels {
-            FastBlurChannels::Channels3 => { 3 }
-            FastBlurChannels::Channels4 => { 4 }
+            FastBlurChannels::Channels3 => 3,
+            FastBlurChannels::Channels4 => 4,
         };
         let half_kernel = kernel_size / 2;
 
@@ -243,44 +204,21 @@ pub mod neon_support {
 
             let mut store: uint32x4_t;
             {
-                let edge_wh_ptr: *const u8;
                 let s_ptr = unsafe { src.as_ptr().add(px) };
-                if safe_pixel_count_x < width {
-                    edge_wh_ptr = s_ptr;
-                } else {
-                    unsafe {
-                        ptr::copy_nonoverlapping(
-                            s_ptr,
-                            safe_transient_store.as_mut_ptr(),
-                            channels_count as usize,
-                        );
-                    }
-                    edge_wh_ptr = safe_transient_store.as_ptr();
-                }
                 let edge_colors =
-                    unsafe { vmovl_u16(vget_low_u16(vmovl_u8(vld1_u8(edge_wh_ptr)))) };
+                    load_u8_u32(s_ptr, safe_pixel_count_x < width, channels_count as usize);
                 store = unsafe { vmulq_u32(edge_colors, v_edge_count) };
             }
 
             for y in 1..std::cmp::min(half_kernel, height) {
                 let y_src_shift = y as usize * src_stride as usize;
-                let edge_wh_ptr: *const u8;
                 let s_ptr = unsafe { src.as_ptr().add(y_src_shift + px) };
-                if safe_pixel_count_x < width {
-                    edge_wh_ptr = s_ptr;
-                } else {
-                    unsafe {
-                        ptr::copy_nonoverlapping(
-                            s_ptr,
-                            safe_transient_store.as_mut_ptr(),
-                            channels_count as usize,
-                        );
-                    }
-                    edge_wh_ptr = safe_transient_store.as_ptr();
-                }
-                let edge_colors =
-                    unsafe { vmovl_u16(vget_low_u16(vmovl_u8(vld1_u8(edge_wh_ptr)))) };
-                store = unsafe { vaddq_u32(store, edge_colors) };
+                let edge_colors = load_u8_u16(
+                    s_ptr,
+                    x + safe_pixel_count_x < width,
+                    channels_count as usize,
+                );
+                store = unsafe { vaddw_u16(store, edge_colors) };
             }
 
             for y in 0..height {
@@ -293,44 +231,24 @@ pub mod neon_support {
 
                 // subtract previous
                 {
-                    let edge_wh_ptr: *const u8;
                     let s_ptr = unsafe { src.as_ptr().add(previous + px) };
-                    if x + safe_pixel_count_x < width {
-                        edge_wh_ptr = s_ptr;
-                    } else {
-                        unsafe {
-                            ptr::copy_nonoverlapping(
-                                s_ptr,
-                                safe_transient_store.as_mut_ptr(),
-                                channels_count as usize,
-                            );
-                        }
-                        edge_wh_ptr = safe_transient_store.as_ptr();
-                    }
-                    let edge_colors =
-                        unsafe { vmovl_u16(vget_low_u16(vmovl_u8(vld1_u8(edge_wh_ptr)))) };
-                    store = unsafe { vsubq_u32(store, edge_colors) };
+                    let edge_colors = load_u8_u16(
+                        s_ptr,
+                        x + safe_pixel_count_x < width,
+                        channels_count as usize,
+                    );
+                    store = unsafe { vsubw_u16(store, edge_colors) };
                 }
 
                 // add next
                 {
-                    let edge_wh_ptr: *const u8;
                     let s_ptr = unsafe { src.as_ptr().add(next + px) };
-                    if x + safe_pixel_count_x < width {
-                        edge_wh_ptr = s_ptr;
-                    } else {
-                        unsafe {
-                            ptr::copy_nonoverlapping(
-                                s_ptr,
-                                safe_transient_store.as_mut_ptr(),
-                                channels_count as usize,
-                            );
-                        }
-                        edge_wh_ptr = safe_transient_store.as_ptr();
-                    }
-                    let edge_colors =
-                        unsafe { vmovl_u16(vget_low_u16(vmovl_u8(vld1_u8(edge_wh_ptr)))) };
-                    store = unsafe { vaddq_u32(store, edge_colors) };
+                    let edge_colors = load_u8_u16(
+                        s_ptr,
+                        x + safe_pixel_count_x < width,
+                        channels_count as usize,
+                    );
+                    store = unsafe { vaddw_u16(store, edge_colors) };
                 }
 
                 let px = x as usize * channels_count as usize;
@@ -392,7 +310,8 @@ pub mod neon_support {
         _start_y: u32,
         _end_y: u32,
         _channels: FastBlurChannels,
-    ) {}
+    ) {
+    }
 
     #[allow(dead_code)]
     pub(crate) fn box_blur_vertical_pass_4channels_u8_impl(
@@ -406,5 +325,6 @@ pub mod neon_support {
         _start_y: u32,
         _end_y: u32,
         _channels: FastBlurChannels,
-    ) {}
+    ) {
+    }
 }

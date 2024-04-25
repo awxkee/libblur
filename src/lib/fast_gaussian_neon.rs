@@ -28,15 +28,14 @@
 #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
 #[cfg(target_feature = "neon")]
 pub mod neon_support {
+    use crate::neon_utils::neon_utils::load_u8_s32;
     use crate::unsafe_slice::UnsafeSlice;
     use crate::FastBlurChannels;
     use std::arch::aarch64::{
         int32x4_t, vaddq_s32, vcombine_u16, vcvtq_f32_s32, vcvtq_s32_f32, vdupq_n_f32, vdupq_n_s32,
-        vget_lane_u8, vget_low_u16, vld1_u8, vld1q_s32, vmovl_u16, vmovl_u8, vmulq_f32, vqaddq_s32,
-        vqmovn_u16, vqmovun_s32, vreinterpretq_s32_u32, vrndq_f32, vshlq_n_s32, vst1q_s32,
-        vsubq_s32,
+        vget_lane_u8, vld1q_s32, vmulq_f32, vqaddq_s32, vqmovn_u16, vqmovun_s32, vrndq_f32,
+        vshlq_n_s32, vst1q_s32, vsubq_s32,
     };
-    use std::ptr;
 
     pub(crate) fn fast_gaussian_horizontal_pass_neon_u8(
         bytes: &UnsafeSlice<u8>,
@@ -49,7 +48,6 @@ pub mod neon_support {
         channels: FastBlurChannels,
     ) {
         let mut buffer: [[i32; 4]; 1024] = [[0; 4]; 1024];
-        let mut safe_transient_store: [u8; 8] = [0; 8];
         let initial_sum = ((radius * radius) >> 1) as i32;
 
         let safe_pixel_count_x = match channels {
@@ -117,23 +115,12 @@ pub mod neon_support {
                     as u32)
                     * channels_count) as usize;
 
-                let edge_wh_ptr: *const u8;
                 let s_ptr = unsafe { bytes.slice.as_ptr().add(next_row_y + next_row_x) as *mut u8 };
-                if x + safe_pixel_count_x < width as i64 {
-                    edge_wh_ptr = s_ptr;
-                } else {
-                    unsafe {
-                        ptr::copy_nonoverlapping(
-                            s_ptr,
-                            safe_transient_store.as_mut_ptr(),
-                            channels_count as usize,
-                        );
-                    }
-                    edge_wh_ptr = safe_transient_store.as_ptr();
-                }
-                let pixel_color = unsafe {
-                    vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(vmovl_u8(vld1_u8(edge_wh_ptr)))))
-                };
+                let pixel_color = load_u8_s32(
+                    s_ptr,
+                    x + safe_pixel_count_x < width as i64,
+                    channels_count as usize,
+                );
 
                 let arr_index = ((x + radius_64) & 1023) as usize;
                 let buf_ptr = buffer[arr_index].as_mut_ptr();
@@ -158,7 +145,6 @@ pub mod neon_support {
         channels: FastBlurChannels,
     ) {
         let mut buffer: [[i32; 4]; 1024] = [[0; 4]; 1024];
-        let mut safe_transient_store: [u8; 8] = [0; 8];
         let initial_sum = ((radius * radius) >> 1) as i32;
 
         let safe_pixel_count_x = match channels {
@@ -181,7 +167,6 @@ pub mod neon_support {
 
             let start_y = 0 - 2 * radius as i64;
             for y in start_y..height_wide {
-
                 let current_y = (y * (stride as i64)) as usize;
 
                 if y >= 0 {
@@ -228,23 +213,12 @@ pub mod neon_support {
                     * (stride as usize);
                 let next_row_x = (x * channels_count) as usize;
 
-                let edge_wh_ptr: *const u8;
                 let s_ptr = unsafe { bytes.slice.as_ptr().add(next_row_y + next_row_x) as *mut u8 };
-                if x as i64 + safe_pixel_count_x < width as i64 {
-                    edge_wh_ptr = s_ptr;
-                } else {
-                    unsafe {
-                        ptr::copy_nonoverlapping(
-                            s_ptr,
-                            safe_transient_store.as_mut_ptr(),
-                            channels_count as usize,
-                        );
-                    }
-                    edge_wh_ptr = safe_transient_store.as_ptr();
-                }
-                let pixel_color = unsafe {
-                    vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(vmovl_u8(vld1_u8(edge_wh_ptr)))))
-                };
+                let pixel_color = load_u8_s32(
+                    s_ptr,
+                    x as i64 + safe_pixel_count_x < width as i64,
+                    channels_count as usize,
+                );
 
                 let arr_index = ((y + radius_64) & 1023) as usize;
                 let buf_ptr = buffer[arr_index].as_mut_ptr();
