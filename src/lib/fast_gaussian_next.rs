@@ -28,7 +28,6 @@
 use crate::unsafe_slice::UnsafeSlice;
 use crate::FastBlurChannels;
 use num_traits::FromPrimitive;
-use std::thread;
 #[allow(unused_imports)]
 use crate::fast_gaussian_next_neon::neon_support;
 
@@ -282,18 +281,19 @@ fn fast_gaussian_next_impl<T: FromPrimitive + Default + Into<i32> + Send + Sync>
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
     let thread_count = std::cmp::max(std::cmp::min(width * height / (256 * 256), 12), 1);
+    let pool = rayon::ThreadPoolBuilder::new().num_threads(thread_count as usize).build().unwrap();
+
     let unsafe_image = UnsafeSlice::new(bytes);
-    thread::scope(|scope| {
+    pool.scope(|scope| {
         let segment_size = width / thread_count;
 
-        let mut handles = vec![];
         for i in 0..thread_count {
             let start_x = i * segment_size;
             let mut end_x = (i + 1) * segment_size;
             if i == thread_count - 1 {
                 end_x = width;
             }
-            let handle = scope.spawn(move || {
+            scope.spawn(move |_| {
                 fast_gaussian_next_vertical_pass(
                     &unsafe_image,
                     stride,
@@ -305,24 +305,19 @@ fn fast_gaussian_next_impl<T: FromPrimitive + Default + Into<i32> + Send + Sync>
                     channels,
                 );
             });
-            handles.push(handle);
-        }
-        for handle in handles {
-            handle.join().unwrap();
         }
     });
 
-    thread::scope(|scope| {
+    pool.scope(|scope| {
         let segment_size = height / thread_count;
 
-        let mut handles = vec![];
         for i in 0..thread_count {
             let start_y = i * segment_size;
             let mut end_y = (i + 1) * segment_size;
             if i == thread_count - 1 {
                 end_y = height;
             }
-            let handle = scope.spawn(move || {
+            scope.spawn(move |_| {
                 fast_gaussian_next_horizontal_pass(
                     &unsafe_image,
                     stride,
@@ -334,10 +329,6 @@ fn fast_gaussian_next_impl<T: FromPrimitive + Default + Into<i32> + Send + Sync>
                     channels,
                 );
             });
-            handles.push(handle);
-        }
-        for handle in handles {
-            handle.join().unwrap();
         }
     });
 }

@@ -27,7 +27,6 @@
 
 use crate::channels_configuration::FastBlurChannels;
 use crate::unsafe_slice::UnsafeSlice;
-use std::thread;
 
 struct MedianHistogram {
     r: [i32; 256],
@@ -278,17 +277,17 @@ pub extern "C" fn median_blur(
     median_channels: FastBlurChannels,
 ) {
     let unsafe_dst = UnsafeSlice::new(dst);
-    thread::scope(|scope| {
-        let thread_count = std::cmp::max(std::cmp::min(width * height / (256 * 256), 12), 1);
+    let thread_count = std::cmp::max(std::cmp::min(width * height / (256 * 256), 12), 1);
+    let pool = rayon::ThreadPoolBuilder::new().num_threads(thread_count as usize).build().unwrap();
+    pool.scope(|scope| {
         let segment_size = height / thread_count;
-        let mut handles = vec![];
         for i in 0..thread_count {
             let start_y = i * segment_size;
             let mut end_y = (i + 1) * segment_size;
             if i == thread_count - 1 {
                 end_y = height;
             }
-            let handle = scope.spawn(move || {
+            scope.spawn(move |_| {
                 median_blur_impl(
                     src,
                     src_stride,
@@ -302,10 +301,6 @@ pub extern "C" fn median_blur(
                     end_y,
                 );
             });
-            handles.push(handle);
-        }
-        for handle in handles {
-            handle.join().unwrap();
         }
     });
 }

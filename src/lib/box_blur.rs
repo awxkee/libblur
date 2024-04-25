@@ -30,7 +30,7 @@ use crate::box_blur_neon::neon_support;
 use crate::channels_configuration::FastBlurChannels;
 use crate::unsafe_slice::UnsafeSlice;
 use num_traits::cast::FromPrimitive;
-use std::thread;
+use rayon::ThreadPool;
 
 #[allow(unused_variables)]
 #[allow(unused_imports)]
@@ -164,14 +164,14 @@ fn box_blur_horizontal_pass<T: FromPrimitive + Default + Into<u32> + Send + Sync
     height: u32,
     radius: u32,
     box_channels: FastBlurChannels,
+    pool: &ThreadPool,
+    thread_count: u32,
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
     let unsafe_dst = UnsafeSlice::new(dst);
-    thread::scope(|scope| {
-        let thread_count = std::cmp::max(std::cmp::min(width * height / (256 * 256), 12), 1);
+    pool.scope(|scope| {
         let segment_size = height / thread_count;
-        let mut handles = vec![];
         for i in 0..thread_count {
             let start_y = i * segment_size;
             let mut end_y = (i + 1) * segment_size;
@@ -179,7 +179,7 @@ fn box_blur_horizontal_pass<T: FromPrimitive + Default + Into<u32> + Send + Sync
                 end_y = height;
             }
 
-            let handle = scope.spawn(move || {
+            scope.spawn(move |_| {
                 box_blur_horizontal_pass_impl(
                     src,
                     src_stride,
@@ -192,10 +192,6 @@ fn box_blur_horizontal_pass<T: FromPrimitive + Default + Into<u32> + Send + Sync
                     end_y,
                 );
             });
-            handles.push(handle);
-        }
-        for handle in handles {
-            handle.join().unwrap();
         }
     });
 }
@@ -332,15 +328,15 @@ fn box_blur_vertical_pass<T: FromPrimitive + Default + Into<u32> + Sync + Send +
     height: u32,
     radius: u32,
     box_channels: FastBlurChannels,
+    pool: &ThreadPool,
+    thread_count: u32,
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
     let unsafe_dst = UnsafeSlice::new(dst);
 
-    thread::scope(|scope| {
-        let thread_count = std::cmp::max(std::cmp::min(width * height / (256 * 256), 12), 1);
+    pool.scope(|scope| {
         let segment_size = width / thread_count;
-        let mut handles = vec![];
         for i in 0..thread_count {
             let start_x = i * segment_size;
             let mut end_x = (i + 1) * segment_size;
@@ -348,7 +344,7 @@ fn box_blur_vertical_pass<T: FromPrimitive + Default + Into<u32> + Sync + Send +
                 end_x = width;
             }
 
-            let handle = scope.spawn(move || {
+            scope.spawn(move |_| {
                 box_blur_vertical_pass_impl(
                     src,
                     src_stride,
@@ -362,10 +358,6 @@ fn box_blur_vertical_pass<T: FromPrimitive + Default + Into<u32> + Sync + Send +
                     end_x,
                 );
             });
-            handles.push(handle);
-        }
-        for handle in handles {
-            handle.join().unwrap();
         }
     });
 }
@@ -379,6 +371,8 @@ fn box_blur_impl<T: FromPrimitive + Default + Into<u32> + Sync + Send + Copy>(
     height: u32,
     radius: u32,
     channels: FastBlurChannels,
+    pool: &ThreadPool,
+    thread_count: u32,
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
@@ -396,9 +390,13 @@ fn box_blur_impl<T: FromPrimitive + Default + Into<u32> + Sync + Send + Copy>(
         height,
         radius,
         channels,
+        pool,
+        thread_count,
     );
     box_blur_vertical_pass(
         &transient, src_stride, dst, dst_stride, width, height, radius, channels,
+        pool,
+        thread_count,
     );
 }
 
@@ -414,8 +412,10 @@ pub extern "C" fn box_blur(
     radius: u32,
     channels: FastBlurChannels,
 ) {
+    let thread_count = std::cmp::max(std::cmp::min(width * height / (256 * 256), 12), 1);
+    let pool = rayon::ThreadPoolBuilder::new().num_threads(thread_count as usize).build().unwrap();
     box_blur_impl(
-        src, src_stride, dst, dst_stride, width, height, radius, channels,
+        src, src_stride, dst, dst_stride, width, height, radius, channels, &pool, thread_count,
     );
 }
 
@@ -431,8 +431,10 @@ pub extern "C" fn box_blur_u16(
     radius: u32,
     channels: FastBlurChannels,
 ) {
+    let thread_count = std::cmp::max(std::cmp::min(width * height / (256 * 256), 12), 1);
+    let pool = rayon::ThreadPoolBuilder::new().num_threads(thread_count as usize).build().unwrap();
     box_blur_impl(
-        src, src_stride, dst, dst_stride, width, height, radius, channels,
+        src, src_stride, dst, dst_stride, width, height, radius, channels, &pool, thread_count,
     );
 }
 
@@ -448,6 +450,8 @@ fn tent_blur_impl<T: FromPrimitive + Default + Into<u32> + Sync + Send + Copy>(
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
+    let thread_count = std::cmp::max(std::cmp::min(width * height / (256 * 256), 12), 1);
+    let pool = rayon::ThreadPoolBuilder::new().num_threads(thread_count as usize).build().unwrap();
     let mut transient: Vec<T> = Vec::with_capacity(dst_stride as usize * height as usize);
     transient.resize(
         dst_stride as usize * height as usize,
@@ -462,9 +466,13 @@ fn tent_blur_impl<T: FromPrimitive + Default + Into<u32> + Sync + Send + Copy>(
         height,
         radius,
         channels,
+        &pool,
+        thread_count
     );
     box_blur_impl(
         &transient, src_stride, dst, dst_stride, width, height, radius, channels,
+        &pool,
+        thread_count
     );
 }
 
@@ -514,6 +522,8 @@ fn gaussian_box_blur_impl<T: FromPrimitive + Default + Into<u32> + Sync + Send +
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
+    let thread_count = std::cmp::max(std::cmp::min(width * height / (256 * 256), 12), 1);
+    let pool = rayon::ThreadPoolBuilder::new().num_threads(thread_count as usize).build().unwrap();
     let mut transient: Vec<T> = Vec::with_capacity(dst_stride as usize * height as usize);
     transient.resize(
         dst_stride as usize * height as usize,
@@ -533,6 +543,8 @@ fn gaussian_box_blur_impl<T: FromPrimitive + Default + Into<u32> + Sync + Send +
         height,
         radius,
         box_channels,
+        &pool,
+        thread_count,
     );
     box_blur_impl(
         &transient,
@@ -543,6 +555,8 @@ fn gaussian_box_blur_impl<T: FromPrimitive + Default + Into<u32> + Sync + Send +
         height,
         radius,
         box_channels,
+        &pool,
+        thread_count,
     );
     box_blur_impl(
         &transient2,
@@ -553,6 +567,8 @@ fn gaussian_box_blur_impl<T: FromPrimitive + Default + Into<u32> + Sync + Send +
         height,
         radius,
         box_channels,
+        &pool,
+        thread_count,
     );
 }
 

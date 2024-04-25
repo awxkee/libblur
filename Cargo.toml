@@ -13,3 +13,4 @@ path = "src/main.rs"
 [dependencies]
 image = "0.25.1"
 libblur = {path = "src/lib"}
+rayon = "1.10.0"

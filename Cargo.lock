@@ -227,6 +227,7 @@ version = "0.1.0"
 dependencies = [
  "image",
  "libblur",
+ "rayon",
 ]
 
 [[package]]
@@ -395,6 +396,7 @@ name = "libblur"
 version = "0.9.2"
 dependencies = [
  "num-traits",
+ "rayon",
 ]
 
 [[package]]

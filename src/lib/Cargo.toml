@@ -20,3 +20,4 @@ path = "lib.rs"
 
 [dependencies]
 num-traits = "0.2.18"
+rayon = "1.10.0"

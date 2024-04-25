@@ -30,7 +30,7 @@ use crate::unsafe_slice::UnsafeSlice;
 #[allow(unused_imports)]
 use crate::FastBlurChannels::Channels3;
 use num_traits::cast::FromPrimitive;
-use std::thread;
+use rayon::ThreadPool;
 #[allow(unused_imports)]
 use crate::gaussian_neon::neon_support;
 
@@ -174,14 +174,14 @@ fn gaussian_blur_horizontal_pass<T: FromPrimitive + Default + Into<f32> + Send +
     kernel_size: usize,
     gaussian_channels: FastBlurChannels,
     kernel: &Vec<f32>,
+    thread_pool: &ThreadPool,
+    thread_count: u32,
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
     let unsafe_dst = UnsafeSlice::new(dst);
-    thread::scope(|scope| {
-        let thread_count = std::cmp::max(std::cmp::min(width * height / (256 * 256), 12), 1);
+    thread_pool.scope(|scope| {
         let segment_size = height / thread_count;
-        let mut handles = vec![];
         for i in 0..thread_count {
             let start_y = i * segment_size;
             let mut end_y = (i + 1) * segment_size;
@@ -189,7 +189,7 @@ fn gaussian_blur_horizontal_pass<T: FromPrimitive + Default + Into<f32> + Send +
                 end_y = height;
             }
 
-            let handle = scope.spawn(move || {
+            scope.spawn(move |_| {
                 gaussian_blur_horizontal_pass_impl(
                     src,
                     src_stride,
@@ -203,11 +203,6 @@ fn gaussian_blur_horizontal_pass<T: FromPrimitive + Default + Into<f32> + Send +
                     end_y,
                 );
             });
-            handles.push(handle);
-        }
-
-        for handle in handles {
-            handle.join().unwrap();
         }
     });
 }
@@ -331,15 +326,15 @@ fn gaussian_blur_vertical_pass<T: FromPrimitive + Default + Into<f32> + Send + S
     kernel_size: usize,
     gaussian_channels: FastBlurChannels,
     kernel: &Vec<f32>,
+    thread_pool: &ThreadPool,
+    thread_count: u32,
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
     let unsafe_dst = UnsafeSlice::new(dst);
-    thread::scope(|scope| {
-        let thread_count = std::cmp::max(std::cmp::min(width * height / (256 * 256), 12), 1);
+    thread_pool.scope(|scope| {
         let segment_size = height / thread_count;
 
-        let mut handles = vec![];
         for i in 0..thread_count {
             let start_y = i * segment_size;
             let mut end_y = (i + 1) * segment_size;
@@ -347,7 +342,7 @@ fn gaussian_blur_vertical_pass<T: FromPrimitive + Default + Into<f32> + Send + S
                 end_y = height;
             }
 
-            let handle = scope.spawn(move || {
+            scope.spawn(move |_| {
                 gaussian_blur_vertical_pass_impl(
                     src,
                     src_stride,
@@ -362,10 +357,6 @@ fn gaussian_blur_vertical_pass<T: FromPrimitive + Default + Into<f32> + Send + S
                     end_y,
                 );
             });
-            handles.push(handle);
-        }
-        for handle in handles {
-            handle.join().unwrap();
         }
     });
 }
@@ -392,6 +383,10 @@ fn gaussian_blur_impl<T: FromPrimitive + Default + Into<f32> + Send + Sync>(
         dst_stride as usize * height as usize,
         T::from_u32(0).unwrap_or_default(),
     );
+
+    let thread_count = std::cmp::max(std::cmp::min(width * height / (256 * 256), 12), 1);
+    let pool = rayon::ThreadPoolBuilder::new().num_threads(thread_count as usize).build().unwrap();
+
     gaussian_blur_horizontal_pass(
         &src,
         src_stride,
@@ -402,6 +397,8 @@ fn gaussian_blur_impl<T: FromPrimitive + Default + Into<f32> + Send + Sync>(
         kernel.len(),
         box_channels,
         &kernel,
+        &pool,
+        thread_count,
     );
     gaussian_blur_vertical_pass(
         &transient,
@@ -413,6 +410,8 @@ fn gaussian_blur_impl<T: FromPrimitive + Default + Into<f32> + Send + Sync>(
         kernel.len(),
         box_channels,
         &kernel,
+        &pool,
+        thread_count,
     );
 }
 

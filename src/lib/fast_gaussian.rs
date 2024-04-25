@@ -28,7 +28,6 @@
 use crate::channels_configuration::FastBlurChannels;
 use crate::unsafe_slice::UnsafeSlice;
 use num_traits::cast::FromPrimitive;
-use std::thread;
 #[allow(unused_imports)]
 use crate::fast_gaussian_neon::neon_support;
 
@@ -250,17 +249,17 @@ fn fast_gaussian_impl<T: FromPrimitive + Default + Into<i32> + Send + Sync>(
 {
     let unsafe_image = UnsafeSlice::new(bytes);
     let thread_count = std::cmp::max(std::cmp::min(width * height / (256 * 256), 12), 1);
-    thread::scope(|scope| {
+    let pool = rayon::ThreadPoolBuilder::new().num_threads(thread_count as usize).build().unwrap();
+    pool.scope(|scope| {
         let segment_size = width / thread_count;
 
-        let mut handles = vec![];
         for i in 0..thread_count {
             let start_x = i * segment_size;
             let mut end_x = (i + 1) * segment_size;
             if i == thread_count - 1 {
                 end_x = width;
             }
-            let handle = scope.spawn(move || {
+            scope.spawn(move |_| {
                 fast_gaussian_vertical_pass(
                     &unsafe_image,
                     stride,
@@ -272,23 +271,18 @@ fn fast_gaussian_impl<T: FromPrimitive + Default + Into<i32> + Send + Sync>(
                     channels,
                 );
             });
-            handles.push(handle);
-        }
-        for handle in handles {
-            handle.join().unwrap();
         }
     });
-    thread::scope(|scope| {
+    pool.scope(|scope| {
         let segment_size = height / thread_count;
 
-        let mut handles = vec![];
         for i in 0..thread_count {
             let start_y = i * segment_size;
             let mut end_y = (i + 1) * segment_size;
             if i == thread_count - 1 {
                 end_y = height;
             }
-            let handle = scope.spawn(move || {
+            scope.spawn(move |_| {
                 fast_gaussian_horizontal_pass(
                     &unsafe_image,
                     stride,
@@ -300,10 +294,6 @@ fn fast_gaussian_impl<T: FromPrimitive + Default + Into<i32> + Send + Sync>(
                     channels,
                 );
             });
-            handles.push(handle);
-        }
-        for handle in handles {
-            handle.join().unwrap();
         }
     });
 }
