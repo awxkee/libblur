@@ -392,7 +392,7 @@ checksum = "03087c2bad5e1034e8cace5926dec053fb3790248370865f5117a7d0213354c8"
 
 [[package]]
 name = "libblur"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "num-traits",
 ]

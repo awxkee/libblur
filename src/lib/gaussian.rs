@@ -69,7 +69,7 @@ fn gaussian_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<f32> + S
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
-    if std::mem::size_of::<T>() == std::mem::size_of::<u8>() {
+    if std::any::type_name::<T>() == "u8" {
         #[cfg(target_arch = "aarch64")]
         {
             match gaussian_channels {
@@ -226,7 +226,7 @@ fn gaussian_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<f32> + Sen
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
-    if std::mem::size_of::<T>() == std::mem::size_of::<u8>() {
+    if std::any::type_name::<T>() == "u8" {
         #[cfg(target_arch = "aarch64")]
         {
             match gaussian_channels {

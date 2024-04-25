@@ -36,7 +36,9 @@ pub mod neon_support {
         vget_low_u16, vld1_u8, vld1q_f32, vmovl_u16, vmovl_u8, vmulq_f32, vqmovn_u16, vqmovn_u32,
         vst1_u8,
     };
-    use std::arch::aarch64::{uint8x16_t, vget_high_u8, vget_low_u8, vld1q_u8, vmovl_high_u16};
+    use std::arch::aarch64::{
+        uint8x16_t, vget_high_u8, vget_low_u8, vld1q_u8, vmovl_high_u16, vrndq_f32,
+    };
     use std::ptr;
 
     #[allow(dead_code)]
@@ -53,8 +55,9 @@ pub mod neon_support {
         end_y: u32,
     ) {
         let half_kernel = (kernel_size / 2) as i32;
-        let mut safe_transient_store: Vec<u8> = Vec::with_capacity(8);
-        safe_transient_store.resize(8, 0);
+
+        let mut safe_transient_store: [u8; 8] = [0; 8];
+
         let eraser_store: [f32; 4] = [1f32, 1f32, 1f32, 0f32];
 
         let eraser: float32x4_t = unsafe { vld1q_f32(eraser_store.as_ptr()) };
@@ -93,16 +96,15 @@ pub mod neon_support {
                 let px = x as usize * 3;
 
                 let dst_ptr = unsafe { unsafe_dst.slice.as_ptr().add(y_dst_shift + px) as *mut u8 };
-                let px_16 = unsafe { vqmovn_u32(vcvtq_u32_f32(store)) };
+                let px_16 = unsafe { vqmovn_u32(vcvtq_u32_f32(vrndq_f32(store))) };
                 let px_8 = unsafe { vqmovn_u16(vcombine_u16(px_16, px_16)) };
                 if x + 3 < width {
                     unsafe {
                         vst1_u8(dst_ptr, px_8);
                     };
                 } else {
-                    let px_8_full = unsafe { vqmovn_u16(vcombine_u16(px_16, px_16)) };
                     unsafe {
-                        vst1_u8(safe_transient_store.as_mut_ptr(), px_8_full);
+                        vst1_u8(safe_transient_store.as_mut_ptr(), px_8);
                     }
                     unsafe {
                         unsafe_dst.write(y_dst_shift + px, safe_transient_store[0]);
@@ -128,11 +130,12 @@ pub mod neon_support {
         start_y: u32,
         end_y: u32,
     ) {
+        let channels_count = 3;
         let half_kernel = (kernel_size / 2) as i32;
-        let mut safe_transient_store: Vec<u8> = Vec::with_capacity(8);
-        safe_transient_store.resize(8, 0);
-        let eraser_store: [f32; 4] = [1f32, 1f32, 1f32, 0f32];
 
+        let mut safe_transient_store: [u8; 8] = [0; 8];
+
+        let eraser_store: [f32; 4] = [1f32, 1f32, 1f32, 0f32];
         let eraser: float32x4_t = unsafe { vld1q_f32(eraser_store.as_ptr()) };
 
         for y in start_y..end_y {
@@ -151,7 +154,11 @@ pub mod neon_support {
                         source_ptr = s_ptr;
                     } else {
                         unsafe {
-                            ptr::copy_nonoverlapping(s_ptr, safe_transient_store.as_mut_ptr(), 3);
+                            ptr::copy_nonoverlapping(
+                                s_ptr,
+                                safe_transient_store.as_mut_ptr(),
+                                channels_count,
+                            );
                         }
                         source_ptr = safe_transient_store.as_ptr();
                     }
@@ -167,16 +174,15 @@ pub mod neon_support {
                 }
 
                 let dst_ptr = unsafe { unsafe_dst.slice.as_ptr().add(y_dst_shift + px) as *mut u8 };
-                let px_16 = unsafe { vqmovn_u32(vcvtq_u32_f32(store)) };
+                let px_16 = unsafe { vqmovn_u32(vcvtq_u32_f32(vrndq_f32(store))) };
                 let px_8 = unsafe { vqmovn_u16(vcombine_u16(px_16, px_16)) };
                 if x + 3 < width {
                     unsafe {
                         vst1_u8(dst_ptr, px_8);
                     };
                 } else {
-                    let px_8_full = unsafe { vqmovn_u16(vcombine_u16(px_16, px_16)) };
                     unsafe {
-                        vst1_u8(safe_transient_store.as_mut_ptr(), px_8_full);
+                        vst1_u8(safe_transient_store.as_mut_ptr(), px_8);
                     }
                     unsafe {
                         unsafe_dst.write(y_dst_shift + px, safe_transient_store[0]);
@@ -202,8 +208,8 @@ pub mod neon_support {
         end_y: u32,
     ) {
         let half_kernel = (kernel_size / 2) as i32;
-        let mut safe_transient_store: Vec<u8> = Vec::with_capacity(8);
-        safe_transient_store.resize(8, 0);
+
+        let mut safe_transient_store: [u8; 8] = [0; 8];
 
         let channels_count: u32 = 4;
 
@@ -215,7 +221,7 @@ pub mod neon_support {
 
                 let mut r = -half_kernel;
 
-                while r + 4 <= half_kernel && x + 4 < width {
+                while r + 4 <= half_kernel && x as i64 + r as i64 + 4 < width as i64 {
                     let px =
                         std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
                             as usize
@@ -265,11 +271,11 @@ pub mod neon_support {
                             as usize
                             * channels_count as usize;
                     let s_ptr = unsafe { src.as_ptr().add(y_src_shift + px) };
-                    if x + 3 < width {
+                    if x + 2 < width {
                         source_ptr = s_ptr;
                     } else {
                         unsafe {
-                            ptr::copy_nonoverlapping(s_ptr, safe_transient_store.as_mut_ptr(), 3);
+                            ptr::copy_nonoverlapping(s_ptr, safe_transient_store.as_mut_ptr(), 4);
                         }
                         source_ptr = safe_transient_store.as_ptr();
                     }
@@ -288,16 +294,15 @@ pub mod neon_support {
                 let px = x as usize * channels_count as usize;
 
                 let dst_ptr = unsafe { unsafe_dst.slice.as_ptr().add(y_dst_shift + px) as *mut u8 };
-                let px_16 = unsafe { vqmovn_u32(vcvtq_u32_f32(store)) };
+                let px_16 = unsafe { vqmovn_u32(vcvtq_u32_f32(vrndq_f32(store))) };
                 let px_8 = unsafe { vqmovn_u16(vcombine_u16(px_16, px_16)) };
-                if x + 3 < width {
+                if x + 2 < width {
                     unsafe {
                         vst1_u8(dst_ptr, px_8);
                     };
                 } else {
-                    let px_8_full = unsafe { vqmovn_u16(vcombine_u16(px_16, px_16)) };
                     unsafe {
-                        vst1_u8(safe_transient_store.as_mut_ptr(), px_8_full);
+                        vst1_u8(safe_transient_store.as_mut_ptr(), px_8);
                     }
                     unsafe {
                         unsafe_dst.write(y_dst_shift + px, safe_transient_store[0]);
@@ -325,8 +330,8 @@ pub mod neon_support {
         end_y: u32,
     ) {
         let half_kernel = (kernel_size / 2) as i32;
-        let mut safe_transient_store: Vec<u8> = Vec::with_capacity(8);
-        safe_transient_store.resize(8, 0);
+
+        let mut safe_transient_store: [u8; 8] = [0; 8];
 
         let channels_count: u32 = 4;
 
@@ -345,11 +350,11 @@ pub mod neon_support {
                         std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
                     let y_src_shift = py as usize * src_stride as usize;
                     let s_ptr = unsafe { src.as_ptr().add(y_src_shift + px) };
-                    if x + 3 < width {
+                    if x + 2 < width {
                         source_ptr = s_ptr;
                     } else {
                         unsafe {
-                            ptr::copy_nonoverlapping(s_ptr, safe_transient_store.as_mut_ptr(), 3);
+                            ptr::copy_nonoverlapping(s_ptr, safe_transient_store.as_mut_ptr(), 4);
                         }
                         source_ptr = safe_transient_store.as_ptr();
                     }
@@ -366,16 +371,15 @@ pub mod neon_support {
                 }
 
                 let dst_ptr = unsafe { unsafe_dst.slice.as_ptr().add(y_dst_shift + px) as *mut u8 };
-                let px_16 = unsafe { vqmovn_u32(vcvtq_u32_f32(store)) };
+                let px_16 = unsafe { vqmovn_u32(vcvtq_u32_f32(vrndq_f32(store))) };
                 let px_8 = unsafe { vqmovn_u16(vcombine_u16(px_16, px_16)) };
-                if x + 3 < width {
+                if x + 2 < width {
                     unsafe {
                         vst1_u8(dst_ptr, px_8);
                     };
                 } else {
-                    let px_8_full = unsafe { vqmovn_u16(vcombine_u16(px_16, px_16)) };
                     unsafe {
-                        vst1_u8(safe_transient_store.as_mut_ptr(), px_8_full);
+                        vst1_u8(safe_transient_store.as_mut_ptr(), px_8);
                     }
                     unsafe {
                         unsafe_dst.write(y_dst_shift + px, safe_transient_store[0]);

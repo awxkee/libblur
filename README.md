@@ -1,8 +1,10 @@
 # Fast blur algorithms library for Rust
 
 There are some very good ( and sometimes blazing fast ) algorithms that do blurring uint images.
+Best optimized for NEON.
 
 You may receive gaussian blur in 100 FPS for 4K photo.
+
 
 Much faster than `image` default blur.
 
@@ -23,7 +25,7 @@ blur, however results better as I see. Max radius ~200-280 for u8, for u16 will 
 
 On my M3 4K photo blurred in 10ms that means it is 4K 100fps blur :)
 
-O(r) complexity (almost linear time).
+O(1) complexity.
 
 ```rust
 libblur::fast_gaussian(&mut bytes, stride, width0, height, radius, FastBlurChannels::Channels3);
@@ -34,7 +36,7 @@ libblur::fast_gaussian(&mut bytes, stride, width0, height, radius, FastBlurChann
 Very fast. Slightly slower that `fast gaussian`, however, produces more pleasant results. Still based on binomial polynomials.
 If 4K photo blurred in 10 ms this method will be done in 15 ms. Max radius ~150-180 for u8, for u16 will be less.
 
-O(r) complexity (almost linear time).
+O(1) complexity.
 
 ```rust
 libblur::fast_gaussian_next(&mut bytes, stride, width0, height, radius, FastBlurChannels::Channels3);
@@ -42,7 +44,9 @@ libblur::fast_gaussian_next(&mut bytes, stride, width0, height, radius, FastBlur
 
 ### Tent blur
 
-2 sequential box blur. Slow, good-looking results.
+2 sequential box blur. Medium speed, good-looking results.
+
+O(1) complexity.
 
 ```rust
 libblur::tent_blur(bytes, stride, &mut dst_bytes, stride, width, height, radius, FastBlurChannels::Channels3);
@@ -51,6 +55,8 @@ libblur::tent_blur(bytes, stride, &mut dst_bytes, stride, width, height, radius,
 ### Median blur
 
 Median blur ( median filter ). Implementation is fast enough.
+
+O(R) complexity.
 
 ```rust
 libblur::median_blur(bytes, stride, &mut dst_bytes, stride, width, height, radius, FastBlurChannels::Channels3);
@@ -63,6 +69,8 @@ FFT analysis etc.
 
 Kernel size must be odd. Will panic if kernel size is not odd.
 
+O(N*K) complexity.
+
 ```rust
 libblur::gaussian_blur(&bytes, src_stride, &mut dst_bytes, dst_stride, width, height, kernel_size, sigma, FastBlurChannels::Channels3);
 ```
@@ -70,6 +78,9 @@ libblur::gaussian_blur(&bytes, src_stride, &mut dst_bytes, dst_stride, width, he
 ### Gaussian box blur
 
 generally 3 sequential box blurs it is almost gaussian blur, slow, really pleasant results.
+Medium speed.
+
+O(1) complexity.
 
 ```rust
 libblur::gaussian_box_blur(bytes, stride, &mut dst_bytes, stride, width, height, radius, FastBlurChannels::Channels3);
@@ -78,6 +89,9 @@ libblur::gaussian_box_blur(bytes, stride, &mut dst_bytes, stride, width, height,
 ### Box blur
 
 Box blur. Compromise speed with bad looking results.
+Medium speed.
+
+O(1) complexity.
 
 ```rust
 libblur::box_blur(bytes, stride, &mut dst_bytes, stride, width, height, radius, FastBlurChannels::Channels3);
