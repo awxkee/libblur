@@ -29,6 +29,7 @@ use crate::channels_configuration::FastBlurChannels;
 use crate::unsafe_slice::UnsafeSlice;
 use num_traits::cast::FromPrimitive;
 use std::thread;
+#[allow(unused_imports)]
 use crate::fast_gaussian_neon::neon_support;
 
 fn fast_gaussian_vertical_pass<T: FromPrimitive + Default + Into<i32>>(

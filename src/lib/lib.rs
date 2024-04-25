@@ -35,6 +35,7 @@ mod fast_gaussian_next;
 mod gaussian_neon;
 mod box_blur_neon;
 mod fast_gaussian_neon;
+mod fast_gaussian_next_neon;
 
 pub use box_blur::tent_blur;
 pub use box_blur::tent_blur_u16;

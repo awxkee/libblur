@@ -29,6 +29,8 @@ use crate::unsafe_slice::UnsafeSlice;
 use crate::FastBlurChannels;
 use num_traits::FromPrimitive;
 use std::thread;
+#[allow(unused_imports)]
+use crate::fast_gaussian_next_neon::neon_support;
 
 fn fast_gaussian_next_vertical_pass<T: FromPrimitive + Default + Into<i32>>(
     bytes: &UnsafeSlice<T>,
@@ -42,6 +44,24 @@ fn fast_gaussian_next_vertical_pass<T: FromPrimitive + Default + Into<i32>>(
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
+    if std::any::type_name::<T>() == "u8" {
+        #[cfg(target_arch = "aarch64")]
+        #[cfg(target_feature = "neon")]
+        {
+            let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(bytes) };
+            neon_support::fast_gaussian_next_vertical_pass_neon_u8(
+                slice,
+                stride,
+                width,
+                height,
+                radius,
+                start,
+                end,
+                channels,
+            );
+            return;
+        }
+    }
     let mut buffer_r: [i32; 1024] = [0; 1024];
     let mut buffer_g: [i32; 1024] = [0; 1024];
     let mut buffer_b: [i32; 1024] = [0; 1024];
@@ -146,6 +166,24 @@ fn fast_gaussian_next_horizontal_pass<T: FromPrimitive + Default + Into<i32> + S
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
+    if std::any::type_name::<T>() == "u8" {
+        #[cfg(target_arch = "aarch64")]
+        #[cfg(target_feature = "neon")]
+        {
+            let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(bytes) };
+            neon_support::fast_gaussian_next_horizontal_pass_neon_u8(
+                slice,
+                stride,
+                width,
+                height,
+                radius,
+                start,
+                end,
+                channels,
+            );
+            return;
+        }
+    }
     let mut buffer_r: [i32; 1024] = [0; 1024];
     let mut buffer_g: [i32; 1024] = [0; 1024];
     let mut buffer_b: [i32; 1024] = [0; 1024];
@@ -243,13 +281,9 @@ fn fast_gaussian_next_impl<T: FromPrimitive + Default + Into<i32> + Send + Sync>
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
-    let acq_radius = std::cmp::min(radius, 160);
-    if radius <= 0 {
-        return;
-    }
+    let thread_count = std::cmp::max(std::cmp::min(width * height / (256 * 256), 12), 1);
     let unsafe_image = UnsafeSlice::new(bytes);
     thread::scope(|scope| {
-        let thread_count = std::cmp::max(std::cmp::min(width * height / (256 * 256), 12), 1);
         let segment_size = width / thread_count;
 
         let mut handles = vec![];
@@ -265,7 +299,7 @@ fn fast_gaussian_next_impl<T: FromPrimitive + Default + Into<i32> + Send + Sync>
                     stride,
                     width,
                     height,
-                    acq_radius,
+                    radius,
                     start_x,
                     end_x,
                     channels,
@@ -279,7 +313,6 @@ fn fast_gaussian_next_impl<T: FromPrimitive + Default + Into<i32> + Send + Sync>
     });
 
     thread::scope(|scope| {
-        let thread_count = std::cmp::max(std::cmp::min(width * height / (256 * 256), 12), 1);
         let segment_size = height / thread_count;
 
         let mut handles = vec![];
@@ -295,7 +328,7 @@ fn fast_gaussian_next_impl<T: FromPrimitive + Default + Into<i32> + Send + Sync>
                     stride,
                     width,
                     height,
-                    acq_radius,
+                    radius,
                     start_y,
                     end_y,
                     channels,
@@ -309,6 +342,10 @@ fn fast_gaussian_next_impl<T: FromPrimitive + Default + Into<i32> + Send + Sync>
     });
 }
 
+/// Fast gaussian approximation.
+/// Results are better than not next and looks awesome.
+/// Radius more than ~212 is not supported.
+/// O(1) complexity.
 #[no_mangle]
 #[allow(dead_code)]
 pub extern "C" fn fast_gaussian_next(
@@ -319,9 +356,13 @@ pub extern "C" fn fast_gaussian_next(
     radius: u32,
     channels: FastBlurChannels,
 ) {
-    fast_gaussian_next_impl(bytes, stride, width, height, radius, channels);
+    let acq_radius = std::cmp::min(radius, 212);
+    fast_gaussian_next_impl(bytes, stride, width, height, acq_radius, channels);
 }
 
+/// Fast gaussian approximation. Results are better than not next and looks awesome.
+/// Radius more than ~152 is not supported.
+/// O(1) complexity.
 #[no_mangle]
 #[allow(dead_code)]
 pub extern "C" fn fast_gaussian_next_u16(
@@ -332,5 +373,6 @@ pub extern "C" fn fast_gaussian_next_u16(
     radius: u32,
     channels: FastBlurChannels,
 ) {
-    fast_gaussian_next_impl(bytes, stride, width, height, radius, channels);
+    let acq_radius = std::cmp::min(radius, 152);
+    fast_gaussian_next_impl(bytes, stride, width, height, acq_radius, channels);
 }

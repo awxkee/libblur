@@ -33,15 +33,15 @@ libblur::fast_gaussian( & mut bytes, stride, width0, height, radius, FastBlurCha
 
 ### Fast gaussian next
 
-Very fast. Slightly slower that `fast gaussian`, however, produces more pleasant results. Still based on binomial
-polynomials.
+Very fast.
+Produces very pleasant results close to gaussian.
 If 4K photo blurred in 10 ms this method will be done in 15 ms. Max radius ~150-180 for u8, for u16 will be less.
 Faster than stack blur.
 
 O(1) complexity.
 
 ```rust
-libblur::fast_gaussian_next( & mut bytes, stride, width0, height, radius, FastBlurChannels::Channels3);
+libblur::fast_gaussian_next(& mut bytes, stride, width0, height, radius, FastBlurChannels::Channels3);
 ```
 
 ### Tent blur
