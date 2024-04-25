@@ -25,12 +25,14 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#[allow(unused_imports)]
 use crate::box_blur_neon::neon_support;
 use crate::channels_configuration::FastBlurChannels;
 use crate::unsafe_slice::UnsafeSlice;
 use num_traits::cast::FromPrimitive;
 use std::thread;
 
+#[allow(unused_variables)]
 #[allow(unused_imports)]
 fn box_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<u32> + Send + Sync>(
     src: &Vec<T>,
@@ -197,6 +199,7 @@ fn box_blur_horizontal_pass<T: FromPrimitive + Default + Into<u32> + Send + Sync
     });
 }
 
+#[allow(unused_variables)]
 #[allow(unused_imports)]
 fn box_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<u32> + Sync + Send + Copy>(
     src: &Vec<T>,
