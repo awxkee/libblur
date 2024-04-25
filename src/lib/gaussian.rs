@@ -26,13 +26,13 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::channels_configuration::FastBlurChannels;
+#[allow(unused_imports)]
+use crate::gaussian_neon::neon_support;
 use crate::unsafe_slice::UnsafeSlice;
 #[allow(unused_imports)]
 use crate::FastBlurChannels::Channels3;
 use num_traits::cast::FromPrimitive;
 use rayon::ThreadPool;
-#[allow(unused_imports)]
-use crate::gaussian_neon::neon_support;
 
 fn get_gaussian_kernel_1d(width: u32, sigma: f32) -> Vec<f32> {
     let mut sum_norm: f32 = 0f32;
@@ -385,7 +385,10 @@ fn gaussian_blur_impl<T: FromPrimitive + Default + Into<f32> + Send + Sync>(
     );
 
     let thread_count = std::cmp::max(std::cmp::min(width * height / (256 * 256), 12), 1);
-    let pool = rayon::ThreadPoolBuilder::new().num_threads(thread_count as usize).build().unwrap();
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(thread_count as usize)
+        .build()
+        .unwrap();
 
     gaussian_blur_horizontal_pass(
         &src,

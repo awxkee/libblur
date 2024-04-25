@@ -26,10 +26,10 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::channels_configuration::FastBlurChannels;
-use crate::unsafe_slice::UnsafeSlice;
-use num_traits::cast::FromPrimitive;
 #[allow(unused_imports)]
 use crate::fast_gaussian_neon::neon_support;
+use crate::unsafe_slice::UnsafeSlice;
+use num_traits::cast::FromPrimitive;
 
 fn fast_gaussian_vertical_pass<T: FromPrimitive + Default + Into<i32>>(
     bytes: &UnsafeSlice<T>,
@@ -49,14 +49,7 @@ fn fast_gaussian_vertical_pass<T: FromPrimitive + Default + Into<i32>>(
         {
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(bytes) };
             neon_support::fast_gaussian_vertical_pass_neon_u8(
-                slice,
-                stride,
-                width,
-                height,
-                radius,
-                start,
-                end,
-                channels,
+                slice, stride, width, height, radius, start, end, channels,
             );
             return;
         }
@@ -153,14 +146,7 @@ fn fast_gaussian_horizontal_pass<T: FromPrimitive + Default + Into<i32> + Send +
         {
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(bytes) };
             neon_support::fast_gaussian_horizontal_pass_neon_u8(
-                slice,
-                stride,
-                width,
-                height,
-                radius,
-                start,
-                end,
-                channels,
+                slice, stride, width, height, radius, start, end, channels,
             );
             return;
         }
@@ -249,7 +235,10 @@ fn fast_gaussian_impl<T: FromPrimitive + Default + Into<i32> + Send + Sync>(
 {
     let unsafe_image = UnsafeSlice::new(bytes);
     let thread_count = std::cmp::max(std::cmp::min(width * height / (256 * 256), 12), 1);
-    let pool = rayon::ThreadPoolBuilder::new().num_threads(thread_count as usize).build().unwrap();
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(thread_count as usize)
+        .build()
+        .unwrap();
     pool.scope(|scope| {
         let segment_size = width / thread_count;
 

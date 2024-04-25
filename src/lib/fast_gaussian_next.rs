@@ -25,11 +25,11 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#[allow(unused_imports)]
+use crate::fast_gaussian_next_neon::neon_support;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::FastBlurChannels;
 use num_traits::FromPrimitive;
-#[allow(unused_imports)]
-use crate::fast_gaussian_next_neon::neon_support;
 
 fn fast_gaussian_next_vertical_pass<T: FromPrimitive + Default + Into<i32>>(
     bytes: &UnsafeSlice<T>,
@@ -49,14 +49,7 @@ fn fast_gaussian_next_vertical_pass<T: FromPrimitive + Default + Into<i32>>(
         {
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(bytes) };
             neon_support::fast_gaussian_next_vertical_pass_neon_u8(
-                slice,
-                stride,
-                width,
-                height,
-                radius,
-                start,
-                end,
-                channels,
+                slice, stride, width, height, radius, start, end, channels,
             );
             return;
         }
@@ -171,14 +164,7 @@ fn fast_gaussian_next_horizontal_pass<T: FromPrimitive + Default + Into<i32> + S
         {
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(bytes) };
             neon_support::fast_gaussian_next_horizontal_pass_neon_u8(
-                slice,
-                stride,
-                width,
-                height,
-                radius,
-                start,
-                end,
-                channels,
+                slice, stride, width, height, radius, start, end, channels,
             );
             return;
         }
@@ -242,9 +228,9 @@ fn fast_gaussian_next_horizontal_pass<T: FromPrimitive + Default + Into<i32> + S
             }
 
             let next_row_y = (y as usize) * (stride as usize);
-            let next_row_x = ((std::cmp::min(std::cmp::max(x + 3 * radius_64 / 2, 0), width_wide - 1)
-                as u32)
-                * channels_count) as usize;
+            let next_row_x =
+                ((std::cmp::min(std::cmp::max(x + 3 * radius_64 / 2, 0), width_wide - 1) as u32)
+                    * channels_count) as usize;
 
             let ur8 = bytes[next_row_y + next_row_x];
             let ug8 = bytes[next_row_y + next_row_x + 1];
@@ -281,7 +267,10 @@ fn fast_gaussian_next_impl<T: FromPrimitive + Default + Into<i32> + Send + Sync>
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
     let thread_count = std::cmp::max(std::cmp::min(width * height / (256 * 256), 12), 1);
-    let pool = rayon::ThreadPoolBuilder::new().num_threads(thread_count as usize).build().unwrap();
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(thread_count as usize)
+        .build()
+        .unwrap();
 
     let unsafe_image = UnsafeSlice::new(bytes);
     pool.scope(|scope| {

@@ -278,7 +278,10 @@ pub extern "C" fn median_blur(
 ) {
     let unsafe_dst = UnsafeSlice::new(dst);
     let thread_count = std::cmp::max(std::cmp::min(width * height / (256 * 256), 12), 1);
-    let pool = rayon::ThreadPoolBuilder::new().num_threads(thread_count as usize).build().unwrap();
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(thread_count as usize)
+        .build()
+        .unwrap();
     pool.scope(|scope| {
         let segment_size = height / thread_count;
         for i in 0..thread_count {

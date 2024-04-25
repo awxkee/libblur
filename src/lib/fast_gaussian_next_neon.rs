@@ -33,9 +33,8 @@ pub mod neon_support {
     use crate::FastBlurChannels;
     use std::arch::aarch64::{
         int32x4_t, vaddq_s32, vcombine_u16, vcvtq_f32_s32, vcvtq_s32_f32, vdupq_n_f32, vdupq_n_s32,
-        vget_lane_u8, vld1q_s32, vmulq_f32,
-        vmulq_n_s32, vqmovn_u16, vqmovun_s32, vrndq_f32, vst1q_s32,
-        vsubq_s32,
+        vget_lane_u8, vld1q_s32, vmulq_f32, vmulq_n_s32, vqmovn_u16, vqmovun_s32, vrndq_f32,
+        vst1q_s32, vsubq_s32,
     };
 
     pub(crate) fn fast_gaussian_next_vertical_pass_neon_u8(
@@ -287,7 +286,8 @@ pub mod neon_support {
         _start: u32,
         _end: u32,
         _channels: FastBlurChannels,
-    ) {}
+    ) {
+    }
 
     #[allow(dead_code)]
     pub(crate) fn fast_gaussian_next_horizontal_pass_neon_u8(
@@ -299,5 +299,6 @@ pub mod neon_support {
         _start: u32,
         _end: u32,
         _channels: FastBlurChannels,
-    ) {}
+    ) {
+    }
 }

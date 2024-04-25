@@ -33,8 +33,7 @@ pub mod neon_support {
     use crate::FastBlurChannels;
     use std::arch::aarch64::{
         uint32x4_t, vaddw_u16, vcombine_u16, vcvtq_f32_u32, vcvtq_u32_f32, vdupq_n_f32,
-        vdupq_n_u32, vld1q_u32, vmulq_f32, vmulq_u32, vqmovn_u16, vqmovn_u32, vst1_u8,
-        vsubw_u16,
+        vdupq_n_u32, vld1q_u32, vmulq_f32, vmulq_u32, vqmovn_u16, vqmovn_u32, vst1_u8, vsubw_u16,
     };
 
     #[allow(dead_code)]

@@ -394,7 +394,14 @@ fn box_blur_impl<T: FromPrimitive + Default + Into<u32> + Sync + Send + Copy>(
         thread_count,
     );
     box_blur_vertical_pass(
-        &transient, src_stride, dst, dst_stride, width, height, radius, channels,
+        &transient,
+        src_stride,
+        dst,
+        dst_stride,
+        width,
+        height,
+        radius,
+        channels,
         pool,
         thread_count,
     );
@@ -413,9 +420,21 @@ pub extern "C" fn box_blur(
     channels: FastBlurChannels,
 ) {
     let thread_count = std::cmp::max(std::cmp::min(width * height / (256 * 256), 12), 1);
-    let pool = rayon::ThreadPoolBuilder::new().num_threads(thread_count as usize).build().unwrap();
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(thread_count as usize)
+        .build()
+        .unwrap();
     box_blur_impl(
-        src, src_stride, dst, dst_stride, width, height, radius, channels, &pool, thread_count,
+        src,
+        src_stride,
+        dst,
+        dst_stride,
+        width,
+        height,
+        radius,
+        channels,
+        &pool,
+        thread_count,
     );
 }
 
@@ -432,9 +451,21 @@ pub extern "C" fn box_blur_u16(
     channels: FastBlurChannels,
 ) {
     let thread_count = std::cmp::max(std::cmp::min(width * height / (256 * 256), 12), 1);
-    let pool = rayon::ThreadPoolBuilder::new().num_threads(thread_count as usize).build().unwrap();
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(thread_count as usize)
+        .build()
+        .unwrap();
     box_blur_impl(
-        src, src_stride, dst, dst_stride, width, height, radius, channels, &pool, thread_count,
+        src,
+        src_stride,
+        dst,
+        dst_stride,
+        width,
+        height,
+        radius,
+        channels,
+        &pool,
+        thread_count,
     );
 }
 
@@ -451,7 +482,10 @@ fn tent_blur_impl<T: FromPrimitive + Default + Into<u32> + Sync + Send + Copy>(
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
     let thread_count = std::cmp::max(std::cmp::min(width * height / (256 * 256), 12), 1);
-    let pool = rayon::ThreadPoolBuilder::new().num_threads(thread_count as usize).build().unwrap();
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(thread_count as usize)
+        .build()
+        .unwrap();
     let mut transient: Vec<T> = Vec::with_capacity(dst_stride as usize * height as usize);
     transient.resize(
         dst_stride as usize * height as usize,
@@ -467,12 +501,19 @@ fn tent_blur_impl<T: FromPrimitive + Default + Into<u32> + Sync + Send + Copy>(
         radius,
         channels,
         &pool,
-        thread_count
+        thread_count,
     );
     box_blur_impl(
-        &transient, src_stride, dst, dst_stride, width, height, radius, channels,
+        &transient,
+        src_stride,
+        dst,
+        dst_stride,
+        width,
+        height,
+        radius,
+        channels,
         &pool,
-        thread_count
+        thread_count,
     );
 }
 
@@ -523,7 +564,10 @@ fn gaussian_box_blur_impl<T: FromPrimitive + Default + Into<u32> + Sync + Send +
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
     let thread_count = std::cmp::max(std::cmp::min(width * height / (256 * 256), 12), 1);
-    let pool = rayon::ThreadPoolBuilder::new().num_threads(thread_count as usize).build().unwrap();
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(thread_count as usize)
+        .build()
+        .unwrap();
     let mut transient: Vec<T> = Vec::with_capacity(dst_stride as usize * height as usize);
     transient.resize(
         dst_stride as usize * height as usize,

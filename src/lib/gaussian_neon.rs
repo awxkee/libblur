@@ -31,8 +31,7 @@ pub mod neon_support {
     #[cfg(target_arch = "aarch64")]
     use std::arch::aarch64::{
         float32x4_t, vaddq_f32, vcombine_u16, vcvtq_f32_u32, vcvtq_u32_f32, vdupq_n_f32,
-        vget_low_u16, vld1q_f32, vmovl_u16, vmovl_u8, vmulq_f32, vqmovn_u16, vqmovn_u32,
-        vst1_u8,
+        vget_low_u16, vld1q_f32, vmovl_u16, vmovl_u8, vmulq_f32, vqmovn_u16, vqmovn_u32, vst1_u8,
     };
     use std::arch::aarch64::{
         uint8x16_t, vget_high_u8, vget_low_u8, vld1q_u8, vmovl_high_u16, vrndq_f32,
@@ -247,7 +246,8 @@ pub mod neon_support {
                             as usize
                             * channels_count as usize;
                     let s_ptr = unsafe { src.as_ptr().add(y_src_shift + px) };
-                    let pixel_colors_u32 = load_u8_u32(s_ptr, x + 2 < width, channels_count as usize);
+                    let pixel_colors_u32 =
+                        load_u8_u32(s_ptr, x + 2 < width, channels_count as usize);
                     let mut pixel_colors_f32 = unsafe { vcvtq_f32_u32(pixel_colors_u32) };
                     let weight = kernel[(r + half_kernel) as usize];
                     let f_weight: float32x4_t = unsafe { vdupq_n_f32(weight) };
@@ -315,7 +315,8 @@ pub mod neon_support {
                         std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
                     let y_src_shift = py as usize * src_stride as usize;
                     let s_ptr = unsafe { src.as_ptr().add(y_src_shift + px) };
-                    let pixel_colors_u32 = load_u8_u32(s_ptr, x + 2 < width, channels_count as usize);
+                    let pixel_colors_u32 =
+                        load_u8_u32(s_ptr, x + 2 < width, channels_count as usize);
                     let mut pixel_colors_f32 = unsafe { vcvtq_f32_u32(pixel_colors_u32) };
                     let weight = kernel[(r + half_kernel) as usize];
                     let f_weight: float32x4_t = unsafe { vdupq_n_f32(weight) };

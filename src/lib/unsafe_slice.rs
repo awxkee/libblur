@@ -26,7 +26,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use std::cell::UnsafeCell;
-use std::ops::{Index};
+use std::ops::Index;
 
 #[derive(Copy, Clone)]
 pub struct UnsafeSlice<'a, T> {

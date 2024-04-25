@@ -26,29 +26,29 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 mod box_blur;
-mod fast_gaussian;
-mod gaussian;
-mod median_blur;
-mod unsafe_slice;
-mod channels_configuration;
-mod fast_gaussian_next;
-mod gaussian_neon;
 mod box_blur_neon;
+mod channels_configuration;
+mod fast_gaussian;
 mod fast_gaussian_neon;
+mod fast_gaussian_next;
 mod fast_gaussian_next_neon;
+mod gaussian;
+mod gaussian_neon;
+mod median_blur;
 mod neon_utils;
+mod unsafe_slice;
 
-pub use box_blur::tent_blur;
-pub use box_blur::tent_blur_u16;
 pub use box_blur::box_blur;
 pub use box_blur::box_blur_u16;
 pub use box_blur::gaussian_box_blur;
 pub use box_blur::gaussian_box_blur_u16;
-pub use fast_gaussian_next::fast_gaussian_next;
-pub use fast_gaussian_next::fast_gaussian_next_u16;
-pub use median_blur::median_blur;
-pub use gaussian::gaussian_blur;
-pub use gaussian::gaussian_blur_u16;
+pub use box_blur::tent_blur;
+pub use box_blur::tent_blur_u16;
+pub use channels_configuration::FastBlurChannels;
 pub use fast_gaussian::fast_gaussian;
 pub use fast_gaussian::fast_gaussian_u16;
-pub use channels_configuration::FastBlurChannels;
+pub use fast_gaussian_next::fast_gaussian_next;
+pub use fast_gaussian_next::fast_gaussian_next_u16;
+pub use gaussian::gaussian_blur;
+pub use gaussian::gaussian_blur_u16;
+pub use median_blur::median_blur;

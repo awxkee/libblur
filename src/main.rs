@@ -1,7 +1,7 @@
 use image::io::Reader as ImageReader;
 use image::{EncodableLayout, GenericImageView};
-use std::time::Instant;
 use libblur::FastBlurChannels;
+use std::time::Instant;
 
 fn main() {
     let img = ImageReader::open("assets/test_image_1.jpg")
