@@ -71,6 +71,7 @@ fn gaussian_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<f32> + S
 {
     if std::any::type_name::<T>() == "u8" {
         #[cfg(target_arch = "aarch64")]
+        #[cfg(target_feature = "neon")]
         {
             match gaussian_channels {
                 Channels3 => {
@@ -228,6 +229,7 @@ fn gaussian_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<f32> + Sen
 {
     if std::any::type_name::<T>() == "u8" {
         #[cfg(target_arch = "aarch64")]
+        #[cfg(target_feature = "neon")]
         {
             match gaussian_channels {
                 Channels3 => {

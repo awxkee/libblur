@@ -49,6 +49,7 @@ fn box_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<u32> + Send +
 {
     if std::any::type_name::<T>() == "u8" {
         #[cfg(target_arch = "aarch64")]
+        #[cfg(target_feature = "neon")]
         {
             let u8_slice: &Vec<u8> = unsafe { std::mem::transmute(src) };
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
@@ -217,6 +218,7 @@ fn box_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<u32> + Sync + S
 {
     if std::any::type_name::<T>() == "u8" {
         #[cfg(target_arch = "aarch64")]
+        #[cfg(target_feature = "neon")]
         {
             let u8_slice: &Vec<u8> = unsafe { std::mem::transmute(src) };
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
