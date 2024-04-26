@@ -551,7 +551,7 @@ pub extern "C" fn tent_blur_u16(
     );
 }
 
-fn gaussian_box_blur_impl<T: FromPrimitive + Default + Into<u32> + Sync + Send + Copy>(
+fn gaussian_box_blur_impl<T: FromPrimitive + Default + Into<u32>   + Sync + Send + Copy>(
     src: &Vec<T>,
     src_stride: u32,
     dst: &mut Vec<T>,

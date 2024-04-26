@@ -25,6 +25,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use crate::fast_gaussian_next_f32::fast_gaussian_next_f32;
 #[allow(unused_imports)]
 use crate::fast_gaussian_next_neon::neon_support;
 use crate::unsafe_slice::UnsafeSlice;
@@ -324,7 +325,8 @@ fn fast_gaussian_next_impl<T: FromPrimitive + Default + Into<i32> + Send + Sync>
 
 /// Fast gaussian approximation.
 /// Results are better than not next and looks awesome.
-/// Radius more than ~212 is not supported.
+/// * `stride` - Lane length, default is width * channels_count if not aligned
+/// * `radius` - Radius more than ~152 is not supported. To use larger radius convert image to f32 and use function for f32
 /// O(1) complexity.
 #[no_mangle]
 #[allow(dead_code)]
@@ -340,8 +342,10 @@ pub extern "C" fn fast_gaussian_next(
     fast_gaussian_next_impl(bytes, stride, width, height, acq_radius, channels);
 }
 
-/// Fast gaussian approximation. Results are better than not next and looks awesome.
-/// Radius more than ~152 is not supported.
+/// Fast gaussian approximation.
+/// Results are better than not next and looks awesome.
+/// * `stride` - Lane length, default is width * channels_count if not aligned
+/// * `radius` - Radius more than ~152 is not supported. To use larger radius convert image to f32 and use function for f32
 /// O(1) complexity.
 #[no_mangle]
 #[allow(dead_code)]
@@ -355,4 +359,24 @@ pub extern "C" fn fast_gaussian_next_u16(
 ) {
     let acq_radius = std::cmp::min(radius, 152);
     fast_gaussian_next_impl(bytes, stride, width, height, acq_radius, channels);
+}
+
+/// Fast gaussian approximation.
+/// Results are better than not next and looks awesome.
+/// * `stride` - Lane length, default is width * channels_count if not aligned
+/// * `radius` - Almost any radius is supported, in real world radius > 300 is too big for this implementation
+/// O(1) complexity.
+#[no_mangle]
+#[allow(dead_code)]
+pub extern "C" fn fast_gaussian_next_f32(
+    bytes: &mut Vec<f32>,
+    stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    channels: FastBlurChannels,
+) {
+    fast_gaussian_next_f32::fast_gaussian_next_impl_f32(
+        bytes, stride, width, height, radius, channels,
+    );
 }

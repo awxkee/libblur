@@ -418,6 +418,11 @@ fn gaussian_blur_impl<T: FromPrimitive + Default + Into<f32> + Send + Sync>(
     );
 }
 
+/// Regular gaussian kernel based blur. Use when you need a gaussian methods or advanced image signal analysis
+/// # Arguments
+///
+/// * `stride` - Lane length, default is width * channels_count * size_of(PixelType) if not aligned
+/// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted.
 #[no_mangle]
 #[allow(dead_code)]
 pub extern "C" fn gaussian_blur(
@@ -444,12 +449,48 @@ pub extern "C" fn gaussian_blur(
     );
 }
 
+/// Regular gaussian kernel based blur. Use when you need a gaussian methods or advanced image signal analysis
+/// # Arguments
+///
+/// * `stride` - Lane length, default is width * channels_count if not aligned
+/// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted.
 #[no_mangle]
 #[allow(dead_code)]
 pub extern "C" fn gaussian_blur_u16(
     src: &Vec<u16>,
     src_stride: u32,
     dst: &mut Vec<u16>,
+    dst_stride: u32,
+    width: u32,
+    height: u32,
+    kernel_size: u32,
+    sigma: f32,
+    channels: FastBlurChannels,
+) {
+    gaussian_blur_impl(
+        src,
+        src_stride,
+        dst,
+        dst_stride,
+        width,
+        height,
+        kernel_size,
+        sigma,
+        channels,
+    );
+}
+
+/// Regular gaussian kernel based blur. Use when you need a gaussian methods or advanced image signal analysis
+/// # Arguments
+///
+/// * `stride` - Lane length, default is width * channels_count if not aligned
+/// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted.
+#[no_mangle]
+#[allow(dead_code)]
+pub extern "C" fn gaussian_blur_f32(
+    src: &Vec<f32>,
+    src_stride: u32,
+    dst: &mut Vec<f32>,
     dst_stride: u32,
     width: u32,
     height: u32,

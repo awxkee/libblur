@@ -26,6 +26,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::channels_configuration::FastBlurChannels;
+use crate::fast_gaussian_f32::fast_gaussian_f32;
 #[allow(unused_imports)]
 use crate::fast_gaussian_neon::neon_support;
 use crate::unsafe_slice::UnsafeSlice;
@@ -288,7 +289,10 @@ fn fast_gaussian_impl<T: FromPrimitive + Default + Into<i32> + Send + Sync>(
 }
 
 /// Fast gaussian approximation.
-/// Radius more than ~512 is not supported.
+/// # Arguments
+///
+/// * `stride` - Lane length, default is width * channels_count if not aligned
+/// * `radius` - Radius more than ~512 is not supported. To use larger radius convert image to f32 and use function for f32
 /// O(1) complexity.
 #[no_mangle]
 #[allow(dead_code)]
@@ -305,7 +309,10 @@ pub extern "C" fn fast_gaussian(
 }
 
 /// Fast gaussian approximation.
-/// Radius more than ~512 is not supported.
+/// # Arguments
+///
+/// * `stride` - Lane length, default is width * channels_count if not aligned
+/// * `radius` - Radius more than ~512 is not supported. To use larger radius convert image to f32 and use function for f32
 /// O(1) complexity.
 #[no_mangle]
 #[allow(dead_code)]
@@ -319,4 +326,23 @@ pub extern "C" fn fast_gaussian_u16(
 ) {
     let acq_radius = std::cmp::min(radius, 512);
     fast_gaussian_impl(bytes, stride, width, height, acq_radius, channels);
+}
+
+/// Fast gaussian approximation.
+/// O(1) complexity.
+/// # Arguments
+///
+/// * `stride` - Lane length, default is width * channels_count if not aligned
+/// * `radius` - almost any radius is supported
+#[no_mangle]
+#[allow(dead_code)]
+pub extern "C" fn fast_gaussian_f32(
+    bytes: &mut Vec<f32>,
+    stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    channels: FastBlurChannels,
+) {
+    fast_gaussian_f32::fast_gaussian_impl_f32(bytes, stride, width, height, radius, channels);
 }
