@@ -31,6 +31,7 @@ use crate::fast_gaussian_f32::fast_gaussian_f32;
 use crate::fast_gaussian_neon::neon_support;
 use crate::unsafe_slice::UnsafeSlice;
 use num_traits::cast::FromPrimitive;
+use crate::fast_gaussian_f16::fast_gaussian_f16;
 
 fn fast_gaussian_vertical_pass<T: FromPrimitive + Default + Into<i32>>(
     bytes: &UnsafeSlice<T>,
@@ -345,4 +346,23 @@ pub extern "C" fn fast_gaussian_f32(
     channels: FastBlurChannels,
 ) {
     fast_gaussian_f32::fast_gaussian_impl_f32(bytes, stride, width, height, radius, channels);
+}
+
+/// Fast gaussian approximation.
+/// O(1) complexity.
+/// # Arguments
+///
+/// * `stride` - Lane length, default is width * channels_count if not aligned
+/// * `radius` - almost any radius is supported
+#[no_mangle]
+#[allow(dead_code)]
+pub extern "C" fn fast_gaussian_f16(
+    bytes: &mut Vec<u16>,
+    stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    channels: FastBlurChannels,
+) {
+    fast_gaussian_f16::fast_gaussian_impl_f16(bytes, stride, width, height, radius, channels);
 }

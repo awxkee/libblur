@@ -33,27 +33,8 @@ use crate::unsafe_slice::UnsafeSlice;
 use crate::FastBlurChannels::Channels3;
 use num_traits::cast::FromPrimitive;
 use rayon::ThreadPool;
-
-fn get_gaussian_kernel_1d(width: u32, sigma: f32) -> Vec<f32> {
-    let mut sum_norm: f32 = 0f32;
-    let mut kernel: Vec<f32> = Vec::with_capacity(width as usize);
-    let scale = 1f32 / (f32::sqrt(2f32 * std::f32::consts::PI) * sigma);
-    let mean = (width / 2) as f32;
-
-    for x in 0..width {
-        let new_weight = f32::exp(-0.5f32 * f32::powf((x as f32 - mean) / sigma, 2.0f32)) * scale;
-        kernel.push(new_weight);
-        sum_norm += new_weight;
-    }
-
-    if sum_norm != 0f32 {
-        for x in 0..width as usize {
-            kernel[x] = kernel[x] / sum_norm;
-        }
-    }
-
-    return kernel;
-}
+use crate::gaussian_f16::gaussian_f16;
+use crate::gaussian_helper::get_gaussian_kernel_1d;
 
 fn gaussian_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<f32> + Send + Sync>(
     src: &Vec<T>,
@@ -499,6 +480,37 @@ pub extern "C" fn gaussian_blur_f32(
     channels: FastBlurChannels,
 ) {
     gaussian_blur_impl(
+        src,
+        src_stride,
+        dst,
+        dst_stride,
+        width,
+        height,
+        kernel_size,
+        sigma,
+        channels,
+    );
+}
+
+/// Regular gaussian kernel based blur. Use when you need a gaussian methods or advanced image signal analysis
+/// # Arguments
+///
+/// * `stride` - Lane length, default is width * channels_count if not aligned
+/// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted.
+#[no_mangle]
+#[allow(dead_code)]
+pub extern "C" fn gaussian_blur_f16(
+    src: &Vec<u16>,
+    src_stride: u32,
+    dst: &mut Vec<u16>,
+    dst_stride: u32,
+    width: u32,
+    height: u32,
+    kernel_size: u32,
+    sigma: f32,
+    channels: FastBlurChannels,
+) {
+    gaussian_f16::gaussian_blur_impl_f16(
         src,
         src_stride,
         dst,

@@ -241,13 +241,12 @@ pub mod neon_support {
                 }
 
                 while r <= half_kernel {
-                    let px =
-                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize
-                            * channels_count as usize;
+                    let current_x = std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
+                        as usize;
+                    let px = current_x * channels_count as usize;
                     let s_ptr = unsafe { src.as_ptr().add(y_src_shift + px) };
                     let pixel_colors_u32 =
-                        load_u8_u32(s_ptr, x + 2 < width, channels_count as usize);
+                        load_u8_u32(s_ptr, current_x as i64 + 2 < width as i64, channels_count as usize);
                     let mut pixel_colors_f32 = unsafe { vcvtq_f32_u32(pixel_colors_u32) };
                     let weight = kernel[(r + half_kernel) as usize];
                     let f_weight: float32x4_t = unsafe { vdupq_n_f32(weight) };

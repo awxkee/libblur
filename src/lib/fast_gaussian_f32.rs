@@ -198,15 +198,14 @@ pub(crate) mod fast_gaussian_f32_impl {
                 }
 
                 let next_row_y = (y as usize) * (stride as usize);
-                let next_row_x = ((std::cmp::min(std::cmp::max(x + radius_64, 0), width_wide - 1)
-                    as u32)
-                    * channels_count) as usize;
+                let next_row_x = std::cmp::min(std::cmp::max(x + radius_64, 0), width_wide - 1) as u32;
+                let next_row_px = (next_row_x * channels_count) as usize;
 
                 let s_ptr =
-                    unsafe { bytes.slice.as_ptr().add(next_row_y + next_row_x) as *mut f32 };
+                    unsafe { bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut f32 };
                 let pixel_color = load_f32(
                     s_ptr,
-                    x + safe_pixel_count_x < width as i64,
+                    (next_row_x as i64) + (safe_pixel_count_x as i64) < width as i64,
                     channels_count as usize,
                 );
 

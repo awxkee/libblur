@@ -1,43 +1,55 @@
 use image::io::Reader as ImageReader;
-use image::{DynamicImage, EncodableLayout, GenericImageView, ImageBuffer, Rgb};
+use image::{EncodableLayout, GenericImageView};
 use libblur::FastBlurChannels;
 use std::time::Instant;
 
+#[allow(dead_code)]
+fn f32_to_f16(bytes: Vec<f32>) -> Vec<u16> {
+    return bytes.iter().map(|&x| half::f16::from_f32(x).to_bits()).collect();
+}
+
+#[allow(dead_code)]
+fn f16_to_f32(bytes: Vec<u16>) -> Vec<f32> {
+    return bytes.iter().map(|&x| half::f16::from_bits(x).to_f32()).collect();
+}
+
+
 fn main() {
-    let img = ImageReader::open("assets/test_image_1.jpg")
+    let img = ImageReader::open("assets/filirovska.jpeg")
         .unwrap()
         .decode()
         .unwrap();
     let dimensions = img.dimensions();
     println!("dimensions {:?}", img.dimensions());
 
-    let f32_image = img.to_rgb32f();
-
     println!("{:?}", img.color());
-    let src_bytes = f32_image.as_raw();
+    let src_bytes = img.as_bytes();
     let stride = dimensions.0 as usize * 3;
-    let mut bytes: Vec<f32> = src_bytes.clone();
-    let mut dst_bytes: Vec<u8> = Vec::with_capacity(dimensions.1 as usize * stride);
+    let mut bytes: Vec<u8> = Vec::with_capacity(dimensions.1 as usize * stride);
+    for i in 0..dimensions.1 as usize * stride {
+        bytes.push(src_bytes[i]);
+    }
+    let mut dst_bytes: Vec<u16> = Vec::with_capacity(dimensions.1 as usize * stride);
     dst_bytes.resize(dimensions.1 as usize * stride, 0);
     let start_time = Instant::now();
 
-    libblur::fast_gaussian_next_f32(
+    libblur::fast_gaussian_next(
         &mut bytes,
         stride as u32,
         dimensions.0,
         dimensions.1,
-        51,
+        151,
         FastBlurChannels::Channels3,
     );
-    // libblur::gaussian_blur(
-    //     &bytes,
+    // libblur::gaussian_blur_f16(
+    //     &f16_bytes,
     //     stride as u32,
     //     &mut dst_bytes,
     //     stride as u32,
     //     dimensions.0,
     //     dimensions.1,
-    //     171,
-    //     171f32 / 3f32,
+    //     151,
+    //     151f32 / 3f32,
     //     FastBlurChannels::Channels3,
     // );
     // libblur::median_blur(
@@ -56,18 +68,12 @@ fn main() {
     // Print the elapsed time in milliseconds
     println!("Elapsed time: {:.2?}", elapsed_time);
 
-    let img = ImageBuffer::<Rgb<f32>, _>::from_raw(dimensions.0, dimensions.1, bytes);
-
-    let dynamic_img: DynamicImage = DynamicImage::ImageRgb32F(img.unwrap());
-
-    let u8_img = dynamic_img.to_rgb8();
-
     image::save_buffer(
         "blurred.png",
-        u8_img.as_bytes(),
+        bytes.as_bytes(),
         dimensions.0,
         dimensions.1,
         image::ExtendedColorType::Rgb8,
     )
-    .unwrap();
+        .unwrap();
 }

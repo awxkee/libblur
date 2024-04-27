@@ -96,18 +96,14 @@ pub mod neon_support {
             for x in 0..width {
                 // preload edge pixels
 
-                let next =
-                    std::cmp::min(x + half_kernel, width - 1) as usize * channels_count as usize;
-
-                let previous = std::cmp::max(x as i64 - half_kernel as i64, 0) as usize
-                    * channels_count as usize;
-
                 // subtract previous
                 {
+                    let previous_x = std::cmp::max(x as i64 - half_kernel as i64, 0) as usize;
+                    let previous = previous_x * channels_count as usize;
                     let s_ptr = unsafe { src.as_ptr().add(y_src_shift + previous) };
                     let edge_colors = load_u8_u16(
                         s_ptr,
-                        x + safe_pixel_count_x < width,
+                        (previous_x as i64) + (safe_pixel_count_x as i64) < width as i64,
                         channels_count as usize,
                     );
                     store = unsafe { vsubw_u16(store, edge_colors) };
@@ -115,10 +111,15 @@ pub mod neon_support {
 
                 // add next
                 {
+                    let next_x =
+                        std::cmp::min(x + half_kernel, width - 1) as usize * channels_count as usize;
+
+                    let next = next_x * channels_count as usize;
+
                     let s_ptr = unsafe { src.as_ptr().add(y_src_shift + next) };
                     let edge_colors = load_u8_u16(
                         s_ptr,
-                        x + safe_pixel_count_x < width,
+                        (next_x as i64) + (safe_pixel_count_x as i64) < (width as i64),
                         channels_count as usize,
                     );
                     store = unsafe { vaddw_u16(store, edge_colors) };

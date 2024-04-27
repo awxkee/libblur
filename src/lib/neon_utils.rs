@@ -1,7 +1,10 @@
 #[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
 #[cfg(target_feature = "neon")]
 pub(crate) mod neon_utils {
-    use std::arch::aarch64::{float32x4_t, int16x4_t, int32x4_t, uint16x4_t, uint32x4_t, vget_low_u16, vld1_u8, vld1q_f32, vmovl_u16, vmovl_u8, vreinterpret_s16_u16, vreinterpretq_s32_u32};
+    use std::arch::aarch64::{
+        float32x4_t, int16x4_t, int32x4_t, uint16x4_t, uint32x4_t, vget_low_u16, vld1_u8,
+        vld1q_f32, vmovl_u16, vmovl_u8, vreinterpret_s16_u16, vreinterpretq_s32_u32,
+    };
     use std::ptr;
 
     #[allow(dead_code)]
@@ -90,5 +93,4 @@ pub(crate) mod neon_utils {
         let pixel_color = unsafe { vld1q_f32(edge_ptr) };
         return pixel_color;
     }
-
 }

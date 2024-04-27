@@ -25,42 +25,23 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-mod box_blur;
-mod box_blur_neon;
-mod channels_configuration;
-mod fast_gaussian;
-mod fast_gaussian_neon;
-mod fast_gaussian_next;
-mod fast_gaussian_next_neon;
-mod gaussian;
-mod gaussian_neon;
-mod median_blur;
-mod neon_utils;
-mod unsafe_slice;
-mod fast_gaussian_f32;
-mod fast_gaussian_next_f32;
-mod gaussian_f16;
-mod gaussian_helper;
-mod fast_gaussian_f16;
-mod fast_gaussian_next_f16;
+pub fn get_gaussian_kernel_1d(width: u32, sigma: f32) -> Vec<f32> {
+    let mut sum_norm: f32 = 0f32;
+    let mut kernel: Vec<f32> = Vec::with_capacity(width as usize);
+    let scale = 1f32 / (f32::sqrt(2f32 * std::f32::consts::PI) * sigma);
+    let mean = (width / 2) as f32;
 
-pub use box_blur::box_blur;
-pub use box_blur::box_blur_u16;
-pub use box_blur::gaussian_box_blur;
-pub use box_blur::gaussian_box_blur_u16;
-pub use box_blur::tent_blur;
-pub use box_blur::tent_blur_u16;
-pub use channels_configuration::FastBlurChannels;
-pub use fast_gaussian::fast_gaussian;
-pub use fast_gaussian::fast_gaussian_u16;
-pub use fast_gaussian::fast_gaussian_f32;
-pub use fast_gaussian::fast_gaussian_f16;
-pub use fast_gaussian_next::fast_gaussian_next;
-pub use fast_gaussian_next::fast_gaussian_next_u16;
-pub use fast_gaussian_next::fast_gaussian_next_f32;
-pub use fast_gaussian_next::fast_gaussian_next_f16;
-pub use gaussian::gaussian_blur;
-pub use gaussian::gaussian_blur_u16;
-pub use gaussian::gaussian_blur_f16;
-pub use gaussian::gaussian_blur_f32;
-pub use median_blur::median_blur;
+    for x in 0..width {
+        let new_weight = f32::exp(-0.5f32 * f32::powf((x as f32 - mean) / sigma, 2.0f32)) * scale;
+        kernel.push(new_weight);
+        sum_norm += new_weight;
+    }
+
+    if sum_norm != 0f32 {
+        for x in 0..width as usize {
+            kernel[x] = kernel[x] / sum_norm;
+        }
+    }
+
+    return kernel;
+}
