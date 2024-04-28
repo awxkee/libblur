@@ -112,7 +112,7 @@ pub mod neon_support {
                 // add next
                 {
                     let next_x =
-                        std::cmp::min(x + half_kernel, width - 1) as usize * channels_count as usize;
+                        std::cmp::min(x + half_kernel, width - 1) as usize;
 
                     let next = next_x * channels_count as usize;
 

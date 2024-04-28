@@ -15,7 +15,7 @@ fn f16_to_f32(bytes: Vec<u16>) -> Vec<f32> {
 
 
 fn main() {
-    let img = ImageReader::open("assets/filirovska.jpeg")
+    let img = ImageReader::open("assets/test_image_1.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -29,27 +29,27 @@ fn main() {
     for i in 0..dimensions.1 as usize * stride {
         bytes.push(src_bytes[i]);
     }
-    let mut dst_bytes: Vec<u16> = Vec::with_capacity(dimensions.1 as usize * stride);
+    let mut dst_bytes: Vec<u8> = Vec::with_capacity(dimensions.1 as usize * stride);
     dst_bytes.resize(dimensions.1 as usize * stride, 0);
     let start_time = Instant::now();
 
-    libblur::fast_gaussian(
+    libblur::fast_gaussian_superior(
         &mut bytes,
         stride as u32,
         dimensions.0,
         dimensions.1,
-        151,
+        512,
         FastBlurChannels::Channels3,
     );
-    // libblur::gaussian_blur_f16(
-    //     &f16_bytes,
+    // libblur::gaussian_blur(
+    //     &bytes,
     //     stride as u32,
     //     &mut dst_bytes,
     //     stride as u32,
     //     dimensions.0,
     //     dimensions.1,
-    //     151,
-    //     151f32 / 3f32,
+    //     127*2+1,
+    //     256f32 / 6f32,
     //     FastBlurChannels::Channels3,
     // );
     // libblur::median_blur(
@@ -62,7 +62,7 @@ fn main() {
     //     36,
     //     FastBlurChannels::Channels3,
     // );
-    // libblur::gaussian_box_blur(&bytes, stride as u32, &mut dst_bytes, stride as u32, dimensions.0, dimensions.1, 128, FastBlurChannels::Channels4);
+    // libblur::gaussian_box_blur(&bytes, stride as u32, &mut dst_bytes, stride as u32, dimensions.0, dimensions.1, 128, FastBlurChannels::Channels3);
 
     let elapsed_time = start_time.elapsed();
     // Print the elapsed time in milliseconds

@@ -43,6 +43,7 @@ mod gaussian_f16;
 mod gaussian_helper;
 mod fast_gaussian_f16;
 mod fast_gaussian_next_f16;
+mod fast_gaussian_superior;
 
 pub use box_blur::box_blur;
 pub use box_blur::box_blur_u16;
@@ -64,3 +65,4 @@ pub use gaussian::gaussian_blur_u16;
 pub use gaussian::gaussian_blur_f16;
 pub use gaussian::gaussian_blur_f32;
 pub use median_blur::median_blur;
+pub use fast_gaussian_superior::fast_gaussian_superior;
