@@ -44,7 +44,7 @@ fn gaussian_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<f32> + S
     width: u32,
     kernel_size: usize,
     gaussian_channels: FastBlurChannels,
-    kernel: &Vec<f32>,
+    u_kernel: &Vec<f32>,
     start_y: u32,
     end_y: u32,
 ) where
@@ -65,7 +65,7 @@ fn gaussian_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<f32> + S
                         dst_stride,
                         width,
                         kernel_size,
-                        kernel,
+                        u_kernel,
                         start_y,
                         end_y,
                     );
@@ -81,7 +81,7 @@ fn gaussian_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<f32> + S
                         dst_stride,
                         width,
                         kernel_size,
-                        kernel,
+                        u_kernel,
                         start_y,
                         end_y,
                     );
@@ -90,6 +90,7 @@ fn gaussian_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<f32> + S
             }
         }
     }
+    let kernel = u_kernel.as_slice();
     let half_kernel = (kernel_size / 2) as i32;
     let channels_count = match gaussian_channels {
         FastBlurChannels::Channels3 => 3,
@@ -154,7 +155,7 @@ fn gaussian_blur_horizontal_pass<T: FromPrimitive + Default + Into<f32> + Send +
     height: u32,
     kernel_size: usize,
     gaussian_channels: FastBlurChannels,
-    kernel: &Vec<f32>,
+    u_kernel: &Vec<f32>,
     thread_pool: &ThreadPool,
     thread_count: u32,
 ) where
@@ -179,7 +180,7 @@ fn gaussian_blur_horizontal_pass<T: FromPrimitive + Default + Into<f32> + Send +
                     width,
                     kernel_size,
                     gaussian_channels,
-                    kernel,
+                    u_kernel,
                     start_y,
                     end_y,
                 );
@@ -197,7 +198,7 @@ fn gaussian_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<f32> + Sen
     height: u32,
     kernel_size: usize,
     gaussian_channels: FastBlurChannels,
-    kernel: &Vec<f32>,
+    u_kernel: &Vec<f32>,
     start_y: u32,
     end_y: u32,
 ) where
@@ -219,7 +220,7 @@ fn gaussian_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<f32> + Sen
                         width,
                         height,
                         kernel_size,
-                        kernel,
+                        u_kernel,
                         start_y,
                         end_y,
                     );
@@ -236,7 +237,7 @@ fn gaussian_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<f32> + Sen
                         width,
                         height,
                         kernel_size,
-                        kernel,
+                        u_kernel,
                         start_y,
                         end_y,
                     );
@@ -245,6 +246,7 @@ fn gaussian_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<f32> + Sen
             }
         }
     }
+    let kernel = u_kernel.as_slice();
     let half_kernel = (kernel_size / 2) as i32;
     let channels_count = match gaussian_channels {
         FastBlurChannels::Channels3 => 3,

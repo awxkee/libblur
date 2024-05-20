@@ -14,4 +14,6 @@ path = "src/main.rs"
 half = "2.4.1"
 image = "0.25.1"
 libblur = {path = "src/lib"}
+num-traits = "0.2.19"
 rayon = "1.10.0"
+yuvutils-rs = {path = "../yuvutils-rs"}
