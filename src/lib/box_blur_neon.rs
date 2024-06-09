@@ -123,7 +123,7 @@ pub mod neon_support {
     }
 
     pub(crate) fn box_blur_vertical_pass_neon<const CHANNEL_CONFIGURATION: usize>(
-        src: &Vec<u8>,
+        src: &[u8],
         src_stride: u32,
         unsafe_dst: &UnsafeSlice<u8>,
         dst_stride: u32,

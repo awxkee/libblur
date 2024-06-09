@@ -215,7 +215,7 @@ fn box_blur_horizontal_pass<T: FromPrimitive + Default + Into<u32> + Send + Sync
 #[allow(unused_variables)]
 #[allow(unused_imports)]
 fn box_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<u32> + Sync + Send + Copy, const CHANNEL_CONFIGURATION: usize>(
-    src: &Vec<T>,
+    src: &[T],
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<T>,
     dst_stride: u32,
@@ -230,7 +230,7 @@ fn box_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<u32> + Sync + S
     if std::any::type_name::<T>() == "u8" {
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
-            let u8_slice: &Vec<u8> = unsafe { std::mem::transmute(src) };
+            let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
             neon_support::box_blur_vertical_pass_neon::<CHANNEL_CONFIGURATION>(
                 u8_slice,
