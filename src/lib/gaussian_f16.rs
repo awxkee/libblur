@@ -30,7 +30,7 @@ mod gaussian_f16_impl {
     use crate::FastBlurChannels;
 
     pub(crate) fn gaussian_blur_horizontal_pass_impl_f16(
-        src: &Vec<u16>,
+        src: &[u16],
         src_stride: u32,
         unsafe_dst: &UnsafeSlice<u16>,
         dst_stride: u32,
@@ -96,7 +96,7 @@ mod gaussian_f16_impl {
     }
 
     pub(crate) fn gaussian_blur_vertical_pass_impl_f16(
-        src: &Vec<u16>,
+        src: &[u16],
         src_stride: u32,
         unsafe_dst: &UnsafeSlice<u16>,
         dst_stride: u32,
@@ -169,9 +169,9 @@ pub(crate) mod gaussian_f16 {
     use crate::FastBlurChannels;
 
     fn gaussian_blur_horizontal_pass_f16(
-        src: &Vec<u16>,
+        src: &[u16],
         src_stride: u32,
-        dst: &mut Vec<u16>,
+        dst: &mut [u16],
         dst_stride: u32,
         width: u32,
         height: u32,
@@ -210,9 +210,9 @@ pub(crate) mod gaussian_f16 {
     }
 
     fn gaussian_blur_vertical_pass_f16(
-        src: &Vec<u16>,
+        src: &[u16],
         src_stride: u32,
-        dst: &mut Vec<u16>,
+        dst: &mut [u16],
         dst_stride: u32,
         width: u32,
         height: u32,
@@ -253,9 +253,9 @@ pub(crate) mod gaussian_f16 {
     }
 
     pub(crate) fn gaussian_blur_impl_f16(
-        src: &Vec<u16>,
+        src: &[u16],
         src_stride: u32,
-        dst: &mut Vec<u16>,
+        dst: &mut [u16],
         dst_stride: u32,
         width: u32,
         height: u32,

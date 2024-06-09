@@ -38,7 +38,7 @@ use crate::ThreadingPolicy;
 #[allow(unused_variables)]
 #[allow(unused_imports)]
 fn box_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<u32> + Send + Sync, const CHANNELS_CONFIGURATION: usize>(
-    src: &Vec<T>,
+    src: &[T],
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<T>,
     dst_stride: u32,
@@ -53,7 +53,7 @@ fn box_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<u32> + Send +
     if std::any::type_name::<T>() == "u8" {
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
-            let u8_slice: &Vec<u8> = unsafe { std::mem::transmute(src) };
+            let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
             neon_support::box_blur_horizontal_pass_neon::<CHANNELS_CONFIGURATION>(
                 u8_slice,
@@ -69,7 +69,7 @@ fn box_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<u32> + Send +
         }
         #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), target_feature = "sse4.1"))]
         {
-            let u8_slice: &Vec<u8> = unsafe { std::mem::transmute(src) };
+            let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
             sse_support::box_blur_horizontal_pass_sse::<{ CHANNELS_CONFIGURATION }>(
                 u8_slice,
@@ -247,7 +247,7 @@ fn box_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<u32> + Sync + S
         }
         #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), target_feature = "sse4.1"))]
         {
-            let u8_slice: &Vec<u8> = unsafe { std::mem::transmute(src) };
+            let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
             sse_support::box_blur_vertical_pass_sse::<CHANNEL_CONFIGURATION>(
                 u8_slice,

@@ -541,10 +541,10 @@ pub fn gaussian_blur_f32(
 /// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted.
 #[no_mangle]
 #[allow(dead_code)]
-pub extern "C" fn gaussian_blur_f16(
-    src: &Vec<u16>,
+pub fn gaussian_blur_f16(
+    src: &[u16],
     src_stride: u32,
-    dst: &mut Vec<u16>,
+    dst: &mut [u16],
     dst_stride: u32,
     width: u32,
     height: u32,

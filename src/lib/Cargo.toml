@@ -1,6 +1,6 @@
 [package]
 name = "libblur"
-version = "0.10.1"
+version = "0.10.2"
 edition = "2021"
 description = "High performance blur in pure rust"
 readme = "../../README.md"

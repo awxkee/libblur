@@ -326,9 +326,8 @@ fn fast_gaussian_impl<T: FromPrimitive + Default + Into<i32> + Send + Sync, cons
 /// * `radius` - Radius more than ~512 is not supported. To use larger radius convert image to f32 and use function for f32
 /// O(1) complexity.
 #[no_mangle]
-#[allow(dead_code)]
-pub extern "C" fn fast_gaussian(
-    bytes: &mut Vec<u8>,
+pub fn fast_gaussian(
+    bytes: &mut [u8],
     stride: u32,
     width: u32,
     height: u32,
@@ -354,9 +353,8 @@ pub extern "C" fn fast_gaussian(
 /// * `radius` - Radius more than ~512 is not supported. To use larger radius convert image to f32 and use function for f32
 /// O(1) complexity.
 #[no_mangle]
-#[allow(dead_code)]
-pub extern "C" fn fast_gaussian_u16(
-    bytes: &mut Vec<u16>,
+pub fn fast_gaussian_u16(
+    bytes: &mut [u16],
     stride: u32,
     width: u32,
     height: u32,
@@ -383,8 +381,8 @@ pub extern "C" fn fast_gaussian_u16(
 /// * `radius` - almost any radius is supported
 #[no_mangle]
 #[allow(dead_code)]
-pub extern "C" fn fast_gaussian_f32(
-    bytes: &mut Vec<f32>,
+pub fn fast_gaussian_f32(
+    bytes: &mut [f32],
     stride: u32,
     width: u32,
     height: u32,
@@ -402,8 +400,8 @@ pub extern "C" fn fast_gaussian_f32(
 /// * `radius` - almost any radius is supported
 #[no_mangle]
 #[allow(dead_code)]
-pub extern "C" fn fast_gaussian_f16(
-    bytes: &mut Vec<u16>,
+pub fn fast_gaussian_f16(
+    bytes: &mut [u16],
     stride: u32,
     width: u32,
     height: u32,

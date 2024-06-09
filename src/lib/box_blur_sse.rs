@@ -36,7 +36,7 @@ pub mod sse_support {
     use crate::unsafe_slice::UnsafeSlice;
 
     pub(crate) fn box_blur_horizontal_pass_sse<const CHANNELS: usize>(
-        src: &Vec<u8>,
+        src: &[u8],
         src_stride: u32,
         unsafe_dst: &UnsafeSlice<u8>,
         dst_stride: u32,
@@ -132,7 +132,7 @@ pub mod sse_support {
     }
 
     pub(crate) fn box_blur_vertical_pass_sse<const CHANNELS: usize>(
-        src: &Vec<u8>,
+        src: &[u8],
         src_stride: u32,
         unsafe_dst: &UnsafeSlice<u8>,
         dst_stride: u32,

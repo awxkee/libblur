@@ -401,7 +401,7 @@ pub(crate) mod fast_gaussian_f32 {
     use crate::FastBlurChannels;
 
     pub(crate) fn fast_gaussian_impl_f32(
-        bytes: &mut Vec<f32>,
+        bytes: &mut [f32],
         stride: u32,
         width: u32,
         height: u32,
