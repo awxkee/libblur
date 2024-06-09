@@ -66,7 +66,7 @@ libblur::median_blur(bytes, stride, & mut dst_bytes, stride, width, height, radi
 
 ### Gaussian blur
 
-Excellent results. Have some improvements, however, slow. Use when use need gaussian methods - smoothing, anti-alias,
+Excellent results. Have improvements, however, much slower than any approximations slow. Use when use need gaussian methods - smoothing, anti-alias,
 FFT analysis etc.
 
 Kernel size must be odd. Will panic if kernel size is not odd.

@@ -12,7 +12,15 @@ pub(crate) mod neon_utils {
         return vreinterpretq_s32_u32(load_u8_u32_fast::<CHANNELS_COUNT>(ptr));
     }
 
-    #[allow(dead_code)]
+    #[inline(always)]
+    pub(crate) unsafe fn load_u8_u32_one(
+        ptr: *const u8,
+    ) -> uint32x2_t {
+        let u_first = u32::from_le_bytes([*ptr, 0, 0, 0]);
+        return vdup_n_u32(u_first);
+    }
+
+
     #[inline(always)]
     pub(crate) unsafe fn load_u8_u32_fast<const CHANNELS_COUNT: usize>(
         ptr: *const u8,
@@ -81,6 +89,23 @@ pub(crate) mod neon_utils {
         #[cfg(target_arch = "arm")]
         {
             return vmlaq_f32(a, b, c);
+        }
+    }
+
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    #[inline(always)]
+    pub(crate) unsafe fn prefer_vfma_f32(
+        a: float32x2_t,
+        b: float32x2_t,
+        c: float32x2_t,
+    ) -> float32x2_t {
+        #[cfg(target_arch = "aarch64")]
+        {
+            return vfma_f32(a, b, c);
+        }
+        #[cfg(target_arch = "arm")]
+        {
+            return vmla_f32(a, b, c);
         }
     }
 
