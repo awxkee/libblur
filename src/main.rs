@@ -43,6 +43,18 @@ fn main() {
     //     ThreadingPolicy::Adaptive,
     // );
 
+    // libblur::gaussian_box_blur(
+    //     &bytes,
+    //     stride as u32,
+    //     &mut dst_bytes,
+    //     stride as u32,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     77,
+    //     FastBlurChannels::Channels3,
+    //     ThreadingPolicy::Single,
+    // );
+    // bytes = dst_bytes;
     libblur::gaussian_blur(
         &bytes,
         stride as u32,
@@ -55,7 +67,7 @@ fn main() {
         FastBlurChannels::Channels3,
         ThreadingPolicy::Single,
     );
-    bytes = dst_bytes;
+    // bytes = dst_bytes;
     // libblur::median_blur(
     //     &bytes,
     //     stride as u32,

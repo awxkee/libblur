@@ -237,7 +237,7 @@ mod fast_gaussian_superior {
     }
 
     pub(crate) fn fast_gaussian_impl<T: FromPrimitive + ToPrimitive + Default + Into<i64> + Send + Sync>(
-        bytes: &mut Vec<T>,
+        bytes: &mut [T],
         stride: u32,
         width: u32,
         height: u32,
@@ -309,8 +309,8 @@ mod fast_gaussian_superior {
 /// O(1) complexity.
 #[no_mangle]
 #[allow(dead_code)]
-pub extern "C" fn fast_gaussian_superior(
-    bytes: &mut Vec<u8>,
+pub fn fast_gaussian_superior(
+    bytes: &mut [u8],
     stride: u32,
     width: u32,
     height: u32,

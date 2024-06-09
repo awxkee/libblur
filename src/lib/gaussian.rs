@@ -349,11 +349,7 @@ fn gaussian_blur_impl<
     if kernel_size % 2 == 0 {
         panic!("kernel size must be odd");
     }
-    let mut transient: Vec<T> = Vec::with_capacity(dst_stride as usize * height as usize);
-    transient.resize(
-        dst_stride as usize * height as usize,
-        T::from_u32(0).unwrap_or_default(),
-    );
+    let mut transient: Vec<T> = vec![T::from_u32(0).unwrap_or_default(); dst_stride as usize * height as usize];
 
     let thread_count = threading_policy.get_threads_count(width, height) as u32;
     let pool = rayon::ThreadPoolBuilder::new()

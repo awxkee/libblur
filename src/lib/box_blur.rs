@@ -174,9 +174,9 @@ fn box_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<u32> + Send +
 }
 
 fn box_blur_horizontal_pass<T: FromPrimitive + Default + Into<u32> + Send + Sync, const CHANNEL_CONFIGURATION: usize, >(
-    src: &Vec<T>,
+    src: &[T],
     src_stride: u32,
-    dst: &mut Vec<T>,
+    dst: &mut [T],
     dst_stride: u32,
     width: u32,
     height: u32,
@@ -351,9 +351,9 @@ fn box_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<u32> + Sync + S
 }
 
 fn box_blur_vertical_pass<T: FromPrimitive + Default + Into<u32> + Sync + Send + Copy, const CHANNEL_CONFIGURATION: usize>(
-    src: &Vec<T>,
+    src: &[T],
     src_stride: u32,
-    dst: &mut Vec<T>,
+    dst: &mut [T],
     dst_stride: u32,
     width: u32,
     height: u32,
@@ -392,9 +392,9 @@ fn box_blur_vertical_pass<T: FromPrimitive + Default + Into<u32> + Sync + Send +
 }
 
 fn box_blur_impl<T: FromPrimitive + Default + Into<u32> + Sync + Send + Copy, const CHANNEL_CONFIGURATION: usize>(
-    src: &Vec<T>,
+    src: &[T],
     src_stride: u32,
-    dst: &mut Vec<T>,
+    dst: &mut [T],
     dst_stride: u32,
     width: u32,
     height: u32,
@@ -404,11 +404,7 @@ fn box_blur_impl<T: FromPrimitive + Default + Into<u32> + Sync + Send + Copy, co
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
-    let mut transient: Vec<T> = Vec::with_capacity(dst_stride as usize * height as usize);
-    transient.resize(
-        dst_stride as usize * height as usize,
-        T::from_u32(0).unwrap_or_default(),
-    );
+    let mut transient: Vec<T> = vec![T::from_u32(0).unwrap_or_default();dst_stride as usize * height as usize];
     box_blur_horizontal_pass::<T, CHANNEL_CONFIGURATION>(
         src,
         src_stride,
@@ -630,9 +626,9 @@ pub extern "C" fn tent_blur_u16(
 }
 
 fn gaussian_box_blur_impl<T: FromPrimitive + Default + Into<u32> + Sync + Send + Copy, const CHANNEL_CONFIGURATION: usize>(
-    src: &Vec<T>,
+    src: &[T],
     src_stride: u32,
-    dst: &mut Vec<T>,
+    dst: &mut [T],
     dst_stride: u32,
     width: u32,
     height: u32,
@@ -693,10 +689,10 @@ fn gaussian_box_blur_impl<T: FromPrimitive + Default + Into<u32> + Sync + Send +
 
 #[no_mangle]
 #[allow(dead_code)]
-pub extern "C" fn gaussian_box_blur(
-    src: &Vec<u8>,
+pub fn gaussian_box_blur(
+    src: &[u8],
     src_stride: u32,
-    dst: &mut Vec<u8>,
+    dst: &mut [u8],
     dst_stride: u32,
     width: u32,
     height: u32,

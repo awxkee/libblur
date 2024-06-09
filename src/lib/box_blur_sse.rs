@@ -153,7 +153,105 @@ pub mod sse_support {
 
         let half_kernel = kernel_size / 2;
 
-        for x in start_x..end_x {
+        let mut cx = start_x;
+
+        for x in (cx..end_x.saturating_sub(2)).step_by(2) {
+            let px = x as usize * CHANNELS;
+
+            let mut store_0;
+            let mut store_1;
+
+            {
+                let s_ptr = unsafe { src.as_ptr().add(px) };
+                let edge_colors_0 = unsafe { load_u8_s32_fast::<CHANNELS>(s_ptr) };
+                let edge_colors_1 = unsafe { load_u8_s32_fast::<CHANNELS>(s_ptr.add(CHANNELS)) };
+                store_0 = unsafe { _mm_mullo_epi32(edge_colors_0, v_edge_count) };
+                store_1 = unsafe { _mm_mullo_epi32(edge_colors_1, v_edge_count) };
+            }
+
+            for y in 1..std::cmp::min(half_kernel, height) {
+                let y_src_shift = y as usize * src_stride as usize;
+                let s_ptr = unsafe { src.as_ptr().add(y_src_shift + px) };
+                let edge_colors_0 = unsafe { load_u8_s32_fast::<CHANNELS>(s_ptr) };
+                let edge_colors_1 = unsafe { load_u8_s32_fast::<CHANNELS>(s_ptr.add(CHANNELS)) };
+                store_0 = unsafe { _mm_add_epi32(store_0, edge_colors_0) };
+                store_1 = unsafe { _mm_add_epi32(store_1, edge_colors_1) };
+            }
+
+            for y in 0..height {
+                // preload edge pixels
+                let next =
+                    std::cmp::min(y + half_kernel, height - 1) as usize * src_stride as usize;
+                let previous =
+                    std::cmp::max(y as i64 - half_kernel as i64, 0) as usize * src_stride as usize;
+                let y_dst_shift = dst_stride as usize * y as usize;
+
+                // subtract previous
+                {
+                    let s_ptr = unsafe { src.as_ptr().add(previous + px) };
+                    let edge_colors_0 = unsafe { load_u8_s32_fast::<CHANNELS>(s_ptr) };
+                    let edge_colors_1 = unsafe { load_u8_s32_fast::<CHANNELS>(s_ptr.add(CHANNELS)) };
+                    store_0 = unsafe { _mm_sub_epi32(store_0, edge_colors_0) };
+                    store_1 = unsafe { _mm_sub_epi32(store_1, edge_colors_1) };
+                }
+
+                // add next
+                {
+                    let s_ptr = unsafe { src.as_ptr().add(next + px) };
+                    let edge_colors_0 = unsafe { load_u8_s32_fast::<CHANNELS>(s_ptr) };
+                    let edge_colors_1 = unsafe { load_u8_s32_fast::<CHANNELS>(s_ptr.add(CHANNELS)) };
+                    store_0 = unsafe { _mm_add_epi32(store_0, edge_colors_0) };
+                    store_1 = unsafe { _mm_add_epi32(store_1, edge_colors_1) };
+                }
+
+                let px = x as usize * CHANNELS;
+
+                if CHANNELS == 3 {
+                    store_0 = unsafe { _mm_mullo_epi32(store_0, eraser) };
+                    store_1 = unsafe { _mm_mullo_epi32(store_1, eraser) };
+                }
+
+                let scale_store =
+                    unsafe { _mm_cvtps_epi32(_mm_mul_ps(_mm_cvtepi32_ps(store_0), v_kernel_scale)) };
+                let px_16 = unsafe { _mm_packus_epi32(scale_store, scale_store) };
+                let px_8 = unsafe { _mm_packus_epi16(px_16, px_16) };
+
+                let pixel = unsafe { _mm_extract_epi32::<0>(px_8) };
+                let pixel_bytes_0 = pixel.to_le_bytes();
+
+                let scale_store =
+                    unsafe { _mm_cvtps_epi32(_mm_mul_ps(_mm_cvtepi32_ps(store_1), v_kernel_scale)) };
+                let px_16 = unsafe { _mm_packus_epi32(scale_store, scale_store) };
+                let px_8 = unsafe { _mm_packus_epi16(px_16, px_16) };
+
+                let pixel = unsafe { _mm_extract_epi32::<0>(px_8) };
+                let pixel_bytes_1 = pixel.to_le_bytes();
+
+                unsafe {
+                    let unsafe_offset = y_dst_shift + px;
+                    unsafe_dst.write(unsafe_offset, pixel_bytes_0[0]);
+                    unsafe_dst.write(unsafe_offset + 1, pixel_bytes_0[1]);
+                    unsafe_dst.write(unsafe_offset + 2, pixel_bytes_0[2]);
+                    if CHANNELS == 4 {
+                        unsafe_dst.write(unsafe_offset + 3, pixel_bytes_0[3]);
+                    }
+                }
+
+                unsafe {
+                    let unsafe_offset = y_dst_shift + px;
+                    unsafe_dst.write(unsafe_offset + CHANNELS, pixel_bytes_1[0]);
+                    unsafe_dst.write(unsafe_offset + 1 + CHANNELS, pixel_bytes_1[1]);
+                    unsafe_dst.write(unsafe_offset + 2 + CHANNELS, pixel_bytes_1[2]);
+                    if CHANNELS == 4 {
+                        unsafe_dst.write(unsafe_offset + 3 + CHANNELS, pixel_bytes_1[3]);
+                    }
+                }
+            }
+
+            cx = x;
+        }
+
+        for x in cx..end_x {
             let px = x as usize * CHANNELS;
 
             let mut store;
