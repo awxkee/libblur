@@ -27,14 +27,21 @@
 
 use crate::fast_gaussian_next_f16::fast_gaussian_next_f16;
 use crate::fast_gaussian_next_f32::fast_gaussian_next_f32;
-#[allow(unused_imports)]
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::fast_gaussian_next_neon::neon_support;
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+))]
+use crate::fast_gaussian_next_sse::sse_support;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{FastBlurChannels, ThreadingPolicy};
 use num_traits::FromPrimitive;
-use crate::fast_gaussian_next_sse::sse_support;
 
-fn fast_gaussian_next_vertical_pass<T: FromPrimitive + Default + Into<i32>, const CHANNEL_CONFIGURATION: usize>(
+fn fast_gaussian_next_vertical_pass<
+    T: FromPrimitive + Default + Into<i32>,
+    const CHANNEL_CONFIGURATION: usize,
+>(
     bytes: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -49,21 +56,15 @@ fn fast_gaussian_next_vertical_pass<T: FromPrimitive + Default + Into<i32>, cons
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(bytes) };
-            match channels {
-                FastBlurChannels::Channels3 => {
-                    neon_support::fast_gaussian_next_vertical_pass_neon_u8::<3>(
-                        slice, stride, width, height, radius, start, end,
-                    );
-                }
-                FastBlurChannels::Channels4 => {
-                    neon_support::fast_gaussian_next_vertical_pass_neon_u8::<4>(
-                        slice, stride, width, height, radius, start, end,
-                    );
-                }
-            }
+            neon_support::fast_gaussian_next_vertical_pass_neon_u8::<CHANNEL_CONFIGURATION>(
+                slice, stride, width, height, radius, start, end,
+            );
             return;
         }
-        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), target_feature = "sse4.1"))]
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "sse4.1"
+        ))]
         {
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(bytes) };
             sse_support::fast_gaussian_next_vertical_pass_sse_u8::<CHANNEL_CONFIGURATION>(
@@ -110,22 +111,28 @@ fn fast_gaussian_next_vertical_pass<T: FromPrimitive + Default + Into<i32>, cons
                 let d_arr_index = (y & 1023) as usize;
                 dif_r += 3
                     * (unsafe { buffer_r.get_unchecked(d_arr_index) }
-                    - unsafe { *buffer_r.get_unchecked(d_arr_index_1) })
+                        - unsafe { *buffer_r.get_unchecked(d_arr_index_1) })
                     - unsafe { *buffer_r.get_unchecked(d_arr_index_2) };
                 dif_g += 3
                     * (unsafe { *buffer_g.get_unchecked(d_arr_index) }
-                    - unsafe { *buffer_g.get_unchecked(d_arr_index_1) })
+                        - unsafe { *buffer_g.get_unchecked(d_arr_index_1) })
                     - unsafe { *buffer_g.get_unchecked(d_arr_index_2) };
                 dif_b += 3
                     * (unsafe { *buffer_b.get_unchecked(d_arr_index) }
-                    - unsafe { *buffer_b.get_unchecked(d_arr_index_1) })
+                        - unsafe { *buffer_b.get_unchecked(d_arr_index_1) })
                     - unsafe { *buffer_b.get_unchecked(d_arr_index_2) };
             } else if y + radius_64 >= 0 {
                 let arr_index = (y & 1023) as usize;
                 let arr_index_1 = ((y + radius_64) & 1023) as usize;
-                dif_r += 3 * (buffer_r[arr_index] - buffer_r[arr_index_1]);
-                dif_g += 3 * (buffer_g[arr_index] - buffer_g[arr_index_1]);
-                dif_b += 3 * (buffer_b[arr_index] - buffer_b[arr_index_1]);
+                dif_r += 3
+                    * (unsafe { *buffer_r.get_unchecked(arr_index) }
+                        - unsafe { *buffer_r.get_unchecked(arr_index_1) });
+                dif_g += 3
+                    * (unsafe { *buffer_g.get_unchecked(arr_index) }
+                        - unsafe { *buffer_g.get_unchecked(arr_index_1) });
+                dif_b += 3
+                    * (unsafe { *buffer_b.get_unchecked(arr_index) }
+                        - unsafe { *buffer_b.get_unchecked(arr_index_1) });
             } else if y + 2 * radius_64 >= 0 {
                 let arr_index = ((y + radius_64) & 1023) as usize;
                 dif_r -= 3 * unsafe { *buffer_r.get_unchecked(arr_index) };
@@ -172,7 +179,10 @@ fn fast_gaussian_next_vertical_pass<T: FromPrimitive + Default + Into<i32>, cons
     }
 }
 
-fn fast_gaussian_next_horizontal_pass<T: FromPrimitive + Default + Into<i32> + Send + Sync, const CHANNEL_CONFIGURATION: usize>(
+fn fast_gaussian_next_horizontal_pass<
+    T: FromPrimitive + Default + Into<i32> + Send + Sync,
+    const CHANNEL_CONFIGURATION: usize,
+>(
     bytes: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -187,21 +197,15 @@ fn fast_gaussian_next_horizontal_pass<T: FromPrimitive + Default + Into<i32> + S
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(bytes) };
-            match channels {
-                FastBlurChannels::Channels3 => {
-                    neon_support::fast_gaussian_next_horizontal_pass_neon_u8::<3>(
-                        slice, stride, width, height, radius, start, end,
-                    );
-                }
-                FastBlurChannels::Channels4 => {
-                    neon_support::fast_gaussian_next_horizontal_pass_neon_u8::<4>(
-                        slice, stride, width, height, radius, start, end,
-                    );
-                }
-            }
+            neon_support::fast_gaussian_next_horizontal_pass_neon_u8::<CHANNEL_CONFIGURATION>(
+                slice, stride, width, height, radius, start, end,
+            );
             return;
         }
-        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), target_feature = "sse4.1"))]
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "sse4.1"
+        ))]
         {
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(bytes) };
             sse_support::fast_gaussian_next_horizontal_pass_sse_u8::<CHANNEL_CONFIGURATION>(
@@ -231,7 +235,8 @@ fn fast_gaussian_next_horizontal_pass<T: FromPrimitive + Default + Into<i32> + S
 
         for x in (0 - 3 * radius_64)..(width as i64) {
             if x >= 0 {
-                let current_px = ((std::cmp::max(x, 0) as u32) * CHANNEL_CONFIGURATION as u32) as usize;
+                let current_px =
+                    ((std::cmp::max(x, 0) as u32) * CHANNEL_CONFIGURATION as u32) as usize;
                 let new_r = T::from_u32(((sum_r as f32) * weight) as u32).unwrap_or_default();
                 let new_g = T::from_u32(((sum_g as f32) * weight) as u32).unwrap_or_default();
                 let new_b = T::from_u32(((sum_b as f32) * weight) as u32).unwrap_or_default();
@@ -247,28 +252,28 @@ fn fast_gaussian_next_horizontal_pass<T: FromPrimitive + Default + Into<i32> + S
                 let d_arr_index = (x & 1023) as usize;
                 dif_r += 3
                     * (unsafe { *buffer_r.get_unchecked(d_arr_index) }
-                    - unsafe { *buffer_r.get_unchecked(d_arr_index_1) })
+                        - unsafe { *buffer_r.get_unchecked(d_arr_index_1) })
                     - unsafe { *buffer_r.get_unchecked(d_arr_index_2) };
                 dif_g += 3
                     * (unsafe { *buffer_g.get_unchecked(d_arr_index) }
-                    - unsafe { *buffer_g.get_unchecked(d_arr_index_1) })
+                        - unsafe { *buffer_g.get_unchecked(d_arr_index_1) })
                     - unsafe { *buffer_g.get_unchecked(d_arr_index_2) };
                 dif_b += 3
                     * (unsafe { *buffer_b.get_unchecked(d_arr_index) }
-                    - unsafe { *buffer_b.get_unchecked(d_arr_index_1) })
+                        - unsafe { *buffer_b.get_unchecked(d_arr_index_1) })
                     - unsafe { *buffer_b.get_unchecked(d_arr_index_2) };
             } else if x + radius_64 >= 0 {
                 let arr_index = (x & 1023) as usize;
                 let arr_index_1 = ((x + radius_64) & 1023) as usize;
                 dif_r += 3
                     * (unsafe { *buffer_r.get_unchecked(arr_index) }
-                    - unsafe { *buffer_r.get_unchecked(arr_index_1) });
+                        - unsafe { *buffer_r.get_unchecked(arr_index_1) });
                 dif_g += 3
                     * (unsafe { *buffer_g.get_unchecked(arr_index) }
-                    - unsafe { *buffer_g.get_unchecked(arr_index_1) });
+                        - unsafe { *buffer_g.get_unchecked(arr_index_1) });
                 dif_b += 3
                     * (unsafe { *buffer_b.get_unchecked(arr_index) }
-                    - unsafe { *buffer_b.get_unchecked(arr_index_1) });
+                        - unsafe { *buffer_b.get_unchecked(arr_index_1) });
             } else if x + 2 * radius_64 >= 0 {
                 let arr_index = ((x + radius_64) & 1023) as usize;
                 dif_r -= 3 * unsafe { buffer_r.get_unchecked(arr_index) };
@@ -311,7 +316,10 @@ fn fast_gaussian_next_horizontal_pass<T: FromPrimitive + Default + Into<i32> + S
     }
 }
 
-fn fast_gaussian_next_impl<T: FromPrimitive + Default + Into<i32> + Send + Sync, const CHANNEL_CONFIGURATION: usize>(
+fn fast_gaussian_next_impl<
+    T: FromPrimitive + Default + Into<i32> + Send + Sync,
+    const CHANNEL_CONFIGURATION: usize,
+>(
     bytes: &mut [T],
     stride: u32,
     width: u32,
@@ -394,10 +402,24 @@ pub fn fast_gaussian_next(
     let acq_radius = std::cmp::min(radius, 212);
     match channels {
         FastBlurChannels::Channels3 => {
-            fast_gaussian_next_impl::<u8, 3>(bytes, stride, width, height, acq_radius, threading_policy);
+            fast_gaussian_next_impl::<u8, 3>(
+                bytes,
+                stride,
+                width,
+                height,
+                acq_radius,
+                threading_policy,
+            );
         }
         FastBlurChannels::Channels4 => {
-            fast_gaussian_next_impl::<u8, 4>(bytes, stride, width, height, acq_radius, threading_policy);
+            fast_gaussian_next_impl::<u8, 4>(
+                bytes,
+                stride,
+                width,
+                height,
+                acq_radius,
+                threading_policy,
+            );
         }
     }
 }
@@ -421,10 +443,24 @@ pub fn fast_gaussian_next_u16(
     let acq_radius = std::cmp::min(radius, 152);
     match channels {
         FastBlurChannels::Channels3 => {
-            fast_gaussian_next_impl::<u16, 3>(bytes, stride, width, height, acq_radius, threading_policy);
+            fast_gaussian_next_impl::<u16, 3>(
+                bytes,
+                stride,
+                width,
+                height,
+                acq_radius,
+                threading_policy,
+            );
         }
         FastBlurChannels::Channels4 => {
-            fast_gaussian_next_impl::<u16, 4>(bytes, stride, width, height, acq_radius, threading_policy);
+            fast_gaussian_next_impl::<u16, 4>(
+                bytes,
+                stride,
+                width,
+                height,
+                acq_radius,
+                threading_policy,
+            );
         }
     }
 }

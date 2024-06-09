@@ -10,13 +10,11 @@ pub(crate) mod sse_utils {
     pub(crate) unsafe fn load_u8_s32_fast<const CHANNELS_COUNT: usize>(
         ptr: *const u8,
     ) -> __m128i {
-        let real_value = (ptr as *const u32).read_unaligned();
-        let real_value_bytes = real_value.to_le_bytes();
-        let u_first = u32::from_le_bytes([real_value_bytes[0], 0, 0, 0]);
-        let u_second = u32::from_le_bytes([real_value_bytes[1], 0, 0, 0]);
-        let u_third = u32::from_le_bytes([real_value_bytes[2], 0, 0, 0]);
+        let u_first = u32::from_le_bytes([*ptr, 0, 0, 0]);
+        let u_second = u32::from_le_bytes([*ptr.add(1), 0, 0, 0]);
+        let u_third = u32::from_le_bytes([*ptr.add(2), 0, 0, 0]);
         let u_fourth = match CHANNELS_COUNT {
-            4 => u32::from_le_bytes([real_value_bytes[3], 0, 0, 0]),
+            4 => u32::from_le_bytes([*ptr.add(3), 0, 0, 0]),
             _ => 0,
         };
         let store: [u32; 4] = [u_first, u_second, u_third, u_fourth];

@@ -28,10 +28,11 @@
 use crate::channels_configuration::FastBlurChannels;
 use crate::fast_gaussian_f16::fast_gaussian_f16;
 use crate::fast_gaussian_f32::fast_gaussian_f32;
-#[allow(unused_imports)]
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::fast_gaussian_neon::neon_support;
 use crate::unsafe_slice::UnsafeSlice;
 use num_traits::cast::FromPrimitive;
+#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), target_feature = "sse4.1"))]
 use crate::fast_gaussian_sse::sse_support;
 use crate::threading_policy::ThreadingPolicy;
 
@@ -50,18 +51,9 @@ fn fast_gaussian_vertical_pass<T: FromPrimitive + Default + Into<i32>, const CHA
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(bytes) };
-            match channels {
-                FastBlurChannels::Channels3 => {
-                    neon_support::fast_gaussian_vertical_pass_neon_u8::<3>(
-                        slice, stride, width, height, radius, start, end,
-                    );
-                }
-                FastBlurChannels::Channels4 => {
-                    neon_support::fast_gaussian_vertical_pass_neon_u8::<4>(
-                        slice, stride, width, height, radius, start, end,
-                    );
-                }
-            }
+            neon_support::fast_gaussian_vertical_pass_neon_u8::<CHANNELS_CONFIGURATION>(
+                slice, stride, width, height, radius, start, end,
+            );
             return;
         }
         #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), target_feature = "sse4.1"))]
@@ -169,18 +161,9 @@ fn fast_gaussian_horizontal_pass<T: FromPrimitive + Default + Into<i32> + Send +
         #[cfg(target_feature = "neon")]
         {
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(bytes) };
-            match channels {
-                FastBlurChannels::Channels3 => {
-                    neon_support::fast_gaussian_horizontal_pass_neon_u8::<3>(
-                        slice, stride, width, height, radius, start, end,
-                    );
-                }
-                FastBlurChannels::Channels4 => {
-                    neon_support::fast_gaussian_horizontal_pass_neon_u8::<4>(
-                        slice, stride, width, height, radius, start, end,
-                    );
-                }
-            }
+            neon_support::fast_gaussian_horizontal_pass_neon_u8::<CHANNEL_CONFIGURATION>(
+                slice, stride, width, height, radius, start, end,
+            );
             return;
         }
         #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), target_feature = "sse4.1"))]

@@ -25,12 +25,13 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#[allow(unused_imports)]
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::box_blur_neon::neon_support;
 use crate::channels_configuration::FastBlurChannels;
 use crate::unsafe_slice::UnsafeSlice;
 use num_traits::cast::FromPrimitive;
 use rayon::ThreadPool;
+#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), target_feature = "sse4.1"))]
 use crate::box_blur_sse::sse_support;
 use crate::ThreadingPolicy;
 
@@ -54,7 +55,7 @@ fn box_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<u32> + Send +
         {
             let u8_slice: &Vec<u8> = unsafe { std::mem::transmute(src) };
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
-            neon_support::box_blur_horizontal_pass_4channels_u8_impl(
+            neon_support::box_blur_horizontal_pass_neon::<CHANNELS_CONFIGURATION>(
                 u8_slice,
                 src_stride,
                 slice,
@@ -63,7 +64,6 @@ fn box_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<u32> + Send +
                 radius,
                 start_y,
                 end_y,
-                box_channels,
             );
             return;
         }
@@ -232,7 +232,7 @@ fn box_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<u32> + Sync + S
         {
             let u8_slice: &Vec<u8> = unsafe { std::mem::transmute(src) };
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
-            neon_support::box_blur_vertical_pass_4channels_u8_impl(
+            neon_support::box_blur_vertical_pass_neon::<CHANNEL_CONFIGURATION>(
                 u8_slice,
                 src_stride,
                 slice,
@@ -242,7 +242,6 @@ fn box_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<u32> + Sync + S
                 radius,
                 start_x,
                 end_x,
-                box_channels,
             );
             return;
         }

@@ -26,17 +26,21 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::channels_configuration::FastBlurChannels;
-#[allow(unused_imports)]
-use crate::gaussian_neon::neon_support;
-use crate::unsafe_slice::UnsafeSlice;
-use num_traits::cast::FromPrimitive;
-use rayon::ThreadPool;
 use crate::gaussian_f16::gaussian_f16;
 use crate::gaussian_helper::get_gaussian_kernel_1d;
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+use crate::gaussian_neon::neon_support;
+#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), target_feature = "sse4.1"))]
 use crate::gaussian_sse::sse_support;
+use crate::unsafe_slice::UnsafeSlice;
 use crate::ThreadingPolicy;
+use num_traits::cast::FromPrimitive;
+use rayon::ThreadPool;
 
-fn gaussian_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<f32> + Send + Sync, const CHANNEL_CONFIGURATION: usize>(
+fn gaussian_blur_horizontal_pass_impl<
+    T: FromPrimitive + Default + Into<f32> + Send + Sync,
+    const CHANNEL_CONFIGURATION: usize,
+>(
     src: &[T],
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<T>,
@@ -50,45 +54,27 @@ fn gaussian_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<f32> + S
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
     if std::any::type_name::<T>() == "u8" {
-        #[cfg(target_arch = "aarch64")]
-        #[cfg(target_feature = "neon")]
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
-            match gaussian_channels {
-                Channels3 => {
-                    let u8_slice: &Vec<u8> = unsafe { std::mem::transmute(src) };
-                    let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
-                    neon_support::gaussian_blur_horizontal_pass_impl_neon_3channels_u8(
-                        u8_slice,
-                        src_stride,
-                        slice,
-                        dst_stride,
-                        width,
-                        kernel_size,
-                        kernel,
-                        start_y,
-                        end_y,
-                    );
-                    return;
-                }
-                FastBlurChannels::Channels4 => {
-                    let u8_slice: &Vec<u8> = unsafe { std::mem::transmute(src) };
-                    let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
-                    neon_support::gaussian_blur_horizontal_pass_impl_neon_4channels_u8(
-                        u8_slice,
-                        src_stride,
-                        slice,
-                        dst_stride,
-                        width,
-                        kernel_size,
-                        kernel,
-                        start_y,
-                        end_y,
-                    );
-                    return;
-                }
-            }
+            let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
+            let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
+            neon_support::gaussian_blur_horizontal_pass_neon::<CHANNEL_CONFIGURATION>(
+                u8_slice,
+                src_stride,
+                slice,
+                dst_stride,
+                width,
+                kernel_size,
+                kernel,
+                start_y,
+                end_y,
+            );
+            return;
         }
-        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), target_feature = "sse4.1"))]
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "sse4.1"
+        ))]
         {
             let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
@@ -121,7 +107,8 @@ fn gaussian_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<f32> + S
                 weights[1] += (unsafe { *src.get_unchecked(y_src_shift + px + 1) }.into()) * weight;
                 weights[2] += (unsafe { *src.get_unchecked(y_src_shift + px + 2) }.into()) * weight;
                 if CHANNEL_CONFIGURATION == 4 {
-                    weights[3] += (unsafe { *src.get_unchecked(y_src_shift + px + 3) }.into()) * weight;
+                    weights[3] +=
+                        (unsafe { *src.get_unchecked(y_src_shift + px + 3) }.into()) * weight;
                 }
             }
 
@@ -151,7 +138,10 @@ fn gaussian_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<f32> + S
     }
 }
 
-fn gaussian_blur_horizontal_pass<T: FromPrimitive + Default + Into<f32> + Send + Sync, const CHANNEL_CONFIGURATION: usize>(
+fn gaussian_blur_horizontal_pass<
+    T: FromPrimitive + Default + Into<f32> + Send + Sync,
+    const CHANNEL_CONFIGURATION: usize,
+>(
     src: &[T],
     src_stride: u32,
     dst: &mut [T],
@@ -192,7 +182,10 @@ fn gaussian_blur_horizontal_pass<T: FromPrimitive + Default + Into<f32> + Send +
     });
 }
 
-fn gaussian_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<f32> + Send + Sync, const CHANNEL_CONFIGURATION: usize>(
+fn gaussian_blur_vertical_pass_impl<
+    T: FromPrimitive + Default + Into<f32> + Send + Sync,
+    const CHANNEL_CONFIGURATION: usize,
+>(
     src: &[T],
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<T>,
@@ -209,44 +202,26 @@ fn gaussian_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<f32> + Sen
     if std::any::type_name::<T>() == "u8" {
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
-            match gaussian_channels {
-                Channels3 => {
-                    let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
-                    let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
-                    neon_support::gaussian_blur_vertical_pass_impl_neon_3channels_u8(
-                        u8_slice,
-                        src_stride,
-                        slice,
-                        dst_stride,
-                        width,
-                        height,
-                        kernel_size,
-                        kernel,
-                        start_y,
-                        end_y,
-                    );
-                    return;
-                }
-                FastBlurChannels::Channels4 => {
-                    let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
-                    let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
-                    neon_support::gaussian_blur_vertical_pass_impl_neon_4channels_u8(
-                        u8_slice,
-                        src_stride,
-                        slice,
-                        dst_stride,
-                        width,
-                        height,
-                        kernel_size,
-                        kernel,
-                        start_y,
-                        end_y,
-                    );
-                    return;
-                }
-            }
+            let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
+            let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
+            neon_support::gaussian_blur_vertical_pass_neon::<CHANNEL_CONFIGURATION>(
+                u8_slice,
+                src_stride,
+                slice,
+                dst_stride,
+                width,
+                height,
+                kernel_size,
+                kernel,
+                start_y,
+                end_y,
+            );
+            return;
         }
-        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), target_feature = "sse4.1"))]
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "sse4.1"
+        ))]
         {
             let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
@@ -279,7 +254,8 @@ fn gaussian_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<f32> + Sen
                 weights[1] += (unsafe { *src.get_unchecked(y_src_shift + px + 1) }.into()) * weight;
                 weights[2] += (unsafe { *src.get_unchecked(y_src_shift + px + 2) }.into()) * weight;
                 if CHANNEL_CONFIGURATION == 4 {
-                    weights[3] += (unsafe { *src.get_unchecked(y_src_shift + px + 3) }.into()) * weight;
+                    weights[3] +=
+                        (unsafe { *src.get_unchecked(y_src_shift + px + 3) }.into()) * weight;
                 }
             }
 
@@ -307,7 +283,10 @@ fn gaussian_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<f32> + Sen
     }
 }
 
-fn gaussian_blur_vertical_pass<T: FromPrimitive + Default + Into<f32> + Send + Sync, const CHANNEL_CONFIGURATION: usize>(
+fn gaussian_blur_vertical_pass<
+    T: FromPrimitive + Default + Into<f32> + Send + Sync,
+    const CHANNEL_CONFIGURATION: usize,
+>(
     src: &[T],
     src_stride: u32,
     dst: &mut [T],
@@ -350,7 +329,10 @@ fn gaussian_blur_vertical_pass<T: FromPrimitive + Default + Into<f32> + Send + S
     });
 }
 
-fn gaussian_blur_impl<T: FromPrimitive + Default + Into<f32> + Send + Sync, const CHANNEL_CONFIGURATION: usize>(
+fn gaussian_blur_impl<
+    T: FromPrimitive + Default + Into<f32> + Send + Sync,
+    const CHANNEL_CONFIGURATION: usize,
+>(
     src: &[T],
     src_stride: u32,
     dst: &mut [T],
