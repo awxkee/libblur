@@ -25,8 +25,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
-#[cfg(target_feature = "neon")]
+#[cfg(all(any(target_arch = "arm", target_arch = "aarch64"), target_feature = "neon"))]
 pub mod neon_support {
     use crate::neon_utils::neon_utils::{load_u8_u16, load_u8_u32};
     use crate::unsafe_slice::UnsafeSlice;

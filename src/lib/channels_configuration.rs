@@ -29,6 +29,16 @@
 #[allow(dead_code)]
 #[derive(Clone, Copy)]
 pub enum FastBlurChannels {
-    Channels3,
-    Channels4,
+    Channels3 = 3,
+    Channels4 = 4,
+}
+
+impl From<usize> for FastBlurChannels {
+    fn from(value: usize) -> Self {
+        return match value {
+            3 => FastBlurChannels::Channels3,
+            4 => FastBlurChannels::Channels4,
+            _ => { panic!("Unknown value"); }
+        };
+    }
 }

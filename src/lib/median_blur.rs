@@ -26,6 +26,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::channels_configuration::FastBlurChannels;
+use crate::ThreadingPolicy;
 use crate::unsafe_slice::UnsafeSlice;
 
 struct MedianHistogram {
@@ -36,25 +37,20 @@ struct MedianHistogram {
     n: i32,
 }
 
-fn add_rgb_pixels(
-    src: &Vec<u8>,
+fn add_rgb_pixels<const CHANNEL_CONFIGURATION: usize>(
+    src: &[u8],
     src_stride: u32,
     y: i64,
     x: i64,
     width: u32,
     height: u32,
     size: u32,
-    median_channels: FastBlurChannels,
     histogram: &mut MedianHistogram,
 ) {
     if x < 0 || x >= width as i64 {
         return;
     }
-    let channels_count = match median_channels {
-        FastBlurChannels::Channels3 => 3,
-        FastBlurChannels::Channels4 => 4,
-    } as usize;
-    let px = x as usize * channels_count;
+    let px = x as usize * CHANNEL_CONFIGURATION;
     let cap = std::cmp::min(y + size as i64, height as i64 - 1);
     let start = y - size as i64;
     for i in start..=cap {
@@ -62,38 +58,42 @@ fn add_rgb_pixels(
             continue;
         }
         let y_shift = i as usize * src_stride as usize;
-        histogram.r[usize::from(src[y_shift + px])] += 1;
-        histogram.g[usize::from(src[y_shift + px + 1])] += 1;
-        histogram.b[usize::from(src[y_shift + px + 2])] += 1;
-        match median_channels {
-            FastBlurChannels::Channels3 => {}
-            FastBlurChannels::Channels4 => {
-                histogram.a[usize::from(src[y_shift + px + 3])] += 1;
-            }
+        let v0 = unsafe { *src.get_unchecked(y_shift + px) };
+        unsafe {
+            *histogram.r.get_unchecked_mut(usize::from(v0)) += 1;
         }
-        histogram.n += 1;
+        let v1 = unsafe { *src.get_unchecked(y_shift + px + 1) };
+        unsafe {
+            *histogram.g.get_unchecked_mut(usize::from(v1)) += 1;
+        }
+        let v2 = unsafe { *src.get_unchecked(y_shift + px + 2) };
+        unsafe {
+            *histogram.b.get_unchecked_mut(usize::from(v2)) += 1;
+        }
+        if CHANNEL_CONFIGURATION == 4 {
+            let v3 = unsafe { *src.get_unchecked(y_shift + px + 3) };
+            unsafe {
+                *histogram.a.get_unchecked_mut(usize::from(v3)) += 1;
+            }
+            histogram.n += 1;
+        }
     }
 }
 
-fn remove_rgb_pixels(
-    src: &Vec<u8>,
+fn remove_rgb_pixels<const CHANNELS_CONFIGURATION: usize>(
+    src: &[u8],
     src_stride: u32,
     y: i64,
     x: i64,
     width: u32,
     height: u32,
     size: u32,
-    median_channels: FastBlurChannels,
     histogram: &mut MedianHistogram,
 ) {
     if x < 0 || x >= width as i64 {
         return;
     }
-    let channels_count = match median_channels {
-        FastBlurChannels::Channels3 => 3,
-        FastBlurChannels::Channels4 => 4,
-    } as usize;
-    let px = x as usize * channels_count;
+    let px = x as usize * CHANNELS_CONFIGURATION;
     let cap = std::cmp::min(y + size as i64, height as i64 - 1);
     let start = y - size as i64;
     for i in start..=cap {
@@ -101,27 +101,33 @@ fn remove_rgb_pixels(
             continue;
         }
         let y_shift = i as usize * src_stride as usize;
-        histogram.r[usize::from(src[y_shift + px])] -= 1;
-        histogram.g[usize::from(src[y_shift + px + 1])] -= 1;
-        histogram.b[usize::from(src[y_shift + px + 2])] -= 1;
-        match median_channels {
-            FastBlurChannels::Channels3 => {}
-            FastBlurChannels::Channels4 => {
-                histogram.a[usize::from(src[y_shift + px + 3])] -= 1;
-            }
+        let v0 = unsafe { *src.get_unchecked(y_shift + px) };
+        unsafe {
+            *histogram.r.get_unchecked_mut(usize::from(v0)) -= 1;
+        }
+        let v1 = unsafe { *src.get_unchecked(y_shift + px + 1) };
+        unsafe {
+            *histogram.g.get_unchecked_mut(usize::from(v1)) -= 1;
+        }
+        let v2 = unsafe { *src.get_unchecked(y_shift + px + 2) };
+        unsafe {
+            *histogram.b.get_unchecked_mut(usize::from(v2)) -= 1;
+        }
+        if CHANNELS_CONFIGURATION == 4 {
+            let v3 = unsafe { *src.get_unchecked(y_shift + px + 3) };
+            histogram.a[usize::from(v3)] -= 1;
         }
         histogram.n -= 1;
     }
 }
 
-fn init_histogram(
-    src: &Vec<u8>,
+fn init_histogram<const CHANNELS_CONFIGURATION: usize>(
+    src: &[u8],
     src_stride: u32,
     y: u32,
     width: u32,
     height: u32,
     radius: u32,
-    median_channels: FastBlurChannels,
     histogram: &mut MedianHistogram,
 ) {
     histogram.r = [0; 256];
@@ -131,7 +137,7 @@ fn init_histogram(
     histogram.n = 0;
 
     for j in 0..std::cmp::min(radius, width) {
-        add_rgb_pixels(
+        add_rgb_pixels::<CHANNELS_CONFIGURATION>(
             src,
             src_stride,
             y as i64,
@@ -139,7 +145,6 @@ fn init_histogram(
             width,
             height,
             radius,
-            median_channels,
             histogram,
         );
     }
@@ -149,7 +154,7 @@ fn median_filter(x: [i32; 256], n: i32) -> i32 {
     let mut n = n / 2;
     let mut i = 0i64;
     while i < 256 && i >= 0 {
-        n -= x[i as usize];
+        n -= unsafe { *x.get_unchecked(i as usize) };
         if n > 0 {
             i += 1;
         } else {
@@ -159,22 +164,17 @@ fn median_filter(x: [i32; 256], n: i32) -> i32 {
     i as i32
 }
 
-fn median_blur_impl(
-    src: &Vec<u8>,
+fn median_blur_impl<const CHANNELS_CONFIGURATION: usize>(
+    src: &[u8],
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<u8>,
     dst_stride: u32,
     width: u32,
     height: u32,
     radius: u32,
-    median_channels: FastBlurChannels,
     start_y: u32,
     end_y: u32,
 ) {
-    let channels_count = match median_channels {
-        FastBlurChannels::Channels3 => 3,
-        FastBlurChannels::Channels4 => 4,
-    } as usize;
     for y in start_y..end_y {
         let y_src_offset = y as usize * src_stride as usize;
         let y_dst_offset = y as usize * dst_stride as usize;
@@ -186,20 +186,19 @@ fn median_blur_impl(
             n: 0,
         };
         for x in 0..width {
-            let px = x as usize * channels_count;
+            let px = x as usize * CHANNELS_CONFIGURATION;
             if x == 0 {
-                init_histogram(
+                init_histogram::<CHANNELS_CONFIGURATION>(
                     src,
                     src_stride,
                     y,
                     width,
                     height,
                     radius,
-                    median_channels,
                     &mut histogram,
                 );
             } else {
-                remove_rgb_pixels(
+                remove_rgb_pixels::<CHANNELS_CONFIGURATION>(
                     src,
                     src_stride,
                     y as i64,
@@ -207,10 +206,9 @@ fn median_blur_impl(
                     width,
                     height,
                     radius,
-                    median_channels,
                     &mut histogram,
                 );
-                add_rgb_pixels(
+                add_rgb_pixels::<CHANNELS_CONFIGURATION>(
                     src,
                     src_stride,
                     y as i64,
@@ -218,7 +216,6 @@ fn median_blur_impl(
                     width,
                     height,
                     radius,
-                    median_channels,
                     &mut histogram,
                 );
             }
@@ -237,27 +234,21 @@ fn median_blur_impl(
                         y_dst_offset + px + 2,
                         median_filter(histogram.b, histogram.n) as u8,
                     );
-                    match median_channels {
-                        FastBlurChannels::Channels3 => {}
-                        FastBlurChannels::Channels4 => {
-                            unsafe_dst.write(
-                                y_dst_offset + px + 3,
-                                median_filter(histogram.a, histogram.n) as u8,
-                            );
-                        }
-                    };
+                    if CHANNELS_CONFIGURATION == 4 {
+                        unsafe_dst.write(
+                            y_dst_offset + px + 3,
+                            median_filter(histogram.a, histogram.n) as u8,
+                        );
+                    }
                 }
             } else {
                 unsafe {
-                    unsafe_dst.write(y_dst_offset + px, src[y_src_offset + px]);
-                    unsafe_dst.write(y_dst_offset + px + 1, src[y_src_offset + px + 1]);
-                    unsafe_dst.write(y_dst_offset + px + 2, src[y_src_offset + px + 2]);
-                    match median_channels {
-                        FastBlurChannels::Channels3 => {}
-                        FastBlurChannels::Channels4 => {
-                            unsafe_dst.write(y_dst_offset + px + 3, src[y_src_offset + px + 3]);
-                        }
-                    };
+                    unsafe_dst.write(y_dst_offset + px, *src.get_unchecked(y_src_offset + px));
+                    unsafe_dst.write(y_dst_offset + px + 1, *src.get_unchecked(y_src_offset + px + 1));
+                    unsafe_dst.write(y_dst_offset + px + 2, *src.get_unchecked(y_src_offset + px + 2));
+                    if CHANNELS_CONFIGURATION == 4 {
+                        unsafe_dst.write(y_dst_offset + px + 3, *src.get_unchecked(y_src_offset + px + 3));
+                    }
                 }
             }
         }
@@ -266,18 +257,19 @@ fn median_blur_impl(
 
 #[no_mangle]
 #[allow(dead_code)]
-pub extern "C" fn median_blur(
-    src: &Vec<u8>,
+pub fn median_blur(
+    src: &[u8],
     src_stride: u32,
-    dst: &mut Vec<u8>,
+    dst: &mut [u8],
     dst_stride: u32,
     width: u32,
     height: u32,
     radius: u32,
     median_channels: FastBlurChannels,
+    threading_policy: ThreadingPolicy,
 ) {
     let unsafe_dst = UnsafeSlice::new(dst);
-    let thread_count = std::cmp::max(std::cmp::min(width * height / (256 * 256), 12), 1);
+    let thread_count = threading_policy.get_threads_count(width, height) as u32;
     let pool = rayon::ThreadPoolBuilder::new()
         .num_threads(thread_count as usize)
         .build()
@@ -291,18 +283,34 @@ pub extern "C" fn median_blur(
                 end_y = height;
             }
             scope.spawn(move |_| {
-                median_blur_impl(
-                    src,
-                    src_stride,
-                    &unsafe_dst,
-                    dst_stride,
-                    width,
-                    height,
-                    radius,
-                    median_channels,
-                    start_y,
-                    end_y,
-                );
+                match median_channels {
+                    FastBlurChannels::Channels3 => {
+                        median_blur_impl::<3>(
+                            src,
+                            src_stride,
+                            &unsafe_dst,
+                            dst_stride,
+                            width,
+                            height,
+                            radius,
+                            start_y,
+                            end_y,
+                        );
+                    }
+                    FastBlurChannels::Channels4 => {
+                        median_blur_impl::<4>(
+                            src,
+                            src_stride,
+                            &unsafe_dst,
+                            dst_stride,
+                            width,
+                            height,
+                            radius,
+                            start_y,
+                            end_y,
+                        );
+                    }
+                }
             });
         }
     });

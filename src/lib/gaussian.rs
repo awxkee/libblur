@@ -29,21 +29,19 @@ use crate::channels_configuration::FastBlurChannels;
 #[allow(unused_imports)]
 use crate::gaussian_neon::neon_support;
 use crate::unsafe_slice::UnsafeSlice;
-#[allow(unused_imports)]
-use crate::FastBlurChannels::Channels3;
 use num_traits::cast::FromPrimitive;
 use rayon::ThreadPool;
 use crate::gaussian_f16::gaussian_f16;
 use crate::gaussian_helper::get_gaussian_kernel_1d;
+use crate::ThreadingPolicy;
 
-fn gaussian_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<f32> + Send + Sync>(
-    src: &Vec<T>,
+fn gaussian_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<f32> + Send + Sync, const CHANNEL_CONFIGURATION: usize>(
+    src: &[T],
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<T>,
     dst_stride: u32,
     width: u32,
     kernel_size: usize,
-    gaussian_channels: FastBlurChannels,
     kernel: &Vec<f32>,
     start_y: u32,
     end_y: u32,
@@ -91,10 +89,6 @@ fn gaussian_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<f32> + S
         }
     }
     let half_kernel = (kernel_size / 2) as i32;
-    let channels_count = match gaussian_channels {
-        FastBlurChannels::Channels3 => 3,
-        FastBlurChannels::Channels4 => 4,
-    };
     for y in start_y..end_y {
         let y_src_shift = y as usize * src_stride as usize;
         let y_dst_shift = y as usize * dst_stride as usize;
@@ -103,20 +97,17 @@ fn gaussian_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<f32> + S
             for r in -half_kernel..=half_kernel {
                 let px = std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
                     as usize
-                    * channels_count;
-                let weight = kernel[(r + half_kernel) as usize];
-                weights[0] += (src[y_src_shift + px].into()) * weight;
-                weights[1] += (src[y_src_shift + px + 1].into()) * weight;
-                weights[2] += (src[y_src_shift + px + 2].into()) * weight;
-                match gaussian_channels {
-                    FastBlurChannels::Channels3 => {}
-                    FastBlurChannels::Channels4 => {
-                        weights[3] += (src[y_src_shift + px + 3].into()) * weight;
-                    }
+                    * CHANNEL_CONFIGURATION;
+                let weight = unsafe { *kernel.get_unchecked((r + half_kernel) as usize) };
+                weights[0] += (unsafe { *src.get_unchecked(y_src_shift + px) }.into()) * weight;
+                weights[1] += (unsafe { *src.get_unchecked(y_src_shift + px + 1) }.into()) * weight;
+                weights[2] += (unsafe { *src.get_unchecked(y_src_shift + px + 2) }.into()) * weight;
+                if CHANNEL_CONFIGURATION == 4 {
+                    weights[3] += (unsafe { *src.get_unchecked(y_src_shift + px + 3) }.into()) * weight;
                 }
             }
 
-            let px = x as usize * channels_count;
+            let px = x as usize * CHANNEL_CONFIGURATION;
 
             unsafe {
                 unsafe_dst.write(
@@ -131,29 +122,25 @@ fn gaussian_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<f32> + S
                     y_dst_shift + px + 2,
                     T::from_f32(weights[2]).unwrap_or_default(),
                 );
-                match gaussian_channels {
-                    FastBlurChannels::Channels3 => {}
-                    FastBlurChannels::Channels4 => {
-                        unsafe_dst.write(
-                            y_dst_shift + px + 3,
-                            T::from_f32(weights[3]).unwrap_or_default(),
-                        );
-                    }
+                if CHANNEL_CONFIGURATION == 4 {
+                    unsafe_dst.write(
+                        y_dst_shift + px + 3,
+                        T::from_f32(weights[3]).unwrap_or_default(),
+                    );
                 }
             }
         }
     }
 }
 
-fn gaussian_blur_horizontal_pass<T: FromPrimitive + Default + Into<f32> + Send + Sync>(
-    src: &Vec<T>,
+fn gaussian_blur_horizontal_pass<T: FromPrimitive + Default + Into<f32> + Send + Sync, const CHANNEL_CONFIGURATION: usize>(
+    src: &[T],
     src_stride: u32,
-    dst: &mut Vec<T>,
+    dst: &mut [T],
     dst_stride: u32,
     width: u32,
     height: u32,
     kernel_size: usize,
-    gaussian_channels: FastBlurChannels,
     kernel: &Vec<f32>,
     thread_pool: &ThreadPool,
     thread_count: u32,
@@ -171,14 +158,13 @@ fn gaussian_blur_horizontal_pass<T: FromPrimitive + Default + Into<f32> + Send +
             }
 
             scope.spawn(move |_| {
-                gaussian_blur_horizontal_pass_impl(
+                gaussian_blur_horizontal_pass_impl::<T, CHANNEL_CONFIGURATION>(
                     src,
                     src_stride,
                     &unsafe_dst,
                     dst_stride,
                     width,
                     kernel_size,
-                    gaussian_channels,
                     kernel,
                     start_y,
                     end_y,
@@ -188,15 +174,14 @@ fn gaussian_blur_horizontal_pass<T: FromPrimitive + Default + Into<f32> + Send +
     });
 }
 
-fn gaussian_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<f32> + Send + Sync>(
-    src: &Vec<T>,
+fn gaussian_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<f32> + Send + Sync, const CHANNEL_CONFIGURATION: usize>(
+    src: &[T],
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<T>,
     dst_stride: u32,
     width: u32,
     height: u32,
     kernel_size: usize,
-    gaussian_channels: FastBlurChannels,
     kernel: &Vec<f32>,
     start_y: u32,
     end_y: u32,
@@ -246,27 +231,20 @@ fn gaussian_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<f32> + Sen
         }
     }
     let half_kernel = (kernel_size / 2) as i32;
-    let channels_count = match gaussian_channels {
-        FastBlurChannels::Channels3 => 3,
-        FastBlurChannels::Channels4 => 4,
-    };
     for y in start_y..end_y {
         let y_dst_shift = y as usize * dst_stride as usize;
         for x in 0..width {
-            let px = x as usize * channels_count;
+            let px = x as usize * CHANNEL_CONFIGURATION;
             let mut weights: [f32; 4] = [0f32; 4];
             for r in -half_kernel..=half_kernel {
                 let py = std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
                 let y_src_shift = py as usize * src_stride as usize;
-                let weight = kernel[(r + half_kernel) as usize];
-                weights[0] += (src[y_src_shift + px].into()) * weight;
-                weights[1] += (src[y_src_shift + px + 1].into()) * weight;
-                weights[2] += (src[y_src_shift + px + 2].into()) * weight;
-                match gaussian_channels {
-                    FastBlurChannels::Channels3 => {}
-                    FastBlurChannels::Channels4 => {
-                        weights[3] += (src[y_src_shift + px + 3].into()) * weight;
-                    }
+                let weight = unsafe { *kernel.get_unchecked((r + half_kernel) as usize) };
+                weights[0] += (unsafe { *src.get_unchecked(y_src_shift + px) }.into()) * weight;
+                weights[1] += (unsafe { *src.get_unchecked(y_src_shift + px + 1) }.into()) * weight;
+                weights[2] += (unsafe { *src.get_unchecked(y_src_shift + px + 2) }.into()) * weight;
+                if CHANNEL_CONFIGURATION == 4 {
+                    weights[3] += (unsafe { *src.get_unchecked(y_src_shift + px + 3) }.into()) * weight;
                 }
             }
 
@@ -283,29 +261,25 @@ fn gaussian_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<f32> + Sen
                     y_dst_shift + px + 2,
                     T::from_f32(weights[2]).unwrap_or_default(),
                 );
-                match gaussian_channels {
-                    FastBlurChannels::Channels3 => {}
-                    FastBlurChannels::Channels4 => {
-                        unsafe_dst.write(
-                            y_dst_shift + px + 3,
-                            T::from_f32(weights[3]).unwrap_or_default(),
-                        );
-                    }
+                if CHANNEL_CONFIGURATION == 4 {
+                    unsafe_dst.write(
+                        y_dst_shift + px + 3,
+                        T::from_f32(weights[3]).unwrap_or_default(),
+                    );
                 }
             }
         }
     }
 }
 
-fn gaussian_blur_vertical_pass<T: FromPrimitive + Default + Into<f32> + Send + Sync>(
-    src: &Vec<T>,
+fn gaussian_blur_vertical_pass<T: FromPrimitive + Default + Into<f32> + Send + Sync, const CHANNEL_CONFIGURATION: usize>(
+    src: &[T],
     src_stride: u32,
-    dst: &mut Vec<T>,
+    dst: &mut [T],
     dst_stride: u32,
     width: u32,
     height: u32,
     kernel_size: usize,
-    gaussian_channels: FastBlurChannels,
     kernel: &Vec<f32>,
     thread_pool: &ThreadPool,
     thread_count: u32,
@@ -324,7 +298,7 @@ fn gaussian_blur_vertical_pass<T: FromPrimitive + Default + Into<f32> + Send + S
             }
 
             scope.spawn(move |_| {
-                gaussian_blur_vertical_pass_impl(
+                gaussian_blur_vertical_pass_impl::<T, CHANNEL_CONFIGURATION>(
                     src,
                     src_stride,
                     &unsafe_dst,
@@ -332,7 +306,6 @@ fn gaussian_blur_vertical_pass<T: FromPrimitive + Default + Into<f32> + Send + S
                     width,
                     height,
                     kernel_size,
-                    gaussian_channels,
                     kernel,
                     start_y,
                     end_y,
@@ -342,16 +315,16 @@ fn gaussian_blur_vertical_pass<T: FromPrimitive + Default + Into<f32> + Send + S
     });
 }
 
-fn gaussian_blur_impl<T: FromPrimitive + Default + Into<f32> + Send + Sync>(
-    src: &Vec<T>,
+fn gaussian_blur_impl<T: FromPrimitive + Default + Into<f32> + Send + Sync, const CHANNEL_CONFIGURATION: usize>(
+    src: &[T],
     src_stride: u32,
-    dst: &mut Vec<T>,
+    dst: &mut [T],
     dst_stride: u32,
     width: u32,
     height: u32,
     kernel_size: u32,
     sigma: f32,
-    box_channels: FastBlurChannels,
+    threading_policy: ThreadingPolicy,
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
@@ -365,13 +338,13 @@ fn gaussian_blur_impl<T: FromPrimitive + Default + Into<f32> + Send + Sync>(
         T::from_u32(0).unwrap_or_default(),
     );
 
-    let thread_count = std::cmp::max(std::cmp::min(width * height / (256 * 256), 12), 1);
+    let thread_count = threading_policy.get_threads_count(width, height) as u32;
     let pool = rayon::ThreadPoolBuilder::new()
         .num_threads(thread_count as usize)
         .build()
         .unwrap();
 
-    gaussian_blur_horizontal_pass(
+    gaussian_blur_horizontal_pass::<T, CHANNEL_CONFIGURATION>(
         &src,
         src_stride,
         &mut transient,
@@ -379,12 +352,11 @@ fn gaussian_blur_impl<T: FromPrimitive + Default + Into<f32> + Send + Sync>(
         width,
         height,
         kernel.len(),
-        box_channels,
         &kernel,
         &pool,
         thread_count,
     );
-    gaussian_blur_vertical_pass(
+    gaussian_blur_vertical_pass::<T, CHANNEL_CONFIGURATION>(
         &transient,
         dst_stride,
         dst,
@@ -392,7 +364,6 @@ fn gaussian_blur_impl<T: FromPrimitive + Default + Into<f32> + Send + Sync>(
         width,
         height,
         kernel.len(),
-        box_channels,
         &kernel,
         &pool,
         thread_count,
@@ -406,28 +377,46 @@ fn gaussian_blur_impl<T: FromPrimitive + Default + Into<f32> + Send + Sync>(
 /// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted.
 #[no_mangle]
 #[allow(dead_code)]
-pub extern "C" fn gaussian_blur(
-    src: &Vec<u8>,
+pub fn gaussian_blur(
+    src: &[u8],
     src_stride: u32,
-    dst: &mut Vec<u8>,
+    dst: &mut [u8],
     dst_stride: u32,
     width: u32,
     height: u32,
     kernel_size: u32,
     sigma: f32,
     channels: FastBlurChannels,
+    threading_policy: ThreadingPolicy,
 ) {
-    gaussian_blur_impl(
-        src,
-        src_stride,
-        dst,
-        dst_stride,
-        width,
-        height,
-        kernel_size,
-        sigma,
-        channels,
-    );
+    match channels {
+        FastBlurChannels::Channels3 => {
+            gaussian_blur_impl::<u8, 3>(
+                src,
+                src_stride,
+                dst,
+                dst_stride,
+                width,
+                height,
+                kernel_size,
+                sigma,
+                threading_policy,
+            );
+        }
+        FastBlurChannels::Channels4 => {
+            gaussian_blur_impl::<u8, 4>(
+                src,
+                src_stride,
+                dst,
+                dst_stride,
+                width,
+                height,
+                kernel_size,
+                sigma,
+                threading_policy,
+            );
+        }
+    }
 }
 
 /// Regular gaussian kernel based blur. Use when you need a gaussian methods or advanced image signal analysis
@@ -437,28 +426,46 @@ pub extern "C" fn gaussian_blur(
 /// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted.
 #[no_mangle]
 #[allow(dead_code)]
-pub extern "C" fn gaussian_blur_u16(
-    src: &Vec<u16>,
+pub fn gaussian_blur_u16(
+    src: &[u16],
     src_stride: u32,
-    dst: &mut Vec<u16>,
+    dst: &mut [u16],
     dst_stride: u32,
     width: u32,
     height: u32,
     kernel_size: u32,
     sigma: f32,
     channels: FastBlurChannels,
+    threading_policy: ThreadingPolicy,
 ) {
-    gaussian_blur_impl(
-        src,
-        src_stride,
-        dst,
-        dst_stride,
-        width,
-        height,
-        kernel_size,
-        sigma,
-        channels,
-    );
+    match channels {
+        FastBlurChannels::Channels3 => {
+            gaussian_blur_impl::<u16, 3>(
+                src,
+                src_stride,
+                dst,
+                dst_stride,
+                width,
+                height,
+                kernel_size,
+                sigma,
+                threading_policy,
+            );
+        }
+        FastBlurChannels::Channels4 => {
+            gaussian_blur_impl::<u16, 4>(
+                src,
+                src_stride,
+                dst,
+                dst_stride,
+                width,
+                height,
+                kernel_size,
+                sigma,
+                threading_policy,
+            );
+        }
+    }
 }
 
 /// Regular gaussian kernel based blur. Use when you need a gaussian methods or advanced image signal analysis
@@ -468,28 +475,46 @@ pub extern "C" fn gaussian_blur_u16(
 /// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted.
 #[no_mangle]
 #[allow(dead_code)]
-pub extern "C" fn gaussian_blur_f32(
-    src: &Vec<f32>,
+pub fn gaussian_blur_f32(
+    src: &[f32],
     src_stride: u32,
-    dst: &mut Vec<f32>,
+    dst: &mut [f32],
     dst_stride: u32,
     width: u32,
     height: u32,
     kernel_size: u32,
     sigma: f32,
     channels: FastBlurChannels,
+    threading_policy: ThreadingPolicy,
 ) {
-    gaussian_blur_impl(
-        src,
-        src_stride,
-        dst,
-        dst_stride,
-        width,
-        height,
-        kernel_size,
-        sigma,
-        channels,
-    );
+    match channels {
+        FastBlurChannels::Channels3 => {
+            gaussian_blur_impl::<f32, 3>(
+                src,
+                src_stride,
+                dst,
+                dst_stride,
+                width,
+                height,
+                kernel_size,
+                sigma,
+                threading_policy,
+            );
+        }
+        FastBlurChannels::Channels4 => {
+            gaussian_blur_impl::<f32, 4>(
+                src,
+                src_stride,
+                dst,
+                dst_stride,
+                width,
+                height,
+                kernel_size,
+                sigma,
+                threading_policy,
+            );
+        }
+    }
 }
 
 /// Regular gaussian kernel based blur. Use when you need a gaussian methods or advanced image signal analysis

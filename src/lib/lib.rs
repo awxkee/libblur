@@ -44,6 +44,11 @@ mod gaussian_helper;
 mod fast_gaussian_f16;
 mod fast_gaussian_next_f16;
 mod fast_gaussian_superior;
+mod threading_policy;
+mod fast_gaussian_sse;
+mod sse_utils;
+mod fast_gaussian_next_sse;
+mod box_blur_sse;
 
 pub use box_blur::box_blur;
 pub use box_blur::box_blur_u16;
@@ -66,3 +71,4 @@ pub use gaussian::gaussian_blur_f16;
 pub use gaussian::gaussian_blur_f32;
 pub use median_blur::median_blur;
 pub use fast_gaussian_superior::fast_gaussian_superior;
+pub use threading_policy::*;
