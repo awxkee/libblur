@@ -33,12 +33,12 @@ fn main() {
     dst_bytes.resize(dimensions.1 as usize * stride, 0);
     let start_time = Instant::now();
 
-    libblur::fast_gaussian_superior(
+    libblur::fast_gaussian(
         &mut bytes,
         stride as u32,
         dimensions.0,
         dimensions.1,
-        512,
+        128,
         FastBlurChannels::Channels3,
     );
     // libblur::gaussian_blur(

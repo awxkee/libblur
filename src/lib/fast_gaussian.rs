@@ -26,12 +26,12 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::channels_configuration::FastBlurChannels;
+use crate::fast_gaussian_f16::fast_gaussian_f16;
 use crate::fast_gaussian_f32::fast_gaussian_f32;
 #[allow(unused_imports)]
 use crate::fast_gaussian_neon::neon_support;
 use crate::unsafe_slice::UnsafeSlice;
 use num_traits::cast::FromPrimitive;
-use crate::fast_gaussian_f16::fast_gaussian_f16;
 
 fn fast_gaussian_vertical_pass<T: FromPrimitive + Default + Into<i32>>(
     bytes: &UnsafeSlice<T>,
@@ -50,9 +50,18 @@ fn fast_gaussian_vertical_pass<T: FromPrimitive + Default + Into<i32>>(
         #[cfg(target_feature = "neon")]
         {
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(bytes) };
-            neon_support::fast_gaussian_vertical_pass_neon_u8(
-                slice, stride, width, height, radius, start, end, channels,
-            );
+            match channels {
+                FastBlurChannels::Channels3 => {
+                    neon_support::fast_gaussian_vertical_pass_neon_u8::<3>(
+                        slice, stride, width, height, radius, start, end,
+                    );
+                }
+                FastBlurChannels::Channels4 => {
+                    neon_support::fast_gaussian_vertical_pass_neon_u8::<4>(
+                        slice, stride, width, height, radius, start, end,
+                    );
+                }
+            }
             return;
         }
     }
@@ -66,13 +75,14 @@ fn fast_gaussian_vertical_pass<T: FromPrimitive + Default + Into<i32>>(
         FastBlurChannels::Channels3 => 3,
         FastBlurChannels::Channels4 => 4,
     };
+    let initial = ((radius * radius) >> 1) as i32;
     for x in start..std::cmp::min(width, end) {
         let mut dif_r: i32 = 0;
-        let mut sum_r: i32 = ((radius * radius) >> 1) as i32;
+        let mut sum_r: i32 = initial;
         let mut dif_g: i32 = 0;
-        let mut sum_g: i32 = ((radius * radius) >> 1) as i32;
+        let mut sum_g: i32 = initial;
         let mut dif_b: i32 = 0;
-        let mut sum_b: i32 = ((radius * radius) >> 1) as i32;
+        let mut sum_b: i32 = initial;
 
         let current_px = (x * channels_count) as usize;
 
@@ -92,14 +102,17 @@ fn fast_gaussian_vertical_pass<T: FromPrimitive + Default + Into<i32>>(
 
                 let arr_index = ((y - radius_64) & 1023) as usize;
                 let d_arr_index = (y & 1023) as usize;
-                dif_r += buffer_r[arr_index] - 2 * buffer_r[d_arr_index];
-                dif_g += buffer_g[arr_index] - 2 * buffer_g[d_arr_index];
-                dif_b += buffer_b[arr_index] - 2 * buffer_b[d_arr_index];
+                dif_r += unsafe { *buffer_r.get_unchecked(arr_index) }
+                    - 2 * unsafe { *buffer_r.get_unchecked(d_arr_index) };
+                dif_g += unsafe { *buffer_g.get_unchecked(arr_index) }
+                    - 2 * unsafe { *buffer_g.get_unchecked(d_arr_index) };
+                dif_b += unsafe { *buffer_b.get_unchecked(arr_index) }
+                    - 2 * unsafe { *buffer_b.get_unchecked(d_arr_index) };
             } else if y + radius_64 >= 0 {
                 let arr_index = (y & 1023) as usize;
-                dif_r -= 2 * buffer_r[arr_index];
-                dif_g -= 2 * buffer_g[arr_index];
-                dif_b -= 2 * buffer_b[arr_index];
+                dif_r -= 2 * unsafe { *buffer_r.get_unchecked(arr_index) };
+                dif_g -= 2 * unsafe { *buffer_g.get_unchecked(arr_index) };
+                dif_b -= 2 * unsafe { *buffer_b.get_unchecked(arr_index) };
             }
 
             let next_row_y = (std::cmp::min(std::cmp::max(y + radius_64, 0), height_wide - 1)
@@ -117,15 +130,21 @@ fn fast_gaussian_vertical_pass<T: FromPrimitive + Default + Into<i32>>(
 
             dif_r += ur8.into();
             sum_r += dif_r;
-            buffer_r[arr_index] = ur8.into();
+            unsafe {
+                *buffer_r.get_unchecked_mut(arr_index) = ur8.into();
+            }
 
             dif_g += ug8.into();
             sum_g += dif_g;
-            buffer_g[arr_index] = ug8.into();
+            unsafe {
+                *buffer_g.get_unchecked_mut(arr_index) = ug8.into();
+            }
 
             dif_b += ub8.into();
             sum_b += dif_b;
-            buffer_b[arr_index] = ub8.into();
+            unsafe {
+                *buffer_b.get_unchecked_mut(arr_index) = ub8.into();
+            }
         }
     }
 }
@@ -147,9 +166,18 @@ fn fast_gaussian_horizontal_pass<T: FromPrimitive + Default + Into<i32> + Send +
         #[cfg(target_feature = "neon")]
         {
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(bytes) };
-            neon_support::fast_gaussian_horizontal_pass_neon_u8(
-                slice, stride, width, height, radius, start, end, channels,
-            );
+            match channels {
+                FastBlurChannels::Channels3 => {
+                    neon_support::fast_gaussian_horizontal_pass_neon_u8::<3>(
+                        slice, stride, width, height, radius, start, end,
+                    );
+                }
+                FastBlurChannels::Channels4 => {
+                    neon_support::fast_gaussian_horizontal_pass_neon_u8::<4>(
+                        slice, stride, width, height, radius, start, end,
+                    );
+                }
+            }
             return;
         }
     }
@@ -189,14 +217,17 @@ fn fast_gaussian_horizontal_pass<T: FromPrimitive + Default + Into<i32> + Send +
 
                 let arr_index = ((x - radius_64) & 1023) as usize;
                 let d_arr_index = (x & 1023) as usize;
-                dif_r += buffer_r[arr_index] - 2 * buffer_r[d_arr_index];
-                dif_g += buffer_g[arr_index] - 2 * buffer_g[d_arr_index];
-                dif_b += buffer_b[arr_index] - 2 * buffer_b[d_arr_index];
+                dif_r += unsafe { *buffer_r.get_unchecked(arr_index) }
+                    - 2 * unsafe { *buffer_r.get_unchecked(d_arr_index) };
+                dif_g += unsafe { *buffer_g.get_unchecked(arr_index) }
+                    - 2 * unsafe { *buffer_g.get_unchecked(d_arr_index) };
+                dif_b += unsafe { *buffer_b.get_unchecked(arr_index) }
+                    - 2 * unsafe { *buffer_b.get_unchecked(d_arr_index) };
             } else if x + radius_64 >= 0 {
                 let arr_index = (x & 1023) as usize;
-                dif_r -= 2 * buffer_r[arr_index];
-                dif_g -= 2 * buffer_g[arr_index];
-                dif_b -= 2 * buffer_b[arr_index];
+                dif_r -= 2 * unsafe { *buffer_r.get_unchecked(arr_index) };
+                dif_g -= 2 * unsafe { *buffer_g.get_unchecked(arr_index) };
+                dif_b -= 2 * unsafe { *buffer_b.get_unchecked(arr_index) };
             }
 
             let next_row_y = (y as usize) * (stride as usize);
@@ -212,15 +243,21 @@ fn fast_gaussian_horizontal_pass<T: FromPrimitive + Default + Into<i32> + Send +
 
             dif_r += ur8.into();
             sum_r += dif_r;
-            buffer_r[arr_index] = ur8.into();
+            unsafe {
+                *buffer_r.get_unchecked_mut(arr_index) = ur8.into();
+            }
 
             dif_g += ug8.into();
             sum_g += dif_g;
-            buffer_g[arr_index] = ug8.into();
+            unsafe {
+                *buffer_g.get_unchecked_mut(arr_index) = ug8.into();
+            }
 
             dif_b += ub8.into();
             sum_b += dif_b;
-            buffer_b[arr_index] = ub8.into();
+            unsafe {
+                *buffer_b.get_unchecked_mut(arr_index) = ub8.into();
+            }
         }
     }
 }

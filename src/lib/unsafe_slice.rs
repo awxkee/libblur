@@ -48,12 +48,12 @@ impl<'a, T> UnsafeSlice<'a, T> {
     /// SAFETY: It is UB if two threads write to the same index without
     /// synchronization.
     pub unsafe fn write(&self, i: usize, value: T) {
-        let ptr = self.slice[i].get();
+        let ptr = unsafe { self.slice.get_unchecked(i) }.get();
         *ptr = value;
     }
     #[allow(dead_code)]
     pub fn get(&self, i: usize) -> &T {
-        let ptr = self.slice[i].get();
+        let ptr = unsafe { self.slice.get_unchecked(i) }.get();
         unsafe { &*ptr }
     }
     #[allow(dead_code)]
@@ -66,7 +66,7 @@ impl<'a, T> Index<usize> for UnsafeSlice<'a, T> {
     type Output = T;
     #[allow(dead_code)]
     fn index(&self, index: usize) -> &Self::Output {
-        let ptr = self.slice[index].get();
+        let ptr = unsafe { self.slice.get_unchecked(index) }.get();
         unsafe { &*ptr }
     }
 }

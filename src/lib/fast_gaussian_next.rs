@@ -25,13 +25,13 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use crate::fast_gaussian_next_f16::fast_gaussian_next_f16;
 use crate::fast_gaussian_next_f32::fast_gaussian_next_f32;
 #[allow(unused_imports)]
 use crate::fast_gaussian_next_neon::neon_support;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::FastBlurChannels;
 use num_traits::FromPrimitive;
-use crate::fast_gaussian_next_f16::fast_gaussian_next_f16;
 
 fn fast_gaussian_next_vertical_pass<T: FromPrimitive + Default + Into<i32>>(
     bytes: &UnsafeSlice<T>,
@@ -50,9 +50,18 @@ fn fast_gaussian_next_vertical_pass<T: FromPrimitive + Default + Into<i32>>(
         #[cfg(target_feature = "neon")]
         {
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(bytes) };
-            neon_support::fast_gaussian_next_vertical_pass_neon_u8(
-                slice, stride, width, height, radius, start, end, channels,
-            );
+            match channels {
+                FastBlurChannels::Channels3 => {
+                    neon_support::fast_gaussian_next_vertical_pass_neon_u8::<3>(
+                        slice, stride, width, height, radius, start, end,
+                    );
+                }
+                FastBlurChannels::Channels4 => {
+                    neon_support::fast_gaussian_next_vertical_pass_neon_u8::<4>(
+                        slice, stride, width, height, radius, start, end,
+                    );
+                }
+            }
             return;
         }
     }
@@ -96,12 +105,18 @@ fn fast_gaussian_next_vertical_pass<T: FromPrimitive + Default + Into<i32>>(
                 let d_arr_index_1 = ((y + radius_64) & 1023) as usize;
                 let d_arr_index_2 = ((y - radius_64) & 1023) as usize;
                 let d_arr_index = (y & 1023) as usize;
-                dif_r +=
-                    3 * (buffer_r[d_arr_index] - buffer_r[d_arr_index_1]) - buffer_r[d_arr_index_2];
-                dif_g +=
-                    3 * (buffer_g[d_arr_index] - buffer_g[d_arr_index_1]) - buffer_g[d_arr_index_2];
-                dif_b +=
-                    3 * (buffer_b[d_arr_index] - buffer_b[d_arr_index_1]) - buffer_b[d_arr_index_2];
+                dif_r += 3
+                    * (unsafe { buffer_r.get_unchecked(d_arr_index) }
+                        - unsafe { *buffer_r.get_unchecked(d_arr_index_1) })
+                    - unsafe { *buffer_r.get_unchecked(d_arr_index_2) };
+                dif_g += 3
+                    * (unsafe { *buffer_g.get_unchecked(d_arr_index) }
+                        - unsafe { *buffer_g.get_unchecked(d_arr_index_1) })
+                    - unsafe { *buffer_g.get_unchecked(d_arr_index_2) };
+                dif_b += 3
+                    * (unsafe { *buffer_b.get_unchecked(d_arr_index) }
+                        - unsafe { *buffer_b.get_unchecked(d_arr_index_1) })
+                    - unsafe { *buffer_b.get_unchecked(d_arr_index_2) };
             } else if y + radius_64 >= 0 {
                 let arr_index = (y & 1023) as usize;
                 let arr_index_1 = ((y + radius_64) & 1023) as usize;
@@ -110,9 +125,9 @@ fn fast_gaussian_next_vertical_pass<T: FromPrimitive + Default + Into<i32>>(
                 dif_b += 3 * (buffer_b[arr_index] - buffer_b[arr_index_1]);
             } else if y + 2 * radius_64 >= 0 {
                 let arr_index = ((y + radius_64) & 1023) as usize;
-                dif_r -= 3 * buffer_r[arr_index];
-                dif_g -= 3 * buffer_g[arr_index];
-                dif_b -= 3 * buffer_b[arr_index];
+                dif_r -= 3 * unsafe { *buffer_r.get_unchecked(arr_index) };
+                dif_g -= 3 * unsafe { *buffer_g.get_unchecked(arr_index) };
+                dif_b -= 3 * unsafe { *buffer_b.get_unchecked(arr_index) };
             }
 
             let next_row_y = (std::cmp::min(
@@ -133,17 +148,23 @@ fn fast_gaussian_next_vertical_pass<T: FromPrimitive + Default + Into<i32>>(
             dif_r += ur8.into();
             der_r += dif_r;
             sum_r += der_r;
-            buffer_r[arr_index] = ur8.into();
+            unsafe {
+                *buffer_r.get_unchecked_mut(arr_index) = ur8.into();
+            }
 
             dif_g += ug8.into();
             der_g += dif_g;
             sum_g += der_g;
-            buffer_g[arr_index] = ug8.into();
+            unsafe {
+                *buffer_g.get_unchecked_mut(arr_index) = ug8.into();
+            }
 
             dif_b += ub8.into();
             der_b += dif_b;
             sum_b += der_b;
-            buffer_b[arr_index] = ub8.into();
+            unsafe {
+                *buffer_b.get_unchecked_mut(arr_index) = ub8.into();
+            }
         }
     }
 }
@@ -161,13 +182,21 @@ fn fast_gaussian_next_horizontal_pass<T: FromPrimitive + Default + Into<i32> + S
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
     if std::any::type_name::<T>() == "u8" {
-        #[cfg(target_arch = "aarch64")]
-        #[cfg(target_feature = "neon")]
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(bytes) };
-            neon_support::fast_gaussian_next_horizontal_pass_neon_u8(
-                slice, stride, width, height, radius, start, end, channels,
-            );
+            match channels {
+                FastBlurChannels::Channels3 => {
+                    neon_support::fast_gaussian_next_horizontal_pass_neon_u8::<3>(
+                        slice, stride, width, height, radius, start, end,
+                    );
+                }
+                FastBlurChannels::Channels4 => {
+                    neon_support::fast_gaussian_next_horizontal_pass_neon_u8::<4>(
+                        slice, stride, width, height, radius, start, end,
+                    );
+                }
+            }
             return;
         }
     }
@@ -210,23 +239,35 @@ fn fast_gaussian_next_horizontal_pass<T: FromPrimitive + Default + Into<i32> + S
                 let d_arr_index_1 = ((x + radius_64) & 1023) as usize;
                 let d_arr_index_2 = ((x - radius_64) & 1023) as usize;
                 let d_arr_index = (x & 1023) as usize;
-                dif_r +=
-                    3 * (buffer_r[d_arr_index] - buffer_r[d_arr_index_1]) - buffer_r[d_arr_index_2];
-                dif_g +=
-                    3 * (buffer_g[d_arr_index] - buffer_g[d_arr_index_1]) - buffer_g[d_arr_index_2];
-                dif_b +=
-                    3 * (buffer_b[d_arr_index] - buffer_b[d_arr_index_1]) - buffer_b[d_arr_index_2];
+                dif_r += 3
+                    * (unsafe { *buffer_r.get_unchecked(d_arr_index) }
+                        - unsafe { *buffer_r.get_unchecked(d_arr_index_1) })
+                    - unsafe { *buffer_r.get_unchecked(d_arr_index_2) };
+                dif_g += 3
+                    * (unsafe { *buffer_g.get_unchecked(d_arr_index) }
+                        - unsafe { *buffer_g.get_unchecked(d_arr_index_1) })
+                    - unsafe { *buffer_g.get_unchecked(d_arr_index_2) };
+                dif_b += 3
+                    * (unsafe { *buffer_b.get_unchecked(d_arr_index) }
+                        - unsafe { *buffer_b.get_unchecked(d_arr_index_1) })
+                    - unsafe { *buffer_b.get_unchecked(d_arr_index_2) };
             } else if x + radius_64 >= 0 {
                 let arr_index = (x & 1023) as usize;
                 let arr_index_1 = ((x + radius_64) & 1023) as usize;
-                dif_r += 3 * (buffer_r[arr_index] - buffer_r[arr_index_1]);
-                dif_g += 3 * (buffer_g[arr_index] - buffer_g[arr_index_1]);
-                dif_b += 3 * (buffer_b[arr_index] - buffer_b[arr_index_1]);
+                dif_r += 3
+                    * (unsafe { *buffer_r.get_unchecked(arr_index) }
+                        - unsafe { *buffer_r.get_unchecked(arr_index_1) });
+                dif_g += 3
+                    * (unsafe { *buffer_g.get_unchecked(arr_index) }
+                        - unsafe { *buffer_g.get_unchecked(arr_index_1) });
+                dif_b += 3
+                    * (unsafe { *buffer_b.get_unchecked(arr_index) }
+                        - unsafe { *buffer_b.get_unchecked(arr_index_1) });
             } else if x + 2 * radius_64 >= 0 {
                 let arr_index = ((x + radius_64) & 1023) as usize;
-                dif_r -= 3 * buffer_r[arr_index];
-                dif_g -= 3 * buffer_g[arr_index];
-                dif_b -= 3 * buffer_b[arr_index];
+                dif_r -= 3 * unsafe { buffer_r.get_unchecked(arr_index) };
+                dif_g -= 3 * unsafe { buffer_g.get_unchecked(arr_index) };
+                dif_b -= 3 * unsafe { buffer_b.get_unchecked(arr_index) };
             }
 
             let next_row_y = (y as usize) * (stride as usize);
@@ -243,17 +284,23 @@ fn fast_gaussian_next_horizontal_pass<T: FromPrimitive + Default + Into<i32> + S
             dif_r += ur8.into();
             der_r += dif_r;
             sum_r += der_r;
-            buffer_r[arr_index] = ur8.into();
+            unsafe {
+                *buffer_r.get_unchecked_mut(arr_index) = ur8.into();
+            }
 
             dif_g += ug8.into();
             der_g += dif_g;
             sum_g += der_g;
-            buffer_g[arr_index] = ug8.into();
+            unsafe {
+                *buffer_g.get_unchecked_mut(arr_index) = ug8.into();
+            }
 
             dif_b += ub8.into();
             der_b += dif_b;
             sum_b += der_b;
-            buffer_b[arr_index] = ub8.into();
+            unsafe {
+                *buffer_b.get_unchecked_mut(arr_index) = ub8.into();
+            }
         }
     }
 }
