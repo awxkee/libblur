@@ -11,7 +11,7 @@ documentation = "https://github.com/awxkee/libblur"
 categories = ["multimedia::images", "multimedia::video", "algorithms"]
 homepage = "https://github.com/awxkee/libblur"
 repository = "https://github.com/awxkee/libblur.git"
-exclude = ["*.jpg"]
+exclude = ["*.jpg", "../../assets/*"]
 
 [lib]
 name = "libblur"
