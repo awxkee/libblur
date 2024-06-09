@@ -1,7 +1,7 @@
 # Fast blur algorithms library for Rust
 
 There are some very good ( and sometimes blazing fast ) algorithms that do blurring uint images.
-Best optimized for NEON.
+Best optimized for NEON and SSE.
 
 You may receive gaussian blur in 100 FPS for 4K photo.
 
@@ -58,7 +58,7 @@ libblur::tent_blur(bytes, stride, & mut dst_bytes, stride, width, height, radius
 
 Median blur ( median filter ). Implementation is fast enough.
 
-O(R) complexity.
+O(log R) complexity.
 
 ```rust
 libblur::median_blur(bytes, stride, & mut dst_bytes, stride, width, height, radius, FastBlurChannels::Channels3);
@@ -71,7 +71,7 @@ FFT analysis etc.
 
 Kernel size must be odd. Will panic if kernel size is not odd.
 
-O(N*K) complexity.
+O(R) complexity.
 
 ```rust
 libblur::gaussian_blur( & bytes, src_stride, & mut dst_bytes, dst_stride, width, height, kernel_size, sigma, FastBlurChannels::Channels3);

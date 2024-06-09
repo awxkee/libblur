@@ -31,7 +31,7 @@ pub mod sse_support {
     use std::arch::x86_64::*;
     #[cfg(target_arch = "x86")]
     use std::arch::x86::*;
-    use crate::sse_utils::neon_utils::{load_u8_s32_fast};
+    use crate::sse_utils::sse_utils::{load_u8_s32_fast};
     use crate::unsafe_slice::UnsafeSlice;
 
     pub(crate) fn fast_gaussian_horizontal_pass_sse_u8<const CHANNELS_COUNT: usize>(

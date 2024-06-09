@@ -32,7 +32,7 @@ pub mod sse_support {
     #[cfg(target_arch = "x86_64")]
     use std::arch::x86_64::*;
 
-    use crate::sse_utils::neon_utils::load_u8_s32_fast;
+    use crate::sse_utils::sse_utils::load_u8_s32_fast;
     use crate::unsafe_slice::UnsafeSlice;
 
     pub(crate) fn box_blur_horizontal_pass_sse<const CHANNELS: usize>(
