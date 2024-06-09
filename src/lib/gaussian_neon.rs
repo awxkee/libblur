@@ -54,7 +54,144 @@ pub mod neon_support {
         let shuffle_2 = unsafe { vld1_u8(shuf_table_2.as_ptr()) };
         let shuffle = unsafe { vcombine_u8(shuffle_1, shuffle_2) };
 
-        for y in start_y..end_y {
+        let mut cy = start_y;
+
+        for y in (cy..end_y.saturating_sub(2)).step_by(2) {
+            let y_src_shift = y as usize * src_stride as usize;
+            let y_dst_shift = y as usize * dst_stride as usize;
+            for x in 0..width {
+                let mut store_0: float32x4_t = unsafe { vdupq_n_f32(0f32) };
+                let mut store_1: float32x4_t = unsafe { vdupq_n_f32(0f32) };
+
+                let mut r = -half_kernel;
+
+                unsafe {
+                    while r + 4 <= half_kernel && x as i64 + r as i64 + 6 < width as i64 {
+                        let px = std::cmp::min(
+                            std::cmp::max(x as i64 + r as i64, 0),
+                            (width - 1) as i64,
+                        ) as usize
+                            * CHANNEL_CONFIGURATION;
+                        let s_ptr = src.as_ptr().add(y_src_shift + px);
+                        let mut pixel_colors_0: uint8x16_t = vld1q_u8(s_ptr);
+                        let mut pixel_colors_1: uint8x16_t =
+                            vld1q_u8(s_ptr.add(src_stride as usize));
+                        if CHANNEL_CONFIGURATION == 3 {
+                            pixel_colors_0 = vqtbl1q_u8(pixel_colors_0, shuffle);
+                            pixel_colors_1 = vqtbl1q_u8(pixel_colors_1, shuffle);
+                        }
+                        let mut pixel_colors_u16_0 = vmovl_u8(vget_low_u8(pixel_colors_0));
+                        let mut pixel_colors_u32_0 = vmovl_u16(vget_low_u16(pixel_colors_u16_0));
+                        let mut pixel_colors_f32_0 = vcvtq_f32_u32(pixel_colors_u32_0);
+
+                        let mut pixel_colors_u16_1 = vmovl_u8(vget_low_u8(pixel_colors_1));
+                        let mut pixel_colors_u32_1 = vmovl_u16(vget_low_u16(pixel_colors_u16_1));
+                        let mut pixel_colors_f32_1 = vcvtq_f32_u32(pixel_colors_u32_1);
+
+                        let mut weight = *kernel.get_unchecked((r + half_kernel) as usize);
+                        let mut f_weight: float32x4_t = vdupq_n_f32(weight);
+                        store_0 = prefer_vfmaq_f32(store_0, pixel_colors_f32_0, f_weight);
+                        store_1 = prefer_vfmaq_f32(store_1, pixel_colors_f32_1, f_weight);
+
+                        pixel_colors_u32_0 = vmovl_high_u16(pixel_colors_u16_0);
+                        pixel_colors_f32_0 = vcvtq_f32_u32(pixel_colors_u32_0);
+
+                        pixel_colors_u32_1 = vmovl_high_u16(pixel_colors_u16_1);
+                        pixel_colors_f32_1 = vcvtq_f32_u32(pixel_colors_u32_1);
+
+                        weight = *kernel.get_unchecked((r + half_kernel + 1) as usize);
+                        f_weight = vdupq_n_f32(weight);
+                        store_0 = prefer_vfmaq_f32(store_0, pixel_colors_f32_0, f_weight);
+                        store_1 = prefer_vfmaq_f32(store_1, pixel_colors_f32_1, f_weight);
+
+                        pixel_colors_u16_0 = vmovl_u8(vget_high_u8(pixel_colors_0));
+                        pixel_colors_u16_1 = vmovl_u8(vget_high_u8(pixel_colors_1));
+
+                        pixel_colors_u32_0 = vmovl_u16(vget_low_u16(pixel_colors_u16_0));
+                        pixel_colors_u32_1 = vmovl_u16(vget_low_u16(pixel_colors_u16_1));
+
+                        pixel_colors_f32_0 = vcvtq_f32_u32(pixel_colors_u32_0);
+                        pixel_colors_f32_1 = vcvtq_f32_u32(pixel_colors_u32_1);
+
+                        weight = *kernel.get_unchecked((r + half_kernel + 2) as usize);
+                        let mut f_weight: float32x4_t = vdupq_n_f32(weight);
+                        store_0 = prefer_vfmaq_f32(store_0, pixel_colors_f32_0, f_weight);
+                        store_1 = prefer_vfmaq_f32(store_1, pixel_colors_f32_1, f_weight);
+
+                        pixel_colors_u32_0 = vmovl_high_u16(pixel_colors_u16_0);
+                        pixel_colors_f32_0 = vcvtq_f32_u32(pixel_colors_u32_0);
+
+                        pixel_colors_u32_1 = vmovl_high_u16(pixel_colors_u16_1);
+                        pixel_colors_f32_1 = vcvtq_f32_u32(pixel_colors_u32_1);
+
+                        weight = *kernel.get_unchecked((r + half_kernel + 3) as usize);
+                        f_weight = vdupq_n_f32(weight);
+                        store_0 = prefer_vfmaq_f32(store_0, pixel_colors_f32_0, f_weight);
+                        store_1 = prefer_vfmaq_f32(store_1, pixel_colors_f32_1, f_weight);
+
+                        r += 4;
+                    }
+                }
+
+                unsafe {
+                    while r <= half_kernel {
+                        let current_x = std::cmp::min(
+                            std::cmp::max(x as i64 + r as i64, 0),
+                            (width - 1) as i64,
+                        ) as usize;
+                        let px = current_x * CHANNEL_CONFIGURATION;
+                        let s_ptr = src.as_ptr().add(y_src_shift + px);
+                        let pixel_colors_u32_0 = load_u8_u32_fast::<CHANNEL_CONFIGURATION>(s_ptr);
+                        let pixel_colors_u32_1 = load_u8_u32_fast::<CHANNEL_CONFIGURATION>(
+                            s_ptr.add(src_stride as usize),
+                        );
+                        let pixel_colors_f32_0 = vcvtq_f32_u32(pixel_colors_u32_0);
+                        let pixel_colors_f32_1 = vcvtq_f32_u32(pixel_colors_u32_1);
+                        let weight = *kernel.get_unchecked((r + half_kernel) as usize);
+                        let f_weight: float32x4_t = vdupq_n_f32(weight);
+                        store_0 = prefer_vfmaq_f32(store_0, pixel_colors_f32_0, f_weight);
+                        store_1 = prefer_vfmaq_f32(store_1, pixel_colors_f32_1, f_weight);
+
+                        r += 1;
+                    }
+                }
+
+                let px = x as usize * CHANNEL_CONFIGURATION;
+
+                let px_16 = unsafe { vqmovn_u32(vcvtq_u32_f32(vrndq_f32(store_0))) };
+                let px_8 = unsafe { vqmovn_u16(vcombine_u16(px_16, px_16)) };
+                let pixel = unsafe { vget_lane_u32::<0>(vreinterpret_u32_u8(px_8)) };
+                let pixel_bytes_0 = pixel.to_le_bytes();
+
+                let px_16 = unsafe { vqmovn_u32(vcvtq_u32_f32(vrndq_f32(store_1))) };
+                let px_8 = unsafe { vqmovn_u16(vcombine_u16(px_16, px_16)) };
+                let pixel = unsafe { vget_lane_u32::<0>(vreinterpret_u32_u8(px_8)) };
+                let pixel_bytes_1 = pixel.to_le_bytes();
+
+                unsafe {
+                    let offset = y_dst_shift + px;
+                    unsafe_dst.write(offset, pixel_bytes_0[0]);
+                    unsafe_dst.write(offset + 1, pixel_bytes_0[1]);
+                    unsafe_dst.write(offset + 2, pixel_bytes_0[2]);
+                    if CHANNEL_CONFIGURATION == 4 {
+                        unsafe_dst.write(offset + 3, pixel_bytes_0[3]);
+                    }
+                }
+
+                unsafe {
+                    let offset = y_dst_shift + px + src_stride as usize;
+                    unsafe_dst.write(offset, pixel_bytes_1[0]);
+                    unsafe_dst.write(offset + 1, pixel_bytes_1[1]);
+                    unsafe_dst.write(offset + 2, pixel_bytes_1[2]);
+                    if CHANNEL_CONFIGURATION == 4 {
+                        unsafe_dst.write(offset + 3, pixel_bytes_1[3]);
+                    }
+                }
+            }
+            cy = y;
+        }
+
+        for y in cy..end_y {
             let y_src_shift = y as usize * src_stride as usize;
             let y_dst_shift = y as usize * dst_stride as usize;
             for x in 0..width {
@@ -107,20 +244,22 @@ pub mod neon_support {
                     }
                 }
 
-                while r <= half_kernel {
-                    let current_x =
-                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize;
-                    let px = current_x * CHANNEL_CONFIGURATION;
-                    let s_ptr = unsafe { src.as_ptr().add(y_src_shift + px) };
-                    let pixel_colors_u32 =
-                        unsafe { load_u8_u32_fast::<CHANNEL_CONFIGURATION>(s_ptr) };
-                    let pixel_colors_f32 = unsafe { vcvtq_f32_u32(pixel_colors_u32) };
-                    let weight = kernel[(r + half_kernel) as usize];
-                    let f_weight: float32x4_t = unsafe { vdupq_n_f32(weight) };
-                    store = unsafe { prefer_vfmaq_f32(store, pixel_colors_f32, f_weight) };
+                unsafe {
+                    while r <= half_kernel {
+                        let current_x = std::cmp::min(
+                            std::cmp::max(x as i64 + r as i64, 0),
+                            (width - 1) as i64,
+                        ) as usize;
+                        let px = current_x * CHANNEL_CONFIGURATION;
+                        let s_ptr = src.as_ptr().add(y_src_shift + px);
+                        let pixel_colors_u32 = load_u8_u32_fast::<CHANNEL_CONFIGURATION>(s_ptr);
+                        let pixel_colors_f32 = vcvtq_f32_u32(pixel_colors_u32);
+                        let weight = *kernel.get_unchecked((r + half_kernel) as usize);
+                        let f_weight: float32x4_t = vdupq_n_f32(weight);
+                        store = prefer_vfmaq_f32(store, pixel_colors_f32, f_weight);
 
-                    r += 1;
+                        r += 1;
+                    }
                 }
 
                 let px = x as usize * CHANNEL_CONFIGURATION;

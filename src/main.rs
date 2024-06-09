@@ -5,14 +5,19 @@ use std::time::Instant;
 
 #[allow(dead_code)]
 fn f32_to_f16(bytes: Vec<f32>) -> Vec<u16> {
-    return bytes.iter().map(|&x| half::f16::from_f32(x).to_bits()).collect();
+    return bytes
+        .iter()
+        .map(|&x| half::f16::from_f32(x).to_bits())
+        .collect();
 }
 
 #[allow(dead_code)]
 fn f16_to_f32(bytes: Vec<u16>) -> Vec<f32> {
-    return bytes.iter().map(|&x| half::f16::from_bits(x).to_f32()).collect();
+    return bytes
+        .iter()
+        .map(|&x| half::f16::from_bits(x).to_f32())
+        .collect();
 }
-
 
 fn main() {
     let img = ImageReader::open("assets/test_image_1.jpg")
@@ -43,19 +48,7 @@ fn main() {
     //     ThreadingPolicy::Adaptive,
     // );
 
-    // libblur::gaussian_box_blur(
-    //     &bytes,
-    //     stride as u32,
-    //     &mut dst_bytes,
-    //     stride as u32,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     77,
-    //     FastBlurChannels::Channels3,
-    //     ThreadingPolicy::Single,
-    // );
-    // bytes = dst_bytes;
-    libblur::gaussian_blur(
+    libblur::gaussian_box_blur(
         &bytes,
         stride as u32,
         &mut dst_bytes,
@@ -63,10 +56,22 @@ fn main() {
         dimensions.0,
         dimensions.1,
         77,
-        77f32 / 6f32,
         FastBlurChannels::Channels3,
         ThreadingPolicy::Single,
     );
+    bytes = dst_bytes;
+    // libblur::gaussian_blur(
+    //     &bytes,
+    //     stride as u32,
+    //     &mut dst_bytes,
+    //     stride as u32,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     77,
+    //     77f32 / 6f32,
+    //     FastBlurChannels::Channels3,
+    //     ThreadingPolicy::Single,
+    // );
     // bytes = dst_bytes;
     // libblur::median_blur(
     //     &bytes,
@@ -94,5 +99,5 @@ fn main() {
         dimensions.1,
         image::ExtendedColorType::Rgb8,
     )
-        .unwrap();
+    .unwrap();
 }

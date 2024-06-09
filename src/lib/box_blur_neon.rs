@@ -144,7 +144,110 @@ pub mod neon_support {
 
         let half_kernel = kernel_size / 2;
 
-        for x in start_x..end_x {
+        let mut cx = start_x;
+
+        for x in (start_x..end_x.saturating_sub(2)).step_by(2) {
+            let px = x as usize * CHANNEL_CONFIGURATION;
+
+            let mut store_0: uint32x4_t;
+            let mut store_1: uint32x4_t;
+            {
+                let s_ptr = unsafe { src.as_ptr().add(px) };
+                let edge_colors_0 = unsafe { load_u8_u32_fast::<CHANNEL_CONFIGURATION>(s_ptr) };
+                let edge_colors_1 = unsafe {
+                    load_u8_u32_fast::<CHANNEL_CONFIGURATION>(s_ptr.add(CHANNEL_CONFIGURATION))
+                };
+                store_0 = unsafe { vmulq_u32(edge_colors_0, v_edge_count) };
+                store_1 = unsafe { vmulq_u32(edge_colors_1, v_edge_count) };
+            }
+
+            for y in 1..std::cmp::min(half_kernel, height) {
+                let y_src_shift = y as usize * src_stride as usize;
+                let s_ptr = unsafe { src.as_ptr().add(y_src_shift + px) };
+                let edge_colors_0 = unsafe { load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr) };
+                let edge_colors_1 = unsafe {
+                    load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr.add(CHANNEL_CONFIGURATION))
+                };
+                store_0 = unsafe { vaddw_u16(store_0, edge_colors_0) };
+                store_1 = unsafe { vaddw_u16(store_1, edge_colors_1) };
+            }
+
+            for y in 0..height {
+                // preload edge pixels
+                let next =
+                    std::cmp::min(y + half_kernel, height - 1) as usize * src_stride as usize;
+                let previous =
+                    std::cmp::max(y as i64 - half_kernel as i64, 0) as usize * src_stride as usize;
+                let y_dst_shift = dst_stride as usize * y as usize;
+
+                // subtract previous
+                {
+                    let s_ptr = unsafe { src.as_ptr().add(previous + px) };
+                    let edge_colors_0 = unsafe { load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr) };
+                    let edge_colors_1 = unsafe {
+                        load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr.add(CHANNEL_CONFIGURATION))
+                    };
+                    store_0 = unsafe { vsubw_u16(store_0, edge_colors_0) };
+                    store_1 = unsafe { vsubw_u16(store_1, edge_colors_1) };
+                }
+
+                // add next
+                {
+                    let s_ptr = unsafe { src.as_ptr().add(next + px) };
+                    let edge_colors_0 = unsafe { load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr) };
+                    let edge_colors_1 = unsafe {
+                        load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr.add(CHANNEL_CONFIGURATION))
+                    };
+                    store_0 = unsafe { vaddw_u16(store_0, edge_colors_0) };
+                    store_1 = unsafe { vaddw_u16(store_1, edge_colors_1) };
+                }
+
+                let px = x as usize * CHANNEL_CONFIGURATION;
+
+                if CHANNEL_CONFIGURATION == 3 {
+                    store_0 = unsafe { vmulq_u32(store_0, eraser) };
+                    store_1 = unsafe { vmulq_u32(store_1, eraser) };
+                }
+
+                let scale_store =
+                    unsafe { vcvtq_u32_f32(vmulq_f32(vcvtq_f32_u32(store_0), v_kernel_scale)) };
+                let px_16 = unsafe { vqmovn_u32(scale_store) };
+                let px_8 = unsafe { vqmovn_u16(vcombine_u16(px_16, px_16)) };
+                let pixel = unsafe { vget_lane_u32::<0>(vreinterpret_u32_u8(px_8)) };
+                let pixel_bits_0 = pixel.to_le_bytes();
+
+                let scale_store =
+                    unsafe { vcvtq_u32_f32(vmulq_f32(vcvtq_f32_u32(store_1), v_kernel_scale)) };
+                let px_16 = unsafe { vqmovn_u32(scale_store) };
+                let px_8 = unsafe { vqmovn_u16(vcombine_u16(px_16, px_16)) };
+                let pixel = unsafe { vget_lane_u32::<0>(vreinterpret_u32_u8(px_8)) };
+                let pixel_bits_1 = pixel.to_le_bytes();
+
+                unsafe {
+                    let offset = y_dst_shift + px;
+                    unsafe_dst.write(offset, pixel_bits_0[0]);
+                    unsafe_dst.write(offset + 1, pixel_bits_0[1]);
+                    unsafe_dst.write(offset + 2, pixel_bits_0[2]);
+                    if CHANNEL_CONFIGURATION == 4 {
+                        unsafe_dst.write(offset + 3, pixel_bits_0[3]);
+                    }
+                }
+
+                unsafe {
+                    let offset = y_dst_shift + px + CHANNEL_CONFIGURATION;
+                    unsafe_dst.write(offset, pixel_bits_1[0]);
+                    unsafe_dst.write(offset + 1, pixel_bits_1[1]);
+                    unsafe_dst.write(offset + 2, pixel_bits_1[2]);
+                    if CHANNEL_CONFIGURATION == 4 {
+                        unsafe_dst.write(offset + 3, pixel_bits_1[3]);
+                    }
+                }
+            }
+
+            cx = x;
+        }
+
+        for x in cx..end_x {
             let px = x as usize * CHANNEL_CONFIGURATION;
 
             let mut store: uint32x4_t;
