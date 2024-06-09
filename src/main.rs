@@ -33,15 +33,15 @@ fn main() {
     dst_bytes.resize(dimensions.1 as usize * stride, 0);
     let start_time = Instant::now();
 
-    libblur::fast_gaussian_next(
-        &mut bytes,
-        stride as u32,
-        dimensions.0,
-        dimensions.1,
-        77,
-        FastBlurChannels::Channels3,
-        ThreadingPolicy::Adaptive,
-    );
+    // libblur::fast_gaussian_next(
+    //     &mut bytes,
+    //     stride as u32,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     77,
+    //     FastBlurChannels::Channels3,
+    //     ThreadingPolicy::Adaptive,
+    // );
 
     // libblur::gaussian_blur(
     //     &bytes,
@@ -56,18 +56,18 @@ fn main() {
     //     ThreadingPolicy::Single,
     // );
     // bytes = dst_bytes;
-    // libblur::median_blur(
-    //     &bytes,
-    //     stride as u32,
-    //     &mut dst_bytes,
-    //     stride as u32,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     77,
-    //     FastBlurChannels::Channels3,
-    //     ThreadingPolicy::Single,
-    // );
-    // bytes = dst_bytes;
+    libblur::median_blur(
+        &bytes,
+        stride as u32,
+        &mut dst_bytes,
+        stride as u32,
+        dimensions.0,
+        dimensions.1,
+        125,
+        FastBlurChannels::Channels3,
+        ThreadingPolicy::Adaptive,
+    );
+    bytes = dst_bytes;
     // libblur::gaussian_box_blur(&bytes, stride as u32, &mut dst_bytes, stride as u32, dimensions.0, dimensions.1, 77,
     //                            FastBlurChannels::Channels3, ThreadingPolicy::Single);
     // bytes = dst_bytes;
