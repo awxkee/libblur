@@ -17,10 +17,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rust-lang/setup-rust-toolchain@v1
-      - run: rustup target add aarch64-unknown-linux-gnu x86_64-unknown-linux-gnu i686-unknown-linux-gnu
+      - run: rustup target add aarch64-unknown-linux-gnu x86_64-unknown-linux-gnu i686-unknown-linux-gnu powerpc-unknown-linux-gnu
       - run: cargo build --target aarch64-unknown-linux-gnu --manifest-path ./src/lib/Cargo.toml
       - run: cargo build --target x86_64-unknown-linux-gnu --manifest-path ./src/lib/Cargo.toml
       - run: cargo build --target i686-unknown-linux-gnu --manifest-path ./src/lib/Cargo.toml
+      - run: cargo build --target powerpc-unknown-linux-gnu --manifest-path ./src/lib/Cargo.toml
       - name: Make a release
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_TOKEN }}

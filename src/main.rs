@@ -53,7 +53,7 @@ fn main() {
         77,
         77f32 / 6f32,
         FastBlurChannels::Channels3,
-        ThreadingPolicy::Adaptive,
+        ThreadingPolicy::Single,
     );
     bytes = dst_bytes;
     // libblur::median_blur(

@@ -29,6 +29,14 @@ pub(crate) mod sse_utils {
         return _mm_cvtepi32_ps(vl);
     }
 
+    #[inline(always)]
+    pub(crate) unsafe fn load_u8_u32_one(
+        ptr: *const u8,
+    ) -> __m128i {
+        let u_first = u32::from_le_bytes([*ptr, 0, 0, 0]);
+        return _mm_set1_epi32(u_first as i32);
+    }
+
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     #[cfg(not(target_feature = "fma"))]
     #[inline]
