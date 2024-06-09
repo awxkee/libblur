@@ -186,13 +186,14 @@ fn fast_gaussian_horizontal_pass<T: FromPrimitive + Default + Into<i32> + Send +
         FastBlurChannels::Channels3 => 3,
         FastBlurChannels::Channels4 => 4,
     };
+    let initial_sum = ((radius * radius) >> 1) as i32;
     for y in start..std::cmp::min(height, end) {
         let mut dif_r: i32 = 0;
-        let mut sum_r: i32 = ((radius * radius) >> 1) as i32;
+        let mut sum_r: i32 = initial_sum;
         let mut dif_g: i32 = 0;
-        let mut sum_g: i32 = ((radius * radius) >> 1) as i32;
+        let mut sum_g: i32 = initial_sum;
         let mut dif_b: i32 = 0;
-        let mut sum_b: i32 = ((radius * radius) >> 1) as i32;
+        let mut sum_b: i32 = initial_sum;
 
         let current_y = ((y as i64) * (stride as i64)) as usize;
 

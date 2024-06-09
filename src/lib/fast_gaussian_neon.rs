@@ -58,7 +58,8 @@ pub mod neon_support {
             let start_x = 0 - 2 * radius_64;
             for x in start_x..(width as i64) {
                 if x >= 0 {
-                    let current_px = ((std::cmp::max(x, 0) as u32) * CHANNELS_COUNT as u32) as usize;
+                    let current_px =
+                        ((std::cmp::max(x, 0) as u32) * CHANNELS_COUNT as u32) as usize;
 
                     let prepared_px_s32 = unsafe {
                         vcvtq_s32_f32(vrndq_f32(vmulq_f32(vcvtq_f32_s32(summs), f_weight)))
@@ -80,14 +81,14 @@ pub mod neon_support {
                     let arr_index = ((x - radius_64) & 1023) as usize;
                     let d_arr_index = (x & 1023) as usize;
 
-                    let d_buf_ptr = buffer[d_arr_index].as_mut_ptr();
+                    let d_buf_ptr = unsafe { buffer.get_unchecked_mut(d_arr_index).as_mut_ptr() };
                     let mut d_stored = unsafe { vld1q_s32(d_buf_ptr) };
                     d_stored = unsafe { vshlq_n_s32::<1>(d_stored) };
 
                     let buf_ptr = unsafe { buffer.get_unchecked_mut(arr_index).as_mut_ptr() };
                     let a_stored = unsafe { vld1q_s32(buf_ptr) };
 
-                    diffs = unsafe { vqaddq_s32(diffs, vsubq_s32(a_stored, d_stored)) };
+                    diffs = unsafe { vaddq_s32(diffs, vsubq_s32(a_stored, d_stored)) };
                 } else if x + radius_64 >= 0 {
                     let arr_index = (x & 1023) as usize;
                     let buf_ptr = unsafe { buffer.get_unchecked_mut(arr_index).as_mut_ptr() };
@@ -101,7 +102,8 @@ pub mod neon_support {
                     as u32) as usize;
                 let next_row_px = next_row_x * CHANNELS_COUNT;
 
-                let s_ptr = unsafe { bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut u8 };
+                let s_ptr =
+                    unsafe { bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut u8 };
                 let pixel_color = unsafe { load_u8_s32_fast::<CHANNELS_COUNT>(s_ptr) };
 
                 let arr_index = ((x + radius_64) & 1023) as usize;
@@ -168,10 +170,10 @@ pub mod neon_support {
                     let mut d_stored = unsafe { vld1q_s32(d_buf_ptr) };
                     d_stored = unsafe { vshlq_n_s32::<1>(d_stored) };
 
-                    let buf_ptr = buffer[arr_index].as_mut_ptr();
+                    let buf_ptr = unsafe { buffer.get_unchecked_mut(arr_index).as_mut_ptr() };
                     let a_stored = unsafe { vld1q_s32(buf_ptr) };
 
-                    diffs = unsafe { vqaddq_s32(diffs, vsubq_s32(a_stored, d_stored)) };
+                    diffs = unsafe { vaddq_s32(diffs, vsubq_s32(a_stored, d_stored)) };
                 } else if y + radius_64 >= 0 {
                     let arr_index = (y & 1023) as usize;
                     let buf_ptr = unsafe { buffer.get_unchecked_mut(arr_index).as_mut_ptr() };
@@ -203,8 +205,8 @@ pub mod neon_support {
 
 #[cfg(not(any(target_arch = "arm", target_arch = "aarch64")))]
 pub mod neon_support {
-    use crate::FastBlurChannels;
     use crate::unsafe_slice::UnsafeSlice;
+    use crate::FastBlurChannels;
 
     #[allow(dead_code)]
     pub(crate) fn fast_gaussian_horizontal_pass_neon_u8(
@@ -216,7 +218,8 @@ pub mod neon_support {
         _start: u32,
         _end: u32,
         _channels: FastBlurChannels,
-    ) {}
+    ) {
+    }
 
     #[allow(dead_code)]
     pub(crate) fn fast_gaussian_vertical_pass_neon_u8(
@@ -228,5 +231,6 @@ pub mod neon_support {
         _start: u32,
         _end: u32,
         _channels: FastBlurChannels,
-    ) {}
+    ) {
+    }
 }

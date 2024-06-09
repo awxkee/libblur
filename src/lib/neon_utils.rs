@@ -4,7 +4,6 @@ pub(crate) mod neon_utils {
     use std::arch::aarch64::*;
     use std::ptr;
 
-    #[allow(dead_code)]
     #[inline(always)]
     pub(crate) unsafe fn load_u8_s32_fast<const CHANNELS_COUNT: usize>(
         ptr: *const u8,
