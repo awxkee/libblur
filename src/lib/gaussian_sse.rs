@@ -296,7 +296,7 @@ pub mod sse_support {
         src_stride: u32,
         unsafe_dst: &UnsafeSlice<u8>,
         dst_stride: u32,
-        _: u32,
+        width: u32,
         height: u32,
         kernel_size: usize,
         kernel: &Vec<f32>,
@@ -308,14 +308,14 @@ pub mod sse_support {
 
         let zeros = unsafe { _mm_setzero_ps() };
         let zeros_si = unsafe { _mm_setzero_si128() };
-
+        let total_length = width as usize * CHANNEL_CONFIGURATION;
         for y in start_y..end_y {
             let y_dst_shift = y as usize * dst_stride as usize;
 
             let mut cx = 0usize;
 
             unsafe {
-                while cx + 32 < dst_stride as usize {
+                while cx + 32 < total_length {
                     let mut store0 = zeros;
                     let mut store1 = zeros;
                     let mut store2 = zeros;
@@ -388,7 +388,7 @@ pub mod sse_support {
                     cx += 32;
                 }
 
-                while cx + 16 < dst_stride as usize {
+                while cx + 16 < total_length {
                     let mut store0 = zeros;
                     let mut store1 = zeros;
                     let mut store2 = zeros;
@@ -436,7 +436,7 @@ pub mod sse_support {
                     cx += 16;
                 }
 
-                while cx + 8 < dst_stride as usize {
+                while cx + 8 < total_length {
                     let mut store0 = zeros;
                     let mut store1 = zeros;
 
@@ -474,7 +474,7 @@ pub mod sse_support {
                     cx += 8;
                 }
 
-                while cx + 4 < dst_stride as usize {
+                while cx + 4 < total_length {
                     let mut store0 = zeros;
 
                     let mut r = -half_kernel;
@@ -507,7 +507,7 @@ pub mod sse_support {
                     cx += 4;
                 }
 
-                while cx + 1 < dst_stride as usize {
+                while cx < total_length {
                     let mut store0 = zeros;
 
                     let mut r = -half_kernel;

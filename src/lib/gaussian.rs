@@ -182,6 +182,46 @@ fn gaussian_blur_horizontal_pass<
     });
 }
 
+#[inline]
+pub fn gaussian_vertical_row<T: FromPrimitive + Default + Into<f32> + Send + Sync + Copy, const ROW_SIZE: usize>(
+    src: &[T],
+    src_stride: u32,
+    unsafe_dst: &UnsafeSlice<T>,
+    dst_stride: u32,
+    _: u32,
+    height: u32,
+    kernel_size: usize,
+    kernel: &[f32],
+    x: u32,
+    y: u32,
+) {
+    let half_kernel = (kernel_size / 2) as i32;
+    let mut weights: [f32; ROW_SIZE] = [0f32; ROW_SIZE];
+    for r in -half_kernel..=half_kernel {
+        let py = std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
+        let y_src_shift = py as usize * src_stride as usize;
+        let weight = unsafe { *kernel.get_unchecked((r + half_kernel) as usize) };
+        for i in 0..ROW_SIZE {
+            let px = x as usize + i;
+            unsafe {
+                let v = *src.get_unchecked(y_src_shift + px);
+                let w0 = weights.get_unchecked_mut(i);
+                *w0 += (*w0).mul_add(v.into(), weight);
+            }
+        }
+    }
+    let y_dst_shift = y as usize * dst_stride as usize;
+    unsafe {
+        for i in 0..ROW_SIZE {
+            let px = x as usize + i;
+            unsafe_dst.write(
+                y_dst_shift + px,
+                T::from_f32((*weights.get_unchecked(i)).round()).unwrap_or_default(),
+            );
+        }
+    }
+}
+
 fn gaussian_blur_vertical_pass_impl<
     T: FromPrimitive + Default + Into<f32> + Send + Sync,
     const CHANNEL_CONFIGURATION: usize,
@@ -240,45 +280,33 @@ fn gaussian_blur_vertical_pass_impl<
             return;
         }
     }
-    let half_kernel = (kernel_size / 2) as i32;
+    let total_length = width as usize * std::mem::size_of::<T>() * CHANNEL_CONFIGURATION;
     for y in start_y..end_y {
-        let y_dst_shift = y as usize * dst_stride as usize;
-        for x in 0..width {
-            let px = x as usize * CHANNEL_CONFIGURATION;
-            let mut weights: [f32; 4] = [0f32; 4];
-            for r in -half_kernel..=half_kernel {
-                let py = std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
-                let y_src_shift = py as usize * src_stride as usize;
-                let weight = unsafe { *kernel.get_unchecked((r + half_kernel) as usize) };
-                weights[0] += (unsafe { *src.get_unchecked(y_src_shift + px) }.into()) * weight;
-                weights[1] += (unsafe { *src.get_unchecked(y_src_shift + px + 1) }.into()) * weight;
-                weights[2] += (unsafe { *src.get_unchecked(y_src_shift + px + 2) }.into()) * weight;
-                if CHANNEL_CONFIGURATION == 4 {
-                    weights[3] +=
-                        (unsafe { *src.get_unchecked(y_src_shift + px + 3) }.into()) * weight;
-                }
-            }
+        let mut _cx = 0usize;
 
-            unsafe {
-                unsafe_dst.write(
-                    y_dst_shift + px,
-                    T::from_f32(weights[0]).unwrap_or_default(),
-                );
-                unsafe_dst.write(
-                    y_dst_shift + px + 1,
-                    T::from_f32(weights[1]).unwrap_or_default(),
-                );
-                unsafe_dst.write(
-                    y_dst_shift + px + 2,
-                    T::from_f32(weights[2]).unwrap_or_default(),
-                );
-                if CHANNEL_CONFIGURATION == 4 {
-                    unsafe_dst.write(
-                        y_dst_shift + px + 3,
-                        T::from_f32(weights[3]).unwrap_or_default(),
-                    );
-                }
-            }
+        while _cx + 32 < total_length {
+            gaussian_vertical_row::<T, 32>(src, src_stride, unsafe_dst, dst_stride, width, height, kernel_size, kernel, _cx as u32, y);
+            _cx += 32;
+        }
+
+        while _cx + 16 < total_length {
+            gaussian_vertical_row::<T, 16>(src, src_stride, unsafe_dst, dst_stride, width, height, kernel_size, kernel, _cx as u32, y);
+            _cx += 16;
+        }
+
+        while _cx + 8 < total_length {
+            gaussian_vertical_row::<T, 8>(src, src_stride, unsafe_dst, dst_stride, width, height, kernel_size, kernel, _cx as u32, y);
+            _cx += 8;
+        }
+
+        while _cx + 4 < total_length {
+            gaussian_vertical_row::<T, 4>(src, src_stride, unsafe_dst, dst_stride, width, height, kernel_size, kernel, _cx as u32, y);
+            _cx += 4;
+        }
+
+        while _cx < total_length {
+            gaussian_vertical_row::<T, 1>(src, src_stride, unsafe_dst, dst_stride, width, height, kernel_size, kernel, _cx as u32, y);
+            _cx += 1;
         }
     }
 }
