@@ -722,12 +722,11 @@ pub fn gaussian_box_blur(
     }
 }
 
-#[no_mangle]
 #[allow(dead_code)]
-pub extern "C" fn gaussian_box_blur_u16(
-    src: &Vec<u16>,
+pub fn gaussian_box_blur_u16(
+    src: &[u16],
     src_stride: u32,
-    dst: &mut Vec<u16>,
+    dst: &mut [u16],
     dst_stride: u32,
     width: u32,
     height: u32,
