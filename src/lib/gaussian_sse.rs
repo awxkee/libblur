@@ -25,13 +25,16 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), target_feature = "sse4.1"))]
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+))]
 pub mod sse_support {
+    use crate::sse_utils::sse_utils::{_mm_prefer_fma_ps, load_u8_f32_fast, load_u8_u32_one};
     #[cfg(target_arch = "x86")]
     use std::arch::x86::*;
     #[cfg(target_arch = "x86_64")]
     use std::arch::x86_64::*;
-    use crate::sse_utils::sse_utils::{_mm_prefer_fma_ps, load_u8_f32_fast, load_u8_u32_one};
 
     use crate::unsafe_slice::UnsafeSlice;
 
@@ -48,12 +51,8 @@ pub mod sse_support {
     ) {
         let half_kernel = (kernel_size / 2) as i32;
 
-        let shuffle_rgb = unsafe {
-            _mm_setr_epi8(0, 1, 2, -1,
-                          3, 4, 5, -1,
-                          6, 7, 8, -1,
-                          9, 10, 11, -1)
-        };
+        let shuffle_rgb =
+            unsafe { _mm_setr_epi8(0, 1, 2, -1, 3, 4, 5, -1, 6, 7, 8, -1, 9, 10, 11, -1) };
 
         let zeros_si = unsafe { _mm_setzero_si128() };
 
@@ -69,11 +68,15 @@ pub mod sse_support {
                 let mut r = -half_kernel;
 
                 unsafe {
-                    while r + 4 <= half_kernel && x as i64 + r as i64 + 6 < width as i64 {
-                        let px =
-                            std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                                as usize
-                                * CHANNEL_CONFIGURATION;
+                    while r + 4 <= half_kernel
+                        && x as i64 + r as i64 + (if CHANNEL_CONFIGURATION == 4 { 4 } else { 6 })
+                            < width as i64
+                    {
+                        let px = std::cmp::min(
+                            std::cmp::max(x as i64 + r as i64, 0),
+                            (width - 1) as i64,
+                        ) as usize
+                            * CHANNEL_CONFIGURATION;
                         let s_ptr = src.as_ptr().add(y_src_shift + px);
                         let s_ptr_1 = s_ptr.add(src_stride as usize);
                         let mut pixel_colors_0 = _mm_loadu_si128(s_ptr as *const __m128i);
@@ -83,11 +86,13 @@ pub mod sse_support {
                             pixel_colors_1 = _mm_shuffle_epi8(pixel_colors_1, shuffle_rgb);
                         }
                         let mut pixel_colors_u16_0 = _mm_unpacklo_epi8(pixel_colors_0, zeros_si);
-                        let mut pixel_colors_u32_0 = _mm_unpacklo_epi16(pixel_colors_u16_0, zeros_si);
+                        let mut pixel_colors_u32_0 =
+                            _mm_unpacklo_epi16(pixel_colors_u16_0, zeros_si);
                         let mut pixel_colors_f32_0 = _mm_cvtepi32_ps(pixel_colors_u32_0);
 
                         let mut pixel_colors_u16_1 = _mm_unpacklo_epi8(pixel_colors_1, zeros_si);
-                        let mut pixel_colors_u32_1 = _mm_unpacklo_epi16(pixel_colors_u16_1, zeros_si);
+                        let mut pixel_colors_u32_1 =
+                            _mm_unpacklo_epi16(pixel_colors_u16_1, zeros_si);
                         let mut pixel_colors_f32_1 = _mm_cvtepi32_ps(pixel_colors_u32_1);
 
                         let mut weight = *kernel.get_unchecked((r + half_kernel) as usize);
@@ -137,12 +142,16 @@ pub mod sse_support {
 
                 unsafe {
                     while r <= half_kernel {
-                        let current_x = std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize;
+                        let current_x = std::cmp::min(
+                            std::cmp::max(x as i64 + r as i64, 0),
+                            (width - 1) as i64,
+                        ) as usize;
                         let px = current_x * CHANNEL_CONFIGURATION;
                         let s_ptr = src.as_ptr().add(y_src_shift + px);
                         let pixel_colors_f32_0 = load_u8_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr);
-                        let pixel_colors_f32_1 = load_u8_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr.add(src_stride as usize));
+                        let pixel_colors_f32_1 = load_u8_f32_fast::<CHANNEL_CONFIGURATION>(
+                            s_ptr.add(src_stride as usize),
+                        );
                         let weight = *kernel.get_unchecked((r + half_kernel) as usize);
                         let f_weight = _mm_set1_ps(weight);
                         store_0 = _mm_prefer_fma_ps(store_0, pixel_colors_f32_0, f_weight);
@@ -201,10 +210,11 @@ pub mod sse_support {
 
                 unsafe {
                     while r + 4 <= half_kernel && x as i64 + r as i64 + 6 < width as i64 {
-                        let px =
-                            std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                                as usize
-                                * CHANNEL_CONFIGURATION;
+                        let px = std::cmp::min(
+                            std::cmp::max(x as i64 + r as i64, 0),
+                            (width - 1) as i64,
+                        ) as usize
+                            * CHANNEL_CONFIGURATION;
                         let s_ptr = src.as_ptr().add(y_src_shift + px);
                         let mut pixel_colors = _mm_loadu_si128(s_ptr as *const __m128i);
                         if CHANNEL_CONFIGURATION == 3 {
@@ -244,8 +254,10 @@ pub mod sse_support {
 
                 unsafe {
                     while r <= half_kernel {
-                        let current_x = std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize;
+                        let current_x = std::cmp::min(
+                            std::cmp::max(x as i64 + r as i64, 0),
+                            (width - 1) as i64,
+                        ) as usize;
                         let px = current_x * CHANNEL_CONFIGURATION;
                         let s_ptr = src.as_ptr().add(y_src_shift + px);
                         let pixel_colors_f32 = load_u8_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr);
@@ -534,7 +546,10 @@ pub mod sse_support {
     }
 }
 
-#[cfg(not(all(any(target_arch = "x86_64", target_arch = "x86"), target_feature = "sse4.1")))]
+#[cfg(not(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+)))]
 pub mod sse_support {
     use crate::unsafe_slice::UnsafeSlice;
 
@@ -550,7 +565,8 @@ pub mod sse_support {
         _kernel: &Vec<f32>,
         _start_y: u32,
         _end_y: u32,
-    ) {}
+    ) {
+    }
 
     #[allow(dead_code)]
     pub fn gaussian_blur_horizontal_pass_impl_sse(
@@ -563,5 +579,6 @@ pub mod sse_support {
         _kernel: &Vec<f32>,
         _start_y: u32,
         _end_y: u32,
-    ) {}
+    ) {
+    }
 }

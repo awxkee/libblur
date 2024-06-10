@@ -50,6 +50,7 @@ mod sse_utils;
 mod fast_gaussian_next_sse;
 mod box_blur_sse;
 mod gaussian_sse;
+mod mul_table;
 
 pub use box_blur::box_blur;
 pub use box_blur::box_blur_u16;

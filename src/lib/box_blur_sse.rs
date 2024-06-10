@@ -25,8 +25,14 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), target_feature = "sse4.1"))]
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+))]
 pub mod sse_support {
+    use crate::mul_table::{
+        MUL_TABLE_DOUBLE, MUL_TABLE_TWICE_RAD, SHR_TABLE_DOUBLE, SHR_TABLE_TWICE_RAD,
+    };
     #[cfg(target_arch = "x86")]
     use std::arch::x86::*;
     #[cfg(target_arch = "x86_64")]
@@ -45,11 +51,18 @@ pub mod sse_support {
         start_y: u32,
         end_y: u32,
     ) {
-        let eraser_store: [i32; 4] = if CHANNELS == 3 { [1i32, 1i32, 1i32, 0i32] } else { [1i32, 1i32, 1i32, 1i32] };
+        let eraser_store: [i32; 4] = if CHANNELS == 3 {
+            [1i32, 1i32, 1i32, 0i32]
+        } else {
+            [1i32, 1i32, 1i32, 1i32]
+        };
         let eraser = unsafe { _mm_loadu_si128(eraser_store.as_ptr() as *const __m128i) };
 
-        let kernel_scale = 1f32 / (radius * 2) as f32;
-        let v_kernel_scale = unsafe { _mm_set1_ps(kernel_scale) };
+        let mul_value = MUL_TABLE_TWICE_RAD[radius as usize];
+        let shr_value = SHR_TABLE_TWICE_RAD[radius as usize];
+        let v_mul_value = unsafe { _mm_set1_epi32(mul_value) };
+        let v_shr_value = unsafe { _mm_set1_epi32(shr_value) };
+
         let kernel_size = radius * 2 + 1;
         let edge_count = (kernel_size / 2) + 1;
         let v_edge_count = unsafe { _mm_set1_epi32(edge_count as i32) };
@@ -63,17 +76,14 @@ pub mod sse_support {
             let mut store;
             {
                 let s_ptr = unsafe { src.as_ptr().add(y_src_shift) };
-                let edge_colors =
-                    unsafe { load_u8_s32_fast::<CHANNELS>(s_ptr) };
+                let edge_colors = unsafe { load_u8_s32_fast::<CHANNELS>(s_ptr) };
                 store = unsafe { _mm_mullo_epi32(edge_colors, v_edge_count) };
             }
 
             for x in 1..std::cmp::min(half_kernel, width) {
                 let px = x as usize * CHANNELS;
                 let s_ptr = unsafe { src.as_ptr().add(y_src_shift + px) };
-                let edge_colors = unsafe {
-                    load_u8_s32_fast::<CHANNELS>(s_ptr)
-                };
+                let edge_colors = unsafe { load_u8_s32_fast::<CHANNELS>(s_ptr) };
                 store = unsafe { _mm_add_epi32(store, edge_colors) };
             }
 
@@ -85,23 +95,18 @@ pub mod sse_support {
                     let previous_x = std::cmp::max(x as i64 - half_kernel as i64, 0) as usize;
                     let previous = previous_x * CHANNELS;
                     let s_ptr = unsafe { src.as_ptr().add(y_src_shift + previous) };
-                    let edge_colors = unsafe {
-                        load_u8_s32_fast::<CHANNELS>(s_ptr)
-                    };
+                    let edge_colors = unsafe { load_u8_s32_fast::<CHANNELS>(s_ptr) };
                     store = unsafe { _mm_sub_epi32(store, edge_colors) };
                 }
 
                 // add next
                 {
-                    let next_x =
-                        std::cmp::min(x + half_kernel, width - 1) as usize;
+                    let next_x = std::cmp::min(x + half_kernel, width - 1) as usize;
 
                     let next = next_x * CHANNELS;
 
                     let s_ptr = unsafe { src.as_ptr().add(y_src_shift + next) };
-                    let edge_colors = unsafe {
-                        load_u8_s32_fast::<CHANNELS>(s_ptr)
-                    };
+                    let edge_colors = unsafe { load_u8_s32_fast::<CHANNELS>(s_ptr) };
                     store = unsafe { _mm_add_epi32(store, edge_colors) };
                 }
 
@@ -112,7 +117,7 @@ pub mod sse_support {
                 }
 
                 let scale_store =
-                    unsafe { _mm_cvtps_epi32(_mm_mul_ps(_mm_cvtepi32_ps(store), v_kernel_scale)) };
+                    unsafe { _mm_sra_epi32(_mm_mullo_epi32(store, v_mul_value), v_shr_value) };
                 let px_16 = unsafe { _mm_packus_epi32(scale_store, scale_store) };
                 let px_8 = unsafe { _mm_packus_epi16(px_16, px_16) };
                 let pixel = unsafe { _mm_extract_epi32::<0>(px_8) };
@@ -142,11 +147,18 @@ pub mod sse_support {
         start_x: u32,
         end_x: u32,
     ) {
-        let eraser_store: [i32; 4] = if CHANNELS == 3 { [1i32, 1i32, 1i32, 0i32] } else { [1i32, 1i32, 1i32, 1i32] };
+        let eraser_store: [i32; 4] = if CHANNELS == 3 {
+            [1i32, 1i32, 1i32, 0i32]
+        } else {
+            [1i32, 1i32, 1i32, 1i32]
+        };
         let eraser = unsafe { _mm_loadu_si128(eraser_store.as_ptr() as *const __m128i) };
 
-        let kernel_scale = 1f32 / (radius * 2) as f32;
-        let v_kernel_scale = unsafe { _mm_set1_ps(kernel_scale) };
+        let mul_value = MUL_TABLE_TWICE_RAD[radius as usize];
+        let shr_value = SHR_TABLE_TWICE_RAD[radius as usize];
+        let v_mul_value = unsafe { _mm_set1_epi32(mul_value) };
+        let v_shr_value = unsafe { _mm_set1_epi32(shr_value) };
+
         let kernel_size = radius * 2 + 1;
         let edge_count = (kernel_size / 2) + 1;
         let v_edge_count = unsafe { _mm_set1_epi32(edge_count as i32) };
@@ -190,7 +202,8 @@ pub mod sse_support {
                 {
                     let s_ptr = unsafe { src.as_ptr().add(previous + px) };
                     let edge_colors_0 = unsafe { load_u8_s32_fast::<CHANNELS>(s_ptr) };
-                    let edge_colors_1 = unsafe { load_u8_s32_fast::<CHANNELS>(s_ptr.add(CHANNELS)) };
+                    let edge_colors_1 =
+                        unsafe { load_u8_s32_fast::<CHANNELS>(s_ptr.add(CHANNELS)) };
                     store_0 = unsafe { _mm_sub_epi32(store_0, edge_colors_0) };
                     store_1 = unsafe { _mm_sub_epi32(store_1, edge_colors_1) };
                 }
@@ -199,7 +212,8 @@ pub mod sse_support {
                 {
                     let s_ptr = unsafe { src.as_ptr().add(next + px) };
                     let edge_colors_0 = unsafe { load_u8_s32_fast::<CHANNELS>(s_ptr) };
-                    let edge_colors_1 = unsafe { load_u8_s32_fast::<CHANNELS>(s_ptr.add(CHANNELS)) };
+                    let edge_colors_1 =
+                        unsafe { load_u8_s32_fast::<CHANNELS>(s_ptr.add(CHANNELS)) };
                     store_0 = unsafe { _mm_add_epi32(store_0, edge_colors_0) };
                     store_1 = unsafe { _mm_add_epi32(store_1, edge_colors_1) };
                 }
@@ -211,39 +225,50 @@ pub mod sse_support {
                     store_1 = unsafe { _mm_mullo_epi32(store_1, eraser) };
                 }
 
-                let scale_store =
-                    unsafe { _mm_cvtps_epi32(_mm_mul_ps(_mm_cvtepi32_ps(store_0), v_kernel_scale)) };
-                let px_16 = unsafe { _mm_packus_epi32(scale_store, scale_store) };
-                let px_8 = unsafe { _mm_packus_epi16(px_16, px_16) };
+                let scale_store_0 =
+                    unsafe { _mm_sra_epi32(_mm_mullo_epi32(store_0, v_mul_value), v_shr_value) };
+                let scale_store_1 =
+                    unsafe { _mm_sra_epi32(_mm_mullo_epi32(store_1, v_mul_value), v_shr_value) };
 
-                let pixel = unsafe { _mm_extract_epi32::<0>(px_8) };
-                let pixel_bytes_0 = pixel.to_le_bytes();
+                if CHANNELS == 3 {
+                    let px_16 = unsafe { _mm_packus_epi32(scale_store_0, scale_store_0) };
+                    let px_8 = unsafe { _mm_packus_epi16(px_16, px_16) };
 
-                let scale_store =
-                    unsafe { _mm_cvtps_epi32(_mm_mul_ps(_mm_cvtepi32_ps(store_1), v_kernel_scale)) };
-                let px_16 = unsafe { _mm_packus_epi32(scale_store, scale_store) };
-                let px_8 = unsafe { _mm_packus_epi16(px_16, px_16) };
+                    let pixel = unsafe { _mm_extract_epi32::<0>(px_8) };
+                    let pixel_bytes_0 = pixel.to_le_bytes();
 
-                let pixel = unsafe { _mm_extract_epi32::<0>(px_8) };
-                let pixel_bytes_1 = pixel.to_le_bytes();
+                    let px_16 = unsafe { _mm_packus_epi32(scale_store_1, scale_store_1) };
+                    let px_8 = unsafe { _mm_packus_epi16(px_16, px_16) };
 
-                unsafe {
-                    let unsafe_offset = y_dst_shift + px;
-                    unsafe_dst.write(unsafe_offset, pixel_bytes_0[0]);
-                    unsafe_dst.write(unsafe_offset + 1, pixel_bytes_0[1]);
-                    unsafe_dst.write(unsafe_offset + 2, pixel_bytes_0[2]);
-                    if CHANNELS == 4 {
-                        unsafe_dst.write(unsafe_offset + 3, pixel_bytes_0[3]);
+                    let pixel = unsafe { _mm_extract_epi32::<0>(px_8) };
+                    let pixel_bytes_1 = pixel.to_le_bytes();
+
+                    unsafe {
+                        let unsafe_offset = y_dst_shift + px;
+                        unsafe_dst.write(unsafe_offset, pixel_bytes_0[0]);
+                        unsafe_dst.write(unsafe_offset + 1, pixel_bytes_0[1]);
+                        unsafe_dst.write(unsafe_offset + 2, pixel_bytes_0[2]);
+                        if CHANNELS == 4 {
+                            unsafe_dst.write(unsafe_offset + 3, pixel_bytes_0[3]);
+                        }
                     }
-                }
 
-                unsafe {
+                    unsafe {
+                        let unsafe_offset = y_dst_shift + px;
+                        unsafe_dst.write(unsafe_offset + CHANNELS, pixel_bytes_1[0]);
+                        unsafe_dst.write(unsafe_offset + 1 + CHANNELS, pixel_bytes_1[1]);
+                        unsafe_dst.write(unsafe_offset + 2 + CHANNELS, pixel_bytes_1[2]);
+                        if CHANNELS == 4 {
+                            unsafe_dst.write(unsafe_offset + 3 + CHANNELS, pixel_bytes_1[3]);
+                        }
+                    }
+                } else {
+                    let px_16 = unsafe { _mm_packus_epi32(scale_store_0, scale_store_1) };
+                    let px_8 = unsafe { _mm_packus_epi16(px_16, px_16) };
                     let unsafe_offset = y_dst_shift + px;
-                    unsafe_dst.write(unsafe_offset + CHANNELS, pixel_bytes_1[0]);
-                    unsafe_dst.write(unsafe_offset + 1 + CHANNELS, pixel_bytes_1[1]);
-                    unsafe_dst.write(unsafe_offset + 2 + CHANNELS, pixel_bytes_1[2]);
-                    if CHANNELS == 4 {
-                        unsafe_dst.write(unsafe_offset + 3 + CHANNELS, pixel_bytes_1[3]);
+                    let ptr = unsafe { unsafe_dst.slice.get_unchecked(unsafe_offset).get() };
+                    unsafe {
+                        std::ptr::copy_nonoverlapping(&px_8 as *const _ as *mut u8, ptr, 8);
                     }
                 }
             }
@@ -297,7 +322,7 @@ pub mod sse_support {
                 }
 
                 let scale_store =
-                    unsafe { _mm_cvtps_epi32(_mm_mul_ps(_mm_cvtepi32_ps(store), v_kernel_scale)) };
+                    unsafe { _mm_sra_epi32(_mm_mullo_epi32(store, v_mul_value), v_shr_value) };
                 let px_16 = unsafe { _mm_packus_epi32(scale_store, scale_store) };
                 let px_8 = unsafe { _mm_packus_epi16(px_16, px_16) };
 
@@ -318,10 +343,13 @@ pub mod sse_support {
     }
 }
 
-#[cfg(not(all(any(target_arch = "x86_64", target_arch = "x86"), target_feature = "sse4.1")))]
+#[cfg(not(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+)))]
 pub mod sse_support {
-    use crate::FastBlurChannels;
     use crate::unsafe_slice::UnsafeSlice;
+    use crate::FastBlurChannels;
 
     #[allow(dead_code)]
     pub(crate) fn box_blur_horizontal_pass_sse(
@@ -335,7 +363,8 @@ pub mod sse_support {
         _start_y: u32,
         _end_y: u32,
         _channels: FastBlurChannels,
-    ) {}
+    ) {
+    }
 
     #[allow(dead_code)]
     pub(crate) fn box_blur_vertical_pass_sse(
@@ -349,5 +378,6 @@ pub mod sse_support {
         _start_y: u32,
         _end_y: u32,
         _channels: FastBlurChannels,
-    ) {}
+    ) {
+    }
 }

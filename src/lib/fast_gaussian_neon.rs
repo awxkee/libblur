@@ -25,9 +25,9 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
-#[cfg(target_feature = "neon")]
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 pub mod neon_support {
+    use crate::mul_table::{MUL_TABLE_DOUBLE, SHR_TABLE_DOUBLE};
     use std::arch::aarch64::*;
 
     use crate::neon_utils::neon_utils::load_u8_s32_fast;
@@ -47,8 +47,10 @@ pub mod neon_support {
 
         let radius_64 = radius as i64;
         let width_wide = width as i64;
-        let weight = 1.0f32 / ((radius as f32) * (radius as f32));
-        let f_weight = unsafe { vdupq_n_f32(weight) };
+        let mul_value = MUL_TABLE_DOUBLE[radius as usize];
+        let shr_value = SHR_TABLE_DOUBLE[radius as usize];
+        let v_mul_value = unsafe { vdupq_n_s32(mul_value) };
+        let v_shr_value = unsafe { vdupq_n_s32(-shr_value) };
         for y in start..std::cmp::min(height, end) {
             let mut diffs: int32x4_t = unsafe { vdupq_n_s32(0) };
             let mut summs: int32x4_t = unsafe { vdupq_n_s32(initial_sum) };
@@ -62,9 +64,12 @@ pub mod neon_support {
                         ((std::cmp::max(x, 0) as u32) * CHANNELS_COUNT as u32) as usize;
 
                     let prepared_px_s32 = unsafe {
-                        vcvtq_s32_f32(vrndq_f32(vmulq_f32(vcvtq_f32_s32(summs), f_weight)))
+                        vshlq_u32(
+                            vreinterpretq_u32_s32(vmulq_s32(summs, v_mul_value)),
+                            v_shr_value,
+                        )
                     };
-                    let prepared_u16 = unsafe { vqmovun_s32(prepared_px_s32) };
+                    let prepared_u16 = unsafe { vqmovn_u32(prepared_px_s32) };
                     let prepared_u8 =
                         unsafe { vqmovn_u16(vcombine_u16(prepared_u16, prepared_u16)) };
 
@@ -133,8 +138,10 @@ pub mod neon_support {
         let height_wide = height as i64;
 
         let radius_64 = radius as i64;
-        let weight = 1.0f32 / ((radius as f32) * (radius as f32));
-        let f_weight = unsafe { vdupq_n_f32(weight) };
+        let mul_value = MUL_TABLE_DOUBLE[radius as usize];
+        let shr_value = SHR_TABLE_DOUBLE[radius as usize];
+        let v_mul_value = unsafe { vdupq_n_s32(mul_value) };
+        let v_shr_value = unsafe { vdupq_n_s32(-shr_value) };
         for x in start..std::cmp::min(width, end) {
             let mut diffs: int32x4_t = unsafe { vdupq_n_s32(0) };
             let mut summs: int32x4_t = unsafe { vdupq_n_s32(initial_sum) };
@@ -147,9 +154,12 @@ pub mod neon_support {
                     let current_px = ((std::cmp::max(x, 0)) * CHANNELS_COUNT as u32) as usize;
 
                     let prepared_px_s32 = unsafe {
-                        vcvtq_s32_f32(vrndq_f32(vmulq_f32(vcvtq_f32_s32(summs), f_weight)))
+                        vshlq_u32(
+                            vreinterpretq_u32_s32(vmulq_s32(summs, v_mul_value)),
+                            v_shr_value,
+                        )
                     };
-                    let prepared_u16 = unsafe { vqmovun_s32(prepared_px_s32) };
+                    let prepared_u16 = unsafe { vqmovn_u32(prepared_px_s32) };
                     let prepared_u8 =
                         unsafe { vqmovn_u16(vcombine_u16(prepared_u16, prepared_u16)) };
 

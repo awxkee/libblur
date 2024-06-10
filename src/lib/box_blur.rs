@@ -25,15 +25,17 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use crate::box_blur_neon::neon_support;
-use crate::channels_configuration::FastBlurChannels;
-use crate::unsafe_slice::UnsafeSlice;
 use num_traits::cast::FromPrimitive;
 use rayon::ThreadPool;
+
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+use crate::box_blur_neon::neon_support;
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), target_feature = "sse4.1"))]
 use crate::box_blur_sse::sse_support;
+use crate::channels_configuration::FastBlurChannels;
+use crate::mul_table::{MUL_TABLE_TWICE_RAD, SHR_TABLE_TWICE_RAD};
 use crate::ThreadingPolicy;
+use crate::unsafe_slice::UnsafeSlice;
 
 #[allow(unused_variables)]
 #[allow(unused_imports)]
@@ -88,7 +90,8 @@ fn box_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<u32> + Send +
     let kernel_size = radius * 2 + 1;
     let edge_count = (kernel_size / 2) + 1;
     let half_kernel = kernel_size / 2;
-    let kernel_scale = 1f32 / (radius * 2) as f32;
+    let mul_value = MUL_TABLE_TWICE_RAD[radius as usize] as u32;
+    let shr_value = SHR_TABLE_TWICE_RAD[radius as usize] as u32;
     let channels_count = match box_channels {
         FastBlurChannels::Channels3 => 3,
         FastBlurChannels::Channels4 => 4,
@@ -148,15 +151,15 @@ fn box_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<u32> + Send +
             unsafe {
                 unsafe_dst.write(
                     y_dst_shift + px + 0,
-                    T::from_f32(kernel[0] as f32 * kernel_scale).unwrap_or_default(),
+                    T::from_u32((kernel[0] * mul_value) >> shr_value).unwrap_or_default(),
                 );
                 unsafe_dst.write(
                     y_dst_shift + px + 1,
-                    T::from_f32(kernel[1] as f32 * kernel_scale).unwrap_or_default(),
+                    T::from_u32((kernel[1] * mul_value) >> shr_value).unwrap_or_default(),
                 );
                 unsafe_dst.write(
                     y_dst_shift + px + 2,
-                    T::from_f32(kernel[2] as f32 * kernel_scale).unwrap_or_default(),
+                    T::from_u32((kernel[2] * mul_value) >> shr_value).unwrap_or_default(),
                 );
 
                 match box_channels {
@@ -164,7 +167,7 @@ fn box_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<u32> + Send +
                     FastBlurChannels::Channels4 => {
                         unsafe_dst.write(
                             y_dst_shift + px + 3,
-                            T::from_f32(kernel[3] as f32 * kernel_scale).unwrap_or_default(),
+                            T::from_u32((kernel[3] * mul_value) >> shr_value).unwrap_or_default(),
                         );
                     }
                 }
@@ -265,7 +268,10 @@ fn box_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<u32> + Sync + S
     }
     let box_channels: FastBlurChannels = CHANNEL_CONFIGURATION.into();
     let kernel_size = radius * 2 + 1;
-    let kernel_scale = 1f32 / (radius * 2) as f32;
+
+    let mul_value = MUL_TABLE_TWICE_RAD[radius as usize] as u32;
+    let shr_value = SHR_TABLE_TWICE_RAD[radius as usize] as u32;
+
     let edge_count = (kernel_size / 2) + 1;
     let half_kernel = kernel_size / 2;
     let channels_count = match box_channels {
@@ -326,22 +332,23 @@ fn box_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<u32> + Sync + S
             unsafe {
                 unsafe_dst.write(
                     y_dst_shift + px + 0,
-                    T::from_f32(kernel[0] as f32 * kernel_scale).unwrap_or_default(),
+                    T::from_u32((kernel[0] * mul_value) >> shr_value).unwrap_or_default(),
                 );
                 unsafe_dst.write(
                     y_dst_shift + px + 1,
-                    T::from_f32(kernel[1] as f32 * kernel_scale).unwrap_or_default(),
+                    T::from_u32((kernel[1] * mul_value) >> shr_value).unwrap_or_default(),
                 );
                 unsafe_dst.write(
                     y_dst_shift + px + 2,
-                    T::from_f32(kernel[2] as f32 * kernel_scale).unwrap_or_default(),
+                    T::from_u32((kernel[2] * mul_value) >> shr_value).unwrap_or_default(),
                 );
+
                 match box_channels {
                     FastBlurChannels::Channels3 => {}
                     FastBlurChannels::Channels4 => {
                         unsafe_dst.write(
                             y_dst_shift + px + 3,
-                            T::from_f32(kernel[3] as f32 * kernel_scale).unwrap_or_default(),
+                            T::from_u32((kernel[3] * mul_value) >> shr_value).unwrap_or_default(),
                         );
                     }
                 }

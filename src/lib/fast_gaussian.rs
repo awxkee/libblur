@@ -30,13 +30,20 @@ use crate::fast_gaussian_f16::fast_gaussian_f16;
 use crate::fast_gaussian_f32::fast_gaussian_f32;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::fast_gaussian_neon::neon_support;
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+))]
+use crate::fast_gaussian_sse::sse_support;
+use crate::mul_table::{MUL_TABLE_DOUBLE, SHR_TABLE_DOUBLE};
+use crate::threading_policy::ThreadingPolicy;
 use crate::unsafe_slice::UnsafeSlice;
 use num_traits::cast::FromPrimitive;
-#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), target_feature = "sse4.1"))]
-use crate::fast_gaussian_sse::sse_support;
-use crate::threading_policy::ThreadingPolicy;
 
-fn fast_gaussian_vertical_pass<T: FromPrimitive + Default + Into<i32>, const CHANNELS_CONFIGURATION: usize>(
+fn fast_gaussian_vertical_pass<
+    T: FromPrimitive + Default + Into<i32>,
+    const CHANNELS_CONFIGURATION: usize,
+>(
     bytes: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -70,7 +77,8 @@ fn fast_gaussian_vertical_pass<T: FromPrimitive + Default + Into<i32>, const CHA
     let mut buffer_b: [i32; 1024] = [0; 1024];
     let radius_64 = radius as i64;
     let height_wide = height as i64;
-    let weight = 1.0f32 / ((radius as f32) * (radius as f32));
+    let mul_value = MUL_TABLE_DOUBLE[radius as usize];
+    let shr_value = SHR_TABLE_DOUBLE[radius as usize];
     let initial = ((radius * radius) >> 1) as i32;
     for x in start..std::cmp::min(width, end) {
         let mut dif_r: i32 = 0;
@@ -86,9 +94,12 @@ fn fast_gaussian_vertical_pass<T: FromPrimitive + Default + Into<i32>, const CHA
         for y in start_y..height_wide {
             let current_y = (y * (stride as i64)) as usize;
             if y >= 0 {
-                let new_r = T::from_u32(((sum_r as f32) * weight) as u32).unwrap_or_default();
-                let new_g = T::from_u32(((sum_g as f32) * weight) as u32).unwrap_or_default();
-                let new_b = T::from_u32(((sum_b as f32) * weight) as u32).unwrap_or_default();
+                let new_r =
+                    T::from_u32((sum_r * mul_value) as u32 >> shr_value).unwrap_or_default();
+                let new_g =
+                    T::from_u32((sum_g * mul_value) as u32 >> shr_value).unwrap_or_default();
+                let new_b =
+                    T::from_u32((sum_b * mul_value) as u32 >> shr_value).unwrap_or_default();
 
                 unsafe {
                     bytes.write(current_y + current_px, new_r);
@@ -145,7 +156,10 @@ fn fast_gaussian_vertical_pass<T: FromPrimitive + Default + Into<i32>, const CHA
     }
 }
 
-fn fast_gaussian_horizontal_pass<T: FromPrimitive + Default + Into<i32> + Send + Sync, const CHANNEL_CONFIGURATION: usize>(
+fn fast_gaussian_horizontal_pass<
+    T: FromPrimitive + Default + Into<i32> + Send + Sync,
+    const CHANNEL_CONFIGURATION: usize,
+>(
     bytes: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -157,8 +171,7 @@ fn fast_gaussian_horizontal_pass<T: FromPrimitive + Default + Into<i32> + Send +
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
     if std::any::type_name::<T>() == "u8" {
-        #[cfg(target_arch = "aarch64")]
-        #[cfg(target_feature = "neon")]
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(bytes) };
             neon_support::fast_gaussian_horizontal_pass_neon_u8::<CHANNEL_CONFIGURATION>(
@@ -166,7 +179,10 @@ fn fast_gaussian_horizontal_pass<T: FromPrimitive + Default + Into<i32> + Send +
             );
             return;
         }
-        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), target_feature = "sse4.1"))]
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "sse4.1"
+        ))]
         {
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(bytes) };
             sse_support::fast_gaussian_horizontal_pass_sse_u8::<CHANNEL_CONFIGURATION>(
@@ -181,7 +197,8 @@ fn fast_gaussian_horizontal_pass<T: FromPrimitive + Default + Into<i32> + Send +
     let mut buffer_b: [i32; 1024] = [0; 1024];
     let radius_64 = radius as i64;
     let width_wide = width as i64;
-    let weight = 1.0f32 / ((radius as f32) * (radius as f32));
+    let mul_value = MUL_TABLE_DOUBLE[radius as usize];
+    let shr_value = SHR_TABLE_DOUBLE[radius as usize];
     let channels_count = match channels {
         FastBlurChannels::Channels3 => 3,
         FastBlurChannels::Channels4 => 4,
@@ -201,9 +218,9 @@ fn fast_gaussian_horizontal_pass<T: FromPrimitive + Default + Into<i32> + Send +
         for x in start_x..(width as i64) {
             if x >= 0 {
                 let current_px = ((std::cmp::max(x, 0) as u32) * channels_count) as usize;
-                let new_r = T::from_u32(((sum_r as f32) * weight) as u32).unwrap_or_default();
-                let new_g = T::from_u32(((sum_g as f32) * weight) as u32).unwrap_or_default();
-                let new_b = T::from_u32(((sum_b as f32) * weight) as u32).unwrap_or_default();
+                let new_r = T::from_u32((sum_r * mul_value) as u32 >> shr_value).unwrap_or_default();
+                let new_g = T::from_u32((sum_g * mul_value) as u32 >> shr_value).unwrap_or_default();
+                let new_b = T::from_u32((sum_b * mul_value) as u32 >> shr_value).unwrap_or_default();
 
                 unsafe {
                     bytes.write(current_y + current_px, new_r);
@@ -258,7 +275,10 @@ fn fast_gaussian_horizontal_pass<T: FromPrimitive + Default + Into<i32> + Send +
     }
 }
 
-fn fast_gaussian_impl<T: FromPrimitive + Default + Into<i32> + Send + Sync, const CHANNEL_CONFIGURATION: usize>(
+fn fast_gaussian_impl<
+    T: FromPrimitive + Default + Into<i32> + Send + Sync,
+    const CHANNEL_CONFIGURATION: usize,
+>(
     bytes: &mut [T],
     stride: u32,
     width: u32,
@@ -324,7 +344,7 @@ fn fast_gaussian_impl<T: FromPrimitive + Default + Into<i32> + Send + Sync, cons
 /// # Arguments
 ///
 /// * `stride` - Lane length, default is width * channels_count if not aligned
-/// * `radius` - Radius more than ~512 is not supported. To use larger radius convert image to f32 and use function for f32
+/// * `radius` - Radius more than 319 is not supported. To use larger radius convert image to f32 and use function for f32
 /// O(1) complexity.
 #[no_mangle]
 pub fn fast_gaussian(
@@ -336,7 +356,7 @@ pub fn fast_gaussian(
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) {
-    let acq_radius = std::cmp::min(radius, 512);
+    let acq_radius = std::cmp::min(radius, 319);
     match channels {
         FastBlurChannels::Channels3 => {
             fast_gaussian_impl::<u8, 3>(bytes, stride, width, height, acq_radius, threading_policy);
@@ -351,7 +371,7 @@ pub fn fast_gaussian(
 /// # Arguments
 ///
 /// * `stride` - Lane length, default is width * channels_count if not aligned
-/// * `radius` - Radius more than ~512 is not supported. To use larger radius convert image to f32 and use function for f32
+/// * `radius` - Radius more than 255 is not supported. To use larger radius convert image to f32 and use function for f32
 /// O(1) complexity.
 #[no_mangle]
 pub fn fast_gaussian_u16(
@@ -363,13 +383,27 @@ pub fn fast_gaussian_u16(
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) {
-    let acq_radius = std::cmp::min(radius, 512);
+    let acq_radius = std::cmp::min(radius, 255);
     match channels {
         FastBlurChannels::Channels3 => {
-            fast_gaussian_impl::<u16, 3>(bytes, stride, width, height, acq_radius, threading_policy);
+            fast_gaussian_impl::<u16, 3>(
+                bytes,
+                stride,
+                width,
+                height,
+                acq_radius,
+                threading_policy,
+            );
         }
         FastBlurChannels::Channels4 => {
-            fast_gaussian_impl::<u16, 4>(bytes, stride, width, height, acq_radius, threading_policy);
+            fast_gaussian_impl::<u16, 4>(
+                bytes,
+                stride,
+                width,
+                height,
+                acq_radius,
+                threading_policy,
+            );
         }
     }
 }

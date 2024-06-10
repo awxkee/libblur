@@ -31,6 +31,7 @@ pub mod sse_support {
     use std::arch::x86_64::*;
     #[cfg(target_arch = "x86")]
     use std::arch::x86::*;
+    use crate::mul_table::{MUL_TABLE_DOUBLE, SHR_TABLE_DOUBLE};
     use crate::sse_utils::sse_utils::{load_u8_s32_fast};
     use crate::unsafe_slice::UnsafeSlice;
 
@@ -48,8 +49,10 @@ pub mod sse_support {
 
         let radius_64 = radius as i64;
         let width_wide = width as i64;
-        let weight = 1.0f32 / ((radius as f32) * (radius as f32));
-        let f_weight = unsafe { _mm_set1_ps(weight) };
+        let mul_value = MUL_TABLE_DOUBLE[radius as usize];
+        let shr_value = SHR_TABLE_DOUBLE[radius as usize];
+        let v_mul_value = unsafe { _mm_set1_epi32(mul_value) };
+        let v_shr_value = unsafe { _mm_set1_epi32(shr_value) };
         for y in start..std::cmp::min(height, end) {
             let mut diffs = unsafe { _mm_set1_epi32(0) };
             let mut summs = unsafe { _mm_set1_epi32(initial_sum) };
@@ -63,7 +66,7 @@ pub mod sse_support {
 
                     const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
                     let prepared_px_s32 = unsafe {
-                        _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(_mm_cvtepi32_ps(summs), f_weight)))
+                        _mm_sra_epi32(_mm_mullo_epi32(summs, v_mul_value), v_shr_value)
                     };
                     let prepared_u16 = unsafe { _mm_packus_epi32(prepared_px_s32, prepared_px_s32) };
                     let prepared_u8 =
@@ -131,8 +134,10 @@ pub mod sse_support {
         let height_wide = height as i64;
 
         let radius_64 = radius as i64;
-        let weight = 1.0f32 / ((radius as f32) * (radius as f32));
-        let f_weight = unsafe { _mm_set1_ps(weight) };
+        let mul_value = MUL_TABLE_DOUBLE[radius as usize];
+        let shr_value = SHR_TABLE_DOUBLE[radius as usize];
+        let v_mul_value = unsafe { _mm_set1_epi32(mul_value) };
+        let v_shr_value = unsafe { _mm_set1_epi32(shr_value) };
         for x in start..std::cmp::min(width, end) {
             let mut diffs = unsafe { _mm_set1_epi32(0) };
             let mut summs = unsafe { _mm_set1_epi32(initial_sum) };
@@ -145,7 +150,7 @@ pub mod sse_support {
                     let current_px = ((std::cmp::max(x, 0)) * CHANNELS_COUNT as u32) as usize;
                     const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
                     let prepared_px_s32 = unsafe {
-                        _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(_mm_cvtepi32_ps(summs), f_weight)))
+                        _mm_sra_epi32(_mm_mullo_epi32(summs, v_mul_value), v_shr_value)
                     };
                     let prepared_u16 = unsafe { _mm_packus_epi32(prepared_px_s32, prepared_px_s32) };
                     let prepared_u8 =

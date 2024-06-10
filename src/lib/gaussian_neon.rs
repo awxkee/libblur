@@ -29,7 +29,7 @@
 #[cfg(target_feature = "neon")]
 pub mod neon_support {
     use crate::neon_utils::neon_utils::{
-        load_u8_u32_fast, load_u8_u32_one, prefer_vfma_f32, prefer_vfmaq_f32,
+        load_u8_u16_x2_fast, load_u8_u32_fast, load_u8_u32_one, prefer_vfma_f32, prefer_vfmaq_f32,
     };
     use std::arch::aarch64::*;
 
@@ -66,7 +66,10 @@ pub mod neon_support {
                 let mut r = -half_kernel;
 
                 unsafe {
-                    while r + 4 <= half_kernel && x as i64 + r as i64 + 6 < width as i64 {
+                    while r + 4 <= half_kernel
+                        && x as i64 + r as i64 + (if CHANNEL_CONFIGURATION == 4 { 4 } else { 6 })
+                            < width as i64
+                    {
                         let px = std::cmp::min(
                             std::cmp::max(x as i64 + r as i64, 0),
                             (width - 1) as i64,
@@ -158,33 +161,44 @@ pub mod neon_support {
 
                 let px = x as usize * CHANNEL_CONFIGURATION;
 
-                let px_16 = unsafe { vqmovn_u32(vcvtq_u32_f32(vrndq_f32(store_0))) };
-                let px_8 = unsafe { vqmovn_u16(vcombine_u16(px_16, px_16)) };
-                let pixel = unsafe { vget_lane_u32::<0>(vreinterpret_u32_u8(px_8)) };
-                let pixel_bytes_0 = pixel.to_le_bytes();
+                if CHANNEL_CONFIGURATION == 3 {
+                    let px_16 = unsafe { vqmovn_u32(vcvtaq_u32_f32(store_0)) };
+                    let px_8 = unsafe { vqmovn_u16(vcombine_u16(px_16, px_16)) };
+                    let pixel = unsafe { vget_lane_u32::<0>(vreinterpret_u32_u8(px_8)) };
+                    let pixel_bytes_0 = pixel.to_le_bytes();
 
-                let px_16 = unsafe { vqmovn_u32(vcvtq_u32_f32(vrndq_f32(store_1))) };
-                let px_8 = unsafe { vqmovn_u16(vcombine_u16(px_16, px_16)) };
-                let pixel = unsafe { vget_lane_u32::<0>(vreinterpret_u32_u8(px_8)) };
-                let pixel_bytes_1 = pixel.to_le_bytes();
+                    let px_16 = unsafe { vqmovn_u32(vcvtaq_u32_f32(store_1)) };
+                    let px_8 = unsafe { vqmovn_u16(vcombine_u16(px_16, px_16)) };
+                    let pixel = unsafe { vget_lane_u32::<0>(vreinterpret_u32_u8(px_8)) };
+                    let pixel_bytes_1 = pixel.to_le_bytes();
 
-                unsafe {
-                    let offset = y_dst_shift + px;
-                    unsafe_dst.write(offset, pixel_bytes_0[0]);
-                    unsafe_dst.write(offset + 1, pixel_bytes_0[1]);
-                    unsafe_dst.write(offset + 2, pixel_bytes_0[2]);
-                    if CHANNEL_CONFIGURATION == 4 {
-                        unsafe_dst.write(offset + 3, pixel_bytes_0[3]);
+                    unsafe {
+                        let offset = y_dst_shift + px;
+                        unsafe_dst.write(offset, pixel_bytes_0[0]);
+                        unsafe_dst.write(offset + 1, pixel_bytes_0[1]);
+                        unsafe_dst.write(offset + 2, pixel_bytes_0[2]);
+                        if CHANNEL_CONFIGURATION == 4 {
+                            unsafe_dst.write(offset + 3, pixel_bytes_0[3]);
+                        }
                     }
-                }
 
-                unsafe {
-                    let offset = y_dst_shift + px + src_stride as usize;
-                    unsafe_dst.write(offset, pixel_bytes_1[0]);
-                    unsafe_dst.write(offset + 1, pixel_bytes_1[1]);
-                    unsafe_dst.write(offset + 2, pixel_bytes_1[2]);
-                    if CHANNEL_CONFIGURATION == 4 {
-                        unsafe_dst.write(offset + 3, pixel_bytes_1[3]);
+                    unsafe {
+                        let offset = y_dst_shift + px + src_stride as usize;
+                        unsafe_dst.write(offset, pixel_bytes_1[0]);
+                        unsafe_dst.write(offset + 1, pixel_bytes_1[1]);
+                        unsafe_dst.write(offset + 2, pixel_bytes_1[2]);
+                        if CHANNEL_CONFIGURATION == 4 {
+                            unsafe_dst.write(offset + 3, pixel_bytes_1[3]);
+                        }
+                    }
+                } else {
+                    unsafe {
+                        let offset = y_dst_shift + px;
+                        let ptr = unsafe_dst.slice.get_unchecked(offset).get();
+                        let px_16_lo = vqmovn_u32(vcvtaq_u32_f32(store_0));
+                        let px_16_hi = vqmovn_u32(vcvtaq_u32_f32(store_1));
+                        let px = vqmovn_u16(vcombine_u16(px_16_lo, px_16_hi));
+                        vst1_u8(ptr, px);
                     }
                 }
             }
@@ -245,6 +259,30 @@ pub mod neon_support {
                 }
 
                 unsafe {
+                    while r + 2 <= half_kernel && x as i64 + r as i64 + 2 < width as i64 {
+                        let current_x = std::cmp::min(
+                            std::cmp::max(x as i64 + r as i64, 0),
+                            (width - 1) as i64,
+                        ) as usize;
+                        let px = current_x * CHANNEL_CONFIGURATION;
+                        let s_ptr = src.as_ptr().add(y_src_shift + px);
+                        let weight_0 = *kernel.get_unchecked((r + half_kernel) as usize);
+                        let weight_1 = *kernel.get_unchecked((r + half_kernel + 1) as usize);
+                        let pixel_colors_u32 = load_u8_u16_x2_fast::<CHANNEL_CONFIGURATION>(s_ptr);
+                        let pixel_colors_f32 =
+                            vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_u32)));
+                        let f_weight = vdupq_n_f32(weight_0);
+                        store = prefer_vfmaq_f32(store, pixel_colors_f32, f_weight);
+
+                        let pixel_colors_f32 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_u32));
+                        let f_weight = vdupq_n_f32(weight_1);
+                        store = prefer_vfmaq_f32(store, pixel_colors_f32, f_weight);
+
+                        r += 2;
+                    }
+                }
+
+                unsafe {
                     while r <= half_kernel {
                         let current_x = std::cmp::min(
                             std::cmp::max(x as i64 + r as i64, 0),
@@ -264,7 +302,7 @@ pub mod neon_support {
 
                 let px = x as usize * CHANNEL_CONFIGURATION;
 
-                let px_16 = unsafe { vqmovn_u32(vcvtq_u32_f32(vrndq_f32(store))) };
+                let px_16 = unsafe { vqmovn_u32(vcvtaq_u32_f32(store)) };
                 let px_8 = unsafe { vqmovn_u16(vcombine_u16(px_16, px_16)) };
                 let pixel = unsafe { vget_lane_u32::<0>(vreinterpret_u32_u8(px_8)) };
                 let bits = pixel.to_le_bytes();

@@ -12,13 +12,10 @@ pub(crate) mod neon_utils {
     }
 
     #[inline(always)]
-    pub(crate) unsafe fn load_u8_u32_one(
-        ptr: *const u8,
-    ) -> uint32x2_t {
+    pub(crate) unsafe fn load_u8_u32_one(ptr: *const u8) -> uint32x2_t {
         let u_first = u32::from_le_bytes([*ptr, 0, 0, 0]);
         return vdup_n_u32(u_first);
     }
-
 
     #[inline(always)]
     pub(crate) unsafe fn load_u8_u32_fast<const CHANNELS_COUNT: usize>(
@@ -33,6 +30,25 @@ pub(crate) mod neon_utils {
         };
         let store: [u32; 4] = [u_first, u_second, u_third, u_fourth];
         return vld1q_u32(store.as_ptr());
+    }
+
+    #[inline(always)]
+    pub(crate) unsafe fn load_u8_u16_x2_fast<const CHANNELS_COUNT: usize>(
+        ptr: *const u8,
+    ) -> uint16x8_t {
+        return if CHANNELS_COUNT == 3 {
+            let first_integer_part = (ptr as *const u32).read_unaligned().to_le_bytes();
+            let u_first = u16::from_le_bytes([first_integer_part[0], 0]);
+            let u_second = u16::from_le_bytes([first_integer_part[1], 0]);
+            let u_third = u16::from_le_bytes([first_integer_part[2], 0]);
+            let u_fourth = u16::from_le_bytes([first_integer_part[3], 0]);
+            let u_fifth = u16::from_le_bytes([*ptr.add(4), 0]);
+            let u_sixth = u16::from_le_bytes([*ptr.add(5), 0]);
+            let store: [u16; 8] = [u_first, u_second, u_third, u_fourth, u_fifth, u_sixth, 0, 0];
+            vld1q_u16(store.as_ptr())
+        } else {
+            vmovl_u8(vld1_u8(ptr))
+        }
     }
 
     #[allow(dead_code)]
@@ -107,5 +123,4 @@ pub(crate) mod neon_utils {
             return vmla_f32(a, b, c);
         }
     }
-
 }
