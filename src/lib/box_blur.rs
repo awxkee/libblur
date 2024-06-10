@@ -707,6 +707,7 @@ pub fn gaussian_box_blur(
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) {
+    let radius = std::cmp::min(radius, 255);
     match channels {
         FastBlurChannels::Channels3 => {
             gaussian_box_blur_impl::<u8, 3>(
@@ -734,6 +735,7 @@ pub extern "C" fn gaussian_box_blur_u16(
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) {
+    let radius = std::cmp::min(radius, 255);
     match channels {
         FastBlurChannels::Channels3 => {
             gaussian_box_blur_impl::<u16, 3>(
