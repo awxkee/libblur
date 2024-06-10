@@ -30,14 +30,14 @@
     target_feature = "sse4.1"
 ))]
 pub mod sse_support {
-    use crate::mul_table::{
-        MUL_TABLE_DOUBLE, MUL_TABLE_TWICE_RAD, SHR_TABLE_DOUBLE, SHR_TABLE_TWICE_RAD,
-    };
     #[cfg(target_arch = "x86")]
     use std::arch::x86::*;
     #[cfg(target_arch = "x86_64")]
     use std::arch::x86_64::*;
 
+    use crate::mul_table::{
+        MUL_TABLE_TWICE_RAD, SHR_TABLE_TWICE_RAD,
+    };
     use crate::sse_utils::sse_utils::load_u8_s32_fast;
     use crate::unsafe_slice::UnsafeSlice;
 
@@ -61,7 +61,7 @@ pub mod sse_support {
         let mul_value = MUL_TABLE_TWICE_RAD[radius as usize];
         let shr_value = SHR_TABLE_TWICE_RAD[radius as usize];
         let v_mul_value = unsafe { _mm_set1_epi32(mul_value) };
-        let v_shr_value = unsafe { _mm_set1_epi32(shr_value) };
+        let v_shr_value = unsafe { _mm_setr_epi32(shr_value,0,0,0) };
 
         let kernel_size = radius * 2 + 1;
         let edge_count = (kernel_size / 2) + 1;
@@ -117,7 +117,7 @@ pub mod sse_support {
                 }
 
                 let scale_store =
-                    unsafe { _mm_sra_epi32(_mm_mullo_epi32(store, v_mul_value), v_shr_value) };
+                    unsafe { _mm_srl_epi32(_mm_mullo_epi32(store, v_mul_value), v_shr_value) };
                 let px_16 = unsafe { _mm_packus_epi32(scale_store, scale_store) };
                 let px_8 = unsafe { _mm_packus_epi16(px_16, px_16) };
                 let pixel = unsafe { _mm_extract_epi32::<0>(px_8) };
@@ -157,7 +157,7 @@ pub mod sse_support {
         let mul_value = MUL_TABLE_TWICE_RAD[radius as usize];
         let shr_value = SHR_TABLE_TWICE_RAD[radius as usize];
         let v_mul_value = unsafe { _mm_set1_epi32(mul_value) };
-        let v_shr_value = unsafe { _mm_set1_epi32(shr_value) };
+        let v_shr_value = unsafe { _mm_setr_epi32(shr_value,0,0,0) };
 
         let kernel_size = radius * 2 + 1;
         let edge_count = (kernel_size / 2) + 1;
@@ -226,9 +226,9 @@ pub mod sse_support {
                 }
 
                 let scale_store_0 =
-                    unsafe { _mm_sra_epi32(_mm_mullo_epi32(store_0, v_mul_value), v_shr_value) };
+                    unsafe { _mm_srl_epi32(_mm_mullo_epi32(store_0, v_mul_value), v_shr_value) };
                 let scale_store_1 =
-                    unsafe { _mm_sra_epi32(_mm_mullo_epi32(store_1, v_mul_value), v_shr_value) };
+                    unsafe { _mm_srl_epi32(_mm_mullo_epi32(store_1, v_mul_value), v_shr_value) };
 
                 if CHANNELS == 3 {
                     let px_16 = unsafe { _mm_packus_epi32(scale_store_0, scale_store_0) };
@@ -322,7 +322,7 @@ pub mod sse_support {
                 }
 
                 let scale_store =
-                    unsafe { _mm_sra_epi32(_mm_mullo_epi32(store, v_mul_value), v_shr_value) };
+                    unsafe { _mm_srl_epi32(_mm_mullo_epi32(store, v_mul_value), v_shr_value) };
                 let px_16 = unsafe { _mm_packus_epi32(scale_store, scale_store) };
                 let px_8 = unsafe { _mm_packus_epi16(px_16, px_16) };
 
@@ -348,8 +348,8 @@ pub mod sse_support {
     target_feature = "sse4.1"
 )))]
 pub mod sse_support {
-    use crate::unsafe_slice::UnsafeSlice;
     use crate::FastBlurChannels;
+    use crate::unsafe_slice::UnsafeSlice;
 
     #[allow(dead_code)]
     pub(crate) fn box_blur_horizontal_pass_sse(

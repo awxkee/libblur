@@ -43,23 +43,23 @@ fn main() {
     //     stride as u32,
     //     dimensions.0,
     //     dimensions.1,
-    //     319,
+    //     32,
     //     FastBlurChannels::Channels3,
     //     ThreadingPolicy::Adaptive,
     // );
 
-    // libblur::gaussian_box_blur(
-    //     &bytes,
-    //     stride as u32,
-    //     &mut dst_bytes,
-    //     stride as u32,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     32,
-    //     FastBlurChannels::Channels3,
-    //     ThreadingPolicy::Single,
-    // );
-    // bytes = dst_bytes;
+    libblur::gaussian_box_blur(
+        &bytes,
+        stride as u32,
+        &mut dst_bytes,
+        stride as u32,
+        dimensions.0,
+        dimensions.1,
+        35,
+        FastBlurChannels::Channels3,
+        ThreadingPolicy::Single,
+    );
+    bytes = dst_bytes;
     // libblur::gaussian_blur(
     //     &bytes,
     //     stride as u32,

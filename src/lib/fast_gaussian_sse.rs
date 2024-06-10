@@ -52,7 +52,7 @@ pub mod sse_support {
         let mul_value = MUL_TABLE_DOUBLE[radius as usize];
         let shr_value = SHR_TABLE_DOUBLE[radius as usize];
         let v_mul_value = unsafe { _mm_set1_epi32(mul_value) };
-        let v_shr_value = unsafe { _mm_set1_epi32(shr_value) };
+        let v_shr_value = unsafe { _mm_setr_epi32(shr_value,0,0,0) };
         for y in start..std::cmp::min(height, end) {
             let mut diffs = unsafe { _mm_set1_epi32(0) };
             let mut summs = unsafe { _mm_set1_epi32(initial_sum) };
@@ -64,9 +64,8 @@ pub mod sse_support {
                 if x >= 0 {
                     let current_px = ((std::cmp::max(x, 0) as u32) * CHANNELS_COUNT as u32) as usize;
 
-                    const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
                     let prepared_px_s32 = unsafe {
-                        _mm_sra_epi32(_mm_mullo_epi32(summs, v_mul_value), v_shr_value)
+                        _mm_srl_epi32(_mm_mullo_epi32(summs, v_mul_value), v_shr_value)
                     };
                     let prepared_u16 = unsafe { _mm_packus_epi32(prepared_px_s32, prepared_px_s32) };
                     let prepared_u8 =
@@ -137,7 +136,7 @@ pub mod sse_support {
         let mul_value = MUL_TABLE_DOUBLE[radius as usize];
         let shr_value = SHR_TABLE_DOUBLE[radius as usize];
         let v_mul_value = unsafe { _mm_set1_epi32(mul_value) };
-        let v_shr_value = unsafe { _mm_set1_epi32(shr_value) };
+        let v_shr_value = unsafe { _mm_setr_epi32(shr_value,0,0,0) };
         for x in start..std::cmp::min(width, end) {
             let mut diffs = unsafe { _mm_set1_epi32(0) };
             let mut summs = unsafe { _mm_set1_epi32(initial_sum) };
@@ -148,9 +147,8 @@ pub mod sse_support {
 
                 if y >= 0 {
                     let current_px = ((std::cmp::max(x, 0)) * CHANNELS_COUNT as u32) as usize;
-                    const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
                     let prepared_px_s32 = unsafe {
-                        _mm_sra_epi32(_mm_mullo_epi32(summs, v_mul_value), v_shr_value)
+                        _mm_srl_epi32(_mm_mullo_epi32(summs, v_mul_value), v_shr_value)
                     };
                     let prepared_u16 = unsafe { _mm_packus_epi32(prepared_px_s32, prepared_px_s32) };
                     let prepared_u8 =
