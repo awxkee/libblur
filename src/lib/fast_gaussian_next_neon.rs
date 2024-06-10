@@ -168,15 +168,14 @@ pub mod neon_support {
                     let prepared_u16 = unsafe { vqmovun_s32(prepared_px_s32) };
                     let prepared_u8 =
                         unsafe { vqmovn_u16(vcombine_u16(prepared_u16, prepared_u16)) };
-
-                    let new_r = unsafe { vget_lane_u8::<0>(prepared_u8) };
-                    let new_g = unsafe { vget_lane_u8::<1>(prepared_u8) };
-                    let new_b = unsafe { vget_lane_u8::<2>(prepared_u8) };
+                    let casted_u32 = unsafe { vreinterpret_u32_u8(prepared_u8) };
+                    let pixel = unsafe { vget_lane_u32::<0>(casted_u32) };
+                    let bits = pixel.to_le_bytes();
 
                     unsafe {
-                        bytes.write(current_y + current_px, new_r);
-                        bytes.write(current_y + current_px + 1, new_g);
-                        bytes.write(current_y + current_px + 2, new_b);
+                        bytes.write(current_y + current_px, bits[0]);
+                        bytes.write(current_y + current_px + 1, bits[1]);
+                        bytes.write(current_y + current_px + 2, bits[2]);
                     }
 
                     let d_arr_index_1 = ((x + radius_64) & 1023) as usize;
@@ -209,7 +208,7 @@ pub mod neon_support {
                     diffs = unsafe { vaddq_s32(diffs, new_diff) };
                 } else if x + 2 * radius_64 >= 0 {
                     let arr_index = ((x + radius_64) & 1023) as usize;
-                    let buf_ptr = buffer[arr_index].as_mut_ptr();
+                    let buf_ptr = unsafe { buffer.get_unchecked_mut(arr_index).as_mut_ptr() };
                     let stored = unsafe { vld1q_s32(buf_ptr) };
                     diffs = unsafe { vsubq_s32(diffs, vmulq_n_s32(stored, 3)) };
                 }

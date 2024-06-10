@@ -312,7 +312,7 @@ pub mod neon_support {
         src_stride: u32,
         unsafe_dst: &UnsafeSlice<u8>,
         dst_stride: u32,
-        _: u32,
+        width: u32,
         height: u32,
         kernel_size: usize,
         kernel: &Vec<f32>,
@@ -323,13 +323,15 @@ pub mod neon_support {
 
         let zeros = unsafe { vdupq_n_f32(0f32) };
 
+        let total_size = 4usize * width as usize;
+
         for y in start_y..end_y {
             let y_dst_shift = y as usize * dst_stride as usize;
 
             let mut cx = 0usize;
 
             unsafe {
-                while cx + 32 < dst_stride as usize {
+                while cx + 32 < total_size {
                     let mut store0 = zeros;
                     let mut store1 = zeros;
                     let mut store2 = zeros;
@@ -401,7 +403,7 @@ pub mod neon_support {
                     cx += 32;
                 }
 
-                while cx + 16 < dst_stride as usize {
+                while cx + 16 < total_size {
                     let mut store0: float32x4_t = zeros;
                     let mut store1: float32x4_t = zeros;
                     let mut store2: float32x4_t = zeros;
@@ -449,7 +451,7 @@ pub mod neon_support {
                     cx += 16;
                 }
 
-                while cx + 8 < dst_stride as usize {
+                while cx + 8 < total_size {
                     let mut store0: float32x4_t = zeros;
                     let mut store1: float32x4_t = zeros;
 
@@ -487,7 +489,7 @@ pub mod neon_support {
                     cx += 8;
                 }
 
-                while cx + 4 < dst_stride as usize {
+                while cx + 4 < total_size {
                     let mut store0: float32x4_t = zeros;
 
                     let mut r = -half_kernel;
@@ -522,7 +524,7 @@ pub mod neon_support {
                     cx += 4;
                 }
 
-                while cx + 1 < dst_stride as usize {
+                while cx < total_size {
                     let mut store0 = vdup_n_f32(0f32);
 
                     let mut r = -half_kernel;
