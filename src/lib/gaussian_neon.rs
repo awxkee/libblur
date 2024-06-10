@@ -161,44 +161,33 @@ pub mod neon_support {
 
                 let px = x as usize * CHANNEL_CONFIGURATION;
 
-                if CHANNEL_CONFIGURATION == 3 {
-                    let px_16 = unsafe { vqmovn_u32(vcvtaq_u32_f32(store_0)) };
-                    let px_8 = unsafe { vqmovn_u16(vcombine_u16(px_16, px_16)) };
-                    let pixel = unsafe { vget_lane_u32::<0>(vreinterpret_u32_u8(px_8)) };
-                    let pixel_bytes_0 = pixel.to_le_bytes();
+                let px_16 = unsafe { vqmovn_u32(vcvtaq_u32_f32(store_0)) };
+                let px_8 = unsafe { vqmovn_u16(vcombine_u16(px_16, px_16)) };
+                let pixel = unsafe { vget_lane_u32::<0>(vreinterpret_u32_u8(px_8)) };
+                let pixel_bytes_0 = pixel.to_le_bytes();
 
-                    let px_16 = unsafe { vqmovn_u32(vcvtaq_u32_f32(store_1)) };
-                    let px_8 = unsafe { vqmovn_u16(vcombine_u16(px_16, px_16)) };
-                    let pixel = unsafe { vget_lane_u32::<0>(vreinterpret_u32_u8(px_8)) };
-                    let pixel_bytes_1 = pixel.to_le_bytes();
+                let px_16 = unsafe { vqmovn_u32(vcvtaq_u32_f32(store_1)) };
+                let px_8 = unsafe { vqmovn_u16(vcombine_u16(px_16, px_16)) };
+                let pixel = unsafe { vget_lane_u32::<0>(vreinterpret_u32_u8(px_8)) };
+                let pixel_bytes_1 = pixel.to_le_bytes();
 
-                    unsafe {
-                        let offset = y_dst_shift + px;
-                        unsafe_dst.write(offset, pixel_bytes_0[0]);
-                        unsafe_dst.write(offset + 1, pixel_bytes_0[1]);
-                        unsafe_dst.write(offset + 2, pixel_bytes_0[2]);
-                        if CHANNEL_CONFIGURATION == 4 {
-                            unsafe_dst.write(offset + 3, pixel_bytes_0[3]);
-                        }
+                unsafe {
+                    let offset = y_dst_shift + px;
+                    unsafe_dst.write(offset, pixel_bytes_0[0]);
+                    unsafe_dst.write(offset + 1, pixel_bytes_0[1]);
+                    unsafe_dst.write(offset + 2, pixel_bytes_0[2]);
+                    if CHANNEL_CONFIGURATION == 4 {
+                        unsafe_dst.write(offset + 3, pixel_bytes_0[3]);
                     }
+                }
 
-                    unsafe {
-                        let offset = y_dst_shift + px + src_stride as usize;
-                        unsafe_dst.write(offset, pixel_bytes_1[0]);
-                        unsafe_dst.write(offset + 1, pixel_bytes_1[1]);
-                        unsafe_dst.write(offset + 2, pixel_bytes_1[2]);
-                        if CHANNEL_CONFIGURATION == 4 {
-                            unsafe_dst.write(offset + 3, pixel_bytes_1[3]);
-                        }
-                    }
-                } else {
-                    unsafe {
-                        let offset = y_dst_shift + px;
-                        let ptr = unsafe_dst.slice.get_unchecked(offset).get();
-                        let px_16_lo = vqmovn_u32(vcvtaq_u32_f32(store_0));
-                        let px_16_hi = vqmovn_u32(vcvtaq_u32_f32(store_1));
-                        let px = vqmovn_u16(vcombine_u16(px_16_lo, px_16_hi));
-                        vst1_u8(ptr, px);
+                unsafe {
+                    let offset = y_dst_shift + px + src_stride as usize;
+                    unsafe_dst.write(offset, pixel_bytes_1[0]);
+                    unsafe_dst.write(offset + 1, pixel_bytes_1[1]);
+                    unsafe_dst.write(offset + 2, pixel_bytes_1[2]);
+                    if CHANNEL_CONFIGURATION == 4 {
+                        unsafe_dst.write(offset + 3, pixel_bytes_1[3]);
                     }
                 }
             }
