@@ -37,8 +37,6 @@ fn main() {
     }
     let mut dst_bytes: Vec<u8> = Vec::with_capacity(dimensions.1 as usize * stride);
     dst_bytes.resize(dimensions.1 as usize * stride, 0);
-    let start_time = Instant::now();
-
     unsafe {
         std::ptr::copy_nonoverlapping(
             src_bytes.as_ptr(),
@@ -47,37 +45,38 @@ fn main() {
         );
     }
 
+    let start_time = Instant::now();
     // libblur::stack_blur(
     //     &mut dst_bytes,
     //     stride as u32,
     //     dimensions.0,
     //     dimensions.1,
-    //     55,
-    //     FastBlurChannels::Channels3,
+    //     77,
+    //     FastBlurChannels::Channels4,
     //     ThreadingPolicy::Adaptive,
     // );
 
-    // libblur::fast_gaussian(
-    //     &mut dst_bytes,
-    //     stride as u32,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     155,
-    //     FastBlurChannels::Channels3,
-    //     ThreadingPolicy::Adaptive,
-    // );
-
-    libblur::gaussian_box_blur(
-        &bytes,
-        stride as u32,
+    libblur::fast_gaussian_next(
         &mut dst_bytes,
         stride as u32,
         dimensions.0,
         dimensions.1,
-        127,
+        77,
         FastBlurChannels::Channels3,
-        ThreadingPolicy::Single,
+        ThreadingPolicy::Adaptive,
     );
+
+    // libblur::box_blur(
+    //     &bytes,
+    //     stride as u32,
+    //     &mut dst_bytes,
+    //     stride as u32,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     77,
+    //     FastBlurChannels::Channels3,
+    //     ThreadingPolicy::Adaptive,
+    // );
     bytes = dst_bytes;
     // libblur::gaussian_blur(
     //     &bytes,
@@ -89,7 +88,7 @@ fn main() {
     //     75 * 2 + 1,
     //     (75f32 * 2f32 + 1f32) / 6f32,
     //     FastBlurChannels::Channels4,
-    //     ThreadingPolicy::Single,
+    //     ThreadingPolicy::Adaptive,
     // );
     // bytes = dst_bytes;
     // libblur::median_blur(
@@ -99,8 +98,8 @@ fn main() {
     //     stride as u32,
     //     dimensions.0,
     //     dimensions.1,
-    //     125,
-    //     FastBlurChannels::Channels3,
+    //     35,
+    //     FastBlurChannels::Channels4,
     //     ThreadingPolicy::Adaptive,
     // );
     // bytes = dst_bytes;

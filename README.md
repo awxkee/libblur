@@ -1,11 +1,19 @@
 # Fast blur algorithms library for Rust
 
-There are some very good ( and sometimes blazing fast ) algorithms that do blurring uint images.
+There are some very good and blazing fast algorithms that do blurring images.
 Best optimized for NEON and SSE.
 
 You may receive gaussian blur in 100 FPS for 4K photo.
 
 Much faster than `image` default blur.
+
+When 4-channels mode is in use that always considered thad alpha channel is the last.
+
+# Performance
+
+Most blur algorithms done very good and works at excellent speed. Where appropriate comparison with OpenCV is available.
+For measurement was used M3 Pro with NEON feature. On x86_84 OpenCV might be better sometimes since there are not AVX-2
+support in library
 
 # Usage
 
@@ -23,8 +31,36 @@ antialias. Results just a little worse than in 'fast gaussian', however it's fas
 O(1) complexity.
 
 ```rust
-libblur::stack_blur(&mut bytes, stride, width0, height, radius, FastBlurChannels::Channels3);
+libblur::stack_blur( & mut bytes, stride, width0, height, radius, FastBlurChannels::Channels3);
 ```
+
+Example comparison time for blurring image 3000x4000 RGB 8-bit in single-threaded mode with 77 radius.
+
+|         | Gaussian |
+|---------|:--------:|
+| libblur | 43.58ms  |
+| OpenCV  | 89.64ms  |
+
+Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded mode with 77 radius.
+
+|         | Gaussian |
+|---------|:--------:|
+| libblur |  8.68ms  |
+| OpenCV  | 87.99ms  |
+
+Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded mode with 77 radius.
+
+|         | Gaussian |
+|---------|:--------:|
+| libblur |  6.73ms  |
+| OpenCV  | 93.26ms  |
+
+Example comparison time for blurring image 2828x4242 RGBA 8-bit in single-threaded mode with 77 radius.
+
+|         | Gaussian |
+|---------|:--------:|
+| libblur | 31.18ms  |
+| OpenCV  | 90.82ms  |
 
 ### Fast gaussian
 
@@ -39,8 +75,36 @@ stackblur ), however results better as I see. Max radius ~320 for u8, for u16 wi
 O(1) complexity.
 
 ```rust
-libblur::fast_gaussian( & mut bytes, stride, width0, height, radius, FastBlurChannels::Channels3);
+libblur::fast_gaussian(& mut bytes, stride, width0, height, radius, FastBlurChannels::Channels3);
 ```
+
+Example comparison time for blurring image 3000x4000 RGB 8-bit in single-threaded mode with 77 radius.
+
+|         | Gaussian |
+|---------|:--------:|
+| libblur | 47.40ms  |
+| OpenCV  |    -     |
+
+Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded mode with 77 radius.
+
+|         | Gaussian |
+|---------|:--------:|
+| libblur |  9.95ms  |
+| OpenCV  |    -     |
+
+Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded mode with 77 radius.
+
+|         | Gaussian |
+|---------|:--------:|
+| libblur |  9.74ms  |
+| OpenCV  |    --    |
+
+Example comparison time for blurring image 2828x4242 RGBA 8-bit in single-threaded mode with 77 radius.
+
+|         | Gaussian |
+|---------|:--------:|
+| libblur | 43.60ms  |
+| OpenCV  |    --    |
 
 ### Fast gaussian next
 
@@ -51,8 +115,22 @@ If 4K photo blurred in 10 ms this method will be done in 15 ms. Max radius ~150-
 O(1) complexity.
 
 ```rust
-libblur::fast_gaussian_next(& mut bytes, stride, width, height, radius, FastBlurChannels::Channels3);
+libblur::fast_gaussian_next( & mut bytes, stride, width, height, radius, FastBlurChannels::Channels3);
 ```
+
+Example comparison time for blurring image 3000x4000 RGB 8-bit in single-threaded mode with 77 radius.
+
+|         | Gaussian |
+|---------|:--------:|
+| libblur | 53.99ms  |
+| OpenCV  |    -     |
+
+Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded mode with 77 radius.
+
+|         | Gaussian |
+|---------|:--------:|
+| libblur | 10.26ms  |
+| OpenCV  |    -     |
 
 ### Tent blur
 
@@ -74,9 +152,24 @@ O(log R) complexity.
 libblur::median_blur(bytes, stride, & mut dst_bytes, stride, width, height, radius, FastBlurChannels::Channels3);
 ```
 
+Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded mode with 35 radius.
+
+|         | Gaussian |
+|---------|:--------:|
+| libblur | 468.47ms |
+| OpenCV  | 725.89ms |
+
+Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded mode with 35 radius.
+
+|         | Gaussian |
+|---------|:--------:|
+| libblur | 643.22ms |
+| OpenCV  | 788.93ms |
+
 ### Gaussian blur
 
-Excellent results. Have improvements, however, much slower than any approximations slow. Use when use need gaussian methods - smoothing, anti-alias,
+Excellent results. Have improvements, however, much slower than any approximations slow. Use when use need gaussian
+methods - smoothing, anti-alias,
 FFT analysis etc.
 
 Kernel size must be odd. Will panic if kernel size is not odd.
@@ -86,6 +179,20 @@ O(R) complexity.
 ```rust
 libblur::gaussian_blur( & bytes, src_stride, & mut dst_bytes, dst_stride, width, height, kernel_size, sigma, FastBlurChannels::Channels3);
 ```
+
+Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded mode with 151 kernel size.
+
+|         | Gaussian |
+|---------|:--------:|
+| libblur | 171.81ms |
+| OpenCV  | 251.10ms |
+
+Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded mode with 151 kernel size.
+
+|         | Gaussian |
+|---------|:--------:|
+| libblur | 172.21ms |
+| OpenCV  | 304.40ms |
 
 ### Gaussian box blur
 
@@ -108,3 +215,31 @@ O(1) complexity.
 ```rust
 libblur::box_blur(bytes, stride, & mut dst_bytes, stride, width, height, radius, FastBlurChannels::Channels3);
 ```
+
+Example comparison time for blurring image 3000x4000 RGB 8-bit in single-threaded mode with 77 radius.
+
+|         | Gaussian |
+|---------|:--------:|
+| libblur | 57.47ms  |
+| OpenCV  | 92.66ms  |
+
+Example comparison time for blurring image 3000x4000 RGB 8-bit in single-threaded mode with 77 radius.
+
+|         | Gaussian |
+|---------|:--------:|
+| libblur | 14.08ms  |
+| OpenCV  | 96.41ms  |
+
+Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded mode with 77 radius.
+
+|         | Gaussian |
+|---------|:--------:|
+| libblur | 12.79ms  |
+| OpenCV  | 136.66ms |
+
+Example comparison time for blurring image 2828x4242 RGBA 8-bit in single-threaded mode with 77 radius.
+
+|         | Gaussian |
+|---------|:--------:|
+| libblur | 51.90ms  |
+| OpenCV  | 134.28ms |
