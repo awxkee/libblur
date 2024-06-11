@@ -20,7 +20,7 @@ fn f16_to_f32(bytes: Vec<u16>) -> Vec<f32> {
 }
 
 fn main() {
-    let img = ImageReader::open("assets/test_image_1.jpg")
+    let img = ImageReader::open("assets/abstract_alpha.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -29,7 +29,8 @@ fn main() {
 
     println!("{:?}", img.color());
     let src_bytes = img.as_bytes();
-    let stride = dimensions.0 as usize * 3;
+    let components = 4;
+    let stride = dimensions.0 as usize * components;
     let mut bytes: Vec<u8> = Vec::with_capacity(dimensions.1 as usize * stride);
     for i in 0..dimensions.1 as usize * stride {
         bytes.push(src_bytes[i]);
@@ -38,15 +39,32 @@ fn main() {
     dst_bytes.resize(dimensions.1 as usize * stride, 0);
     let start_time = Instant::now();
 
-    libblur::fast_gaussian_next(
-        &mut bytes,
+    unsafe {
+        std::ptr::copy_nonoverlapping(
+            src_bytes.as_ptr(),
+            dst_bytes.as_mut_ptr(),
+            dimensions.1 as usize * stride,
+        );
+    }
+
+    libblur::stack_blur(
+        &mut dst_bytes,
         stride as u32,
         dimensions.0,
         dimensions.1,
-        77,
-        FastBlurChannels::Channels3,
-        ThreadingPolicy::Single,
+        55,
+        FastBlurChannels::Channels4,
     );
+
+    // libblur::fast_gaussian_next(
+    //     &mut bytes,
+    //     stride as u32,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     35,
+    //     FastBlurChannels::Channels4,
+    //     ThreadingPolicy::Single,
+    // );
 
     // libblur::gaussian_box_blur(
     //     &bytes,
@@ -56,7 +74,7 @@ fn main() {
     //     dimensions.0,
     //     dimensions.1,
     //     35,
-    //     FastBlurChannels::Channels3,
+    //     FastBlurChannels::Channels4,
     //     ThreadingPolicy::Single,
     // );
     // bytes = dst_bytes;
@@ -69,7 +87,7 @@ fn main() {
     //     dimensions.1,
     //     75 * 2 + 1,
     //     (75f32 * 2f32 + 1f32) / 6f32,
-    //     FastBlurChannels::Channels3,
+    //     FastBlurChannels::Channels4,
     //     ThreadingPolicy::Single,
     // );
     // bytes = dst_bytes;
@@ -97,7 +115,11 @@ fn main() {
         bytes.as_bytes(),
         dimensions.0,
         dimensions.1,
-        image::ExtendedColorType::Rgb8,
+        if components == 3 {
+            image::ExtendedColorType::Rgb8
+        } else {
+            image::ExtendedColorType::Rgba8
+        },
     )
     .unwrap();
 }

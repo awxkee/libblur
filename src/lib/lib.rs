@@ -51,6 +51,7 @@ mod fast_gaussian_next_sse;
 mod box_blur_sse;
 mod gaussian_sse;
 mod mul_table;
+mod stack_blur;
 
 pub use box_blur::box_blur;
 pub use box_blur::box_blur_u16;
@@ -74,3 +75,4 @@ pub use gaussian::gaussian_blur_f32;
 pub use median_blur::median_blur;
 pub use fast_gaussian_superior::fast_gaussian_superior;
 pub use threading_policy::*;
+pub use stack_blur::stack_blur;

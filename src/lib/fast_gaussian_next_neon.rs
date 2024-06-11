@@ -69,12 +69,23 @@ pub mod neon_support {
 
                     let casted_u32 = unsafe { vreinterpret_u32_u8(prepared_u8) };
                     let pixel = unsafe { vget_lane_u32::<0>(casted_u32) };
-                    let bits = pixel.to_le_bytes();
 
-                    unsafe {
-                        bytes.write(current_y + current_px, bits[0]);
-                        bytes.write(current_y + current_px + 1, bits[1]);
-                        bytes.write(current_y + current_px + 2, bits[2]);
+                    let bytes_offset = current_y + current_px;
+
+                    if CHANNELS_COUNT == 4 {
+                        unsafe {
+                            let dst_ptr =
+                                (bytes.slice.as_ptr() as *mut u8).add(bytes_offset) as *mut u32;
+                            *dst_ptr = pixel;
+                        }
+                    } else {
+                        let bits = pixel.to_le_bytes();
+
+                        unsafe {
+                            bytes.write(bytes_offset, bits[0]);
+                            bytes.write(bytes_offset + 1, bits[1]);
+                            bytes.write(bytes_offset + 2, bits[2]);
+                        }
                     }
 
                     let d_arr_index_1 = ((y + radius_64) & 1023) as usize;
@@ -170,12 +181,23 @@ pub mod neon_support {
                         unsafe { vqmovn_u16(vcombine_u16(prepared_u16, prepared_u16)) };
                     let casted_u32 = unsafe { vreinterpret_u32_u8(prepared_u8) };
                     let pixel = unsafe { vget_lane_u32::<0>(casted_u32) };
-                    let bits = pixel.to_le_bytes();
 
-                    unsafe {
-                        bytes.write(current_y + current_px, bits[0]);
-                        bytes.write(current_y + current_px + 1, bits[1]);
-                        bytes.write(current_y + current_px + 2, bits[2]);
+                    let bytes_offset = current_y + current_px;
+
+                    if CHANNELS_COUNT == 4 {
+                        unsafe {
+                            let dst_ptr =
+                                (bytes.slice.as_ptr() as *mut u8).add(bytes_offset) as *mut u32;
+                            *dst_ptr = pixel;
+                        }
+                    } else {
+                        let bits = pixel.to_le_bytes();
+
+                        unsafe {
+                            bytes.write(bytes_offset, bits[0]);
+                            bytes.write(bytes_offset + 1, bits[1]);
+                            bytes.write(bytes_offset + 2, bits[2]);
+                        }
                     }
 
                     let d_arr_index_1 = ((x + radius_64) & 1023) as usize;

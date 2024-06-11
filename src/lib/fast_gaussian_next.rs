@@ -76,6 +76,7 @@ fn fast_gaussian_next_vertical_pass<
     let mut buffer_r: [i32; 1024] = [0; 1024];
     let mut buffer_g: [i32; 1024] = [0; 1024];
     let mut buffer_b: [i32; 1024] = [0; 1024];
+    let mut buffer_a: [i32; 1024] = [0; 1024];
     let radius_64 = radius as i64;
     let height_wide = height as i64;
     let weight = 1.0f32 / ((radius as f32) * (radius as f32) * (radius as f32));
@@ -89,6 +90,9 @@ fn fast_gaussian_next_vertical_pass<
         let mut dif_b: i32 = 0;
         let mut der_b: i32 = 0;
         let mut sum_b: i32 = 0;
+        let mut dif_a: i32 = 0;
+        let mut der_a: i32 = 0;
+        let mut sum_a: i32 = 0;
 
         let current_px = (x * CHANNEL_CONFIGURATION as u32) as usize;
 
@@ -100,10 +104,17 @@ fn fast_gaussian_next_vertical_pass<
                 let new_g = T::from_u32(((sum_g as f32) * weight) as u32).unwrap_or_default();
                 let new_b = T::from_u32(((sum_b as f32) * weight) as u32).unwrap_or_default();
 
+                let bytes_offset = current_y + current_px;
+
                 unsafe {
-                    bytes.write(current_y + current_px, new_r);
-                    bytes.write(current_y + current_px + 1, new_g);
-                    bytes.write(current_y + current_px + 2, new_b);
+                    bytes.write(bytes_offset, new_r);
+                    bytes.write(bytes_offset + 1, new_g);
+                    bytes.write(bytes_offset + 2, new_b);
+                    if CHANNEL_CONFIGURATION == 4 {
+                        let new_a =
+                            T::from_u32(((sum_a as f32) * weight) as u32).unwrap_or_default();
+                        bytes.write(bytes_offset + 3, new_a);
+                    }
                 }
 
                 let d_arr_index_1 = ((y + radius_64) & 1023) as usize;
@@ -121,6 +132,12 @@ fn fast_gaussian_next_vertical_pass<
                     * (unsafe { *buffer_b.get_unchecked(d_arr_index) }
                         - unsafe { *buffer_b.get_unchecked(d_arr_index_1) })
                     - unsafe { *buffer_b.get_unchecked(d_arr_index_2) };
+                if CHANNEL_CONFIGURATION == 4 {
+                    dif_a += 3
+                        * (unsafe { *buffer_a.get_unchecked(d_arr_index) }
+                        - unsafe { *buffer_a.get_unchecked(d_arr_index_1) })
+                        - unsafe { *buffer_a.get_unchecked(d_arr_index_2) };
+                }
             } else if y + radius_64 >= 0 {
                 let arr_index = (y & 1023) as usize;
                 let arr_index_1 = ((y + radius_64) & 1023) as usize;
@@ -133,11 +150,19 @@ fn fast_gaussian_next_vertical_pass<
                 dif_b += 3
                     * (unsafe { *buffer_b.get_unchecked(arr_index) }
                         - unsafe { *buffer_b.get_unchecked(arr_index_1) });
+                if CHANNEL_CONFIGURATION == 4 {
+                    dif_a += 3
+                        * (unsafe { *buffer_a.get_unchecked(arr_index) }
+                        - unsafe { *buffer_a.get_unchecked(arr_index_1) });
+                }
             } else if y + 2 * radius_64 >= 0 {
                 let arr_index = ((y + radius_64) & 1023) as usize;
                 dif_r -= 3 * unsafe { *buffer_r.get_unchecked(arr_index) };
                 dif_g -= 3 * unsafe { *buffer_g.get_unchecked(arr_index) };
                 dif_b -= 3 * unsafe { *buffer_b.get_unchecked(arr_index) };
+                if CHANNEL_CONFIGURATION == 4 {
+                    dif_a -= 3 * unsafe { *buffer_a.get_unchecked(arr_index) };
+                }
             }
 
             let next_row_y = (std::cmp::min(
@@ -174,6 +199,17 @@ fn fast_gaussian_next_vertical_pass<
             sum_b += der_b;
             unsafe {
                 *buffer_b.get_unchecked_mut(arr_index) = ub8.into();
+            }
+
+            if CHANNEL_CONFIGURATION == 4 {
+                let ua8 = bytes[px_idx + 3];
+
+                dif_a += ua8.into();
+                der_a += dif_a;
+                sum_a += der_a;
+                unsafe {
+                    *buffer_a.get_unchecked_mut(arr_index) = ua8.into();
+                }
             }
         }
     }
@@ -217,6 +253,7 @@ fn fast_gaussian_next_horizontal_pass<
     let mut buffer_r: [i32; 1024] = [0; 1024];
     let mut buffer_g: [i32; 1024] = [0; 1024];
     let mut buffer_b: [i32; 1024] = [0; 1024];
+    let mut buffer_a: [i32; 1024] = [0; 1024];
     let radius_64 = radius as i64;
     let width_wide = width as i64;
     let weight = 1.0f32 / ((radius as f32) * (radius as f32) * (radius as f32));
@@ -230,6 +267,9 @@ fn fast_gaussian_next_horizontal_pass<
         let mut dif_b: i32 = 0;
         let mut der_b: i32 = 0;
         let mut sum_b: i32 = 0;
+        let mut dif_a: i32 = 0;
+        let mut der_a: i32 = 0;
+        let mut sum_a: i32 = 0;
 
         let current_y = ((y as i64) * (stride as i64)) as usize;
 
@@ -241,10 +281,17 @@ fn fast_gaussian_next_horizontal_pass<
                 let new_g = T::from_u32(((sum_g as f32) * weight) as u32).unwrap_or_default();
                 let new_b = T::from_u32(((sum_b as f32) * weight) as u32).unwrap_or_default();
 
+                let bytes_offset = current_y + current_px;
+
                 unsafe {
-                    bytes.write(current_y + current_px, new_r);
-                    bytes.write(current_y + current_px + 1, new_g);
-                    bytes.write(current_y + current_px + 2, new_b);
+                    bytes.write(bytes_offset, new_r);
+                    bytes.write(bytes_offset + 1, new_g);
+                    bytes.write(bytes_offset + 2, new_b);
+                    if CHANNEL_CONFIGURATION == 4 {
+                        let new_a =
+                            T::from_u32(((sum_a as f32) * weight) as u32).unwrap_or_default();
+                        bytes.write(bytes_offset + 3, new_a);
+                    }
                 }
 
                 let d_arr_index_1 = ((x + radius_64) & 1023) as usize;
@@ -262,6 +309,12 @@ fn fast_gaussian_next_horizontal_pass<
                     * (unsafe { *buffer_b.get_unchecked(d_arr_index) }
                         - unsafe { *buffer_b.get_unchecked(d_arr_index_1) })
                     - unsafe { *buffer_b.get_unchecked(d_arr_index_2) };
+                if CHANNEL_CONFIGURATION == 4 {
+                    dif_a += 3
+                        * (unsafe { *buffer_a.get_unchecked(d_arr_index) }
+                            - unsafe { *buffer_a.get_unchecked(d_arr_index_1) })
+                        - unsafe { *buffer_a.get_unchecked(d_arr_index_2) };
+                }
             } else if x + radius_64 >= 0 {
                 let arr_index = (x & 1023) as usize;
                 let arr_index_1 = ((x + radius_64) & 1023) as usize;
@@ -274,11 +327,19 @@ fn fast_gaussian_next_horizontal_pass<
                 dif_b += 3
                     * (unsafe { *buffer_b.get_unchecked(arr_index) }
                         - unsafe { *buffer_b.get_unchecked(arr_index_1) });
+                if CHANNEL_CONFIGURATION == 4 {
+                    dif_a += 3
+                        * (unsafe { *buffer_a.get_unchecked(arr_index) }
+                            - unsafe { *buffer_a.get_unchecked(arr_index_1) });
+                }
             } else if x + 2 * radius_64 >= 0 {
                 let arr_index = ((x + radius_64) & 1023) as usize;
                 dif_r -= 3 * unsafe { buffer_r.get_unchecked(arr_index) };
                 dif_g -= 3 * unsafe { buffer_g.get_unchecked(arr_index) };
                 dif_b -= 3 * unsafe { buffer_b.get_unchecked(arr_index) };
+                if CHANNEL_CONFIGURATION == 4 {
+                    dif_a -= 3 * unsafe { buffer_a.get_unchecked(arr_index) };
+                }
             }
 
             let next_row_y = (y as usize) * (stride as usize);
@@ -286,9 +347,11 @@ fn fast_gaussian_next_horizontal_pass<
                 ((std::cmp::min(std::cmp::max(x + 3 * radius_64 / 2, 0), width_wide - 1) as u32)
                     * CHANNEL_CONFIGURATION as u32) as usize;
 
-            let ur8 = bytes[next_row_y + next_row_x];
-            let ug8 = bytes[next_row_y + next_row_x + 1];
-            let ub8 = bytes[next_row_y + next_row_x + 2];
+            let bytes_offset = next_row_y + next_row_x;
+
+            let ur8 = bytes[bytes_offset];
+            let ug8 = bytes[bytes_offset + 1];
+            let ub8 = bytes[bytes_offset + 2];
 
             let arr_index = ((x + 2 * radius_64) & 1023) as usize;
 
@@ -311,6 +374,16 @@ fn fast_gaussian_next_horizontal_pass<
             sum_b += der_b;
             unsafe {
                 *buffer_b.get_unchecked_mut(arr_index) = ub8.into();
+            }
+
+            if CHANNEL_CONFIGURATION == 4 {
+                let ua8 = bytes[bytes_offset + 3];
+                dif_a += ua8.into();
+                der_a += dif_a;
+                sum_a += der_a;
+                unsafe {
+                    *buffer_a.get_unchecked_mut(arr_index) = ua8.into();
+                }
             }
         }
     }

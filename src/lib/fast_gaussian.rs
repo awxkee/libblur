@@ -63,7 +63,10 @@ fn fast_gaussian_vertical_pass<
             );
             return;
         }
-        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), target_feature = "sse4.1"))]
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "sse4.1"
+        ))]
         {
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(bytes) };
             sse_support::fast_gaussian_vertical_pass_sse_u8::<CHANNELS_CONFIGURATION>(
@@ -75,6 +78,7 @@ fn fast_gaussian_vertical_pass<
     let mut buffer_r: [i32; 1024] = [0; 1024];
     let mut buffer_g: [i32; 1024] = [0; 1024];
     let mut buffer_b: [i32; 1024] = [0; 1024];
+    let mut buffer_a: [i32; 1024] = [0; 1024];
     let radius_64 = radius as i64;
     let height_wide = height as i64;
     let mul_value = MUL_TABLE_DOUBLE[radius as usize];
@@ -87,6 +91,8 @@ fn fast_gaussian_vertical_pass<
         let mut sum_g: i32 = initial;
         let mut dif_b: i32 = 0;
         let mut sum_b: i32 = initial;
+        let mut dif_a: i32 = 0;
+        let mut sum_a: i32 = initial;
 
         let current_px = (x * CHANNELS_CONFIGURATION as u32) as usize;
 
@@ -105,6 +111,11 @@ fn fast_gaussian_vertical_pass<
                     bytes.write(current_y + current_px, new_r);
                     bytes.write(current_y + current_px + 1, new_g);
                     bytes.write(current_y + current_px + 2, new_b);
+                    if CHANNELS_CONFIGURATION == 4 {
+                        let new_a = T::from_u32((sum_a * mul_value) as u32 >> shr_value)
+                            .unwrap_or_default();
+                        bytes.write(current_y + current_px + 3, new_a);
+                    }
                 }
 
                 let arr_index = ((y - radius_64) & 1023) as usize;
@@ -115,11 +126,18 @@ fn fast_gaussian_vertical_pass<
                     - 2 * unsafe { *buffer_g.get_unchecked(d_arr_index) };
                 dif_b += unsafe { *buffer_b.get_unchecked(arr_index) }
                     - 2 * unsafe { *buffer_b.get_unchecked(d_arr_index) };
+                if CHANNELS_CONFIGURATION == 4 {
+                    dif_a += unsafe { *buffer_a.get_unchecked(arr_index) }
+                        - 2 * unsafe { *buffer_a.get_unchecked(d_arr_index) };
+                }
             } else if y + radius_64 >= 0 {
                 let arr_index = (y & 1023) as usize;
                 dif_r -= 2 * unsafe { *buffer_r.get_unchecked(arr_index) };
                 dif_g -= 2 * unsafe { *buffer_g.get_unchecked(arr_index) };
                 dif_b -= 2 * unsafe { *buffer_b.get_unchecked(arr_index) };
+                if CHANNELS_CONFIGURATION == 4 {
+                    dif_a -= 2 * unsafe { *buffer_a.get_unchecked(arr_index) };
+                }
             }
 
             let next_row_y = (std::cmp::min(std::cmp::max(y + radius_64, 0), height_wide - 1)
@@ -151,6 +169,15 @@ fn fast_gaussian_vertical_pass<
             sum_b += dif_b;
             unsafe {
                 *buffer_b.get_unchecked_mut(arr_index) = ub8.into();
+            }
+
+            if CHANNELS_CONFIGURATION == 4 {
+                let ua8 = bytes[px_idx + 3];
+                dif_a += ua8.into();
+                sum_a += dif_a;
+                unsafe {
+                    *buffer_a.get_unchecked_mut(arr_index) = ua8.into();
+                }
             }
         }
     }
@@ -195,6 +222,7 @@ fn fast_gaussian_horizontal_pass<
     let mut buffer_r: [i32; 1024] = [0; 1024];
     let mut buffer_g: [i32; 1024] = [0; 1024];
     let mut buffer_b: [i32; 1024] = [0; 1024];
+    let mut buffer_a: [i32; 1024] = [0; 1024];
     let radius_64 = radius as i64;
     let width_wide = width as i64;
     let mul_value = MUL_TABLE_DOUBLE[radius as usize];
@@ -211,6 +239,8 @@ fn fast_gaussian_horizontal_pass<
         let mut sum_g: i32 = initial_sum;
         let mut dif_b: i32 = 0;
         let mut sum_b: i32 = initial_sum;
+        let mut dif_a: i32 = 0;
+        let mut sum_a: i32 = initial_sum;
 
         let current_y = ((y as i64) * (stride as i64)) as usize;
 
@@ -218,14 +248,23 @@ fn fast_gaussian_horizontal_pass<
         for x in start_x..(width as i64) {
             if x >= 0 {
                 let current_px = ((std::cmp::max(x, 0) as u32) * channels_count) as usize;
-                let new_r = T::from_u32((sum_r * mul_value) as u32 >> shr_value).unwrap_or_default();
-                let new_g = T::from_u32((sum_g * mul_value) as u32 >> shr_value).unwrap_or_default();
-                let new_b = T::from_u32((sum_b * mul_value) as u32 >> shr_value).unwrap_or_default();
+                let new_r =
+                    T::from_u32((sum_r * mul_value) as u32 >> shr_value).unwrap_or_default();
+                let new_g =
+                    T::from_u32((sum_g * mul_value) as u32 >> shr_value).unwrap_or_default();
+                let new_b =
+                    T::from_u32((sum_b * mul_value) as u32 >> shr_value).unwrap_or_default();
 
                 unsafe {
-                    bytes.write(current_y + current_px, new_r);
-                    bytes.write(current_y + current_px + 1, new_g);
-                    bytes.write(current_y + current_px + 2, new_b);
+                    let offset = current_y + current_px;
+                    bytes.write(offset, new_r);
+                    bytes.write(offset + 1, new_g);
+                    bytes.write(offset + 2, new_b);
+                    if CHANNEL_CONFIGURATION == 4 {
+                        let new_a = T::from_u32((sum_a * mul_value) as u32 >> shr_value)
+                            .unwrap_or_default();
+                        bytes.write(offset + 3, new_a);
+                    }
                 }
 
                 let arr_index = ((x - radius_64) & 1023) as usize;
@@ -236,11 +275,18 @@ fn fast_gaussian_horizontal_pass<
                     - 2 * unsafe { *buffer_g.get_unchecked(d_arr_index) };
                 dif_b += unsafe { *buffer_b.get_unchecked(arr_index) }
                     - 2 * unsafe { *buffer_b.get_unchecked(d_arr_index) };
+                if CHANNEL_CONFIGURATION == 4 {
+                    dif_a += unsafe { *buffer_a.get_unchecked(arr_index) }
+                        - 2 * unsafe { *buffer_a.get_unchecked(d_arr_index) };
+                }
             } else if x + radius_64 >= 0 {
                 let arr_index = (x & 1023) as usize;
                 dif_r -= 2 * unsafe { *buffer_r.get_unchecked(arr_index) };
                 dif_g -= 2 * unsafe { *buffer_g.get_unchecked(arr_index) };
                 dif_b -= 2 * unsafe { *buffer_b.get_unchecked(arr_index) };
+                if CHANNEL_CONFIGURATION == 4 {
+                    dif_a -= 2 * unsafe { *buffer_a.get_unchecked(arr_index) };
+                }
             }
 
             let next_row_y = (y as usize) * (stride as usize);
@@ -248,9 +294,11 @@ fn fast_gaussian_horizontal_pass<
                 as u32)
                 * channels_count) as usize;
 
-            let ur8 = bytes[next_row_y + next_row_x];
-            let ug8 = bytes[next_row_y + next_row_x + 1];
-            let ub8 = bytes[next_row_y + next_row_x + 2];
+            let bytes_offset = next_row_y + next_row_x;
+
+            let ur8 = bytes[bytes_offset];
+            let ug8 = bytes[bytes_offset + 1];
+            let ub8 = bytes[bytes_offset + 2];
 
             let arr_index = ((x + radius_64) & 1023) as usize;
 
@@ -270,6 +318,15 @@ fn fast_gaussian_horizontal_pass<
             sum_b += dif_b;
             unsafe {
                 *buffer_b.get_unchecked_mut(arr_index) = ub8.into();
+            }
+
+            if CHANNEL_CONFIGURATION == 4 {
+                let ua8 = bytes[bytes_offset + 3];
+                dif_a += ua8.into();
+                sum_a += dif_a;
+                unsafe {
+                    *buffer_a.get_unchecked_mut(arr_index) = ua8.into();
+                }
             }
         }
     }
@@ -415,7 +472,6 @@ pub fn fast_gaussian_u16(
 /// * `stride` - Lane length, default is width * channels_count if not aligned
 /// * `radius` - almost any radius is supported
 #[no_mangle]
-#[allow(dead_code)]
 pub fn fast_gaussian_f32(
     bytes: &mut [f32],
     stride: u32,
@@ -434,7 +490,6 @@ pub fn fast_gaussian_f32(
 /// * `stride` - Lane length, default is width * channels_count if not aligned
 /// * `radius` - almost any radius is supported
 #[no_mangle]
-#[allow(dead_code)]
 pub fn fast_gaussian_f16(
     bytes: &mut [u16],
     stride: u32,
