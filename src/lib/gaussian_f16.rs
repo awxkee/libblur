@@ -267,8 +267,7 @@ pub(crate) mod gaussian_f16 {
         if kernel_size % 2 == 0 {
             panic!("kernel size must be odd");
         }
-        let mut transient: Vec<u16> = Vec::with_capacity(dst_stride as usize * height as usize);
-        transient.resize(dst_stride as usize * height as usize, 0);
+        let mut transient: Vec<u16> = vec![0u16; dst_stride as usize * height as usize];
 
         let thread_count = std::cmp::max(std::cmp::min(width * height / (256 * 256), 12), 1);
         let pool = rayon::ThreadPoolBuilder::new()

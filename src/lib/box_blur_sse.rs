@@ -35,9 +35,7 @@ pub mod sse_support {
     #[cfg(target_arch = "x86_64")]
     use std::arch::x86_64::*;
 
-    use crate::mul_table::{
-        MUL_TABLE_TWICE_RAD, SHR_TABLE_TWICE_RAD,
-    };
+    use crate::mul_table::{MUL_TABLE_TWICE_RAD, SHR_TABLE_TWICE_RAD};
     use crate::sse_utils::sse_utils::load_u8_s32_fast;
     use crate::unsafe_slice::UnsafeSlice;
 
@@ -61,7 +59,7 @@ pub mod sse_support {
         let mul_value = MUL_TABLE_TWICE_RAD[radius as usize];
         let shr_value = SHR_TABLE_TWICE_RAD[radius as usize];
         let v_mul_value = unsafe { _mm_set1_epi32(mul_value) };
-        let v_shr_value = unsafe { _mm_setr_epi32(shr_value,0,0,0) };
+        let v_shr_value = unsafe { _mm_setr_epi32(shr_value, 0, 0, 0) };
 
         let kernel_size = radius * 2 + 1;
         let edge_count = (kernel_size / 2) + 1;
@@ -157,7 +155,7 @@ pub mod sse_support {
         let mul_value = MUL_TABLE_TWICE_RAD[radius as usize];
         let shr_value = SHR_TABLE_TWICE_RAD[radius as usize];
         let v_mul_value = unsafe { _mm_set1_epi32(mul_value) };
-        let v_shr_value = unsafe { _mm_setr_epi32(shr_value,0,0,0) };
+        let v_shr_value = unsafe { _mm_setr_epi32(shr_value, 0, 0, 0) };
 
         let kernel_size = radius * 2 + 1;
         let edge_count = (kernel_size / 2) + 1;
@@ -348,12 +346,12 @@ pub mod sse_support {
     target_feature = "sse4.1"
 )))]
 pub mod sse_support {
-    use crate::FastBlurChannels;
     use crate::unsafe_slice::UnsafeSlice;
+    use crate::FastBlurChannels;
 
     #[allow(dead_code)]
     pub(crate) fn box_blur_horizontal_pass_sse(
-        _src: &Vec<u8>,
+        _src: &[u8],
         _src_stride: u32,
         _unsafe_dst: &UnsafeSlice<u8>,
         _dst_stride: u32,
@@ -368,7 +366,7 @@ pub mod sse_support {
 
     #[allow(dead_code)]
     pub(crate) fn box_blur_vertical_pass_sse(
-        _src: &Vec<u8>,
+        _src: &[u8],
         _src_stride: u32,
         _unsafe_dst: &UnsafeSlice<u8>,
         _dst_stride: u32,

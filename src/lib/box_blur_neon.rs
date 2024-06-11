@@ -337,7 +337,7 @@ pub mod neon_support {
 
     #[allow(dead_code)]
     pub(crate) fn box_blur_horizontal_pass_neon(
-        _src: &Vec<u8>,
+        _src: &[u8],
         _src_stride: u32,
         _unsafe_dst: &UnsafeSlice<u8>,
         _dst_stride: u32,
@@ -352,7 +352,7 @@ pub mod neon_support {
 
     #[allow(dead_code)]
     pub(crate) fn box_blur_vertical_pass_neon(
-        _src: &Vec<u8>,
+        _src: &[u8],
         _src_stride: u32,
         _unsafe_dst: &UnsafeSlice<u8>,
         _dst_stride: u32,

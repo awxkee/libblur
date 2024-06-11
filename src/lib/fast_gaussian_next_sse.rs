@@ -25,14 +25,17 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), target_feature = "sse4.1"))]
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+))]
 pub mod sse_support {
-    #[cfg(target_arch = "x86_64")]
-    use std::arch::x86_64::*;
-    #[cfg(target_arch = "x86")]
-    use std::arch::x86::*;
     use crate::sse_utils::sse_utils::load_u8_s32_fast;
     use crate::unsafe_slice::UnsafeSlice;
+    #[cfg(target_arch = "x86")]
+    use std::arch::x86::*;
+    #[cfg(target_arch = "x86_64")]
+    use std::arch::x86_64::*;
 
     pub(crate) fn fast_gaussian_next_vertical_pass_sse_u8<const CHANNELS_COUNT: usize>(
         bytes: &UnsafeSlice<u8>,
@@ -65,11 +68,14 @@ pub mod sse_support {
                     let current_px = ((std::cmp::max(x, 0)) * CHANNELS_COUNT as u32) as usize;
                     const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
                     let prepared_px_s32 = unsafe {
-                        _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(_mm_cvtepi32_ps(summs), f_weight)))
+                        _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(
+                            _mm_cvtepi32_ps(summs),
+                            f_weight,
+                        )))
                     };
-                    let prepared_u16 = unsafe { _mm_packus_epi32(prepared_px_s32, prepared_px_s32) };
-                    let prepared_u8 =
-                        unsafe { _mm_packus_epi16(prepared_u16, prepared_u16) };
+                    let prepared_u16 =
+                        unsafe { _mm_packus_epi32(prepared_px_s32, prepared_px_s32) };
+                    let prepared_u8 = unsafe { _mm_packus_epi16(prepared_u16, prepared_u16) };
 
                     let pixel = unsafe { _mm_extract_epi32::<0>(prepared_u8) };
 
@@ -104,8 +110,12 @@ pub mod sse_support {
                     let buf_ptr_2 = buffer[d_arr_index_2].as_mut_ptr();
                     let stored_2 = unsafe { _mm_loadu_si128(buf_ptr_2 as *const __m128i) };
 
-                    let new_diff =
-                        unsafe { _mm_sub_epi32(_mm_mullo_epi32(_mm_sub_epi32(stored, stored_1), threes), stored_2) };
+                    let new_diff = unsafe {
+                        _mm_sub_epi32(
+                            _mm_mullo_epi32(_mm_sub_epi32(stored, stored_1), threes),
+                            stored_2,
+                        )
+                    };
                     diffs = unsafe { _mm_add_epi32(diffs, new_diff) };
                 } else if y + radius_64 >= 0 {
                     let arr_index = (y & 1023) as usize;
@@ -116,7 +126,8 @@ pub mod sse_support {
                     let buf_ptr_1 = unsafe { buffer.get_unchecked_mut(arr_index_1).as_mut_ptr() };
                     let stored_1 = unsafe { _mm_loadu_si128(buf_ptr_1 as *const __m128i) };
 
-                    let new_diff = unsafe { _mm_mullo_epi32(_mm_sub_epi32(stored, stored_1), threes) };
+                    let new_diff =
+                        unsafe { _mm_mullo_epi32(_mm_sub_epi32(stored, stored_1), threes) };
 
                     diffs = unsafe { _mm_add_epi32(diffs, new_diff) };
                 } else if y + 2 * radius_64 >= 0 {
@@ -181,11 +192,14 @@ pub mod sse_support {
 
                     const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
                     let prepared_px_s32 = unsafe {
-                        _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(_mm_cvtepi32_ps(summs), f_weight)))
+                        _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(
+                            _mm_cvtepi32_ps(summs),
+                            f_weight,
+                        )))
                     };
-                    let prepared_u16 = unsafe { _mm_packus_epi32(prepared_px_s32, prepared_px_s32) };
-                    let prepared_u8 =
-                        unsafe { _mm_packus_epi16(prepared_u16, prepared_u16) };
+                    let prepared_u16 =
+                        unsafe { _mm_packus_epi32(prepared_px_s32, prepared_px_s32) };
+                    let prepared_u8 = unsafe { _mm_packus_epi16(prepared_u16, prepared_u16) };
 
                     let pixel = unsafe { _mm_extract_epi32::<0>(prepared_u8) };
 
@@ -220,8 +234,12 @@ pub mod sse_support {
                     let buf_ptr_2 = unsafe { buffer.get_unchecked_mut(d_arr_index_2).as_mut_ptr() };
                     let stored_2 = unsafe { _mm_loadu_si128(buf_ptr_2 as *const __m128i) };
 
-                    let new_diff =
-                        unsafe { _mm_sub_epi32(_mm_mullo_epi32(_mm_sub_epi32(stored, stored_1), threes), stored_2) };
+                    let new_diff = unsafe {
+                        _mm_sub_epi32(
+                            _mm_mullo_epi32(_mm_sub_epi32(stored, stored_1), threes),
+                            stored_2,
+                        )
+                    };
                     diffs = unsafe { _mm_add_epi32(diffs, new_diff) };
                 } else if x + radius_64 >= 0 {
                     let arr_index = (x & 1023) as usize;
@@ -232,7 +250,8 @@ pub mod sse_support {
                     let buf_ptr_1 = buffer[arr_index_1].as_mut_ptr();
                     let stored_1 = unsafe { _mm_loadu_si128(buf_ptr_1 as *const __m128i) };
 
-                    let new_diff = unsafe { _mm_mullo_epi32(_mm_sub_epi32(stored, stored_1), threes) };
+                    let new_diff =
+                        unsafe { _mm_mullo_epi32(_mm_sub_epi32(stored, stored_1), threes) };
 
                     diffs = unsafe { _mm_add_epi32(diffs, new_diff) };
                 } else if x + 2 * radius_64 >= 0 {
@@ -266,10 +285,13 @@ pub mod sse_support {
     }
 }
 
-#[cfg(not(all(any(target_arch = "x86_64", target_arch = "x86"), target_feature = "sse4.1")))]
+#[cfg(not(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+)))]
 pub mod sse_support {
-    use crate::FastBlurChannels;
     use crate::unsafe_slice::UnsafeSlice;
+    use crate::FastBlurChannels;
 
     #[allow(dead_code)]
     pub(crate) fn fast_gaussian_next_vertical_pass_sse_u8(
@@ -281,7 +303,8 @@ pub mod sse_support {
         _start: u32,
         _end: u32,
         _channels: FastBlurChannels,
-    ) {}
+    ) {
+    }
 
     #[allow(dead_code)]
     pub(crate) fn fast_gaussian_next_horizontal_pass_sse_u8(
@@ -293,5 +316,6 @@ pub mod sse_support {
         _start: u32,
         _end: u32,
         _channels: FastBlurChannels,
-    ) {}
+    ) {
+    }
 }

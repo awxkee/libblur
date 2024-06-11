@@ -1,8 +1,13 @@
 use crate::mul_table::{MUL_TABLE_STACK_BLUR, SHR_TABLE_STACK_BLUR};
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::stack_blur_neon::stackblur_neon::*;
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+))]
+use crate::stack_blur_sse::stackblur_sse::{stack_blur_pass_sse_3, stack_blur_pass_sse_4};
 use crate::unsafe_slice::UnsafeSlice;
-use crate::FastBlurChannels;
+use crate::{FastBlurChannels, ThreadingPolicy};
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub(crate) struct BlurStack {
@@ -27,28 +32,6 @@ impl BlurStack {
 pub(crate) enum StackBlurPass {
     HORIZONTAL,
     VERTICAL,
-}
-
-fn stack_blur_pass_4(
-    pixels: &UnsafeSlice<u8>,
-    stride: u32,
-    width: u32,
-    height: u32,
-    radius: u32,
-    pass: StackBlurPass,
-    thread: usize,
-    total_threads: usize,
-) {
-    stack_blur_pass::<4>(
-        pixels,
-        stride,
-        width,
-        height,
-        radius,
-        pass,
-        thread,
-        total_threads,
-    );
 }
 
 fn stack_blur_pass<const COMPONENTS: usize>(
@@ -453,16 +436,16 @@ fn stack_blur_pass<const COMPONENTS: usize>(
     }
 }
 
-#[no_mangle]
-pub fn stack_blur(
-    in_place: &mut [u8],
+fn stack_blur_worker_horizontal(
+    slice: &UnsafeSlice<u8>,
     stride: u32,
     width: u32,
     height: u32,
     radius: u32,
     channels: FastBlurChannels,
+    thread: usize,
+    thread_count: usize,
 ) {
-    let slice = UnsafeSlice::new(in_place);
     match channels {
         FastBlurChannels::Channels3 => {
             let mut _dispatcher: fn(
@@ -479,6 +462,13 @@ pub fn stack_blur(
             {
                 _dispatcher = stack_blur_pass_neon_3;
             }
+            #[cfg(all(
+                any(target_arch = "x86_64", target_arch = "x86"),
+                target_feature = "sse4.1"
+            ))]
+            {
+                _dispatcher = stack_blur_pass_sse_3;
+            }
             _dispatcher(
                 &slice,
                 stride,
@@ -486,18 +476,8 @@ pub fn stack_blur(
                 height,
                 radius,
                 StackBlurPass::HORIZONTAL,
-                0,
-                1,
-            );
-            _dispatcher(
-                &slice,
-                stride,
-                width,
-                height,
-                radius,
-                StackBlurPass::VERTICAL,
-                0,
-                1,
+                thread,
+                thread_count,
             );
         }
         FastBlurChannels::Channels4 => {
@@ -510,10 +490,17 @@ pub fn stack_blur(
                 StackBlurPass,
                 usize,
                 usize,
-            ) = stack_blur_pass_4;
+            ) = stack_blur_pass::<4>;
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             {
                 _dispatcher = stack_blur_pass_neon_4;
+            }
+            #[cfg(all(
+                any(target_arch = "x86_64", target_arch = "x86"),
+                target_feature = "sse4.1"
+            ))]
+            {
+                _dispatcher = stack_blur_pass_sse_4;
             }
 
             _dispatcher(
@@ -523,9 +510,46 @@ pub fn stack_blur(
                 height,
                 radius,
                 StackBlurPass::HORIZONTAL,
-                0,
-                1,
+                thread,
+                thread_count,
             );
+        }
+    }
+}
+
+fn stack_blur_worker_vertical(
+    slice: &UnsafeSlice<u8>,
+    stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    channels: FastBlurChannels,
+    thread: usize,
+    thread_count: usize,
+) {
+    match channels {
+        FastBlurChannels::Channels3 => {
+            let mut _dispatcher: fn(
+                &UnsafeSlice<u8>,
+                u32,
+                u32,
+                u32,
+                u32,
+                StackBlurPass,
+                usize,
+                usize,
+            ) = stack_blur_pass::<3>;
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            {
+                _dispatcher = stack_blur_pass_neon_3;
+            }
+            #[cfg(all(
+                any(target_arch = "x86_64", target_arch = "x86"),
+                target_feature = "sse4.1"
+            ))]
+            {
+                _dispatcher = stack_blur_pass_sse_3;
+            }
             _dispatcher(
                 &slice,
                 stride,
@@ -533,9 +557,105 @@ pub fn stack_blur(
                 height,
                 radius,
                 StackBlurPass::VERTICAL,
-                0,
-                1,
+                thread,
+                thread_count,
+            );
+        }
+        FastBlurChannels::Channels4 => {
+            let mut _dispatcher: fn(
+                &UnsafeSlice<u8>,
+                u32,
+                u32,
+                u32,
+                u32,
+                StackBlurPass,
+                usize,
+                usize,
+            ) = stack_blur_pass::<4>;
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            {
+                _dispatcher = stack_blur_pass_neon_4;
+            }
+            #[cfg(all(
+                any(target_arch = "x86_64", target_arch = "x86"),
+                target_feature = "sse4.1"
+            ))]
+            {
+                _dispatcher = stack_blur_pass_sse_4;
+            }
+            _dispatcher(
+                &slice,
+                stride,
+                width,
+                height,
+                radius,
+                StackBlurPass::VERTICAL,
+                thread,
+                thread_count,
             );
         }
     }
+}
+
+/// Fastest available blur option
+///
+/// Fast gaussian approximation using stack blur
+/// * `stride` - Bytes per lane, default is width * channels_count if not aligned
+/// * `radius` - 2..254
+/// O(1) complexity.
+pub fn stack_blur(
+    in_place: &mut [u8],
+    stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    channels: FastBlurChannels,
+    threading_policy: ThreadingPolicy,
+) {
+    let radius = std::cmp::max(std::cmp::min(254, radius), 2);
+    let thread_count = threading_policy.get_threads_count(width, height) as u32;
+    if thread_count == 1 {
+        let slice = UnsafeSlice::new(in_place);
+        stack_blur_worker_horizontal(&slice, stride, width, height, radius, channels, 0, 1);
+        stack_blur_worker_vertical(&slice, stride, width, height, radius, channels, 0, 1);
+        return;
+    }
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(thread_count as usize)
+        .build()
+        .unwrap();
+    pool.scope(|scope| {
+        let slice = UnsafeSlice::new(in_place);
+        for i in 0..thread_count {
+            scope.spawn(move |_| {
+                stack_blur_worker_horizontal(
+                    &slice,
+                    stride,
+                    width,
+                    height,
+                    radius,
+                    channels,
+                    i as usize,
+                    thread_count as usize,
+                );
+            });
+        }
+    });
+    pool.scope(|scope| {
+        let slice = UnsafeSlice::new(in_place);
+        for i in 0..thread_count {
+            scope.spawn(move |_| {
+                stack_blur_worker_vertical(
+                    &slice,
+                    stride,
+                    width,
+                    height,
+                    radius,
+                    channels,
+                    i as usize,
+                    thread_count as usize,
+                );
+            });
+        }
+    })
 }

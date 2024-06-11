@@ -30,7 +30,10 @@ use crate::gaussian_f16::gaussian_f16;
 use crate::gaussian_helper::get_gaussian_kernel_1d;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::gaussian_neon::neon_support;
-#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), target_feature = "sse4.1"))]
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+))]
 use crate::gaussian_sse::sse_support;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::ThreadingPolicy;
@@ -183,7 +186,10 @@ fn gaussian_blur_horizontal_pass<
 }
 
 #[inline]
-pub fn gaussian_vertical_row<T: FromPrimitive + Default + Into<f32> + Send + Sync + Copy, const ROW_SIZE: usize>(
+pub fn gaussian_vertical_row<
+    T: FromPrimitive + Default + Into<f32> + Send + Sync + Copy,
+    const ROW_SIZE: usize,
+>(
     src: &[T],
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<T>,
@@ -285,27 +291,82 @@ fn gaussian_blur_vertical_pass_impl<
         let mut _cx = 0usize;
 
         while _cx + 32 < total_length {
-            gaussian_vertical_row::<T, 32>(src, src_stride, unsafe_dst, dst_stride, width, height, kernel_size, kernel, _cx as u32, y);
+            gaussian_vertical_row::<T, 32>(
+                src,
+                src_stride,
+                unsafe_dst,
+                dst_stride,
+                width,
+                height,
+                kernel_size,
+                kernel,
+                _cx as u32,
+                y,
+            );
             _cx += 32;
         }
 
         while _cx + 16 < total_length {
-            gaussian_vertical_row::<T, 16>(src, src_stride, unsafe_dst, dst_stride, width, height, kernel_size, kernel, _cx as u32, y);
+            gaussian_vertical_row::<T, 16>(
+                src,
+                src_stride,
+                unsafe_dst,
+                dst_stride,
+                width,
+                height,
+                kernel_size,
+                kernel,
+                _cx as u32,
+                y,
+            );
             _cx += 16;
         }
 
         while _cx + 8 < total_length {
-            gaussian_vertical_row::<T, 8>(src, src_stride, unsafe_dst, dst_stride, width, height, kernel_size, kernel, _cx as u32, y);
+            gaussian_vertical_row::<T, 8>(
+                src,
+                src_stride,
+                unsafe_dst,
+                dst_stride,
+                width,
+                height,
+                kernel_size,
+                kernel,
+                _cx as u32,
+                y,
+            );
             _cx += 8;
         }
 
         while _cx + 4 < total_length {
-            gaussian_vertical_row::<T, 4>(src, src_stride, unsafe_dst, dst_stride, width, height, kernel_size, kernel, _cx as u32, y);
+            gaussian_vertical_row::<T, 4>(
+                src,
+                src_stride,
+                unsafe_dst,
+                dst_stride,
+                width,
+                height,
+                kernel_size,
+                kernel,
+                _cx as u32,
+                y,
+            );
             _cx += 4;
         }
 
         while _cx < total_length {
-            gaussian_vertical_row::<T, 1>(src, src_stride, unsafe_dst, dst_stride, width, height, kernel_size, kernel, _cx as u32, y);
+            gaussian_vertical_row::<T, 1>(
+                src,
+                src_stride,
+                unsafe_dst,
+                dst_stride,
+                width,
+                height,
+                kernel_size,
+                kernel,
+                _cx as u32,
+                y,
+            );
             _cx += 1;
         }
     }
@@ -377,7 +438,8 @@ fn gaussian_blur_impl<
     if kernel_size % 2 == 0 {
         panic!("kernel size must be odd");
     }
-    let mut transient: Vec<T> = vec![T::from_u32(0).unwrap_or_default(); dst_stride as usize * height as usize];
+    let mut transient: Vec<T> =
+        vec![T::from_u32(0).unwrap_or_default(); dst_stride as usize * height as usize];
 
     let thread_count = threading_policy.get_threads_count(width, height) as u32;
     let pool = rayon::ThreadPoolBuilder::new()

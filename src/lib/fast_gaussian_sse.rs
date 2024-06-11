@@ -25,15 +25,18 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), target_feature = "sse4.1"))]
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+))]
 pub mod sse_support {
-    #[cfg(target_arch = "x86_64")]
-    use std::arch::x86_64::*;
+    use crate::mul_table::{MUL_TABLE_DOUBLE, SHR_TABLE_DOUBLE};
+    use crate::sse_utils::sse_utils::load_u8_s32_fast;
+    use crate::unsafe_slice::UnsafeSlice;
     #[cfg(target_arch = "x86")]
     use std::arch::x86::*;
-    use crate::mul_table::{MUL_TABLE_DOUBLE, SHR_TABLE_DOUBLE};
-    use crate::sse_utils::sse_utils::{load_u8_s32_fast};
-    use crate::unsafe_slice::UnsafeSlice;
+    #[cfg(target_arch = "x86_64")]
+    use std::arch::x86_64::*;
 
     pub(crate) fn fast_gaussian_horizontal_pass_sse_u8<const CHANNELS_COUNT: usize>(
         bytes: &UnsafeSlice<u8>,
@@ -52,7 +55,7 @@ pub mod sse_support {
         let mul_value = MUL_TABLE_DOUBLE[radius as usize];
         let shr_value = SHR_TABLE_DOUBLE[radius as usize];
         let v_mul_value = unsafe { _mm_set1_epi32(mul_value) };
-        let v_shr_value = unsafe { _mm_setr_epi32(shr_value,0,0,0) };
+        let v_shr_value = unsafe { _mm_setr_epi32(shr_value, 0, 0, 0) };
         for y in start..std::cmp::min(height, end) {
             let mut diffs = unsafe { _mm_set1_epi32(0) };
             let mut summs = unsafe { _mm_set1_epi32(initial_sum) };
@@ -62,14 +65,14 @@ pub mod sse_support {
             let start_x = 0 - 2 * radius_64;
             for x in start_x..(width as i64) {
                 if x >= 0 {
-                    let current_px = ((std::cmp::max(x, 0) as u32) * CHANNELS_COUNT as u32) as usize;
+                    let current_px =
+                        ((std::cmp::max(x, 0) as u32) * CHANNELS_COUNT as u32) as usize;
 
-                    let prepared_px_s32 = unsafe {
-                        _mm_srl_epi32(_mm_mullo_epi32(summs, v_mul_value), v_shr_value)
-                    };
-                    let prepared_u16 = unsafe { _mm_packus_epi32(prepared_px_s32, prepared_px_s32) };
-                    let prepared_u8 =
-                        unsafe { _mm_packus_epi16(prepared_u16, prepared_u16) };
+                    let prepared_px_s32 =
+                        unsafe { _mm_srl_epi32(_mm_mullo_epi32(summs, v_mul_value), v_shr_value) };
+                    let prepared_u16 =
+                        unsafe { _mm_packus_epi32(prepared_px_s32, prepared_px_s32) };
+                    let prepared_u8 = unsafe { _mm_packus_epi16(prepared_u16, prepared_u16) };
                     let pixel = unsafe { _mm_extract_epi32::<0>(prepared_u8) };
 
                     let bytes_offset = current_y + current_px;
@@ -114,7 +117,8 @@ pub mod sse_support {
                     as u32) as usize;
                 let next_row_px = next_row_x * CHANNELS_COUNT;
 
-                let s_ptr = unsafe { bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut u8 };
+                let s_ptr =
+                    unsafe { bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut u8 };
                 let pixel_color = unsafe { load_u8_s32_fast::<CHANNELS_COUNT>(s_ptr) };
 
                 let arr_index = ((x + radius_64) & 1023) as usize;
@@ -147,7 +151,7 @@ pub mod sse_support {
         let mul_value = MUL_TABLE_DOUBLE[radius as usize];
         let shr_value = SHR_TABLE_DOUBLE[radius as usize];
         let v_mul_value = unsafe { _mm_set1_epi32(mul_value) };
-        let v_shr_value = unsafe { _mm_setr_epi32(shr_value,0,0,0) };
+        let v_shr_value = unsafe { _mm_setr_epi32(shr_value, 0, 0, 0) };
         for x in start..std::cmp::min(width, end) {
             let mut diffs = unsafe { _mm_set1_epi32(0) };
             let mut summs = unsafe { _mm_set1_epi32(initial_sum) };
@@ -158,12 +162,11 @@ pub mod sse_support {
 
                 if y >= 0 {
                     let current_px = ((std::cmp::max(x, 0)) * CHANNELS_COUNT as u32) as usize;
-                    let prepared_px_s32 = unsafe {
-                        _mm_srl_epi32(_mm_mullo_epi32(summs, v_mul_value), v_shr_value)
-                    };
-                    let prepared_u16 = unsafe { _mm_packus_epi32(prepared_px_s32, prepared_px_s32) };
-                    let prepared_u8 =
-                        unsafe { _mm_packus_epi16(prepared_u16, prepared_u16) };
+                    let prepared_px_s32 =
+                        unsafe { _mm_srl_epi32(_mm_mullo_epi32(summs, v_mul_value), v_shr_value) };
+                    let prepared_u16 =
+                        unsafe { _mm_packus_epi32(prepared_px_s32, prepared_px_s32) };
+                    let prepared_u8 = unsafe { _mm_packus_epi16(prepared_u16, prepared_u16) };
 
                     let pixel = unsafe { _mm_extract_epi32::<0>(prepared_u8) };
 
@@ -225,10 +228,13 @@ pub mod sse_support {
     }
 }
 
-#[cfg(not(all(any(target_arch = "x86_64", target_arch = "x86"), target_feature = "sse4.1")))]
+#[cfg(not(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+)))]
 pub mod sse_support {
-    use crate::FastBlurChannels;
     use crate::unsafe_slice::UnsafeSlice;
+    use crate::FastBlurChannels;
 
     #[allow(dead_code)]
     pub(crate) fn fast_gaussian_horizontal_pass_sse_u8(
@@ -240,7 +246,8 @@ pub mod sse_support {
         _start: u32,
         _end: u32,
         _channels: FastBlurChannels,
-    ) {}
+    ) {
+    }
 
     #[allow(dead_code)]
     pub(crate) fn fast_gaussian_vertical_pass_sse_u8(
@@ -252,5 +259,6 @@ pub mod sse_support {
         _start: u32,
         _end: u32,
         _channels: FastBlurChannels,
-    ) {}
+    ) {
+    }
 }

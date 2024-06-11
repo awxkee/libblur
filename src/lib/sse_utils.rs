@@ -37,6 +37,26 @@ pub(crate) mod sse_utils {
         return _mm_set1_epi32(u_first as i32);
     }
 
+    #[inline(always)]
+    pub(crate) unsafe fn store_u8_s32<const CHANNELS_COUNT: usize>(
+        dst_ptr: *mut u8,
+        regi: __m128i,
+    ) {
+        let s16 = _mm_packs_epi32(regi, regi);
+        let v8 = _mm_packus_epi16(s16, s16);
+        let pixel_u32 = _mm_extract_epi32::<0>(v8);
+        if CHANNELS_COUNT == 4 {
+            let casted_dst = dst_ptr as *mut i32;
+            *casted_dst = pixel_u32;
+        } else {
+            let pixel_bytes = pixel_u32.to_le_bytes();
+            *dst_ptr = pixel_bytes[0];
+            *dst_ptr.add(1) = pixel_bytes[1];
+            *dst_ptr.add(2) = pixel_bytes[2];
+        }
+    }
+
+
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     #[cfg(not(target_feature = "fma"))]
     #[inline]

@@ -20,7 +20,7 @@ fn f16_to_f32(bytes: Vec<u16>) -> Vec<f32> {
 }
 
 fn main() {
-    let img = ImageReader::open("assets/abstract_alpha.png")
+    let img = ImageReader::open("assets/test_image_1.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -29,7 +29,7 @@ fn main() {
 
     println!("{:?}", img.color());
     let src_bytes = img.as_bytes();
-    let components = 4;
+    let components = 3;
     let stride = dimensions.0 as usize * components;
     let mut bytes: Vec<u8> = Vec::with_capacity(dimensions.1 as usize * stride);
     for i in 0..dimensions.1 as usize * stride {
@@ -47,36 +47,37 @@ fn main() {
         );
     }
 
-    libblur::stack_blur(
-        &mut dst_bytes,
-        stride as u32,
-        dimensions.0,
-        dimensions.1,
-        127,
-        FastBlurChannels::Channels4,
-    );
+    // libblur::stack_blur(
+    //     &mut dst_bytes,
+    //     stride as u32,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     55,
+    //     FastBlurChannels::Channels3,
+    //     ThreadingPolicy::Adaptive,
+    // );
 
     // libblur::fast_gaussian(
     //     &mut dst_bytes,
     //     stride as u32,
     //     dimensions.0,
     //     dimensions.1,
-    //     127,
-    //     FastBlurChannels::Channels4,
-    //     ThreadingPolicy::Single,
+    //     155,
+    //     FastBlurChannels::Channels3,
+    //     ThreadingPolicy::Adaptive,
     // );
 
-    // libblur::gaussian_box_blur(
-    //     &bytes,
-    //     stride as u32,
-    //     &mut dst_bytes,
-    //     stride as u32,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     35,
-    //     FastBlurChannels::Channels4,
-    //     ThreadingPolicy::Single,
-    // );
+    libblur::gaussian_box_blur(
+        &bytes,
+        stride as u32,
+        &mut dst_bytes,
+        stride as u32,
+        dimensions.0,
+        dimensions.1,
+        127,
+        FastBlurChannels::Channels3,
+        ThreadingPolicy::Single,
+    );
     bytes = dst_bytes;
     // libblur::gaussian_blur(
     //     &bytes,

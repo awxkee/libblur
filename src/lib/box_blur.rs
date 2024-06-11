@@ -30,16 +30,22 @@ use rayon::ThreadPool;
 
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::box_blur_neon::neon_support;
-#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), target_feature = "sse4.1"))]
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+))]
 use crate::box_blur_sse::sse_support;
 use crate::channels_configuration::FastBlurChannels;
 use crate::mul_table::{MUL_TABLE_TWICE_RAD, SHR_TABLE_TWICE_RAD};
-use crate::ThreadingPolicy;
 use crate::unsafe_slice::UnsafeSlice;
+use crate::ThreadingPolicy;
 
 #[allow(unused_variables)]
 #[allow(unused_imports)]
-fn box_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<u32> + Send + Sync, const CHANNELS_CONFIGURATION: usize>(
+fn box_blur_horizontal_pass_impl<
+    T: FromPrimitive + Default + Into<u32> + Send + Sync,
+    const CHANNELS_CONFIGURATION: usize,
+>(
     src: &[T],
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<T>,
@@ -58,30 +64,19 @@ fn box_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<u32> + Send +
             let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
             neon_support::box_blur_horizontal_pass_neon::<CHANNELS_CONFIGURATION>(
-                u8_slice,
-                src_stride,
-                slice,
-                dst_stride,
-                width,
-                radius,
-                start_y,
-                end_y,
+                u8_slice, src_stride, slice, dst_stride, width, radius, start_y, end_y,
             );
             return;
         }
-        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), target_feature = "sse4.1"))]
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "sse4.1"
+        ))]
         {
             let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
             sse_support::box_blur_horizontal_pass_sse::<{ CHANNELS_CONFIGURATION }>(
-                u8_slice,
-                src_stride,
-                slice,
-                dst_stride,
-                width,
-                radius,
-                start_y,
-                end_y,
+                u8_slice, src_stride, slice, dst_stride, width, radius, start_y, end_y,
             );
             return;
         }
@@ -176,7 +171,10 @@ fn box_blur_horizontal_pass_impl<T: FromPrimitive + Default + Into<u32> + Send +
     }
 }
 
-fn box_blur_horizontal_pass<T: FromPrimitive + Default + Into<u32> + Send + Sync, const CHANNEL_CONFIGURATION: usize, >(
+fn box_blur_horizontal_pass<
+    T: FromPrimitive + Default + Into<u32> + Send + Sync,
+    const CHANNEL_CONFIGURATION: usize,
+>(
     src: &[T],
     src_stride: u32,
     dst: &mut [T],
@@ -217,7 +215,10 @@ fn box_blur_horizontal_pass<T: FromPrimitive + Default + Into<u32> + Send + Sync
 
 #[allow(unused_variables)]
 #[allow(unused_imports)]
-fn box_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<u32> + Sync + Send + Copy, const CHANNEL_CONFIGURATION: usize>(
+fn box_blur_vertical_pass_impl<
+    T: FromPrimitive + Default + Into<u32> + Sync + Send + Copy,
+    const CHANNEL_CONFIGURATION: usize,
+>(
     src: &[T],
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<T>,
@@ -236,32 +237,19 @@ fn box_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<u32> + Sync + S
             let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
             neon_support::box_blur_vertical_pass_neon::<CHANNEL_CONFIGURATION>(
-                u8_slice,
-                src_stride,
-                slice,
-                dst_stride,
-                width,
-                height,
-                radius,
-                start_x,
-                end_x,
+                u8_slice, src_stride, slice, dst_stride, width, height, radius, start_x, end_x,
             );
             return;
         }
-        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), target_feature = "sse4.1"))]
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "sse4.1"
+        ))]
         {
             let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
             sse_support::box_blur_vertical_pass_sse::<CHANNEL_CONFIGURATION>(
-                u8_slice,
-                src_stride,
-                slice,
-                dst_stride,
-                width,
-                height,
-                radius,
-                start_x,
-                end_x,
+                u8_slice, src_stride, slice, dst_stride, width, height, radius, start_x, end_x,
             );
             return;
         }
@@ -357,7 +345,10 @@ fn box_blur_vertical_pass_impl<T: FromPrimitive + Default + Into<u32> + Sync + S
     }
 }
 
-fn box_blur_vertical_pass<T: FromPrimitive + Default + Into<u32> + Sync + Send + Copy, const CHANNEL_CONFIGURATION: usize>(
+fn box_blur_vertical_pass<
+    T: FromPrimitive + Default + Into<u32> + Sync + Send + Copy,
+    const CHANNEL_CONFIGURATION: usize,
+>(
     src: &[T],
     src_stride: u32,
     dst: &mut [T],
@@ -398,7 +389,10 @@ fn box_blur_vertical_pass<T: FromPrimitive + Default + Into<u32> + Sync + Send +
     });
 }
 
-fn box_blur_impl<T: FromPrimitive + Default + Into<u32> + Sync + Send + Copy, const CHANNEL_CONFIGURATION: usize>(
+fn box_blur_impl<
+    T: FromPrimitive + Default + Into<u32> + Sync + Send + Copy,
+    const CHANNEL_CONFIGURATION: usize,
+>(
     src: &[T],
     src_stride: u32,
     dst: &mut [T],
@@ -411,7 +405,8 @@ fn box_blur_impl<T: FromPrimitive + Default + Into<u32> + Sync + Send + Copy, co
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
-    let mut transient: Vec<T> = vec![T::from_u32(0).unwrap_or_default();dst_stride as usize * height as usize];
+    let mut transient: Vec<T> =
+        vec![T::from_u32(0).unwrap_or_default(); dst_stride as usize * height as usize];
     box_blur_horizontal_pass::<T, CHANNEL_CONFIGURATION>(
         src,
         src_stride,
@@ -436,12 +431,11 @@ fn box_blur_impl<T: FromPrimitive + Default + Into<u32> + Sync + Send + Copy, co
     );
 }
 
-#[no_mangle]
 #[allow(dead_code)]
-pub extern "C" fn box_blur(
-    src: &Vec<u8>,
+pub fn box_blur(
+    src: &[u8],
     src_stride: u32,
-    dst: &mut Vec<u8>,
+    dst: &mut [u8],
     dst_stride: u32,
     width: u32,
     height: u32,
@@ -484,12 +478,10 @@ pub extern "C" fn box_blur(
     }
 }
 
-#[no_mangle]
-#[allow(dead_code)]
-pub extern "C" fn box_blur_u16(
-    src: &Vec<u16>,
+pub fn box_blur_u16(
+    src: &[u16],
     src_stride: u32,
-    dst: &mut Vec<u16>,
+    dst: &mut [u16],
     dst_stride: u32,
     width: u32,
     height: u32,
@@ -532,10 +524,13 @@ pub extern "C" fn box_blur_u16(
     }
 }
 
-fn tent_blur_impl<T: FromPrimitive + Default + Into<u32> + Sync + Send + Copy, const CHANNEL_CONFIGURATION: usize>(
-    src: &Vec<T>,
+fn tent_blur_impl<
+    T: FromPrimitive + Default + Into<u32> + Sync + Send + Copy,
+    const CHANNEL_CONFIGURATION: usize,
+>(
+    src: &[T],
     src_stride: u32,
-    dst: &mut Vec<T>,
+    dst: &mut [T],
     dst_stride: u32,
     width: u32,
     height: u32,
@@ -549,11 +544,8 @@ fn tent_blur_impl<T: FromPrimitive + Default + Into<u32> + Sync + Send + Copy, c
         .num_threads(thread_count as usize)
         .build()
         .unwrap();
-    let mut transient: Vec<T> = Vec::with_capacity(dst_stride as usize * height as usize);
-    transient.resize(
-        dst_stride as usize * height as usize,
-        T::from_u32(0).unwrap_or_default(),
-    );
+    let mut transient: Vec<T> =
+        vec![T::from_u32(0).unwrap_or_default(); dst_stride as usize * height as usize];
     box_blur_impl::<T, CHANNEL_CONFIGURATION>(
         src,
         src_stride,
@@ -578,12 +570,10 @@ fn tent_blur_impl<T: FromPrimitive + Default + Into<u32> + Sync + Send + Copy, c
     );
 }
 
-#[no_mangle]
-#[allow(dead_code)]
-pub extern "C" fn tent_blur(
-    src: &Vec<u8>,
+pub fn tent_blur(
+    src: &[u8],
     src_stride: u32,
-    dst: &mut Vec<u8>,
+    dst: &mut [u8],
     dst_stride: u32,
     width: u32,
     height: u32,
@@ -594,23 +584,35 @@ pub extern "C" fn tent_blur(
     match channels {
         FastBlurChannels::Channels3 => {
             tent_blur_impl::<u8, 3>(
-                src, src_stride, dst, dst_stride, width, height, radius, threading_policy,
+                src,
+                src_stride,
+                dst,
+                dst_stride,
+                width,
+                height,
+                radius,
+                threading_policy,
             );
         }
         FastBlurChannels::Channels4 => {
             tent_blur_impl::<u8, 4>(
-                src, src_stride, dst, dst_stride, width, height, radius, threading_policy,
+                src,
+                src_stride,
+                dst,
+                dst_stride,
+                width,
+                height,
+                radius,
+                threading_policy,
             );
         }
     }
 }
 
-#[no_mangle]
-#[allow(dead_code)]
-pub extern "C" fn tent_blur_u16(
-    src: &Vec<u16>,
+pub fn tent_blur_u16(
+    src: &[u16],
     src_stride: u32,
-    dst: &mut Vec<u16>,
+    dst: &mut [u16],
     dst_stride: u32,
     width: u32,
     height: u32,
@@ -621,18 +623,35 @@ pub extern "C" fn tent_blur_u16(
     match channels {
         FastBlurChannels::Channels3 => {
             tent_blur_impl::<u16, 3>(
-                src, src_stride, dst, dst_stride, width, height, radius, threading_policy,
+                src,
+                src_stride,
+                dst,
+                dst_stride,
+                width,
+                height,
+                radius,
+                threading_policy,
             );
         }
         FastBlurChannels::Channels4 => {
             tent_blur_impl::<u16, 4>(
-                src, src_stride, dst, dst_stride, width, height, radius, threading_policy,
+                src,
+                src_stride,
+                dst,
+                dst_stride,
+                width,
+                height,
+                radius,
+                threading_policy,
             );
         }
     }
 }
 
-fn gaussian_box_blur_impl<T: FromPrimitive + Default + Into<u32> + Sync + Send + Copy, const CHANNEL_CONFIGURATION: usize>(
+fn gaussian_box_blur_impl<
+    T: FromPrimitive + Default + Into<u32> + Sync + Send + Copy,
+    const CHANNEL_CONFIGURATION: usize,
+>(
     src: &[T],
     src_stride: u32,
     dst: &mut [T],
@@ -649,16 +668,10 @@ fn gaussian_box_blur_impl<T: FromPrimitive + Default + Into<u32> + Sync + Send +
         .num_threads(thread_count as usize)
         .build()
         .unwrap();
-    let mut transient: Vec<T> = Vec::with_capacity(dst_stride as usize * height as usize);
-    transient.resize(
-        dst_stride as usize * height as usize,
-        T::from_u32(0).unwrap_or_default(),
-    );
-    let mut transient2: Vec<T> = Vec::with_capacity(dst_stride as usize * height as usize);
-    transient2.resize(
-        dst_stride as usize * height as usize,
-        T::from_u32(0).unwrap_or_default(),
-    );
+    let mut transient: Vec<T> =
+        vec![T::from_u32(0).unwrap_or_default(); dst_stride as usize * height as usize];
+    let mut transient2: Vec<T> =
+        vec![T::from_u32(0).unwrap_or_default(); dst_stride as usize * height as usize];
     box_blur_impl::<T, CHANNEL_CONFIGURATION>(
         &src,
         src_stride,
@@ -694,8 +707,6 @@ fn gaussian_box_blur_impl<T: FromPrimitive + Default + Into<u32> + Sync + Send +
     );
 }
 
-#[no_mangle]
-#[allow(dead_code)]
 pub fn gaussian_box_blur(
     src: &[u8],
     src_stride: u32,
@@ -711,12 +722,26 @@ pub fn gaussian_box_blur(
     match channels {
         FastBlurChannels::Channels3 => {
             gaussian_box_blur_impl::<u8, 3>(
-                src, src_stride, dst, dst_stride, width, height, radius, threading_policy,
+                src,
+                src_stride,
+                dst,
+                dst_stride,
+                width,
+                height,
+                radius,
+                threading_policy,
             );
         }
         FastBlurChannels::Channels4 => {
             gaussian_box_blur_impl::<u8, 4>(
-                src, src_stride, dst, dst_stride, width, height, radius, threading_policy,
+                src,
+                src_stride,
+                dst,
+                dst_stride,
+                width,
+                height,
+                radius,
+                threading_policy,
             );
         }
     }
@@ -738,12 +763,26 @@ pub fn gaussian_box_blur_u16(
     match channels {
         FastBlurChannels::Channels3 => {
             gaussian_box_blur_impl::<u16, 3>(
-                src, src_stride, dst, dst_stride, width, height, radius, threading_policy,
+                src,
+                src_stride,
+                dst,
+                dst_stride,
+                width,
+                height,
+                radius,
+                threading_policy,
             );
         }
         FastBlurChannels::Channels4 => {
             gaussian_box_blur_impl::<u16, 4>(
-                src, src_stride, dst, dst_stride, width, height, radius, threading_policy,
+                src,
+                src_stride,
+                dst,
+                dst_stride,
+                width,
+                height,
+                radius,
+                threading_policy,
             );
         }
     }
