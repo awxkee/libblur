@@ -13,17 +13,28 @@ Much faster than `image` default blur.
 cargo add libblur
 ```
 
+### Stack blur
+
+The fastest with acceptable results. Result are quite close to gaussian and look good. Sometimes noticeable changes
+may be
+observed. However, if you'll use advanced analysis algorithms non gaussian methods will be detected. Not suitable for
+antialias.
+
+O(1) complexity.
+
+```rust
+libblur::stack_blur(&mut bytes, stride, width0, height, radius, FastBlurChannels::Channels3);
+```
+
 ### Fast gaussian
 
-Very fast. Faster than any other blur. Result are quite close to gaussian and look good. Sometimes noticeable changes
+Very fast. Result are quite close to gaussian and look good. Sometimes noticeable changes
 may be
 observed. However, if you'll use advanced analysis algorithms non gaussian methods will be detected. Not suitable for
 antialias.
 Do not use when you need gaussian. Based on binomial filter, generally speed close, might be a little faster than stack
 blur ( except NEON or except non multithreaded stack blur, on NEON much faster or overcome non multithreaded
-stackblur ), however results better as I see. Max radius ~300-500 for u8, for u16 will be less.
-
-On my M3 4K photo blurred in 10ms that means it is 4K 100fps blur :)
+stackblur ), however results better as I see. Max radius ~320 for u8, for u16 will be less.
 
 O(1) complexity.
 
@@ -36,7 +47,6 @@ libblur::fast_gaussian( & mut bytes, stride, width0, height, radius, FastBlurCha
 Very fast.
 Produces very pleasant results close to gaussian.
 If 4K photo blurred in 10 ms this method will be done in 15 ms. Max radius ~150-180 for u8, for u16 will be less.
-Faster than stack blur.
 
 O(1) complexity.
 

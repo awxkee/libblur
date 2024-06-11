@@ -18,6 +18,26 @@ pub(crate) mod neon_utils {
     }
 
     #[inline(always)]
+    pub(crate) unsafe fn store_u8_s32<const CHANNELS_COUNT: usize>(
+        dst_ptr: *mut u8,
+        regi: int32x4_t,
+    ) {
+        let s16 = vreinterpret_u16_s16(vqmovn_s32(regi));
+        let u16_f = vcombine_u16(s16, s16);
+        let v8 = vqmovn_u16(u16_f);
+        let pixel_u32 = vget_lane_u32::<0>(vreinterpret_u32_u8(v8));
+        if CHANNELS_COUNT == 4 {
+            let casted_dst = dst_ptr as *mut u32;
+            *casted_dst = pixel_u32;
+        } else {
+            let pixel_bytes = pixel_u32.to_le_bytes();
+            *dst_ptr = pixel_bytes[0];
+            *dst_ptr.add(1) = pixel_bytes[1];
+            *dst_ptr.add(2) = pixel_bytes[2];
+        }
+    }
+
+    #[inline(always)]
     pub(crate) unsafe fn load_u8_u32_fast<const CHANNELS_COUNT: usize>(
         ptr: *const u8,
     ) -> uint32x4_t {

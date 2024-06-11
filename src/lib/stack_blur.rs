@@ -1,4 +1,7 @@
 use crate::mul_table::{MUL_TABLE_STACK_BLUR, SHR_TABLE_STACK_BLUR};
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+use crate::stack_blur_neon::stackblur_neon::*;
+use crate::unsafe_slice::UnsafeSlice;
 use crate::FastBlurChannels;
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
@@ -21,13 +24,35 @@ impl BlurStack {
 }
 
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
-enum StackBlurPass {
+pub(crate) enum StackBlurPass {
     HORIZONTAL,
     VERTICAL,
 }
 
+fn stack_blur_pass_4(
+    pixels: &UnsafeSlice<u8>,
+    stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    pass: StackBlurPass,
+    thread: usize,
+    total_threads: usize,
+) {
+    stack_blur_pass::<4>(
+        pixels,
+        stride,
+        width,
+        height,
+        radius,
+        pass,
+        thread,
+        total_threads,
+    );
+}
+
 fn stack_blur_pass<const COMPONENTS: usize>(
-    pixels: &mut [u8],
+    pixels: &UnsafeSlice<u8>,
     stride: u32,
     width: u32,
     height: u32,
@@ -87,11 +112,11 @@ fn stack_blur_pass<const COMPONENTS: usize>(
 
             src_ptr = stride as usize * y; // start of line (0,y)
 
-            let src_r = unsafe { *pixels.get_unchecked(src_ptr + 0) as i32 };
-            let src_g = unsafe { *pixels.get_unchecked(src_ptr + 1) as i32 };
-            let src_b = unsafe { *pixels.get_unchecked(src_ptr + 2) as i32 };
+            let src_r = pixels[src_ptr + 0] as i32;
+            let src_g = pixels[src_ptr + 1] as i32;
+            let src_b = pixels[src_ptr + 2] as i32;
             let src_a = if COMPONENTS == 4 {
-                unsafe { *pixels.get_unchecked(src_ptr + 3) as i32 }
+                pixels[src_ptr + 3] as i32
             } else {
                 0i32
             };
@@ -126,11 +151,11 @@ fn stack_blur_pass<const COMPONENTS: usize>(
                 }
                 let stack_ptr = unsafe { &mut *stacks.get_unchecked_mut((i + radius) as usize) };
 
-                let src_r = unsafe { *pixels.get_unchecked(src_ptr + 0) as i32 };
-                let src_g = unsafe { *pixels.get_unchecked(src_ptr + 1) as i32 };
-                let src_b = unsafe { *pixels.get_unchecked(src_ptr + 2) as i32 };
+                let src_r = pixels[src_ptr + 0] as i32;
+                let src_g = pixels[src_ptr + 1] as i32;
+                let src_b = pixels[src_ptr + 2] as i32;
                 let src_a = if COMPONENTS == 4 {
-                    unsafe { *pixels.get_unchecked(src_ptr + 3) as i32 }
+                    pixels[src_ptr + 3] as i32
                 } else {
                     0i32
                 };
@@ -167,12 +192,11 @@ fn stack_blur_pass<const COMPONENTS: usize>(
             dst_ptr = y * stride as usize;
             for _ in 0..width {
                 unsafe {
-                    *pixels.get_unchecked_mut(dst_ptr + 0) = ((sum_r * mul_sum) >> shr_sum) as u8;
-                    *pixels.get_unchecked_mut(dst_ptr + 1) = ((sum_g * mul_sum) >> shr_sum) as u8;
-                    *pixels.get_unchecked_mut(dst_ptr + 2) = ((sum_b * mul_sum) >> shr_sum) as u8;
+                    pixels.write(dst_ptr + 0, ((sum_r * mul_sum) >> shr_sum) as u8);
+                    pixels.write(dst_ptr + 1, ((sum_g * mul_sum) >> shr_sum) as u8);
+                    pixels.write(dst_ptr + 2, ((sum_b * mul_sum) >> shr_sum) as u8);
                     if COMPONENTS == 4 {
-                        *pixels.get_unchecked_mut(dst_ptr + 3) =
-                            ((sum_a * mul_sum) >> shr_sum) as u8;
+                        pixels.write(dst_ptr + 3, ((sum_a * mul_sum) >> shr_sum) as u8);
                     }
                 }
                 dst_ptr += COMPONENTS;
@@ -200,11 +224,11 @@ fn stack_blur_pass<const COMPONENTS: usize>(
                     xp += 1;
                 }
 
-                let src_r = unsafe { *pixels.get_unchecked(src_ptr + 0) as i32 };
-                let src_g = unsafe { *pixels.get_unchecked(src_ptr + 1) as i32 };
-                let src_b = unsafe { *pixels.get_unchecked(src_ptr + 2) as i32 };
+                let src_r = pixels[src_ptr + 0] as i32;
+                let src_g = pixels[src_ptr + 1] as i32;
+                let src_b = pixels[src_ptr + 2] as i32;
                 let src_a = if COMPONENTS == 4 {
-                    unsafe { *pixels.get_unchecked(src_ptr + 3) as i32 }
+                    pixels[src_ptr + 3] as i32
                 } else {
                     0i32
                 };
@@ -263,11 +287,11 @@ fn stack_blur_pass<const COMPONENTS: usize>(
 
             src_ptr = COMPONENTS * x; // x,0
 
-            let src_r = unsafe { *pixels.get_unchecked(src_ptr + 0) as i32 };
-            let src_g = unsafe { *pixels.get_unchecked(src_ptr + 1) as i32 };
-            let src_b = unsafe { *pixels.get_unchecked(src_ptr + 2) as i32 };
+            let src_r = pixels[src_ptr + 0] as i32;
+            let src_g = pixels[src_ptr + 1] as i32;
+            let src_b = pixels[src_ptr + 2] as i32;
             let src_a = if COMPONENTS == 4 {
-                unsafe { *pixels.get_unchecked(src_ptr + 3) as i32 }
+                pixels[src_ptr + 3] as i32
             } else {
                 0i32
             };
@@ -303,11 +327,11 @@ fn stack_blur_pass<const COMPONENTS: usize>(
 
                 let stack_ptr = unsafe { &mut *stacks.get_unchecked_mut((i + radius) as usize) };
 
-                let src_r = unsafe { *pixels.get_unchecked(src_ptr + 0) as i32 };
-                let src_g = unsafe { *pixels.get_unchecked(src_ptr + 1) as i32 };
-                let src_b = unsafe { *pixels.get_unchecked(src_ptr + 2) as i32 };
+                let src_r = pixels[src_ptr + 0] as i32;
+                let src_g = pixels[src_ptr + 1] as i32;
+                let src_b = pixels[src_ptr + 2] as i32;
                 let src_a = if COMPONENTS == 4 {
-                    unsafe { *pixels.get_unchecked(src_ptr + 3) as i32 }
+                    pixels[src_ptr + 3] as i32
                 } else {
                     0i32
                 };
@@ -342,12 +366,11 @@ fn stack_blur_pass<const COMPONENTS: usize>(
             dst_ptr = COMPONENTS * x;
             for _ in 0..height {
                 unsafe {
-                    *pixels.get_unchecked_mut(dst_ptr + 0) = ((sum_r * mul_sum) >> shr_sum) as u8;
-                    *pixels.get_unchecked_mut(dst_ptr + 1) = ((sum_g * mul_sum) >> shr_sum) as u8;
-                    *pixels.get_unchecked_mut(dst_ptr + 2) = ((sum_b * mul_sum) >> shr_sum) as u8;
+                    pixels.write(dst_ptr + 0, ((sum_r * mul_sum) >> shr_sum) as u8);
+                    pixels.write(dst_ptr + 1, ((sum_g * mul_sum) >> shr_sum) as u8);
+                    pixels.write(dst_ptr + 2, ((sum_b * mul_sum) >> shr_sum) as u8);
                     if COMPONENTS == 4 {
-                        *pixels.get_unchecked_mut(dst_ptr + 3) =
-                            ((sum_a * mul_sum) >> shr_sum) as u8;
+                        pixels.write(dst_ptr + 3, ((sum_a * mul_sum) >> shr_sum) as u8);
                     }
                 }
                 dst_ptr += stride as usize;
@@ -377,11 +400,11 @@ fn stack_blur_pass<const COMPONENTS: usize>(
                     yp += 1;
                 }
 
-                let src_r = unsafe { *pixels.get_unchecked(src_ptr + 0) as i32 };
-                let src_g = unsafe { *pixels.get_unchecked(src_ptr + 1) as i32 };
-                let src_b = unsafe { *pixels.get_unchecked(src_ptr + 2) as i32 };
+                let src_r = pixels[src_ptr + 0] as i32;
+                let src_g = pixels[src_ptr + 1] as i32;
+                let src_b = pixels[src_ptr + 2] as i32;
                 let src_a = if COMPONENTS == 4 {
-                    unsafe { *pixels.get_unchecked(src_ptr + 3) as i32 }
+                    pixels[src_ptr + 3] as i32
                 } else {
                     0i32
                 };
@@ -439,10 +462,25 @@ pub fn stack_blur(
     radius: u32,
     channels: FastBlurChannels,
 ) {
+    let slice = UnsafeSlice::new(in_place);
     match channels {
         FastBlurChannels::Channels3 => {
-            stack_blur_pass::<3>(
-                in_place,
+            let mut _dispatcher: fn(
+                &UnsafeSlice<u8>,
+                u32,
+                u32,
+                u32,
+                u32,
+                StackBlurPass,
+                usize,
+                usize,
+            ) = stack_blur_pass::<3>;
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            {
+                _dispatcher = stack_blur_pass_neon_3;
+            }
+            _dispatcher(
+                &slice,
                 stride,
                 width,
                 height,
@@ -451,8 +489,8 @@ pub fn stack_blur(
                 0,
                 1,
             );
-            stack_blur_pass::<3>(
-                in_place,
+            _dispatcher(
+                &slice,
                 stride,
                 width,
                 height,
@@ -463,8 +501,23 @@ pub fn stack_blur(
             );
         }
         FastBlurChannels::Channels4 => {
-            stack_blur_pass::<4>(
-                in_place,
+            let mut _dispatcher: fn(
+                &UnsafeSlice<u8>,
+                u32,
+                u32,
+                u32,
+                u32,
+                StackBlurPass,
+                usize,
+                usize,
+            ) = stack_blur_pass_4;
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            {
+                _dispatcher = stack_blur_pass_neon_4;
+            }
+
+            _dispatcher(
+                &slice,
                 stride,
                 width,
                 height,
@@ -473,8 +526,8 @@ pub fn stack_blur(
                 0,
                 1,
             );
-            stack_blur_pass::<4>(
-                in_place,
+            _dispatcher(
+                &slice,
                 stride,
                 width,
                 height,

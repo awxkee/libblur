@@ -52,6 +52,7 @@ mod box_blur_sse;
 mod gaussian_sse;
 mod mul_table;
 mod stack_blur;
+mod stack_blur_neon;
 
 pub use box_blur::box_blur;
 pub use box_blur::box_blur_u16;

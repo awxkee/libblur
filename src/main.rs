@@ -52,16 +52,16 @@ fn main() {
         stride as u32,
         dimensions.0,
         dimensions.1,
-        55,
+        127,
         FastBlurChannels::Channels4,
     );
 
-    // libblur::fast_gaussian_superior(
-    //     &mut bytes,
+    // libblur::fast_gaussian(
+    //     &mut dst_bytes,
     //     stride as u32,
     //     dimensions.0,
     //     dimensions.1,
-    //     35,
+    //     127,
     //     FastBlurChannels::Channels4,
     //     ThreadingPolicy::Single,
     // );
