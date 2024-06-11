@@ -71,12 +71,23 @@ pub mod sse_support {
                     let prepared_u8 =
                         unsafe { _mm_packus_epi16(prepared_u16, prepared_u16) };
                     let pixel = unsafe { _mm_extract_epi32::<0>(prepared_u8) };
-                    let bits = pixel.to_le_bytes();
 
-                    unsafe {
-                        bytes.write(current_y + current_px, bits[0]);
-                        bytes.write(current_y + current_px + 1, bits[1]);
-                        bytes.write(current_y + current_px + 2, bits[2]);
+                    let bytes_offset = current_y + current_px;
+
+                    if CHANNELS_COUNT == 4 {
+                        unsafe {
+                            let dst_ptr =
+                                (bytes.slice.as_ptr() as *mut u8).add(bytes_offset) as *mut i32;
+                            *dst_ptr = pixel;
+                        }
+                    } else {
+                        let bits = pixel.to_le_bytes();
+
+                        unsafe {
+                            bytes.write(current_y + current_px, bits[0]);
+                            bytes.write(current_y + current_px + 1, bits[1]);
+                            bytes.write(current_y + current_px + 2, bits[2]);
+                        }
                     }
 
                     let arr_index = ((x - radius_64) & 1023) as usize;
@@ -155,12 +166,23 @@ pub mod sse_support {
                         unsafe { _mm_packus_epi16(prepared_u16, prepared_u16) };
 
                     let pixel = unsafe { _mm_extract_epi32::<0>(prepared_u8) };
-                    let bits = pixel.to_le_bytes();
 
-                    unsafe {
-                        bytes.write(current_y + current_px, bits[0]);
-                        bytes.write(current_y + current_px + 1, bits[1]);
-                        bytes.write(current_y + current_px + 2, bits[2]);
+                    let bytes_offset = current_y + current_px;
+
+                    if CHANNELS_COUNT == 4 {
+                        unsafe {
+                            let dst_ptr =
+                                (bytes.slice.as_ptr() as *mut u8).add(bytes_offset) as *mut i32;
+                            *dst_ptr = pixel;
+                        }
+                    } else {
+                        let bits = pixel.to_le_bytes();
+
+                        unsafe {
+                            bytes.write(bytes_offset, bits[0]);
+                            bytes.write(bytes_offset + 1, bits[1]);
+                            bytes.write(bytes_offset + 2, bits[2]);
+                        }
                     }
 
                     let arr_index = ((y - radius_64) & 1023) as usize;

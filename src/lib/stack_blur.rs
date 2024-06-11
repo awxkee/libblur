@@ -1,4 +1,4 @@
-use crate::mul_table::{MUL_TABLE_STACK_BLUR, SHR_TABLE_STACKBLUR};
+use crate::mul_table::{MUL_TABLE_STACK_BLUR, SHR_TABLE_STACK_BLUR};
 use crate::FastBlurChannels;
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
@@ -26,7 +26,7 @@ enum StackBlurPass {
     VERTICAL,
 }
 
-fn stack_blur_pass<'a, const COMPONENTS: usize>(
+fn stack_blur_pass<const COMPONENTS: usize>(
     pixels: &mut [u8],
     stride: u32,
     width: u32,
@@ -60,10 +60,9 @@ fn stack_blur_pass<'a, const COMPONENTS: usize>(
 
     let wm = width - 1;
     let hm = height - 1;
-    // let w4 = width as usize * components;
     let div = (radius * 2) + 1;
     let mul_sum = MUL_TABLE_STACK_BLUR[radius as usize];
-    let shr_sum = SHR_TABLE_STACKBLUR[radius as usize];
+    let shr_sum = SHR_TABLE_STACK_BLUR[radius as usize];
 
     let mut src_ptr;
     let mut dst_ptr;
@@ -88,33 +87,36 @@ fn stack_blur_pass<'a, const COMPONENTS: usize>(
 
             src_ptr = stride as usize * y; // start of line (0,y)
 
+            let src_r = unsafe { *pixels.get_unchecked(src_ptr + 0) as i32 };
+            let src_g = unsafe { *pixels.get_unchecked(src_ptr + 1) as i32 };
+            let src_b = unsafe { *pixels.get_unchecked(src_ptr + 2) as i32 };
+            let src_a = if COMPONENTS == 4 {
+                unsafe { *pixels.get_unchecked(src_ptr + 3) as i32 }
+            } else {
+                0i32
+            };
+
             for i in 0..=radius {
                 let stack_value = unsafe { &mut *stacks.get_unchecked_mut(i as usize) };
-                unsafe {
-                    stack_value.r = *pixels.get_unchecked(src_ptr + 0) as i32;
-                    stack_value.g = *pixels.get_unchecked(src_ptr + 1) as i32;
-                    stack_value.b = *pixels.get_unchecked(src_ptr + 2) as i32;
-                    if COMPONENTS == 4 {
-                        stack_value.a = *pixels.get_unchecked(src_ptr + 3) as i32;
-                    }
+                stack_value.r = src_r;
+                stack_value.g = src_g;
+                stack_value.b = src_b;
+                if COMPONENTS == 4 {
+                    stack_value.a = src_a;
                 }
 
-                unsafe {
-                    sum_r += *pixels.get_unchecked(src_ptr + 0) as i32 * (i + 1) as i32;
-                    sum_g += *pixels.get_unchecked(src_ptr + 1) as i32 * (i + 1) as i32;
-                    sum_b += *pixels.get_unchecked(src_ptr + 2) as i32 * (i + 1) as i32;
-                    if COMPONENTS == 4 {
-                        sum_a += *pixels.get_unchecked(src_ptr + 3) as i32 * (i + 1) as i32;
-                    }
+                sum_r += src_r * (i + 1) as i32;
+                sum_g += src_g * (i + 1) as i32;
+                sum_b += src_b * (i + 1) as i32;
+                if COMPONENTS == 4 {
+                    sum_a += src_a * (i + 1) as i32;
                 }
 
-                unsafe {
-                    sum_out_r += *pixels.get_unchecked(src_ptr + 0) as i32;
-                    sum_out_g += *pixels.get_unchecked(src_ptr + 1) as i32;
-                    sum_out_b += *pixels.get_unchecked(src_ptr + 2) as i32;
-                    if COMPONENTS == 4 {
-                        sum_out_a += *pixels.get_unchecked(src_ptr + 3) as i32;
-                    }
+                sum_out_r += src_r;
+                sum_out_g += src_g;
+                sum_out_b += src_b;
+                if COMPONENTS == 4 {
+                    sum_out_a += src_a;
                 }
             }
 
@@ -123,30 +125,35 @@ fn stack_blur_pass<'a, const COMPONENTS: usize>(
                     src_ptr += COMPONENTS;
                 }
                 let stack_ptr = unsafe { &mut *stacks.get_unchecked_mut((i + radius) as usize) };
-                unsafe {
-                    stack_ptr.r = *pixels.get_unchecked(src_ptr + 0) as i32;
-                    stack_ptr.g = *pixels.get_unchecked(src_ptr + 1) as i32;
-                    stack_ptr.b = *pixels.get_unchecked(src_ptr + 2) as i32;
-                    if COMPONENTS == 4 {
-                        stack_ptr.a = *pixels.get_unchecked(src_ptr + 3) as i32;
-                    }
+
+                let src_r = unsafe { *pixels.get_unchecked(src_ptr + 0) as i32 };
+                let src_g = unsafe { *pixels.get_unchecked(src_ptr + 1) as i32 };
+                let src_b = unsafe { *pixels.get_unchecked(src_ptr + 2) as i32 };
+                let src_a = if COMPONENTS == 4 {
+                    unsafe { *pixels.get_unchecked(src_ptr + 3) as i32 }
+                } else {
+                    0i32
+                };
+
+                stack_ptr.r = src_r;
+                stack_ptr.g = src_g;
+                stack_ptr.b = src_b;
+                if COMPONENTS == 4 {
+                    stack_ptr.a = src_a;
                 }
-                unsafe {
-                    sum_r += *pixels.get_unchecked(src_ptr + 0) as i32 * (radius + 1 - i) as i32;
-                    sum_g += *pixels.get_unchecked(src_ptr + 1) as i32 * (radius + 1 - i) as i32;
-                    sum_b += *pixels.get_unchecked(src_ptr + 2) as i32 * (radius + 1 - i) as i32;
-                    if COMPONENTS == 4 {
-                        sum_a +=
-                            *pixels.get_unchecked(src_ptr + 3) as i32 * (radius + 1 - i) as i32;
-                    }
+
+                sum_r += src_r * (radius + 1 - i) as i32;
+                sum_g += src_g * (radius + 1 - i) as i32;
+                sum_b += src_b * (radius + 1 - i) as i32;
+                if COMPONENTS == 4 {
+                    sum_a += src_a * (radius + 1 - i) as i32;
                 }
-                unsafe {
-                    sum_in_r += *pixels.get_unchecked(src_ptr + 0) as i32;
-                    sum_in_g += *pixels.get_unchecked(src_ptr + 1) as i32;
-                    sum_in_b += *pixels.get_unchecked(src_ptr + 2) as i32;
-                    if COMPONENTS == 4 {
-                        sum_in_a += *pixels.get_unchecked(src_ptr + 3) as i32;
-                    }
+
+                sum_in_r += src_r;
+                sum_in_g += src_g;
+                sum_in_b += src_b;
+                if COMPONENTS == 4 {
+                    sum_in_a += src_a;
                 }
             }
 
@@ -155,6 +162,7 @@ fn stack_blur_pass<'a, const COMPONENTS: usize>(
             if xp > wm {
                 xp = wm;
             }
+
             src_ptr = COMPONENTS * xp as usize + y * stride as usize;
             dst_ptr = y * stride as usize;
             for _ in 0..width {
@@ -192,23 +200,28 @@ fn stack_blur_pass<'a, const COMPONENTS: usize>(
                     xp += 1;
                 }
 
-                unsafe {
-                    stack.r = *pixels.get_unchecked(src_ptr + 0) as i32;
-                    stack.g = *pixels.get_unchecked(src_ptr + 1) as i32;
-                    stack.b = *pixels.get_unchecked(src_ptr + 2) as i32;
-                    if COMPONENTS == 4 {
-                        stack.a = *pixels.get_unchecked(src_ptr + 3) as i32;
-                    }
+                let src_r = unsafe { *pixels.get_unchecked(src_ptr + 0) as i32 };
+                let src_g = unsafe { *pixels.get_unchecked(src_ptr + 1) as i32 };
+                let src_b = unsafe { *pixels.get_unchecked(src_ptr + 2) as i32 };
+                let src_a = if COMPONENTS == 4 {
+                    unsafe { *pixels.get_unchecked(src_ptr + 3) as i32 }
+                } else {
+                    0i32
+                };
+                stack.r = src_r;
+                stack.g = src_g;
+                stack.b = src_b;
+                if COMPONENTS == 4 {
+                    stack.a = src_a;
                 }
 
-                unsafe {
-                    sum_in_r += *pixels.get_unchecked(src_ptr + 0) as i32;
-                    sum_in_g += *pixels.get_unchecked(src_ptr + 1) as i32;
-                    sum_in_b += *pixels.get_unchecked(src_ptr + 2) as i32;
-                    if COMPONENTS == 4 {
-                        sum_in_a += *pixels.get_unchecked(src_ptr + 3) as i32;
-                    }
+                sum_in_r += src_r;
+                sum_in_g += src_g;
+                sum_in_b += src_b;
+                if COMPONENTS == 4 {
+                    sum_in_a += src_a;
                 }
+
                 sum_r += sum_in_r;
                 sum_g += sum_in_g;
                 sum_b += sum_in_b;
@@ -249,65 +262,74 @@ fn stack_blur_pass<'a, const COMPONENTS: usize>(
             sum_out_a = 0;
 
             src_ptr = COMPONENTS * x; // x,0
+
+            let src_r = unsafe { *pixels.get_unchecked(src_ptr + 0) as i32 };
+            let src_g = unsafe { *pixels.get_unchecked(src_ptr + 1) as i32 };
+            let src_b = unsafe { *pixels.get_unchecked(src_ptr + 2) as i32 };
+            let src_a = if COMPONENTS == 4 {
+                unsafe { *pixels.get_unchecked(src_ptr + 3) as i32 }
+            } else {
+                0i32
+            };
+
             for i in 0..=radius {
                 let stack_value = unsafe { &mut *stacks.get_unchecked_mut(i as usize) };
-                unsafe {
-                    stack_value.r = *pixels.get_unchecked(src_ptr + 0) as i32;
-                    stack_value.g = *pixels.get_unchecked(src_ptr + 1) as i32;
-                    stack_value.b = *pixels.get_unchecked(src_ptr + 2) as i32;
-                    if COMPONENTS == 4 {
-                        stack_value.a = *pixels.get_unchecked(src_ptr + 3) as i32;
-                    }
+                stack_value.r = src_r;
+                stack_value.g = src_g;
+                stack_value.b = src_b;
+                if COMPONENTS == 4 {
+                    stack_value.a = src_a;
                 }
 
-                unsafe {
-                    sum_r += *pixels.get_unchecked(src_ptr + 0) as i32 * (i + 1) as i32;
-                    sum_g += *pixels.get_unchecked(src_ptr + 1) as i32 * (i + 1) as i32;
-                    sum_b += *pixels.get_unchecked(src_ptr + 2) as i32 * (i + 1) as i32;
-                    if COMPONENTS == 4 {
-                        sum_a += *pixels.get_unchecked(src_ptr + 3) as i32 * (i + 1) as i32;
-                    }
+                sum_r += src_r * (i + 1) as i32;
+                sum_g += src_g * (i + 1) as i32;
+                sum_b += src_b * (i + 1) as i32;
+                if COMPONENTS == 4 {
+                    sum_a += src_a * (i + 1) as i32;
                 }
 
-                unsafe {
-                    sum_out_r += *pixels.get_unchecked(src_ptr + 0) as i32;
-                    sum_out_g += *pixels.get_unchecked(src_ptr + 1) as i32;
-                    sum_out_b += *pixels.get_unchecked(src_ptr + 2) as i32;
-                    if COMPONENTS == 4 {
-                        sum_out_a += *pixels.get_unchecked(src_ptr + 3) as i32;
-                    }
+                sum_out_r += src_r;
+                sum_out_g += src_g;
+                sum_out_b += src_b;
+                if COMPONENTS == 4 {
+                    sum_out_a += src_a;
                 }
             }
+
             for i in 1..=radius {
                 if i <= hm {
                     src_ptr += stride as usize;
                 }
 
                 let stack_ptr = unsafe { &mut *stacks.get_unchecked_mut((i + radius) as usize) };
-                unsafe {
-                    stack_ptr.r = *pixels.get_unchecked(src_ptr + 0) as i32;
-                    stack_ptr.g = *pixels.get_unchecked(src_ptr + 1) as i32;
-                    stack_ptr.b = *pixels.get_unchecked(src_ptr + 2) as i32;
-                    if COMPONENTS == 4 {
-                        stack_ptr.a = *pixels.get_unchecked(src_ptr + 3) as i32;
-                    }
+
+                let src_r = unsafe { *pixels.get_unchecked(src_ptr + 0) as i32 };
+                let src_g = unsafe { *pixels.get_unchecked(src_ptr + 1) as i32 };
+                let src_b = unsafe { *pixels.get_unchecked(src_ptr + 2) as i32 };
+                let src_a = if COMPONENTS == 4 {
+                    unsafe { *pixels.get_unchecked(src_ptr + 3) as i32 }
+                } else {
+                    0i32
+                };
+
+                stack_ptr.r = src_r;
+                stack_ptr.g = src_g;
+                stack_ptr.b = src_b;
+                if COMPONENTS == 4 {
+                    stack_ptr.a = src_a;
                 }
-                unsafe {
-                    sum_r += *pixels.get_unchecked(src_ptr + 0) as i32 * (radius + 1 - i) as i32;
-                    sum_g += *pixels.get_unchecked(src_ptr + 1) as i32 * (radius + 1 - i) as i32;
-                    sum_b += *pixels.get_unchecked(src_ptr + 2) as i32 * (radius + 1 - i) as i32;
-                    if COMPONENTS == 4 {
-                        sum_a +=
-                            *pixels.get_unchecked(src_ptr + 3) as i32 * (radius + 1 - i) as i32;
-                    }
+
+                sum_r += src_r * (radius + 1 - i) as i32;
+                sum_g += src_g * (radius + 1 - i) as i32;
+                sum_b += src_b * (radius + 1 - i) as i32;
+                if COMPONENTS == 4 {
+                    sum_a += src_a * (radius + 1 - i) as i32;
                 }
-                unsafe {
-                    sum_in_r += *pixels.get_unchecked(src_ptr + 0) as i32;
-                    sum_in_g += *pixels.get_unchecked(src_ptr + 1) as i32;
-                    sum_in_b += *pixels.get_unchecked(src_ptr + 2) as i32;
-                    if COMPONENTS == 4 {
-                        sum_in_a += *pixels.get_unchecked(src_ptr + 3) as i32;
-                    }
+                sum_in_r += src_r;
+                sum_in_g += src_g;
+                sum_in_b += src_b;
+                if COMPONENTS == 4 {
+                    sum_in_a += src_a;
                 }
             }
 
@@ -355,23 +377,29 @@ fn stack_blur_pass<'a, const COMPONENTS: usize>(
                     yp += 1;
                 }
 
-                unsafe {
-                    stack_ptr.r = *pixels.get_unchecked(src_ptr + 0) as i32;
-                    stack_ptr.g = *pixels.get_unchecked(src_ptr + 1) as i32;
-                    stack_ptr.b = *pixels.get_unchecked(src_ptr + 2) as i32;
-                    if COMPONENTS == 4 {
-                        stack_ptr.a = *pixels.get_unchecked(src_ptr + 3) as i32;
-                    }
+                let src_r = unsafe { *pixels.get_unchecked(src_ptr + 0) as i32 };
+                let src_g = unsafe { *pixels.get_unchecked(src_ptr + 1) as i32 };
+                let src_b = unsafe { *pixels.get_unchecked(src_ptr + 2) as i32 };
+                let src_a = if COMPONENTS == 4 {
+                    unsafe { *pixels.get_unchecked(src_ptr + 3) as i32 }
+                } else {
+                    0i32
+                };
+
+                stack_ptr.r = src_r;
+                stack_ptr.g = src_g;
+                stack_ptr.b = src_b;
+                if COMPONENTS == 4 {
+                    stack_ptr.a = src_a;
                 }
 
-                unsafe {
-                    sum_in_r += *pixels.get_unchecked(src_ptr + 0) as i32;
-                    sum_in_g += *pixels.get_unchecked(src_ptr + 1) as i32;
-                    sum_in_b += *pixels.get_unchecked(src_ptr + 2) as i32;
-                    if COMPONENTS == 4 {
-                        sum_in_a += *pixels.get_unchecked(src_ptr + 3) as i32;
-                    }
+                sum_in_r += src_r;
+                sum_in_g += src_g;
+                sum_in_b += src_b;
+                if COMPONENTS == 4 {
+                    sum_in_a += src_a;
                 }
+
                 sum_r += sum_in_r;
                 sum_g += sum_in_g;
                 sum_b += sum_in_b;
@@ -403,8 +431,8 @@ fn stack_blur_pass<'a, const COMPONENTS: usize>(
 }
 
 #[no_mangle]
-pub fn stack_blur<'a>(
-    pixels: &mut [u8],
+pub fn stack_blur(
+    in_place: &mut [u8],
     stride: u32,
     width: u32,
     height: u32,
@@ -414,7 +442,7 @@ pub fn stack_blur<'a>(
     match channels {
         FastBlurChannels::Channels3 => {
             stack_blur_pass::<3>(
-                pixels,
+                in_place,
                 stride,
                 width,
                 height,
@@ -424,7 +452,7 @@ pub fn stack_blur<'a>(
                 1,
             );
             stack_blur_pass::<3>(
-                pixels,
+                in_place,
                 stride,
                 width,
                 height,
@@ -436,7 +464,7 @@ pub fn stack_blur<'a>(
         }
         FastBlurChannels::Channels4 => {
             stack_blur_pass::<4>(
-                pixels,
+                in_place,
                 stride,
                 width,
                 height,
@@ -446,7 +474,7 @@ pub fn stack_blur<'a>(
                 1,
             );
             stack_blur_pass::<4>(
-                pixels,
+                in_place,
                 stride,
                 width,
                 height,

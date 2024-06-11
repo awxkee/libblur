@@ -1,12 +1,13 @@
 use crate::{FastBlurChannels, ThreadingPolicy};
 
 mod fast_gaussian_superior {
-    use crate::unsafe_slice::UnsafeSlice;
-    use crate::{FastBlurChannels, ThreadingPolicy};
     use num_traits::{FromPrimitive, ToPrimitive};
 
+    use crate::ThreadingPolicy;
+    use crate::unsafe_slice::UnsafeSlice;
+
     fn fast_gaussian_vertical_pass<
-        T: FromPrimitive + ToPrimitive + Default + Into<i64> + Send + Sync,
+        T: FromPrimitive + ToPrimitive + Default + Into<i64> + Send + Sync, const CHANNELS_COUNT: usize,
     >(
         bytes: &UnsafeSlice<T>,
         stride: u32,
@@ -15,21 +16,17 @@ mod fast_gaussian_superior {
         radius: u32,
         start: u32,
         end: u32,
-        channels: FastBlurChannels,
     ) where
         T: std::ops::AddAssign + std::ops::SubAssign + Copy,
     {
         let mut buffer_r: [i64; 2048] = [0; 2048];
         let mut buffer_g: [i64; 2048] = [0; 2048];
         let mut buffer_b: [i64; 2048] = [0; 2048];
+        let mut buffer_a: [i64; 2048] = [0; 2048];
         let radius_64 = radius as i64;
         let height_wide = height as i64;
         let radius_2d = (radius as f32) * (radius as f32);
         let weight = 1.0f32 / (radius_2d * radius_2d);
-        let channels_count = match channels {
-            FastBlurChannels::Channels3 => 3,
-            FastBlurChannels::Channels4 => 4,
-        };
         for x in start..std::cmp::min(width, end) {
             let mut dif_r: i64 = 0;
             let mut der_1_r: i64 = 0;
@@ -43,8 +40,12 @@ mod fast_gaussian_superior {
             let mut der_1_b: i64 = 0;
             let mut der_2_b: i64 = 0;
             let mut sum_b: i64 = 0;
+            let mut dif_a: i64 = 0;
+            let mut der_1_a: i64 = 0;
+            let mut der_2_a: i64 = 0;
+            let mut sum_a: i64 = 0;
 
-            let current_px = (x * channels_count) as usize;
+            let current_px = x as usize * CHANNELS_COUNT;
 
             let start_y = 0i64 - 4i64 * radius as i64;
             for y in start_y..height_wide {
@@ -54,10 +55,16 @@ mod fast_gaussian_superior {
                     let new_g = T::from_u32(((sum_g as f32) * weight) as u32).unwrap_or_default();
                     let new_b = T::from_u32(((sum_b as f32) * weight) as u32).unwrap_or_default();
 
+                    let bytes_offset = current_y + current_px;
+
                     unsafe {
-                        bytes.write(current_y + current_px, new_r);
-                        bytes.write(current_y + current_px + 1, new_g);
-                        bytes.write(current_y + current_px + 2, new_b);
+                        bytes.write(bytes_offset, new_r);
+                        bytes.write(bytes_offset + 1, new_g);
+                        bytes.write(bytes_offset + 2, new_b);
+                        if CHANNELS_COUNT == 4 {
+                            let new_a = T::from_u32(((sum_a as f32) * weight) as u32).unwrap_or_default();
+                            bytes.write(bytes_offset + 3, new_a);
+                        }
                     }
 
                     let arr_index_3 = (y & 2047) as usize;
@@ -81,6 +88,13 @@ mod fast_gaussian_superior {
                             + (*buffer_b.get_unchecked(arr_index_2)))
                             + 6 * (*buffer_b.get_unchecked(arr_index_3))
                             + (*buffer_b.get_unchecked(arr_index_4));
+                        if CHANNELS_COUNT == 4 {
+                            dif_a += -4
+                                * ((*buffer_a.get_unchecked(arr_index_1))
+                                + (*buffer_a.get_unchecked(arr_index_2)))
+                                + 6 * (*buffer_a.get_unchecked(arr_index_3))
+                                + (*buffer_a.get_unchecked(arr_index_4));
+                        }
                     };
                 } else {
                     if y + 3 * radius_64 >= 0 {
@@ -88,18 +102,27 @@ mod fast_gaussian_superior {
                         dif_r -= 4 * unsafe { *buffer_r.get_unchecked(arr_index) };
                         dif_g -= 4 * unsafe { *buffer_g.get_unchecked(arr_index) };
                         dif_b -= 4 * unsafe { *buffer_b.get_unchecked(arr_index) };
+                        if CHANNELS_COUNT == 4 {
+                            dif_a -= 4 * unsafe { *buffer_a.get_unchecked(arr_index) };
+                        }
                     }
                     if y + 2 * radius_64 >= 0 {
                         let arr_index = (y & 2047) as usize;
                         dif_r += 6 * unsafe { *buffer_r.get_unchecked(arr_index) };
                         dif_g += 6 * unsafe { *buffer_g.get_unchecked(arr_index) };
                         dif_b += 6 * unsafe { *buffer_b.get_unchecked(arr_index) };
+                        if CHANNELS_COUNT == 4 {
+                            dif_a += 6 * unsafe { *buffer_a.get_unchecked(arr_index) };
+                        }
                     }
                     if y + radius_64 >= 0 {
                         let arr_index = ((y - radius_64) & 2047) as usize;
                         dif_r -= 4 * unsafe { *buffer_r.get_unchecked(arr_index) };
                         dif_g -= 4 * unsafe { *buffer_g.get_unchecked(arr_index) };
                         dif_b -= 4 * unsafe { *buffer_b.get_unchecked(arr_index) };
+                        if CHANNELS_COUNT == 4 {
+                            dif_a -= 4 * unsafe { *buffer_a.get_unchecked(arr_index) };
+                        }
                     }
                 }
 
@@ -107,7 +130,7 @@ mod fast_gaussian_superior {
                     (std::cmp::min(std::cmp::max(y + 2 * radius_64 - 1, 0), height_wide - 1)
                         as usize)
                         * (stride as usize);
-                let next_row_x = (x * channels_count) as usize;
+                let next_row_x = x as usize * CHANNELS_COUNT;
 
                 let px_idx = next_row_y + next_row_x;
 
@@ -140,12 +163,23 @@ mod fast_gaussian_superior {
                 unsafe {
                     *buffer_b.get_unchecked_mut(arr_index) = ub8.into();
                 }
+
+                if CHANNELS_COUNT == 4 {
+                    let ua8 = bytes[px_idx + 3];
+                    dif_a += ua8.into();
+                    der_2_a += dif_a;
+                    der_1_a += der_2_a;
+                    sum_a += der_1_a;
+                    unsafe {
+                        *buffer_a.get_unchecked_mut(arr_index) = ua8.into();
+                    }
+                }
             }
         }
     }
 
     fn fast_gaussian_horizontal_pass<
-        T: FromPrimitive + ToPrimitive + Default + Into<i64> + Send + Sync,
+        T: FromPrimitive + ToPrimitive + Default + Into<i64> + Send + Sync, const CHANNELS_COUNT: usize,
     >(
         bytes: &UnsafeSlice<T>,
         stride: u32,
@@ -154,21 +188,17 @@ mod fast_gaussian_superior {
         radius: u32,
         start: u32,
         end: u32,
-        channels: FastBlurChannels,
     ) where
         T: std::ops::AddAssign + std::ops::SubAssign + Copy,
     {
         let mut buffer_r: [i64; 2048] = [0; 2048];
         let mut buffer_g: [i64; 2048] = [0; 2048];
         let mut buffer_b: [i64; 2048] = [0; 2048];
+        let mut buffer_a: [i64; 2048] = [0; 2048];
         let radius_64 = radius as i64;
         let width_wide = width as i64;
         let radius_2d = (radius as f32) * (radius as f32);
         let weight = 1.0f32 / (radius_2d * radius_2d);
-        let channels_count = match channels {
-            FastBlurChannels::Channels3 => 3,
-            FastBlurChannels::Channels4 => 4,
-        };
         for y in start..std::cmp::min(height, end) {
             let mut dif_r: i64 = 0;
             let mut der_1_r: i64 = 0;
@@ -182,20 +212,30 @@ mod fast_gaussian_superior {
             let mut der_1_b: i64 = 0;
             let mut der_2_b: i64 = 0;
             let mut sum_b: i64 = 0;
+            let mut dif_a: i64 = 0;
+            let mut der_1_a: i64 = 0;
+            let mut der_2_a: i64 = 0;
+            let mut sum_a: i64 = 0;
 
             let current_y = ((y as i64) * (stride as i64)) as usize;
 
             for x in (0i64 - 4i64 * radius_64)..(width as i64) {
                 if x >= 0 {
-                    let current_px = ((std::cmp::max(x, 0) as u32) * channels_count) as usize;
+                    let current_px = (std::cmp::max(x, 0) as u32) as usize * CHANNELS_COUNT;
                     let new_r = T::from_u32(((sum_r as f32) * weight) as u32).unwrap_or_default();
                     let new_g = T::from_u32(((sum_g as f32) * weight) as u32).unwrap_or_default();
                     let new_b = T::from_u32(((sum_b as f32) * weight) as u32).unwrap_or_default();
 
+                    let bytes_offset = current_y + current_px;
+
                     unsafe {
-                        bytes.write(current_y + current_px, new_r);
-                        bytes.write(current_y + current_px + 1, new_g);
-                        bytes.write(current_y + current_px + 2, new_b);
+                        bytes.write(bytes_offset, new_r);
+                        bytes.write(bytes_offset + 1, new_g);
+                        bytes.write(bytes_offset + 2, new_b);
+                        if CHANNELS_COUNT == 4 {
+                            let new_a = T::from_u32(((sum_a as f32) * weight) as u32).unwrap_or_default();
+                            bytes.write(bytes_offset + 3, new_a);
+                        }
                     }
 
                     let arr_index_3 = (x & 2047) as usize;
@@ -206,19 +246,26 @@ mod fast_gaussian_superior {
                     unsafe {
                         dif_r += -4
                             * ((*buffer_r.get_unchecked(arr_index_1))
-                                + (*buffer_r.get_unchecked(arr_index_2)))
+                            + (*buffer_r.get_unchecked(arr_index_2)))
                             + 6 * (*buffer_r.get_unchecked(arr_index_3))
                             + (*buffer_r.get_unchecked(arr_index_4));
                         dif_g += -4
                             * ((*buffer_g.get_unchecked(arr_index_1))
-                                + (*buffer_g.get_unchecked(arr_index_2)))
+                            + (*buffer_g.get_unchecked(arr_index_2)))
                             + 6 * (*buffer_g.get_unchecked(arr_index_3))
                             + (*buffer_g.get_unchecked(arr_index_4));
                         dif_b += -4
                             * ((*buffer_b.get_unchecked(arr_index_1))
-                                + (*buffer_b.get_unchecked(arr_index_2)))
+                            + (*buffer_b.get_unchecked(arr_index_2)))
                             + 6 * (*buffer_b.get_unchecked(arr_index_3))
                             + (*buffer_b.get_unchecked(arr_index_4));
+                        if CHANNELS_COUNT == 4 {
+                            dif_a += -4
+                                * ((*buffer_a.get_unchecked(arr_index_1))
+                                + (*buffer_a.get_unchecked(arr_index_2)))
+                                + 6 * (*buffer_a.get_unchecked(arr_index_3))
+                                + (*buffer_a.get_unchecked(arr_index_4));
+                        }
                     }
                 } else {
                     if x + 3 * radius_64 >= 0 {
@@ -226,30 +273,41 @@ mod fast_gaussian_superior {
                         dif_r -= 4 * unsafe { *buffer_r.get_unchecked(arr_index) };
                         dif_g -= 4 * unsafe { *buffer_g.get_unchecked(arr_index) };
                         dif_b -= 4 * unsafe { *buffer_b.get_unchecked(arr_index) };
+                        if CHANNELS_COUNT == 4 {
+                            dif_a -= 4 * unsafe { *buffer_a.get_unchecked(arr_index) };
+                        }
                     }
                     if x + 2 * radius_64 >= 0 {
                         let arr_index = (x & 2047) as usize;
                         dif_r += 6 * unsafe { *buffer_r.get_unchecked(arr_index) };
                         dif_g += 6 * unsafe { *buffer_g.get_unchecked(arr_index) };
                         dif_b += 6 * unsafe { *buffer_b.get_unchecked(arr_index) };
+                        if CHANNELS_COUNT == 4 {
+                            dif_a += 6 * unsafe { *buffer_a.get_unchecked(arr_index) };
+                        }
                     }
                     if x + radius_64 >= 0 {
                         let arr_index = ((x - radius_64) & 2047) as usize;
                         dif_r -= 4 * unsafe { *buffer_r.get_unchecked(arr_index) };
                         dif_g -= 4 * unsafe { *buffer_g.get_unchecked(arr_index) };
                         dif_b -= 4 * unsafe { *buffer_b.get_unchecked(arr_index) };
+                        if CHANNELS_COUNT == 4 {
+                            dif_a -= 4 * unsafe { *buffer_a.get_unchecked(arr_index) };
+                        }
                     }
                 }
 
                 let next_row_y = (y as usize) * (stride as usize);
                 let next_row_x =
-                    ((std::cmp::min(std::cmp::max(x + 2 * radius_64 - 1, 0), width_wide - 1)
-                        as u32)
-                        * channels_count) as usize;
+                    (std::cmp::min(std::cmp::max(x + 2 * radius_64 - 1, 0), width_wide - 1)
+                        as u32) as usize
+                        * CHANNELS_COUNT;
 
-                let ur8 = bytes[next_row_y + next_row_x];
-                let ug8 = bytes[next_row_y + next_row_x + 1];
-                let ub8 = bytes[next_row_y + next_row_x + 2];
+                let bytes_offset = next_row_y + next_row_x;
+
+                let ur8 = bytes[bytes_offset];
+                let ug8 = bytes[bytes_offset + 1];
+                let ub8 = bytes[bytes_offset + 2];
 
                 let arr_index = ((x + 2 * radius_64) & 2047) as usize;
 
@@ -276,19 +334,29 @@ mod fast_gaussian_superior {
                 unsafe {
                     *buffer_b.get_unchecked_mut(arr_index) = ub8.into();
                 }
+
+                if CHANNELS_COUNT == 4 {
+                    let ua8 = bytes[bytes_offset + 3];
+                    dif_a += ua8.into();
+                    der_2_a += dif_a;
+                    der_1_a += der_2_a;
+                    sum_a += der_1_a;
+                    unsafe {
+                        *buffer_a.get_unchecked_mut(arr_index) = ua8.into();
+                    }
+                }
             }
         }
     }
 
     pub(crate) fn fast_gaussian_impl<
-        T: FromPrimitive + ToPrimitive + Default + Into<i64> + Send + Sync,
+        T: FromPrimitive + ToPrimitive + Default + Into<i64> + Send + Sync, const CHANNELS_COUNT: usize,
     >(
         bytes: &mut [T],
         stride: u32,
         width: u32,
         height: u32,
         radius: u32,
-        channels: FastBlurChannels,
         threading_policy: ThreadingPolicy,
     ) where
         T: std::ops::AddAssign + std::ops::SubAssign + Copy,
@@ -309,7 +377,7 @@ mod fast_gaussian_superior {
                     end_x = width;
                 }
                 scope.spawn(move |_| {
-                    fast_gaussian_vertical_pass::<T>(
+                    fast_gaussian_vertical_pass::<T, CHANNELS_COUNT>(
                         &unsafe_image,
                         stride,
                         width,
@@ -317,7 +385,6 @@ mod fast_gaussian_superior {
                         radius,
                         start_x,
                         end_x,
-                        channels,
                     );
                 });
             }
@@ -332,7 +399,7 @@ mod fast_gaussian_superior {
                     end_y = height;
                 }
                 scope.spawn(move |_| {
-                    fast_gaussian_horizontal_pass::<T>(
+                    fast_gaussian_horizontal_pass::<T, CHANNELS_COUNT>(
                         &unsafe_image,
                         stride,
                         width,
@@ -340,7 +407,6 @@ mod fast_gaussian_superior {
                         radius,
                         start_y,
                         end_y,
-                        channels,
                     );
                 });
             }
@@ -366,13 +432,26 @@ pub fn fast_gaussian_superior(
     threading_policy: ThreadingPolicy,
 ) {
     let acq_radius = std::cmp::min(radius, 256);
-    fast_gaussian_superior::fast_gaussian_impl::<u8>(
-        bytes,
-        stride,
-        width,
-        height,
-        acq_radius,
-        channels,
-        threading_policy,
-    );
+    match channels {
+        FastBlurChannels::Channels3 => {
+            fast_gaussian_superior::fast_gaussian_impl::<u8, 3>(
+                bytes,
+                stride,
+                width,
+                height,
+                acq_radius,
+                threading_policy,
+            );
+        }
+        FastBlurChannels::Channels4 => {
+            fast_gaussian_superior::fast_gaussian_impl::<u8, 4>(
+                bytes,
+                stride,
+                width,
+                height,
+                acq_radius,
+                threading_policy,
+            );
+        }
+    }
 }

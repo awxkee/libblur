@@ -56,7 +56,7 @@ fn main() {
         FastBlurChannels::Channels4,
     );
 
-    // libblur::fast_gaussian_next(
+    // libblur::fast_gaussian_superior(
     //     &mut bytes,
     //     stride as u32,
     //     dimensions.0,
@@ -77,7 +77,7 @@ fn main() {
     //     FastBlurChannels::Channels4,
     //     ThreadingPolicy::Single,
     // );
-    // bytes = dst_bytes;
+    bytes = dst_bytes;
     // libblur::gaussian_blur(
     //     &bytes,
     //     stride as u32,
