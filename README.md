@@ -18,7 +18,7 @@ cargo add libblur
 The fastest with acceptable results. Result are quite close to gaussian and look good. Sometimes noticeable changes
 may be
 observed. However, if you'll use advanced analysis algorithms non gaussian methods will be detected. Not suitable for
-antialias.
+antialias. Results just a little worse than in 'fast gaussian', however it's faster.
 
 O(1) complexity.
 
