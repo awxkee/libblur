@@ -79,7 +79,7 @@ pub mod neon_support {
                     if CHANNELS_COUNT == 4 {
                         unsafe {
                             let dst_ptr = (bytes.slice.as_ptr() as *mut u8).add(offset) as *mut u32;
-                            *dst_ptr = pixel;
+                            dst_ptr.write_unaligned(pixel);
                         }
                     } else {
                         let bits = pixel.to_le_bytes();
@@ -180,7 +180,7 @@ pub mod neon_support {
                         unsafe {
                             let dst_ptr =
                                 (bytes.slice.as_ptr() as *mut u8).add(bytes_offset) as *mut u32;
-                            *dst_ptr = pixel;
+                            dst_ptr.write_unaligned(pixel);
                         }
                     } else {
                         let bits = pixel.to_le_bytes();

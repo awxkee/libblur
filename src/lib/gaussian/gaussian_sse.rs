@@ -562,7 +562,7 @@ pub mod sse_support {
                     let dst_ptr = unsafe_dst.slice.as_ptr().add(y_dst_shift + cx) as *mut i32;
 
                     let pixel = _mm_extract_epi32::<0>(store_lo);
-                    *dst_ptr = pixel;
+                    dst_ptr.write_unaligned(pixel);
 
                     cx += 4;
                 }
@@ -597,7 +597,7 @@ pub mod sse_support {
 
                     let pixel = _mm_extract_epi32::<0>(store_lo);
                     let bytes = pixel.to_le_bytes();
-                    *dst_ptr = bytes[0];
+                    dst_ptr.write_unaligned(bytes[0]);
 
                     cx += 1;
                 }

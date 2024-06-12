@@ -44,15 +44,15 @@ pub(crate) mod sse_utils {
     ) {
         let s16 = _mm_packs_epi32(regi, regi);
         let v8 = _mm_packus_epi16(s16, s16);
-        let pixel_u32 = _mm_extract_epi32::<0>(v8);
+        let pixel_s32 = _mm_extract_epi32::<0>(v8);
         if CHANNELS_COUNT == 4 {
             let casted_dst = dst_ptr as *mut i32;
-            *casted_dst = pixel_u32;
+            casted_dst.write_unaligned(pixel_s32);
         } else {
-            let pixel_bytes = pixel_u32.to_le_bytes();
-            *dst_ptr = pixel_bytes[0];
-            *dst_ptr.add(1) = pixel_bytes[1];
-            *dst_ptr.add(2) = pixel_bytes[2];
+            let pixel_bytes = pixel_s32.to_le_bytes();
+            dst_ptr.write_unaligned(pixel_bytes[0]);
+            dst_ptr.add(1).write_unaligned(pixel_bytes[1]);
+            dst_ptr.add(2).write_unaligned(pixel_bytes[2]);
         }
     }
 

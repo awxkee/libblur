@@ -20,7 +20,7 @@ fn f16_to_f32(bytes: Vec<u16>) -> Vec<f32> {
 }
 
 fn main() {
-    let img = ImageReader::open("assets/test_image_1.jpg")
+    let img = ImageReader::open("assets/filirovska.jpeg")
         .unwrap()
         .decode()
         .unwrap();
@@ -89,7 +89,7 @@ fn main() {
         126 * 2 + 1,
         (126f32 * 2f32 + 1f32) / 6f32,
         FastBlurChannels::Channels3,
-        EdgeMode::KernelClip,
+        EdgeMode::Reflect,
         ThreadingPolicy::Adaptive,
     );
     bytes = dst_bytes;
@@ -113,7 +113,7 @@ fn main() {
     println!("Elapsed time: {:.2?}", elapsed_time);
 
     image::save_buffer(
-        "blurred.png",
+        "blurred_reflect.png",
         bytes.as_bytes(),
         dimensions.0,
         dimensions.1,

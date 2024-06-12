@@ -35,17 +35,19 @@ use crate::gaussian::gaussian_neon_filter::neon_gaussian_filter::gaussian_blur_h
     target_feature = "sse4.1"
 ))]
 use crate::gaussian::gaussian_sse::sse_support::gaussian_blur_horizontal_pass_impl_sse;
-use crate::unsafe_slice::UnsafeSlice;
-use num_traits::FromPrimitive;
 #[cfg(all(
     any(target_arch = "x86_64", target_arch = "x86"),
     target_feature = "sse4.1"
 ))]
 use crate::gaussian::gaussian_sse_filter::sse_filter::gaussian_blur_horizontal_pass_filter_sse;
+use crate::unsafe_slice::UnsafeSlice;
+use crate::{EdgeMode, reflect_index};
+use num_traits::FromPrimitive;
 
 pub(crate) fn gaussian_blur_horizontal_pass_impl<
     T: FromPrimitive + Default + Into<f32> + Send + Sync,
     const CHANNEL_CONFIGURATION: usize,
+    const EDGE_MODE: usize,
 >(
     src: &[T],
     src_stride: u32,
@@ -64,7 +66,7 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl<
         {
             let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
-            neon_support::gaussian_blur_horizontal_pass_neon::<CHANNEL_CONFIGURATION>(
+            neon_support::gaussian_blur_horizontal_pass_neon::<CHANNEL_CONFIGURATION, EDGE_MODE>(
                 u8_slice,
                 src_stride,
                 slice,
@@ -98,7 +100,7 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl<
             return;
         }
     }
-    gaussian_blur_horizontal_pass_impl_c::<T, CHANNEL_CONFIGURATION>(
+    gaussian_blur_horizontal_pass_impl_c::<T, CHANNEL_CONFIGURATION, EDGE_MODE>(
         src,
         src_stride,
         unsafe_dst,
@@ -114,6 +116,7 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl<
 pub(crate) fn gaussian_blur_horizontal_pass_impl_c<
     T: FromPrimitive + Default + Into<f32> + Send + Sync,
     const CHANNEL_CONFIGURATION: usize,
+    const EDGE_MODE: usize,
 >(
     src: &[T],
     src_stride: u32,
@@ -127,6 +130,7 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_c<
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
+    let edge_mode: EdgeMode = EDGE_MODE.into();
     let half_kernel = (kernel_size / 2) as i32;
     for y in start_y..end_y {
         let y_src_shift = y as usize * src_stride as usize;
@@ -134,9 +138,21 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_c<
         for x in 0..width {
             let mut weights: [f32; 4] = [0f32; 4];
             for r in -half_kernel..=half_kernel {
-                let px = std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                    as usize
-                    * CHANNEL_CONFIGURATION;
+                let px = match edge_mode {
+                    EdgeMode::Clamp | EdgeMode::KernelClip => {
+                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
+                            as usize
+                            * CHANNEL_CONFIGURATION
+                    }
+                    EdgeMode::Wrap => {
+                        let cx = (x as i64 + r as i64).rem_euclid(width as i64 - 1);
+                        cx as usize * CHANNEL_CONFIGURATION
+                    }
+                    EdgeMode::Reflect => {
+                        let cx = reflect_index(x as i64 + r as i64, width as i64 - 1i64);
+                        cx * CHANNEL_CONFIGURATION
+                    }
+                };
                 let weight = unsafe { *kernel.get_unchecked((r + half_kernel) as usize) };
                 weights[0] += (unsafe { *src.get_unchecked(y_src_shift + px) }.into()) * weight;
                 weights[1] += (unsafe { *src.get_unchecked(y_src_shift + px + 1) }.into()) * weight;
@@ -206,14 +222,7 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_clip_edge<
             let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
             gaussian_blur_horizontal_pass_filter_sse::<CHANNEL_CONFIGURATION>(
-                u8_slice,
-                src_stride,
-                slice,
-                dst_stride,
-                width,
-                filter,
-                start_y,
-                end_y,
+                u8_slice, src_stride, slice, dst_stride, width, filter, start_y, end_y,
             );
             return;
         }

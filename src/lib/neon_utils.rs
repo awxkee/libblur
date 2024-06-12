@@ -28,12 +28,12 @@ pub(crate) mod neon_utils {
         let pixel_u32 = vget_lane_u32::<0>(vreinterpret_u32_u8(v8));
         if CHANNELS_COUNT == 4 {
             let casted_dst = dst_ptr as *mut u32;
-            *casted_dst = pixel_u32;
+            casted_dst.write_unaligned(pixel_u32);
         } else {
             let pixel_bytes = pixel_u32.to_le_bytes();
-            *dst_ptr = pixel_bytes[0];
-            *dst_ptr.add(1) = pixel_bytes[1];
-            *dst_ptr.add(2) = pixel_bytes[2];
+            dst_ptr.write_unaligned(pixel_bytes[0]);
+            dst_ptr.add(1).write_unaligned(pixel_bytes[1]);
+            dst_ptr.add(2) .write_unaligned(pixel_bytes[2]);
         }
     }
 

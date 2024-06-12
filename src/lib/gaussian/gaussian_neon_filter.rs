@@ -208,7 +208,7 @@ pub(crate) mod neon_gaussian_filter {
                     unsafe {
                         let unsafe_offset = y_dst_shift + px;
                         let dst_ptr = unsafe_dst.slice.as_ptr().add(unsafe_offset) as *mut u32;
-                        *dst_ptr = pixel_0;
+                        dst_ptr.write_unaligned(pixel_0);
                     }
                 } else {
                     let pixel_bytes_0 = pixel_0.to_le_bytes();
@@ -224,7 +224,7 @@ pub(crate) mod neon_gaussian_filter {
                 if CHANNEL_CONFIGURATION == 4 {
                     unsafe {
                         let dst_ptr = unsafe_dst.slice.as_ptr().add(offset) as *mut u32;
-                        *dst_ptr = pixel_1;
+                        dst_ptr.write_unaligned(pixel_1);
                     }
                 } else {
                     let pixel_bytes_1 = pixel_1.to_le_bytes();
@@ -336,7 +336,7 @@ pub(crate) mod neon_gaussian_filter {
                 if CHANNEL_CONFIGURATION == 4 {
                     unsafe {
                         let dst_ptr = unsafe_dst.slice.as_ptr().add(offset) as *mut u32;
-                        *dst_ptr = pixel;
+                        dst_ptr.write_unaligned(pixel);
                     }
                 } else {
                     let bits = pixel.to_le_bytes();
@@ -551,7 +551,7 @@ pub(crate) mod neon_gaussian_filter {
                     let dst_ptr = unsafe_dst.slice.as_ptr().add(y_dst_shift + cx) as *mut u32;
 
                     let pixel = vget_lane_u32::<0>(vreinterpret_u32_u8(store));
-                    *dst_ptr = pixel;
+                    dst_ptr.write_unaligned(pixel);
 
                     cx += 4;
                 }
@@ -584,7 +584,7 @@ pub(crate) mod neon_gaussian_filter {
 
                     let pixel = vget_lane_u32::<0>(vreinterpret_u32_u8(store));
                     let bytes = pixel.to_le_bytes();
-                    *dst_ptr = bytes[0];
+                    dst_ptr.write_unaligned(bytes[0]);
 
                     cx += 1;
                 }

@@ -35,10 +35,12 @@ use crate::gaussian::gaussian_neon_filter::neon_gaussian_filter::gaussian_blur_v
 use crate::gaussian::gaussian_sse_filter::sse_filter::gaussian_blur_vertical_pass_filter_sse;
 use crate::unsafe_slice::UnsafeSlice;
 use num_traits::FromPrimitive;
+use crate::{EdgeMode, reflect_index};
 
 pub fn gaussian_blur_vertical_pass_c_impl<
     T: FromPrimitive + Default + Into<f32> + Send + Sync + Copy,
     const CHANNEL_CONFIGURATION: usize,
+    const EDGE_MODE: usize,
 >(
     src: &[T],
     src_stride: u32,
@@ -56,7 +58,7 @@ pub fn gaussian_blur_vertical_pass_c_impl<
         let mut _cx = 0usize;
 
         while _cx + 32 < total_length {
-            gaussian_vertical_row::<T, 32>(
+            gaussian_vertical_row::<T, 32, EDGE_MODE>(
                 src,
                 src_stride,
                 unsafe_dst,
@@ -72,7 +74,7 @@ pub fn gaussian_blur_vertical_pass_c_impl<
         }
 
         while _cx + 16 < total_length {
-            gaussian_vertical_row::<T, 16>(
+            gaussian_vertical_row::<T, 16, EDGE_MODE>(
                 src,
                 src_stride,
                 unsafe_dst,
@@ -88,7 +90,7 @@ pub fn gaussian_blur_vertical_pass_c_impl<
         }
 
         while _cx + 8 < total_length {
-            gaussian_vertical_row::<T, 8>(
+            gaussian_vertical_row::<T, 8, EDGE_MODE>(
                 src,
                 src_stride,
                 unsafe_dst,
@@ -104,7 +106,7 @@ pub fn gaussian_blur_vertical_pass_c_impl<
         }
 
         while _cx + 4 < total_length {
-            gaussian_vertical_row::<T, 4>(
+            gaussian_vertical_row::<T, 4, EDGE_MODE>(
                 src,
                 src_stride,
                 unsafe_dst,
@@ -120,7 +122,7 @@ pub fn gaussian_blur_vertical_pass_c_impl<
         }
 
         while _cx < total_length {
-            gaussian_vertical_row::<T, 1>(
+            gaussian_vertical_row::<T, 1, EDGE_MODE>(
                 src,
                 src_stride,
                 unsafe_dst,
@@ -141,6 +143,7 @@ pub fn gaussian_blur_vertical_pass_c_impl<
 pub fn gaussian_vertical_row<
     T: FromPrimitive + Default + Into<f32> + Send + Sync + Copy,
     const ROW_SIZE: usize,
+    const EDGE_MODE: usize,
 >(
     src: &[T],
     src_stride: u32,
@@ -153,10 +156,22 @@ pub fn gaussian_vertical_row<
     x: u32,
     y: u32,
 ) {
+    let edge_mode: EdgeMode = EDGE_MODE.into();
     let half_kernel = (kernel_size / 2) as i32;
     let mut weights: [f32; ROW_SIZE] = [0f32; ROW_SIZE];
     for r in -half_kernel..=half_kernel {
-        let py = std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
+        let py = match edge_mode {
+            EdgeMode::Clamp | EdgeMode::KernelClip => {
+                std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64)
+            }
+            EdgeMode::Wrap => {
+                (y as i64 + r as i64).rem_euclid(height as i64 - 1i64)
+            }
+            EdgeMode::Reflect => {
+                let k = reflect_index(y as i64 + r as i64, height as i64 - 1i64);
+                k as i64
+            }
+        };
         let y_src_shift = py as usize * src_stride as usize;
         let weight = unsafe { *kernel.get_unchecked((r + half_kernel) as usize) };
         for i in 0..ROW_SIZE {

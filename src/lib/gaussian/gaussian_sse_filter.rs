@@ -215,7 +215,7 @@ pub mod sse_filter {
                     unsafe {
                         let unsafe_offset = y_dst_shift + px;
                         let dst_ptr = unsafe_dst.slice.as_ptr().add(unsafe_offset) as *mut i32;
-                        *dst_ptr = pixel;
+                        dst_ptr.write_unaligned(pixel);
                     }
                 } else {
                     let pixel_bytes = pixel.to_le_bytes();
@@ -236,7 +236,7 @@ pub mod sse_filter {
                     unsafe {
                         let unsafe_offset = y_dst_shift + src_stride as usize + px;
                         let dst_ptr = unsafe_dst.slice.as_ptr().add(unsafe_offset) as *mut i32;
-                        *dst_ptr = pixel;
+                        dst_ptr.write_unaligned(pixel);
                     }
                 } else {
                     let pixel_bytes = pixel.to_le_bytes();
@@ -361,7 +361,7 @@ pub mod sse_filter {
                 if CHANNEL_CONFIGURATION == 4 {
                     unsafe {
                         let dst_ptr = unsafe_dst.slice.as_ptr().add(y_dst_shift + px) as *mut i32;
-                        *dst_ptr = pixel;
+                        dst_ptr.write_unaligned(pixel);
                     }
                 } else {
                     let pixel_bytes = pixel.to_le_bytes();
@@ -577,7 +577,7 @@ pub mod sse_filter {
                     let dst_ptr = unsafe_dst.slice.as_ptr().add(y_dst_shift + cx) as *mut i32;
 
                     let pixel = _mm_extract_epi32::<0>(store_lo);
-                    *dst_ptr = pixel;
+                    dst_ptr.write_unaligned(pixel);
 
                     cx += 4;
                 }
@@ -609,48 +609,11 @@ pub mod sse_filter {
 
                     let pixel = _mm_extract_epi32::<0>(store_lo);
                     let bytes = pixel.to_le_bytes();
-                    *dst_ptr = bytes[0];
+                    dst_ptr.write_unaligned(bytes[0]);
 
                     cx += 1;
                 }
             }
         }
-    }
-}
-
-#[cfg(not(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "sse4.1"
-)))]
-pub mod sse_filter {
-    use crate::unsafe_slice::UnsafeSlice;
-
-    #[allow(dead_code)]
-    pub fn gaussian_blur_vertical_pass_filter_sse(
-        _src: &Vec<u8>,
-        _src_stride: u32,
-        _unsafe_dst: &UnsafeSlice<u8>,
-        _dst_stride: u32,
-        _width: u32,
-        _height: u32,
-        _kernel_size: usize,
-        _kernel: &Vec<f32>,
-        _start_y: u32,
-        _end_y: u32,
-    ) {
-    }
-
-    #[allow(dead_code)]
-    pub fn gaussian_blur_horizontal_pass_filter_sse(
-        _src: &Vec<u8>,
-        _src_stride: u32,
-        _unsafe_dst: &UnsafeSlice<u8>,
-        _dst_stride: u32,
-        _width: u32,
-        _kernel_size: usize,
-        _kernel: &Vec<f32>,
-        _start_y: u32,
-        _end_y: u32,
-    ) {
     }
 }
