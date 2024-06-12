@@ -1,8 +1,40 @@
+// Copyright (c) Radzivon Bartoshyk. All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without modification,
+// are permitted provided that the following conditions are met:
+//
+// 1.  Redistributions of source code must retain the above copyright notice, this
+// list of conditions and the following disclaimer.
+//
+// 2.  Redistributions in binary form must reproduce the above copyright notice,
+// this list of conditions and the following disclaimer in the documentation
+// and/or other materials provided with the distribution.
+//
+// 3.  Neither the name of the copyright holder nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+// OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 use crate::gaussian::gaussian_filter::GaussianFilter;
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+use crate::gaussian::gaussian_neon_filter::neon_gaussian_filter::gaussian_blur_vertical_pass_filter_neon;
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+))]
+use crate::gaussian::gaussian_sse_filter::sse_filter::gaussian_blur_vertical_pass_filter_sse;
 use crate::unsafe_slice::UnsafeSlice;
 use num_traits::FromPrimitive;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use crate::gaussian::gaussian_neon_filter::neon_gaussian_filter::{gaussian_blur_vertical_pass_filter_neon};
 
 pub fn gaussian_blur_vertical_pass_c_impl<
     T: FromPrimitive + Default + Into<f32> + Send + Sync + Copy,
@@ -168,6 +200,18 @@ pub fn gaussian_blur_vertical_pass_clip_edge_impl<
             let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
             gaussian_blur_vertical_pass_filter_neon::<CHANNEL_CONFIGURATION>(
+                u8_slice, src_stride, slice, dst_stride, width, height, filter, start_y, end_y,
+            );
+            return;
+        }
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "sse4.1"
+        ))]
+        {
+            let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
+            let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
+            gaussian_blur_vertical_pass_filter_sse::<CHANNEL_CONFIGURATION>(
                 u8_slice, src_stride, slice, dst_stride, width, height, filter, start_y, end_y,
             );
             return;

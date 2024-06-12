@@ -40,6 +40,11 @@ use crate::gaussian::gaussian_kernel::get_gaussian_kernel_1d;
 use crate::gaussian::gaussian_horizontal::gaussian_blur_horizontal_pass_impl;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::gaussian::gaussian_neon::neon_support;
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+))]
+use crate::gaussian::gaussian_sse::sse_support::gaussian_blur_vertical_pass_impl_sse;
 use crate::gaussian::gaussian_vertical::gaussian_blur_vertical_pass_c_impl;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::ThreadingPolicy;
@@ -131,7 +136,7 @@ fn gaussian_blur_vertical_pass_impl<
         {
             let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
-            sse_support::gaussian_blur_vertical_pass_impl_sse::<CHANNEL_CONFIGURATION>(
+            gaussian_blur_vertical_pass_impl_sse::<CHANNEL_CONFIGURATION>(
                 u8_slice,
                 src_stride,
                 slice,

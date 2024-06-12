@@ -29,7 +29,8 @@
     any(target_arch = "x86_64", target_arch = "x86"),
     target_feature = "sse4.1"
 ))]
-pub mod sse_support {
+pub mod sse_filter {
+    use crate::gaussian::gaussian_filter::GaussianFilter;
     use crate::sse_utils::sse_utils::{_mm_prefer_fma_ps, load_u8_f32_fast, load_u8_u32_one};
     #[cfg(target_arch = "x86")]
     use std::arch::x86::*;
@@ -38,21 +39,21 @@ pub mod sse_support {
 
     use crate::unsafe_slice::UnsafeSlice;
 
-    pub fn gaussian_blur_horizontal_pass_impl_sse<const CHANNEL_CONFIGURATION: usize>(
+    pub fn gaussian_blur_horizontal_pass_filter_sse<const CHANNEL_CONFIGURATION: usize>(
         src: &[u8],
         src_stride: u32,
         unsafe_dst: &UnsafeSlice<u8>,
         dst_stride: u32,
         width: u32,
-        kernel_size: usize,
-        kernel: &[f32],
+        filter: &Vec<GaussianFilter>,
         start_y: u32,
         end_y: u32,
     ) {
-        let half_kernel = (kernel_size / 2) as i32;
-
+        #[rustfmt::skip]
         let shuffle_rgb =
-            unsafe { _mm_setr_epi8(0, 1, 2, -1, 3, 4, 5, -1, 6, 7, 8, -1, 9, 10, 11, -1) };
+            unsafe { _mm_setr_epi8(0, 1, 2, -1, 3, 4,
+                                   5, -1, 6, 7, 8, -1,
+                                   9, 10, 11, -1) };
 
         let zeros_si = unsafe { _mm_setzero_si128() };
 
@@ -65,18 +66,18 @@ pub mod sse_support {
                 let mut store_0 = unsafe { _mm_setzero_ps() };
                 let mut store_1 = unsafe { _mm_setzero_ps() };
 
-                let mut r = -half_kernel;
+                let current_filter = unsafe { filter.get_unchecked(x as usize) };
+                let filter_start = current_filter.start;
+                let filter_weights = &current_filter.filter;
+
+                let mut j = 0usize;
 
                 unsafe {
-                    while r + 4 <= half_kernel
-                        && x as i64 + r as i64 + (if CHANNEL_CONFIGURATION == 4 { 4 } else { 6 })
+                    while j + 4 < current_filter.size
+                        && x as i64 + j as i64 + (if CHANNEL_CONFIGURATION == 4 { 4 } else { 6 })
                             < width as i64
                     {
-                        let px = std::cmp::min(
-                            std::cmp::max(x as i64 + r as i64, 0),
-                            (width - 1) as i64,
-                        ) as usize
-                            * CHANNEL_CONFIGURATION;
+                        let px = (filter_start + j) * CHANNEL_CONFIGURATION;
                         let s_ptr = src.as_ptr().add(y_src_shift + px);
                         let s_ptr_1 = s_ptr.add(src_stride as usize);
                         let mut pixel_colors_0 = _mm_loadu_si128(s_ptr as *const __m128i);
@@ -95,7 +96,7 @@ pub mod sse_support {
                             _mm_unpacklo_epi16(pixel_colors_u16_1, zeros_si);
                         let mut pixel_colors_f32_1 = _mm_cvtepi32_ps(pixel_colors_u32_1);
 
-                        let mut weight = *kernel.get_unchecked((r + half_kernel) as usize);
+                        let mut weight = *filter_weights.get_unchecked(j);
                         let mut f_weight = _mm_set1_ps(weight);
                         store_0 = _mm_prefer_fma_ps(store_0, pixel_colors_f32_0, f_weight);
                         store_1 = _mm_prefer_fma_ps(store_1, pixel_colors_f32_1, f_weight);
@@ -106,7 +107,7 @@ pub mod sse_support {
                         pixel_colors_u32_1 = _mm_unpackhi_epi16(pixel_colors_u16_1, zeros_si);
                         pixel_colors_f32_1 = _mm_cvtepi32_ps(pixel_colors_u32_1);
 
-                        weight = *kernel.get_unchecked((r + half_kernel + 1) as usize);
+                        weight = *filter_weights.get_unchecked(j + 1);
                         f_weight = _mm_set1_ps(weight);
                         store_0 = _mm_prefer_fma_ps(store_0, pixel_colors_f32_0, f_weight);
                         store_1 = _mm_prefer_fma_ps(store_1, pixel_colors_f32_1, f_weight);
@@ -120,7 +121,7 @@ pub mod sse_support {
                         pixel_colors_f32_0 = _mm_cvtepi32_ps(pixel_colors_u32_0);
                         pixel_colors_f32_1 = _mm_cvtepi32_ps(pixel_colors_u32_1);
 
-                        let mut weight = *kernel.get_unchecked((r + half_kernel + 2) as usize);
+                        let mut weight = *filter_weights.get_unchecked(j + 2);
                         let mut f_weight = _mm_set1_ps(weight);
                         store_0 = _mm_prefer_fma_ps(store_0, pixel_colors_f32_0, f_weight);
                         store_1 = _mm_prefer_fma_ps(store_1, pixel_colors_f32_1, f_weight);
@@ -131,25 +132,21 @@ pub mod sse_support {
                         pixel_colors_u32_1 = _mm_unpackhi_epi16(pixel_colors_u16_1, zeros_si);
                         pixel_colors_f32_1 = _mm_cvtepi32_ps(pixel_colors_u32_1);
 
-                        weight = *kernel.get_unchecked((r + half_kernel + 3) as usize);
+                        weight = *filter_weights.get_unchecked(j + 3);
                         f_weight = _mm_set1_ps(weight);
                         store_0 = _mm_prefer_fma_ps(store_0, pixel_colors_f32_0, f_weight);
                         store_1 = _mm_prefer_fma_ps(store_1, pixel_colors_f32_1, f_weight);
 
-                        r += 4;
+                        j += 4;
                     }
                 }
 
                 unsafe {
-                    while r + 2 <= half_kernel
-                        && x as i64 + r as i64 + (if CHANNEL_CONFIGURATION == 4 { 4 } else { 6 })
+                    while j + 2 < current_filter.size
+                        && x as i64 + j as i64 + (if CHANNEL_CONFIGURATION == 4 { 3 } else { 3 })
                         < width as i64
                     {
-                        let px = std::cmp::min(
-                            std::cmp::max(x as i64 + r as i64, 0),
-                            (width - 1) as i64,
-                        ) as usize
-                            * CHANNEL_CONFIGURATION;
+                        let px = (filter_start + j) * CHANNEL_CONFIGURATION;
                         let s_ptr = src.as_ptr().add(y_src_shift + px);
                         let s_ptr_1 = s_ptr.add(src_stride as usize);
                         let mut pixel_colors_0 = _mm_loadu_si128(s_ptr as *const __m128i);
@@ -168,7 +165,7 @@ pub mod sse_support {
                             _mm_unpacklo_epi16(pixel_colors_u16_1, zeros_si);
                         let mut pixel_colors_f32_1 = _mm_cvtepi32_ps(pixel_colors_u32_1);
 
-                        let mut weight = *kernel.get_unchecked((r + half_kernel) as usize);
+                        let mut weight = *filter_weights.get_unchecked(j);
                         let mut f_weight = _mm_set1_ps(weight);
                         store_0 = _mm_prefer_fma_ps(store_0, pixel_colors_f32_0, f_weight);
                         store_1 = _mm_prefer_fma_ps(store_1, pixel_colors_f32_1, f_weight);
@@ -179,32 +176,30 @@ pub mod sse_support {
                         pixel_colors_u32_1 = _mm_unpackhi_epi16(pixel_colors_u16_1, zeros_si);
                         pixel_colors_f32_1 = _mm_cvtepi32_ps(pixel_colors_u32_1);
 
-                        weight = *kernel.get_unchecked((r + half_kernel + 1) as usize);
+                        weight = *filter_weights.get_unchecked(j + 1);
                         f_weight = _mm_set1_ps(weight);
                         store_0 = _mm_prefer_fma_ps(store_0, pixel_colors_f32_0, f_weight);
                         store_1 = _mm_prefer_fma_ps(store_1, pixel_colors_f32_1, f_weight);
-                        r += 2;
+
+                        j += 2;
                     }
                 }
 
                 unsafe {
-                    while r <= half_kernel {
-                        let current_x = std::cmp::min(
-                            std::cmp::max(x as i64 + r as i64, 0),
-                            (width - 1) as i64,
-                        ) as usize;
+                    while j < current_filter.size {
+                        let current_x = filter_start + j;
                         let px = current_x * CHANNEL_CONFIGURATION;
                         let s_ptr = src.as_ptr().add(y_src_shift + px);
                         let pixel_colors_f32_0 = load_u8_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr);
                         let pixel_colors_f32_1 = load_u8_f32_fast::<CHANNEL_CONFIGURATION>(
                             s_ptr.add(src_stride as usize),
                         );
-                        let weight = *kernel.get_unchecked((r + half_kernel) as usize);
+                        let weight = *filter_weights.get_unchecked(j);
                         let f_weight = _mm_set1_ps(weight);
                         store_0 = _mm_prefer_fma_ps(store_0, pixel_colors_f32_0, f_weight);
                         store_1 = _mm_prefer_fma_ps(store_0, pixel_colors_f32_1, f_weight);
 
-                        r += 1;
+                        j += 1;
                     }
                 }
 
@@ -236,6 +231,7 @@ pub mod sse_support {
                 let px_16 = unsafe { _mm_packus_epi32(px_32, px_32) };
                 let px_8 = unsafe { _mm_packus_epi16(px_16, px_16) };
                 let pixel = unsafe { _mm_extract_epi32::<0>(px_8) };
+
                 if CHANNEL_CONFIGURATION == 4 {
                     unsafe {
                         let unsafe_offset = y_dst_shift + src_stride as usize + px;
@@ -261,17 +257,20 @@ pub mod sse_support {
             let y_src_shift = y as usize * src_stride as usize;
             let y_dst_shift = y as usize * dst_stride as usize;
             for x in 0..width {
-                let mut store = unsafe { _mm_set1_ps(0f32) };
+                let mut store = unsafe { _mm_setzero_ps() };
 
-                let mut r = -half_kernel;
+                let current_filter = unsafe { filter.get_unchecked(x as usize) };
+                let filter_start = current_filter.start;
+                let filter_weights = &current_filter.filter;
+
+                let mut j = 0usize;
 
                 unsafe {
-                    while r + 4 <= half_kernel && x as i64 + r as i64 + 6 < width as i64 {
-                        let px = std::cmp::min(
-                            std::cmp::max(x as i64 + r as i64, 0),
-                            (width - 1) as i64,
-                        ) as usize
-                            * CHANNEL_CONFIGURATION;
+                    while j + 4 < current_filter.size
+                        && x as i64 + j as i64 + (if CHANNEL_CONFIGURATION == 4 { 4 } else { 6 })
+                            < width as i64
+                    {
+                        let px = (filter_start + j) * CHANNEL_CONFIGURATION;
                         let s_ptr = src.as_ptr().add(y_src_shift + px);
                         let mut pixel_colors = _mm_loadu_si128(s_ptr as *const __m128i);
                         if CHANNEL_CONFIGURATION == 3 {
@@ -280,49 +279,74 @@ pub mod sse_support {
                         let mut pixel_colors_u16 = _mm_unpacklo_epi8(pixel_colors, zeros_si);
                         let mut pixel_colors_u32 = _mm_unpacklo_epi16(pixel_colors_u16, zeros_si);
                         let mut pixel_colors_f32 = _mm_cvtepi32_ps(pixel_colors_u32);
-                        let mut weight = *kernel.get_unchecked((r + half_kernel) as usize);
+                        let mut weight = *filter_weights.get_unchecked(j);
                         let mut f_weight = _mm_set1_ps(weight);
                         store = _mm_prefer_fma_ps(store, pixel_colors_f32, f_weight);
 
                         pixel_colors_u32 = _mm_unpackhi_epi16(pixel_colors_u16, zeros_si);
                         pixel_colors_f32 = _mm_cvtepi32_ps(pixel_colors_u32);
 
-                        weight = *kernel.get_unchecked((r + half_kernel + 1) as usize);
+                        weight = *filter_weights.get_unchecked(j + 1);
                         f_weight = _mm_set1_ps(weight);
                         store = _mm_prefer_fma_ps(store, pixel_colors_f32, f_weight);
 
                         pixel_colors_u16 = _mm_unpackhi_epi8(pixel_colors, zeros_si);
                         pixel_colors_u32 = _mm_unpacklo_epi16(pixel_colors_u16, zeros_si);
                         let mut pixel_colors_f32 = _mm_cvtepi32_ps(pixel_colors_u32);
-                        let mut weight = *kernel.get_unchecked((r + half_kernel + 2) as usize);
+                        let mut weight = *filter_weights.get_unchecked(j + 2);
                         let mut f_weight = _mm_set1_ps(weight);
                         store = _mm_prefer_fma_ps(store, pixel_colors_f32, f_weight);
 
                         pixel_colors_u32 = _mm_unpackhi_epi16(pixel_colors_u16, zeros_si);
                         pixel_colors_f32 = _mm_cvtepi32_ps(pixel_colors_u32);
 
-                        weight = *kernel.get_unchecked((r + half_kernel + 3) as usize);
+                        weight = *filter_weights.get_unchecked(j + 3);
                         f_weight = _mm_set1_ps(weight);
                         store = _mm_prefer_fma_ps(store, pixel_colors_f32, f_weight);
 
-                        r += 4;
+                        j += 4;
                     }
                 }
 
                 unsafe {
-                    while r <= half_kernel {
-                        let current_x = std::cmp::min(
-                            std::cmp::max(x as i64 + r as i64, 0),
-                            (width - 1) as i64,
-                        ) as usize;
+                    while j + 2 < current_filter.size
+                        && x as i64 + j as i64 + (if CHANNEL_CONFIGURATION == 4 { 2 } else { 3 })
+                        < width as i64
+                    {
+                        let px = (filter_start + j) * CHANNEL_CONFIGURATION;
+                        let s_ptr = src.as_ptr().add(y_src_shift + px);
+                        let mut pixel_colors = _mm_loadu_si128(s_ptr as *const __m128i);
+                        if CHANNEL_CONFIGURATION == 3 {
+                            pixel_colors = _mm_shuffle_epi8(pixel_colors, shuffle_rgb);
+                        }
+                        let pixel_colors_u16 = _mm_unpacklo_epi8(pixel_colors, zeros_si);
+                        let mut pixel_colors_u32 = _mm_unpacklo_epi16(pixel_colors_u16, zeros_si);
+                        let mut pixel_colors_f32 = _mm_cvtepi32_ps(pixel_colors_u32);
+                        let mut weight = *filter_weights.get_unchecked(j);
+                        let mut f_weight = _mm_set1_ps(weight);
+                        store = _mm_prefer_fma_ps(store, pixel_colors_f32, f_weight);
+
+                        pixel_colors_u32 = _mm_unpackhi_epi16(pixel_colors_u16, zeros_si);
+                        pixel_colors_f32 = _mm_cvtepi32_ps(pixel_colors_u32);
+
+                        weight = *filter_weights.get_unchecked(j + 1);
+                        f_weight = _mm_set1_ps(weight);
+                        store = _mm_prefer_fma_ps(store, pixel_colors_f32, f_weight);
+                        j += 2;
+                    }
+                }
+
+                unsafe {
+                    while j < current_filter.size {
+                        let current_x = filter_start + j;
                         let px = current_x * CHANNEL_CONFIGURATION;
                         let s_ptr = src.as_ptr().add(y_src_shift + px);
                         let pixel_colors_f32 = load_u8_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr);
-                        let weight = *kernel.get_unchecked((r + half_kernel) as usize);
+                        let weight = *filter_weights.get_unchecked(j);
                         let f_weight = _mm_set1_ps(weight);
                         store = _mm_prefer_fma_ps(store, pixel_colors_f32, f_weight);
 
-                        r += 1;
+                        j += 1;
                     }
                 }
 
@@ -333,6 +357,7 @@ pub mod sse_support {
                 let px_16 = unsafe { _mm_packus_epi32(px_32, px_32) };
                 let px_8 = unsafe { _mm_packus_epi16(px_16, px_16) };
                 let pixel = unsafe { _mm_extract_epi32::<0>(px_8) };
+
                 if CHANNEL_CONFIGURATION == 4 {
                     unsafe {
                         let dst_ptr = unsafe_dst.slice.as_ptr().add(y_dst_shift + px) as *mut i32;
@@ -351,19 +376,17 @@ pub mod sse_support {
         }
     }
 
-    pub fn gaussian_blur_vertical_pass_impl_sse<const CHANNEL_CONFIGURATION: usize>(
+    pub fn gaussian_blur_vertical_pass_filter_sse<const CHANNEL_CONFIGURATION: usize>(
         src: &[u8],
         src_stride: u32,
         unsafe_dst: &UnsafeSlice<u8>,
         dst_stride: u32,
         width: u32,
-        height: u32,
-        kernel_size: usize,
-        kernel: &Vec<f32>,
+        _: u32,
+        filter: &Vec<GaussianFilter>,
         start_y: u32,
         end_y: u32,
     ) {
-        let half_kernel = (kernel_size / 2) as i32;
         const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
 
         let zeros = unsafe { _mm_setzero_ps() };
@@ -373,6 +396,10 @@ pub mod sse_support {
             let y_dst_shift = y as usize * dst_stride as usize;
 
             let mut cx = 0usize;
+
+            let current_filter = unsafe { filter.get_unchecked(y as usize) };
+            let filter_start = current_filter.start;
+            let filter_weights = &current_filter.filter;
 
             unsafe {
                 while cx + 32 < total_length {
@@ -385,16 +412,13 @@ pub mod sse_support {
                     let mut store6 = zeros;
                     let mut store7 = zeros;
 
-                    let mut r = -half_kernel;
-                    while r <= half_kernel {
-                        let weight = *kernel.get_unchecked((r + half_kernel) as usize);
+                    let mut j = 0usize;
+                    while j < current_filter.size {
+                        let weight = *filter_weights.get_unchecked(j);
                         let f_weight = _mm_set1_ps(weight);
 
-                        let py = std::cmp::min(
-                            std::cmp::max(y as i64 + r as i64, 0),
-                            (height - 1) as i64,
-                        );
-                        let y_src_shift = py as usize * src_stride as usize;
+                        let py = filter_start + j;
+                        let y_src_shift = py * src_stride as usize;
                         let s_ptr = src.as_ptr().add(y_src_shift + cx);
                         let pixels_u8_lo = _mm_loadu_si128(s_ptr as *const __m128i);
                         let pixels_u8_hi = _mm_loadu_si128(s_ptr.add(16) as *const __m128i);
@@ -420,7 +444,7 @@ pub mod sse_support {
                         let hi_hi = _mm_cvtepi32_ps(_mm_unpackhi_epi16(hi_16, zeros_si));
                         store7 = _mm_prefer_fma_ps(store7, hi_hi, f_weight);
 
-                        r += 1;
+                        j += 1;
                     }
 
                     let store_0 = _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(store0));
@@ -454,16 +478,13 @@ pub mod sse_support {
                     let mut store2 = zeros;
                     let mut store3 = zeros;
 
-                    let mut r = -half_kernel;
-                    while r <= half_kernel {
-                        let weight = *kernel.get_unchecked((r + half_kernel) as usize);
+                    let mut j = 0usize;
+                    while j < current_filter.size {
+                        let weight = *filter_weights.get_unchecked(j);
                         let f_weight = _mm_set1_ps(weight);
 
-                        let py = std::cmp::min(
-                            std::cmp::max(y as i64 + r as i64, 0),
-                            (height - 1) as i64,
-                        );
-                        let y_src_shift = py as usize * src_stride as usize;
+                        let py = filter_start + j;
+                        let y_src_shift = py * src_stride as usize;
                         let s_ptr = src.as_ptr().add(y_src_shift + cx);
                         let pixels_u8 = _mm_loadu_si128(s_ptr as *const __m128i);
                         let hi_16 = _mm_unpackhi_epi8(pixels_u8, zeros_si);
@@ -477,7 +498,7 @@ pub mod sse_support {
                         let hi_hi = _mm_cvtepi32_ps(_mm_unpackhi_epi16(hi_16, zeros_si));
                         store3 = _mm_prefer_fma_ps(store3, hi_hi, f_weight);
 
-                        r += 1;
+                        j += 1;
                     }
 
                     let store_0 = _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(store0));
@@ -500,16 +521,13 @@ pub mod sse_support {
                     let mut store0 = zeros;
                     let mut store1 = zeros;
 
-                    let mut r = -half_kernel;
-                    while r <= half_kernel {
-                        let weight = *kernel.get_unchecked((r + half_kernel) as usize);
+                    let mut j = 0usize;
+                    while j < current_filter.size {
+                        let weight = *filter_weights.get_unchecked(j);
                         let f_weight = _mm_set1_ps(weight);
 
-                        let py = std::cmp::min(
-                            std::cmp::max(y as i64 + r as i64, 0),
-                            (height - 1) as i64,
-                        );
-                        let y_src_shift = py as usize * src_stride as usize;
+                        let py = filter_start + j;
+                        let y_src_shift = py * src_stride as usize;
                         let s_ptr = src.as_ptr().add(y_src_shift + cx);
                         let pixels_u8 = _mm_loadu_si64(s_ptr);
                         let pixels_u16 = _mm_unpacklo_epi8(pixels_u8, zeros_si);
@@ -518,7 +536,7 @@ pub mod sse_support {
                         let lo_hi = _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixels_u16, zeros_si));
                         store1 = _mm_prefer_fma_ps(store1, lo_hi, f_weight);
 
-                        r += 1;
+                        j += 1;
                     }
 
                     let store_0 = _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(store0));
@@ -537,21 +555,18 @@ pub mod sse_support {
                 while cx + 4 < total_length {
                     let mut store0 = zeros;
 
-                    let mut r = -half_kernel;
-                    while r <= half_kernel {
-                        let weight = *kernel.get_unchecked((r + half_kernel) as usize);
+                    let mut j = 0usize;
+                    while j < current_filter.size {
+                        let weight = *filter_weights.get_unchecked(j);
                         let f_weight = _mm_set1_ps(weight);
 
-                        let py = std::cmp::min(
-                            std::cmp::max(y as i64 + r as i64, 0),
-                            (height - 1) as i64,
-                        );
-                        let y_src_shift = py as usize * src_stride as usize;
+                        let py = filter_start + j;
+                        let y_src_shift = py * src_stride as usize;
                         let s_ptr = src.as_ptr().add(y_src_shift + cx);
                         let lo_lo = load_u8_f32_fast::<4>(s_ptr);
                         store0 = _mm_prefer_fma_ps(store0, lo_lo, f_weight);
 
-                        r += 1;
+                        j += 1;
                     }
 
                     let store_0 = _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(store0));
@@ -570,22 +585,19 @@ pub mod sse_support {
                 while cx < total_length {
                     let mut store0 = zeros;
 
-                    let mut r = -half_kernel;
-                    while r <= half_kernel {
-                        let weight = *kernel.get_unchecked((r + half_kernel) as usize);
+                    let mut j = 0usize;
+                    while j < current_filter.size {
+                        let weight = *filter_weights.get_unchecked(j);
                         let f_weight = _mm_set1_ps(weight);
 
-                        let py = std::cmp::min(
-                            std::cmp::max(y as i64 + r as i64, 0),
-                            (height - 1) as i64,
-                        );
-                        let y_src_shift = py as usize * src_stride as usize;
+                        let py = filter_start + j;
+                        let y_src_shift = py * src_stride as usize;
                         let s_ptr = src.as_ptr().add(y_src_shift + cx);
                         let pixels_u32 = load_u8_u32_one(s_ptr);
                         let lo_lo = _mm_cvtepi32_ps(pixels_u32);
                         store0 = _mm_prefer_fma_ps(store0, lo_lo, f_weight);
 
-                        r += 1;
+                        j += 1;
                     }
 
                     let store_0 = _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(store0));
@@ -610,11 +622,11 @@ pub mod sse_support {
     any(target_arch = "x86_64", target_arch = "x86"),
     target_feature = "sse4.1"
 )))]
-pub mod sse_support {
+pub mod sse_filter {
     use crate::unsafe_slice::UnsafeSlice;
 
     #[allow(dead_code)]
-    pub fn gaussian_blur_vertical_pass_impl_sse(
+    pub fn gaussian_blur_vertical_pass_filter_sse(
         _src: &Vec<u8>,
         _src_stride: u32,
         _unsafe_dst: &UnsafeSlice<u8>,
@@ -629,7 +641,7 @@ pub mod sse_support {
     }
 
     #[allow(dead_code)]
-    pub fn gaussian_blur_horizontal_pass_impl_sse(
+    pub fn gaussian_blur_horizontal_pass_filter_sse(
         _src: &Vec<u8>,
         _src_stride: u32,
         _unsafe_dst: &UnsafeSlice<u8>,
