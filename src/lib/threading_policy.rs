@@ -1,8 +1,12 @@
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+/// Declares thread policy usage
 pub enum ThreadingPolicy {
+    /// Will use only one thread, current is preferred
     Single,
+    /// Computes adaptive thread count between 1...12 for given image bounds
     Adaptive,
+    /// Spawn provided threads count
     Fixed(usize),
 }
 

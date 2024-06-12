@@ -28,15 +28,15 @@
 use num_traits::cast::FromPrimitive;
 use rayon::ThreadPool;
 
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use crate::box_blur_neon::neon_support;
 #[cfg(all(
     any(target_arch = "x86_64", target_arch = "x86"),
     target_feature = "sse4.1"
 ))]
-use crate::box_blur_sse::sse_support;
+use crate::r#box::box_blur_sse::sse_support;
 use crate::channels_configuration::FastBlurChannels;
 use crate::mul_table::{MUL_TABLE_TWICE_RAD, SHR_TABLE_TWICE_RAD};
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+use crate::r#box::box_blur_neon::neon_support;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::ThreadingPolicy;
 

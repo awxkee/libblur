@@ -37,6 +37,10 @@ use crate::gaussian::gaussian_neon_filter::neon_gaussian_filter::gaussian_blur_h
 use crate::gaussian::gaussian_sse::sse_support::gaussian_blur_horizontal_pass_impl_sse;
 use crate::unsafe_slice::UnsafeSlice;
 use num_traits::FromPrimitive;
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+))]
 use crate::gaussian::gaussian_sse_filter::sse_filter::gaussian_blur_horizontal_pass_filter_sse;
 
 pub(crate) fn gaussian_blur_horizontal_pass_impl<
