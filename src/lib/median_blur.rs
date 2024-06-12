@@ -58,19 +58,20 @@ fn add_rgb_pixels<const CHANNEL_CONFIGURATION: usize>(
             continue;
         }
         let y_shift = i as usize * src_stride as usize;
-        let v0 = unsafe { *src.get_unchecked(y_shift + px) };
+        let bytes_offset = y_shift + px;
+        let v0 = unsafe { *src.get_unchecked(bytes_offset) };
         unsafe {
             let k = histogram.r.get_unchecked_mut(usize::from(v0));
             let x = *k + 1;
             *k = x;
         }
-        let v1 = unsafe { *src.get_unchecked(y_shift + px + 1) };
+        let v1 = unsafe { *src.get_unchecked(bytes_offset + 1) };
         unsafe {
             let k = histogram.g.get_unchecked_mut(usize::from(v1));
             let x = *k + 1;
             *k = x;
         }
-        let v2 = unsafe { *src.get_unchecked(y_shift + px + 2) };
+        let v2 = unsafe { *src.get_unchecked(bytes_offset + 2) };
         unsafe {
             let k = histogram.b.get_unchecked_mut(usize::from(v2));
             let x = *k + 1;
@@ -78,7 +79,7 @@ fn add_rgb_pixels<const CHANNEL_CONFIGURATION: usize>(
         }
         if CHANNEL_CONFIGURATION == 4 {
             unsafe {
-                let v3 = *src.get_unchecked(y_shift + px + 3);
+                let v3 = *src.get_unchecked(bytes_offset + 3);
                 let k = histogram.a.get_unchecked_mut(usize::from(v3));
                 let x = *k + 1;
                 *k = x;
@@ -109,26 +110,27 @@ fn remove_rgb_pixels<const CHANNELS_CONFIGURATION: usize>(
             continue;
         }
         let y_shift = i as usize * src_stride as usize;
-        let v0 = unsafe { *src.get_unchecked(y_shift + px) };
+        let bytes_offset = y_shift + px;
+        let v0 = unsafe { *src.get_unchecked(bytes_offset) };
         unsafe {
             let k = histogram.r.get_unchecked_mut(usize::from(v0));
             let x = *k - 1;
             *k = x;
         }
-        let v1 = unsafe { *src.get_unchecked(y_shift + px + 1) };
+        let v1 = unsafe { *src.get_unchecked(bytes_offset + 1) };
         unsafe {
             let k = histogram.g.get_unchecked_mut(usize::from(v1));
             let x = *k - 1;
             *k = x;
         }
-        let v2 = unsafe { *src.get_unchecked(y_shift + px + 2) };
+        let v2 = unsafe { *src.get_unchecked(bytes_offset + 2) };
         unsafe {
             let k = histogram.b.get_unchecked_mut(usize::from(v2));
             let x = *k - 1;
             *k = x;
         }
         if CHANNELS_CONFIGURATION == 4 {
-            let v3 = unsafe { *src.get_unchecked(y_shift + px + 3) };
+            let v3 = unsafe { *src.get_unchecked(bytes_offset + 3) };
             let k = unsafe { histogram.a.get_unchecked_mut(usize::from(v3)) };
             let x = *k - 1;
             *k = x;
@@ -231,41 +233,34 @@ fn median_blur_impl<const CHANNELS_CONFIGURATION: usize>(
 
             if histogram.n > 0 {
                 unsafe {
+                    let bytes_offset = y_dst_offset + px;
                     unsafe_dst.write(
-                        y_dst_offset + px,
+                        bytes_offset,
                         median_filter(histogram.r, histogram.n) as u8,
                     );
                     unsafe_dst.write(
-                        y_dst_offset + px + 1,
+                        bytes_offset + 1,
                         median_filter(histogram.g, histogram.n) as u8,
                     );
                     unsafe_dst.write(
-                        y_dst_offset + px + 2,
+                        bytes_offset + 2,
                         median_filter(histogram.b, histogram.n) as u8,
                     );
                     if CHANNELS_CONFIGURATION == 4 {
                         unsafe_dst.write(
-                            y_dst_offset + px + 3,
+                            bytes_offset + 3,
                             median_filter(histogram.a, histogram.n) as u8,
                         );
                     }
                 }
             } else {
                 unsafe {
-                    unsafe_dst.write(y_dst_offset + px, *src.get_unchecked(y_src_offset + px));
-                    unsafe_dst.write(
-                        y_dst_offset + px + 1,
-                        *src.get_unchecked(y_src_offset + px + 1),
-                    );
-                    unsafe_dst.write(
-                        y_dst_offset + px + 2,
-                        *src.get_unchecked(y_src_offset + px + 2),
-                    );
+                    let bytes_offset = y_dst_offset + px;
+                    unsafe_dst.write(bytes_offset, *src.get_unchecked(y_src_offset + px));
+                    unsafe_dst.write(bytes_offset + 1, *src.get_unchecked(bytes_offset + 1));
+                    unsafe_dst.write(bytes_offset + 2, *src.get_unchecked(bytes_offset + 2));
                     if CHANNELS_CONFIGURATION == 4 {
-                        unsafe_dst.write(
-                            y_dst_offset + px + 3,
-                            *src.get_unchecked(y_src_offset + px + 3),
-                        );
+                        unsafe_dst.write(bytes_offset + 3, *src.get_unchecked(bytes_offset + 3));
                     }
                 }
             }
@@ -273,8 +268,6 @@ fn median_blur_impl<const CHANNELS_CONFIGURATION: usize>(
     }
 }
 
-#[no_mangle]
-#[allow(dead_code)]
 pub fn median_blur(
     src: &[u8],
     src_stride: u32,

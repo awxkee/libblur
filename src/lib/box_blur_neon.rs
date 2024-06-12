@@ -113,13 +113,19 @@ pub mod neon_support {
                 let px_16 = unsafe { vqmovn_u32(scale_store) };
                 let px_8 = unsafe { vqmovn_u16(vcombine_u16(px_16, px_16)) };
                 let pixel = unsafe { vget_lane_u32::<0>(vreinterpret_u32_u8(px_8)) };
-                let bits = pixel.to_le_bytes();
-                unsafe {
-                    unsafe_dst.write(y_dst_shift + px, bits[0]);
-                    unsafe_dst.write(y_dst_shift + px + 1, bits[1]);
-                    unsafe_dst.write(y_dst_shift + px + 2, bits[2]);
-                    if CHANNEL_CONFIGURATION == 4 {
-                        unsafe_dst.write(y_dst_shift + px + 3, bits[3]);
+
+                let bytes_offset = y_dst_shift + px;
+                if CHANNEL_CONFIGURATION == 4 {
+                    unsafe {
+                        let dst_ptr = unsafe_dst.slice.as_ptr().add(bytes_offset) as *mut u32;
+                        *dst_ptr = pixel;
+                    }
+                } else {
+                    let bits = pixel.to_le_bytes();
+                    unsafe {
+                        unsafe_dst.write(bytes_offset, bits[0]);
+                        unsafe_dst.write(bytes_offset + 1, bits[1]);
+                        unsafe_dst.write(bytes_offset + 2, bits[2]);
                     }
                 }
             }
@@ -311,18 +317,22 @@ pub mod neon_support {
                     store = unsafe { vmulq_u32(store, eraser) };
                 }
 
-                let scale_store =
-                    unsafe { vshlq_u32(vmulq_u32(store, v_mul_value), v_shr_value) };
+                let scale_store = unsafe { vshlq_u32(vmulq_u32(store, v_mul_value), v_shr_value) };
                 let px_16 = unsafe { vqmovn_u32(scale_store) };
                 let px_8 = unsafe { vqmovn_u16(vcombine_u16(px_16, px_16)) };
                 let pixel = unsafe { vget_lane_u32::<0>(vreinterpret_u32_u8(px_8)) };
-                let bits = pixel.to_le_bytes();
-                unsafe {
-                    unsafe_dst.write(y_dst_shift + px, bits[0]);
-                    unsafe_dst.write(y_dst_shift + px + 1, bits[1]);
-                    unsafe_dst.write(y_dst_shift + px + 2, bits[2]);
-                    if CHANNEL_CONFIGURATION == 4 {
-                        unsafe_dst.write(y_dst_shift + px + 3, bits[3]);
+                let bytes_offset = y_dst_shift + px;
+                if CHANNEL_CONFIGURATION == 4 {
+                    unsafe {
+                        let dst_ptr = unsafe_dst.slice.as_ptr().add(bytes_offset) as *mut u32;
+                        *dst_ptr = pixel;
+                    }
+                } else {
+                    let bits = pixel.to_le_bytes();
+                    unsafe {
+                        unsafe_dst.write(bytes_offset, bits[0]);
+                        unsafe_dst.write(bytes_offset + 1, bits[1]);
+                        unsafe_dst.write(bytes_offset + 2, bits[2]);
                     }
                 }
             }

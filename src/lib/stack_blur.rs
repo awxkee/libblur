@@ -200,7 +200,9 @@ fn stack_blur_pass<const COMPONENTS: usize>(
                 sum_out_r -= stack.r;
                 sum_out_g -= stack.g;
                 sum_out_b -= stack.b;
-                sum_out_a -= stack.a;
+                if COMPONENTS == 4 {
+                    sum_out_a -= stack.a;
+                }
 
                 if xp < wm {
                     src_ptr += COMPONENTS;
@@ -232,7 +234,9 @@ fn stack_blur_pass<const COMPONENTS: usize>(
                 sum_r += sum_in_r;
                 sum_g += sum_in_g;
                 sum_b += sum_in_b;
-                sum_a += sum_in_a;
+                if COMPONENTS == 4 {
+                    sum_a += sum_in_a;
+                }
 
                 sp += 1;
                 if sp >= div {
@@ -243,11 +247,15 @@ fn stack_blur_pass<const COMPONENTS: usize>(
                 sum_out_r += stack.r;
                 sum_out_g += stack.g;
                 sum_out_b += stack.b;
-                sum_out_a += stack.a;
+                if COMPONENTS == 4 {
+                    sum_out_a += stack.a;
+                }
                 sum_in_r -= stack.r;
                 sum_in_g -= stack.g;
                 sum_in_b -= stack.b;
-                sum_in_a -= stack.a;
+                if COMPONENTS == 4 {
+                    sum_in_a -= stack.a;
+                }
             }
         }
     } else if pass == StackBlurPass::VERTICAL {
