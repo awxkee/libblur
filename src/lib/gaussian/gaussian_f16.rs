@@ -163,10 +163,10 @@ mod gaussian_f16_impl {
 pub(crate) mod gaussian_f16 {
     use rayon::ThreadPool;
 
-    use crate::gaussian_f16::gaussian_f16_impl;
-    use crate::gaussian_helper::get_gaussian_kernel_1d;
     use crate::unsafe_slice::UnsafeSlice;
     use crate::FastBlurChannels;
+    use crate::gaussian::gaussian_f16::gaussian_f16_impl;
+    use crate::gaussian::gaussian_kernel::get_gaussian_kernel_1d;
 
     fn gaussian_blur_horizontal_pass_f16(
         src: &[u16],

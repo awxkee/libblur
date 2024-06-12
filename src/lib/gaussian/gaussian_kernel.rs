@@ -25,7 +25,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-pub fn get_gaussian_kernel_1d(width: u32, sigma: f32) -> Vec<f32> {
+pub(crate) fn get_gaussian_kernel_1d(width: u32, sigma: f32) -> Vec<f32> {
     let mut sum_norm: f32 = 0f32;
     let mut kernel: Vec<f32> = Vec::with_capacity(width as usize);
     let scale = 1f32 / (f32::sqrt(2f32 * std::f32::consts::PI) * sigma);

@@ -1,6 +1,6 @@
 use image::io::Reader as ImageReader;
 use image::{EncodableLayout, GenericImageView};
-use libblur::{FastBlurChannels, ThreadingPolicy};
+use libblur::{EdgeMode, FastBlurChannels, ThreadingPolicy};
 use std::time::Instant;
 
 #[allow(dead_code)]
@@ -26,6 +26,7 @@ fn main() {
         .unwrap();
     let dimensions = img.dimensions();
     println!("dimensions {:?}", img.dimensions());
+    println!("type {:?}", img.color());
 
     println!("{:?}", img.color());
     let src_bytes = img.as_bytes();
@@ -56,19 +57,7 @@ fn main() {
     //     ThreadingPolicy::Adaptive,
     // );
 
-    libblur::fast_gaussian_next(
-        &mut dst_bytes,
-        stride as u32,
-        dimensions.0,
-        dimensions.1,
-        77,
-        FastBlurChannels::Channels3,
-        ThreadingPolicy::Adaptive,
-    );
-
-    // libblur::box_blur(
-    //     &bytes,
-    //     stride as u32,
+    // libblur::fast_gaussian_next(
     //     &mut dst_bytes,
     //     stride as u32,
     //     dimensions.0,
@@ -77,20 +66,33 @@ fn main() {
     //     FastBlurChannels::Channels3,
     //     ThreadingPolicy::Adaptive,
     // );
-    bytes = dst_bytes;
-    // libblur::gaussian_blur(
-    //     &bytes,
-    //     stride as u32,
-    //     &mut dst_bytes,
-    //     stride as u32,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     75 * 2 + 1,
-    //     (75f32 * 2f32 + 1f32) / 6f32,
-    //     FastBlurChannels::Channels4,
-    //     ThreadingPolicy::Adaptive,
-    // );
+
+    // // libblur::box_blur(
+    // //     &bytes,
+    // //     stride as u32,
+    // //     &mut dst_bytes,
+    // //     stride as u32,
+    // //     dimensions.0,
+    // //     dimensions.1,
+    // //     77,
+    // //     FastBlurChannels::Channels3,
+    // //     ThreadingPolicy::Adaptive,
+    // // );
     // bytes = dst_bytes;
+    libblur::gaussian_blur(
+        &bytes,
+        stride as u32,
+        &mut dst_bytes,
+        stride as u32,
+        dimensions.0,
+        dimensions.1,
+        55 * 2 + 1,
+        (55f32 * 2f32 + 1f32) / 6f32,
+        FastBlurChannels::Channels3,
+        EdgeMode::KernelClip,
+        ThreadingPolicy::Adaptive,
+    );
+    bytes = dst_bytes;
     // libblur::median_blur(
     //     &bytes,
     //     stride as u32,

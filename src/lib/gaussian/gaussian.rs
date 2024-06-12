@@ -25,121 +25,24 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::channels_configuration::FastBlurChannels;
-use crate::gaussian_f16::gaussian_f16;
-use crate::gaussian_helper::get_gaussian_kernel_1d;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use crate::gaussian_neon::neon_support;
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "sse4.1"
-))]
-use crate::gaussian_sse::sse_support;
-use crate::unsafe_slice::UnsafeSlice;
-use crate::ThreadingPolicy;
 use num_traits::cast::FromPrimitive;
 use rayon::ThreadPool;
 
-fn gaussian_blur_horizontal_pass_impl<
-    T: FromPrimitive + Default + Into<f32> + Send + Sync,
-    const CHANNEL_CONFIGURATION: usize,
->(
-    src: &[T],
-    src_stride: u32,
-    unsafe_dst: &UnsafeSlice<T>,
-    dst_stride: u32,
-    width: u32,
-    kernel_size: usize,
-    kernel: &Vec<f32>,
-    start_y: u32,
-    end_y: u32,
-) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy,
-{
-    if std::any::type_name::<T>() == "u8" {
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-        {
-            let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
-            let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
-            neon_support::gaussian_blur_horizontal_pass_neon::<CHANNEL_CONFIGURATION>(
-                u8_slice,
-                src_stride,
-                slice,
-                dst_stride,
-                width,
-                kernel_size,
-                kernel,
-                start_y,
-                end_y,
-            );
-            return;
-        }
-        #[cfg(all(
-            any(target_arch = "x86_64", target_arch = "x86"),
-            target_feature = "sse4.1"
-        ))]
-        {
-            let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
-            let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
-            sse_support::gaussian_blur_horizontal_pass_impl_sse::<CHANNEL_CONFIGURATION>(
-                u8_slice,
-                src_stride,
-                slice,
-                dst_stride,
-                width,
-                kernel_size,
-                kernel,
-                start_y,
-                end_y,
-            );
-            return;
-        }
-    }
-    let half_kernel = (kernel_size / 2) as i32;
-    for y in start_y..end_y {
-        let y_src_shift = y as usize * src_stride as usize;
-        let y_dst_shift = y as usize * dst_stride as usize;
-        for x in 0..width {
-            let mut weights: [f32; 4] = [0f32; 4];
-            for r in -half_kernel..=half_kernel {
-                let px = std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                    as usize
-                    * CHANNEL_CONFIGURATION;
-                let weight = unsafe { *kernel.get_unchecked((r + half_kernel) as usize) };
-                weights[0] += (unsafe { *src.get_unchecked(y_src_shift + px) }.into()) * weight;
-                weights[1] += (unsafe { *src.get_unchecked(y_src_shift + px + 1) }.into()) * weight;
-                weights[2] += (unsafe { *src.get_unchecked(y_src_shift + px + 2) }.into()) * weight;
-                if CHANNEL_CONFIGURATION == 4 {
-                    weights[3] +=
-                        (unsafe { *src.get_unchecked(y_src_shift + px + 3) }.into()) * weight;
-                }
-            }
-
-            let px = x as usize * CHANNEL_CONFIGURATION;
-
-            unsafe {
-                unsafe_dst.write(
-                    y_dst_shift + px,
-                    T::from_f32(weights[0]).unwrap_or_default(),
-                );
-                unsafe_dst.write(
-                    y_dst_shift + px + 1,
-                    T::from_f32(weights[1]).unwrap_or_default(),
-                );
-                unsafe_dst.write(
-                    y_dst_shift + px + 2,
-                    T::from_f32(weights[2]).unwrap_or_default(),
-                );
-                if CHANNEL_CONFIGURATION == 4 {
-                    unsafe_dst.write(
-                        y_dst_shift + px + 3,
-                        T::from_f32(weights[3]).unwrap_or_default(),
-                    );
-                }
-            }
-        }
-    }
-}
+use crate::channels_configuration::FastBlurChannels;
+use crate::edge_mode::EdgeMode;
+use crate::gaussian::gaussian_kernel_filter_dispatch::{
+    gaussian_blur_horizontal_pass_edge_clip_dispatch,
+    gaussian_blur_vertical_pass_edge_clip_dispatch,
+};
+use crate::gaussian::gaussian_f16::gaussian_f16::gaussian_blur_impl_f16;
+use crate::gaussian::gaussian_filter::create_filter;
+use crate::gaussian::gaussian_kernel::get_gaussian_kernel_1d;
+use crate::gaussian::gaussian_horizontal::gaussian_blur_horizontal_pass_impl;
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+use crate::gaussian::gaussian_neon::neon_support;
+use crate::gaussian::gaussian_vertical::gaussian_blur_vertical_pass_c_impl;
+use crate::unsafe_slice::UnsafeSlice;
+use crate::ThreadingPolicy;
 
 fn gaussian_blur_horizontal_pass<
     T: FromPrimitive + Default + Into<f32> + Send + Sync,
@@ -183,49 +86,6 @@ fn gaussian_blur_horizontal_pass<
             });
         }
     });
-}
-
-#[inline]
-pub fn gaussian_vertical_row<
-    T: FromPrimitive + Default + Into<f32> + Send + Sync + Copy,
-    const ROW_SIZE: usize,
->(
-    src: &[T],
-    src_stride: u32,
-    unsafe_dst: &UnsafeSlice<T>,
-    dst_stride: u32,
-    _: u32,
-    height: u32,
-    kernel_size: usize,
-    kernel: &[f32],
-    x: u32,
-    y: u32,
-) {
-    let half_kernel = (kernel_size / 2) as i32;
-    let mut weights: [f32; ROW_SIZE] = [0f32; ROW_SIZE];
-    for r in -half_kernel..=half_kernel {
-        let py = std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
-        let y_src_shift = py as usize * src_stride as usize;
-        let weight = unsafe { *kernel.get_unchecked((r + half_kernel) as usize) };
-        for i in 0..ROW_SIZE {
-            let px = x as usize + i;
-            unsafe {
-                let v = *src.get_unchecked(y_src_shift + px);
-                let w0 = weights.get_unchecked_mut(i);
-                *w0 += (*w0).mul_add(v.into(), weight);
-            }
-        }
-    }
-    let y_dst_shift = y as usize * dst_stride as usize;
-    unsafe {
-        for i in 0..ROW_SIZE {
-            let px = x as usize + i;
-            unsafe_dst.write(
-                y_dst_shift + px,
-                T::from_f32((*weights.get_unchecked(i)).round()).unwrap_or_default(),
-            );
-        }
-    }
 }
 
 fn gaussian_blur_vertical_pass_impl<
@@ -286,90 +146,18 @@ fn gaussian_blur_vertical_pass_impl<
             return;
         }
     }
-    let total_length = width as usize * std::mem::size_of::<T>() * CHANNEL_CONFIGURATION;
-    for y in start_y..end_y {
-        let mut _cx = 0usize;
-
-        while _cx + 32 < total_length {
-            gaussian_vertical_row::<T, 32>(
-                src,
-                src_stride,
-                unsafe_dst,
-                dst_stride,
-                width,
-                height,
-                kernel_size,
-                kernel,
-                _cx as u32,
-                y,
-            );
-            _cx += 32;
-        }
-
-        while _cx + 16 < total_length {
-            gaussian_vertical_row::<T, 16>(
-                src,
-                src_stride,
-                unsafe_dst,
-                dst_stride,
-                width,
-                height,
-                kernel_size,
-                kernel,
-                _cx as u32,
-                y,
-            );
-            _cx += 16;
-        }
-
-        while _cx + 8 < total_length {
-            gaussian_vertical_row::<T, 8>(
-                src,
-                src_stride,
-                unsafe_dst,
-                dst_stride,
-                width,
-                height,
-                kernel_size,
-                kernel,
-                _cx as u32,
-                y,
-            );
-            _cx += 8;
-        }
-
-        while _cx + 4 < total_length {
-            gaussian_vertical_row::<T, 4>(
-                src,
-                src_stride,
-                unsafe_dst,
-                dst_stride,
-                width,
-                height,
-                kernel_size,
-                kernel,
-                _cx as u32,
-                y,
-            );
-            _cx += 4;
-        }
-
-        while _cx < total_length {
-            gaussian_vertical_row::<T, 1>(
-                src,
-                src_stride,
-                unsafe_dst,
-                dst_stride,
-                width,
-                height,
-                kernel_size,
-                kernel,
-                _cx as u32,
-                y,
-            );
-            _cx += 1;
-        }
-    }
+    gaussian_blur_vertical_pass_c_impl::<T, CHANNEL_CONFIGURATION>(
+        src,
+        src_stride,
+        unsafe_dst,
+        dst_stride,
+        width,
+        height,
+        kernel_size,
+        kernel,
+        start_y,
+        end_y,
+    );
 }
 
 fn gaussian_blur_vertical_pass<
@@ -431,10 +219,10 @@ fn gaussian_blur_impl<
     kernel_size: u32,
     sigma: f32,
     threading_policy: ThreadingPolicy,
+    edge_mode: EdgeMode,
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
-    let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
     if kernel_size % 2 == 0 {
         panic!("kernel size must be odd");
     }
@@ -447,30 +235,61 @@ fn gaussian_blur_impl<
         .build()
         .unwrap();
 
-    gaussian_blur_horizontal_pass::<T, CHANNEL_CONFIGURATION>(
-        &src,
-        src_stride,
-        &mut transient,
-        dst_stride,
-        width,
-        height,
-        kernel.len(),
-        &kernel,
-        &pool,
-        thread_count,
-    );
-    gaussian_blur_vertical_pass::<T, CHANNEL_CONFIGURATION>(
-        &transient,
-        dst_stride,
-        dst,
-        dst_stride,
-        width,
-        height,
-        kernel.len(),
-        &kernel,
-        &pool,
-        thread_count,
-    );
+    match edge_mode {
+        EdgeMode::Clamp => {
+            let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
+            gaussian_blur_horizontal_pass::<T, CHANNEL_CONFIGURATION>(
+                &src,
+                src_stride,
+                &mut transient,
+                dst_stride,
+                width,
+                height,
+                kernel.len(),
+                &kernel,
+                &pool,
+                thread_count,
+            );
+            gaussian_blur_vertical_pass::<T, CHANNEL_CONFIGURATION>(
+                &transient,
+                dst_stride,
+                dst,
+                dst_stride,
+                width,
+                height,
+                kernel.len(),
+                &kernel,
+                &pool,
+                thread_count,
+            );
+        }
+        EdgeMode::KernelClip => {
+            let horizontal_filter = create_filter(width as usize, kernel_size, sigma);
+            let vertical_filter = create_filter(height as usize, kernel_size, sigma);
+            gaussian_blur_horizontal_pass_edge_clip_dispatch::<T, CHANNEL_CONFIGURATION>(
+                &src,
+                dst_stride,
+                &mut transient,
+                dst_stride,
+                width,
+                height,
+                &horizontal_filter,
+                &pool,
+                thread_count,
+            );
+            gaussian_blur_vertical_pass_edge_clip_dispatch::<T, CHANNEL_CONFIGURATION>(
+                &transient,
+                dst_stride,
+                dst,
+                dst_stride,
+                width,
+                height,
+                &vertical_filter,
+                &pool,
+                thread_count,
+            );
+        }
+    }
 }
 
 /// Performs gaussian blur on the image.
@@ -487,6 +306,7 @@ fn gaussian_blur_impl<
 /// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted.
 /// * `sigma` - Sigma for a gaussian kernel, corresponds to kernel flattening level. Default - kernel_size / 6
 /// * `channels` - Count of channels in the image
+/// * `threading_policy` - Threading policy according to *ThreadingPolicy*
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
@@ -500,6 +320,7 @@ pub fn gaussian_blur(
     kernel_size: u32,
     sigma: f32,
     channels: FastBlurChannels,
+    edge_mode: EdgeMode,
     threading_policy: ThreadingPolicy,
 ) {
     match channels {
@@ -514,6 +335,7 @@ pub fn gaussian_blur(
                 kernel_size,
                 sigma,
                 threading_policy,
+                edge_mode,
             );
         }
         FastBlurChannels::Channels4 => {
@@ -527,6 +349,7 @@ pub fn gaussian_blur(
                 kernel_size,
                 sigma,
                 threading_policy,
+                edge_mode,
             );
         }
     }
@@ -546,6 +369,7 @@ pub fn gaussian_blur(
 /// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted.
 /// * `sigma` - Sigma for a gaussian kernel, corresponds to kernel flattening level. Default - kernel_size / 6
 /// * `channels` - Count of channels in the image
+/// * `threading_policy` - Threading policy according to *ThreadingPolicy*
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
@@ -573,6 +397,7 @@ pub fn gaussian_blur_u16(
                 kernel_size,
                 sigma,
                 threading_policy,
+                EdgeMode::Clamp,
             );
         }
         FastBlurChannels::Channels4 => {
@@ -586,6 +411,7 @@ pub fn gaussian_blur_u16(
                 kernel_size,
                 sigma,
                 threading_policy,
+                EdgeMode::Clamp,
             );
         }
     }
@@ -605,6 +431,7 @@ pub fn gaussian_blur_u16(
 /// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted.
 /// * `sigma` - Sigma for a gaussian kernel, corresponds to kernel flattening level. Default - kernel_size / 6
 /// * `channels` - Count of channels in the image
+/// * `threading_policy` - Threading policy according to *ThreadingPolicy*
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
@@ -632,6 +459,7 @@ pub fn gaussian_blur_f32(
                 kernel_size,
                 sigma,
                 threading_policy,
+                EdgeMode::Clamp,
             );
         }
         FastBlurChannels::Channels4 => {
@@ -645,6 +473,7 @@ pub fn gaussian_blur_f32(
                 kernel_size,
                 sigma,
                 threading_policy,
+                EdgeMode::Clamp,
             );
         }
     }
@@ -678,7 +507,7 @@ pub fn gaussian_blur_f16(
     sigma: f32,
     channels: FastBlurChannels,
 ) {
-    gaussian_f16::gaussian_blur_impl_f16(
+    gaussian_blur_impl_f16(
         src,
         src_stride,
         dst,

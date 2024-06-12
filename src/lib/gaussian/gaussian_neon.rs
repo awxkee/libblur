@@ -25,8 +25,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#[cfg(any(target_arch = "arm", target_arch = "aarch64"))]
-#[cfg(target_feature = "neon")]
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 pub mod neon_support {
     use crate::neon_utils::neon_utils::{
         load_u8_u16_x2_fast, load_u8_u32_fast, load_u8_u32_one, prefer_vfma_f32, prefer_vfmaq_f32,
@@ -133,6 +132,51 @@ pub mod neon_support {
                         store_1 = prefer_vfmaq_f32(store_1, pixel_colors_f32_1, f_weight);
 
                         r += 4;
+                    }
+                }
+
+                unsafe {
+                    while r + 2 <= half_kernel
+                        && x as i64 + r as i64 + (if CHANNEL_CONFIGURATION == 4 { 2 } else { 3 })
+                            < width as i64
+                    {
+                        let px = std::cmp::min(
+                            std::cmp::max(x as i64 + r as i64, 0),
+                            (width - 1) as i64,
+                        ) as usize
+                            * CHANNEL_CONFIGURATION;
+                        let s_ptr = src.as_ptr().add(y_src_shift + px);
+                        let mut pixel_colors_0: uint8x8_t = vld1_u8(s_ptr);
+                        let mut pixel_colors_1: uint8x8_t = vld1_u8(s_ptr.add(src_stride as usize));
+                        if CHANNEL_CONFIGURATION == 3 {
+                            pixel_colors_0 = vtbl1_u8(pixel_colors_0, shuffle_1);
+                            pixel_colors_1 = vtbl1_u8(pixel_colors_1, shuffle_1);
+                        }
+                        let pixel_colors_u16_0 = vmovl_u8(pixel_colors_0);
+                        let mut pixel_colors_u32_0 = vmovl_u16(vget_low_u16(pixel_colors_u16_0));
+                        let mut pixel_colors_f32_0 = vcvtq_f32_u32(pixel_colors_u32_0);
+
+                        let pixel_colors_u16_1 = vmovl_u8(pixel_colors_1);
+                        let mut pixel_colors_u32_1 = vmovl_u16(vget_low_u16(pixel_colors_u16_1));
+                        let mut pixel_colors_f32_1 = vcvtq_f32_u32(pixel_colors_u32_1);
+
+                        let mut weight = *kernel.get_unchecked((r + half_kernel) as usize);
+                        let mut f_weight: float32x4_t = vdupq_n_f32(weight);
+                        store_0 = prefer_vfmaq_f32(store_0, pixel_colors_f32_0, f_weight);
+                        store_1 = prefer_vfmaq_f32(store_1, pixel_colors_f32_1, f_weight);
+
+                        pixel_colors_u32_0 = vmovl_high_u16(pixel_colors_u16_0);
+                        pixel_colors_f32_0 = vcvtq_f32_u32(pixel_colors_u32_0);
+
+                        pixel_colors_u32_1 = vmovl_high_u16(pixel_colors_u16_1);
+                        pixel_colors_f32_1 = vcvtq_f32_u32(pixel_colors_u32_1);
+
+                        weight = *kernel.get_unchecked((r + half_kernel + 1) as usize);
+                        f_weight = vdupq_n_f32(weight);
+                        store_0 = prefer_vfmaq_f32(store_0, pixel_colors_f32_0, f_weight);
+                        store_1 = prefer_vfmaq_f32(store_1, pixel_colors_f32_1, f_weight);
+
+                        r += 2;
                     }
                 }
 
@@ -323,7 +367,7 @@ pub mod neon_support {
 
         let zeros = unsafe { vdupq_n_f32(0f32) };
 
-        let total_size = 4usize * width as usize;
+        let total_size = CHANNEL_CONFIGURATION * width as usize;
 
         for y in start_y..end_y {
             let y_dst_shift = y as usize * dst_stride as usize;
