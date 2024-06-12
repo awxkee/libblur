@@ -456,13 +456,22 @@ fn fast_gaussian_next_impl<
     });
 }
 
-/// Fast gaussian approximation.
-/// Results are better than not next and looks awesome.
-/// * `stride` - Lane length, default is width * channels_count if not aligned
-/// * `radius` - Radius more than ~152 is not supported. To use larger radius convert image to f32 and use function for f32
+/// Performs gaussian approximation on the image.
+///
+/// Fast gaussian approximation for u8 image.
+/// This is also a VERY fast approximation, however producing more pleasant results than stack blur, or first level of approximation.
+/// Radius is limited to 212.
+/// Approximation based on binomial filter.
 /// O(1) complexity.
-#[no_mangle]
-#[allow(dead_code)]
+///
+/// * `stride` - Lane length, default is width * channels_count if not aligned
+/// * `width` - Width of the image
+/// * `height` - Height of the image
+/// * `radius` - Radius more than ~152 is not supported. To use larger radius convert image to f32 and use function for f32
+/// * `channels` - Count of channels in the image
+///
+/// # Panics
+/// Panic is stride/width/height/channel configuration do not match provided
 pub fn fast_gaussian_next(
     bytes: &mut [u8],
     stride: u32,
@@ -497,13 +506,22 @@ pub fn fast_gaussian_next(
     }
 }
 
-/// Fast gaussian approximation.
-/// Results are better than not next and looks awesome.
-/// * `stride` - Lane length, default is width * channels_count if not aligned
-/// * `radius` - Radius more than ~152 is not supported. To use larger radius convert image to f32 and use function for f32
+/// Performs gaussian approximation on the image.
+///
+/// Fast gaussian approximation for u16 image.
+/// This is also a VERY fast approximation, however producing more pleasant results than stack blur, or first level of approximation.
+/// Radius is limited to 152.
+/// Approximation based on binomial filter.
 /// O(1) complexity.
-#[no_mangle]
-#[allow(dead_code)]
+///
+/// * `stride` - Lane length, default is width * channels_count if not aligned
+/// * `width` - Width of the image
+/// * `height` - Height of the image
+/// * `radius` - Radius more than ~152 is not supported. To use larger radius convert image to f32 and use function for f32
+/// * `channels` - Count of channels in the image
+///
+/// # Panics
+/// Panic is stride/width/height/channel configuration do not match provided
 pub fn fast_gaussian_next_u16(
     bytes: &mut [u16],
     stride: u32,
@@ -538,13 +556,21 @@ pub fn fast_gaussian_next_u16(
     }
 }
 
-/// Fast gaussian approximation.
-/// Results are better than not next and looks awesome.
-/// * `stride` - Lane length, default is width * channels_count if not aligned
-/// * `radius` - Almost any radius is supported, in real world radius > 300 is too big for this implementation
+/// Performs gaussian approximation on the image.
+///
+/// Fast gaussian approximation for u16 image.
+/// This is also a VERY fast approximation, however producing more pleasant results than stack blur, or first level of approximation.
+/// Approximation based on binomial filter.
 /// O(1) complexity.
-#[no_mangle]
-#[allow(dead_code)]
+///
+/// * `stride` - Lane length, default is width * channels_count if not aligned
+/// * `width` - Width of the image
+/// * `height` - Height of the image
+/// * `radius` - Almost any radius is supported, in real world radius > 300 is too big for this implementation
+/// * `channels` - Count of channels in the image
+///
+/// # Panics
+/// Panic is stride/width/height/channel configuration do not match provided
 pub fn fast_gaussian_next_f32(
     bytes: &mut [f32],
     stride: u32,
@@ -558,13 +584,21 @@ pub fn fast_gaussian_next_f32(
     );
 }
 
-/// Fast gaussian approximation.
-/// Results are better than not next and looks awesome.
-/// * `stride` - Lane length, default is width * channels_count if not aligned
-/// * `radius` - Almost any radius is supported, in real world radius > 300 is too big for this implementation
+/// Performs gaussian approximation on the image.
+///
+/// Fast gaussian approximation for f16 image.
+/// This is also a VERY fast approximation, however producing more pleasant results than stack blur, or first level of approximation.
+/// Approximation based on binomial filter.
 /// O(1) complexity.
-#[no_mangle]
-#[allow(dead_code)]
+///
+/// * `stride` - Lane length, default is width * channels_count if not aligned
+/// * `width` - Width of the image
+/// * `height` - Height of the image
+/// * `radius` - Almost any radius is supported, in real world radius > 300 is too big for this implementation
+/// * `channels` - Count of channels in the image
+///
+/// # Panics
+/// Panic is stride/width/height/channel configuration do not match provided
 pub fn fast_gaussian_next_f16(
     bytes: &mut [u16],
     stride: u32,

@@ -473,13 +473,23 @@ fn gaussian_blur_impl<
     );
 }
 
-/// Regular gaussian kernel based blur. Use when you need a gaussian methods or advanced image signal analysis
+/// Performs gaussian blur on the image.
+///
+/// This performs a gaussian kernel filter on the image producing beautiful looking result.
+/// Preferred if you need to perform an advanced signal analysis after.
+/// O(R) complexity.
+///
 /// # Arguments
 ///
 /// * `stride` - Lane length, default is width * channels_count * size_of(PixelType) if not aligned
+/// * `width` - Width of the image
+/// * `height` - Height of the image
 /// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted.
-#[no_mangle]
-#[allow(dead_code)]
+/// * `sigma` - Sigma for a gaussian kernel, corresponds to kernel flattening level. Default - kernel_size / 6
+/// * `channels` - Count of channels in the image
+///
+/// # Panics
+/// Panic is stride/width/height/channel configuration do not match provided
 pub fn gaussian_blur(
     src: &[u8],
     src_stride: u32,
@@ -522,13 +532,23 @@ pub fn gaussian_blur(
     }
 }
 
-/// Regular gaussian kernel based blur. Use when you need a gaussian methods or advanced image signal analysis
+/// Performs gaussian blur on the image.
+///
+/// This performs a gaussian kernel filter on the image producing beautiful looking result.
+/// Preferred if you need to perform an advanced signal analysis after.
+/// O(R) complexity.
+///
 /// # Arguments
 ///
 /// * `stride` - Lane length, default is width * channels_count if not aligned
+/// * `width` - Width of the image
+/// * `height` - Height of the image
 /// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted.
-#[no_mangle]
-#[allow(dead_code)]
+/// * `sigma` - Sigma for a gaussian kernel, corresponds to kernel flattening level. Default - kernel_size / 6
+/// * `channels` - Count of channels in the image
+///
+/// # Panics
+/// Panic is stride/width/height/channel configuration do not match provided
 pub fn gaussian_blur_u16(
     src: &[u16],
     src_stride: u32,
@@ -571,13 +591,23 @@ pub fn gaussian_blur_u16(
     }
 }
 
-/// Regular gaussian kernel based blur. Use when you need a gaussian methods or advanced image signal analysis
+/// Performs gaussian blur on the image.
+///
+/// This performs a gaussian kernel filter on the image producing beautiful looking result.
+/// Preferred if you need to perform an advanced signal analysis after.
+/// O(R) complexity.
+///
 /// # Arguments
 ///
 /// * `stride` - Lane length, default is width * channels_count if not aligned
+/// * `width` - Width of the image
+/// * `height` - Height of the image
 /// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted.
-#[no_mangle]
-#[allow(dead_code)]
+/// * `sigma` - Sigma for a gaussian kernel, corresponds to kernel flattening level. Default - kernel_size / 6
+/// * `channels` - Count of channels in the image
+///
+/// # Panics
+/// Panic is stride/width/height/channel configuration do not match provided
 pub fn gaussian_blur_f32(
     src: &[f32],
     src_stride: u32,
@@ -620,13 +650,23 @@ pub fn gaussian_blur_f32(
     }
 }
 
-/// Regular gaussian kernel based blur. Use when you need a gaussian methods or advanced image signal analysis
+/// Performs gaussian blur on the image.
+///
+/// This performs a gaussian kernel filter on the image producing beautiful looking result.
+/// Preferred if you need to perform an advanced signal analysis after.
+/// O(R) complexity.
+///
 /// # Arguments
 ///
 /// * `stride` - Lane length, default is width * channels_count if not aligned
+/// * `width` - Width of the image
+/// * `height` - Height of the image
 /// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted.
-#[no_mangle]
-#[allow(dead_code)]
+/// * `sigma` - Sigma for a gaussian kernel, corresponds to kernel flattening level. Default - kernel_size / 6
+/// * `channels` - Count of channels in the image
+///
+/// # Panics
+/// Panic is stride/width/height/channel configuration do not match provided
 pub fn gaussian_blur_f16(
     src: &[u16],
     src_stride: u32,

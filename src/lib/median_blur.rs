@@ -268,6 +268,22 @@ fn median_blur_impl<const CHANNELS_CONFIGURATION: usize>(
     }
 }
 
+/// Performs median blur on the image.
+///
+/// This performs a median kernel filter on the image producing edge preserving blur result.
+/// Preferred if you need to save edges.
+/// O(R) complexity.
+///
+/// # Arguments
+///
+/// * `stride` - Lane length, default is width * channels_count if not aligned
+/// * `width` - Width of the image
+/// * `height` - Height of the image
+/// * `radius` - Radius of kernel
+/// * `channels` - Count of channels in the image
+///
+/// # Panics
+/// Panic is stride/width/height/channel configuration do not match provided
 pub fn median_blur(
     src: &[u8],
     src_stride: u32,
@@ -276,7 +292,7 @@ pub fn median_blur(
     width: u32,
     height: u32,
     radius: u32,
-    median_channels: FastBlurChannels,
+    channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) {
     let unsafe_dst = UnsafeSlice::new(dst);
@@ -293,7 +309,7 @@ pub fn median_blur(
             if i == thread_count - 1 {
                 end_y = height;
             }
-            scope.spawn(move |_| match median_channels {
+            scope.spawn(move |_| match channels {
                 FastBlurChannels::Channels3 => {
                     median_blur_impl::<3>(
                         src,

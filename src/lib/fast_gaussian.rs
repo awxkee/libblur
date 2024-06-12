@@ -397,13 +397,23 @@ fn fast_gaussian_impl<
     });
 }
 
-/// Fast gaussian approximation.
+/// Performs gaussian approximation on the image.
+///
+/// Fast gaussian approximation for u8 image, limited to 319 radius, sometimes on the very bright images may start ringing on a very large radius.
+/// Approximation based on binomial filter. Algorithm is close to stack blur with better results and a little slower speed
+/// Results better than in stack blur however this a little slower.
+/// O(1) complexity.
+///
 /// # Arguments
 ///
 /// * `stride` - Lane length, default is width * channels_count if not aligned
+/// * `width` - Width of the image
+/// * `height` - Height of the image
 /// * `radius` - Radius more than 319 is not supported. To use larger radius convert image to f32 and use function for f32
-/// O(1) complexity.
-#[no_mangle]
+/// * `channels` - Count of channels in the image
+///
+/// # Panics
+/// Panic is stride/width/height/channel configuration do not match provided
 pub fn fast_gaussian(
     bytes: &mut [u8],
     stride: u32,
@@ -424,13 +434,22 @@ pub fn fast_gaussian(
     }
 }
 
-/// Fast gaussian approximation.
+/// Performs gaussian approximation on the image.
+///
+/// Fast gaussian approximation for u16 image, limited to 319 radius, sometimes on the very bright images may start ringing on a very large radius.
+/// Approximation based on binomial filter. Algorithm is close to stack blur with better results and a little slower speed
+/// O(1) complexity.
+///
 /// # Arguments
 ///
 /// * `stride` - Lane length, default is width * channels_count if not aligned
+/// * `width` - Width of the image
+/// * `height` - Height of the image
 /// * `radius` - Radius more than 255 is not supported. To use larger radius convert image to f32 and use function for f32
-/// O(1) complexity.
-#[no_mangle]
+/// * `channels` - Count of channels in the image
+///
+/// # Panics
+/// Panic is stride/width/height/channel configuration do not match provided
 pub fn fast_gaussian_u16(
     bytes: &mut [u16],
     stride: u32,
@@ -465,13 +484,22 @@ pub fn fast_gaussian_u16(
     }
 }
 
-/// Fast gaussian approximation.
+/// Performs gaussian approximation on the image.
+///
+/// Fast gaussian approximation for f32 image. No limitations are expected.
+/// Approximation based on binomial filter. Algorithm is close to stack blur with better results and a little slower speed
 /// O(1) complexity.
+///
 /// # Arguments
 ///
 /// * `stride` - Lane length, default is width * channels_count if not aligned
+/// * `width` - Width of the image
+/// * `height` - Height of the image
 /// * `radius` - almost any radius is supported
-#[no_mangle]
+/// * `channels` - Count of channels in the image
+///
+/// # Panics
+/// Panic is stride/width/height/channel configuration do not match provided
 pub fn fast_gaussian_f32(
     bytes: &mut [f32],
     stride: u32,
@@ -483,13 +511,22 @@ pub fn fast_gaussian_f32(
     fast_gaussian_f32::fast_gaussian_impl_f32(bytes, stride, width, height, radius, channels);
 }
 
-/// Fast gaussian approximation.
+/// Performs gaussian approximation on the image.
+///
+/// Fast gaussian approximation for f32 image. No limitations are expected.
+/// Approximation based on binomial filter. Algorithm is close to stack blur with better results and a little slower speed
 /// O(1) complexity.
+///
 /// # Arguments
 ///
 /// * `stride` - Lane length, default is width * channels_count if not aligned
+/// * `width` - Width of the image
+/// * `height` - Height of the image
 /// * `radius` - almost any radius is supported
-#[no_mangle]
+/// * `channels` - Count of channels in the image
+///
+/// # Panics
+/// Panic is stride/width/height/channel configuration do not match provided
 pub fn fast_gaussian_f16(
     bytes: &mut [u16],
     stride: u32,

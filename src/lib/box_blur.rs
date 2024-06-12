@@ -431,7 +431,22 @@ fn box_blur_impl<
     );
 }
 
-#[allow(dead_code)]
+/// Performs box blur on the image.
+///
+/// Even gaussian blur is not approximation by itself it uses a division approximation for performance purposes
+/// which affects a very large radius making it a slightly darker since it is approximated division.
+/// O(1) complexity.
+///
+/// # Arguments
+///
+/// * `stride` - Lane length, default is width * channels_count if not aligned
+/// * `width` - Width of the image
+/// * `height` - Height of the image
+/// * `radius` - almost any radius is supported
+/// * `channels` - Count of channels in the image
+///
+/// # Panics
+/// Panic is stride/width/height/channel configuration do not match provided
 pub fn box_blur(
     src: &[u8],
     src_stride: u32,
@@ -478,6 +493,22 @@ pub fn box_blur(
     }
 }
 
+/// Performs box blur on the image.
+///
+/// Even gaussian blur is not approximation by itself it uses a division approximation for performance purposes
+/// which affects a very large radius making it a slightly darker since it is approximated division.
+/// O(1) complexity.
+///
+/// # Arguments
+///
+/// * `stride` - Lane length, default is width * channels_count if not aligned
+/// * `width` - Width of the image
+/// * `height` - Height of the image
+/// * `radius` - almost any radius is supported
+/// * `channels` - Count of channels in the image
+///
+/// # Panics
+/// Panic is stride/width/height/channel configuration do not match provided
 pub fn box_blur_u16(
     src: &[u16],
     src_stride: u32,
@@ -570,6 +601,23 @@ fn tent_blur_impl<
     );
 }
 
+/// Performs tent blur on the image.
+///
+/// Tent blur just makes a two passes box blur on the image since two times box it is almost equal to tent filter.
+/// Even box blur is not approximation by itself it uses a division approximation for performance purposes
+/// which affects a very large radius making it a slightly darker since it is approximated division.
+/// O(1) complexity.
+///
+/// # Arguments
+///
+/// * `stride` - Lane length, default is width * channels_count if not aligned
+/// * `width` - Width of the image
+/// * `height` - Height of the image
+/// * `radius` - almost any radius is supported
+/// * `channels` - Count of channels in the image
+///
+/// # Panics
+/// Panic is stride/width/height/channel configuration do not match provided
 pub fn tent_blur(
     src: &[u8],
     src_stride: u32,
@@ -609,6 +657,23 @@ pub fn tent_blur(
     }
 }
 
+/// Performs tent blur on the image.
+///
+/// Tent blur just makes a two passes box blur on the image since two times box it is almost equal to tent filter.
+/// Even box blur is not approximation by itself it uses a division approximation for performance purposes
+/// which affects a very large radius making it a slightly darker since it is approximated division.
+/// O(1) complexity.
+///
+/// # Arguments
+///
+/// * `stride` - Lane length, default is width * channels_count if not aligned
+/// * `width` - Width of the image
+/// * `height` - Height of the image
+/// * `radius` - almost any radius is supported
+/// * `channels` - Count of channels in the image
+///
+/// # Panics
+/// Panic is stride/width/height/channel configuration do not match provided
 pub fn tent_blur_u16(
     src: &[u16],
     src_stride: u32,
@@ -707,6 +772,24 @@ fn gaussian_box_blur_impl<
     );
 }
 
+/// Performs gaussian box blur approximation on the image.
+///
+/// This method launches three times box blur on the image since 2 passes box filter it is a tent filter and 3 passes of box blur it is almost gaussian filter.
+/// Even it is having low complexity it is slow filter.
+/// Even box blur is not approximation by itself it uses a division approximation for performance purposes
+/// which affects a very large radius making it a slightly darker since it is approximated division.
+/// O(1) complexity.
+///
+/// # Arguments
+///
+/// * `stride` - Lane length, default is width * channels_count if not aligned
+/// * `width` - Width of the image
+/// * `height` - Height of the image
+/// * `radius` - almost any radius is supported
+/// * `channels` - Count of channels in the image
+///
+/// # Panics
+/// Panic is stride/width/height/channel configuration do not match provided
 pub fn gaussian_box_blur(
     src: &[u8],
     src_stride: u32,
@@ -747,7 +830,24 @@ pub fn gaussian_box_blur(
     }
 }
 
-#[allow(dead_code)]
+/// Performs gaussian box blur approximation on the image.
+///
+/// This method launches three times box blur on the image since 2 passes box filter it is a tent filter and 3 passes of box blur it is almost gaussian filter
+/// Even it is having low complexity it is slow filter.
+/// Even box blur is not approximation by itself it uses a division approximation for performance purposes
+/// which affects a very large radius making it a slightly darker since it is approximated division.
+/// O(1) complexity.
+///
+/// # Arguments
+///
+/// * `stride` - Lane length, default is width * channels_count if not aligned
+/// * `width` - Width of the image
+/// * `height` - Height of the image
+/// * `radius` - almost any radius is supported
+/// * `channels` - Count of channels in the image
+///
+/// # Panics
+/// Panic is stride/width/height/channel configuration do not match provided
 pub fn gaussian_box_blur_u16(
     src: &[u16],
     src_stride: u32,
