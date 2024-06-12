@@ -30,14 +30,14 @@ use rayon::ThreadPool;
 
 use crate::channels_configuration::FastBlurChannels;
 use crate::edge_mode::EdgeMode;
+use crate::gaussian::gaussian_f16::gaussian_f16::gaussian_blur_impl_f16;
+use crate::gaussian::gaussian_filter::create_filter;
+use crate::gaussian::gaussian_horizontal::gaussian_blur_horizontal_pass_impl;
+use crate::gaussian::gaussian_kernel::get_gaussian_kernel_1d;
 use crate::gaussian::gaussian_kernel_filter_dispatch::{
     gaussian_blur_horizontal_pass_edge_clip_dispatch,
     gaussian_blur_vertical_pass_edge_clip_dispatch,
 };
-use crate::gaussian::gaussian_f16::gaussian_f16::gaussian_blur_impl_f16;
-use crate::gaussian::gaussian_filter::create_filter;
-use crate::gaussian::gaussian_kernel::get_gaussian_kernel_1d;
-use crate::gaussian::gaussian_horizontal::gaussian_blur_horizontal_pass_impl;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::gaussian::gaussian_neon::neon_support;
 #[cfg(all(
