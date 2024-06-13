@@ -79,20 +79,20 @@ fn main() {
     // //     ThreadingPolicy::Adaptive,
     // // );
     // bytes = dst_bytes;
-    libblur::gaussian_blur(
-        &bytes,
-        stride as u32,
-        &mut dst_bytes,
-        stride as u32,
-        dimensions.0,
-        dimensions.1,
-        75 * 2 + 1,
-        (75f32 * 2f32 + 1f32) / 6f32,
-        FastBlurChannels::Channels3,
-        EdgeMode::Wrap,
-        ThreadingPolicy::Adaptive,
-    );
-    bytes = dst_bytes;
+    // libblur::gaussian_blur(
+    //     &bytes,
+    //     stride as u32,
+    //     &mut dst_bytes,
+    //     stride as u32,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     75 * 2 + 1,
+    //     (75f32 * 2f32 + 1f32) / 6f32,
+    //     FastBlurChannels::Channels3,
+    //     EdgeMode::Wrap,
+    //     ThreadingPolicy::Adaptive,
+    // );
+    // bytes = dst_bytes;
     // libblur::median_blur(
     //     &bytes,
     //     stride as u32,

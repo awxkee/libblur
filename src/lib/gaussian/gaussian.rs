@@ -246,11 +246,7 @@ fn gaussian_blur_impl<
     match edge_mode {
         EdgeMode::Reflect => {
             let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
-            gaussian_blur_horizontal_pass::<
-                T,
-                CHANNEL_CONFIGURATION,
-                { EdgeMode::Reflect as usize },
-            >(
+            gaussian_blur_horizontal_pass::<T, CHANNEL_CONFIGURATION, { EdgeMode::Reflect as usize }>(
                 &src,
                 src_stride,
                 &mut transient,
@@ -262,11 +258,7 @@ fn gaussian_blur_impl<
                 &pool,
                 thread_count,
             );
-            gaussian_blur_vertical_pass::<
-                T,
-                CHANNEL_CONFIGURATION,
-                { EdgeMode::Reflect as usize },
-            >(
+            gaussian_blur_vertical_pass::<T, CHANNEL_CONFIGURATION, { EdgeMode::Reflect as usize }>(
                 &transient,
                 dst_stride,
                 dst,
@@ -281,11 +273,7 @@ fn gaussian_blur_impl<
         }
         EdgeMode::Wrap => {
             let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
-            gaussian_blur_horizontal_pass::<
-                T,
-                CHANNEL_CONFIGURATION,
-                { EdgeMode::Wrap as usize },
-            >(
+            gaussian_blur_horizontal_pass::<T, CHANNEL_CONFIGURATION, { EdgeMode::Wrap as usize }>(
                 &src,
                 src_stride,
                 &mut transient,
@@ -297,11 +285,7 @@ fn gaussian_blur_impl<
                 &pool,
                 thread_count,
             );
-            gaussian_blur_vertical_pass::<
-                T,
-                CHANNEL_CONFIGURATION,
-                { EdgeMode::Wrap as usize },
-            >(
+            gaussian_blur_vertical_pass::<T, CHANNEL_CONFIGURATION, { EdgeMode::Wrap as usize }>(
                 &transient,
                 dst_stride,
                 dst,
@@ -577,6 +561,7 @@ pub fn gaussian_blur_f32(
 /// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted.
 /// * `sigma` - Sigma for a gaussian kernel, corresponds to kernel flattening level. Default - kernel_size / 6
 /// * `channels` - Count of channels in the image
+/// * `threading_policy` - Threading policy according to *ThreadingPolicy*
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
@@ -590,6 +575,7 @@ pub fn gaussian_blur_f16(
     kernel_size: u32,
     sigma: f32,
     channels: FastBlurChannels,
+    threading_policy: ThreadingPolicy,
 ) {
     gaussian_blur_impl_f16(
         src,
@@ -601,5 +587,6 @@ pub fn gaussian_blur_f16(
         kernel_size,
         sigma,
         channels,
+        threading_policy,
     );
 }

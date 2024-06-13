@@ -164,7 +164,7 @@ pub(crate) mod gaussian_f16 {
     use rayon::ThreadPool;
 
     use crate::unsafe_slice::UnsafeSlice;
-    use crate::FastBlurChannels;
+    use crate::{FastBlurChannels, ThreadingPolicy};
     use crate::gaussian::gaussian_f16::gaussian_f16_impl;
     use crate::gaussian::gaussian_kernel::get_gaussian_kernel_1d;
 
@@ -262,6 +262,7 @@ pub(crate) mod gaussian_f16 {
         kernel_size: u32,
         sigma: f32,
         box_channels: FastBlurChannels,
+        threading_policy: ThreadingPolicy,
     ) {
         let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
         if kernel_size % 2 == 0 {
@@ -269,7 +270,7 @@ pub(crate) mod gaussian_f16 {
         }
         let mut transient: Vec<u16> = vec![0u16; dst_stride as usize * height as usize];
 
-        let thread_count = std::cmp::max(std::cmp::min(width * height / (256 * 256), 12), 1);
+        let thread_count = threading_policy.get_threads_count(width, height);
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(thread_count as usize)
             .build()
