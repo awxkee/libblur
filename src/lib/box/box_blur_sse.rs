@@ -119,15 +119,19 @@ pub mod sse_support {
                 let px_16 = unsafe { _mm_packus_epi32(scale_store, scale_store) };
                 let px_8 = unsafe { _mm_packus_epi16(px_16, px_16) };
                 let pixel = unsafe { _mm_extract_epi32::<0>(px_8) };
-                let pixel_bytes = pixel.to_le_bytes();
 
-                unsafe {
-                    let unsafe_offset = y_dst_shift + px;
-                    unsafe_dst.write(unsafe_offset, pixel_bytes[0]);
-                    unsafe_dst.write(unsafe_offset + 1, pixel_bytes[1]);
-                    unsafe_dst.write(unsafe_offset + 2, pixel_bytes[2]);
-                    if CHANNELS == 4 {
-                        unsafe_dst.write(unsafe_offset + 3, pixel_bytes[3]);
+                let bytes_offset = y_dst_shift + px;
+                if CHANNELS == 4 {
+                    unsafe {
+                        let dst_ptr = unsafe_dst.slice.as_ptr().add(bytes_offset) as *mut i32;
+                        dst_ptr.write_unaligned(pixel);
+                    }
+                } else {
+                    let pixel_bytes = pixel.to_le_bytes();
+                    unsafe {
+                        unsafe_dst.write(bytes_offset, pixel_bytes[0]);
+                        unsafe_dst.write(bytes_offset + 1, pixel_bytes[1]);
+                        unsafe_dst.write(bytes_offset + 2, pixel_bytes[2]);
                     }
                 }
             }
@@ -232,14 +236,14 @@ pub mod sse_support {
                     let px_16 = unsafe { _mm_packus_epi32(scale_store_0, scale_store_0) };
                     let px_8 = unsafe { _mm_packus_epi16(px_16, px_16) };
 
-                    let pixel = unsafe { _mm_extract_epi32::<0>(px_8) };
-                    let pixel_bytes_0 = pixel.to_le_bytes();
+                    let pixel_0 = unsafe { _mm_extract_epi32::<0>(px_8) };
+                    let pixel_bytes_0 = pixel_0.to_le_bytes();
 
                     let px_16 = unsafe { _mm_packus_epi32(scale_store_1, scale_store_1) };
                     let px_8 = unsafe { _mm_packus_epi16(px_16, px_16) };
 
-                    let pixel = unsafe { _mm_extract_epi32::<0>(px_8) };
-                    let pixel_bytes_1 = pixel.to_le_bytes();
+                    let pixel_1 = unsafe { _mm_extract_epi32::<0>(px_8) };
+                    let pixel_bytes_1 = pixel_1.to_le_bytes();
 
                     unsafe {
                         let unsafe_offset = y_dst_shift + px;
