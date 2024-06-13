@@ -604,6 +604,8 @@ fn tent_blur_impl<
 /// Performs tent blur on the image.
 ///
 /// Tent blur just makes a two passes box blur on the image since two times box it is almost equal to tent filter.
+/// https://en.wikipedia.org/wiki/Central_limit_theorem
+///
 /// Even box blur is not approximation by itself it uses a division approximation for performance purposes
 /// which affects a very large radius making it a slightly darker since it is approximated division.
 /// O(1) complexity.
@@ -660,6 +662,8 @@ pub fn tent_blur(
 /// Performs tent blur on the image.
 ///
 /// Tent blur just makes a two passes box blur on the image since two times box it is almost equal to tent filter.
+/// https://en.wikipedia.org/wiki/Central_limit_theorem
+///
 /// Even box blur is not approximation by itself it uses a division approximation for performance purposes
 /// which affects a very large radius making it a slightly darker since it is approximated division.
 /// O(1) complexity.
@@ -775,6 +779,8 @@ fn gaussian_box_blur_impl<
 /// Performs gaussian box blur approximation on the image.
 ///
 /// This method launches three times box blur on the image since 2 passes box filter it is a tent filter and 3 passes of box blur it is almost gaussian filter.
+/// https://en.wikipedia.org/wiki/Central_limit_theorem
+///
 /// Even it is having low complexity it is slow filter.
 /// Even box blur is not approximation by itself it uses a division approximation for performance purposes
 /// which affects a very large radius making it a slightly darker since it is approximated division.
@@ -832,7 +838,9 @@ pub fn gaussian_box_blur(
 
 /// Performs gaussian box blur approximation on the image.
 ///
-/// This method launches three times box blur on the image since 2 passes box filter it is a tent filter and 3 passes of box blur it is almost gaussian filter
+/// This method launches three times box blur on the image since 2 passes box filter it is a tent filter and 3 passes of box blur it is almost gaussian filter.
+/// https://en.wikipedia.org/wiki/Central_limit_theorem
+///
 /// Even it is having low complexity it is slow filter.
 /// Even box blur is not approximation by itself it uses a division approximation for performance purposes
 /// which affects a very large radius making it a slightly darker since it is approximated division.

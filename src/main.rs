@@ -67,18 +67,18 @@ fn main() {
     //     ThreadingPolicy::Adaptive,
     // );
 
-    // // libblur::box_blur(
-    // //     &bytes,
-    // //     stride as u32,
-    // //     &mut dst_bytes,
-    // //     stride as u32,
-    // //     dimensions.0,
-    // //     dimensions.1,
-    // //     77,
-    // //     FastBlurChannels::Channels3,
-    // //     ThreadingPolicy::Adaptive,
-    // // );
-    // bytes = dst_bytes;
+    libblur::tent_blur(
+        &bytes,
+        stride as u32,
+        &mut dst_bytes,
+        stride as u32,
+        dimensions.0,
+        dimensions.1,
+        77,
+        FastBlurChannels::Channels3,
+        ThreadingPolicy::Adaptive,
+    );
+    bytes = dst_bytes;
     // libblur::gaussian_blur(
     //     &bytes,
     //     stride as u32,

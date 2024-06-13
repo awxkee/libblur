@@ -258,7 +258,7 @@ pub mod sse_support {
                     unsafe {
                         let unsafe_offset = y_dst_shift + px;
                         let dst_ptr = unsafe_dst.slice.as_ptr().add(unsafe_offset) as *mut i32;
-                        *dst_ptr = pixel;
+                        dst_ptr.write_unaligned(pixel);
                     }
                 } else {
                     let pixel_bytes = pixel.to_le_bytes();
@@ -278,7 +278,7 @@ pub mod sse_support {
                     unsafe {
                         let unsafe_offset = y_dst_shift + src_stride as usize + px;
                         let dst_ptr = unsafe_dst.slice.as_ptr().add(unsafe_offset) as *mut i32;
-                        *dst_ptr = pixel;
+                        dst_ptr.write_unaligned(pixel);
                     }
                 } else {
                     let pixel_bytes = pixel.to_le_bytes();
@@ -374,7 +374,7 @@ pub mod sse_support {
                 if CHANNEL_CONFIGURATION == 4 {
                     unsafe {
                         let dst_ptr = unsafe_dst.slice.as_ptr().add(y_dst_shift + px) as *mut i32;
-                        *dst_ptr = pixel;
+                        dst_ptr.write_unaligned(pixel);
                     }
                 } else {
                     let pixel_bytes = pixel.to_le_bytes();
