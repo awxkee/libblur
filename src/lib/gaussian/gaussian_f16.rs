@@ -272,7 +272,7 @@ pub(crate) mod gaussian_f16 {
 
         let thread_count = threading_policy.get_threads_count(width, height);
         let pool = rayon::ThreadPoolBuilder::new()
-            .num_threads(thread_count as usize)
+            .num_threads(thread_count)
             .build()
             .unwrap();
 
@@ -287,7 +287,7 @@ pub(crate) mod gaussian_f16 {
             box_channels,
             &kernel,
             &pool,
-            thread_count,
+            thread_count as u32,
         );
         gaussian_blur_vertical_pass_f16(
             &transient,
@@ -300,7 +300,7 @@ pub(crate) mod gaussian_f16 {
             box_channels,
             &kernel,
             &pool,
-            thread_count,
+            thread_count as u32,
         );
     }
 }
