@@ -20,7 +20,7 @@ fn f16_to_f32(bytes: Vec<u16>) -> Vec<f32> {
 }
 
 fn main() {
-    let img = ImageReader::open("assets/filirovska.jpeg")
+    let img = ImageReader::open("assets/test_image_1.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -86,10 +86,10 @@ fn main() {
         stride as u32,
         dimensions.0,
         dimensions.1,
-        126 * 2 + 1,
-        (126f32 * 2f32 + 1f32) / 6f32,
+        75 * 2 + 1,
+        (75f32 * 2f32 + 1f32) / 6f32,
         FastBlurChannels::Channels3,
-        EdgeMode::Reflect,
+        EdgeMode::Wrap,
         ThreadingPolicy::Adaptive,
     );
     bytes = dst_bytes;

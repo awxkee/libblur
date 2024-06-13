@@ -138,7 +138,7 @@ fn gaussian_blur_vertical_pass_impl<
         {
             let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
-            gaussian_blur_vertical_pass_impl_sse::<CHANNEL_CONFIGURATION>(
+            gaussian_blur_vertical_pass_impl_sse::<CHANNEL_CONFIGURATION, EDGE_MODE>(
                 u8_slice,
                 src_stride,
                 slice,
@@ -384,6 +384,7 @@ fn gaussian_blur_impl<
 /// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted.
 /// * `sigma` - Sigma for a gaussian kernel, corresponds to kernel flattening level. Default - kernel_size / 6
 /// * `channels` - Count of channels in the image
+/// * `edge_mode` - Rule to handle edge mode
 /// * `threading_policy` - Threading policy according to *ThreadingPolicy*
 ///
 /// # Panics
@@ -447,6 +448,7 @@ pub fn gaussian_blur(
 /// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted.
 /// * `sigma` - Sigma for a gaussian kernel, corresponds to kernel flattening level. Default - kernel_size / 6
 /// * `channels` - Count of channels in the image
+/// * `edge_mode` - Rule to handle edge mode
 /// * `threading_policy` - Threading policy according to *ThreadingPolicy*
 ///
 /// # Panics
@@ -461,6 +463,7 @@ pub fn gaussian_blur_u16(
     kernel_size: u32,
     sigma: f32,
     channels: FastBlurChannels,
+    edge_mode: EdgeMode,
     threading_policy: ThreadingPolicy,
 ) {
     match channels {
@@ -475,7 +478,7 @@ pub fn gaussian_blur_u16(
                 kernel_size,
                 sigma,
                 threading_policy,
-                EdgeMode::Clamp,
+                edge_mode,
             );
         }
         FastBlurChannels::Channels4 => {
@@ -489,7 +492,7 @@ pub fn gaussian_blur_u16(
                 kernel_size,
                 sigma,
                 threading_policy,
-                EdgeMode::Clamp,
+                edge_mode,
             );
         }
     }
@@ -509,6 +512,7 @@ pub fn gaussian_blur_u16(
 /// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted.
 /// * `sigma` - Sigma for a gaussian kernel, corresponds to kernel flattening level. Default - kernel_size / 6
 /// * `channels` - Count of channels in the image
+/// * `edge_mode` - Rule to handle edge mode
 /// * `threading_policy` - Threading policy according to *ThreadingPolicy*
 ///
 /// # Panics
@@ -522,7 +526,9 @@ pub fn gaussian_blur_f32(
     height: u32,
     kernel_size: u32,
     sigma: f32,
+    edge_mode: EdgeMode,
     channels: FastBlurChannels,
+
     threading_policy: ThreadingPolicy,
 ) {
     match channels {
@@ -537,7 +543,7 @@ pub fn gaussian_blur_f32(
                 kernel_size,
                 sigma,
                 threading_policy,
-                EdgeMode::Clamp,
+                edge_mode,
             );
         }
         FastBlurChannels::Channels4 => {
@@ -551,7 +557,7 @@ pub fn gaussian_blur_f32(
                 kernel_size,
                 sigma,
                 threading_policy,
-                EdgeMode::Clamp,
+                edge_mode,
             );
         }
     }

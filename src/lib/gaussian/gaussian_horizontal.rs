@@ -86,7 +86,7 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl<
         {
             let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
-            gaussian_blur_horizontal_pass_impl_sse::<CHANNEL_CONFIGURATION>(
+            gaussian_blur_horizontal_pass_impl_sse::<CHANNEL_CONFIGURATION, EDGE_MODE>(
                 u8_slice,
                 src_stride,
                 slice,
