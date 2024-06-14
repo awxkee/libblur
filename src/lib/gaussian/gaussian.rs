@@ -112,12 +112,13 @@ fn gaussian_blur_vertical_pass_impl<
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
-    if std::any::type_name::<T>() == "u8" {
+    let edge_mode: EdgeMode = EDGE_MODE.into();
+    if std::any::type_name::<T>() == "u8" && edge_mode == EdgeMode::Clamp {
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
-            neon_support::gaussian_blur_vertical_pass_neon::<CHANNEL_CONFIGURATION, EDGE_MODE>(
+            neon_support::gaussian_blur_vertical_pass_neon::<CHANNEL_CONFIGURATION>(
                 u8_slice,
                 src_stride,
                 slice,
@@ -138,7 +139,7 @@ fn gaussian_blur_vertical_pass_impl<
         {
             let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
-            gaussian_blur_vertical_pass_impl_sse::<CHANNEL_CONFIGURATION, EDGE_MODE>(
+            gaussian_blur_vertical_pass_impl_sse::<CHANNEL_CONFIGURATION>(
                 u8_slice,
                 src_stride,
                 slice,

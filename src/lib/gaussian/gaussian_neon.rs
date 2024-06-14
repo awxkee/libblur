@@ -27,17 +27,15 @@
 
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 pub mod neon_support {
+    use std::arch::aarch64::*;
+
     use crate::neon_utils::neon_utils::{
         load_u8_u16_x2_fast, load_u8_u32_fast, load_u8_u32_one, prefer_vfma_f32, prefer_vfmaq_f32,
     };
-    use crate::{reflect_index, EdgeMode};
-    use std::arch::aarch64::*;
-
     use crate::unsafe_slice::UnsafeSlice;
 
     pub fn gaussian_blur_horizontal_pass_neon<
         const CHANNEL_CONFIGURATION: usize,
-        const EDGE_MODE: usize,
     >(
         src: &[u8],
         src_stride: u32,
@@ -49,7 +47,6 @@ pub mod neon_support {
         start_y: u32,
         end_y: u32,
     ) {
-        let edge_mode: EdgeMode = EDGE_MODE.into();
         let half_kernel = (kernel_size / 2) as i32;
 
         let shuf_table_1: [u8; 8] = [0, 1, 2, 255, 3, 4, 5, 255];
@@ -74,23 +71,11 @@ pub mod neon_support {
                         && x as i64 + r as i64 + (if CHANNEL_CONFIGURATION == 4 { 4 } else { 6 })
                             < width as i64
                     {
-                        let px = match edge_mode {
-                            EdgeMode::Clamp | EdgeMode::KernelClip => {
-                                std::cmp::min(
-                                    std::cmp::max(x as i64 + r as i64, 0),
-                                    (width - 1) as i64,
-                                ) as usize
-                                    * CHANNEL_CONFIGURATION
-                            }
-                            EdgeMode::Wrap => {
-                                let cx = (x as i64 + r as i64).rem_euclid(width as i64 - 1);
-                                cx as usize * CHANNEL_CONFIGURATION
-                            }
-                            EdgeMode::Reflect => {
-                                let cx = reflect_index(x as i64 + r as i64, width as i64 - 1i64);
-                                cx * CHANNEL_CONFIGURATION
-                            }
-                        };
+                        let px = std::cmp::min(
+                            std::cmp::max(x as i64 + r as i64, 0),
+                            (width - 1) as i64,
+                        ) as usize
+                            * CHANNEL_CONFIGURATION;
                         let s_ptr = src.as_ptr().add(y_src_shift + px);
                         let mut pixel_colors_0: uint8x16_t = vld1q_u8(s_ptr);
                         let mut pixel_colors_1: uint8x16_t =
@@ -157,23 +142,11 @@ pub mod neon_support {
                         && x as i64 + r as i64 + (if CHANNEL_CONFIGURATION == 4 { 2 } else { 3 })
                             < width as i64
                     {
-                        let px = match edge_mode {
-                            EdgeMode::Clamp | EdgeMode::KernelClip => {
-                                std::cmp::min(
-                                    std::cmp::max(x as i64 + r as i64, 0),
-                                    (width - 1) as i64,
-                                ) as usize
-                                    * CHANNEL_CONFIGURATION
-                            }
-                            EdgeMode::Wrap => {
-                                let cx = (x as i64 + r as i64).rem_euclid(width as i64 - 1);
-                                cx as usize * CHANNEL_CONFIGURATION
-                            }
-                            EdgeMode::Reflect => {
-                                let cx = reflect_index(x as i64 + r as i64, width as i64 - 1i64);
-                                cx * CHANNEL_CONFIGURATION
-                            }
-                        };
+                        let px = std::cmp::min(
+                            std::cmp::max(x as i64 + r as i64, 0),
+                            (width - 1) as i64,
+                        ) as usize
+                            * CHANNEL_CONFIGURATION;
                         let s_ptr = src.as_ptr().add(y_src_shift + px);
                         let mut pixel_colors_0: uint8x8_t = vld1_u8(s_ptr);
                         let mut pixel_colors_1: uint8x8_t = vld1_u8(s_ptr.add(src_stride as usize));
@@ -211,19 +184,11 @@ pub mod neon_support {
 
                 unsafe {
                     while r <= half_kernel {
-                        let current_x = match edge_mode {
-                            EdgeMode::Clamp | EdgeMode::KernelClip => std::cmp::min(
-                                std::cmp::max(x as i64 + r as i64, 0),
-                                (width - 1) as i64,
-                            )
-                                as usize,
-                            EdgeMode::Wrap => {
-                                (x as i64 + r as i64).rem_euclid(width as i64 - 1) as usize
-                            }
-                            EdgeMode::Reflect => {
-                                reflect_index(x as i64 + r as i64, width as i64 - 1i64) as usize
-                            }
-                        };
+                        let current_x = std::cmp::min(
+                            std::cmp::max(x as i64 + r as i64, 0),
+                            (width - 1) as i64,
+                        )
+                            as usize;
                         let px = current_x * CHANNEL_CONFIGURATION;
                         let s_ptr = src.as_ptr().add(y_src_shift + px);
                         let pixel_colors_u32_0 = load_u8_u32_fast::<CHANNEL_CONFIGURATION>(s_ptr);
@@ -295,23 +260,11 @@ pub mod neon_support {
 
                 unsafe {
                     while r + 4 <= half_kernel && x as i64 + r as i64 + 6 < width as i64 {
-                        let px = match edge_mode {
-                            EdgeMode::Clamp | EdgeMode::KernelClip => {
-                                std::cmp::min(
-                                    std::cmp::max(x as i64 + r as i64, 0),
-                                    (width - 1) as i64,
-                                ) as usize
-                                    * CHANNEL_CONFIGURATION
-                            }
-                            EdgeMode::Wrap => {
-                                let cx = (x as i64 + r as i64).rem_euclid(width as i64 - 1);
-                                cx as usize * CHANNEL_CONFIGURATION
-                            }
-                            EdgeMode::Reflect => {
-                                let cx = reflect_index(x as i64 + r as i64, width as i64 - 1i64);
-                                cx * CHANNEL_CONFIGURATION
-                            }
-                        };
+                        let px = std::cmp::min(
+                            std::cmp::max(x as i64 + r as i64, 0),
+                            (width - 1) as i64,
+                        ) as usize
+                            * CHANNEL_CONFIGURATION;
                         let s_ptr = src.as_ptr().add(y_src_shift + px);
                         let mut pixel_colors: uint8x16_t = vld1q_u8(s_ptr);
                         if CHANNEL_CONFIGURATION == 3 {
@@ -352,21 +305,11 @@ pub mod neon_support {
 
                 unsafe {
                     while r + 2 <= half_kernel && x as i64 + r as i64 + 2 < width as i64 {
-                        let current_x = match edge_mode {
-                            EdgeMode::Clamp | EdgeMode::KernelClip => std::cmp::min(
-                                std::cmp::max(x as i64 + r as i64, 0),
-                                (width - 1) as i64,
-                            )
-                                as usize,
-                            EdgeMode::Wrap => {
-                                let cx = (x as i64 + r as i64).rem_euclid(width as i64 - 1);
-                                cx as usize
-                            }
-                            EdgeMode::Reflect => {
-                                let cx = reflect_index(x as i64 + r as i64, width as i64 - 1i64);
-                                cx
-                            }
-                        };
+                        let current_x = std::cmp::min(
+                            std::cmp::max(x as i64 + r as i64, 0),
+                            (width - 1) as i64,
+                        )
+                            as usize;
                         let px = current_x * CHANNEL_CONFIGURATION;
                         let s_ptr = src.as_ptr().add(y_src_shift + px);
                         let weight_0 = *kernel.get_unchecked((r + half_kernel) as usize);
@@ -387,21 +330,11 @@ pub mod neon_support {
 
                 unsafe {
                     while r <= half_kernel {
-                        let current_x = match edge_mode {
-                            EdgeMode::Clamp | EdgeMode::KernelClip => std::cmp::min(
-                                std::cmp::max(x as i64 + r as i64, 0),
-                                (width - 1) as i64,
-                            )
-                                as usize,
-                            EdgeMode::Wrap => {
-                                let cx = (x as i64 + r as i64).rem_euclid(width as i64 - 1);
-                                cx as usize
-                            }
-                            EdgeMode::Reflect => {
-                                let cx = reflect_index(x as i64 + r as i64, width as i64 - 1i64);
-                                cx
-                            }
-                        };
+                        let current_x = std::cmp::min(
+                            std::cmp::max(x as i64 + r as i64, 0),
+                            (width - 1) as i64,
+                        )
+                            as usize;
                         let px = current_x * CHANNEL_CONFIGURATION;
                         let s_ptr = src.as_ptr().add(y_src_shift + px);
                         let pixel_colors_u32 = load_u8_u32_fast::<CHANNEL_CONFIGURATION>(s_ptr);
@@ -440,7 +373,6 @@ pub mod neon_support {
 
     pub fn gaussian_blur_vertical_pass_neon<
         const CHANNEL_CONFIGURATION: usize,
-        const EDGE_MODE: usize,
     >(
         src: &[u8],
         src_stride: u32,
@@ -454,7 +386,6 @@ pub mod neon_support {
         end_y: u32,
     ) {
         let half_kernel = (kernel_size / 2) as i32;
-        let edge_mode: EdgeMode = EDGE_MODE.into();
 
         let zeros = unsafe { vdupq_n_f32(0f32) };
 
@@ -481,19 +412,10 @@ pub mod neon_support {
                         let weight = *kernel.get_unchecked((r + half_kernel) as usize);
                         let f_weight: float32x4_t = vdupq_n_f32(weight);
 
-                        let py = match edge_mode {
-                            EdgeMode::Clamp | EdgeMode::KernelClip => std::cmp::min(
-                                std::cmp::max(y as i64 + r as i64, 0),
-                                (height - 1) as i64,
-                            ),
-                            EdgeMode::Wrap => {
-                                (y as i64 + r as i64).rem_euclid(height as i64 - 1i64)
-                            }
-                            EdgeMode::Reflect => {
-                                let k = reflect_index(y as i64 + r as i64, height as i64 - 1i64);
-                                k as i64
-                            }
-                        };
+                        let py = std::cmp::min(
+                            std::cmp::max(y as i64 + r as i64, 0),
+                            (height - 1) as i64,
+                        );
                         let y_src_shift = py as usize * src_stride as usize;
                         let s_ptr = src.as_ptr().add(y_src_shift + cx);
                         let pixels_u8x2 = vld1q_u8_x2(s_ptr);
@@ -558,19 +480,10 @@ pub mod neon_support {
                         let weight = *kernel.get_unchecked((r + half_kernel) as usize);
                         let f_weight: float32x4_t = vdupq_n_f32(weight);
 
-                        let py = match edge_mode {
-                            EdgeMode::Clamp | EdgeMode::KernelClip => std::cmp::min(
-                                std::cmp::max(y as i64 + r as i64, 0),
-                                (height - 1) as i64,
-                            ),
-                            EdgeMode::Wrap => {
-                                (y as i64 + r as i64).rem_euclid(height as i64 - 1i64)
-                            }
-                            EdgeMode::Reflect => {
-                                let k = reflect_index(y as i64 + r as i64, height as i64 - 1i64);
-                                k as i64
-                            }
-                        };
+                        let py = std::cmp::min(
+                            std::cmp::max(y as i64 + r as i64, 0),
+                            (height - 1) as i64,
+                        );
                         let y_src_shift = py as usize * src_stride as usize;
                         let s_ptr = src.as_ptr().add(y_src_shift + cx);
                         let pixels_u8 = vld1q_u8(s_ptr);
@@ -613,19 +526,10 @@ pub mod neon_support {
                         let weight = *kernel.get_unchecked((r + half_kernel) as usize);
                         let f_weight: float32x4_t = vdupq_n_f32(weight);
 
-                        let py = match edge_mode {
-                            EdgeMode::Clamp | EdgeMode::KernelClip => std::cmp::min(
-                                std::cmp::max(y as i64 + r as i64, 0),
-                                (height - 1) as i64,
-                            ),
-                            EdgeMode::Wrap => {
-                                (y as i64 + r as i64).rem_euclid(height as i64 - 1i64)
-                            }
-                            EdgeMode::Reflect => {
-                                let k = reflect_index(y as i64 + r as i64, height as i64 - 1i64);
-                                k as i64
-                            }
-                        };
+                        let py = std::cmp::min(
+                            std::cmp::max(y as i64 + r as i64, 0),
+                            (height - 1) as i64,
+                        );
                         let y_src_shift = py as usize * src_stride as usize;
                         let s_ptr = src.as_ptr().add(y_src_shift + cx);
                         let pixels_u8 = vld1_u8(s_ptr);
@@ -659,19 +563,10 @@ pub mod neon_support {
                         let weight = *kernel.get_unchecked((r + half_kernel) as usize);
                         let f_weight: float32x4_t = vdupq_n_f32(weight);
 
-                        let py = match edge_mode {
-                            EdgeMode::Clamp | EdgeMode::KernelClip => std::cmp::min(
-                                std::cmp::max(y as i64 + r as i64, 0),
-                                (height - 1) as i64,
-                            ),
-                            EdgeMode::Wrap => {
-                                (y as i64 + r as i64).rem_euclid(height as i64 - 1i64)
-                            }
-                            EdgeMode::Reflect => {
-                                let k = reflect_index(y as i64 + r as i64, height as i64 - 1i64);
-                                k as i64
-                            }
-                        };
+                        let py = std::cmp::min(
+                            std::cmp::max(y as i64 + r as i64, 0),
+                            (height - 1) as i64,
+                        );
                         let y_src_shift = py as usize * src_stride as usize;
                         let s_ptr = src.as_ptr().add(y_src_shift + cx);
                         let pixels_u32 = load_u8_u32_fast::<4>(s_ptr);
@@ -703,19 +598,10 @@ pub mod neon_support {
                         let weight = *kernel.get_unchecked((r + half_kernel) as usize);
                         let f_weight = vdup_n_f32(weight);
 
-                        let py = match edge_mode {
-                            EdgeMode::Clamp | EdgeMode::KernelClip => std::cmp::min(
-                                std::cmp::max(y as i64 + r as i64, 0),
-                                (height - 1) as i64,
-                            ),
-                            EdgeMode::Wrap => {
-                                (y as i64 + r as i64).rem_euclid(height as i64 - 1i64)
-                            }
-                            EdgeMode::Reflect => {
-                                let k = reflect_index(y as i64 + r as i64, height as i64 - 1i64);
-                                k as i64
-                            }
-                        };
+                        let py = std::cmp::min(
+                            std::cmp::max(y as i64 + r as i64, 0),
+                            (height - 1) as i64,
+                        );
                         let y_src_shift = py as usize * src_stride as usize;
                         let s_ptr = src.as_ptr().add(y_src_shift + cx);
                         let pixels_u32 = load_u8_u32_one(s_ptr);

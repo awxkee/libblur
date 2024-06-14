@@ -30,16 +30,15 @@
     target_feature = "sse4.1"
 ))]
 pub mod sse_support {
-    use crate::sse_utils::sse_utils::{_mm_prefer_fma_ps, load_u8_f32_fast, load_u8_u32_one};
     #[cfg(target_arch = "x86")]
     use std::arch::x86::*;
     #[cfg(target_arch = "x86_64")]
     use std::arch::x86_64::*;
-    use crate::{EdgeMode, reflect_index};
 
+    use crate::sse_utils::sse_utils::{_mm_prefer_fma_ps, load_u8_f32_fast, load_u8_u32_one};
     use crate::unsafe_slice::UnsafeSlice;
 
-    pub fn gaussian_blur_horizontal_pass_impl_sse<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>(
+    pub fn gaussian_blur_horizontal_pass_impl_sse<const CHANNEL_CONFIGURATION: usize>(
         src: &[u8],
         src_stride: u32,
         unsafe_dst: &UnsafeSlice<u8>,
@@ -50,7 +49,6 @@ pub mod sse_support {
         start_y: u32,
         end_y: u32,
     ) {
-        let edge_mode: EdgeMode = EDGE_MODE.into();
         let half_kernel = (kernel_size / 2) as i32;
 
         let shuffle_rgb =
@@ -74,23 +72,11 @@ pub mod sse_support {
                         && x as i64 + r as i64 + (if CHANNEL_CONFIGURATION == 4 { 4 } else { 6 })
                             < width as i64
                     {
-                        let px = match edge_mode {
-                            EdgeMode::Clamp | EdgeMode::KernelClip => {
-                                std::cmp::min(
-                                    std::cmp::max(x as i64 + r as i64, 0),
-                                    (width - 1) as i64,
-                                ) as usize
-                                    * CHANNEL_CONFIGURATION
-                            }
-                            EdgeMode::Wrap => {
-                                let cx = (x as i64 + r as i64).rem_euclid(width as i64 - 1);
-                                cx as usize * CHANNEL_CONFIGURATION
-                            }
-                            EdgeMode::Reflect => {
-                                let cx = reflect_index(x as i64 + r as i64, width as i64 - 1i64);
-                                cx * CHANNEL_CONFIGURATION
-                            }
-                        };
+                        let px = std::cmp::min(
+                            std::cmp::max(x as i64 + r as i64, 0),
+                            (width - 1) as i64,
+                        ) as usize
+                            * CHANNEL_CONFIGURATION;
                         let s_ptr = src.as_ptr().add(y_src_shift + px);
                         let s_ptr_1 = s_ptr.add(src_stride as usize);
                         let mut pixel_colors_0 = _mm_loadu_si128(s_ptr as *const __m128i);
@@ -159,23 +145,11 @@ pub mod sse_support {
                         && x as i64 + r as i64 + (if CHANNEL_CONFIGURATION == 4 { 4 } else { 6 })
                         < width as i64
                     {
-                        let px = match edge_mode {
-                            EdgeMode::Clamp | EdgeMode::KernelClip => {
-                                std::cmp::min(
-                                    std::cmp::max(x as i64 + r as i64, 0),
-                                    (width - 1) as i64,
-                                ) as usize
-                                    * CHANNEL_CONFIGURATION
-                            }
-                            EdgeMode::Wrap => {
-                                let cx = (x as i64 + r as i64).rem_euclid(width as i64 - 1);
-                                cx as usize * CHANNEL_CONFIGURATION
-                            }
-                            EdgeMode::Reflect => {
-                                let cx = reflect_index(x as i64 + r as i64, width as i64 - 1i64);
-                                cx * CHANNEL_CONFIGURATION
-                            }
-                        };
+                        let px = std::cmp::min(
+                            std::cmp::max(x as i64 + r as i64, 0),
+                            (width - 1) as i64,
+                        ) as usize
+                            * CHANNEL_CONFIGURATION;
                         let s_ptr = src.as_ptr().add(y_src_shift + px);
                         let s_ptr_1 = s_ptr.add(src_stride as usize);
                         let mut pixel_colors_0 = _mm_loadu_si128(s_ptr as *const __m128i);
@@ -215,22 +189,10 @@ pub mod sse_support {
 
                 unsafe {
                     while r <= half_kernel {
-                        let current_x = match edge_mode {
-                            EdgeMode::Clamp | EdgeMode::KernelClip => {
-                                std::cmp::min(
-                                    std::cmp::max(x as i64 + r as i64, 0),
-                                    (width - 1) as i64,
-                                ) as usize
-                            }
-                            EdgeMode::Wrap => {
-                                let cx = (x as i64 + r as i64).rem_euclid(width as i64 - 1);
-                                cx as usize
-                            }
-                            EdgeMode::Reflect => {
-                                let cx = reflect_index(x as i64 + r as i64, width as i64 - 1i64);
-                                cx
-                            }
-                        };
+                        let current_x = std::cmp::min(
+                            std::cmp::max(x as i64 + r as i64, 0),
+                            (width - 1) as i64,
+                        ) as usize;
                         let px = current_x * CHANNEL_CONFIGURATION;
                         let s_ptr = src.as_ptr().add(y_src_shift + px);
                         let pixel_colors_f32_0 = load_u8_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr);
@@ -389,7 +351,7 @@ pub mod sse_support {
         }
     }
 
-    pub fn gaussian_blur_vertical_pass_impl_sse<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>(
+    pub fn gaussian_blur_vertical_pass_impl_sse<const CHANNEL_CONFIGURATION: usize>(
         src: &[u8],
         src_stride: u32,
         unsafe_dst: &UnsafeSlice<u8>,
@@ -401,7 +363,6 @@ pub mod sse_support {
         start_y: u32,
         end_y: u32,
     ) {
-        let edge_mode: EdgeMode = EDGE_MODE.into();
         let half_kernel = (kernel_size / 2) as i32;
         const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
 
@@ -429,19 +390,10 @@ pub mod sse_support {
                         let weight = *kernel.get_unchecked((r + half_kernel) as usize);
                         let f_weight = _mm_set1_ps(weight);
 
-                        let py = match edge_mode {
-                            EdgeMode::Clamp | EdgeMode::KernelClip => std::cmp::min(
-                                std::cmp::max(y as i64 + r as i64, 0),
-                                (height - 1) as i64,
-                            ),
-                            EdgeMode::Wrap => {
-                                (y as i64 + r as i64).rem_euclid(height as i64 - 1i64)
-                            }
-                            EdgeMode::Reflect => {
-                                let k = reflect_index(y as i64 + r as i64, height as i64 - 1i64);
-                                k as i64
-                            }
-                        };
+                        let py = std::cmp::min(
+                            std::cmp::max(y as i64 + r as i64, 0),
+                            (height - 1) as i64,
+                        );
                         let y_src_shift = py as usize * src_stride as usize;
                         let s_ptr = src.as_ptr().add(y_src_shift + cx);
                         let pixels_u8_lo = _mm_loadu_si128(s_ptr as *const __m128i);
@@ -507,19 +459,10 @@ pub mod sse_support {
                         let weight = *kernel.get_unchecked((r + half_kernel) as usize);
                         let f_weight = _mm_set1_ps(weight);
 
-                        let py = match edge_mode {
-                            EdgeMode::Clamp | EdgeMode::KernelClip => std::cmp::min(
-                                std::cmp::max(y as i64 + r as i64, 0),
-                                (height - 1) as i64,
-                            ),
-                            EdgeMode::Wrap => {
-                                (y as i64 + r as i64).rem_euclid(height as i64 - 1i64)
-                            }
-                            EdgeMode::Reflect => {
-                                let k = reflect_index(y as i64 + r as i64, height as i64 - 1i64);
-                                k as i64
-                            }
-                        };
+                        let py = std::cmp::min(
+                            std::cmp::max(y as i64 + r as i64, 0),
+                            (height - 1) as i64,
+                        );
                         let y_src_shift = py as usize * src_stride as usize;
                         let s_ptr = src.as_ptr().add(y_src_shift + cx);
                         let pixels_u8 = _mm_loadu_si128(s_ptr as *const __m128i);
@@ -599,19 +542,10 @@ pub mod sse_support {
                         let weight = *kernel.get_unchecked((r + half_kernel) as usize);
                         let f_weight = _mm_set1_ps(weight);
 
-                        let py = match edge_mode {
-                            EdgeMode::Clamp | EdgeMode::KernelClip => std::cmp::min(
-                                std::cmp::max(y as i64 + r as i64, 0),
-                                (height - 1) as i64,
-                            ),
-                            EdgeMode::Wrap => {
-                                (y as i64 + r as i64).rem_euclid(height as i64 - 1i64)
-                            }
-                            EdgeMode::Reflect => {
-                                let k = reflect_index(y as i64 + r as i64, height as i64 - 1i64);
-                                k as i64
-                            }
-                        };
+                        let py = std::cmp::min(
+                            std::cmp::max(y as i64 + r as i64, 0),
+                            (height - 1) as i64,
+                        );
                         let y_src_shift = py as usize * src_stride as usize;
                         let s_ptr = src.as_ptr().add(y_src_shift + cx);
                         let lo_lo = load_u8_f32_fast::<4>(s_ptr);
@@ -641,19 +575,10 @@ pub mod sse_support {
                         let weight = *kernel.get_unchecked((r + half_kernel) as usize);
                         let f_weight = _mm_set1_ps(weight);
 
-                        let py = match edge_mode {
-                            EdgeMode::Clamp | EdgeMode::KernelClip => std::cmp::min(
-                                std::cmp::max(y as i64 + r as i64, 0),
-                                (height - 1) as i64,
-                            ),
-                            EdgeMode::Wrap => {
-                                (y as i64 + r as i64).rem_euclid(height as i64 - 1i64)
-                            }
-                            EdgeMode::Reflect => {
-                                let k = reflect_index(y as i64 + r as i64, height as i64 - 1i64);
-                                k as i64
-                            }
-                        };
+                        let py = std::cmp::min(
+                            std::cmp::max(y as i64 + r as i64, 0),
+                            (height - 1) as i64,
+                        );
                         let y_src_shift = py as usize * src_stride as usize;
                         let s_ptr = src.as_ptr().add(y_src_shift + cx);
                         let pixels_u32 = load_u8_u32_one(s_ptr);

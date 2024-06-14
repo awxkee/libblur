@@ -20,7 +20,7 @@ fn f16_to_f32(bytes: Vec<u16>) -> Vec<f32> {
 }
 
 fn main() {
-    let img = ImageReader::open("assets/test_image_1.jpg")
+    let img = ImageReader::open("assets/Screenshot_20240612-105034.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -30,7 +30,7 @@ fn main() {
 
     println!("{:?}", img.color());
     let src_bytes = img.as_bytes();
-    let components = 3;
+    let components = 4;
     let stride = dimensions.0 as usize * components;
     let mut bytes: Vec<u8> = Vec::with_capacity(dimensions.1 as usize * stride);
     for i in 0..dimensions.1 as usize * stride {
@@ -67,32 +67,32 @@ fn main() {
     //     ThreadingPolicy::Adaptive,
     // );
 
-    libblur::tent_blur(
-        &bytes,
-        stride as u32,
-        &mut dst_bytes,
-        stride as u32,
-        dimensions.0,
-        dimensions.1,
-        77,
-        FastBlurChannels::Channels3,
-        ThreadingPolicy::Adaptive,
-    );
-    bytes = dst_bytes;
-    // libblur::gaussian_blur(
+    // libblur::tent_blur(
     //     &bytes,
     //     stride as u32,
     //     &mut dst_bytes,
     //     stride as u32,
     //     dimensions.0,
     //     dimensions.1,
-    //     75 * 2 + 1,
-    //     (75f32 * 2f32 + 1f32) / 6f32,
+    //     77,
     //     FastBlurChannels::Channels3,
-    //     EdgeMode::Wrap,
     //     ThreadingPolicy::Adaptive,
     // );
     // bytes = dst_bytes;
+    libblur::gaussian_blur(
+        &bytes,
+        stride as u32,
+        &mut dst_bytes,
+        stride as u32,
+        dimensions.0,
+        dimensions.1,
+        25 * 2 + 1,
+        10f32,
+        FastBlurChannels::Channels4,
+        EdgeMode::Wrap,
+        ThreadingPolicy::Adaptive,
+    );
+    bytes = dst_bytes;
     // libblur::median_blur(
     //     &bytes,
     //     stride as u32,
