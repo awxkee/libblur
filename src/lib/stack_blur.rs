@@ -608,8 +608,15 @@ fn stack_blur_worker_vertical(
 /// Fastest available blur option
 ///
 /// Fast gaussian approximation using stack blur
+/// This is a very fast approximation limited with i32 accumulator size,
+/// on some images overflowing may become much faster than limited 254 radius.
+/// Consider avoiding 150+ radius for high intensity images
+///
+/// # Arguments
 /// * `stride` - Bytes per lane, default is width * channels_count if not aligned
 /// * `radius` - 2..254
+///
+/// # Complexity
 /// O(1) complexity.
 pub fn stack_blur(
     in_place: &mut [u8],

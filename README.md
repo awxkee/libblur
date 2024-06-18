@@ -134,7 +134,8 @@ Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded 
 
 ### Tent blur
 
-2 sequential box blur. Medium speed, good-looking results.
+2 sequential box blur ( [theory](https://en.wikipedia.org/wiki/Central_limit_theorem) ) that produces a tent filter. 
+Medium speed, good-looking results with large radius `tents` becoming more noticeable
 
 O(1) complexity.
 
@@ -196,7 +197,7 @@ Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded
 
 ### Gaussian box blur
 
-generally 3 sequential box blurs it is almost gaussian blur, slow, really pleasant results.
+Generally 3 sequential box blurs it is almost gaussian blur ( [theory](https://en.wikipedia.org/wiki/Central_limit_theorem) ), slow, really pleasant results.
 Medium speed.
 
 O(1) complexity.
