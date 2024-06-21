@@ -20,6 +20,14 @@ fn f16_to_f32(bytes: Vec<u16>) -> Vec<f32> {
 }
 
 fn main() {
+    // unsafe {
+    //     let v = vdupq_n_s64(2);
+    //     let v2 = vdupq_n_s64(3);
+    //     let mul = vmulq_s64(v, v2);
+    //     let mut t: [i64; 2] = [0i64; 2];
+    //     vst1q_s64(t.as_mut_ptr(), mul);
+    //     println!("{:?}", t);
+    // }
     let img = ImageReader::open("assets/test_image_4.png")
         .unwrap()
         .decode()
@@ -57,27 +65,27 @@ fn main() {
     //     ThreadingPolicy::Single,
     // );
 
-    libblur::fast_gaussian_next(
-        &mut dst_bytes,
-        stride as u32,
-        dimensions.0,
-        dimensions.1,
-        100,
-        FastBlurChannels::Channels4,
-        ThreadingPolicy::Single,
-    );
-
-    // libblur::tent_blur(
-    //     &bytes,
-    //     stride as u32,
+    // libblur::fast_gaussian_superior(
     //     &mut dst_bytes,
     //     stride as u32,
     //     dimensions.0,
     //     dimensions.1,
-    //     77,
-    //     FastBlurChannels::Channels3,
-    //     ThreadingPolicy::Adaptive,
+    //     75,
+    //     FastBlurChannels::Channels4,
+    //     ThreadingPolicy::Single,
     // );
+
+    libblur::tent_blur(
+        &bytes,
+        stride as u32,
+        &mut dst_bytes,
+        stride as u32,
+        dimensions.0,
+        dimensions.1,
+        77,
+        FastBlurChannels::Channels4,
+        ThreadingPolicy::Single,
+    );
     bytes = dst_bytes;
     // libblur::gaussian_blur(
     //     &bytes,
@@ -112,16 +120,27 @@ fn main() {
     // Print the elapsed time in milliseconds
     println!("Elapsed time: {:.2?}", elapsed_time);
 
-    image::save_buffer(
-        "blurred_reflect.png",
-        bytes.as_bytes(),
-        dimensions.0,
-        dimensions.1,
-        if components == 3 {
-            image::ExtendedColorType::Rgb8
-        } else {
-            image::ExtendedColorType::Rgba8
-        },
-    )
-    .unwrap();
+    if components == 3 {
+        image::save_buffer(
+            "blurred_reflect.jpg",
+            bytes.as_bytes(),
+            dimensions.0,
+            dimensions.1,
+            image::ExtendedColorType::Rgb8,
+        )
+        .unwrap();
+    } else {
+        image::save_buffer(
+            "blurred_reflect.png",
+            bytes.as_bytes(),
+            dimensions.0,
+            dimensions.1,
+            if components == 3 {
+                image::ExtendedColorType::Rgb8
+            } else {
+                image::ExtendedColorType::Rgba8
+            },
+        )
+        .unwrap();
+    }
 }

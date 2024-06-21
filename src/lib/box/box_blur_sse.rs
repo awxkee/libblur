@@ -35,20 +35,21 @@ pub mod sse_support {
     #[cfg(target_arch = "x86_64")]
     use std::arch::x86_64::*;
 
-    use crate::mul_table::{MUL_TABLE_TWICE_RAD, SHR_TABLE_TWICE_RAD};
-    use crate::sse::load_u8_s32_fast;
+    use crate::sse::{_mm_mul_ps_epi32, load_u8_s32_fast};
     use crate::unsafe_slice::UnsafeSlice;
 
-    pub(crate) fn box_blur_horizontal_pass_sse<const CHANNELS: usize>(
-        src: &[u8],
+    pub(crate) fn box_blur_horizontal_pass_sse<T, const CHANNELS: usize>(
+        undefined_src: &[T],
         src_stride: u32,
-        unsafe_dst: &UnsafeSlice<u8>,
+        undefined_unsafe_dst: &UnsafeSlice<T>,
         dst_stride: u32,
         width: u32,
         radius: u32,
         start_y: u32,
         end_y: u32,
     ) {
+        let src: &[u8] = unsafe { std::mem::transmute(undefined_src) };
+        let unsafe_dst: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(undefined_unsafe_dst) };
         let eraser_store: [i32; 4] = if CHANNELS == 3 {
             [1i32, 1i32, 1i32, 0i32]
         } else {
@@ -56,14 +57,11 @@ pub mod sse_support {
         };
         let eraser = unsafe { _mm_loadu_si128(eraser_store.as_ptr() as *const __m128i) };
 
-        let mul_value = MUL_TABLE_TWICE_RAD[radius as usize];
-        let shr_value = SHR_TABLE_TWICE_RAD[radius as usize];
-        let v_mul_value = unsafe { _mm_set1_epi32(mul_value) };
-        let v_shr_value = unsafe { _mm_setr_epi32(shr_value, 0, 0, 0) };
-
         let kernel_size = radius * 2 + 1;
         let edge_count = (kernel_size / 2) + 1;
         let v_edge_count = unsafe { _mm_set1_epi32(edge_count as i32) };
+
+        let v_weight = unsafe { _mm_set1_ps(1f32 / kernel_size as f32) };
 
         let half_kernel = kernel_size / 2;
 
@@ -114,8 +112,7 @@ pub mod sse_support {
                     store = unsafe { _mm_mullo_epi32(store, eraser) };
                 }
 
-                let scale_store =
-                    unsafe { _mm_srl_epi32(_mm_mullo_epi32(store, v_mul_value), v_shr_value) };
+                let scale_store = unsafe { _mm_mul_ps_epi32(store, v_weight) };
                 let px_16 = unsafe { _mm_packus_epi32(scale_store, scale_store) };
                 let px_8 = unsafe { _mm_packus_epi16(px_16, px_16) };
                 let pixel = unsafe { _mm_extract_epi32::<0>(px_8) };
@@ -138,10 +135,10 @@ pub mod sse_support {
         }
     }
 
-    pub(crate) fn box_blur_vertical_pass_sse<const CHANNELS: usize>(
-        src: &[u8],
+    pub(crate) fn box_blur_vertical_pass_sse<T, const CHANNELS: usize>(
+        undefined_src: &[T],
         src_stride: u32,
-        unsafe_dst: &UnsafeSlice<u8>,
+        undefined_unsafe_dst: &UnsafeSlice<T>,
         dst_stride: u32,
         _: u32,
         height: u32,
@@ -149,6 +146,8 @@ pub mod sse_support {
         start_x: u32,
         end_x: u32,
     ) {
+        let src: &[u8] = unsafe { std::mem::transmute(undefined_src) };
+        let unsafe_dst: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(undefined_unsafe_dst) };
         let eraser_store: [i32; 4] = if CHANNELS == 3 {
             [1i32, 1i32, 1i32, 0i32]
         } else {
@@ -156,14 +155,11 @@ pub mod sse_support {
         };
         let eraser = unsafe { _mm_loadu_si128(eraser_store.as_ptr() as *const __m128i) };
 
-        let mul_value = MUL_TABLE_TWICE_RAD[radius as usize];
-        let shr_value = SHR_TABLE_TWICE_RAD[radius as usize];
-        let v_mul_value = unsafe { _mm_set1_epi32(mul_value) };
-        let v_shr_value = unsafe { _mm_setr_epi32(shr_value, 0, 0, 0) };
-
         let kernel_size = radius * 2 + 1;
         let edge_count = (kernel_size / 2) + 1;
         let v_edge_count = unsafe { _mm_set1_epi32(edge_count as i32) };
+
+        let v_weight = unsafe { _mm_set1_ps(1f32 / kernel_size as f32) };
 
         let half_kernel = kernel_size / 2;
 
@@ -227,10 +223,8 @@ pub mod sse_support {
                     store_1 = unsafe { _mm_mullo_epi32(store_1, eraser) };
                 }
 
-                let scale_store_0 =
-                    unsafe { _mm_srl_epi32(_mm_mullo_epi32(store_0, v_mul_value), v_shr_value) };
-                let scale_store_1 =
-                    unsafe { _mm_srl_epi32(_mm_mullo_epi32(store_1, v_mul_value), v_shr_value) };
+                let scale_store_0 = unsafe { _mm_mul_ps_epi32(store_0, v_weight) };
+                let scale_store_1 = unsafe { _mm_mul_ps_epi32(store_1, v_weight) };
 
                 if CHANNELS == 3 {
                     let px_16 = unsafe { _mm_packus_epi32(scale_store_0, scale_store_0) };
@@ -323,8 +317,7 @@ pub mod sse_support {
                     store = unsafe { _mm_mullo_epi32(store, eraser) };
                 }
 
-                let scale_store =
-                    unsafe { _mm_srl_epi32(_mm_mullo_epi32(store, v_mul_value), v_shr_value) };
+                let scale_store = unsafe { _mm_mul_ps_epi32(store, v_weight) };
                 let px_16 = unsafe { _mm_packus_epi32(scale_store, scale_store) };
                 let px_8 = unsafe { _mm_packus_epi16(px_16, px_16) };
 

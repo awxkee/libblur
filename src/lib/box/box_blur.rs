@@ -40,8 +40,6 @@ use crate::r#box::box_blur_sse::sse_support;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::ThreadingPolicy;
 
-#[allow(unused_variables)]
-#[allow(unused_imports)]
 fn box_blur_horizontal_pass_impl<
     T: FromPrimitive + Default + Into<u32> + Send + Sync,
     const CHANNELS_CONFIGURATION: usize,
@@ -58,39 +56,15 @@ fn box_blur_horizontal_pass_impl<
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
     let box_channels: FastBlurChannels = CHANNELS_CONFIGURATION.into();
-    if std::any::type_name::<T>() == "u8" {
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-        {
-            let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
-            let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
-            neon_support::box_blur_horizontal_pass_neon::<CHANNELS_CONFIGURATION>(
-                u8_slice, src_stride, slice, dst_stride, width, radius, start_y, end_y,
-            );
-            return;
-        }
-        #[cfg(all(
-            any(target_arch = "x86_64", target_arch = "x86"),
-            target_feature = "sse4.1"
-        ))]
-        {
-            let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
-            let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
-            sse_support::box_blur_horizontal_pass_sse::<{ CHANNELS_CONFIGURATION }>(
-                u8_slice, src_stride, slice, dst_stride, width, radius, start_y, end_y,
-            );
-            return;
-        }
-    }
-    let box_channels: FastBlurChannels = CHANNELS_CONFIGURATION.into();
     let kernel_size = radius * 2 + 1;
     let edge_count = (kernel_size / 2) + 1;
     let half_kernel = kernel_size / 2;
-    let mul_value = MUL_TABLE_TWICE_RAD[radius as usize] as u32;
-    let shr_value = SHR_TABLE_TWICE_RAD[radius as usize] as u32;
     let channels_count = match box_channels {
         FastBlurChannels::Channels3 => 3,
         FastBlurChannels::Channels4 => 4,
     } as usize;
+
+    let weight = 1f32 / kernel_size as f32;
 
     for y in start_y..end_y {
         let mut kernel: [u32; 4] = [0; 4];
@@ -143,26 +117,28 @@ fn box_blur_horizontal_pass_impl<
                 }
             }
 
+            let write_offset = y_dst_shift + px;
             unsafe {
                 unsafe_dst.write(
-                    y_dst_shift + px + 0,
-                    T::from_u32((kernel[0] * mul_value) >> shr_value).unwrap_or_default(),
+                    write_offset + 0,
+                    T::from_u32((kernel[0] as f32 * weight).round() as u32).unwrap_or_default(),
                 );
                 unsafe_dst.write(
-                    y_dst_shift + px + 1,
-                    T::from_u32((kernel[1] * mul_value) >> shr_value).unwrap_or_default(),
+                    write_offset + 1,
+                    T::from_u32((kernel[1] as f32 * weight).round() as u32).unwrap_or_default(),
                 );
                 unsafe_dst.write(
-                    y_dst_shift + px + 2,
-                    T::from_u32((kernel[2] * mul_value) >> shr_value).unwrap_or_default(),
+                    write_offset + 2,
+                    T::from_u32((kernel[2] as f32 * weight).round() as u32).unwrap_or_default(),
                 );
 
                 match box_channels {
                     FastBlurChannels::Channels3 => {}
                     FastBlurChannels::Channels4 => {
                         unsafe_dst.write(
-                            y_dst_shift + px + 3,
-                            T::from_u32((kernel[3] * mul_value) >> shr_value).unwrap_or_default(),
+                            write_offset + 3,
+                            T::from_u32((kernel[3] as f32 * weight).round() as u32)
+                                .unwrap_or_default(),
                         );
                     }
                 }
@@ -187,6 +163,31 @@ fn box_blur_horizontal_pass<
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
+    let mut _dispatcher_horizontal: fn(
+        src: &[T],
+        src_stride: u32,
+        unsafe_dst: &UnsafeSlice<T>,
+        dst_stride: u32,
+        width: u32,
+        radius: u32,
+        start_y: u32,
+        end_y: u32,
+    ) = box_blur_horizontal_pass_impl::<T, CHANNEL_CONFIGURATION>;
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    {
+        if std::any::type_name::<T>() == "u8" {
+            _dispatcher_horizontal = neon_support::box_blur_horizontal_pass_neon::<T, CHANNEL_CONFIGURATION>;
+        }
+    }
+    #[cfg(all(
+        any(target_arch = "x86_64", target_arch = "x86"),
+        target_feature = "sse4.1"
+    ))]
+    {
+        if std::any::type_name::<T>() == "u8" {
+            _dispatcher_horizontal = sse_support::box_blur_horizontal_pass_sse::<T, { CHANNEL_CONFIGURATION }>;
+        }
+    }
     let unsafe_dst = UnsafeSlice::new(dst);
     pool.scope(|scope| {
         let segment_size = height / thread_count;
@@ -198,7 +199,7 @@ fn box_blur_horizontal_pass<
             }
 
             scope.spawn(move |_| {
-                box_blur_horizontal_pass_impl::<T, CHANNEL_CONFIGURATION>(
+                _dispatcher_horizontal(
                     src,
                     src_stride,
                     &unsafe_dst,
@@ -213,8 +214,6 @@ fn box_blur_horizontal_pass<
     });
 }
 
-#[allow(unused_variables)]
-#[allow(unused_imports)]
 fn box_blur_vertical_pass_impl<
     T: FromPrimitive + Default + Into<u32> + Sync + Send + Copy,
     const CHANNEL_CONFIGURATION: usize,
@@ -223,7 +222,7 @@ fn box_blur_vertical_pass_impl<
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<T>,
     dst_stride: u32,
-    width: u32,
+    _: u32,
     height: u32,
     radius: u32,
     start_x: u32,
@@ -231,29 +230,6 @@ fn box_blur_vertical_pass_impl<
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
-    if std::any::type_name::<T>() == "u8" {
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-        {
-            let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
-            let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
-            neon_support::box_blur_vertical_pass_neon::<CHANNEL_CONFIGURATION>(
-                u8_slice, src_stride, slice, dst_stride, width, height, radius, start_x, end_x,
-            );
-            return;
-        }
-        #[cfg(all(
-            any(target_arch = "x86_64", target_arch = "x86"),
-            target_feature = "sse4.1"
-        ))]
-        {
-            let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
-            let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
-            sse_support::box_blur_vertical_pass_sse::<CHANNEL_CONFIGURATION>(
-                u8_slice, src_stride, slice, dst_stride, width, height, radius, start_x, end_x,
-            );
-            return;
-        }
-    }
     let box_channels: FastBlurChannels = CHANNEL_CONFIGURATION.into();
     let kernel_size = radius * 2 + 1;
 
@@ -361,6 +337,32 @@ fn box_blur_vertical_pass<
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
+    let mut _dispatcher_vertical: fn(
+        src: &[T],
+        src_stride: u32,
+        unsafe_dst: &UnsafeSlice<T>,
+        dst_stride: u32,
+        width: u32,
+        height: u32,
+        radius: u32,
+        start_x: u32,
+        end_x: u32,
+    ) = box_blur_vertical_pass_impl::<T, CHANNEL_CONFIGURATION>;
+    #[cfg(all(
+        any(target_arch = "x86_64", target_arch = "x86"),
+        target_feature = "sse4.1"
+    ))]
+    {
+        if std::any::type_name::<T>() == "u8" {
+            _dispatcher_vertical = sse_support::box_blur_vertical_pass_sse::<T, CHANNEL_CONFIGURATION>;
+        }
+    }
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    {
+        if std::any::type_name::<T>() == "u8" {
+            _dispatcher_vertical = neon_support::box_blur_vertical_pass_neon::<T, CHANNEL_CONFIGURATION>;
+        }
+    }
     let unsafe_dst = UnsafeSlice::new(dst);
 
     pool.scope(|scope| {
@@ -373,7 +375,7 @@ fn box_blur_vertical_pass<
             }
 
             scope.spawn(move |_| {
-                box_blur_vertical_pass_impl::<T, CHANNEL_CONFIGURATION>(
+                _dispatcher_vertical(
                     src,
                     src_stride,
                     &unsafe_dst,
@@ -606,8 +608,6 @@ fn tent_blur_impl<
 /// Tent blur just makes a two passes box blur on the image since two times box it is almost equal to tent filter.
 /// https://en.wikipedia.org/wiki/Central_limit_theorem
 ///
-/// Even box blur is not approximation by itself it uses a division approximation for performance purposes
-/// which affects a very large radius making it a slightly darker since it is approximated division.
 /// O(1) complexity.
 ///
 /// # Arguments
@@ -664,8 +664,6 @@ pub fn tent_blur(
 /// Tent blur just makes a two passes box blur on the image since two times box it is almost equal to tent filter.
 /// https://en.wikipedia.org/wiki/Central_limit_theorem
 ///
-/// Even box blur is not approximation by itself it uses a division approximation for performance purposes
-/// which affects a very large radius making it a slightly darker since it is approximated division.
 /// O(1) complexity.
 ///
 /// # Arguments
@@ -782,8 +780,6 @@ fn gaussian_box_blur_impl<
 /// https://en.wikipedia.org/wiki/Central_limit_theorem
 ///
 /// Even it is having low complexity it is slow filter.
-/// Even box blur is not approximation by itself it uses a division approximation for performance purposes
-/// which affects a very large radius making it a slightly darker since it is approximated division.
 /// O(1) complexity.
 ///
 /// # Arguments
@@ -807,7 +803,6 @@ pub fn gaussian_box_blur(
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) {
-    let radius = std::cmp::min(radius, 255);
     match channels {
         FastBlurChannels::Channels3 => {
             gaussian_box_blur_impl::<u8, 3>(
@@ -842,8 +837,6 @@ pub fn gaussian_box_blur(
 /// https://en.wikipedia.org/wiki/Central_limit_theorem
 ///
 /// Even it is having low complexity it is slow filter.
-/// Even box blur is not approximation by itself it uses a division approximation for performance purposes
-/// which affects a very large radius making it a slightly darker since it is approximated division.
 /// O(1) complexity.
 ///
 /// # Arguments
@@ -867,7 +860,6 @@ pub fn gaussian_box_blur_u16(
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) {
-    let radius = std::cmp::min(radius, 255);
     match channels {
         FastBlurChannels::Channels3 => {
             gaussian_box_blur_impl::<u16, 3>(

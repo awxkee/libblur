@@ -30,23 +30,24 @@
     target_feature = "neon"
 ))]
 pub mod neon_support {
-    use crate::mul_table::{MUL_TABLE_TWICE_RAD, SHR_TABLE_TWICE_RAD};
+    use crate::neon::{load_u8_u16, load_u8_u32_fast, vmulq_u32_f32};
     use std::arch::aarch64::*;
 
-    use crate::neon_utils::neon_utils::{load_u8_u16, load_u8_u32_fast};
     use crate::unsafe_slice::UnsafeSlice;
 
     #[allow(dead_code)]
-    pub(crate) fn box_blur_horizontal_pass_neon<const CHANNEL_CONFIGURATION: usize>(
-        src: &[u8],
+    pub(crate) fn box_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usize>(
+        undefined_src: &[T],
         src_stride: u32,
-        unsafe_dst: &UnsafeSlice<u8>,
+        undefined_dst: &UnsafeSlice<T>,
         dst_stride: u32,
         width: u32,
         radius: u32,
         start_y: u32,
         end_y: u32,
     ) {
+        let src: &[u8] = unsafe { std::mem::transmute(undefined_src) };
+        let unsafe_dst: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(undefined_dst) };
         let eraser_store: [u32; 4] = [1u32, 1u32, 1u32, 0u32];
         let eraser: uint32x4_t = unsafe { vld1q_u32(eraser_store.as_ptr()) };
 
@@ -54,11 +55,7 @@ pub mod neon_support {
         let edge_count = (kernel_size / 2) + 1;
         let v_edge_count = unsafe { vdupq_n_u32(edge_count) };
 
-        let mul_value = MUL_TABLE_TWICE_RAD[radius as usize] as u32;
-        let shr_value = SHR_TABLE_TWICE_RAD[radius as usize];
-
-        let v_mul_value = unsafe { vdupq_n_u32(mul_value) };
-        let v_shr_value = unsafe { vdupq_n_s32(-shr_value) };
+        let v_weight = unsafe { vdupq_n_f32(1f32 / kernel_size as f32) };
 
         let half_kernel = kernel_size / 2;
 
@@ -109,7 +106,7 @@ pub mod neon_support {
                     store = unsafe { vmulq_u32(store, eraser) };
                 }
 
-                let scale_store = unsafe { vshlq_u32(vmulq_u32(store, v_mul_value), v_shr_value) };
+                let scale_store = unsafe { vmulq_u32_f32(store, v_weight) };
                 let px_16 = unsafe { vqmovn_u32(scale_store) };
                 let px_8 = unsafe { vqmovn_u16(vcombine_u16(px_16, px_16)) };
                 let pixel = unsafe { vget_lane_u32::<0>(vreinterpret_u32_u8(px_8)) };
@@ -132,10 +129,10 @@ pub mod neon_support {
         }
     }
 
-    pub(crate) fn box_blur_vertical_pass_neon<const CHANNEL_CONFIGURATION: usize>(
-        src: &[u8],
+    pub(crate) fn box_blur_vertical_pass_neon<T, const CHANNEL_CONFIGURATION: usize>(
+        undefined_src: &[T],
         src_stride: u32,
-        unsafe_dst: &UnsafeSlice<u8>,
+        undefined_unsafe_dst: &UnsafeSlice<T>,
         dst_stride: u32,
         _: u32,
         height: u32,
@@ -143,20 +140,18 @@ pub mod neon_support {
         start_x: u32,
         end_x: u32,
     ) {
+        let src: &[u8] = unsafe { std::mem::transmute(undefined_src) };
+        let unsafe_dst: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(undefined_unsafe_dst) };
         let eraser_store: [u32; 4] = [1u32, 1u32, 1u32, 0u32];
         let eraser: uint32x4_t = unsafe { vld1q_u32(eraser_store.as_ptr()) };
-
-        let mul_value = MUL_TABLE_TWICE_RAD[radius as usize] as u32;
-        let shr_value = SHR_TABLE_TWICE_RAD[radius as usize];
-
-        let v_mul_value = unsafe { vdupq_n_u32(mul_value) };
-        let v_shr_value = unsafe { vdupq_n_s32(-shr_value) };
 
         let kernel_size = radius * 2 + 1;
         let edge_count = (kernel_size / 2) + 1;
         let v_edge_count = unsafe { vdupq_n_u32(edge_count) };
 
         let half_kernel = kernel_size / 2;
+
+        let v_weight = unsafe { vdupq_n_f32(1f32 / kernel_size as f32) };
 
         let mut cx = start_x;
 
@@ -224,9 +219,9 @@ pub mod neon_support {
                 }
 
                 let scale_store_0 =
-                    unsafe { vshlq_u32(vmulq_u32(store_0, v_mul_value), v_shr_value) };
+                    unsafe { vmulq_u32_f32(store_0, v_weight) };
                 let scale_store_1 =
-                    unsafe { vshlq_u32(vmulq_u32(store_1, v_mul_value), v_shr_value) };
+                    unsafe { vmulq_u32_f32(store_1, v_weight) };
                 if CHANNEL_CONFIGURATION == 3 {
                     let px_16 = unsafe { vqmovn_u32(scale_store_0) };
                     let px_8 = unsafe { vqmovn_u16(vcombine_u16(px_16, px_16)) };
@@ -317,7 +312,7 @@ pub mod neon_support {
                     store = unsafe { vmulq_u32(store, eraser) };
                 }
 
-                let scale_store = unsafe { vshlq_u32(vmulq_u32(store, v_mul_value), v_shr_value) };
+                let scale_store = unsafe { vmulq_u32_f32(store, v_weight) };
                 let px_16 = unsafe { vqmovn_u32(scale_store) };
                 let px_8 = unsafe { vqmovn_u16(vcombine_u16(px_16, px_16)) };
                 let pixel = unsafe { vget_lane_u32::<0>(vreinterpret_u32_u8(px_8)) };

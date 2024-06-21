@@ -29,7 +29,7 @@
 pub(crate) mod fast_gaussian_next_f32_neon {
     use std::arch::aarch64::*;
 
-    use crate::neon_utils::neon_utils::load_f32;
+    use crate::neon::load_f32;
     use crate::unsafe_slice::UnsafeSlice;
     use crate::FastBlurChannels;
 

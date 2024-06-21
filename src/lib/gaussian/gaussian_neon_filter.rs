@@ -28,7 +28,7 @@
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 pub(crate) mod neon_gaussian_filter {
     use crate::gaussian::gaussian_filter::GaussianFilter;
-    use crate::neon_utils::neon_utils::{
+    use crate::neon::{
         load_u8_u16_x2_fast, load_u8_u32_fast, load_u8_u32_one, prefer_vfma_f32, prefer_vfmaq_f32,
     };
     use std::arch::aarch64::*;

@@ -28,13 +28,9 @@
 use crate::channels_configuration::FastBlurChannels;
 use crate::fast_gaussian_f16::fast_gaussian_f16;
 use crate::fast_gaussian_f32::fast_gaussian_f32;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use crate::fast_gaussian_neon::neon_support;
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "sse4.1"
-))]
 use crate::mul_table::{MUL_TABLE_DOUBLE, SHR_TABLE_DOUBLE};
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+use crate::neon::{fast_gaussian_horizontal_pass_neon_u8, fast_gaussian_vertical_pass_neon_u8};
 #[cfg(all(
     any(target_arch = "x86_64", target_arch = "x86"),
     target_feature = "sse4.1"
@@ -70,30 +66,10 @@ fn fast_gaussian_vertical_pass<T, J, const CHANNELS_CONFIGURATION: usize>(
         + std::ops::Sub<Output = J>
         + std::ops::Add<Output = J>
         + std::ops::AddAssign
-        + std::ops::SubAssign,
+        + std::ops::SubAssign
+        + From<i32>,
     i64: From<T>,
 {
-    if std::any::type_name::<T>() == "u8" && !(std::any::type_name::<J>() == "i64") {
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-        {
-            let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(bytes) };
-            neon_support::fast_gaussian_vertical_pass_neon_u8::<CHANNELS_CONFIGURATION>(
-                slice, stride, width, height, radius, start, end,
-            );
-            return;
-        }
-        #[cfg(all(
-            any(target_arch = "x86_64", target_arch = "x86"),
-            target_feature = "sse4.1"
-        ))]
-        {
-            let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(bytes) };
-            fast_gaussian_vertical_pass_sse_u8::<CHANNELS_CONFIGURATION>(
-                slice, stride, width, height, radius, start, end,
-            );
-            return;
-        }
-    }
     let mut buffer_r: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
     let mut buffer_g: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
     let mut buffer_b: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
@@ -120,14 +96,11 @@ fn fast_gaussian_vertical_pass<T, J, const CHANNELS_CONFIGURATION: usize>(
             let current_y = (y * (stride as i64)) as usize;
             if y >= 0 {
                 let sum_r_i64: i64 = sum_r.into();
-                let new_r =
-                    T::from_u64((sum_r_i64 * mul_value) as u64 >> shr_value).unwrap_or_default();
+                let new_r = T::from_u64((sum_r_i64 * mul_value) as u64 >> shr_value).unwrap();
                 let sum_g_i64: i64 = sum_g.into();
-                let new_g =
-                    T::from_u64((sum_g_i64 * mul_value) as u64 >> shr_value).unwrap_or_default();
+                let new_g = T::from_u64((sum_g_i64 * mul_value) as u64 >> shr_value).unwrap();
                 let sum_b_i64: i64 = sum_b.into();
-                let new_b =
-                    T::from_u64((sum_b_i64 * mul_value) as u64 >> shr_value).unwrap_or_default();
+                let new_b = T::from_u64((sum_b_i64 * mul_value) as u64 >> shr_value).unwrap();
 
                 unsafe {
                     bytes.write(current_y + current_px, new_r);
@@ -135,32 +108,33 @@ fn fast_gaussian_vertical_pass<T, J, const CHANNELS_CONFIGURATION: usize>(
                     bytes.write(current_y + current_px + 2, new_b);
                     if CHANNELS_CONFIGURATION == 4 {
                         let sum_a_i64: i64 = sum_a.into();
-                        let new_a = T::from_u64((sum_a_i64 * mul_value) as u64 >> shr_value)
-                            .unwrap_or_default();
+                        let new_a =
+                            T::from_u64((sum_a_i64 * mul_value) as u64 >> shr_value).unwrap();
                         bytes.write(current_y + current_px + 3, new_a);
                     }
                 }
 
                 let arr_index = ((y - radius_64) & 1023) as usize;
                 let d_arr_index = (y & 1023) as usize;
+                let twos: J = 2i32.into();
                 dif_r += unsafe { *buffer_r.get_unchecked(arr_index) }
-                    - J::from_i32(2).unwrap() * unsafe { *buffer_r.get_unchecked(d_arr_index) };
+                    - twos * unsafe { *buffer_r.get_unchecked(d_arr_index) };
                 dif_g += unsafe { *buffer_g.get_unchecked(arr_index) }
-                    - J::from_i32(2).unwrap() * unsafe { *buffer_g.get_unchecked(d_arr_index) };
+                    - twos * unsafe { *buffer_g.get_unchecked(d_arr_index) };
                 dif_b += unsafe { *buffer_b.get_unchecked(arr_index) }
-                    - J::from_i32(2).unwrap() * unsafe { *buffer_b.get_unchecked(d_arr_index) };
+                    - twos * unsafe { *buffer_b.get_unchecked(d_arr_index) };
                 if CHANNELS_CONFIGURATION == 4 {
                     dif_a += unsafe { *buffer_a.get_unchecked(arr_index) }
-                        - J::from_i32(2).unwrap() * unsafe { *buffer_a.get_unchecked(d_arr_index) };
+                        - twos * unsafe { *buffer_a.get_unchecked(d_arr_index) };
                 }
             } else if y + radius_64 >= 0 {
                 let arr_index = (y & 1023) as usize;
-                dif_r -= J::from_i32(2).unwrap() * unsafe { *buffer_r.get_unchecked(arr_index) };
-                dif_g -= J::from_i32(2).unwrap() * unsafe { *buffer_g.get_unchecked(arr_index) };
-                dif_b -= J::from_i32(2).unwrap() * unsafe { *buffer_b.get_unchecked(arr_index) };
+                let twos: J = 2i32.into();
+                dif_r -= twos * unsafe { *buffer_r.get_unchecked(arr_index) };
+                dif_g -= twos * unsafe { *buffer_g.get_unchecked(arr_index) };
+                dif_b -= twos * unsafe { *buffer_b.get_unchecked(arr_index) };
                 if CHANNELS_CONFIGURATION == 4 {
-                    dif_a -=
-                        J::from_i32(2).unwrap() * unsafe { *buffer_a.get_unchecked(arr_index) };
+                    dif_a -= twos * unsafe { *buffer_a.get_unchecked(arr_index) };
                 }
             }
 
@@ -233,27 +207,6 @@ fn fast_gaussian_horizontal_pass<
         + TryFrom<u8>,
     i64: From<T>,
 {
-    if std::any::type_name::<T>() == "u8" && !(std::any::type_name::<J>() == "i64") {
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-        {
-            let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(bytes) };
-            neon_support::fast_gaussian_horizontal_pass_neon_u8::<CHANNEL_CONFIGURATION>(
-                slice, stride, width, height, radius, start, end,
-            );
-            return;
-        }
-        #[cfg(all(
-            any(target_arch = "x86_64", target_arch = "x86"),
-            target_feature = "sse4.1"
-        ))]
-        {
-            let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(bytes) };
-            fast_gaussian_horizontal_pass_sse_u8::<CHANNEL_CONFIGURATION>(
-                slice, stride, width, height, radius, start, end,
-            );
-            return;
-        }
-    }
     let channels: FastBlurChannels = CHANNEL_CONFIGURATION.into();
     let mut buffer_r: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
     let mut buffer_g: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
@@ -394,7 +347,7 @@ fn fast_gaussian_impl<
         .num_threads(thread_count as usize)
         .build()
         .unwrap();
-    let dispatcher_vertical: fn(
+    let mut _dispatcher_vertical: fn(
         bytes: &UnsafeSlice<T>,
         stride: u32,
         width: u32,
@@ -402,17 +355,42 @@ fn fast_gaussian_impl<
         radius: u32,
         start: u32,
         end: u32,
-    ) = if BASE_RADIUS_I64_CUTOFF < radius {
+    ) = if BASE_RADIUS_I64_CUTOFF > radius {
         fast_gaussian_vertical_pass::<T, i32, CHANNEL_CONFIGURATION>
     } else {
         fast_gaussian_vertical_pass::<T, i64, CHANNEL_CONFIGURATION>
     };
-    let dispatcher_horizontal: fn(&UnsafeSlice<T>, u32, u32, u32, u32, u32, u32) =
-        if BASE_RADIUS_I64_CUTOFF < radius {
+    let mut _dispatcher_horizontal: fn(&UnsafeSlice<T>, u32, u32, u32, u32, u32, u32) =
+        if BASE_RADIUS_I64_CUTOFF > radius {
             fast_gaussian_horizontal_pass::<T, i32, CHANNEL_CONFIGURATION>
         } else {
             fast_gaussian_horizontal_pass::<T, i64, CHANNEL_CONFIGURATION>
         };
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    {
+        if std::any::type_name::<T>() == "u8" {
+            if BASE_RADIUS_I64_CUTOFF > radius {
+                _dispatcher_vertical =
+                    fast_gaussian_vertical_pass_neon_u8::<T, CHANNEL_CONFIGURATION>;
+                _dispatcher_horizontal =
+                    fast_gaussian_horizontal_pass_neon_u8::<T, CHANNEL_CONFIGURATION>;
+            }
+        }
+    }
+    #[cfg(all(
+        any(target_arch = "x86_64", target_arch = "x86"),
+        target_feature = "sse4.1"
+    ))]
+    {
+        if std::any::type_name::<T>() == "u8" {
+            if BASE_RADIUS_I64_CUTOFF > radius {
+                _dispatcher_vertical =
+                    fast_gaussian_vertical_pass_sse_u8::<T, CHANNEL_CONFIGURATION>;
+                _dispatcher_horizontal =
+                    fast_gaussian_horizontal_pass_sse_u8::<T, CHANNEL_CONFIGURATION>;
+            }
+        }
+    }
     pool.scope(|scope| {
         let segment_size = width / thread_count;
 
@@ -423,7 +401,7 @@ fn fast_gaussian_impl<
                 end_x = width;
             }
             scope.spawn(move |_| {
-                dispatcher_vertical(&unsafe_image, stride, width, height, radius, start_x, end_x);
+                _dispatcher_vertical(&unsafe_image, stride, width, height, radius, start_x, end_x);
             });
         }
     });
@@ -437,7 +415,15 @@ fn fast_gaussian_impl<
                 end_y = height;
             }
             scope.spawn(move |_| {
-                dispatcher_horizontal(&unsafe_image, stride, width, height, radius, start_y, end_y);
+                _dispatcher_horizontal(
+                    &unsafe_image,
+                    stride,
+                    width,
+                    height,
+                    radius,
+                    start_y,
+                    end_y,
+                );
             });
         }
     });

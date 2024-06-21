@@ -44,6 +44,14 @@ pub(crate) unsafe fn load_u8_s32_fast<const CHANNELS_COUNT: usize>(ptr: *const u
 }
 
 #[inline(always)]
+pub(crate) unsafe fn _mm_mul_ps_epi32(ab: __m128i, cd: __m128) -> __m128i {
+    let cvt = _mm_cvtepi32_ps(ab);
+    const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
+    let rs = _mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(cvt, cd));
+    _mm_cvtps_epi32(rs)
+}
+
+#[inline(always)]
 pub(crate) unsafe fn _mm_mul_epi64(ab: __m128i, cd: __m128i) -> __m128i {
     /* ac = (ab & 0xFFFFFFFF) * (cd & 0xFFFFFFFF); */
     let ac = _mm_mul_epu32(ab, cd);

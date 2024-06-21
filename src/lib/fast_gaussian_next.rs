@@ -28,7 +28,9 @@
 use crate::fast_gaussian_next_f16::fast_gaussian_next_f16;
 use crate::fast_gaussian_next_f32::fast_gaussian_next_f32;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use crate::fast_gaussian_next_neon::neon_support;
+use crate::neon::{
+    fast_gaussian_next_horizontal_pass_neon_u8, fast_gaussian_next_vertical_pass_neon_u8,
+};
 #[cfg(all(
     any(target_arch = "x86_64", target_arch = "x86"),
     target_feature = "sse4.1"
@@ -38,10 +40,13 @@ use crate::sse::{
 };
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{FastBlurChannels, ThreadingPolicy};
-use num_traits::FromPrimitive;
+use num_traits::{AsPrimitive, FromPrimitive};
+
+const BASE_RADIUS_I64_CUTOFF: u32 = 125;
 
 fn fast_gaussian_next_vertical_pass<
     T: FromPrimitive + Default + Into<i32>,
+    J,
     const CHANNEL_CONFIGURATION: usize,
 >(
     bytes: &UnsafeSlice<T>,
@@ -52,49 +57,46 @@ fn fast_gaussian_next_vertical_pass<
     start: u32,
     end: u32,
 ) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy,
+    T: std::ops::AddAssign
+        + std::ops::SubAssign
+        + Copy
+        + FromPrimitive
+        + Default
+        + Into<i32>
+        + Into<J>,
+    J: Copy
+        + FromPrimitive
+        + AsPrimitive<f64>
+        + Default
+        + Into<i64>
+        + std::ops::Mul<Output = J>
+        + std::ops::Sub<Output = J>
+        + std::ops::Add<Output = J>
+        + std::ops::AddAssign
+        + std::ops::SubAssign
+        + From<i32>,
+    i64: From<T>,
 {
-    if std::any::type_name::<T>() == "u8" {
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-        {
-            let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(bytes) };
-            neon_support::fast_gaussian_next_vertical_pass_neon_u8::<CHANNEL_CONFIGURATION>(
-                slice, stride, width, height, radius, start, end,
-            );
-            return;
-        }
-        #[cfg(all(
-            any(target_arch = "x86_64", target_arch = "x86"),
-            target_feature = "sse4.1"
-        ))]
-        {
-            let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(bytes) };
-            fast_gaussian_next_vertical_pass_sse_u8::<CHANNEL_CONFIGURATION>(
-                slice, stride, width, height, radius, start, end,
-            );
-            return;
-        }
-    }
-    let mut buffer_r: [i32; 1024] = [0; 1024];
-    let mut buffer_g: [i32; 1024] = [0; 1024];
-    let mut buffer_b: [i32; 1024] = [0; 1024];
-    let mut buffer_a: [i32; 1024] = [0; 1024];
+    let mut buffer_r: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
+    let mut buffer_g: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
+    let mut buffer_b: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
+    let mut buffer_a: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
     let radius_64 = radius as i64;
     let height_wide = height as i64;
-    let weight = 1.0f32 / ((radius as f32) * (radius as f32) * (radius as f32));
+    let weight = 1.0f64 / ((radius as f64) * (radius as f64) * (radius as f64));
     for x in start..std::cmp::min(width, end) {
-        let mut dif_r: i32 = 0;
-        let mut der_r: i32 = 0;
-        let mut sum_r: i32 = 0;
-        let mut dif_g: i32 = 0;
-        let mut der_g: i32 = 0;
-        let mut sum_g: i32 = 0;
-        let mut dif_b: i32 = 0;
-        let mut der_b: i32 = 0;
-        let mut sum_b: i32 = 0;
-        let mut dif_a: i32 = 0;
-        let mut der_a: i32 = 0;
-        let mut sum_a: i32 = 0;
+        let mut dif_r: J = J::from_i32(0i32).unwrap();
+        let mut der_r: J = J::from_i32(0i32).unwrap();
+        let mut sum_r: J = J::from_i32(0i32).unwrap();
+        let mut dif_g: J = J::from_i32(0i32).unwrap();
+        let mut der_g: J = J::from_i32(0i32).unwrap();
+        let mut sum_g: J = J::from_i32(0i32).unwrap();
+        let mut dif_b: J = J::from_i32(0i32).unwrap();
+        let mut der_b: J = J::from_i32(0i32).unwrap();
+        let mut sum_b: J = J::from_i32(0i32).unwrap();
+        let mut dif_a: J = J::from_i32(0i32).unwrap();
+        let mut der_a: J = J::from_i32(0i32).unwrap();
+        let mut sum_a: J = J::from_i32(0i32).unwrap();
 
         let current_px = (x * CHANNEL_CONFIGURATION as u32) as usize;
 
@@ -102,9 +104,12 @@ fn fast_gaussian_next_vertical_pass<
         for y in start_y..height_wide {
             let current_y = (y * (stride as i64)) as usize;
             if y >= 0 {
-                let new_r = T::from_u32(((sum_r as f32) * weight) as u32).unwrap_or_default();
-                let new_g = T::from_u32(((sum_g as f32) * weight) as u32).unwrap_or_default();
-                let new_b = T::from_u32(((sum_b as f32) * weight) as u32).unwrap_or_default();
+                let sum_r_f: f64 = sum_r.as_();
+                let sum_g_f: f64 = sum_g.as_();
+                let sum_b_f: f64 = sum_b.as_();
+                let new_r = T::from_u32((sum_r_f * weight) as u32).unwrap_or_default();
+                let new_g = T::from_u32((sum_g_f * weight) as u32).unwrap_or_default();
+                let new_b = T::from_u32((sum_b_f * weight) as u32).unwrap_or_default();
 
                 let bytes_offset = current_y + current_px;
 
@@ -113,8 +118,8 @@ fn fast_gaussian_next_vertical_pass<
                     bytes.write(bytes_offset + 1, new_g);
                     bytes.write(bytes_offset + 2, new_b);
                     if CHANNEL_CONFIGURATION == 4 {
-                        let new_a =
-                            T::from_u32(((sum_a as f32) * weight) as u32).unwrap_or_default();
+                        let sum_a_f: f64 = sum_a.as_();
+                        let new_a = T::from_u32((sum_a_f * weight) as u32).unwrap_or_default();
                         bytes.write(bytes_offset + 3, new_a);
                     }
                 }
@@ -122,20 +127,21 @@ fn fast_gaussian_next_vertical_pass<
                 let d_arr_index_1 = ((y + radius_64) & 1023) as usize;
                 let d_arr_index_2 = ((y - radius_64) & 1023) as usize;
                 let d_arr_index = (y & 1023) as usize;
-                dif_r += 3
-                    * (unsafe { buffer_r.get_unchecked(d_arr_index) }
+                let threes = J::from_i32(3i32).unwrap();
+                dif_r += threes
+                    * (unsafe { *buffer_r.get_unchecked(d_arr_index) }
                         - unsafe { *buffer_r.get_unchecked(d_arr_index_1) })
                     - unsafe { *buffer_r.get_unchecked(d_arr_index_2) };
-                dif_g += 3
+                dif_g += threes
                     * (unsafe { *buffer_g.get_unchecked(d_arr_index) }
                         - unsafe { *buffer_g.get_unchecked(d_arr_index_1) })
                     - unsafe { *buffer_g.get_unchecked(d_arr_index_2) };
-                dif_b += 3
+                dif_b += threes
                     * (unsafe { *buffer_b.get_unchecked(d_arr_index) }
                         - unsafe { *buffer_b.get_unchecked(d_arr_index_1) })
                     - unsafe { *buffer_b.get_unchecked(d_arr_index_2) };
                 if CHANNEL_CONFIGURATION == 4 {
-                    dif_a += 3
+                    dif_a += threes
                         * (unsafe { *buffer_a.get_unchecked(d_arr_index) }
                             - unsafe { *buffer_a.get_unchecked(d_arr_index_1) })
                         - unsafe { *buffer_a.get_unchecked(d_arr_index_2) };
@@ -143,27 +149,29 @@ fn fast_gaussian_next_vertical_pass<
             } else if y + radius_64 >= 0 {
                 let arr_index = (y & 1023) as usize;
                 let arr_index_1 = ((y + radius_64) & 1023) as usize;
-                dif_r += 3
+                let threes = J::from_i32(3i32).unwrap();
+                dif_r += threes
                     * (unsafe { *buffer_r.get_unchecked(arr_index) }
                         - unsafe { *buffer_r.get_unchecked(arr_index_1) });
-                dif_g += 3
+                dif_g += threes
                     * (unsafe { *buffer_g.get_unchecked(arr_index) }
                         - unsafe { *buffer_g.get_unchecked(arr_index_1) });
-                dif_b += 3
+                dif_b += threes
                     * (unsafe { *buffer_b.get_unchecked(arr_index) }
                         - unsafe { *buffer_b.get_unchecked(arr_index_1) });
                 if CHANNEL_CONFIGURATION == 4 {
-                    dif_a += 3
+                    dif_a += threes
                         * (unsafe { *buffer_a.get_unchecked(arr_index) }
                             - unsafe { *buffer_a.get_unchecked(arr_index_1) });
                 }
             } else if y + 2 * radius_64 >= 0 {
                 let arr_index = ((y + radius_64) & 1023) as usize;
-                dif_r -= 3 * unsafe { *buffer_r.get_unchecked(arr_index) };
-                dif_g -= 3 * unsafe { *buffer_g.get_unchecked(arr_index) };
-                dif_b -= 3 * unsafe { *buffer_b.get_unchecked(arr_index) };
+                let threes = J::from_i32(3i32).unwrap();
+                dif_r -= threes * unsafe { *buffer_r.get_unchecked(arr_index) };
+                dif_g -= threes * unsafe { *buffer_g.get_unchecked(arr_index) };
+                dif_b -= threes * unsafe { *buffer_b.get_unchecked(arr_index) };
                 if CHANNEL_CONFIGURATION == 4 {
-                    dif_a -= 3 * unsafe { *buffer_a.get_unchecked(arr_index) };
+                    dif_a -= threes * unsafe { *buffer_a.get_unchecked(arr_index) };
                 }
             }
 
@@ -219,6 +227,7 @@ fn fast_gaussian_next_vertical_pass<
 
 fn fast_gaussian_next_horizontal_pass<
     T: FromPrimitive + Default + Into<i32> + Send + Sync,
+    J,
     const CHANNEL_CONFIGURATION: usize,
 >(
     bytes: &UnsafeSlice<T>,
@@ -229,49 +238,46 @@ fn fast_gaussian_next_horizontal_pass<
     start: u32,
     end: u32,
 ) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy,
+    T: std::ops::AddAssign
+        + std::ops::SubAssign
+        + Copy
+        + FromPrimitive
+        + Default
+        + Into<i32>
+        + Into<J>,
+    J: Copy
+        + FromPrimitive
+        + AsPrimitive<f64>
+        + Default
+        + Into<i64>
+        + std::ops::Mul<Output = J>
+        + std::ops::Sub<Output = J>
+        + std::ops::Add<Output = J>
+        + std::ops::AddAssign
+        + std::ops::SubAssign
+        + From<i32>,
+    i64: From<T>,
 {
-    if std::any::type_name::<T>() == "u8" {
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-        {
-            let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(bytes) };
-            neon_support::fast_gaussian_next_horizontal_pass_neon_u8::<CHANNEL_CONFIGURATION>(
-                slice, stride, width, height, radius, start, end,
-            );
-            return;
-        }
-        #[cfg(all(
-            any(target_arch = "x86_64", target_arch = "x86"),
-            target_feature = "sse4.1"
-        ))]
-        {
-            let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(bytes) };
-            fast_gaussian_next_horizontal_pass_sse_u8::<CHANNEL_CONFIGURATION>(
-                slice, stride, width, height, radius, start, end,
-            );
-            return;
-        }
-    }
-    let mut buffer_r: [i32; 1024] = [0; 1024];
-    let mut buffer_g: [i32; 1024] = [0; 1024];
-    let mut buffer_b: [i32; 1024] = [0; 1024];
-    let mut buffer_a: [i32; 1024] = [0; 1024];
+    let mut buffer_r: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
+    let mut buffer_g: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
+    let mut buffer_b: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
+    let mut buffer_a: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
     let radius_64 = radius as i64;
     let width_wide = width as i64;
-    let weight = 1.0f32 / ((radius as f32) * (radius as f32) * (radius as f32));
+    let weight = 1.0f64 / ((radius as f64) * (radius as f64) * (radius as f64));
     for y in start..std::cmp::min(height, end) {
-        let mut dif_r: i32 = 0;
-        let mut der_r: i32 = 0;
-        let mut sum_r: i32 = 0;
-        let mut dif_g: i32 = 0;
-        let mut der_g: i32 = 0;
-        let mut sum_g: i32 = 0;
-        let mut dif_b: i32 = 0;
-        let mut der_b: i32 = 0;
-        let mut sum_b: i32 = 0;
-        let mut dif_a: i32 = 0;
-        let mut der_a: i32 = 0;
-        let mut sum_a: i32 = 0;
+        let mut dif_r: J = J::from_i32(0i32).unwrap();
+        let mut der_r: J = J::from_i32(0i32).unwrap();
+        let mut sum_r: J = J::from_i32(0i32).unwrap();
+        let mut dif_g: J = J::from_i32(0i32).unwrap();
+        let mut der_g: J = J::from_i32(0i32).unwrap();
+        let mut sum_g: J = J::from_i32(0i32).unwrap();
+        let mut dif_b: J = J::from_i32(0i32).unwrap();
+        let mut der_b: J = J::from_i32(0i32).unwrap();
+        let mut sum_b: J = J::from_i32(0i32).unwrap();
+        let mut dif_a: J = J::from_i32(0i32).unwrap();
+        let mut der_a: J = J::from_i32(0i32).unwrap();
+        let mut sum_a: J = J::from_i32(0i32).unwrap();
 
         let current_y = ((y as i64) * (stride as i64)) as usize;
 
@@ -279,9 +285,12 @@ fn fast_gaussian_next_horizontal_pass<
             if x >= 0 {
                 let current_px =
                     ((std::cmp::max(x, 0) as u32) * CHANNEL_CONFIGURATION as u32) as usize;
-                let new_r = T::from_u32(((sum_r as f32) * weight) as u32).unwrap_or_default();
-                let new_g = T::from_u32(((sum_g as f32) * weight) as u32).unwrap_or_default();
-                let new_b = T::from_u32(((sum_b as f32) * weight) as u32).unwrap_or_default();
+                let sum_r_f: f64 = sum_r.as_();
+                let sum_g_f: f64 = sum_g.as_();
+                let sum_b_f: f64 = sum_b.as_();
+                let new_r = T::from_u32((sum_r_f * weight) as u32).unwrap_or_default();
+                let new_g = T::from_u32((sum_g_f * weight) as u32).unwrap_or_default();
+                let new_b = T::from_u32((sum_b_f * weight) as u32).unwrap_or_default();
 
                 let bytes_offset = current_y + current_px;
 
@@ -290,8 +299,8 @@ fn fast_gaussian_next_horizontal_pass<
                     bytes.write(bytes_offset + 1, new_g);
                     bytes.write(bytes_offset + 2, new_b);
                     if CHANNEL_CONFIGURATION == 4 {
-                        let new_a =
-                            T::from_u32(((sum_a as f32) * weight) as u32).unwrap_or_default();
+                        let sum_a_f: f64 = sum_a.as_();
+                        let new_a = T::from_u32((sum_a_f * weight) as u32).unwrap_or_default();
                         bytes.write(bytes_offset + 3, new_a);
                     }
                 }
@@ -299,20 +308,21 @@ fn fast_gaussian_next_horizontal_pass<
                 let d_arr_index_1 = ((x + radius_64) & 1023) as usize;
                 let d_arr_index_2 = ((x - radius_64) & 1023) as usize;
                 let d_arr_index = (x & 1023) as usize;
-                dif_r += 3
+                let threes = J::from_i32(3i32).unwrap();
+                dif_r += threes
                     * (unsafe { *buffer_r.get_unchecked(d_arr_index) }
                         - unsafe { *buffer_r.get_unchecked(d_arr_index_1) })
                     - unsafe { *buffer_r.get_unchecked(d_arr_index_2) };
-                dif_g += 3
+                dif_g += threes
                     * (unsafe { *buffer_g.get_unchecked(d_arr_index) }
                         - unsafe { *buffer_g.get_unchecked(d_arr_index_1) })
                     - unsafe { *buffer_g.get_unchecked(d_arr_index_2) };
-                dif_b += 3
+                dif_b += threes
                     * (unsafe { *buffer_b.get_unchecked(d_arr_index) }
                         - unsafe { *buffer_b.get_unchecked(d_arr_index_1) })
                     - unsafe { *buffer_b.get_unchecked(d_arr_index_2) };
                 if CHANNEL_CONFIGURATION == 4 {
-                    dif_a += 3
+                    dif_a += threes
                         * (unsafe { *buffer_a.get_unchecked(d_arr_index) }
                             - unsafe { *buffer_a.get_unchecked(d_arr_index_1) })
                         - unsafe { *buffer_a.get_unchecked(d_arr_index_2) };
@@ -320,27 +330,29 @@ fn fast_gaussian_next_horizontal_pass<
             } else if x + radius_64 >= 0 {
                 let arr_index = (x & 1023) as usize;
                 let arr_index_1 = ((x + radius_64) & 1023) as usize;
-                dif_r += 3
+                let threes = J::from_i32(3i32).unwrap();
+                dif_r += threes
                     * (unsafe { *buffer_r.get_unchecked(arr_index) }
                         - unsafe { *buffer_r.get_unchecked(arr_index_1) });
-                dif_g += 3
+                dif_g += threes
                     * (unsafe { *buffer_g.get_unchecked(arr_index) }
                         - unsafe { *buffer_g.get_unchecked(arr_index_1) });
-                dif_b += 3
+                dif_b += threes
                     * (unsafe { *buffer_b.get_unchecked(arr_index) }
                         - unsafe { *buffer_b.get_unchecked(arr_index_1) });
                 if CHANNEL_CONFIGURATION == 4 {
-                    dif_a += 3
+                    dif_a += threes
                         * (unsafe { *buffer_a.get_unchecked(arr_index) }
                             - unsafe { *buffer_a.get_unchecked(arr_index_1) });
                 }
             } else if x + 2 * radius_64 >= 0 {
                 let arr_index = ((x + radius_64) & 1023) as usize;
-                dif_r -= 3 * unsafe { buffer_r.get_unchecked(arr_index) };
-                dif_g -= 3 * unsafe { buffer_g.get_unchecked(arr_index) };
-                dif_b -= 3 * unsafe { buffer_b.get_unchecked(arr_index) };
+                let threes = J::from_i32(3i32).unwrap();
+                dif_r -= threes * unsafe { *buffer_r.get_unchecked(arr_index) };
+                dif_g -= threes * unsafe { *buffer_g.get_unchecked(arr_index) };
+                dif_b -= threes * unsafe { *buffer_b.get_unchecked(arr_index) };
                 if CHANNEL_CONFIGURATION == 4 {
-                    dif_a -= 3 * unsafe { buffer_a.get_unchecked(arr_index) };
+                    dif_a -= threes * unsafe { *buffer_a.get_unchecked(arr_index) };
                 }
             }
 
@@ -403,7 +415,59 @@ fn fast_gaussian_next_impl<
     threading_policy: ThreadingPolicy,
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
+    i64: From<T>,
 {
+    let mut _dispatcher_vertical: fn(
+        bytes: &UnsafeSlice<T>,
+        stride: u32,
+        width: u32,
+        height: u32,
+        radius: u32,
+        start: u32,
+        end: u32,
+    ) = if BASE_RADIUS_I64_CUTOFF > radius {
+        fast_gaussian_next_vertical_pass::<T, i32, CHANNEL_CONFIGURATION>
+    } else {
+        fast_gaussian_next_vertical_pass::<T, i64, CHANNEL_CONFIGURATION>
+    };
+    let mut _dispatcher_horizontal: fn(
+        bytes: &UnsafeSlice<T>,
+        stride: u32,
+        width: u32,
+        height: u32,
+        radius: u32,
+        start: u32,
+        end: u32,
+    ) = if BASE_RADIUS_I64_CUTOFF > radius {
+        fast_gaussian_next_horizontal_pass::<T, i32, CHANNEL_CONFIGURATION>
+    } else {
+        fast_gaussian_next_horizontal_pass::<T, i64, CHANNEL_CONFIGURATION>
+    };
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    {
+        if BASE_RADIUS_I64_CUTOFF > radius {
+            if std::any::type_name::<T>() == "u8" {
+                _dispatcher_vertical =
+                    fast_gaussian_next_vertical_pass_neon_u8::<T, CHANNEL_CONFIGURATION>;
+                _dispatcher_horizontal =
+                    fast_gaussian_next_horizontal_pass_neon_u8::<T, CHANNEL_CONFIGURATION>;
+            }
+        }
+    }
+    #[cfg(all(
+        any(target_arch = "x86_64", target_arch = "x86"),
+        target_feature = "sse4.1"
+    ))]
+    {
+        if BASE_RADIUS_I64_CUTOFF > radius {
+            if std::any::type_name::<T>() == "u8" {
+                _dispatcher_vertical =
+                    fast_gaussian_next_vertical_pass_sse_u8::<T, CHANNEL_CONFIGURATION>;
+                _dispatcher_horizontal =
+                    fast_gaussian_next_horizontal_pass_sse_u8::<T, CHANNEL_CONFIGURATION>;
+            }
+        }
+    }
     let thread_count = threading_policy.get_threads_count(width, height) as u32;
     let pool = rayon::ThreadPoolBuilder::new()
         .num_threads(thread_count as usize)
@@ -421,15 +485,7 @@ fn fast_gaussian_next_impl<
                 end_x = width;
             }
             scope.spawn(move |_| {
-                fast_gaussian_next_vertical_pass::<T, CHANNEL_CONFIGURATION>(
-                    &unsafe_image,
-                    stride,
-                    width,
-                    height,
-                    radius,
-                    start_x,
-                    end_x,
-                );
+                _dispatcher_vertical(&unsafe_image, stride, width, height, radius, start_x, end_x);
             });
         }
     });
@@ -444,7 +500,7 @@ fn fast_gaussian_next_impl<
                 end_y = height;
             }
             scope.spawn(move |_| {
-                fast_gaussian_next_horizontal_pass::<T, CHANNEL_CONFIGURATION>(
+                _dispatcher_horizontal(
                     &unsafe_image,
                     stride,
                     width,
@@ -483,7 +539,7 @@ pub fn fast_gaussian_next(
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) {
-    let acq_radius = std::cmp::min(radius, 212);
+    let acq_radius = std::cmp::min(radius, 280);
     match channels {
         FastBlurChannels::Channels3 => {
             fast_gaussian_next_impl::<u8, 3>(

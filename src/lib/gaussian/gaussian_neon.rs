@@ -27,11 +27,11 @@
 
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 pub mod neon_support {
-    use std::arch::aarch64::*;
-
-    use crate::neon_utils::neon_utils::{
+    use crate::neon::{
         load_u8_u16_x2_fast, load_u8_u32_fast, load_u8_u32_one, prefer_vfma_f32, prefer_vfmaq_f32,
     };
+    use std::arch::aarch64::*;
+
     use crate::unsafe_slice::UnsafeSlice;
 
     pub fn gaussian_blur_horizontal_pass_neon<const CHANNEL_CONFIGURATION: usize>(

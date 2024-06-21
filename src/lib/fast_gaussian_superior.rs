@@ -1,3 +1,30 @@
+// Copyright (c) Radzivon Bartoshyk. All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without modification,
+// are permitted provided that the following conditions are met:
+//
+// 1.  Redistributions of source code must retain the above copyright notice, this
+// list of conditions and the following disclaimer.
+//
+// 2.  Redistributions in binary form must reproduce the above copyright notice,
+// this list of conditions and the following disclaimer in the documentation
+// and/or other materials provided with the distribution.
+//
+// 3.  Neither the name of the copyright holder nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+// OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 use crate::{FastBlurChannels, ThreadingPolicy};
 
 mod fast_gaussian_superior {
@@ -26,8 +53,8 @@ mod fast_gaussian_superior {
         let mut buffer_a: [i64; 2048] = [0; 2048];
         let radius_64 = radius as i64;
         let height_wide = height as i64;
-        let radius_2d = (radius as f32) * (radius as f32);
-        let weight = 1.0f32 / (radius_2d * radius_2d);
+        let radius_2d = (radius as f64) * (radius as f64);
+        let weight = 1.0f64 / (radius_2d * radius_2d);
         for x in start..std::cmp::min(width, end) {
             let mut dif_r: i64 = 0;
             let mut der_1_r: i64 = 0;
@@ -52,9 +79,9 @@ mod fast_gaussian_superior {
             for y in start_y..height_wide {
                 let current_y = (y * (stride as i64)) as usize;
                 if y >= 0 {
-                    let new_r = T::from_u32(((sum_r as f32) * weight) as u32).unwrap_or_default();
-                    let new_g = T::from_u32(((sum_g as f32) * weight) as u32).unwrap_or_default();
-                    let new_b = T::from_u32(((sum_b as f32) * weight) as u32).unwrap_or_default();
+                    let new_r = T::from_u32(((sum_r as f64) * weight) as u32).unwrap_or_default();
+                    let new_g = T::from_u32(((sum_g as f64) * weight) as u32).unwrap_or_default();
+                    let new_b = T::from_u32(((sum_b as f64) * weight) as u32).unwrap_or_default();
 
                     let bytes_offset = current_y + current_px;
 
@@ -64,7 +91,7 @@ mod fast_gaussian_superior {
                         bytes.write(bytes_offset + 2, new_b);
                         if CHANNELS_COUNT == 4 {
                             let new_a =
-                                T::from_u32(((sum_a as f32) * weight) as u32).unwrap_or_default();
+                                T::from_u32(((sum_a as f64) * weight) as u32).unwrap_or_default();
                             bytes.write(bytes_offset + 3, new_a);
                         }
                     }
@@ -200,8 +227,8 @@ mod fast_gaussian_superior {
         let mut buffer_a: [i64; 2048] = [0; 2048];
         let radius_64 = radius as i64;
         let width_wide = width as i64;
-        let radius_2d = (radius as f32) * (radius as f32);
-        let weight = 1.0f32 / (radius_2d * radius_2d);
+        let radius_2d = (radius as f64) * (radius as f64);
+        let weight = 1.0f64 / (radius_2d * radius_2d);
         for y in start..std::cmp::min(height, end) {
             let mut dif_r: i64 = 0;
             let mut der_1_r: i64 = 0;
@@ -225,9 +252,9 @@ mod fast_gaussian_superior {
             for x in (0i64 - 4i64 * radius_64)..(width as i64) {
                 if x >= 0 {
                     let current_px = (std::cmp::max(x, 0) as u32) as usize * CHANNELS_COUNT;
-                    let new_r = T::from_u32(((sum_r as f32) * weight) as u32).unwrap_or_default();
-                    let new_g = T::from_u32(((sum_g as f32) * weight) as u32).unwrap_or_default();
-                    let new_b = T::from_u32(((sum_b as f32) * weight) as u32).unwrap_or_default();
+                    let new_r = T::from_u32(((sum_r as f64) * weight) as u32).unwrap_or_default();
+                    let new_g = T::from_u32(((sum_g as f64) * weight) as u32).unwrap_or_default();
+                    let new_b = T::from_u32(((sum_b as f64) * weight) as u32).unwrap_or_default();
 
                     let bytes_offset = current_y + current_px;
 
@@ -237,7 +264,7 @@ mod fast_gaussian_superior {
                         bytes.write(bytes_offset + 2, new_b);
                         if CHANNELS_COUNT == 4 {
                             let new_a =
-                                T::from_u32(((sum_a as f32) * weight) as u32).unwrap_or_default();
+                                T::from_u32(((sum_a as f64) * weight) as u32).unwrap_or_default();
                             bytes.write(bytes_offset + 3, new_a);
                         }
                     }
@@ -425,8 +452,6 @@ mod fast_gaussian_superior {
 /// * `stride` - Lane length, default is width * channels_count if not aligned
 /// * `radius` - Radius more than ~256 is not supported.
 /// O(1) complexity.
-#[no_mangle]
-#[allow(dead_code)]
 pub fn fast_gaussian_superior(
     bytes: &mut [u8],
     stride: u32,

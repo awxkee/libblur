@@ -32,7 +32,7 @@ pub(crate) mod fast_gaussian_f32_neon {
         vst1q_f32, vsubq_f32,
     };
 
-    use crate::neon_utils::neon_utils::load_f32;
+    use crate::neon::load_f32;
     use crate::unsafe_slice::UnsafeSlice;
     use crate::FastBlurChannels;
 
@@ -223,8 +223,6 @@ pub(crate) mod fast_gaussian_f32_neon {
 }
 
 pub(crate) mod fast_gaussian_f32_cpu {
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-    use crate::fast_gaussian_f32::*;
     use crate::unsafe_slice::UnsafeSlice;
     use crate::FastBlurChannels;
 
@@ -238,12 +236,6 @@ pub(crate) mod fast_gaussian_f32_cpu {
         end: u32,
         channels: FastBlurChannels,
     ) {
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-        {
-            fast_gaussian_f32_neon::fast_gaussian_vertical_pass_f32(
-                bytes, stride, width, height, radius, start, end, channels,
-            )
-        }
         let mut buffer_r: [f32; 1024] = [0f32; 1024];
         let mut buffer_g: [f32; 1024] = [0f32; 1024];
         let mut buffer_b: [f32; 1024] = [0f32; 1024];
@@ -328,12 +320,6 @@ pub(crate) mod fast_gaussian_f32_cpu {
         end: u32,
         channels: FastBlurChannels,
     ) {
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-        {
-            fast_gaussian_f32_neon::fast_gaussian_horizontal_pass_f32(
-                bytes, stride, width, height, radius, start, end, channels,
-            )
-        }
         let mut buffer_r: [f32; 1024] = [0f32; 1024];
         let mut buffer_g: [f32; 1024] = [0f32; 1024];
         let mut buffer_b: [f32; 1024] = [0f32; 1024];
@@ -420,6 +406,31 @@ pub(crate) mod fast_gaussian_f32 {
         radius: u32,
         channels: FastBlurChannels,
     ) {
+        let mut _dispatcher_vertical: fn(
+            bytes: &UnsafeSlice<f32>,
+            stride: u32,
+            width: u32,
+            height: u32,
+            radius: u32,
+            start: u32,
+            end: u32,
+            channels: FastBlurChannels,
+        ) = fast_gaussian_f32_cpu::fast_gaussian_vertical_pass_f32;
+        let mut _dispatcher_horizontal: fn(
+            bytes: &UnsafeSlice<f32>,
+            stride: u32,
+            width: u32,
+            height: u32,
+            radius: u32,
+            start: u32,
+            end: u32,
+            channels: FastBlurChannels,
+        ) = fast_gaussian_f32_cpu::fast_gaussian_horizontal_pass_f32;
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            _dispatcher_vertical = fast_gaussian_f32_neon::fast_gaussian_horizontal_pass_f32;
+            _dispatcher_horizontal = fast_gaussian_f32_neon::fast_gaussian_vertical_pass_f32;
+        }
         let unsafe_image = UnsafeSlice::new(bytes);
         let thread_count = std::cmp::max(std::cmp::min(width * height / (256 * 256), 12), 1);
         let pool = rayon::ThreadPoolBuilder::new()
@@ -436,7 +447,7 @@ pub(crate) mod fast_gaussian_f32 {
                     end_x = width;
                 }
                 scope.spawn(move |_| {
-                    fast_gaussian_f32_cpu::fast_gaussian_vertical_pass_f32(
+                    _dispatcher_vertical(
                         &unsafe_image,
                         stride,
                         width,
@@ -460,7 +471,7 @@ pub(crate) mod fast_gaussian_f32 {
                 }
 
                 scope.spawn(move |_| {
-                    fast_gaussian_f32_cpu::fast_gaussian_horizontal_pass_f32(
+                    _dispatcher_horizontal(
                         &unsafe_image,
                         stride,
                         width,

@@ -25,51 +25,14 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-mod r#box;
-mod channels_configuration;
-mod edge_mode;
 mod fast_gaussian;
-mod fast_gaussian_f16;
-mod fast_gaussian_f32;
 mod fast_gaussian_next;
-mod fast_gaussian_next_f16;
-mod fast_gaussian_next_f32;
-mod fast_gaussian_superior;
-mod gaussian;
-mod median_blur;
-mod mul_table;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-mod neon;
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "sse4.1"
-))]
-mod sse;
-mod stack_blur;
-mod threading_policy;
-mod unsafe_slice;
+mod stack_blur_i32;
+mod stack_blur_i64;
+mod utils;
 
-pub use channels_configuration::FastBlurChannels;
-pub use edge_mode::*;
-pub use fast_gaussian::fast_gaussian;
-pub use fast_gaussian::fast_gaussian_f16;
-pub use fast_gaussian::fast_gaussian_f32;
-pub use fast_gaussian::fast_gaussian_u16;
-pub use fast_gaussian_next::fast_gaussian_next;
-pub use fast_gaussian_next::fast_gaussian_next_f16;
-pub use fast_gaussian_next::fast_gaussian_next_f32;
-pub use fast_gaussian_next::fast_gaussian_next_u16;
-pub use fast_gaussian_superior::fast_gaussian_superior;
-pub use gaussian::gaussian_blur;
-pub use gaussian::gaussian_blur_f16;
-pub use gaussian::gaussian_blur_f32;
-pub use gaussian::gaussian_blur_u16;
-pub use median_blur::median_blur;
-pub use r#box::box_blur;
-pub use r#box::box_blur_u16;
-pub use r#box::gaussian_box_blur;
-pub use r#box::gaussian_box_blur_u16;
-pub use r#box::tent_blur;
-pub use r#box::tent_blur_u16;
-pub use stack_blur::stack_blur;
-pub use threading_policy::*;
+pub use fast_gaussian::*;
+pub use fast_gaussian_next::*;
+pub use stack_blur_i32::*;
+pub use stack_blur_i64::stack_blur_pass_neon_i64;
+pub use utils::*;
