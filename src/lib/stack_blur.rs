@@ -1,17 +1,21 @@
 use crate::mul_table::{MUL_TABLE_STACK_BLUR, SHR_TABLE_STACK_BLUR};
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+))]
+use crate::sse::stack_blur_pass_sse;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::stack_blur_neon::stackblur_neon::*;
 #[cfg(all(
     any(target_arch = "x86_64", target_arch = "x86"),
     target_feature = "sse4.1"
 ))]
-use crate::stack_blur_sse::stackblur_sse::{stack_blur_pass_sse_3, stack_blur_pass_sse_4};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{FastBlurChannels, ThreadingPolicy};
 use num_traits::FromPrimitive;
 use std::ops::AddAssign;
 
-const BASE_RADIUS_I64_CUTOFF: u32 = 500;
+const BASE_RADIUS_I64_CUTOFF: u32 = 150;
 
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub(crate) struct BlurStack<J: Copy + FromPrimitive> {
@@ -508,7 +512,7 @@ fn stack_blur_worker_horizontal(
                     target_feature = "sse4.1"
                 ))]
                 {
-                    _dispatcher = stack_blur_pass_sse_3;
+                    _dispatcher = stack_blur_pass_sse::<3>;
                 }
             }
             _dispatcher(
@@ -547,7 +551,7 @@ fn stack_blur_worker_horizontal(
                     target_feature = "sse4.1"
                 ))]
                 {
-                    _dispatcher = stack_blur_pass_sse_4;
+                    _dispatcher = stack_blur_pass_sse::<4>;
                 }
             }
             _dispatcher(
@@ -600,7 +604,7 @@ fn stack_blur_worker_vertical(
                     target_feature = "sse4.1"
                 ))]
                 {
-                    _dispatcher = stack_blur_pass_sse_3;
+                    _dispatcher = stack_blur_pass_sse::<3>;
                 }
             }
             _dispatcher(
@@ -639,7 +643,7 @@ fn stack_blur_worker_vertical(
                     target_feature = "sse4.1"
                 ))]
                 {
-                    _dispatcher = stack_blur_pass_sse_4;
+                    _dispatcher = stack_blur_pass_sse::<4>;
                 }
             }
             _dispatcher(

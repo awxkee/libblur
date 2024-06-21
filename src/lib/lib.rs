@@ -36,17 +36,18 @@ mod fast_gaussian_next;
 mod fast_gaussian_next_f16;
 mod fast_gaussian_next_f32;
 mod fast_gaussian_next_neon;
-mod fast_gaussian_next_sse;
-mod fast_gaussian_sse;
 mod fast_gaussian_superior;
 mod gaussian;
 mod median_blur;
 mod mul_table;
 mod neon_utils;
-mod sse_utils;
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+))]
+mod sse;
 mod stack_blur;
 mod stack_blur_neon;
-mod stack_blur_sse;
 mod threading_policy;
 mod unsafe_slice;
 

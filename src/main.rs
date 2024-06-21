@@ -47,25 +47,25 @@ fn main() {
     }
 
     let start_time = Instant::now();
-    libblur::stack_blur(
-        &mut dst_bytes,
-        stride as u32,
-        dimensions.0,
-        dimensions.1,
-        250,
-        FastBlurChannels::Channels4,
-        ThreadingPolicy::Adaptive,
-    );
-
-    // libblur::fast_gaussian_next(
+    // libblur::stack_blur(
     //     &mut dst_bytes,
     //     stride as u32,
     //     dimensions.0,
     //     dimensions.1,
-    //     77,
-    //     FastBlurChannels::Channels3,
-    //     ThreadingPolicy::Adaptive,
+    //     255,
+    //     FastBlurChannels::Channels4,
+    //     ThreadingPolicy::Single,
     // );
+
+    libblur::fast_gaussian_next(
+        &mut dst_bytes,
+        stride as u32,
+        dimensions.0,
+        dimensions.1,
+        100,
+        FastBlurChannels::Channels4,
+        ThreadingPolicy::Single,
+    );
 
     // libblur::tent_blur(
     //     &bytes,

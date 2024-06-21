@@ -36,7 +36,7 @@ pub mod sse_support {
     use std::arch::x86_64::*;
 
     use crate::mul_table::{MUL_TABLE_TWICE_RAD, SHR_TABLE_TWICE_RAD};
-    use crate::sse_utils::sse_utils::load_u8_s32_fast;
+    use crate::sse::load_u8_s32_fast;
     use crate::unsafe_slice::UnsafeSlice;
 
     pub(crate) fn box_blur_horizontal_pass_sse<const CHANNELS: usize>(

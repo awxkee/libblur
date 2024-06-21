@@ -31,7 +31,7 @@
 ))]
 pub mod sse_filter {
     use crate::gaussian::gaussian_filter::GaussianFilter;
-    use crate::sse_utils::sse_utils::{_mm_prefer_fma_ps, load_u8_f32_fast, load_u8_u32_one};
+    use crate::sse::{_mm_prefer_fma_ps, load_u8_f32_fast, load_u8_u32_one};
     #[cfg(target_arch = "x86")]
     use std::arch::x86::*;
     #[cfg(target_arch = "x86_64")]

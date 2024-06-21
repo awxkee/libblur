@@ -33,7 +33,9 @@ use crate::fast_gaussian_next_neon::neon_support;
     any(target_arch = "x86_64", target_arch = "x86"),
     target_feature = "sse4.1"
 ))]
-use crate::fast_gaussian_next_sse::sse_support;
+use crate::sse::{
+    fast_gaussian_next_horizontal_pass_sse_u8, fast_gaussian_next_vertical_pass_sse_u8,
+};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{FastBlurChannels, ThreadingPolicy};
 use num_traits::FromPrimitive;
@@ -67,7 +69,7 @@ fn fast_gaussian_next_vertical_pass<
         ))]
         {
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(bytes) };
-            sse_support::fast_gaussian_next_vertical_pass_sse_u8::<CHANNEL_CONFIGURATION>(
+            fast_gaussian_next_vertical_pass_sse_u8::<CHANNEL_CONFIGURATION>(
                 slice, stride, width, height, radius, start, end,
             );
             return;
@@ -244,7 +246,7 @@ fn fast_gaussian_next_horizontal_pass<
         ))]
         {
             let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(bytes) };
-            sse_support::fast_gaussian_next_horizontal_pass_sse_u8::<CHANNEL_CONFIGURATION>(
+            fast_gaussian_next_horizontal_pass_sse_u8::<CHANNEL_CONFIGURATION>(
                 slice, stride, width, height, radius, start, end,
             );
             return;
@@ -467,7 +469,7 @@ fn fast_gaussian_next_impl<
 /// * `stride` - Lane length, default is width * channels_count if not aligned
 /// * `width` - Width of the image
 /// * `height` - Height of the image
-/// * `radius` - Radius more than ~152 is not supported. To use larger radius convert image to f32 and use function for f32
+/// * `radius` - Radius is limited to 212
 /// * `channels` - Count of channels in the image
 ///
 /// # Panics
