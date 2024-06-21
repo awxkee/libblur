@@ -34,9 +34,7 @@ pub mod neon_support {
     };
     use crate::unsafe_slice::UnsafeSlice;
 
-    pub fn gaussian_blur_horizontal_pass_neon<
-        const CHANNEL_CONFIGURATION: usize,
-    >(
+    pub fn gaussian_blur_horizontal_pass_neon<const CHANNEL_CONFIGURATION: usize>(
         src: &[u8],
         src_stride: u32,
         unsafe_dst: &UnsafeSlice<u8>,
@@ -187,8 +185,7 @@ pub mod neon_support {
                         let current_x = std::cmp::min(
                             std::cmp::max(x as i64 + r as i64, 0),
                             (width - 1) as i64,
-                        )
-                            as usize;
+                        ) as usize;
                         let px = current_x * CHANNEL_CONFIGURATION;
                         let s_ptr = src.as_ptr().add(y_src_shift + px);
                         let pixel_colors_u32_0 = load_u8_u32_fast::<CHANNEL_CONFIGURATION>(s_ptr);
@@ -308,8 +305,7 @@ pub mod neon_support {
                         let current_x = std::cmp::min(
                             std::cmp::max(x as i64 + r as i64, 0),
                             (width - 1) as i64,
-                        )
-                            as usize;
+                        ) as usize;
                         let px = current_x * CHANNEL_CONFIGURATION;
                         let s_ptr = src.as_ptr().add(y_src_shift + px);
                         let weight_0 = *kernel.get_unchecked((r + half_kernel) as usize);
@@ -333,8 +329,7 @@ pub mod neon_support {
                         let current_x = std::cmp::min(
                             std::cmp::max(x as i64 + r as i64, 0),
                             (width - 1) as i64,
-                        )
-                            as usize;
+                        ) as usize;
                         let px = current_x * CHANNEL_CONFIGURATION;
                         let s_ptr = src.as_ptr().add(y_src_shift + px);
                         let pixel_colors_u32 = load_u8_u32_fast::<CHANNEL_CONFIGURATION>(s_ptr);
@@ -371,9 +366,7 @@ pub mod neon_support {
         }
     }
 
-    pub fn gaussian_blur_vertical_pass_neon<
-        const CHANNEL_CONFIGURATION: usize,
-    >(
+    pub fn gaussian_blur_vertical_pass_neon<const CHANNEL_CONFIGURATION: usize>(
         src: &[u8],
         src_stride: u32,
         unsafe_dst: &UnsafeSlice<u8>,

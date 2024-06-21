@@ -74,7 +74,9 @@ pub mod sse_filter {
 
                 unsafe {
                     while j + 4 < current_filter.size
-                        && filter_start as i64 + j as i64 + (if CHANNEL_CONFIGURATION == 4 { 4 } else { 6 })
+                        && filter_start as i64
+                            + j as i64
+                            + (if CHANNEL_CONFIGURATION == 4 { 4 } else { 6 })
                             < width as i64
                     {
                         let px = (filter_start + j) * CHANNEL_CONFIGURATION;
@@ -143,8 +145,10 @@ pub mod sse_filter {
 
                 unsafe {
                     while j + 2 < current_filter.size
-                        && filter_start as i64 + j as i64 + (if CHANNEL_CONFIGURATION == 4 { 3 } else { 3 })
-                        < width as i64
+                        && filter_start as i64
+                            + j as i64
+                            + (if CHANNEL_CONFIGURATION == 4 { 3 } else { 3 })
+                            < width as i64
                     {
                         let px = (filter_start + j) * CHANNEL_CONFIGURATION;
                         let s_ptr = src.as_ptr().add(y_src_shift + px);
@@ -267,7 +271,9 @@ pub mod sse_filter {
 
                 unsafe {
                     while j + 4 < current_filter.size
-                        && filter_start as i64 + j as i64 + (if CHANNEL_CONFIGURATION == 4 { 4 } else { 6 })
+                        && filter_start as i64
+                            + j as i64
+                            + (if CHANNEL_CONFIGURATION == 4 { 4 } else { 6 })
                             < width as i64
                     {
                         let px = (filter_start + j) * CHANNEL_CONFIGURATION;
@@ -310,8 +316,10 @@ pub mod sse_filter {
 
                 unsafe {
                     while j + 2 < current_filter.size
-                        && filter_start as i64 + j as i64 + (if CHANNEL_CONFIGURATION == 4 { 2 } else { 3 })
-                        < width as i64
+                        && filter_start as i64
+                            + j as i64
+                            + (if CHANNEL_CONFIGURATION == 4 { 2 } else { 3 })
+                            < width as i64
                     {
                         let px = (filter_start + j) * CHANNEL_CONFIGURATION;
                         let s_ptr = src.as_ptr().add(y_src_shift + px);

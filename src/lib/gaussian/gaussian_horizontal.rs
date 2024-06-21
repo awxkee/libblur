@@ -41,7 +41,7 @@ use crate::gaussian::gaussian_sse::sse_support::gaussian_blur_horizontal_pass_im
 ))]
 use crate::gaussian::gaussian_sse_filter::sse_filter::gaussian_blur_horizontal_pass_filter_sse;
 use crate::unsafe_slice::UnsafeSlice;
-use crate::{EdgeMode, reflect_index};
+use crate::{reflect_index, EdgeMode};
 use num_traits::FromPrimitive;
 
 pub(crate) fn gaussian_blur_horizontal_pass_impl<

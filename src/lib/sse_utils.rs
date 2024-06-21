@@ -19,6 +19,33 @@ pub(crate) mod sse_utils {
         return _mm_loadu_si128(store.as_ptr() as *const __m128i);
     }
 
+    #[inline(always)]
+    pub(crate) unsafe fn _mm_mul_epi64(ab: __m128i, cd: __m128i) -> __m128i {
+        /* ac = (ab & 0xFFFFFFFF) * (cd & 0xFFFFFFFF); */
+        let ac = _mm_mul_epu32(ab, cd);
+
+        /* b = ab >> 32; */
+        let b = _mm_srli_epi64::<32>(ab);
+
+        /* bc = b * (cd & 0xFFFFFFFF); */
+        let bc = _mm_mul_epu32(b, cd);
+
+        /* d = cd >> 32; */
+        let d = _mm_srli_epi64::<32>(cd);
+
+        /* ad = (ab & 0xFFFFFFFF) * d; */
+        let ad = _mm_mul_epu32(ab, d);
+
+        /* high = bc + ad; */
+        let mut high = _mm_add_epi64(bc, ad);
+
+        /* high <<= 32; */
+        high = _mm_slli_epi64::<32>(high);
+
+        /* return ac + high; */
+        return _mm_add_epi64(high, ac);
+    }
+
     #[inline]
     pub(crate) unsafe fn load_u8_f32_fast<const CHANNELS_COUNT: usize>(ptr: *const u8) -> __m128 {
         let vl = load_u8_s32_fast::<CHANNELS_COUNT>(ptr);

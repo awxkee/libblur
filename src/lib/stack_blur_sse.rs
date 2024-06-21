@@ -4,7 +4,7 @@
 ))]
 pub(crate) mod stackblur_sse {
     use crate::mul_table::{MUL_TABLE_STACK_BLUR, SHR_TABLE_STACK_BLUR};
-    use crate::sse_utils::sse_utils::{load_u8_s32_fast, store_u8_s32};
+    use crate::sse_utils::sse_utils::{_mm_mul_epi64, load_u8_s32_fast, store_u8_s32};
     use crate::stack_blur::StackBlurPass;
     use crate::unsafe_slice::UnsafeSlice;
     #[cfg(target_arch = "x86")]
@@ -83,7 +83,7 @@ pub(crate) mod stackblur_sse {
         let wm = width - 1;
         let hm = height - 1;
         let div = (radius * 2) + 1;
-        let mul_sum = _mm_set1_epi32(MUL_TABLE_STACK_BLUR[radius as usize]);
+        let mul_sum = _mm_set1_epi64x(MUL_TABLE_STACK_BLUR[radius as usize] as i64);
         let shr_sum = _mm_setr_epi32(SHR_TABLE_STACK_BLUR[radius as usize], 0i32, 0i32, 0i32);
 
         let mut src_ptr;
@@ -138,7 +138,8 @@ pub(crate) mod stackblur_sse {
                 dst_ptr = y * stride as usize;
                 for _ in 0..width {
                     let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
-                    let blurred = _mm_srl_epi32(_mm_mullo_epi32(sums, mul_sum), shr_sum);
+                    let blurred_hi = _mm_srl_epi64(_mm_mul_epi64(_mm_unpackhi_epi32(sums, _mm_setzero_si128()), mul_sum), shr_sum);
+                    let blurred_lo = _mm_srl_epi64(_mm_mul_epi64(_mm_unpacklo_epi32(sums, _mm_setzero_si128()), mul_sum), shr_sum);
                     store_u8_s32::<COMPONENTS>(store_ld, blurred);
                     dst_ptr += COMPONENTS;
 

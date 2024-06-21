@@ -29,9 +29,9 @@
 pub(crate) mod fast_gaussian_next_f32_neon {
     use std::arch::aarch64::*;
 
-    use crate::FastBlurChannels;
     use crate::neon_utils::neon_utils::load_f32;
     use crate::unsafe_slice::UnsafeSlice;
+    use crate::FastBlurChannels;
 
     pub(crate) fn fast_gaussian_next_vertical_pass_f32(
         bytes: &UnsafeSlice<f32>,
@@ -233,7 +233,8 @@ pub(crate) mod fast_gaussian_next_f32_neon {
                 }
 
                 let next_row_y = (y as usize) * (stride as usize);
-                let next_row_x = std::cmp::min(std::cmp::max(x + 3 * radius_64 / 2, 0), width_wide - 1) as u32;
+                let next_row_x =
+                    std::cmp::min(std::cmp::max(x + 3 * radius_64 / 2, 0), width_wide - 1) as u32;
                 let next_row_px = next_row_x as usize * channels_count as usize;
 
                 let s_ptr =
@@ -261,8 +262,8 @@ pub(crate) mod fast_gaussian_next_f32_neon {
 pub(crate) mod fast_gaussian_next_f32_cpu {
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     use crate::fast_gaussian_next_f32::fast_gaussian_next_f32_neon;
-    use crate::FastBlurChannels;
     use crate::unsafe_slice::UnsafeSlice;
+    use crate::FastBlurChannels;
 
     pub(crate) fn fast_gaussian_next_vertical_pass_f32(
         bytes: &UnsafeSlice<f32>,
@@ -277,14 +278,7 @@ pub(crate) mod fast_gaussian_next_f32_cpu {
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             fast_gaussian_next_f32_neon::fast_gaussian_next_vertical_pass_f32(
-                &bytes,
-                stride,
-                width,
-                height,
-                radius,
-                start,
-                end,
-                channels,
+                &bytes, stride, width, height, radius, start, end, channels,
             );
         }
         let mut buffer_r: [f32; 1024] = [0f32; 1024];
@@ -392,14 +386,7 @@ pub(crate) mod fast_gaussian_next_f32_cpu {
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             fast_gaussian_next_f32_neon::fast_gaussian_next_horizontal_pass_f32(
-                &bytes,
-                stride,
-                width,
-                height,
-                radius,
-                start,
-                end,
-                channels,
+                &bytes, stride, width, height, radius, start, end, channels,
             );
         }
         let mut buffer_r: [f32; 1024] = [0f32; 1024];
@@ -493,8 +480,8 @@ pub(crate) mod fast_gaussian_next_f32_cpu {
 
 pub(crate) mod fast_gaussian_next_f32 {
     use crate::fast_gaussian_next_f32::fast_gaussian_next_f32_cpu;
-    use crate::FastBlurChannels;
     use crate::unsafe_slice::UnsafeSlice;
+    use crate::FastBlurChannels;
 
     pub(crate) fn fast_gaussian_next_impl_f32(
         bytes: &mut [f32],

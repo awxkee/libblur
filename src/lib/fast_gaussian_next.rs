@@ -135,7 +135,7 @@ fn fast_gaussian_next_vertical_pass<
                 if CHANNEL_CONFIGURATION == 4 {
                     dif_a += 3
                         * (unsafe { *buffer_a.get_unchecked(d_arr_index) }
-                        - unsafe { *buffer_a.get_unchecked(d_arr_index_1) })
+                            - unsafe { *buffer_a.get_unchecked(d_arr_index_1) })
                         - unsafe { *buffer_a.get_unchecked(d_arr_index_2) };
                 }
             } else if y + radius_64 >= 0 {
@@ -153,7 +153,7 @@ fn fast_gaussian_next_vertical_pass<
                 if CHANNEL_CONFIGURATION == 4 {
                     dif_a += 3
                         * (unsafe { *buffer_a.get_unchecked(arr_index) }
-                        - unsafe { *buffer_a.get_unchecked(arr_index_1) });
+                            - unsafe { *buffer_a.get_unchecked(arr_index_1) });
                 }
             } else if y + 2 * radius_64 >= 0 {
                 let arr_index = ((y + radius_64) & 1023) as usize;

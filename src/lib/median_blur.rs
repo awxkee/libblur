@@ -234,10 +234,7 @@ fn median_blur_impl<const CHANNELS_CONFIGURATION: usize>(
             if histogram.n > 0 {
                 unsafe {
                     let bytes_offset = y_dst_offset + px;
-                    unsafe_dst.write(
-                        bytes_offset,
-                        median_filter(histogram.r, histogram.n) as u8,
-                    );
+                    unsafe_dst.write(bytes_offset, median_filter(histogram.r, histogram.n) as u8);
                     unsafe_dst.write(
                         bytes_offset + 1,
                         median_filter(histogram.g, histogram.n) as u8,

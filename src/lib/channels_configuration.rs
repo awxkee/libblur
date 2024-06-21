@@ -38,7 +38,9 @@ impl From<usize> for FastBlurChannels {
         return match value {
             3 => FastBlurChannels::Channels3,
             4 => FastBlurChannels::Channels4,
-            _ => { panic!("Unknown value"); }
+            _ => {
+                panic!("Unknown value");
+            }
         };
     }
 }

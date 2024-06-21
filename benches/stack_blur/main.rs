@@ -1,6 +1,6 @@
-use criterion::{Criterion, criterion_group, criterion_main};
-use image::GenericImageView;
+use criterion::{criterion_group, criterion_main, Criterion};
 use image::io::Reader as ImageReader;
+use image::GenericImageView;
 
 use libblur::{FastBlurChannels, ThreadingPolicy};
 

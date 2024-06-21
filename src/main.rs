@@ -20,7 +20,7 @@ fn f16_to_f32(bytes: Vec<u16>) -> Vec<f32> {
 }
 
 fn main() {
-    let img = ImageReader::open("assets/Screenshot_20240612-105034.png")
+    let img = ImageReader::open("assets/test_image_4.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -47,15 +47,15 @@ fn main() {
     }
 
     let start_time = Instant::now();
-    // libblur::stack_blur(
-    //     &mut dst_bytes,
-    //     stride as u32,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     77,
-    //     FastBlurChannels::Channels4,
-    //     ThreadingPolicy::Adaptive,
-    // );
+    libblur::stack_blur(
+        &mut dst_bytes,
+        stride as u32,
+        dimensions.0,
+        dimensions.1,
+        250,
+        FastBlurChannels::Channels4,
+        ThreadingPolicy::Adaptive,
+    );
 
     // libblur::fast_gaussian_next(
     //     &mut dst_bytes,
@@ -78,21 +78,21 @@ fn main() {
     //     FastBlurChannels::Channels3,
     //     ThreadingPolicy::Adaptive,
     // );
-    // bytes = dst_bytes;
-    libblur::gaussian_blur(
-        &bytes,
-        stride as u32,
-        &mut dst_bytes,
-        stride as u32,
-        dimensions.0,
-        dimensions.1,
-        25 * 2 + 1,
-        10f32,
-        FastBlurChannels::Channels4,
-        EdgeMode::Wrap,
-        ThreadingPolicy::Adaptive,
-    );
     bytes = dst_bytes;
+    // libblur::gaussian_blur(
+    //     &bytes,
+    //     stride as u32,
+    //     &mut dst_bytes,
+    //     stride as u32,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     25 * 2 + 1,
+    //     10f32,
+    //     FastBlurChannels::Channels4,
+    //     EdgeMode::Wrap,
+    //     ThreadingPolicy::Adaptive,
+    // );
+    // bytes = dst_bytes;
     // libblur::median_blur(
     //     &bytes,
     //     stride as u32,

@@ -34,8 +34,8 @@ use crate::gaussian::gaussian_neon_filter::neon_gaussian_filter::gaussian_blur_v
 ))]
 use crate::gaussian::gaussian_sse_filter::sse_filter::gaussian_blur_vertical_pass_filter_sse;
 use crate::unsafe_slice::UnsafeSlice;
+use crate::{reflect_index, EdgeMode};
 use num_traits::FromPrimitive;
-use crate::{EdgeMode, reflect_index};
 
 pub fn gaussian_blur_vertical_pass_c_impl<
     T: FromPrimitive + Default + Into<f32> + Send + Sync + Copy,
@@ -164,9 +164,7 @@ pub fn gaussian_vertical_row<
             EdgeMode::Clamp | EdgeMode::KernelClip => {
                 std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64)
             }
-            EdgeMode::Wrap => {
-                (y as i64 + r as i64).rem_euclid(height as i64 - 1i64)
-            }
+            EdgeMode::Wrap => (y as i64 + r as i64).rem_euclid(height as i64 - 1i64),
             EdgeMode::Reflect => {
                 let k = reflect_index(y as i64 + r as i64, height as i64 - 1i64);
                 k as i64

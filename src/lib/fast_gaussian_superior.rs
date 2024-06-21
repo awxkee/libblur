@@ -3,11 +3,12 @@ use crate::{FastBlurChannels, ThreadingPolicy};
 mod fast_gaussian_superior {
     use num_traits::{FromPrimitive, ToPrimitive};
 
-    use crate::ThreadingPolicy;
     use crate::unsafe_slice::UnsafeSlice;
+    use crate::ThreadingPolicy;
 
     fn fast_gaussian_vertical_pass<
-        T: FromPrimitive + ToPrimitive + Default + Into<i64> + Send + Sync, const CHANNELS_COUNT: usize,
+        T: FromPrimitive + ToPrimitive + Default + Into<i64> + Send + Sync,
+        const CHANNELS_COUNT: usize,
     >(
         bytes: &UnsafeSlice<T>,
         stride: u32,
@@ -62,7 +63,8 @@ mod fast_gaussian_superior {
                         bytes.write(bytes_offset + 1, new_g);
                         bytes.write(bytes_offset + 2, new_b);
                         if CHANNELS_COUNT == 4 {
-                            let new_a = T::from_u32(((sum_a as f32) * weight) as u32).unwrap_or_default();
+                            let new_a =
+                                T::from_u32(((sum_a as f32) * weight) as u32).unwrap_or_default();
                             bytes.write(bytes_offset + 3, new_a);
                         }
                     }
@@ -75,23 +77,23 @@ mod fast_gaussian_superior {
                     unsafe {
                         dif_r += -4
                             * ((*buffer_r.get_unchecked(arr_index_1))
-                            + (*buffer_r.get_unchecked(arr_index_2)))
+                                + (*buffer_r.get_unchecked(arr_index_2)))
                             + 6 * (*buffer_r.get_unchecked(arr_index_3))
                             + (*buffer_r.get_unchecked(arr_index_4));
                         dif_g += -4
                             * ((*buffer_g.get_unchecked(arr_index_1))
-                            + (*buffer_g.get_unchecked(arr_index_2)))
+                                + (*buffer_g.get_unchecked(arr_index_2)))
                             + 6 * (*buffer_g.get_unchecked(arr_index_3))
                             + (*buffer_g.get_unchecked(arr_index_4));
                         dif_b += -4
                             * ((*buffer_b.get_unchecked(arr_index_1))
-                            + (*buffer_b.get_unchecked(arr_index_2)))
+                                + (*buffer_b.get_unchecked(arr_index_2)))
                             + 6 * (*buffer_b.get_unchecked(arr_index_3))
                             + (*buffer_b.get_unchecked(arr_index_4));
                         if CHANNELS_COUNT == 4 {
                             dif_a += -4
                                 * ((*buffer_a.get_unchecked(arr_index_1))
-                                + (*buffer_a.get_unchecked(arr_index_2)))
+                                    + (*buffer_a.get_unchecked(arr_index_2)))
                                 + 6 * (*buffer_a.get_unchecked(arr_index_3))
                                 + (*buffer_a.get_unchecked(arr_index_4));
                         }
@@ -179,7 +181,8 @@ mod fast_gaussian_superior {
     }
 
     fn fast_gaussian_horizontal_pass<
-        T: FromPrimitive + ToPrimitive + Default + Into<i64> + Send + Sync, const CHANNELS_COUNT: usize,
+        T: FromPrimitive + ToPrimitive + Default + Into<i64> + Send + Sync,
+        const CHANNELS_COUNT: usize,
     >(
         bytes: &UnsafeSlice<T>,
         stride: u32,
@@ -233,7 +236,8 @@ mod fast_gaussian_superior {
                         bytes.write(bytes_offset + 1, new_g);
                         bytes.write(bytes_offset + 2, new_b);
                         if CHANNELS_COUNT == 4 {
-                            let new_a = T::from_u32(((sum_a as f32) * weight) as u32).unwrap_or_default();
+                            let new_a =
+                                T::from_u32(((sum_a as f32) * weight) as u32).unwrap_or_default();
                             bytes.write(bytes_offset + 3, new_a);
                         }
                     }
@@ -246,23 +250,23 @@ mod fast_gaussian_superior {
                     unsafe {
                         dif_r += -4
                             * ((*buffer_r.get_unchecked(arr_index_1))
-                            + (*buffer_r.get_unchecked(arr_index_2)))
+                                + (*buffer_r.get_unchecked(arr_index_2)))
                             + 6 * (*buffer_r.get_unchecked(arr_index_3))
                             + (*buffer_r.get_unchecked(arr_index_4));
                         dif_g += -4
                             * ((*buffer_g.get_unchecked(arr_index_1))
-                            + (*buffer_g.get_unchecked(arr_index_2)))
+                                + (*buffer_g.get_unchecked(arr_index_2)))
                             + 6 * (*buffer_g.get_unchecked(arr_index_3))
                             + (*buffer_g.get_unchecked(arr_index_4));
                         dif_b += -4
                             * ((*buffer_b.get_unchecked(arr_index_1))
-                            + (*buffer_b.get_unchecked(arr_index_2)))
+                                + (*buffer_b.get_unchecked(arr_index_2)))
                             + 6 * (*buffer_b.get_unchecked(arr_index_3))
                             + (*buffer_b.get_unchecked(arr_index_4));
                         if CHANNELS_COUNT == 4 {
                             dif_a += -4
                                 * ((*buffer_a.get_unchecked(arr_index_1))
-                                + (*buffer_a.get_unchecked(arr_index_2)))
+                                    + (*buffer_a.get_unchecked(arr_index_2)))
                                 + 6 * (*buffer_a.get_unchecked(arr_index_3))
                                 + (*buffer_a.get_unchecked(arr_index_4));
                         }
@@ -299,8 +303,8 @@ mod fast_gaussian_superior {
 
                 let next_row_y = (y as usize) * (stride as usize);
                 let next_row_x =
-                    (std::cmp::min(std::cmp::max(x + 2 * radius_64 - 1, 0), width_wide - 1)
-                        as u32) as usize
+                    (std::cmp::min(std::cmp::max(x + 2 * radius_64 - 1, 0), width_wide - 1) as u32)
+                        as usize
                         * CHANNELS_COUNT;
 
                 let bytes_offset = next_row_y + next_row_x;
@@ -350,7 +354,8 @@ mod fast_gaussian_superior {
     }
 
     pub(crate) fn fast_gaussian_impl<
-        T: FromPrimitive + ToPrimitive + Default + Into<i64> + Send + Sync, const CHANNELS_COUNT: usize,
+        T: FromPrimitive + ToPrimitive + Default + Into<i64> + Send + Sync,
+        const CHANNELS_COUNT: usize,
     >(
         bytes: &mut [T],
         stride: u32,

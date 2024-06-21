@@ -143,7 +143,7 @@ pub mod sse_support {
                 unsafe {
                     while r + 2 <= half_kernel
                         && x as i64 + r as i64 + (if CHANNEL_CONFIGURATION == 4 { 4 } else { 6 })
-                        < width as i64
+                            < width as i64
                     {
                         let px = std::cmp::min(
                             std::cmp::max(x as i64 + r as i64, 0),
