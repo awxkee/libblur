@@ -288,9 +288,9 @@ fn fast_gaussian_next_horizontal_pass<
                 let sum_r_f: f64 = sum_r.as_();
                 let sum_g_f: f64 = sum_g.as_();
                 let sum_b_f: f64 = sum_b.as_();
-                let new_r = T::from_u32((sum_r_f * weight) as u32).unwrap_or_default();
-                let new_g = T::from_u32((sum_g_f * weight) as u32).unwrap_or_default();
-                let new_b = T::from_u32((sum_b_f * weight) as u32).unwrap_or_default();
+                let new_r = T::from_u32((sum_r_f * weight).round() as u32).unwrap_or_default();
+                let new_g = T::from_u32((sum_g_f * weight).round() as u32).unwrap_or_default();
+                let new_b = T::from_u32((sum_b_f * weight).round() as u32).unwrap_or_default();
 
                 let bytes_offset = current_y + current_px;
 
@@ -300,7 +300,8 @@ fn fast_gaussian_next_horizontal_pass<
                     bytes.write(bytes_offset + 2, new_b);
                     if CHANNEL_CONFIGURATION == 4 {
                         let sum_a_f: f64 = sum_a.as_();
-                        let new_a = T::from_u32((sum_a_f * weight) as u32).unwrap_or_default();
+                        let new_a =
+                            T::from_u32((sum_a_f * weight).round() as u32).unwrap_or_default();
                         bytes.write(bytes_offset + 3, new_a);
                     }
                 }

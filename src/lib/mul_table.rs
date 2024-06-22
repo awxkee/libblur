@@ -39,6 +39,7 @@ pub(crate) const SHR_TABLE_DOUBLE: [i32; 320] = [
 ];
 
 // Mul table for 1 / (radius*2)
+#[allow(dead_code)]
 pub(crate) const MUL_TABLE_TWICE_RAD: [i32; 256] = [
     512, 32768, 16384, 10922, 8192, 6553, 5461, 4681, 4096, 3640, 3276, 2978, 2730, 2520, 2340,
     2184, 2048, 1927, 1820, 1724, 1638, 1560, 1489, 1424, 1365, 1310, 1260, 1213, 1170, 1129, 1092,
@@ -58,6 +59,7 @@ pub(crate) const MUL_TABLE_TWICE_RAD: [i32; 256] = [
 ];
 
 // Shift right table for 1 / (2*radius)
+#[allow(dead_code)]
 pub(crate) const SHR_TABLE_TWICE_RAD: [i32; 256] = [
     9, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16,
     16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16,

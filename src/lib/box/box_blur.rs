@@ -29,7 +29,6 @@ use num_traits::cast::FromPrimitive;
 use rayon::ThreadPool;
 
 use crate::channels_configuration::FastBlurChannels;
-use crate::mul_table::{MUL_TABLE_TWICE_RAD, SHR_TABLE_TWICE_RAD};
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::r#box::box_blur_neon::neon_support;
 #[cfg(all(
@@ -64,7 +63,7 @@ fn box_blur_horizontal_pass_impl<
         FastBlurChannels::Channels4 => 4,
     } as usize;
 
-    let weight = 1f32 / kernel_size as f32;
+    let weight = 1f32 / (radius * 2) as f32;
 
     for y in start_y..end_y {
         let mut kernel: [u32; 4] = [0; 4];
@@ -176,7 +175,8 @@ fn box_blur_horizontal_pass<
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     {
         if std::any::type_name::<T>() == "u8" {
-            _dispatcher_horizontal = neon_support::box_blur_horizontal_pass_neon::<T, CHANNEL_CONFIGURATION>;
+            _dispatcher_horizontal =
+                neon_support::box_blur_horizontal_pass_neon::<T, CHANNEL_CONFIGURATION>;
         }
     }
     #[cfg(all(
@@ -185,7 +185,8 @@ fn box_blur_horizontal_pass<
     ))]
     {
         if std::any::type_name::<T>() == "u8" {
-            _dispatcher_horizontal = sse_support::box_blur_horizontal_pass_sse::<T, { CHANNEL_CONFIGURATION }>;
+            _dispatcher_horizontal =
+                sse_support::box_blur_horizontal_pass_sse::<T, { CHANNEL_CONFIGURATION }>;
         }
     }
     let unsafe_dst = UnsafeSlice::new(dst);
@@ -233,15 +234,14 @@ fn box_blur_vertical_pass_impl<
     let box_channels: FastBlurChannels = CHANNEL_CONFIGURATION.into();
     let kernel_size = radius * 2 + 1;
 
-    let mul_value = MUL_TABLE_TWICE_RAD[radius as usize] as u32;
-    let shr_value = SHR_TABLE_TWICE_RAD[radius as usize] as u32;
-
     let edge_count = (kernel_size / 2) + 1;
     let half_kernel = kernel_size / 2;
     let channels_count = match box_channels {
         FastBlurChannels::Channels3 => 3,
         FastBlurChannels::Channels4 => 4,
     };
+
+    let weight = 1f32 / (radius * 2) as f32;
 
     for x in start_x..end_x {
         let mut kernel: [u32; 4] = [0; 4];
@@ -293,26 +293,28 @@ fn box_blur_vertical_pass_impl<
                 }
             }
 
+            let write_offset = y_dst_shift + px;
             unsafe {
                 unsafe_dst.write(
-                    y_dst_shift + px + 0,
-                    T::from_u32((kernel[0] * mul_value) >> shr_value).unwrap_or_default(),
+                    write_offset + 0,
+                    T::from_u32((kernel[0] as f32 * weight).round() as u32).unwrap_or_default(),
                 );
                 unsafe_dst.write(
-                    y_dst_shift + px + 1,
-                    T::from_u32((kernel[1] * mul_value) >> shr_value).unwrap_or_default(),
+                    write_offset + 1,
+                    T::from_u32((kernel[1] as f32 * weight).round() as u32).unwrap_or_default(),
                 );
                 unsafe_dst.write(
-                    y_dst_shift + px + 2,
-                    T::from_u32((kernel[2] * mul_value) >> shr_value).unwrap_or_default(),
+                    write_offset + 2,
+                    T::from_u32((kernel[2] as f32 * weight).round() as u32).unwrap_or_default(),
                 );
 
                 match box_channels {
                     FastBlurChannels::Channels3 => {}
                     FastBlurChannels::Channels4 => {
                         unsafe_dst.write(
-                            y_dst_shift + px + 3,
-                            T::from_u32((kernel[3] * mul_value) >> shr_value).unwrap_or_default(),
+                            write_offset + 3,
+                            T::from_u32((kernel[3] as f32 * weight).round() as u32)
+                                .unwrap_or_default(),
                         );
                     }
                 }
@@ -354,13 +356,15 @@ fn box_blur_vertical_pass<
     ))]
     {
         if std::any::type_name::<T>() == "u8" {
-            _dispatcher_vertical = sse_support::box_blur_vertical_pass_sse::<T, CHANNEL_CONFIGURATION>;
+            _dispatcher_vertical =
+                sse_support::box_blur_vertical_pass_sse::<T, CHANNEL_CONFIGURATION>;
         }
     }
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     {
         if std::any::type_name::<T>() == "u8" {
-            _dispatcher_vertical = neon_support::box_blur_vertical_pass_neon::<T, CHANNEL_CONFIGURATION>;
+            _dispatcher_vertical =
+                neon_support::box_blur_vertical_pass_neon::<T, CHANNEL_CONFIGURATION>;
         }
     }
     let unsafe_dst = UnsafeSlice::new(dst);

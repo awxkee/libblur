@@ -61,7 +61,7 @@ pub mod sse_support {
         let edge_count = (kernel_size / 2) + 1;
         let v_edge_count = unsafe { _mm_set1_epi32(edge_count as i32) };
 
-        let v_weight = unsafe { _mm_set1_ps(1f32 / kernel_size as f32) };
+        let v_weight = unsafe { _mm_set1_ps(1f32 / (radius * 2) as f32) };
 
         let half_kernel = kernel_size / 2;
 
@@ -159,7 +159,7 @@ pub mod sse_support {
         let edge_count = (kernel_size / 2) + 1;
         let v_edge_count = unsafe { _mm_set1_epi32(edge_count as i32) };
 
-        let v_weight = unsafe { _mm_set1_ps(1f32 / kernel_size as f32) };
+        let v_weight = unsafe { _mm_set1_ps(1f32 / (radius * 2) as f32) };
 
         let half_kernel = kernel_size / 2;
 
