@@ -38,10 +38,10 @@ pub mod sse_support {
 
     use crate::unsafe_slice::UnsafeSlice;
 
-    pub fn gaussian_blur_horizontal_pass_impl_sse<const CHANNEL_CONFIGURATION: usize>(
-        src: &[u8],
+    pub fn gaussian_blur_horizontal_pass_impl_sse<T, const CHANNEL_CONFIGURATION: usize>(
+        undef_src: &[T],
         src_stride: u32,
-        unsafe_dst: &UnsafeSlice<u8>,
+        undef_unsafe_dst: &UnsafeSlice<T>,
         dst_stride: u32,
         width: u32,
         kernel_size: usize,
@@ -49,6 +49,9 @@ pub mod sse_support {
         start_y: u32,
         end_y: u32,
     ) {
+        let src: &[u8] = unsafe { std::mem::transmute(undef_src) };
+        let unsafe_dst: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(undef_unsafe_dst) };
+
         let half_kernel = (kernel_size / 2) as i32;
 
         let shuffle_rgb =
@@ -351,18 +354,20 @@ pub mod sse_support {
         }
     }
 
-    pub fn gaussian_blur_vertical_pass_impl_sse<const CHANNEL_CONFIGURATION: usize>(
-        src: &[u8],
+    pub fn gaussian_blur_vertical_pass_impl_sse<T, const CHANNEL_CONFIGURATION: usize>(
+        undef_src: &[T],
         src_stride: u32,
-        unsafe_dst: &UnsafeSlice<u8>,
+        undef_unsafe_dst: &UnsafeSlice<T>,
         dst_stride: u32,
         width: u32,
         height: u32,
         kernel_size: usize,
-        kernel: &Vec<f32>,
+        kernel: &[f32],
         start_y: u32,
         end_y: u32,
     ) {
+        let src: &[u8] = unsafe { std::mem::transmute(undef_src) };
+        let unsafe_dst: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(undef_unsafe_dst) };
         let half_kernel = (kernel_size / 2) as i32;
         const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
 

@@ -27,6 +27,13 @@
 
 use crate::gaussian::gaussian_filter::GaussianFilter;
 use crate::gaussian::gaussian_horizontal::gaussian_blur_horizontal_pass_impl_clip_edge;
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+))]
+use crate::gaussian::gaussian_sse_filter::sse_filter::{
+    gaussian_blur_horizontal_pass_filter_sse, gaussian_blur_vertical_pass_filter_sse,
+};
 use crate::gaussian::gaussian_vertical::gaussian_blur_vertical_pass_clip_edge_impl;
 use crate::unsafe_slice::UnsafeSlice;
 use num_traits::FromPrimitive;
@@ -35,6 +42,7 @@ use rayon::ThreadPool;
 pub(crate) fn gaussian_blur_vertical_pass_edge_clip_dispatch<
     T: FromPrimitive + Default + Into<f32> + Send + Sync,
     const CHANNEL_CONFIGURATION: usize,
+    const USE_ROUNDING: bool,
 >(
     src: &[T],
     src_stride: u32,
@@ -48,6 +56,26 @@ pub(crate) fn gaussian_blur_vertical_pass_edge_clip_dispatch<
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
+    let mut _dispatcher: fn(
+        src: &[T],
+        src_stride: u32,
+        unsafe_dst: &UnsafeSlice<T>,
+        dst_stride: u32,
+        width: u32,
+        height: u32,
+        filter: &Vec<GaussianFilter>,
+        start_y: u32,
+        end_y: u32,
+    ) = gaussian_blur_vertical_pass_clip_edge_impl::<T, CHANNEL_CONFIGURATION, USE_ROUNDING>;
+    if std::any::type_name::<T>() == "u8" {
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "sse4.1"
+        ))]
+        {
+            _dispatcher = gaussian_blur_vertical_pass_filter_sse::<T, CHANNEL_CONFIGURATION>;
+        }
+    }
     let unsafe_dst = UnsafeSlice::new(dst);
     thread_pool.scope(|scope| {
         let segment_size = height / thread_count;
@@ -60,7 +88,7 @@ pub(crate) fn gaussian_blur_vertical_pass_edge_clip_dispatch<
             }
 
             scope.spawn(move |_| {
-                gaussian_blur_vertical_pass_clip_edge_impl::<T, CHANNEL_CONFIGURATION>(
+                _dispatcher(
                     src,
                     src_stride,
                     &unsafe_dst,
@@ -79,6 +107,7 @@ pub(crate) fn gaussian_blur_vertical_pass_edge_clip_dispatch<
 pub(crate) fn gaussian_blur_horizontal_pass_edge_clip_dispatch<
     T: FromPrimitive + Default + Into<f32> + Send + Sync,
     const CHANNEL_CONFIGURATION: usize,
+    const USE_ROUNDING: bool,
 >(
     src: &[T],
     src_stride: u32,
@@ -92,6 +121,25 @@ pub(crate) fn gaussian_blur_horizontal_pass_edge_clip_dispatch<
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
+    let mut _dispatcher: fn(
+        src: &[T],
+        src_stride: u32,
+        unsafe_dst: &UnsafeSlice<T>,
+        dst_stride: u32,
+        width: u32,
+        filter: &Vec<GaussianFilter>,
+        start_y: u32,
+        end_y: u32,
+    ) = gaussian_blur_horizontal_pass_impl_clip_edge::<T, CHANNEL_CONFIGURATION, USE_ROUNDING>;
+    if std::any::type_name::<T>() == "u8" {
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "sse4.1"
+        ))]
+        {
+            _dispatcher = gaussian_blur_horizontal_pass_filter_sse::<T, CHANNEL_CONFIGURATION>;
+        }
+    }
     let unsafe_dst = UnsafeSlice::new(dst);
     thread_pool.scope(|scope| {
         let segment_size = height / thread_count;
@@ -103,7 +151,7 @@ pub(crate) fn gaussian_blur_horizontal_pass_edge_clip_dispatch<
             }
 
             scope.spawn(move |_| {
-                gaussian_blur_horizontal_pass_impl_clip_edge::<T, CHANNEL_CONFIGURATION>(
+                _dispatcher(
                     src,
                     src_stride,
                     &unsafe_dst,

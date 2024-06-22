@@ -1,3 +1,4 @@
+use colorutils_rs::{linear_to_rgba, rgba_to_linear, TransferFunction};
 use image::io::Reader as ImageReader;
 use image::{EncodableLayout, GenericImageView};
 use libblur::{EdgeMode, FastBlurChannels, ThreadingPolicy};
@@ -65,15 +66,15 @@ fn main() {
     //     ThreadingPolicy::Single,
     // );
 
-    libblur::stack_blur(
-        &mut dst_bytes,
-        stride as u32,
-        dimensions.0,
-        dimensions.1,
-        191,
-        FastBlurChannels::Channels4,
-        ThreadingPolicy::Single,
-    );
+    // libblur::stack_blur(
+    //     &mut dst_bytes,
+    //     stride as u32,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     191,
+    //     FastBlurChannels::Channels4,
+    //     ThreadingPolicy::Single,
+    // );
     //
     // libblur::tent_blur(
     //     &bytes,
@@ -86,7 +87,43 @@ fn main() {
     //     FastBlurChannels::Channels4,
     //     ThreadingPolicy::Single,
     // );
-    bytes = dst_bytes;
+    // bytes = dst_bytes;
+    let mut linear_data: Vec<f32> =
+        vec![0f32; dimensions.0 as usize * dimensions.1 as usize * components];
+    let mut linear_data_2: Vec<f32> =
+        vec![0f32; dimensions.0 as usize * dimensions.1 as usize * components];
+    rgba_to_linear(
+        &bytes,
+        stride as u32,
+        &mut linear_data,
+        dimensions.0 * std::mem::size_of::<f32>() as u32 * components as u32,
+        dimensions.0,
+        dimensions.1,
+        TransferFunction::Gamma2p8,
+    );
+
+    libblur::gaussian_blur_f32(
+        &linear_data,
+        &mut linear_data_2,
+        dimensions.0,
+        dimensions.1,
+        75 * 2 + 1,
+        75f32 * 2f32 / 6f32,
+        FastBlurChannels::Channels4,
+        EdgeMode::KernelClip,
+        ThreadingPolicy::Adaptive,
+    );
+
+    linear_to_rgba(
+        &linear_data_2,
+        dimensions.0 as u32 * std::mem::size_of::<f32>() as u32 * components as u32,
+        &mut dst_bytes,
+        stride as u32,
+        dimensions.0,
+        dimensions.1,
+        TransferFunction::Gamma2p8,
+    );
+
     // libblur::gaussian_blur(
     //     &bytes,
     //     stride as u32,
@@ -94,13 +131,13 @@ fn main() {
     //     stride as u32,
     //     dimensions.0,
     //     dimensions.1,
-    //     25 * 2 + 1,
-    //     10f32,
+    //     75 * 2 + 1,
+    //     75f32*2f32 / 6f32,
     //     FastBlurChannels::Channels4,
-    //     EdgeMode::Wrap,
+    //     EdgeMode::Reflect,
     //     ThreadingPolicy::Adaptive,
     // );
-    // bytes = dst_bytes;
+    bytes = dst_bytes;
     // libblur::median_blur(
     //     &bytes,
     //     stride as u32,
@@ -122,7 +159,7 @@ fn main() {
 
     if components == 3 {
         image::save_buffer(
-            "blurred_reflect.jpg",
+            "blurred_linear.jpg",
             bytes.as_bytes(),
             dimensions.0,
             dimensions.1,
@@ -131,7 +168,7 @@ fn main() {
         .unwrap();
     } else {
         image::save_buffer(
-            "blurred_reflect.png",
+            "blurred_linear.png",
             bytes.as_bytes(),
             dimensions.0,
             dimensions.1,

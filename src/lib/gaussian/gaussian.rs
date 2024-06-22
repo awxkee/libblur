@@ -44,7 +44,9 @@ use crate::gaussian::gaussian_neon::neon_support;
     any(target_arch = "x86_64", target_arch = "x86"),
     target_feature = "sse4.1"
 ))]
-use crate::gaussian::gaussian_sse::sse_support::gaussian_blur_vertical_pass_impl_sse;
+use crate::gaussian::gaussian_sse::sse_support::{
+    gaussian_blur_horizontal_pass_impl_sse, gaussian_blur_vertical_pass_impl_sse,
+};
 use crate::gaussian::gaussian_vertical::gaussian_blur_vertical_pass_c_impl;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::ThreadingPolicy;
@@ -53,6 +55,7 @@ fn gaussian_blur_horizontal_pass<
     T: FromPrimitive + Default + Into<f32> + Send + Sync,
     const CHANNEL_CONFIGURATION: usize,
     const EDGE_MODE: usize,
+    const USE_ROUNDING: bool,
 >(
     src: &[T],
     src_stride: u32,
@@ -67,6 +70,27 @@ fn gaussian_blur_horizontal_pass<
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
+    let mut _dispatcher: fn(
+        src: &[T],
+        src_stride: u32,
+        unsafe_dst: &UnsafeSlice<T>,
+        dst_stride: u32,
+        width: u32,
+        kernel_size: usize,
+        kernel: &[f32],
+        start_y: u32,
+        end_y: u32,
+    ) = gaussian_blur_horizontal_pass_impl::<T, CHANNEL_CONFIGURATION, EDGE_MODE, USE_ROUNDING>;
+    let edge_mode: EdgeMode = EDGE_MODE.into();
+    if std::any::type_name::<T>() == "u8" && edge_mode == EdgeMode::Clamp {
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "sse4.1"
+        ))]
+        {
+            _dispatcher = gaussian_blur_horizontal_pass_impl_sse::<T, CHANNEL_CONFIGURATION>;
+        }
+    }
     let unsafe_dst = UnsafeSlice::new(dst);
     thread_pool.scope(|scope| {
         let segment_size = height / thread_count;
@@ -78,7 +102,7 @@ fn gaussian_blur_horizontal_pass<
             }
 
             scope.spawn(move |_| {
-                gaussian_blur_horizontal_pass_impl::<T, CHANNEL_CONFIGURATION, EDGE_MODE>(
+                _dispatcher(
                     src,
                     src_stride,
                     &unsafe_dst,
@@ -98,6 +122,7 @@ fn gaussian_blur_vertical_pass_impl<
     T: FromPrimitive + Default + Into<f32> + Send + Sync,
     const CHANNEL_CONFIGURATION: usize,
     const EDGE_MODE: usize,
+    const USE_ROUNDING: bool,
 >(
     src: &[T],
     src_stride: u32,
@@ -106,7 +131,7 @@ fn gaussian_blur_vertical_pass_impl<
     width: u32,
     height: u32,
     kernel_size: usize,
-    kernel: &Vec<f32>,
+    kernel: &[f32],
     start_y: u32,
     end_y: u32,
 ) where
@@ -132,29 +157,8 @@ fn gaussian_blur_vertical_pass_impl<
             );
             return;
         }
-        #[cfg(all(
-            any(target_arch = "x86_64", target_arch = "x86"),
-            target_feature = "sse4.1"
-        ))]
-        {
-            let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
-            let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
-            gaussian_blur_vertical_pass_impl_sse::<CHANNEL_CONFIGURATION>(
-                u8_slice,
-                src_stride,
-                slice,
-                dst_stride,
-                width,
-                height,
-                kernel_size,
-                kernel,
-                start_y,
-                end_y,
-            );
-            return;
-        }
     }
-    gaussian_blur_vertical_pass_c_impl::<T, CHANNEL_CONFIGURATION, EDGE_MODE>(
+    gaussian_blur_vertical_pass_c_impl::<T, CHANNEL_CONFIGURATION, EDGE_MODE, USE_ROUNDING>(
         src,
         src_stride,
         unsafe_dst,
@@ -172,6 +176,7 @@ fn gaussian_blur_vertical_pass<
     T: FromPrimitive + Default + Into<f32> + Send + Sync,
     const CHANNEL_CONFIGURATION: usize,
     const EDGE_MODE: usize,
+    const USE_ROUNDING: bool,
 >(
     src: &[T],
     src_stride: u32,
@@ -186,6 +191,28 @@ fn gaussian_blur_vertical_pass<
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
+    let mut _dispatcher: fn(
+        src: &[T],
+        src_stride: u32,
+        unsafe_dst: &UnsafeSlice<T>,
+        dst_stride: u32,
+        width: u32,
+        height: u32,
+        kernel_size: usize,
+        kernel: &[f32],
+        start_y: u32,
+        end_y: u32,
+    ) = gaussian_blur_vertical_pass_impl::<T, CHANNEL_CONFIGURATION, EDGE_MODE, USE_ROUNDING>;
+    let edge_mode: EdgeMode = EDGE_MODE.into();
+    if std::any::type_name::<T>() == "u8" && edge_mode == EdgeMode::Clamp {
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "sse4.1"
+        ))]
+        {
+            _dispatcher = gaussian_blur_vertical_pass_impl_sse::<T, CHANNEL_CONFIGURATION>;
+        }
+    }
     let unsafe_dst = UnsafeSlice::new(dst);
     thread_pool.scope(|scope| {
         let segment_size = height / thread_count;
@@ -198,7 +225,7 @@ fn gaussian_blur_vertical_pass<
             }
 
             scope.spawn(move |_| {
-                gaussian_blur_vertical_pass_impl::<T, CHANNEL_CONFIGURATION, EDGE_MODE>(
+                _dispatcher(
                     src,
                     src_stride,
                     &unsafe_dst,
@@ -218,6 +245,7 @@ fn gaussian_blur_vertical_pass<
 fn gaussian_blur_impl<
     T: FromPrimitive + Default + Into<f32> + Send + Sync,
     const CHANNEL_CONFIGURATION: usize,
+    const USE_ROUNDING: bool,
 >(
     src: &[T],
     src_stride: u32,
@@ -247,7 +275,12 @@ fn gaussian_blur_impl<
     match edge_mode {
         EdgeMode::Reflect => {
             let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
-            gaussian_blur_horizontal_pass::<T, CHANNEL_CONFIGURATION, { EdgeMode::Reflect as usize }>(
+            gaussian_blur_horizontal_pass::<
+                T,
+                CHANNEL_CONFIGURATION,
+                { EdgeMode::Reflect as usize },
+                USE_ROUNDING,
+            >(
                 &src,
                 src_stride,
                 &mut transient,
@@ -259,7 +292,12 @@ fn gaussian_blur_impl<
                 &pool,
                 thread_count,
             );
-            gaussian_blur_vertical_pass::<T, CHANNEL_CONFIGURATION, { EdgeMode::Reflect as usize }>(
+            gaussian_blur_vertical_pass::<
+                T,
+                CHANNEL_CONFIGURATION,
+                { EdgeMode::Reflect as usize },
+                USE_ROUNDING,
+            >(
                 &transient,
                 dst_stride,
                 dst,
@@ -274,7 +312,12 @@ fn gaussian_blur_impl<
         }
         EdgeMode::Wrap => {
             let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
-            gaussian_blur_horizontal_pass::<T, CHANNEL_CONFIGURATION, { EdgeMode::Wrap as usize }>(
+            gaussian_blur_horizontal_pass::<
+                T,
+                CHANNEL_CONFIGURATION,
+                { EdgeMode::Wrap as usize },
+                USE_ROUNDING,
+            >(
                 &src,
                 src_stride,
                 &mut transient,
@@ -286,7 +329,12 @@ fn gaussian_blur_impl<
                 &pool,
                 thread_count,
             );
-            gaussian_blur_vertical_pass::<T, CHANNEL_CONFIGURATION, { EdgeMode::Wrap as usize }>(
+            gaussian_blur_vertical_pass::<
+                T,
+                CHANNEL_CONFIGURATION,
+                { EdgeMode::Wrap as usize },
+                USE_ROUNDING,
+            >(
                 &transient,
                 dst_stride,
                 dst,
@@ -301,7 +349,12 @@ fn gaussian_blur_impl<
         }
         EdgeMode::Clamp => {
             let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
-            gaussian_blur_horizontal_pass::<T, CHANNEL_CONFIGURATION, { EdgeMode::Clamp as usize }>(
+            gaussian_blur_horizontal_pass::<
+                T,
+                CHANNEL_CONFIGURATION,
+                { EdgeMode::Clamp as usize },
+                USE_ROUNDING,
+            >(
                 &src,
                 src_stride,
                 &mut transient,
@@ -313,7 +366,12 @@ fn gaussian_blur_impl<
                 &pool,
                 thread_count,
             );
-            gaussian_blur_vertical_pass::<T, CHANNEL_CONFIGURATION, { EdgeMode::Clamp as usize }>(
+            gaussian_blur_vertical_pass::<
+                T,
+                CHANNEL_CONFIGURATION,
+                { EdgeMode::Clamp as usize },
+                USE_ROUNDING,
+            >(
                 &transient,
                 dst_stride,
                 dst,
@@ -329,7 +387,11 @@ fn gaussian_blur_impl<
         EdgeMode::KernelClip => {
             let horizontal_filter = create_filter(width as usize, kernel_size, sigma);
             let vertical_filter = create_filter(height as usize, kernel_size, sigma);
-            gaussian_blur_horizontal_pass_edge_clip_dispatch::<T, CHANNEL_CONFIGURATION>(
+            gaussian_blur_horizontal_pass_edge_clip_dispatch::<
+                T,
+                CHANNEL_CONFIGURATION,
+                USE_ROUNDING,
+            >(
                 &src,
                 dst_stride,
                 &mut transient,
@@ -340,7 +402,7 @@ fn gaussian_blur_impl<
                 &pool,
                 thread_count,
             );
-            gaussian_blur_vertical_pass_edge_clip_dispatch::<T, CHANNEL_CONFIGURATION>(
+            gaussian_blur_vertical_pass_edge_clip_dispatch::<T, CHANNEL_CONFIGURATION, USE_ROUNDING>(
                 &transient,
                 dst_stride,
                 dst,
@@ -389,7 +451,7 @@ pub fn gaussian_blur(
 ) {
     match channels {
         FastBlurChannels::Channels3 => {
-            gaussian_blur_impl::<u8, 3>(
+            gaussian_blur_impl::<u8, 3, true>(
                 src,
                 src_stride,
                 dst,
@@ -403,7 +465,7 @@ pub fn gaussian_blur(
             );
         }
         FastBlurChannels::Channels4 => {
-            gaussian_blur_impl::<u8, 4>(
+            gaussian_blur_impl::<u8, 4, true>(
                 src,
                 src_stride,
                 dst,
@@ -440,9 +502,7 @@ pub fn gaussian_blur(
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn gaussian_blur_u16(
     src: &[u16],
-    src_stride: u32,
     dst: &mut [u16],
-    dst_stride: u32,
     width: u32,
     height: u32,
     kernel_size: u32,
@@ -453,11 +513,11 @@ pub fn gaussian_blur_u16(
 ) {
     match channels {
         FastBlurChannels::Channels3 => {
-            gaussian_blur_impl::<u16, 3>(
+            gaussian_blur_impl::<u16, 3, true>(
                 src,
-                src_stride,
+                width * channels.get_channels() as u32,
                 dst,
-                dst_stride,
+                width * channels.get_channels() as u32,
                 width,
                 height,
                 kernel_size,
@@ -467,11 +527,11 @@ pub fn gaussian_blur_u16(
             );
         }
         FastBlurChannels::Channels4 => {
-            gaussian_blur_impl::<u16, 4>(
+            gaussian_blur_impl::<u16, 4, true>(
                 src,
-                src_stride,
+                width * channels.get_channels() as u32,
                 dst,
-                dst_stride,
+                width * channels.get_channels() as u32,
                 width,
                 height,
                 kernel_size,
@@ -491,7 +551,6 @@ pub fn gaussian_blur_u16(
 ///
 /// # Arguments
 ///
-/// * `stride` - Lane length, default is width * channels_count if not aligned
 /// * `width` - Width of the image
 /// * `height` - Height of the image
 /// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted.
@@ -504,25 +563,22 @@ pub fn gaussian_blur_u16(
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn gaussian_blur_f32(
     src: &[f32],
-    src_stride: u32,
     dst: &mut [f32],
-    dst_stride: u32,
     width: u32,
     height: u32,
     kernel_size: u32,
     sigma: f32,
-    edge_mode: EdgeMode,
     channels: FastBlurChannels,
-
+    edge_mode: EdgeMode,
     threading_policy: ThreadingPolicy,
 ) {
     match channels {
         FastBlurChannels::Channels3 => {
-            gaussian_blur_impl::<f32, 3>(
+            gaussian_blur_impl::<f32, 3, false>(
                 src,
-                src_stride,
+                width * channels.get_channels() as u32,
                 dst,
-                dst_stride,
+                width * channels.get_channels() as u32,
                 width,
                 height,
                 kernel_size,
@@ -532,11 +588,11 @@ pub fn gaussian_blur_f32(
             );
         }
         FastBlurChannels::Channels4 => {
-            gaussian_blur_impl::<f32, 4>(
+            gaussian_blur_impl::<f32, 4, false>(
                 src,
-                src_stride,
+                width * channels.get_channels() as u32,
                 dst,
-                dst_stride,
+                width * channels.get_channels() as u32,
                 width,
                 height,
                 kernel_size,
@@ -556,7 +612,6 @@ pub fn gaussian_blur_f32(
 ///
 /// # Arguments
 ///
-/// * `stride` - Lane length, default is width * channels_count if not aligned
 /// * `width` - Width of the image
 /// * `height` - Height of the image
 /// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted.
@@ -568,9 +623,7 @@ pub fn gaussian_blur_f32(
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn gaussian_blur_f16(
     src: &[u16],
-    src_stride: u32,
     dst: &mut [u16],
-    dst_stride: u32,
     width: u32,
     height: u32,
     kernel_size: u32,
@@ -580,9 +633,9 @@ pub fn gaussian_blur_f16(
 ) {
     gaussian_blur_impl_f16(
         src,
-        src_stride,
+        width * channels.get_channels() as u32,
         dst,
-        dst_stride,
+        width * channels.get_channels() as u32,
         width,
         height,
         kernel_size,

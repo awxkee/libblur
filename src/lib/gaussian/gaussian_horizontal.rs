@@ -30,16 +30,6 @@ use crate::gaussian::gaussian_filter::GaussianFilter;
 use crate::gaussian::gaussian_neon::neon_support;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::gaussian::gaussian_neon_filter::neon_gaussian_filter::gaussian_blur_horizontal_pass_filter_neon;
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "sse4.1"
-))]
-use crate::gaussian::gaussian_sse::sse_support::gaussian_blur_horizontal_pass_impl_sse;
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "sse4.1"
-))]
-use crate::gaussian::gaussian_sse_filter::sse_filter::gaussian_blur_horizontal_pass_filter_sse;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{reflect_index, EdgeMode};
 use num_traits::FromPrimitive;
@@ -48,6 +38,7 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl<
     T: FromPrimitive + Default + Into<f32> + Send + Sync,
     const CHANNEL_CONFIGURATION: usize,
     const EDGE_MODE: usize,
+    const USE_ROUNDING: bool,
 >(
     src: &[T],
     src_stride: u32,
@@ -55,7 +46,7 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl<
     dst_stride: u32,
     width: u32,
     kernel_size: usize,
-    kernel: &Vec<f32>,
+    kernel: &[f32],
     start_y: u32,
     end_y: u32,
 ) where
@@ -80,28 +71,8 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl<
             );
             return;
         }
-        #[cfg(all(
-            any(target_arch = "x86_64", target_arch = "x86"),
-            target_feature = "sse4.1"
-        ))]
-        {
-            let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
-            let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
-            gaussian_blur_horizontal_pass_impl_sse::<CHANNEL_CONFIGURATION>(
-                u8_slice,
-                src_stride,
-                slice,
-                dst_stride,
-                width,
-                kernel_size,
-                kernel,
-                start_y,
-                end_y,
-            );
-            return;
-        }
     }
-    gaussian_blur_horizontal_pass_impl_c::<T, CHANNEL_CONFIGURATION, EDGE_MODE>(
+    gaussian_blur_horizontal_pass_impl_c::<T, CHANNEL_CONFIGURATION, EDGE_MODE, USE_ROUNDING>(
         src,
         src_stride,
         unsafe_dst,
@@ -118,6 +89,7 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_c<
     T: FromPrimitive + Default + Into<f32> + Send + Sync,
     const CHANNEL_CONFIGURATION: usize,
     const EDGE_MODE: usize,
+    const USE_ROUNDING: bool,
 >(
     src: &[T],
     src_stride: u32,
@@ -125,7 +97,7 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_c<
     dst_stride: u32,
     width: u32,
     kernel_size: usize,
-    kernel: &Vec<f32>,
+    kernel: &[f32],
     start_y: u32,
     end_y: u32,
 ) where
@@ -154,36 +126,57 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_c<
                         cx * CHANNEL_CONFIGURATION
                     }
                 };
+                let y_offset = y_src_shift + px;
                 let weight = unsafe { *kernel.get_unchecked((r + half_kernel) as usize) };
-                weights[0] += (unsafe { *src.get_unchecked(y_src_shift + px) }.into()) * weight;
-                weights[1] += (unsafe { *src.get_unchecked(y_src_shift + px + 1) }.into()) * weight;
-                weights[2] += (unsafe { *src.get_unchecked(y_src_shift + px + 2) }.into()) * weight;
+                weights[0] += (unsafe { *src.get_unchecked(y_offset) }.into()) * weight;
+                weights[1] += (unsafe { *src.get_unchecked(y_offset + 1) }.into()) * weight;
+                weights[2] += (unsafe { *src.get_unchecked(y_offset + 2) }.into()) * weight;
                 if CHANNEL_CONFIGURATION == 4 {
-                    weights[3] +=
-                        (unsafe { *src.get_unchecked(y_src_shift + px + 3) }.into()) * weight;
+                    weights[3] += (unsafe { *src.get_unchecked(y_offset + 3) }.into()) * weight;
                 }
             }
 
             let px = x as usize * CHANNEL_CONFIGURATION;
 
             unsafe {
-                unsafe_dst.write(
-                    y_dst_shift + px,
-                    T::from_f32(weights[0]).unwrap_or_default(),
-                );
-                unsafe_dst.write(
-                    y_dst_shift + px + 1,
-                    T::from_f32(weights[1]).unwrap_or_default(),
-                );
-                unsafe_dst.write(
-                    y_dst_shift + px + 2,
-                    T::from_f32(weights[2]).unwrap_or_default(),
-                );
-                if CHANNEL_CONFIGURATION == 4 {
+                if USE_ROUNDING {
                     unsafe_dst.write(
-                        y_dst_shift + px + 3,
-                        T::from_f32(weights[3]).unwrap_or_default(),
+                        y_dst_shift + px,
+                        T::from_f32(weights[0].round()).unwrap_or_default(),
                     );
+                    unsafe_dst.write(
+                        y_dst_shift + px + 1,
+                        T::from_f32(weights[1].round()).unwrap_or_default(),
+                    );
+                    unsafe_dst.write(
+                        y_dst_shift + px + 2,
+                        T::from_f32(weights[2].round()).unwrap_or_default(),
+                    );
+                    if CHANNEL_CONFIGURATION == 4 {
+                        unsafe_dst.write(
+                            y_dst_shift + px + 3,
+                            T::from_f32(weights[3].round()).unwrap_or_default(),
+                        );
+                    }
+                } else {
+                    unsafe_dst.write(
+                        y_dst_shift + px,
+                        T::from_f32(weights[0]).unwrap_or_default(),
+                    );
+                    unsafe_dst.write(
+                        y_dst_shift + px + 1,
+                        T::from_f32(weights[1]).unwrap_or_default(),
+                    );
+                    unsafe_dst.write(
+                        y_dst_shift + px + 2,
+                        T::from_f32(weights[2]).unwrap_or_default(),
+                    );
+                    if CHANNEL_CONFIGURATION == 4 {
+                        unsafe_dst.write(
+                            y_dst_shift + px + 3,
+                            T::from_f32(weights[3]).unwrap_or_default(),
+                        );
+                    }
                 }
             }
         }
@@ -193,6 +186,7 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_c<
 pub(crate) fn gaussian_blur_horizontal_pass_impl_clip_edge<
     T: FromPrimitive + Default + Into<f32> + Send + Sync,
     const CHANNEL_CONFIGURATION: usize,
+    const USE_ROUNDING: bool,
 >(
     src: &[T],
     src_stride: u32,
@@ -215,18 +209,6 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_clip_edge<
             );
             return;
         }
-        #[cfg(all(
-            any(target_arch = "x86_64", target_arch = "x86"),
-            target_feature = "sse4.1"
-        ))]
-        {
-            let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
-            let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
-            gaussian_blur_horizontal_pass_filter_sse::<CHANNEL_CONFIGURATION>(
-                u8_slice, src_stride, slice, dst_stride, width, filter, start_y, end_y,
-            );
-            return;
-        }
     }
     for y in start_y..end_y {
         let y_src_shift = y as usize * src_stride as usize;
@@ -241,35 +223,56 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_clip_edge<
             for j in 0..current_filter.size {
                 let px = (filter_start + j) * CHANNEL_CONFIGURATION;
                 let weight = unsafe { *filter_weights.get_unchecked(j) };
-                weights[0] += (unsafe { *src.get_unchecked(y_src_shift + px) }.into()) * weight;
-                weights[1] += (unsafe { *src.get_unchecked(y_src_shift + px + 1) }.into()) * weight;
-                weights[2] += (unsafe { *src.get_unchecked(y_src_shift + px + 2) }.into()) * weight;
+                let y_offset = y_src_shift + px;
+                weights[0] += (unsafe { *src.get_unchecked(y_offset) }.into()) * weight;
+                weights[1] += (unsafe { *src.get_unchecked(y_offset + 1) }.into()) * weight;
+                weights[2] += (unsafe { *src.get_unchecked(y_offset + 2) }.into()) * weight;
                 if CHANNEL_CONFIGURATION == 4 {
-                    weights[3] +=
-                        (unsafe { *src.get_unchecked(y_src_shift + px + 3) }.into()) * weight;
+                    weights[3] += (unsafe { *src.get_unchecked(y_offset + 3) }.into()) * weight;
                 }
             }
 
             let px = x as usize * CHANNEL_CONFIGURATION;
 
             unsafe {
-                unsafe_dst.write(
-                    y_dst_shift + px,
-                    T::from_f32(weights[0]).unwrap_or_default(),
-                );
-                unsafe_dst.write(
-                    y_dst_shift + px + 1,
-                    T::from_f32(weights[1]).unwrap_or_default(),
-                );
-                unsafe_dst.write(
-                    y_dst_shift + px + 2,
-                    T::from_f32(weights[2]).unwrap_or_default(),
-                );
-                if CHANNEL_CONFIGURATION == 4 {
+                if USE_ROUNDING {
                     unsafe_dst.write(
-                        y_dst_shift + px + 3,
-                        T::from_f32(weights[3]).unwrap_or_default(),
+                        y_dst_shift + px,
+                        T::from_f32(weights[0].round()).unwrap_or_default(),
                     );
+                    unsafe_dst.write(
+                        y_dst_shift + px + 1,
+                        T::from_f32(weights[1].round()).unwrap_or_default(),
+                    );
+                    unsafe_dst.write(
+                        y_dst_shift + px + 2,
+                        T::from_f32(weights[2].round()).unwrap_or_default(),
+                    );
+                    if CHANNEL_CONFIGURATION == 4 {
+                        unsafe_dst.write(
+                            y_dst_shift + px + 3,
+                            T::from_f32(weights[3].round()).unwrap_or_default(),
+                        );
+                    }
+                } else {
+                    unsafe_dst.write(
+                        y_dst_shift + px,
+                        T::from_f32(weights[0]).unwrap_or_default(),
+                    );
+                    unsafe_dst.write(
+                        y_dst_shift + px + 1,
+                        T::from_f32(weights[1]).unwrap_or_default(),
+                    );
+                    unsafe_dst.write(
+                        y_dst_shift + px + 2,
+                        T::from_f32(weights[2]).unwrap_or_default(),
+                    );
+                    if CHANNEL_CONFIGURATION == 4 {
+                        unsafe_dst.write(
+                            y_dst_shift + px + 3,
+                            T::from_f32(weights[3]).unwrap_or_default(),
+                        );
+                    }
                 }
             }
         }

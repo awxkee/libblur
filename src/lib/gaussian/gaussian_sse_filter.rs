@@ -39,16 +39,18 @@ pub mod sse_filter {
 
     use crate::unsafe_slice::UnsafeSlice;
 
-    pub fn gaussian_blur_horizontal_pass_filter_sse<const CHANNEL_CONFIGURATION: usize>(
-        src: &[u8],
+    pub fn gaussian_blur_horizontal_pass_filter_sse<T, const CHANNEL_CONFIGURATION: usize>(
+        undef_src: &[T],
         src_stride: u32,
-        unsafe_dst: &UnsafeSlice<u8>,
+        undef_unsafe_dst: &UnsafeSlice<T>,
         dst_stride: u32,
         width: u32,
         filter: &Vec<GaussianFilter>,
         start_y: u32,
         end_y: u32,
     ) {
+        let src: &[u8] = unsafe { std::mem::transmute(undef_src) };
+        let unsafe_dst: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(undef_unsafe_dst) };
         #[rustfmt::skip]
         let shuffle_rgb =
             unsafe { _mm_setr_epi8(0, 1, 2, -1, 3, 4,
@@ -384,10 +386,10 @@ pub mod sse_filter {
         }
     }
 
-    pub fn gaussian_blur_vertical_pass_filter_sse<const CHANNEL_CONFIGURATION: usize>(
-        src: &[u8],
+    pub fn gaussian_blur_vertical_pass_filter_sse<T, const CHANNEL_CONFIGURATION: usize>(
+        undef_src: &[T],
         src_stride: u32,
-        unsafe_dst: &UnsafeSlice<u8>,
+        undef_unsafe_dst: &UnsafeSlice<T>,
         dst_stride: u32,
         width: u32,
         _: u32,
@@ -395,6 +397,8 @@ pub mod sse_filter {
         start_y: u32,
         end_y: u32,
     ) {
+        let src: &[u8] = unsafe { std::mem::transmute(undef_src) };
+        let unsafe_dst: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(undef_unsafe_dst) };
         const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
 
         let zeros = unsafe { _mm_setzero_ps() };

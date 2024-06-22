@@ -33,6 +33,15 @@ pub enum FastBlurChannels {
     Channels4 = 4,
 }
 
+impl FastBlurChannels {
+    pub fn get_channels(&self) -> usize {
+        match self {
+            FastBlurChannels::Channels3 => 3,
+            FastBlurChannels::Channels4 => 4,
+        }
+    }
+}
+
 impl From<usize> for FastBlurChannels {
     fn from(value: usize) -> Self {
         return match value {
