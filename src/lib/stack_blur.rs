@@ -92,7 +92,7 @@ fn stack_blur_pass<J, const COMPONENTS: usize>(
     let mut sp;
     let mut stack_start;
     let mut stacks = vec![];
-    for _ in 0..div * total_threads {
+    for _ in 0..div {
         stacks.push(Box::new(BlurStack::new()));
     }
 

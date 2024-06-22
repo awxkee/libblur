@@ -70,9 +70,9 @@ fn main() {
         stride as u32,
         dimensions.0,
         dimensions.1,
-        75,
+        33,
         FastBlurChannels::Channels4,
-        ThreadingPolicy::Single,
+        ThreadingPolicy::Adaptive,
     );
     //
     // libblur::tent_blur(

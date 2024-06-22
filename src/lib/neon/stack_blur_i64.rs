@@ -49,7 +49,7 @@ pub fn stack_blur_pass_neon_i64<const COMPONENTS: usize>(
         let (mut xp, mut yp);
         let mut sp;
         let mut stack_start;
-        let mut stacks = vec![0i64; 4 * div * total_threads];
+        let mut stacks = vec![0i64; 4 * div];
 
         let mut sums: int64x2x2_t;
         let mut sum_in: int64x2x2_t;

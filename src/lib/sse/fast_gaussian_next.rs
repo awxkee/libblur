@@ -99,10 +99,10 @@ pub fn fast_gaussian_next_vertical_pass_sse_u8<T, const CHANNELS_COUNT: usize>(
                 let buf_ptr = unsafe { buffer.get_unchecked_mut(d_arr_index).as_mut_ptr() };
                 let stored = unsafe { _mm_loadu_si128(buf_ptr as *const __m128i) };
 
-                let buf_ptr_1 = buffer[d_arr_index_1].as_mut_ptr();
+                let buf_ptr_1 = unsafe { buffer.as_mut_ptr().add(d_arr_index_1) };
                 let stored_1 = unsafe { _mm_loadu_si128(buf_ptr_1 as *const __m128i) };
 
-                let buf_ptr_2 = buffer[d_arr_index_2].as_mut_ptr();
+                let buf_ptr_2 = unsafe { buffer.as_mut_ptr().add(d_arr_index_2) };
                 let stored_2 = unsafe { _mm_loadu_si128(buf_ptr_2 as *const __m128i) };
 
                 let new_diff = unsafe {
