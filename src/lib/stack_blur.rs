@@ -32,7 +32,7 @@ use crate::neon::{stack_blur_pass_neon_i32, stack_blur_pass_neon_i64};
     any(target_arch = "x86_64", target_arch = "x86"),
     target_feature = "sse4.1"
 ))]
-use crate::sse::stack_blur_pass_sse;
+use crate::sse::{stack_blur_pass_sse, stack_blur_pass_sse_i64};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{FastBlurChannels, ThreadingPolicy};
 use num_traits::FromPrimitive;
@@ -542,6 +542,13 @@ fn stack_blur_worker_horizontal(
                 {
                     _dispatcher = stack_blur_pass_neon_i64::<3>;
                 }
+                #[cfg(all(
+                    any(target_arch = "x86_64", target_arch = "x86"),
+                    target_feature = "sse4.1"
+                ))]
+                {
+                    _dispatcher = stack_blur_pass_sse_i64::<3>;
+                }
             }
             _dispatcher(
                 &slice,
@@ -585,6 +592,13 @@ fn stack_blur_worker_horizontal(
                 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
                 {
                     _dispatcher = stack_blur_pass_neon_i64::<4>;
+                }
+                #[cfg(all(
+                    any(target_arch = "x86_64", target_arch = "x86"),
+                    target_feature = "sse4.1"
+                ))]
+                {
+                    _dispatcher = stack_blur_pass_sse_i64::<4>;
                 }
             }
             _dispatcher(
@@ -644,6 +658,13 @@ fn stack_blur_worker_vertical(
                 {
                     _dispatcher = stack_blur_pass_neon_i64::<3>;
                 }
+                #[cfg(all(
+                    any(target_arch = "x86_64", target_arch = "x86"),
+                    target_feature = "sse4.1"
+                ))]
+                {
+                    _dispatcher = stack_blur_pass_sse_i64::<3>;
+                }
             }
             _dispatcher(
                 &slice,
@@ -687,6 +708,13 @@ fn stack_blur_worker_vertical(
                 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
                 {
                     _dispatcher = stack_blur_pass_neon_i64::<4>;
+                }
+                #[cfg(all(
+                    any(target_arch = "x86_64", target_arch = "x86"),
+                    target_feature = "sse4.1"
+                ))]
+                {
+                    _dispatcher = stack_blur_pass_sse_i64::<4>;
                 }
             }
             _dispatcher(

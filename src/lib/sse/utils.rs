@@ -30,6 +30,61 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
+#[allow(non_camel_case_types)]
+#[derive(Clone, Copy)]
+pub struct __mm128ix2(pub(crate) __m128i, pub(crate) __m128i);
+
+#[inline(always)]
+pub(crate) unsafe fn _mm_sub_epi64x2(a: __mm128ix2, b: __mm128ix2) -> __mm128ix2 {
+    __mm128ix2(_mm_sub_epi64(a.0, b.0), _mm_sub_epi64(a.1, b.1))
+}
+
+#[inline(always)]
+pub(crate) unsafe fn _mm_add_epi64x2(a: __mm128ix2, b: __mm128ix2) -> __mm128ix2 {
+    __mm128ix2(_mm_add_epi64(a.0, b.0), _mm_add_epi64(a.1, b.1))
+}
+
+#[inline(always)]
+pub(crate) unsafe fn _mm_mul_n_epi64x2(x: __mm128ix2, v: i64) -> __mm128ix2 {
+    let v = _mm_set1_epi64x(v);
+    let c0 = _mm_mul_epi64(x.0, v);
+    let c1 = _mm_mul_epi64(x.1, v);
+    __mm128ix2(c0, c1)
+}
+
+#[inline(always)]
+pub(crate) unsafe fn _mm_store_epi64x2(ptr: *mut i64, x: __mm128ix2) {
+    _mm_storeu_si128(ptr as *mut __m128i, x.0);
+    _mm_storeu_si128(ptr.add(2) as *mut __m128i, x.1);
+}
+
+#[inline(always)]
+pub(crate) unsafe fn _mm_set1_epi64x2(v: i64) -> __mm128ix2 {
+    __mm128ix2(_mm_set1_epi64x(v), _mm_set1_epi64x(v))
+}
+
+#[inline(always)]
+pub(crate) unsafe fn _mm_load_epi64x2(ptr: *const i64) -> __mm128ix2 {
+    let v0 = _mm_loadu_si128(ptr as *const __m128i);
+    let v1 = _mm_loadu_si128(ptr.add(2) as *const __m128i);
+    __mm128ix2(v0, v1)
+}
+
+#[inline(always)]
+pub(crate) unsafe fn load_u8_s64x2_fast<const CHANNELS_COUNT: usize>(ptr: *const u8) -> __mm128ix2 {
+    let u_first = i64::from_le_bytes([ptr.read_unaligned(), 0, 0, 0, 0, 0, 0, 0]);
+    let u_second = i64::from_le_bytes([ptr.add(1).read_unaligned(), 0, 0, 0, 0, 0, 0, 0]);
+    let u_third = i64::from_le_bytes([ptr.add(2).read_unaligned(), 0, 0, 0, 0, 0, 0, 0]);
+    let u_fourth = match CHANNELS_COUNT {
+        4 => i64::from_le_bytes([ptr.add(3).read_unaligned(), 0, 0, 0, 0, 0, 0, 0]),
+        _ => 0,
+    };
+    __mm128ix2(
+        _mm_set_epi64x(u_second, u_first),
+        _mm_set_epi64x(u_fourth, u_third),
+    )
+}
+
 #[inline]
 pub(crate) unsafe fn load_u8_s32_fast<const CHANNELS_COUNT: usize>(ptr: *const u8) -> __m128i {
     let u_first = u32::from_le_bytes([ptr.read_unaligned(), 0, 0, 0]);

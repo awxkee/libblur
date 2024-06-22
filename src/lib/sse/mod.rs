@@ -27,10 +27,12 @@
 
 mod fast_gaussian;
 mod fast_gaussian_next;
-mod stack_blur;
+mod stack_blur_i32;
 mod utils;
+mod stack_blur_i64;
 
 pub use fast_gaussian::*;
 pub use fast_gaussian_next::*;
-pub use stack_blur::*;
+pub use stack_blur_i32::stack_blur_pass_sse;
 pub use utils::*;
+pub use stack_blur_i64::stack_blur_pass_sse_i64;
