@@ -517,15 +517,14 @@ pub fn box_blur(
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn box_blur_u16(
     src: &[u16],
-    src_stride: u32,
     dst: &mut [u16],
-    dst_stride: u32,
     width: u32,
     height: u32,
     radius: u32,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) {
+    let stride = width * channels.get_channels() as u32;
     let thread_count = threading_policy.get_threads_count(width, height) as u32;
     let pool = rayon::ThreadPoolBuilder::new()
         .num_threads(thread_count as usize)
@@ -535,9 +534,9 @@ pub fn box_blur_u16(
         FastBlurChannels::Channels3 => {
             box_blur_impl::<u16, 3>(
                 src,
-                src_stride,
+                stride,
                 dst,
-                dst_stride,
+                stride,
                 width,
                 height,
                 radius,
@@ -548,9 +547,9 @@ pub fn box_blur_u16(
         FastBlurChannels::Channels4 => {
             box_blur_impl::<u16, 4>(
                 src,
-                src_stride,
+                stride,
                 dst,
-                dst_stride,
+                stride,
                 width,
                 height,
                 radius,
@@ -682,22 +681,21 @@ pub fn tent_blur(
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn tent_blur_u16(
     src: &[u16],
-    src_stride: u32,
     dst: &mut [u16],
-    dst_stride: u32,
     width: u32,
     height: u32,
     radius: u32,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) {
+    let stride = width * channels.get_channels() as u32;
     match channels {
         FastBlurChannels::Channels3 => {
             tent_blur_impl::<u16, 3>(
                 src,
-                src_stride,
+                stride,
                 dst,
-                dst_stride,
+                stride,
                 width,
                 height,
                 radius,
@@ -707,9 +705,9 @@ pub fn tent_blur_u16(
         FastBlurChannels::Channels4 => {
             tent_blur_impl::<u16, 4>(
                 src,
-                src_stride,
+                stride,
                 dst,
-                dst_stride,
+                stride,
                 width,
                 height,
                 radius,
@@ -855,22 +853,21 @@ pub fn gaussian_box_blur(
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn gaussian_box_blur_u16(
     src: &[u16],
-    src_stride: u32,
     dst: &mut [u16],
-    dst_stride: u32,
     width: u32,
     height: u32,
     radius: u32,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) {
+    let stride = width * channels.get_channels() as u32;
     match channels {
         FastBlurChannels::Channels3 => {
             gaussian_box_blur_impl::<u16, 3>(
                 src,
-                src_stride,
+                stride,
                 dst,
-                dst_stride,
+                stride,
                 width,
                 height,
                 radius,
@@ -880,9 +877,9 @@ pub fn gaussian_box_blur_u16(
         FastBlurChannels::Channels4 => {
             gaussian_box_blur_impl::<u16, 4>(
                 src,
-                src_stride,
+                stride,
                 dst,
-                dst_stride,
+                stride,
                 width,
                 height,
                 radius,

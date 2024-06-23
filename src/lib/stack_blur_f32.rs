@@ -29,6 +29,10 @@ const BASE_RADIUS_F64_CUTOFF: u32 = 327;
 
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::stack_blur_pass_neon_f32;
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+))]
 use crate::sse::stack_blur_pass_sse_f;
 use crate::stack_blur::{BlurStack, StackBlurPass};
 use crate::unsafe_slice::UnsafeSlice;

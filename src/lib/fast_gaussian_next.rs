@@ -40,6 +40,9 @@ use crate::sse::{
 };
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{FastBlurChannels, ThreadingPolicy};
+use colorutils_rs::{
+    linear_to_rgb, linear_to_rgba, rgb_to_linear, rgba_to_linear, TransferFunction,
+};
 use num_traits::{AsPrimitive, FromPrimitive};
 
 const BASE_RADIUS_I64_CUTOFF: u32 = 125;
@@ -626,7 +629,8 @@ pub fn fast_gaussian_next_u16(
 /// * `width` - Width of the image
 /// * `height` - Height of the image
 /// * `radius` - Almost any radius is supported, in real world radius > 300 is too big for this implementation
-/// * `channels` - Count of channels in the image
+/// * `channels` - Count of channels of the image, only 3 and 4 is supported, alpha position, and channels order does not matter
+/// * `threading_policy` - Threads usage policy
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
@@ -637,9 +641,16 @@ pub fn fast_gaussian_next_f32(
     height: u32,
     radius: u32,
     channels: FastBlurChannels,
+    threading_policy: ThreadingPolicy,
 ) {
     fast_gaussian_next_f32::fast_gaussian_next_impl_f32(
-        bytes, stride, width, height, radius, channels,
+        bytes,
+        stride,
+        width,
+        height,
+        radius,
+        channels,
+        threading_policy,
     );
 }
 
@@ -654,7 +665,8 @@ pub fn fast_gaussian_next_f32(
 /// * `width` - Width of the image
 /// * `height` - Height of the image
 /// * `radius` - Almost any radius is supported, in real world radius > 300 is too big for this implementation
-/// * `channels` - Count of channels in the image
+/// * `channels` - Count of channels of the image, only 3 and 4 is supported, alpha position, and channels order does not matter
+/// * `threading_policy` - Threads usage policy
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
@@ -665,8 +677,86 @@ pub fn fast_gaussian_next_f16(
     height: u32,
     radius: u32,
     channels: FastBlurChannels,
+    threading_policy: ThreadingPolicy,
 ) {
     fast_gaussian_next_f16::fast_gaussian_next_impl_f16(
-        bytes, stride, width, height, radius, channels,
+        bytes,
+        stride,
+        width,
+        height,
+        radius,
+        channels,
+        threading_policy,
+    );
+}
+
+/// Performs gaussian approximation on the image in linear color space
+///
+/// This is fast approximation that first converts in linear colorspace, performs blur and converts back,
+/// operation will be performed in f32 so its cost is significant
+/// Approximation based on binomial filter.
+/// O(1) complexity.
+///
+/// * `stride` - Lane length, default is width * channels_count if not aligned
+/// * `width` - Width of the image
+/// * `height` - Height of the image
+/// * `radius` - Almost any reasonable radius is supported
+/// * `channels` - Count of channels of the image, only 3 and 4 is supported, alpha position, and channels order does not matter
+/// * `threading_policy` - Threads usage policy
+/// * `transfer_function` - Transfer function in linear colorspace
+///
+/// # Panics
+/// Panic is stride/width/height/channel configuration do not match provided
+pub fn fast_gaussian_next_in_linear(
+    in_place: &mut [u8],
+    stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    channels: FastBlurChannels,
+    threading_policy: ThreadingPolicy,
+    transfer_function: TransferFunction,
+) {
+    let mut linear_data: Vec<f32> =
+        vec![0f32; width as usize * height as usize * channels.get_channels()];
+
+    let forward_transformer = match channels {
+        FastBlurChannels::Channels3 => rgb_to_linear,
+        FastBlurChannels::Channels4 => rgba_to_linear,
+    };
+
+    let inverse_transformer = match channels {
+        FastBlurChannels::Channels3 => linear_to_rgb,
+        FastBlurChannels::Channels4 => linear_to_rgba,
+    };
+
+    forward_transformer(
+        &in_place,
+        stride,
+        &mut linear_data,
+        width * std::mem::size_of::<f32>() as u32 * channels.get_channels() as u32,
+        width,
+        height,
+        transfer_function,
+    );
+
+    fast_gaussian_next_f32::fast_gaussian_next_impl_f32(
+        in_place,
+        stride,
+        width,
+        height,
+        radius,
+        channels,
+        threading_policy,
+    );
+
+    inverse_transformer(
+        &linear_data,
+        width * std::mem::size_of::<f32>() as u32 * channels.get_channels() as u32,
+        in_place,
+        stride,
+        width,
+        height,
+        transfer_function,
     );
 }

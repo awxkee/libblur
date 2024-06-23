@@ -93,7 +93,7 @@ fn main() {
 
     let start_time = Instant::now();
 
-    libblur::stack_blur_in_linear(
+    libblur::fast_gaussian_next_in_linear(
         &mut dst_bytes,
         stride as u32,
         dimensions.0,
@@ -155,7 +155,7 @@ fn main() {
 
     if components == 3 {
         image::save_buffer(
-            "blurred_stack.jpg",
+            "blurred_stack_cpu.jpg",
             bytes.as_bytes(),
             dimensions.0,
             dimensions.1,
@@ -164,7 +164,7 @@ fn main() {
         .unwrap();
     } else {
         image::save_buffer(
-            "blurred_stack.png",
+            "blurred_stack_cpu.png",
             bytes.as_bytes(),
             dimensions.0,
             dimensions.1,

@@ -62,6 +62,7 @@ pub use fast_gaussian::fast_gaussian_u16;
 pub use fast_gaussian_next::fast_gaussian_next;
 pub use fast_gaussian_next::fast_gaussian_next_f16;
 pub use fast_gaussian_next::fast_gaussian_next_f32;
+pub use fast_gaussian_next::fast_gaussian_next_in_linear;
 pub use fast_gaussian_next::fast_gaussian_next_u16;
 pub use fast_gaussian_superior::fast_gaussian_superior;
 pub use gaussian::gaussian_blur;

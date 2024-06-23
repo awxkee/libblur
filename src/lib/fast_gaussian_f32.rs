@@ -27,16 +27,19 @@
 
 use crate::unsafe_slice::UnsafeSlice;
 use crate::FastBlurChannels;
+use num_traits::{AsPrimitive, FromPrimitive};
 
-pub(crate) fn fast_gaussian_vertical_pass_f32<const CHANNELS_COUNT: usize>(
-    bytes: &UnsafeSlice<f32>,
+pub(crate) fn fast_gaussian_vertical_pass_f32<T, const CHANNELS_COUNT: usize>(
+    bytes: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
     height: u32,
     radius: u32,
     start: u32,
     end: u32,
-) {
+) where
+    T: Copy + AsPrimitive<f32> + FromPrimitive,
+{
     let channels: FastBlurChannels = CHANNELS_COUNT.into();
     let mut buffer_r: [f32; 1024] = [0f32; 1024];
     let mut buffer_g: [f32; 1024] = [0f32; 1024];
@@ -71,12 +74,12 @@ pub(crate) fn fast_gaussian_vertical_pass_f32<const CHANNELS_COUNT: usize>(
 
                 unsafe {
                     let offset = current_y + current_px;
-                    bytes.write(offset, new_r);
-                    bytes.write(offset + 1, new_g);
-                    bytes.write(offset + 2, new_b);
+                    bytes.write(offset, T::from_f32(new_r).unwrap());
+                    bytes.write(offset + 1, T::from_f32(new_g).unwrap());
+                    bytes.write(offset + 2, T::from_f32(new_b).unwrap());
                     if CHANNELS_COUNT == 4 {
                         let new_a = sum_a * weight;
-                        bytes.write(offset + 3, new_a);
+                        bytes.write(offset + 3, T::from_f32(new_a).unwrap());
                     }
                 }
 
@@ -109,9 +112,9 @@ pub(crate) fn fast_gaussian_vertical_pass_f32<const CHANNELS_COUNT: usize>(
 
             let px_idx = next_row_y + next_row_x;
 
-            let rf32 = bytes[px_idx];
-            let gf32 = bytes[px_idx + 1];
-            let bf32 = bytes[px_idx + 2];
+            let rf32 = bytes[px_idx].as_();
+            let gf32 = bytes[px_idx + 1].as_();
+            let bf32 = bytes[px_idx + 2].as_();
 
             let arr_index = ((y + radius_64) & 1023) as usize;
 
@@ -134,7 +137,7 @@ pub(crate) fn fast_gaussian_vertical_pass_f32<const CHANNELS_COUNT: usize>(
             }
 
             if CHANNELS_COUNT == 4 {
-                let af32 = bytes[px_idx + 3];
+                let af32 = bytes[px_idx + 3].as_();
                 dif_a += af32;
                 sum_a += dif_a;
                 unsafe {
@@ -145,15 +148,17 @@ pub(crate) fn fast_gaussian_vertical_pass_f32<const CHANNELS_COUNT: usize>(
     }
 }
 
-pub(crate) fn fast_gaussian_horizontal_pass_f32<const CHANNELS_COUNT: usize>(
-    bytes: &UnsafeSlice<f32>,
+pub(crate) fn fast_gaussian_horizontal_pass_f32<T, const CHANNELS_COUNT: usize>(
+    bytes: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
     height: u32,
     radius: u32,
     start: u32,
     end: u32,
-) {
+) where
+    T: Copy + AsPrimitive<f32> + FromPrimitive,
+{
     let channels: FastBlurChannels = CHANNELS_COUNT.into();
     let mut buffer_r: [f32; 1024] = [0f32; 1024];
     let mut buffer_g: [f32; 1024] = [0f32; 1024];
@@ -188,12 +193,12 @@ pub(crate) fn fast_gaussian_horizontal_pass_f32<const CHANNELS_COUNT: usize>(
 
                 unsafe {
                     let offset = current_y + current_px;
-                    bytes.write(offset, new_r);
-                    bytes.write(offset + 1, new_g);
-                    bytes.write(offset + 2, new_b);
+                    bytes.write(offset, T::from_f32(new_r).unwrap());
+                    bytes.write(offset + 1, T::from_f32(new_g).unwrap());
+                    bytes.write(offset + 2, T::from_f32(new_b).unwrap());
                     if CHANNELS_COUNT == 4 {
                         let new_a = sum_a * weight;
-                        bytes.write(offset + 3, new_a);
+                        bytes.write(offset + 3, T::from_f32(new_a).unwrap());
                     }
                 }
 
@@ -226,9 +231,9 @@ pub(crate) fn fast_gaussian_horizontal_pass_f32<const CHANNELS_COUNT: usize>(
 
             let src_offset = next_row_y + next_row_x;
 
-            let rf32 = bytes[src_offset];
-            let gf32 = bytes[src_offset + 1];
-            let bf32 = bytes[src_offset + 2];
+            let rf32 = bytes[src_offset].as_();
+            let gf32 = bytes[src_offset + 1].as_();
+            let bf32 = bytes[src_offset + 2].as_();
 
             let arr_index = ((x + radius_64) & 1023) as usize;
 
@@ -251,7 +256,7 @@ pub(crate) fn fast_gaussian_horizontal_pass_f32<const CHANNELS_COUNT: usize>(
             }
 
             if CHANNELS_COUNT == 4 {
-                let af32 = bytes[src_offset + 3];
+                let af32 = bytes[src_offset + 3].as_();
                 dif_a += af32;
                 sum_a += dif_a;
                 unsafe {
@@ -288,7 +293,7 @@ pub(crate) mod fast_gaussian_f32 {
             radius: u32,
             start: u32,
             end: u32,
-        ) = fast_gaussian_vertical_pass_f32::<CHANNELS_COUNT>;
+        ) = fast_gaussian_vertical_pass_f32::<f32, CHANNELS_COUNT>;
         let mut _dispatcher_horizontal: fn(
             bytes: &UnsafeSlice<f32>,
             stride: u32,
@@ -297,7 +302,7 @@ pub(crate) mod fast_gaussian_f32 {
             radius: u32,
             start: u32,
             end: u32,
-        ) = fast_gaussian_horizontal_pass_f32::<CHANNELS_COUNT>;
+        ) = fast_gaussian_horizontal_pass_f32::<f32, CHANNELS_COUNT>;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             _dispatcher_vertical = fast_gaussian_vertical_pass_neon_f32::<CHANNELS_COUNT>;
