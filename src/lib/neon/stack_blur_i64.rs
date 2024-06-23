@@ -90,6 +90,7 @@ pub fn stack_blur_pass_neon_i64<const COMPONENTS: usize>(
                         src_ptr += COMPONENTS;
                     }
                     let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4);
+                    let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
                     let src_pixel = load_u8_s64x2_fast::<COMPONENTS>(src_ld as *const u8);
                     vst1q_s64_x2(stack_ptr, src_pixel);
                     sums =
@@ -177,6 +178,7 @@ pub fn stack_blur_pass_neon_i64<const COMPONENTS: usize>(
                     }
 
                     let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4);
+                    let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
                     let src_pixel = load_u8_s64x2_fast::<COMPONENTS>(src_ld as *const u8);
                     vst1q_s64_x2(stack_ptr, src_pixel);
                     sums =

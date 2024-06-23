@@ -741,7 +741,7 @@ pub fn fast_gaussian_next_in_linear(
     );
 
     fast_gaussian_next_f32::fast_gaussian_next_impl_f32(
-        in_place,
+        &mut linear_data,
         stride,
         width,
         height,

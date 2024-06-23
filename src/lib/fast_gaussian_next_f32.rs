@@ -25,243 +25,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-pub(crate) mod fast_gaussian_next_f32_neon {
-    use std::arch::aarch64::*;
-
-    use crate::neon::load_f32;
-    use crate::unsafe_slice::UnsafeSlice;
-    use crate::FastBlurChannels;
-
-    pub(crate) fn fast_gaussian_next_vertical_pass_f32(
-        bytes: &UnsafeSlice<f32>,
-        stride: u32,
-        width: u32,
-        height: u32,
-        radius: u32,
-        start: u32,
-        end: u32,
-        channels: FastBlurChannels,
-    ) {
-        let mut buffer: [[f32; 4]; 1024] = [[0f32; 4]; 1024];
-
-        let safe_pixel_count_x = match channels {
-            FastBlurChannels::Channels3 => 3,
-            FastBlurChannels::Channels4 => 2,
-        };
-
-        let height_wide = height as i64;
-
-        let radius_64 = radius as i64;
-        let weight = 1.0f32 / ((radius as f32) * (radius as f32) * (radius as f32));
-        let f_weight = unsafe { vdupq_n_f32(weight) };
-        let channels_count = match channels {
-            FastBlurChannels::Channels3 => 3,
-            FastBlurChannels::Channels4 => 4,
-        };
-        for x in start..std::cmp::min(width, end) {
-            let mut diffs: float32x4_t = unsafe { vdupq_n_f32(0f32) };
-            let mut ders: float32x4_t = unsafe { vdupq_n_f32(0f32) };
-            let mut summs: float32x4_t = unsafe { vdupq_n_f32(0f32) };
-
-            let start_y = 0 - 3 * radius as i64;
-            for y in start_y..height_wide {
-                let current_y = (y * (stride as i64)) as usize;
-
-                if y >= 0 {
-                    let current_px = ((std::cmp::max(x, 0)) * channels_count) as usize;
-
-                    let prepared_px = unsafe { vmulq_f32(summs, f_weight) };
-                    let new_r = unsafe { vgetq_lane_f32::<0>(prepared_px) };
-                    let new_g = unsafe { vgetq_lane_f32::<1>(prepared_px) };
-                    let new_b = unsafe { vgetq_lane_f32::<2>(prepared_px) };
-
-                    unsafe {
-                        bytes.write(current_y + current_px, new_r);
-                        bytes.write(current_y + current_px + 1, new_g);
-                        bytes.write(current_y + current_px + 2, new_b);
-                    }
-
-                    let d_arr_index_1 = ((y + radius_64) & 1023) as usize;
-                    let d_arr_index_2 = ((y - radius_64) & 1023) as usize;
-                    let d_arr_index = (y & 1023) as usize;
-
-                    let buf_ptr = buffer[d_arr_index].as_mut_ptr();
-                    let stored = unsafe { vld1q_f32(buf_ptr) };
-
-                    let buf_ptr_1 = buffer[d_arr_index_1].as_mut_ptr();
-                    let stored_1 = unsafe { vld1q_f32(buf_ptr_1) };
-
-                    let buf_ptr_2 = buffer[d_arr_index_2].as_mut_ptr();
-                    let stored_2 = unsafe { vld1q_f32(buf_ptr_2) };
-
-                    let new_diff = unsafe {
-                        vsubq_f32(vmulq_n_f32(vsubq_f32(stored, stored_1), 3f32), stored_2)
-                    };
-                    diffs = unsafe { vaddq_f32(diffs, new_diff) };
-                } else if y + radius_64 >= 0 {
-                    let arr_index = (y & 1023) as usize;
-                    let arr_index_1 = ((y + radius_64) & 1023) as usize;
-                    let buf_ptr = buffer[arr_index].as_mut_ptr();
-                    let stored = unsafe { vld1q_f32(buf_ptr) };
-
-                    let buf_ptr_1 = buffer[arr_index_1].as_mut_ptr();
-                    let stored_1 = unsafe { vld1q_f32(buf_ptr_1) };
-
-                    let new_diff = unsafe { vmulq_n_f32(vsubq_f32(stored, stored_1), 3f32) };
-
-                    diffs = unsafe { vaddq_f32(diffs, new_diff) };
-                } else if y + 2 * radius_64 >= 0 {
-                    let arr_index = ((y + radius_64) & 1023) as usize;
-                    let buf_ptr = buffer[arr_index].as_mut_ptr();
-                    let stored = unsafe { vld1q_f32(buf_ptr) };
-                    diffs = unsafe { vsubq_f32(diffs, vmulq_n_f32(stored, 3f32)) };
-                }
-
-                let next_row_y = (std::cmp::min(
-                    std::cmp::max(y + ((3 * radius_64) >> 1), 0),
-                    height_wide - 1,
-                ) as usize)
-                    * (stride as usize);
-                let next_row_x = (x * channels_count) as usize;
-
-                let s_ptr =
-                    unsafe { bytes.slice.as_ptr().add(next_row_y + next_row_x) as *mut f32 };
-
-                let pixel_color = load_f32(
-                    s_ptr,
-                    (x as i64 + safe_pixel_count_x) < width as i64,
-                    channels_count as usize,
-                );
-
-                let arr_index = ((y + 2 * radius_64) & 1023) as usize;
-                let buf_ptr = buffer[arr_index].as_mut_ptr();
-
-                diffs = unsafe { vaddq_f32(diffs, pixel_color) };
-                ders = unsafe { vaddq_f32(ders, diffs) };
-                summs = unsafe { vaddq_f32(summs, ders) };
-                unsafe {
-                    vst1q_f32(buf_ptr, pixel_color);
-                }
-            }
-        }
-    }
-
-    pub(crate) fn fast_gaussian_next_horizontal_pass_f32(
-        bytes: &UnsafeSlice<f32>,
-        stride: u32,
-        width: u32,
-        height: u32,
-        radius: u32,
-        start: u32,
-        end: u32,
-        channels: FastBlurChannels,
-    ) {
-        let mut buffer: [[f32; 4]; 1024] = [[0f32; 4]; 1024];
-
-        let safe_pixel_count_x = match channels {
-            FastBlurChannels::Channels3 => 3,
-            FastBlurChannels::Channels4 => 2,
-        };
-
-        let width_wide = width as i64;
-
-        let radius_64 = radius as i64;
-        let weight = 1.0f32 / ((radius as f32) * (radius as f32) * (radius as f32));
-        let f_weight = unsafe { vdupq_n_f32(weight) };
-        let channels_count = match channels {
-            FastBlurChannels::Channels3 => 3,
-            FastBlurChannels::Channels4 => 4,
-        };
-        for y in start..std::cmp::min(height, end) {
-            let mut diffs: float32x4_t = unsafe { vdupq_n_f32(0f32) };
-            let mut ders: float32x4_t = unsafe { vdupq_n_f32(0f32) };
-            let mut summs: float32x4_t = unsafe { vdupq_n_f32(0f32) };
-
-            let current_y = ((y as i64) * (stride as i64)) as usize;
-
-            for x in (0 - 3 * radius_64)..(width as i64) {
-                if x >= 0 {
-                    let current_px = x as usize * channels_count as usize;
-
-                    let prepared_px = unsafe { vmulq_f32(summs, f_weight) };
-
-                    let new_r = unsafe { vgetq_lane_f32::<0>(prepared_px) };
-                    let new_g = unsafe { vgetq_lane_f32::<1>(prepared_px) };
-                    let new_b = unsafe { vgetq_lane_f32::<2>(prepared_px) };
-
-                    unsafe {
-                        bytes.write(current_y + current_px, new_r);
-                        bytes.write(current_y + current_px + 1, new_g);
-                        bytes.write(current_y + current_px + 2, new_b);
-                    }
-
-                    let d_arr_index_1 = ((x + radius_64) & 1023) as usize;
-                    let d_arr_index_2 = ((x - radius_64) & 1023) as usize;
-                    let d_arr_index = (x & 1023) as usize;
-
-                    let buf_ptr = buffer[d_arr_index].as_mut_ptr();
-                    let stored = unsafe { vld1q_f32(buf_ptr) };
-
-                    let buf_ptr_1 = buffer[d_arr_index_1].as_mut_ptr();
-                    let stored_1 = unsafe { vld1q_f32(buf_ptr_1) };
-
-                    let buf_ptr_2 = buffer[d_arr_index_2].as_mut_ptr();
-                    let stored_2 = unsafe { vld1q_f32(buf_ptr_2) };
-
-                    let new_diff = unsafe {
-                        vsubq_f32(vmulq_n_f32(vsubq_f32(stored, stored_1), 3f32), stored_2)
-                    };
-                    diffs = unsafe { vaddq_f32(diffs, new_diff) };
-                } else if x + radius_64 >= 0 {
-                    let arr_index = (x & 1023) as usize;
-                    let arr_index_1 = ((x + radius_64) & 1023) as usize;
-                    let buf_ptr = buffer[arr_index].as_mut_ptr();
-                    let stored = unsafe { vld1q_f32(buf_ptr) };
-
-                    let buf_ptr_1 = buffer[arr_index_1].as_mut_ptr();
-                    let stored_1 = unsafe { vld1q_f32(buf_ptr_1) };
-
-                    let new_diff = unsafe { vmulq_n_f32(vsubq_f32(stored, stored_1), 3f32) };
-
-                    diffs = unsafe { vaddq_f32(diffs, new_diff) };
-                } else if x + 2 * radius_64 >= 0 {
-                    let arr_index = ((x + radius_64) & 1023) as usize;
-                    let buf_ptr = buffer[arr_index].as_mut_ptr();
-                    let stored = unsafe { vld1q_f32(buf_ptr) };
-                    diffs = unsafe { vsubq_f32(diffs, vmulq_n_f32(stored, 3f32)) };
-                }
-
-                let next_row_y = (y as usize) * (stride as usize);
-                let next_row_x =
-                    std::cmp::min(std::cmp::max(x + 3 * radius_64 / 2, 0), width_wide - 1) as u32;
-                let next_row_px = next_row_x as usize * channels_count as usize;
-
-                let s_ptr =
-                    unsafe { bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut f32 };
-                let pixel_color = load_f32(
-                    s_ptr,
-                    next_row_x as i64 + safe_pixel_count_x < width as i64,
-                    channels_count as usize,
-                );
-
-                let arr_index = ((x + 2 * radius_64) & 1023) as usize;
-                let buf_ptr = buffer[arr_index].as_mut_ptr();
-
-                diffs = unsafe { vaddq_f32(diffs, pixel_color) };
-                ders = unsafe { vaddq_f32(ders, diffs) };
-                summs = unsafe { vaddq_f32(summs, ders) };
-                unsafe {
-                    vst1q_f32(buf_ptr, pixel_color);
-                }
-            }
-        }
-    }
-}
-
 pub(crate) mod fast_gaussian_next_f32_cpu {
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-    use crate::fast_gaussian_next_f32::fast_gaussian_next_f32_neon;
     use crate::unsafe_slice::UnsafeSlice;
     use crate::FastBlurChannels;
     use num_traits::{AsPrimitive, FromPrimitive};
@@ -277,12 +41,6 @@ pub(crate) mod fast_gaussian_next_f32_cpu {
     ) where
         T: Copy + AsPrimitive<f32> + FromPrimitive,
     {
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-        {
-            fast_gaussian_next_f32_neon::fast_gaussian_next_vertical_pass_f32(
-                &bytes, stride, width, height, radius, start, end, channels,
-            );
-        }
         let channels: FastBlurChannels = CHANNELS_COUNT.into();
         let mut buffer_r: [f32; 1024] = [0f32; 1024];
         let mut buffer_g: [f32; 1024] = [0f32; 1024];
@@ -445,12 +203,6 @@ pub(crate) mod fast_gaussian_next_f32_cpu {
         T: Copy + AsPrimitive<f32> + FromPrimitive,
     {
         let channels: FastBlurChannels = CHANNELS_COUNT.into();
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-        {
-            fast_gaussian_next_f32_neon::fast_gaussian_next_horizontal_pass_f32(
-                &bytes, stride, width, height, radius, start, end, channels,
-            );
-        }
         let mut buffer_r: [f32; 1024] = [0f32; 1024];
         let mut buffer_g: [f32; 1024] = [0f32; 1024];
         let mut buffer_b: [f32; 1024] = [0f32; 1024];
@@ -600,6 +352,10 @@ pub(crate) mod fast_gaussian_next_f32_cpu {
 
 pub(crate) mod fast_gaussian_next_f32 {
     use crate::fast_gaussian_next_f32::fast_gaussian_next_f32_cpu;
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    use crate::neon::{
+        fast_gaussian_next_horizontal_pass_neon_f32, fast_gaussian_next_vertical_pass_neon_f32,
+    };
     use crate::unsafe_slice::UnsafeSlice;
     use crate::{FastBlurChannels, ThreadingPolicy};
     use num_traits::{AsPrimitive, FromPrimitive};
@@ -616,7 +372,7 @@ pub(crate) mod fast_gaussian_next_f32 {
         T: Copy + AsPrimitive<f32> + FromPrimitive + Send + Sync,
     {
         let threads_count = threading_policy.get_threads_count(width, height) as u32;
-        let _dispatcher_horizontal: fn(
+        let mut _dispatcher_horizontal: fn(
             &UnsafeSlice<T>,
             u32,
             u32,
@@ -632,7 +388,7 @@ pub(crate) mod fast_gaussian_next_f32 {
                 fast_gaussian_next_f32_cpu::fast_gaussian_next_horizontal_pass_f32::<T, 4>
             }
         };
-        let _dispatcher_vertical: fn(
+        let mut _dispatcher_vertical: fn(
             bytes: &UnsafeSlice<T>,
             stride: u32,
             width: u32,
@@ -648,6 +404,27 @@ pub(crate) mod fast_gaussian_next_f32 {
                 fast_gaussian_next_f32_cpu::fast_gaussian_next_vertical_pass_f32::<T, 4>
             }
         };
+        if std::any::type_name::<T>() == "f32" {
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            {
+                _dispatcher_horizontal = match channels {
+                    FastBlurChannels::Channels3 => {
+                        fast_gaussian_next_horizontal_pass_neon_f32::<T, 3>
+                    }
+                    FastBlurChannels::Channels4 => {
+                        fast_gaussian_next_horizontal_pass_neon_f32::<T, 4>
+                    }
+                };
+                _dispatcher_vertical = match channels {
+                    FastBlurChannels::Channels3 => {
+                        fast_gaussian_next_vertical_pass_neon_f32::<T, 3>
+                    }
+                    FastBlurChannels::Channels4 => {
+                        fast_gaussian_next_vertical_pass_neon_f32::<T, 4>
+                    }
+                };
+            }
+        }
         let unsafe_image = UnsafeSlice::new(bytes);
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(threads_count as usize)

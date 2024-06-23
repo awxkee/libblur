@@ -1,1 +1,1 @@
-Added boxblur, tentblur, fast gaussian, fast gaussian next, gaussian blur
+Added blurs in linear colorspace, bugfixes in stack blur

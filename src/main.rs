@@ -98,10 +98,10 @@ fn main() {
         stride as u32,
         dimensions.0,
         dimensions.1,
-        77,
+        93,
         FastBlurChannels::Channels4,
         ThreadingPolicy::Single,
-        TransferFunction::Srgb,
+        TransferFunction::Rec709,
     );
 
     // libblur::gaussian_blur_in_linear(
