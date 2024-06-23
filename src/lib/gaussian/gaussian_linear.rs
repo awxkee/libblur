@@ -1,0 +1,85 @@
+use crate::{gaussian_blur_f32, EdgeMode, FastBlurChannels, ThreadingPolicy};
+use colorutils_rs::{
+    linear_to_rgb, linear_to_rgba, rgb_to_linear, rgba_to_linear, TransferFunction,
+};
+
+/// Performs gaussian blur on the image in linear colorspace
+///
+/// This is performing gaussian blur in linear colorspace, it is mathematically correct to do so.
+/// This performs a gaussian kernel filter on the image producing beautiful looking result.
+/// Preferred if you need to perform an advanced signal analysis after.
+/// O(R) complexity.
+///
+/// # Arguments
+///
+/// * `stride` - Lane length, default is width * channels_count * size_of(PixelType) if not aligned
+/// * `width` - Width of the image
+/// * `height` - Height of the image
+/// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted.
+/// * `sigma` - Sigma for a gaussian kernel, corresponds to kernel flattening level. Default - kernel_size / 6
+/// * `channels` - Count of channels in the image
+/// * `edge_mode` - Rule to handle edge mode
+/// * `threading_policy` - Threading policy according to *ThreadingPolicy*
+/// * `transfer_function` - Transfer function in linear colorspace
+///
+/// # Panics
+/// Panic is stride/width/height/channel configuration do not match provided
+pub fn gaussian_blur_in_linear(
+    src: &[u8],
+    src_stride: u32,
+    dst: &mut [u8],
+    dst_stride: u32,
+    width: u32,
+    height: u32,
+    kernel_size: u32,
+    sigma: f32,
+    channels: FastBlurChannels,
+    edge_mode: EdgeMode,
+    threading_policy: ThreadingPolicy,
+    transfer_function: TransferFunction,
+) {
+    let mut linear_data: Vec<f32> =
+        vec![0f32; width as usize * height as usize * channels.get_channels()];
+    let mut linear_data_1: Vec<f32> =
+        vec![0f32; width as usize * height as usize * channels.get_channels()];
+
+    let forward_transformer = match channels {
+        FastBlurChannels::Channels3 => rgb_to_linear,
+        FastBlurChannels::Channels4 => rgba_to_linear,
+    };
+
+    let inverse_transformer = match channels {
+        FastBlurChannels::Channels3 => linear_to_rgb,
+        FastBlurChannels::Channels4 => linear_to_rgba,
+    };
+
+    forward_transformer(
+        &src,
+        src_stride,
+        &mut linear_data,
+        width * std::mem::size_of::<f32>() as u32 * channels.get_channels() as u32,
+        width,
+        height,
+        transfer_function,
+    );
+    gaussian_blur_f32(
+        &linear_data,
+        &mut linear_data_1,
+        width,
+        height,
+        kernel_size,
+        sigma,
+        channels,
+        edge_mode,
+        threading_policy,
+    );
+    inverse_transformer(
+        &linear_data_1,
+        width * std::mem::size_of::<f32>() as u32 * channels.get_channels() as u32,
+        dst,
+        dst_stride,
+        width,
+        height,
+        transfer_function,
+    );
+}

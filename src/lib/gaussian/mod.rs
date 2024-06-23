@@ -30,6 +30,7 @@ mod gaussian_filter;
 mod gaussian_horizontal;
 mod gaussian_kernel;
 mod gaussian_kernel_filter_dispatch;
+mod gaussian_linear;
 mod gaussian_neon;
 mod gaussian_neon_filter;
 mod gaussian_sse;
@@ -37,3 +38,4 @@ mod gaussian_sse_filter;
 mod gaussian_vertical;
 
 pub use gaussian::*;
+pub use gaussian_linear::gaussian_blur_in_linear;

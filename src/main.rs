@@ -1,4 +1,7 @@
-use colorutils_rs::{linear_to_rgba, rgba_to_linear, TransferFunction};
+use colorutils_rs::{
+    linear_to_rgba, luv_with_alpha_to_bgra, luv_with_alpha_to_rgba, rgba_to_linear,
+    rgba_to_luv_with_alpha, rgba_to_sigmoidal, sigmoidal_to_rgba, TransferFunction,
+};
 use image::io::Reader as ImageReader;
 use image::{EncodableLayout, GenericImageView};
 use libblur::{EdgeMode, FastBlurChannels, ThreadingPolicy};
@@ -29,7 +32,7 @@ fn main() {
     //     vst1q_s64(t.as_mut_ptr(), mul);
     //     println!("{:?}", t);
     // }
-    let img = ImageReader::open("assets/test_image_4.png")
+    let img = ImageReader::open("assets/abstract_alpha.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -55,7 +58,6 @@ fn main() {
         );
     }
 
-    let start_time = Instant::now();
     // libblur::stack_blur(
     //     &mut dst_bytes,
     //     stride as u32,
@@ -71,7 +73,7 @@ fn main() {
     //     stride as u32,
     //     dimensions.0,
     //     dimensions.1,
-    //     191,
+    //     75,
     //     FastBlurChannels::Channels4,
     //     ThreadingPolicy::Single,
     // );
@@ -88,41 +90,38 @@ fn main() {
     //     ThreadingPolicy::Single,
     // );
     // bytes = dst_bytes;
-    let mut linear_data: Vec<f32> =
-        vec![0f32; dimensions.0 as usize * dimensions.1 as usize * components];
-    let mut linear_data_2: Vec<f32> =
-        vec![0f32; dimensions.0 as usize * dimensions.1 as usize * components];
-    rgba_to_linear(
-        &bytes,
-        stride as u32,
-        &mut linear_data,
-        dimensions.0 * std::mem::size_of::<f32>() as u32 * components as u32,
-        dimensions.0,
-        dimensions.1,
-        TransferFunction::Gamma2p8,
-    );
 
-    libblur::gaussian_blur_f32(
-        &linear_data,
-        &mut linear_data_2,
-        dimensions.0,
-        dimensions.1,
-        75 * 2 + 1,
-        75f32 * 2f32 / 6f32,
-        FastBlurChannels::Channels4,
-        EdgeMode::KernelClip,
-        ThreadingPolicy::Adaptive,
-    );
+    let start_time = Instant::now();
 
-    linear_to_rgba(
-        &linear_data_2,
-        dimensions.0 as u32 * std::mem::size_of::<f32>() as u32 * components as u32,
+    libblur::fast_gaussian_in_linear(
         &mut dst_bytes,
         stride as u32,
         dimensions.0,
         dimensions.1,
-        TransferFunction::Gamma2p8,
+        22,
+        FastBlurChannels::Channels4,
+        ThreadingPolicy::Single,
+        TransferFunction::Srgb,
     );
+
+    // libblur::gaussian_blur_in_linear(
+    //     &bytes,
+    //     stride as u32,
+    //     &mut dst_bytes,
+    //     stride as u32,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     75 * 2 + 1,
+    //     75f32 * 2f32 / 6f32,
+    //     FastBlurChannels::Channels3,
+    //     EdgeMode::Clamp,
+    //     ThreadingPolicy::Adaptive,
+    //     TransferFunction::Srgb,
+    // );
+
+    let elapsed_time = start_time.elapsed();
+    // Print the elapsed time in milliseconds
+    println!("Elapsed time: {:.2?}", elapsed_time);
 
     // libblur::gaussian_blur(
     //     &bytes,
@@ -153,13 +152,10 @@ fn main() {
     // libblur::gaussian_box_blur(&bytes, stride as u32, &mut dst_bytes, stride as u32, dimensions.0, dimensions.1, 77,
     //                            FastBlurChannels::Channels3, ThreadingPolicy::Single);
     // bytes = dst_bytes;
-    let elapsed_time = start_time.elapsed();
-    // Print the elapsed time in milliseconds
-    println!("Elapsed time: {:.2?}", elapsed_time);
 
     if components == 3 {
         image::save_buffer(
-            "blurred_linear.jpg",
+            "blurred_stack.jpg",
             bytes.as_bytes(),
             dimensions.0,
             dimensions.1,
@@ -168,7 +164,7 @@ fn main() {
         .unwrap();
     } else {
         image::save_buffer(
-            "blurred_linear.png",
+            "blurred_stack.png",
             bytes.as_bytes(),
             dimensions.0,
             dimensions.1,

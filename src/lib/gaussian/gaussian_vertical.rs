@@ -26,8 +26,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::gaussian::gaussian_filter::GaussianFilter;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use crate::gaussian::gaussian_neon_filter::neon_gaussian_filter::gaussian_blur_vertical_pass_filter_neon;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{reflect_index, EdgeMode};
 use num_traits::FromPrimitive;
@@ -212,17 +210,6 @@ pub fn gaussian_blur_vertical_pass_clip_edge_impl<
     start_y: u32,
     end_y: u32,
 ) {
-    if std::any::type_name::<T>() == "u8" {
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-        {
-            let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
-            let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
-            gaussian_blur_vertical_pass_filter_neon::<CHANNEL_CONFIGURATION>(
-                u8_slice, src_stride, slice, dst_stride, width, height, filter, start_y, end_y,
-            );
-            return;
-        }
-    }
     let total_length = width as usize * CHANNEL_CONFIGURATION;
     for y in start_y..end_y {
         let mut _cx = 0usize;

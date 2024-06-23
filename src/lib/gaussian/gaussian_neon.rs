@@ -34,17 +34,19 @@ pub mod neon_support {
 
     use crate::unsafe_slice::UnsafeSlice;
 
-    pub fn gaussian_blur_horizontal_pass_neon<const CHANNEL_CONFIGURATION: usize>(
-        src: &[u8],
+    pub fn gaussian_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usize>(
+        undef_src: &[T],
         src_stride: u32,
-        unsafe_dst: &UnsafeSlice<u8>,
+        undef_unsafe_dst: &UnsafeSlice<T>,
         dst_stride: u32,
         width: u32,
         kernel_size: usize,
-        kernel: &Vec<f32>,
+        kernel: &[f32],
         start_y: u32,
         end_y: u32,
     ) {
+        let src: &[u8] = unsafe { std::mem::transmute(undef_src) };
+        let unsafe_dst: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(undef_unsafe_dst) };
         let half_kernel = (kernel_size / 2) as i32;
 
         let shuf_table_1: [u8; 8] = [0, 1, 2, 255, 3, 4, 5, 255];
@@ -366,18 +368,20 @@ pub mod neon_support {
         }
     }
 
-    pub fn gaussian_blur_vertical_pass_neon<const CHANNEL_CONFIGURATION: usize>(
-        src: &[u8],
+    pub fn gaussian_blur_vertical_pass_neon<T, const CHANNEL_CONFIGURATION: usize>(
+        undef_src: &[T],
         src_stride: u32,
-        unsafe_dst: &UnsafeSlice<u8>,
+        undef_unsafe_dst: &UnsafeSlice<T>,
         dst_stride: u32,
         width: u32,
         height: u32,
         kernel_size: usize,
-        kernel: &Vec<f32>,
+        kernel: &[f32],
         start_y: u32,
         end_y: u32,
     ) {
+        let src: &[u8] = unsafe { std::mem::transmute(undef_src) };
+        let unsafe_dst: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(undef_unsafe_dst) };
         let half_kernel = (kernel_size / 2) as i32;
 
         let zeros = unsafe { vdupq_n_f32(0f32) };

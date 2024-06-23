@@ -27,6 +27,10 @@
 
 use crate::gaussian::gaussian_filter::GaussianFilter;
 use crate::gaussian::gaussian_horizontal::gaussian_blur_horizontal_pass_impl_clip_edge;
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+use crate::gaussian::gaussian_neon_filter::neon_gaussian_filter::{
+    gaussian_blur_horizontal_pass_filter_neon, gaussian_blur_vertical_pass_filter_neon,
+};
 #[cfg(all(
     any(target_arch = "x86_64", target_arch = "x86"),
     target_feature = "sse4.1"
@@ -74,6 +78,10 @@ pub(crate) fn gaussian_blur_vertical_pass_edge_clip_dispatch<
         ))]
         {
             _dispatcher = gaussian_blur_vertical_pass_filter_sse::<T, CHANNEL_CONFIGURATION>;
+        }
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            _dispatcher = gaussian_blur_vertical_pass_filter_neon::<T, CHANNEL_CONFIGURATION>;
         }
     }
     let unsafe_dst = UnsafeSlice::new(dst);
@@ -138,6 +146,10 @@ pub(crate) fn gaussian_blur_horizontal_pass_edge_clip_dispatch<
         ))]
         {
             _dispatcher = gaussian_blur_horizontal_pass_filter_sse::<T, CHANNEL_CONFIGURATION>;
+        }
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            _dispatcher = gaussian_blur_horizontal_pass_filter_neon::<T, CHANNEL_CONFIGURATION>;
         }
     }
     let unsafe_dst = UnsafeSlice::new(dst);

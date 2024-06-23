@@ -40,6 +40,22 @@ pub(crate) unsafe fn load_u8_u32_one(ptr: *const u8) -> uint32x2_t {
 }
 
 #[inline(always)]
+pub(crate) unsafe fn store_f32<const CHANNELS_COUNT: usize>(dst_ptr: *mut f32, regi: float32x4_t) {
+    if CHANNELS_COUNT == 4 {
+        vst1q_f32(dst_ptr, regi);
+    } else if CHANNELS_COUNT == 3 {
+        dst_ptr.write_unaligned(vgetq_lane_f32::<0>(regi));
+        dst_ptr.add(1).write_unaligned(vgetq_lane_f32::<1>(regi));
+        dst_ptr.add(2).write_unaligned(vgetq_lane_f32::<2>(regi));
+    } else if CHANNELS_COUNT == 2 {
+        dst_ptr.write_unaligned(vgetq_lane_f32::<0>(regi));
+        dst_ptr.add(1).write_unaligned(vgetq_lane_f32::<1>(regi));
+    } else {
+        dst_ptr.write_unaligned(vgetq_lane_f32::<0>(regi));
+    }
+}
+
+#[inline(always)]
 pub(crate) unsafe fn store_u8_s32<const CHANNELS_COUNT: usize>(dst_ptr: *mut u8, regi: int32x4_t) {
     let s16 = vreinterpret_u16_s16(vqmovn_s32(regi));
     let u16_f = vcombine_u16(s16, s16);
@@ -54,6 +70,34 @@ pub(crate) unsafe fn store_u8_s32<const CHANNELS_COUNT: usize>(dst_ptr: *mut u8,
         dst_ptr.add(1).write_unaligned(pixel_bytes[1]);
         dst_ptr.add(2).write_unaligned(pixel_bytes[2]);
     }
+}
+
+#[inline(always)]
+pub(crate) unsafe fn load_f32_fast<const CHANNELS_COUNT: usize>(ptr: *const f32) -> float32x4_t {
+    if CHANNELS_COUNT == 4 {
+        return vld1q_f32(ptr);
+    } else if CHANNELS_COUNT == 3 {
+        return vld1q_f32(
+            [
+                ptr.read_unaligned(),
+                ptr.add(1).read_unaligned(),
+                ptr.add(2).read_unaligned(),
+                0f32,
+            ]
+            .as_ptr(),
+        );
+    } else if CHANNELS_COUNT == 2 {
+        return vld1q_f32(
+            [
+                ptr.read_unaligned(),
+                ptr.add(1).read_unaligned(),
+                0f32,
+                0f32,
+            ]
+            .as_ptr(),
+        );
+    }
+    return vld1q_f32([ptr.read_unaligned(), 0f32, 0f32, 0f32].as_ptr());
 }
 
 #[inline(always)]

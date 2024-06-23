@@ -9,6 +9,9 @@ Much faster than `image` default blur.
 
 When 4-channels mode is in use that always considered thad alpha channel is the last.
 
+Also there are some available options to perform blurring in linear colorspace, or if methods do not fit you `f32`
+options also available
+
 # Performance
 
 Most blur algorithms done very good and works at excellent speed. Where appropriate comparison with OpenCV is available.
@@ -75,7 +78,7 @@ stackblur ), however results better as I see. Max radius ~320 for u8, for u16 wi
 O(1) complexity.
 
 ```rust
-libblur::fast_gaussian(& mut bytes, stride, width0, height, radius, FastBlurChannels::Channels3);
+libblur::fast_gaussian( & mut bytes, stride, width0, height, radius, FastBlurChannels::Channels3);
 ```
 
 Example comparison time for blurring image 3000x4000 RGB 8-bit in single-threaded mode with 77 radius.
@@ -94,10 +97,10 @@ Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded 
 
 Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded mode with 77 radius.
 
-|         | Time |
-|---------|:--------:|
-| libblur |  9.74ms  |
-| OpenCV  |    --    |
+|         |  Time  |
+|---------|:------:|
+| libblur | 9.74ms |
+| OpenCV  |   --   |
 
 Example comparison time for blurring image 2828x4242 RGBA 8-bit in single-threaded mode with 77 radius.
 
@@ -134,7 +137,7 @@ Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded 
 
 ### Tent blur
 
-2 sequential box blur ( [theory](https://en.wikipedia.org/wiki/Central_limit_theorem) ) that produces a tent filter. 
+2 sequential box blur ( [theory](https://en.wikipedia.org/wiki/Central_limit_theorem) ) that produces a tent filter.
 Medium speed, good-looking results with large radius `tents` becoming more noticeable
 
 O(1) complexity.
@@ -197,7 +200,8 @@ Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded
 
 ### Gaussian box blur
 
-Generally 3 sequential box blurs it is almost gaussian blur ( [theory](https://en.wikipedia.org/wiki/Central_limit_theorem) ), slow, really pleasant results.
+Generally 3 sequential box blurs it is almost gaussian
+blur ( [theory](https://en.wikipedia.org/wiki/Central_limit_theorem) ), slow, really pleasant results.
 Medium speed.
 
 O(1) complexity.

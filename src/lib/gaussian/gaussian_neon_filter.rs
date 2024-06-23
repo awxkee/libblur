@@ -35,16 +35,18 @@ pub(crate) mod neon_gaussian_filter {
 
     use crate::unsafe_slice::UnsafeSlice;
 
-    pub fn gaussian_blur_horizontal_pass_filter_neon<const CHANNEL_CONFIGURATION: usize>(
-        src: &[u8],
+    pub fn gaussian_blur_horizontal_pass_filter_neon<T, const CHANNEL_CONFIGURATION: usize>(
+        undef_src: &[T],
         src_stride: u32,
-        unsafe_dst: &UnsafeSlice<u8>,
+        undef_unsafe_dst: &UnsafeSlice<T>,
         dst_stride: u32,
         width: u32,
         filter: &Vec<GaussianFilter>,
         start_y: u32,
         end_y: u32,
     ) {
+        let src: &[u8] = unsafe { std::mem::transmute(undef_src) };
+        let unsafe_dst: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(undef_unsafe_dst) };
         let shuf_table_1: [u8; 8] = [0, 1, 2, 255, 3, 4, 5, 255];
         let shuffle_1 = unsafe { vld1_u8(shuf_table_1.as_ptr()) };
         let shuf_table_2: [u8; 8] = [6, 7, 8, 255, 9, 10, 11, 255];
@@ -358,10 +360,10 @@ pub(crate) mod neon_gaussian_filter {
         }
     }
 
-    pub fn gaussian_blur_vertical_pass_filter_neon<const CHANNEL_CONFIGURATION: usize>(
-        src: &[u8],
+    pub fn gaussian_blur_vertical_pass_filter_neon<T, const CHANNEL_CONFIGURATION: usize>(
+        undef_src: &[T],
         src_stride: u32,
-        unsafe_dst: &UnsafeSlice<u8>,
+        undef_unsafe_dst: &UnsafeSlice<T>,
         dst_stride: u32,
         width: u32,
         _: u32,
@@ -369,6 +371,8 @@ pub(crate) mod neon_gaussian_filter {
         start_y: u32,
         end_y: u32,
     ) {
+        let src: &[u8] = unsafe { std::mem::transmute(undef_src) };
+        let unsafe_dst: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(undef_unsafe_dst) };
         let zeros = unsafe { vdupq_n_f32(0f32) };
 
         let total_size = CHANNEL_CONFIGURATION * width as usize;

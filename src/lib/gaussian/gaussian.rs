@@ -90,6 +90,11 @@ fn gaussian_blur_horizontal_pass<
         {
             _dispatcher = gaussian_blur_horizontal_pass_impl_sse::<T, CHANNEL_CONFIGURATION>;
         }
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            _dispatcher =
+                neon_support::gaussian_blur_horizontal_pass_neon::<T, CHANNEL_CONFIGURATION>;
+        }
     }
     let unsafe_dst = UnsafeSlice::new(dst);
     thread_pool.scope(|scope| {
@@ -137,27 +142,6 @@ fn gaussian_blur_vertical_pass_impl<
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
-    let edge_mode: EdgeMode = EDGE_MODE.into();
-    if std::any::type_name::<T>() == "u8" && edge_mode == EdgeMode::Clamp {
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-        {
-            let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
-            let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
-            neon_support::gaussian_blur_vertical_pass_neon::<CHANNEL_CONFIGURATION>(
-                u8_slice,
-                src_stride,
-                slice,
-                dst_stride,
-                width,
-                height,
-                kernel_size,
-                kernel,
-                start_y,
-                end_y,
-            );
-            return;
-        }
-    }
     gaussian_blur_vertical_pass_c_impl::<T, CHANNEL_CONFIGURATION, EDGE_MODE, USE_ROUNDING>(
         src,
         src_stride,
@@ -211,6 +195,11 @@ fn gaussian_blur_vertical_pass<
         ))]
         {
             _dispatcher = gaussian_blur_vertical_pass_impl_sse::<T, CHANNEL_CONFIGURATION>;
+        }
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            _dispatcher =
+                neon_support::gaussian_blur_vertical_pass_neon::<T, CHANNEL_CONFIGURATION>;
         }
     }
     let unsafe_dst = UnsafeSlice::new(dst);
@@ -489,7 +478,6 @@ pub fn gaussian_blur(
 ///
 /// # Arguments
 ///
-/// * `stride` - Lane length, default is width * channels_count if not aligned
 /// * `width` - Width of the image
 /// * `height` - Height of the image
 /// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted.

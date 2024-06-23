@@ -26,10 +26,16 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::gaussian::gaussian_filter::GaussianFilter;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use crate::gaussian::gaussian_neon::neon_support;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use crate::gaussian::gaussian_neon_filter::neon_gaussian_filter::gaussian_blur_horizontal_pass_filter_neon;
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+))]
+use crate::gaussian::gaussian_sse::sse_support::gaussian_blur_horizontal_pass_impl_sse;
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+))]
+use crate::gaussian::gaussian_sse_filter::sse_filter::gaussian_blur_horizontal_pass_filter_sse;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{reflect_index, EdgeMode};
 use num_traits::FromPrimitive;
@@ -52,26 +58,6 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl<
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
-    let edge_mode: EdgeMode = EDGE_MODE.into();
-    if std::any::type_name::<T>() == "u8" && edge_mode == EdgeMode::Clamp {
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-        {
-            let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
-            let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
-            neon_support::gaussian_blur_horizontal_pass_neon::<CHANNEL_CONFIGURATION>(
-                u8_slice,
-                src_stride,
-                slice,
-                dst_stride,
-                width,
-                kernel_size,
-                kernel,
-                start_y,
-                end_y,
-            );
-            return;
-        }
-    }
     gaussian_blur_horizontal_pass_impl_c::<T, CHANNEL_CONFIGURATION, EDGE_MODE, USE_ROUNDING>(
         src,
         src_stride,
@@ -199,17 +185,6 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_clip_edge<
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy,
 {
-    if std::any::type_name::<T>() == "u8" {
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-        {
-            let u8_slice: &[u8] = unsafe { std::mem::transmute(src) };
-            let slice: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(unsafe_dst) };
-            gaussian_blur_horizontal_pass_filter_neon::<CHANNEL_CONFIGURATION>(
-                u8_slice, src_stride, slice, dst_stride, width, filter, start_y, end_y,
-            );
-            return;
-        }
-    }
     for y in start_y..end_y {
         let y_src_shift = y as usize * src_stride as usize;
         let y_dst_shift = y as usize * dst_stride as usize;
