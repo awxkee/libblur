@@ -86,6 +86,28 @@ pub(crate) unsafe fn load_u8_s64x2_fast<const CHANNELS_COUNT: usize>(ptr: *const
 }
 
 #[inline]
+pub(crate) unsafe fn load_f32<const CHANNELS_COUNT: usize>(ptr: *const f32) -> __m128 {
+    if CHANNELS_COUNT == 4 {
+        return _mm_loadu_ps(ptr);
+    } else if CHANNELS_COUNT == 3 {
+        return _mm_setr_ps(
+            ptr.read_unaligned(),
+            ptr.add(1).read_unaligned(),
+            ptr.add(2).read_unaligned(),
+            0f32,
+        );
+    } else if CHANNELS_COUNT == 2 {
+        return _mm_setr_ps(
+            ptr.read_unaligned(),
+            ptr.add(1).read_unaligned(),
+            0f32,
+            0f32,
+        );
+    }
+    return _mm_setr_ps(ptr.read_unaligned(), 0f32, 0f32, 0f32);
+}
+
+#[inline]
 pub(crate) unsafe fn load_u8_s32_fast<const CHANNELS_COUNT: usize>(ptr: *const u8) -> __m128i {
     let u_first = u32::from_le_bytes([ptr.read_unaligned(), 0, 0, 0]);
     let u_second = u32::from_le_bytes([ptr.add(1).read_unaligned(), 0, 0, 0]);
@@ -166,6 +188,28 @@ pub(crate) unsafe fn load_u8_f32_fast<const CHANNELS_COUNT: usize>(ptr: *const u
 pub(crate) unsafe fn load_u8_u32_one(ptr: *const u8) -> __m128i {
     let u_first = u32::from_le_bytes([ptr.read_unaligned(), 0, 0, 0]);
     return _mm_set1_epi32(u_first as i32);
+}
+
+#[inline(always)]
+pub(crate) unsafe fn store_f32<const CHANNELS_COUNT: usize>(dst_ptr: *mut f32, regi: __m128) {
+    if CHANNELS_COUNT == 4 {
+        _mm_storeu_ps(dst_ptr, regi);
+    } else if CHANNELS_COUNT == 3 {
+        dst_ptr.write_unaligned(f32::from_bits(_mm_extract_ps::<0>(regi) as u32));
+        dst_ptr
+            .add(1)
+            .write_unaligned(f32::from_bits(_mm_extract_ps::<1>(regi) as u32));
+        dst_ptr
+            .add(2)
+            .write_unaligned(f32::from_bits(_mm_extract_ps::<2>(regi) as u32));
+    } else if CHANNELS_COUNT == 2 {
+        dst_ptr.write_unaligned(f32::from_bits(_mm_extract_ps::<0>(regi) as u32));
+        dst_ptr
+            .add(1)
+            .write_unaligned(f32::from_bits(_mm_extract_ps::<1>(regi) as u32));
+    } else {
+        dst_ptr.write_unaligned(f32::from_bits(_mm_extract_ps::<0>(regi) as u32));
+    }
 }
 
 #[inline(always)]

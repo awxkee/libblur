@@ -32,7 +32,7 @@ fn main() {
     //     vst1q_s64(t.as_mut_ptr(), mul);
     //     println!("{:?}", t);
     // }
-    let img = ImageReader::open("assets/abstract_alpha.png")
+    let img = ImageReader::open("assets/test_image_4.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -93,12 +93,12 @@ fn main() {
 
     let start_time = Instant::now();
 
-    libblur::fast_gaussian_in_linear(
+    libblur::stack_blur_in_linear(
         &mut dst_bytes,
         stride as u32,
         dimensions.0,
         dimensions.1,
-        22,
+        77,
         FastBlurChannels::Channels4,
         ThreadingPolicy::Single,
         TransferFunction::Srgb,

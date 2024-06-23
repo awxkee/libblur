@@ -25,12 +25,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::mul_table::{MUL_TABLE_STACK_BLUR, SHR_TABLE_STACK_BLUR};
-use crate::sse::utils::{_mm_mul_epi64, _mm_packus_epi64, store_u8_s32};
-use crate::sse::{
-    __mm128ix2, _mm_add_epi64x2, _mm_load_epi64x2, _mm_mul_n_epi64x2, _mm_set1_epi64x2,
-    _mm_store_epi64x2, _mm_sub_epi64x2, load_u8_s64x2_fast,
-};
+use crate::sse::{load_f32, store_f32};
 use crate::stack_blur::StackBlurPass;
 use crate::unsafe_slice::UnsafeSlice;
 #[cfg(target_arch = "x86")]
@@ -38,8 +33,8 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-pub fn stack_blur_pass_sse_i64<const COMPONENTS: usize>(
-    pixels: &UnsafeSlice<u8>,
+pub fn stack_blur_pass_sse_f<const COMPONENTS: usize>(
+    pixels: &UnsafeSlice<f32>,
     stride: u32,
     width: u32,
     height: u32,
@@ -50,20 +45,20 @@ pub fn stack_blur_pass_sse_i64<const COMPONENTS: usize>(
 ) {
     unsafe {
         let div = ((radius * 2) + 1) as usize;
+        let radius_scale: f32 = (1f64 / (radius * (radius + 2) - 1) as f64) as f32;
         let (mut xp, mut yp);
         let mut sp;
         let mut stack_start;
-        let mut stacks = vec![0i64; 4 * div * total_threads];
+        let mut stacks = vec![0f32; 4 * div * total_threads];
 
-        let mut sums: __mm128ix2;
-        let mut sum_in: __mm128ix2;
-        let mut sum_out: __mm128ix2;
+        let mut sums: __m128;
+        let mut sum_in: __m128;
+        let mut sum_out: __m128;
 
         let wm = width - 1;
         let hm = height - 1;
         let div = (radius * 2) + 1;
-        let mul_sum = _mm_set1_epi64x(MUL_TABLE_STACK_BLUR[radius as usize] as i64);
-        let shr_sum = _mm_setr_epi32(SHR_TABLE_STACK_BLUR[radius as usize], 0i32, 0i32, 0i32);
+        let v_scale = _mm_set1_ps(radius_scale);
 
         let mut src_ptr;
         let mut dst_ptr;
@@ -73,20 +68,20 @@ pub fn stack_blur_pass_sse_i64<const COMPONENTS: usize>(
             let max_y = (thread + 1) * height as usize / total_threads;
 
             for y in min_y..max_y {
-                sums = _mm_set1_epi64x2(0i64);
-                sum_in = _mm_set1_epi64x2(0i64);
-                sum_out = _mm_set1_epi64x2(0i64);
+                sums = _mm_set1_ps(0f32);
+                sum_in = _mm_set1_ps(0f32);
+                sum_out = _mm_set1_ps(0f32);
 
                 src_ptr = stride as usize * y; // start of line (0,y)
 
-                let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
-                let src_pixel = load_u8_s64x2_fast::<COMPONENTS>(src_ld as *const u8);
+                let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f32;
+                let src_pixel = load_f32::<COMPONENTS>(src_ld);
 
                 for i in 0..=radius {
                     let stack_value = stacks.as_mut_ptr().add(i as usize * 4);
-                    _mm_store_epi64x2(stack_value, src_pixel);
-                    sums = _mm_add_epi64x2(sums, _mm_mul_n_epi64x2(src_pixel, i as i64 + 1i64));
-                    sum_out = _mm_add_epi64x2(sum_out, src_pixel);
+                    _mm_storeu_ps(stack_value, src_pixel);
+                    sums = _mm_add_ps(sums, _mm_mul_ps(src_pixel, _mm_set1_ps(i as f32 + 1f32)));
+                    sum_out = _mm_add_ps(sum_out, src_pixel);
                 }
 
                 for i in 1..=radius {
@@ -94,15 +89,15 @@ pub fn stack_blur_pass_sse_i64<const COMPONENTS: usize>(
                         src_ptr += COMPONENTS;
                     }
                     let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4);
-                    let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
-                    let src_pixel = load_u8_s64x2_fast::<COMPONENTS>(src_ld as *const u8);
-                    _mm_store_epi64x2(stack_ptr, src_pixel);
-                    sums = _mm_add_epi64x2(
+                    let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f32;
+                    let src_pixel = load_f32::<COMPONENTS>(src_ld);
+                    _mm_storeu_ps(stack_ptr, src_pixel);
+                    sums = _mm_add_ps(
                         sums,
-                        _mm_mul_n_epi64x2(src_pixel, radius as i64 + 1i64 - i as i64),
+                        _mm_mul_ps(src_pixel, _mm_set1_ps(radius as f32 + 1f32 - i as f32)),
                     );
 
-                    sum_in = _mm_add_epi64x2(sum_in, src_pixel);
+                    sum_in = _mm_add_ps(sum_in, src_pixel);
                 }
 
                 sp = radius;
@@ -114,14 +109,12 @@ pub fn stack_blur_pass_sse_i64<const COMPONENTS: usize>(
                 src_ptr = COMPONENTS * xp as usize + y * stride as usize;
                 dst_ptr = y * stride as usize;
                 for _ in 0..width {
-                    let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
-                    let blurred_hi = _mm_srl_epi64(_mm_mul_epi64(sums.1, mul_sum), shr_sum);
-                    let blurred_lo = _mm_srl_epi64(_mm_mul_epi64(sums.0, mul_sum), shr_sum);
-                    let blurred = _mm_packus_epi64(blurred_lo, blurred_hi);
-                    store_u8_s32::<COMPONENTS>(store_ld, blurred);
+                    let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut f32;
+                    let blurred = _mm_mul_ps(sums, v_scale);
+                    store_f32::<COMPONENTS>(store_ld, blurred);
                     dst_ptr += COMPONENTS;
 
-                    sums = _mm_sub_epi64x2(sums, sum_out);
+                    sums = _mm_sub_ps(sums, sum_out);
 
                     stack_start = sp + div - radius;
                     if stack_start >= div {
@@ -129,31 +122,31 @@ pub fn stack_blur_pass_sse_i64<const COMPONENTS: usize>(
                     }
                     let stack = stacks.as_mut_ptr().add(stack_start as usize * 4);
 
-                    let stack_val = _mm_load_epi64x2(stack as *const i64);
+                    let stack_val = _mm_loadu_ps(stack);
 
-                    sum_out = _mm_sub_epi64x2(sum_out, stack_val);
+                    sum_out = _mm_sub_ps(sum_out, stack_val);
 
                     if xp < wm {
                         src_ptr += COMPONENTS;
                         xp += 1;
                     }
 
-                    let src_ld = pixels.slice.as_ptr().add(src_ptr);
-                    let src_pixel = load_u8_s64x2_fast::<COMPONENTS>(src_ld as *const u8);
-                    _mm_store_epi64x2(stack, src_pixel);
+                    let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f32;
+                    let src_pixel = load_f32::<COMPONENTS>(src_ld);
+                    _mm_storeu_ps(stack, src_pixel);
 
-                    sum_in = _mm_add_epi64x2(sum_in, src_pixel);
-                    sums = _mm_add_epi64x2(sums, sum_in);
+                    sum_in = _mm_add_ps(sum_in, src_pixel);
+                    sums = _mm_add_ps(sums, sum_in);
 
                     sp += 1;
                     if sp >= div {
                         sp = 0;
                     }
                     let stack = stacks.as_mut_ptr().add(sp as usize * 4);
-                    let stack_val = _mm_load_epi64x2(stack as *const i64);
+                    let stack_val = _mm_loadu_ps(stack);
 
-                    sum_out = _mm_add_epi64x2(sum_out, stack_val);
-                    sum_in = _mm_sub_epi64x2(sum_in, stack_val);
+                    sum_out = _mm_add_ps(sum_out, stack_val);
+                    sum_in = _mm_sub_ps(sum_in, stack_val);
                 }
             }
         } else if pass == StackBlurPass::VERTICAL {
@@ -161,21 +154,21 @@ pub fn stack_blur_pass_sse_i64<const COMPONENTS: usize>(
             let max_x = (thread + 1) * width as usize / total_threads;
 
             for x in min_x..max_x {
-                sums = _mm_set1_epi64x2(0i64);
-                sum_in = _mm_set1_epi64x2(0i64);
-                sum_out = _mm_set1_epi64x2(0i64);
+                sums = _mm_set1_ps(0f32);
+                sum_in = _mm_set1_ps(0f32);
+                sum_out = _mm_set1_ps(0f32);
 
                 src_ptr = COMPONENTS * x; // x,0
 
-                let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
+                let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f32;
 
-                let src_pixel = load_u8_s64x2_fast::<COMPONENTS>(src_ld as *const u8);
+                let src_pixel = load_f32::<COMPONENTS>(src_ld);
 
                 for i in 0..=radius {
                     let stack_ptr = stacks.as_mut_ptr().add(i as usize * 4);
-                    _mm_store_epi64x2(stack_ptr, src_pixel);
-                    sums = _mm_add_epi64x2(sums, _mm_mul_n_epi64x2(src_pixel, i as i64 + 1i64));
-                    sum_out = _mm_add_epi64x2(sum_out, src_pixel);
+                    _mm_storeu_ps(stack_ptr, src_pixel);
+                    sums = _mm_add_ps(sums, _mm_mul_ps(src_pixel, _mm_set1_ps(i as f32 + 1f32)));
+                    sum_out = _mm_add_ps(sum_out, src_pixel);
                 }
 
                 for i in 1..=radius {
@@ -184,15 +177,15 @@ pub fn stack_blur_pass_sse_i64<const COMPONENTS: usize>(
                     }
 
                     let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4);
-                    let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
-                    let src_pixel = load_u8_s64x2_fast::<COMPONENTS>(src_ld as *const u8);
-                    _mm_store_epi64x2(stack_ptr, src_pixel);
-                    sums = _mm_add_epi64x2(
+                    let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f32;
+                    let src_pixel = load_f32::<COMPONENTS>(src_ld);
+                    _mm_storeu_ps(stack_ptr, src_pixel);
+                    sums = _mm_add_ps(
                         sums,
-                        _mm_mul_n_epi64x2(src_pixel, radius as i64 + 1i64 - i as i64),
+                        _mm_mul_ps(src_pixel, _mm_set1_ps(radius as f32 + 1f32 - i as f32)),
                     );
 
-                    sum_in = _mm_add_epi64x2(sum_in, src_pixel);
+                    sum_in = _mm_add_ps(sum_in, src_pixel);
                 }
 
                 sp = radius;
@@ -203,15 +196,13 @@ pub fn stack_blur_pass_sse_i64<const COMPONENTS: usize>(
                 src_ptr = COMPONENTS * x + yp as usize * stride as usize;
                 dst_ptr = COMPONENTS * x;
                 for _ in 0..height {
-                    let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
-                    let blurred_hi = _mm_srl_epi64(_mm_mul_epi64(sums.1, mul_sum), shr_sum);
-                    let blurred_lo = _mm_srl_epi64(_mm_mul_epi64(sums.0, mul_sum), shr_sum);
-                    let blurred = _mm_packus_epi64(blurred_lo, blurred_hi);
-                    store_u8_s32::<COMPONENTS>(store_ld, blurred);
+                    let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut f32;
+                    let blurred = _mm_mul_ps(sums, v_scale);
+                    store_f32::<COMPONENTS>(store_ld, blurred);
 
                     dst_ptr += stride as usize;
 
-                    sums = _mm_sub_epi64x2(sums, sum_out);
+                    sums = _mm_sub_ps(sums, sum_out);
 
                     stack_start = sp + div - radius;
                     if stack_start >= div {
@@ -219,8 +210,8 @@ pub fn stack_blur_pass_sse_i64<const COMPONENTS: usize>(
                     }
 
                     let stack_ptr = stacks.as_mut_ptr().add(stack_start as usize * 4);
-                    let stack_val = _mm_load_epi64x2(stack_ptr as *const i64);
-                    sum_out = _mm_sub_epi64x2(sum_out, stack_val);
+                    let stack_val = _mm_loadu_ps(stack_ptr as *const f32);
+                    sum_out = _mm_sub_ps(sum_out, stack_val);
 
                     if yp < hm {
                         src_ptr += stride as usize; // stride
@@ -228,11 +219,11 @@ pub fn stack_blur_pass_sse_i64<const COMPONENTS: usize>(
                     }
 
                     let src_ld = pixels.slice.as_ptr().add(src_ptr);
-                    let src_pixel = load_u8_s64x2_fast::<COMPONENTS>(src_ld as *const u8);
-                    _mm_store_epi64x2(stack_ptr, src_pixel);
+                    let src_pixel = load_f32::<COMPONENTS>(src_ld as *const f32);
+                    _mm_storeu_ps(stack_ptr, src_pixel);
 
-                    sum_in = _mm_add_epi64x2(sum_in, src_pixel);
-                    sums = _mm_add_epi64x2(sums, sum_in);
+                    sum_in = _mm_add_ps(sum_in, src_pixel);
+                    sums = _mm_add_ps(sums, sum_in);
 
                     sp += 1;
 
@@ -240,10 +231,10 @@ pub fn stack_blur_pass_sse_i64<const COMPONENTS: usize>(
                         sp = 0;
                     }
                     let stack_ptr = stacks.as_mut_ptr().add(sp as usize * 4);
-                    let stack_val = _mm_load_epi64x2(stack_ptr as *const i64);
+                    let stack_val = _mm_loadu_ps(stack_ptr as *const f32);
 
-                    sum_out = _mm_add_epi64x2(sum_out, stack_val);
-                    sum_in = _mm_sub_epi64x2(sum_in, stack_val);
+                    sum_out = _mm_add_ps(sum_out, stack_val);
+                    sum_in = _mm_sub_ps(sum_in, stack_val);
                 }
             }
         }

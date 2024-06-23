@@ -93,6 +93,7 @@ pub fn stack_blur_pass_sse<const COMPONENTS: usize>(
                         src_ptr += COMPONENTS;
                     }
                     let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4);
+                    let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
                     let src_pixel = load_u8_s32_fast::<COMPONENTS>(src_ld as *const u8);
                     _mm_storeu_si128(stack_ptr as *mut __m128i, src_pixel);
                     sums = _mm_add_epi32(
@@ -187,6 +188,7 @@ pub fn stack_blur_pass_sse<const COMPONENTS: usize>(
                     }
 
                     let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4);
+                    let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
                     let src_pixel = load_u8_s32_fast::<COMPONENTS>(src_ld as *const u8);
                     _mm_storeu_si128(stack_ptr as *mut __m128i, src_pixel);
                     sums = _mm_add_epi32(

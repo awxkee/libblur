@@ -26,16 +26,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::gaussian::gaussian_filter::GaussianFilter;
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "sse4.1"
-))]
-use crate::gaussian::gaussian_sse::sse_support::gaussian_blur_horizontal_pass_impl_sse;
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "sse4.1"
-))]
-use crate::gaussian::gaussian_sse_filter::sse_filter::gaussian_blur_horizontal_pass_filter_sse;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{reflect_index, EdgeMode};
 use num_traits::FromPrimitive;
