@@ -92,17 +92,28 @@ fn main() {
     // bytes = dst_bytes;
 
     let start_time = Instant::now();
-
-    libblur::fast_gaussian_next_in_linear(
+    libblur::gaussian_box_blur_in_linear(
+        &bytes,
+        stride as u32,
         &mut dst_bytes,
         stride as u32,
         dimensions.0,
         dimensions.1,
-        93,
+        100,
         FastBlurChannels::Channels4,
         ThreadingPolicy::Single,
         TransferFunction::Rec709,
     );
+    // libblur::fast_gaussian_next_in_linear(
+    //     &mut dst_bytes,
+    //     stride as u32,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     93,
+    //     FastBlurChannels::Channels4,
+    //     ThreadingPolicy::Single,
+    //     TransferFunction::Rec709,
+    // );
 
     // libblur::gaussian_blur_in_linear(
     //     &bytes,
