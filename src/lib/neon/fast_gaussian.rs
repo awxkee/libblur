@@ -25,13 +25,18 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::mul_table::{MUL_TABLE_DOUBLE, SHR_TABLE_DOUBLE};
-use crate::neon::load_u8_s32_fast;
+use crate::edge_mode::reflect_index;
+use crate::neon::{load_u8_s32_fast, vmulq_s32_f32};
+use crate::{clamp_edge, EdgeMode};
 use std::arch::aarch64::*;
 
 use crate::unsafe_slice::UnsafeSlice;
 
-pub fn fast_gaussian_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
+pub fn fast_gaussian_horizontal_pass_neon_u8<
+    T,
+    const CHANNELS_COUNT: usize,
+    const EDGE_MODE: usize,
+>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -40,16 +45,14 @@ pub fn fast_gaussian_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
     start: u32,
     end: u32,
 ) {
+    let edge_mode: EdgeMode = EDGE_MODE.into();
     let bytes: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(undefined_slice) };
     let mut buffer: [[i32; 4]; 1024] = [[0; 4]; 1024];
     let initial_sum = ((radius * radius) >> 1) as i32;
 
     let radius_64 = radius as i64;
     let width_wide = width as i64;
-    let mul_value = MUL_TABLE_DOUBLE[radius as usize];
-    let shr_value = SHR_TABLE_DOUBLE[radius as usize];
-    let v_mul_value = unsafe { vdupq_n_s32(mul_value) };
-    let v_shr_value = unsafe { vdupq_n_s32(-shr_value) };
+    let v_weight = unsafe { vdupq_n_f32((1f64 / (radius as f64 * radius as f64)) as f32) };
     for y in start..std::cmp::min(height, end) {
         let mut diffs: int32x4_t = unsafe { vdupq_n_s32(0) };
         let mut summs: int32x4_t = unsafe { vdupq_n_s32(initial_sum) };
@@ -61,12 +64,8 @@ pub fn fast_gaussian_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
             if x >= 0 {
                 let current_px = ((std::cmp::max(x, 0) as u32) * CHANNELS_COUNT as u32) as usize;
 
-                let prepared_px_s32 = unsafe {
-                    vshlq_u32(
-                        vreinterpretq_u32_s32(vmulq_s32(summs, v_mul_value)),
-                        v_shr_value,
-                    )
-                };
+                let prepared_px_s32 =
+                    unsafe { vreinterpretq_u32_s32(vmulq_s32_f32(summs, v_weight)) };
                 let prepared_u16 = unsafe { vqmovn_u32(prepared_px_s32) };
                 let prepared_u8 = unsafe { vqmovn_u16(vcombine_u16(prepared_u16, prepared_u16)) };
 
@@ -108,8 +107,7 @@ pub fn fast_gaussian_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
             }
 
             let next_row_y = (y as usize) * (stride as usize);
-            let next_row_x =
-                (std::cmp::min(std::cmp::max(x + radius_64, 0), width_wide - 1) as u32) as usize;
+            let next_row_x = clamp_edge!(edge_mode, x + radius_64, 0, width_wide - 1);
             let next_row_px = next_row_x * CHANNELS_COUNT;
 
             let s_ptr = unsafe { bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut u8 };
@@ -127,7 +125,11 @@ pub fn fast_gaussian_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
     }
 }
 
-pub(crate) fn fast_gaussian_vertical_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
+pub(crate) fn fast_gaussian_vertical_pass_neon_u8<
+    T,
+    const CHANNELS_COUNT: usize,
+    const EDGE_MODE: usize,
+>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -136,6 +138,7 @@ pub(crate) fn fast_gaussian_vertical_pass_neon_u8<T, const CHANNELS_COUNT: usize
     start: u32,
     end: u32,
 ) {
+    let edge_mode: EdgeMode = EDGE_MODE.into();
     let bytes: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(undefined_slice) };
     let mut buffer: [[i32; 4]; 1024] = [[0; 4]; 1024];
     let initial_sum = ((radius * radius) >> 1) as i32;
@@ -143,10 +146,7 @@ pub(crate) fn fast_gaussian_vertical_pass_neon_u8<T, const CHANNELS_COUNT: usize
     let height_wide = height as i64;
 
     let radius_64 = radius as i64;
-    let mul_value = MUL_TABLE_DOUBLE[radius as usize];
-    let shr_value = SHR_TABLE_DOUBLE[radius as usize];
-    let v_mul_value = unsafe { vdupq_n_s32(mul_value) };
-    let v_shr_value = unsafe { vdupq_n_s32(-shr_value) };
+    let v_weight = unsafe { vdupq_n_f32((1f64 / (radius as f64 * radius as f64)) as f32) };
     for x in start..std::cmp::min(width, end) {
         let mut diffs: int32x4_t = unsafe { vdupq_n_s32(0) };
         let mut summs: int32x4_t = unsafe { vdupq_n_s32(initial_sum) };
@@ -158,12 +158,8 @@ pub(crate) fn fast_gaussian_vertical_pass_neon_u8<T, const CHANNELS_COUNT: usize
             if y >= 0 {
                 let current_px = ((std::cmp::max(x, 0)) * CHANNELS_COUNT as u32) as usize;
 
-                let prepared_px_s32 = unsafe {
-                    vshlq_u32(
-                        vreinterpretq_u32_s32(vmulq_s32(summs, v_mul_value)),
-                        v_shr_value,
-                    )
-                };
+                let prepared_px_s32 =
+                    unsafe { vreinterpretq_u32_s32(vmulq_s32_f32(summs, v_weight)) };
                 let prepared_u16 = unsafe { vqmovn_u32(prepared_px_s32) };
                 let prepared_u8 = unsafe { vqmovn_u16(vcombine_u16(prepared_u16, prepared_u16)) };
 
@@ -207,9 +203,8 @@ pub(crate) fn fast_gaussian_vertical_pass_neon_u8<T, const CHANNELS_COUNT: usize
                 diffs = unsafe { vsubq_s32(diffs, stored) };
             }
 
-            let next_row_y = (std::cmp::min(std::cmp::max(y + radius_64, 0), height_wide - 1)
-                as usize)
-                * (stride as usize);
+            let next_row_y =
+                clamp_edge!(edge_mode, y + radius_64, 0, height_wide - 1) * (stride as usize);
             let next_row_x = (x * CHANNELS_COUNT as u32) as usize;
 
             let s_ptr = unsafe { bytes.slice.as_ptr().add(next_row_y + next_row_x) as *mut u8 };

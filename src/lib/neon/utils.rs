@@ -189,6 +189,12 @@ pub(crate) unsafe fn vmulq_u32_f32(a: uint32x4_t, b: float32x4_t) -> uint32x4_t 
 }
 
 #[inline(always)]
+pub(crate) unsafe fn vmulq_s32_f32(a: int32x4_t, b: float32x4_t) -> int32x4_t {
+    let cvt = vcvtq_f32_s32(a);
+    vcvtaq_s32_f32(vmulq_f32(cvt, b))
+}
+
+#[inline(always)]
 pub(crate) unsafe fn vmulq_n_s64x2(x: int64x2x2_t, v: i64) -> int64x2x2_t {
     let vl = vdupq_n_s64(v);
     let lo = vmulq_s64(x.0, vl);

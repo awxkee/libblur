@@ -27,9 +27,15 @@
 
 #[repr(C)]
 #[allow(dead_code)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Ord, PartialOrd, Eq, PartialEq)]
+/// Declared channels count, generally channels order do not matter for blurring,
+/// except cases when transformation into linear colorspace is performed
+/// in this case alpha plane expected to be last so if colorspace has 4 channels then it should be
+/// RGBA, BGRA etc
 pub enum FastBlurChannels {
+    /// RGB, BGR etc
     Channels3 = 3,
+    /// RGBA, BGRA etc
     Channels4 = 4,
 }
 

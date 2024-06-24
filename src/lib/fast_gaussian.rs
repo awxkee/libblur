@@ -26,26 +26,194 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::channels_configuration::FastBlurChannels;
-use crate::fast_gaussian_f16::fast_gaussian_f16;
-use crate::fast_gaussian_f32::fast_gaussian_f32;
-use crate::mul_table::{MUL_TABLE_DOUBLE, SHR_TABLE_DOUBLE};
+use crate::edge_mode::reflect_index;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use crate::neon::{fast_gaussian_horizontal_pass_neon_u8, fast_gaussian_vertical_pass_neon_u8};
+use crate::neon::{
+    fast_gaussian_horizontal_pass_neon_f32, fast_gaussian_horizontal_pass_neon_u8,
+    fast_gaussian_vertical_pass_neon_f32, fast_gaussian_vertical_pass_neon_u8,
+};
 #[cfg(all(
     any(target_arch = "x86_64", target_arch = "x86"),
     target_feature = "sse4.1"
 ))]
 use crate::sse::{fast_gaussian_horizontal_pass_sse_u8, fast_gaussian_vertical_pass_sse_u8};
 use crate::threading_policy::ThreadingPolicy;
+use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
+use crate::{clamp_edge, EdgeMode};
 use colorutils_rs::{
     linear_to_rgb, linear_to_rgba, rgb_to_linear, rgba_to_linear, TransferFunction,
 };
 use num_traits::cast::FromPrimitive;
+use num_traits::{AsPrimitive, Float};
 
 const BASE_RADIUS_I64_CUTOFF: u32 = 180;
 
-fn fast_gaussian_vertical_pass<T, J, const CHANNELS_CONFIGURATION: usize>(
+/**
+      RRRRRR  OOOOO  U     U TTTTTTT IIIII NN   N EEEEEEE SSSSS
+      R     R O     O U     U   T     I   I N N  N E       S
+     RRRRRR  O     O U     U   T     I   I N  N N EEEEE    SSS
+     R   R   O     O U     U   T     I   I N   NN E            S
+     R    R   OOOOO   UUUUU    T    IIIII N    N EEEEEEE  SSSSS
+**/
+
+macro_rules! update_differences_inside {
+    ($dif_r:expr, $buffer_r:expr, $arr_index:expr, $d_arr_index:expr) => {{
+        let twos = J::from_i32(2i32).unwrap();
+        $dif_r += unsafe { *$buffer_r.get_unchecked($arr_index) }
+            - twos * unsafe { *$buffer_r.get_unchecked($d_arr_index) };
+    }};
+}
+
+macro_rules! update_differences_out {
+    ($dif:expr, $buffer:expr, $arr_index:expr) => {{
+        let twos = J::from_i32(2i32).unwrap();
+        $dif -= twos * unsafe { *$buffer.get_unchecked($arr_index) };
+    }};
+}
+
+macro_rules! update_sum_in {
+    ($bytes:expr, $bytes_offset:expr, $dif:expr, $sum:expr, $buffer:expr, $arr_index:expr) => {{
+        let v: J = $bytes[$bytes_offset].as_();
+        $dif += v;
+        $sum += $dif;
+        unsafe {
+            *$buffer.get_unchecked_mut($arr_index) = v;
+        }
+    }};
+}
+
+macro_rules! write_out_blurred {
+    ($sum:expr, $weight:expr, $bytes:expr, $bytes_offset:expr) => {{
+        let sum_f: M = $sum.as_();
+        let new_v: T = (sum_f * $weight).to_();
+        unsafe {
+            $bytes.write($bytes_offset, new_v);
+        }
+    }};
+}
+
+macro_rules! impl_generic_call {
+    ($store_type:ty, $channels_type:expr, $edge_mode:expr, $bytes:expr, $stride:expr, $width:expr, $height:expr, $radius:expr, $threading_policy:expr) => {
+        match $channels_type {
+            FastBlurChannels::Channels3 => {
+                fast_gaussian_impl::<$store_type, 3, $edge_mode>(
+                    $bytes,
+                    $stride,
+                    $width,
+                    $height,
+                    $radius,
+                    $threading_policy,
+                );
+            }
+            FastBlurChannels::Channels4 => {
+                fast_gaussian_impl::<$store_type, 4, $edge_mode>(
+                    $bytes,
+                    $stride,
+                    $width,
+                    $height,
+                    $radius,
+                    $threading_policy,
+                );
+            }
+        }
+    };
+}
+
+macro_rules! impl_margin_call {
+    ($store_type:ty, $channels_type:expr, $edge_mode:expr, $bytes:expr, $stride:expr, $width:expr, $height:expr, $radius:expr, $threading_policy:expr) => {
+        match $edge_mode {
+            EdgeMode::Clamp => {
+                impl_generic_call!(
+                    $store_type,
+                    $channels_type,
+                    { EdgeMode::Clamp as usize },
+                    $bytes,
+                    $stride,
+                    $width,
+                    $height,
+                    $radius,
+                    $threading_policy
+                );
+            }
+            EdgeMode::KernelClip => {
+                panic!("Kernel clip is supported only in gaussian")
+            }
+            EdgeMode::Wrap => {
+                impl_generic_call!(
+                    $store_type,
+                    $channels_type,
+                    { EdgeMode::Wrap as usize },
+                    $bytes,
+                    $stride,
+                    $width,
+                    $height,
+                    $radius,
+                    $threading_policy
+                );
+            }
+            EdgeMode::Reflect => {
+                impl_generic_call!(
+                    $store_type,
+                    $channels_type,
+                    { EdgeMode::Reflect as usize },
+                    $bytes,
+                    $stride,
+                    $width,
+                    $height,
+                    $radius,
+                    $threading_policy
+                );
+            }
+        }
+    };
+}
+
+trait InitialValue {
+    fn get_initial(radius: usize) -> i64;
+}
+
+impl InitialValue for f32 {
+    fn get_initial(_: usize) -> i64 {
+        0i64
+    }
+}
+
+impl InitialValue for f64 {
+    fn get_initial(_: usize) -> i64 {
+        0i64
+    }
+}
+
+impl InitialValue for u8 {
+    fn get_initial(radius: usize) -> i64 {
+        ((radius * radius) >> 1) as i64
+    }
+}
+
+impl InitialValue for u16 {
+    fn get_initial(radius: usize) -> i64 {
+        ((radius * radius) >> 1) as i64
+    }
+}
+
+impl InitialValue for half::f16 {
+    fn get_initial(_: usize) -> i64 {
+        0i64
+    }
+}
+
+/// # Params
+/// `T` - type of buffer
+/// `J` - accumulator type
+/// `M` - multiplication type, when weight will be applied this type will be used also
+fn fast_gaussian_vertical_pass<
+    T,
+    J,
+    M,
+    const CHANNELS_CONFIGURATION: usize,
+    const EDGE_MODE: usize,
+>(
     bytes: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -55,33 +223,33 @@ fn fast_gaussian_vertical_pass<T, J, const CHANNELS_CONFIGURATION: usize>(
     end: u32,
 ) where
     T: std::ops::AddAssign
+        + 'static
         + std::ops::SubAssign
         + Copy
         + FromPrimitive
         + Default
-        + Into<i32>
-        + Into<J>,
+        + AsPrimitive<J>
+        + InitialValue,
     J: Copy
         + FromPrimitive
         + Default
-        + Into<i64>
         + std::ops::Mul<Output = J>
         + std::ops::Sub<Output = J>
         + std::ops::Add<Output = J>
         + std::ops::AddAssign
         + std::ops::SubAssign
-        + From<i32>,
-    i64: From<T>,
+        + AsPrimitive<M>,
+    M: Copy + FromPrimitive + std::ops::Mul<Output = M> + AsPrimitive<T> + Float + ToStorage<T>,
 {
+    let edge_mode: EdgeMode = EDGE_MODE.into();
     let mut buffer_r: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
     let mut buffer_g: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
     let mut buffer_b: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
     let mut buffer_a: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
     let radius_64 = radius as i64;
     let height_wide = height as i64;
-    let mul_value = MUL_TABLE_DOUBLE[radius as usize] as i64;
-    let shr_value = SHR_TABLE_DOUBLE[radius as usize] as u64;
-    let initial = J::from_i32(((radius * radius) >> 1) as i32).unwrap();
+    let initial = J::from_i64(T::get_initial(radius as usize)).unwrap();
+    let weight = M::from_f64(1f64 / (radius as f64 * radius as f64)).unwrap();
     for x in start..std::cmp::min(width, end) {
         let mut dif_r: J = J::from_i32(0i32).unwrap();
         let mut sum_r: J = initial;
@@ -96,98 +264,64 @@ fn fast_gaussian_vertical_pass<T, J, const CHANNELS_CONFIGURATION: usize>(
 
         let start_y = 0 - 2 * radius as i64;
         for y in start_y..height_wide {
-            let current_y = (y * (stride as i64)) as usize;
             if y >= 0 {
-                let sum_r_i64: i64 = sum_r.into();
-                let new_r = T::from_u64((sum_r_i64 * mul_value) as u64 >> shr_value).unwrap();
-                let sum_g_i64: i64 = sum_g.into();
-                let new_g = T::from_u64((sum_g_i64 * mul_value) as u64 >> shr_value).unwrap();
-                let sum_b_i64: i64 = sum_b.into();
-                let new_b = T::from_u64((sum_b_i64 * mul_value) as u64 >> shr_value).unwrap();
+                let current_y = (y * (stride as i64)) as usize;
+                let bytes_offset = current_y + current_px;
 
-                unsafe {
-                    bytes.write(current_y + current_px, new_r);
-                    bytes.write(current_y + current_px + 1, new_g);
-                    bytes.write(current_y + current_px + 2, new_b);
-                    if CHANNELS_CONFIGURATION == 4 {
-                        let sum_a_i64: i64 = sum_a.into();
-                        let new_a =
-                            T::from_u64((sum_a_i64 * mul_value) as u64 >> shr_value).unwrap();
-                        bytes.write(current_y + current_px + 3, new_a);
-                    }
+                write_out_blurred!(sum_r, weight, bytes, bytes_offset);
+                write_out_blurred!(sum_g, weight, bytes, bytes_offset + 1);
+                write_out_blurred!(sum_b, weight, bytes, bytes_offset + 2);
+                if CHANNELS_CONFIGURATION == 4 {
+                    write_out_blurred!(sum_a, weight, bytes, bytes_offset + 3);
                 }
 
                 let arr_index = ((y - radius_64) & 1023) as usize;
                 let d_arr_index = (y & 1023) as usize;
-                let twos: J = 2i32.into();
-                dif_r += unsafe { *buffer_r.get_unchecked(arr_index) }
-                    - twos * unsafe { *buffer_r.get_unchecked(d_arr_index) };
-                dif_g += unsafe { *buffer_g.get_unchecked(arr_index) }
-                    - twos * unsafe { *buffer_g.get_unchecked(d_arr_index) };
-                dif_b += unsafe { *buffer_b.get_unchecked(arr_index) }
-                    - twos * unsafe { *buffer_b.get_unchecked(d_arr_index) };
+                update_differences_inside!(dif_r, buffer_r, arr_index, d_arr_index);
+                update_differences_inside!(dif_g, buffer_g, arr_index, d_arr_index);
+                update_differences_inside!(dif_b, buffer_b, arr_index, d_arr_index);
                 if CHANNELS_CONFIGURATION == 4 {
-                    dif_a += unsafe { *buffer_a.get_unchecked(arr_index) }
-                        - twos * unsafe { *buffer_a.get_unchecked(d_arr_index) };
+                    update_differences_inside!(dif_a, buffer_a, arr_index, d_arr_index);
                 }
             } else if y + radius_64 >= 0 {
                 let arr_index = (y & 1023) as usize;
-                let twos: J = 2i32.into();
-                dif_r -= twos * unsafe { *buffer_r.get_unchecked(arr_index) };
-                dif_g -= twos * unsafe { *buffer_g.get_unchecked(arr_index) };
-                dif_b -= twos * unsafe { *buffer_b.get_unchecked(arr_index) };
+                update_differences_out!(dif_r, buffer_r, arr_index);
+                update_differences_out!(dif_g, buffer_g, arr_index);
+                update_differences_out!(dif_b, buffer_b, arr_index);
                 if CHANNELS_CONFIGURATION == 4 {
-                    dif_a -= twos * unsafe { *buffer_a.get_unchecked(arr_index) };
+                    update_differences_out!(dif_a, buffer_a, arr_index);
                 }
             }
 
-            let next_row_y = (std::cmp::min(std::cmp::max(y + radius_64, 0), height_wide - 1)
-                as usize)
-                * (stride as usize);
+            let next_row_y =
+                clamp_edge!(edge_mode, y + radius_64, 0, height_wide - 1) * (stride as usize);
             let next_row_x = (x * CHANNELS_CONFIGURATION as u32) as usize;
 
             let px_idx = next_row_y + next_row_x;
 
-            let ur8: J = bytes[px_idx].into();
-            let ug8: J = bytes[px_idx + 1].into();
-            let ub8: J = bytes[px_idx + 2].into();
-
             let arr_index = ((y + radius_64) & 1023) as usize;
 
-            dif_r += ur8;
-            sum_r += dif_r;
-            unsafe {
-                *buffer_r.get_unchecked_mut(arr_index) = ur8;
-            }
-
-            dif_g += ug8;
-            sum_g += dif_g;
-            unsafe {
-                *buffer_g.get_unchecked_mut(arr_index) = ug8;
-            }
-
-            dif_b += ub8;
-            sum_b += dif_b;
-            unsafe {
-                *buffer_b.get_unchecked_mut(arr_index) = ub8;
-            }
+            update_sum_in!(bytes, px_idx, dif_r, sum_r, buffer_r, arr_index);
+            update_sum_in!(bytes, px_idx + 1, dif_g, sum_g, buffer_g, arr_index);
+            update_sum_in!(bytes, px_idx + 2, dif_b, sum_b, buffer_b, arr_index);
 
             if CHANNELS_CONFIGURATION == 4 {
-                let ua8: J = bytes[px_idx + 3].into();
-                dif_a += ua8;
-                sum_a += dif_a;
-                unsafe {
-                    *buffer_a.get_unchecked_mut(arr_index) = ua8;
-                }
+                update_sum_in!(bytes, px_idx + 3, dif_a, sum_a, buffer_a, arr_index);
             }
         }
     }
 }
 
+/// # Params
+/// `T` - type of buffer
+/// `J` - accumulator type
+/// `M` - multiplication type, when weight will be applied this type will be used also
 fn fast_gaussian_horizontal_pass<
-    T: FromPrimitive + Default + Into<i32> + Send + Sync,
+    T,
     J,
-    const CHANNEL_CONFIGURATION: usize,
+    M,
+    const CHANNELS_CONFIGURATION: usize,
+    const EDGE_MODE: usize,
 >(
     bytes: &UnsafeSlice<T>,
     stride: u32,
@@ -197,33 +331,39 @@ fn fast_gaussian_horizontal_pass<
     start: u32,
     end: u32,
 ) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy + Into<J>,
+    T: std::ops::AddAssign
+        + 'static
+        + std::ops::SubAssign
+        + Copy
+        + FromPrimitive
+        + Default
+        + AsPrimitive<J>
+        + InitialValue,
     J: Copy
         + FromPrimitive
         + Default
-        + Into<i64>
         + std::ops::Mul<Output = J>
         + std::ops::Sub<Output = J>
         + std::ops::Add<Output = J>
         + std::ops::AddAssign
         + std::ops::SubAssign
-        + TryFrom<u8>,
-    i64: From<T>,
+        + AsPrimitive<M>,
+    M: Copy + FromPrimitive + std::ops::Mul<Output = M> + AsPrimitive<T> + Float + ToStorage<T>,
 {
-    let channels: FastBlurChannels = CHANNEL_CONFIGURATION.into();
+    let edge_mode: EdgeMode = EDGE_MODE.into();
+    let channels: FastBlurChannels = CHANNELS_CONFIGURATION.into();
     let mut buffer_r: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
     let mut buffer_g: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
     let mut buffer_b: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
     let mut buffer_a: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
     let radius_64 = radius as i64;
     let width_wide = width as i64;
-    let mul_value = MUL_TABLE_DOUBLE[radius as usize] as i64;
-    let shr_value = SHR_TABLE_DOUBLE[radius as usize] as i64;
+    let weight = M::from_f64(1f64 / (radius as f64 * radius as f64)).unwrap();
     let channels_count = match channels {
         FastBlurChannels::Channels3 => 3,
         FastBlurChannels::Channels4 => 4,
     };
-    let initial = J::from_i32(((radius * radius) >> 1) as i32).unwrap();
+    let initial = J::from_i64(T::get_initial(radius as usize)).unwrap();
     for y in start..std::cmp::min(height, end) {
         let mut dif_r: J = J::from_i32(0i32).unwrap();
         let mut sum_r: J = initial;
@@ -239,99 +379,58 @@ fn fast_gaussian_horizontal_pass<
         let start_x = 0 - 2 * radius_64;
         for x in start_x..(width as i64) {
             if x >= 0 {
-                let current_px = ((std::cmp::max(x, 0) as u32) * channels_count) as usize;
-                let sum_r_i64: i64 = sum_r.into();
-                let new_r =
-                    T::from_u64((sum_r_i64 * mul_value) as u64 >> shr_value).unwrap_or_default();
-                let sum_g_i64: i64 = sum_g.into();
-                let new_g =
-                    T::from_u64((sum_g_i64 * mul_value) as u64 >> shr_value).unwrap_or_default();
-                let sum_b_i64: i64 = sum_b.into();
-                let new_b =
-                    T::from_u64((sum_b_i64 * mul_value) as u64 >> shr_value).unwrap_or_default();
+                let current_px = (x * channels_count) as usize;
 
-                unsafe {
-                    let offset = current_y + current_px;
-                    bytes.write(offset, new_r);
-                    bytes.write(offset + 1, new_g);
-                    bytes.write(offset + 2, new_b);
-                    if CHANNEL_CONFIGURATION == 4 {
-                        let sum_a_i64: i64 = sum_a.into();
-                        let new_a = T::from_u64((sum_a_i64 * mul_value) as u64 >> shr_value)
-                            .unwrap_or_default();
-                        bytes.write(offset + 3, new_a);
-                    }
+                let bytes_offset = current_y + current_px;
+
+                write_out_blurred!(sum_r, weight, bytes, bytes_offset);
+                write_out_blurred!(sum_g, weight, bytes, bytes_offset + 1);
+                write_out_blurred!(sum_b, weight, bytes, bytes_offset + 2);
+                if CHANNELS_CONFIGURATION == 4 {
+                    write_out_blurred!(sum_a, weight, bytes, bytes_offset + 3);
                 }
 
                 let arr_index = ((x - radius_64) & 1023) as usize;
                 let d_arr_index = (x & 1023) as usize;
-                dif_r += unsafe { *buffer_r.get_unchecked(arr_index) }
-                    - J::from_i32(2).unwrap() * unsafe { *buffer_r.get_unchecked(d_arr_index) };
-                dif_g += unsafe { *buffer_g.get_unchecked(arr_index) }
-                    - J::from_i32(2).unwrap() * unsafe { *buffer_g.get_unchecked(d_arr_index) };
-                dif_b += unsafe { *buffer_b.get_unchecked(arr_index) }
-                    - J::from_i32(2).unwrap() * unsafe { *buffer_b.get_unchecked(d_arr_index) };
-                if CHANNEL_CONFIGURATION == 4 {
-                    dif_a += unsafe { *buffer_a.get_unchecked(arr_index) }
-                        - J::from_i32(2).unwrap() * unsafe { *buffer_a.get_unchecked(d_arr_index) };
+                update_differences_inside!(dif_r, buffer_r, arr_index, d_arr_index);
+                update_differences_inside!(dif_g, buffer_g, arr_index, d_arr_index);
+                update_differences_inside!(dif_b, buffer_b, arr_index, d_arr_index);
+                if CHANNELS_CONFIGURATION == 4 {
+                    update_differences_inside!(dif_a, buffer_a, arr_index, d_arr_index);
                 }
             } else if x + radius_64 >= 0 {
                 let arr_index = (x & 1023) as usize;
-                dif_r -= J::from_i32(2).unwrap() * unsafe { *buffer_r.get_unchecked(arr_index) };
-                dif_g -= J::from_i32(2).unwrap() * unsafe { *buffer_g.get_unchecked(arr_index) };
-                dif_b -= J::from_i32(2).unwrap() * unsafe { *buffer_b.get_unchecked(arr_index) };
-                if CHANNEL_CONFIGURATION == 4 {
-                    dif_a -=
-                        J::from_i32(2).unwrap() * unsafe { *buffer_a.get_unchecked(arr_index) };
+                update_differences_out!(dif_r, buffer_r, arr_index);
+                update_differences_out!(dif_g, buffer_g, arr_index);
+                update_differences_out!(dif_b, buffer_b, arr_index);
+                if CHANNELS_CONFIGURATION == 4 {
+                    update_differences_out!(dif_a, buffer_a, arr_index);
                 }
             }
 
             let next_row_y = (y as usize) * (stride as usize);
-            let next_row_x = ((std::cmp::min(std::cmp::max(x + radius_64, 0), width_wide - 1)
-                as u32)
-                * channels_count) as usize;
+            let next_row_x =
+                clamp_edge!(edge_mode, x + radius_64, 0, width_wide - 1) * channels_count as usize;
 
             let bytes_offset = next_row_y + next_row_x;
 
-            let ur8: J = bytes[bytes_offset].into();
-            let ug8: J = bytes[bytes_offset + 1].into();
-            let ub8: J = bytes[bytes_offset + 2].into();
-
             let arr_index = ((x + radius_64) & 1023) as usize;
 
-            dif_r += ur8;
-            sum_r += dif_r;
-            unsafe {
-                *buffer_r.get_unchecked_mut(arr_index) = ur8;
-            }
+            update_sum_in!(bytes, bytes_offset, dif_r, sum_r, buffer_r, arr_index);
+            update_sum_in!(bytes, bytes_offset + 1, dif_g, sum_g, buffer_g, arr_index);
+            update_sum_in!(bytes, bytes_offset + 2, dif_b, sum_b, buffer_b, arr_index);
 
-            dif_g += ug8;
-            sum_g += dif_g;
-            unsafe {
-                *buffer_g.get_unchecked_mut(arr_index) = ug8;
-            }
-
-            dif_b += ub8;
-            sum_b += dif_b;
-            unsafe {
-                *buffer_b.get_unchecked_mut(arr_index) = ub8;
-            }
-
-            if CHANNEL_CONFIGURATION == 4 {
-                let ua8: J = bytes[bytes_offset + 3].into();
-                dif_a += ua8;
-                sum_a += dif_a;
-                unsafe {
-                    *buffer_a.get_unchecked_mut(arr_index) = ua8;
-                }
+            if CHANNELS_CONFIGURATION == 4 {
+                update_sum_in!(bytes, bytes_offset + 3, dif_a, sum_a, buffer_a, arr_index);
             }
         }
     }
 }
 
 fn fast_gaussian_impl<
-    T: FromPrimitive + Default + Into<i32> + Send + Sync,
+    T: FromPrimitive + Default + Send + Sync,
     const CHANNEL_CONFIGURATION: usize,
+    const EDGE_MODE: usize,
 >(
     bytes: &mut [T],
     stride: u32,
@@ -340,9 +439,16 @@ fn fast_gaussian_impl<
     radius: u32,
     threading_policy: ThreadingPolicy,
 ) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy,
-    i64: From<T>,
-    i32: From<T>,
+    T: std::ops::AddAssign
+        + std::ops::SubAssign
+        + Copy
+        + AsPrimitive<i32>
+        + AsPrimitive<i64>
+        + AsPrimitive<f32>
+        + AsPrimitive<f64>
+        + InitialValue,
+    f32: AsPrimitive<T> + ToStorage<T>,
+    f64: AsPrimitive<T> + ToStorage<T>,
 {
     let unsafe_image = UnsafeSlice::new(bytes);
     let thread_count = threading_policy.get_threads_count(width, height) as u32;
@@ -359,24 +465,46 @@ fn fast_gaussian_impl<
         start: u32,
         end: u32,
     ) = if BASE_RADIUS_I64_CUTOFF > radius {
-        fast_gaussian_vertical_pass::<T, i32, CHANNEL_CONFIGURATION>
+        fast_gaussian_vertical_pass::<T, i32, f32, CHANNEL_CONFIGURATION, EDGE_MODE>
     } else {
-        fast_gaussian_vertical_pass::<T, i64, CHANNEL_CONFIGURATION>
+        fast_gaussian_vertical_pass::<T, i64, f64, CHANNEL_CONFIGURATION, EDGE_MODE>
     };
     let mut _dispatcher_horizontal: fn(&UnsafeSlice<T>, u32, u32, u32, u32, u32, u32) =
         if BASE_RADIUS_I64_CUTOFF > radius {
-            fast_gaussian_horizontal_pass::<T, i32, CHANNEL_CONFIGURATION>
+            fast_gaussian_horizontal_pass::<T, i32, f32, CHANNEL_CONFIGURATION, EDGE_MODE>
         } else {
-            fast_gaussian_horizontal_pass::<T, i64, CHANNEL_CONFIGURATION>
+            fast_gaussian_horizontal_pass::<T, i64, f64, CHANNEL_CONFIGURATION, EDGE_MODE>
         };
+    if std::any::type_name::<T>() == "f32"
+        || std::any::type_name::<T>() == "f16"
+        || std::any::type_name::<T>() == "half::f16"
+    {
+        _dispatcher_vertical = if BASE_RADIUS_I64_CUTOFF > radius {
+            fast_gaussian_vertical_pass::<T, f32, f32, CHANNEL_CONFIGURATION, EDGE_MODE>
+        } else {
+            fast_gaussian_vertical_pass::<T, f64, f64, CHANNEL_CONFIGURATION, EDGE_MODE>
+        };
+        _dispatcher_horizontal = if BASE_RADIUS_I64_CUTOFF > radius {
+            fast_gaussian_horizontal_pass::<T, f32, f32, CHANNEL_CONFIGURATION, EDGE_MODE>
+        } else {
+            fast_gaussian_horizontal_pass::<T, f64, f64, CHANNEL_CONFIGURATION, EDGE_MODE>
+        };
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            _dispatcher_vertical =
+                fast_gaussian_vertical_pass_neon_f32::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
+            _dispatcher_horizontal =
+                fast_gaussian_horizontal_pass_neon_f32::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
+        }
+    }
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     {
         if std::any::type_name::<T>() == "u8" {
             if BASE_RADIUS_I64_CUTOFF > radius {
                 _dispatcher_vertical =
-                    fast_gaussian_vertical_pass_neon_u8::<T, CHANNEL_CONFIGURATION>;
+                    fast_gaussian_vertical_pass_neon_u8::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
                 _dispatcher_horizontal =
-                    fast_gaussian_horizontal_pass_neon_u8::<T, CHANNEL_CONFIGURATION>;
+                    fast_gaussian_horizontal_pass_neon_u8::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
             }
         }
     }
@@ -388,9 +516,9 @@ fn fast_gaussian_impl<
         if std::any::type_name::<T>() == "u8" {
             if BASE_RADIUS_I64_CUTOFF > radius {
                 _dispatcher_vertical =
-                    fast_gaussian_vertical_pass_sse_u8::<T, CHANNEL_CONFIGURATION>;
+                    fast_gaussian_vertical_pass_sse_u8::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
                 _dispatcher_horizontal =
-                    fast_gaussian_horizontal_pass_sse_u8::<T, CHANNEL_CONFIGURATION>;
+                    fast_gaussian_horizontal_pass_sse_u8::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
             }
         }
     }
@@ -462,6 +590,7 @@ fn fast_gaussian_impl<
 /// * `radius` - Radius more than 319 is not supported. To use larger radius convert image to f32 and use function for f32
 /// * `channels` - Count of channels of the image, only 3 and 4 is supported, alpha position, and channels order does not matter
 /// * `threading_policy` - Threads usage policy
+/// * `edge_mode` - Edge handling mode, *Kernel clip* is not supported!
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
@@ -473,16 +602,20 @@ pub fn fast_gaussian(
     radius: u32,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
+    edge_mode: EdgeMode,
 ) {
-    let acq_radius = std::cmp::min(radius, 319);
-    match channels {
-        FastBlurChannels::Channels3 => {
-            fast_gaussian_impl::<u8, 3>(bytes, stride, width, height, acq_radius, threading_policy);
-        }
-        FastBlurChannels::Channels4 => {
-            fast_gaussian_impl::<u8, 4>(bytes, stride, width, height, acq_radius, threading_policy);
-        }
-    }
+    let radius = std::cmp::min(radius, 319);
+    impl_margin_call!(
+        u8,
+        channels,
+        edge_mode,
+        bytes,
+        stride,
+        width,
+        height,
+        radius,
+        threading_policy
+    );
 }
 
 /// Performs gaussian approximation on the image.
@@ -498,6 +631,7 @@ pub fn fast_gaussian(
 /// * `height` - Height of the image
 /// * `radius` - Radius more than 255 is not supported. To use larger radius convert image to f32 and use function for f32
 /// * `channels` - Count of channels in the image
+/// * `edge_mode` - Edge handling mode, *Kernel clip* is not supported!
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
@@ -509,30 +643,20 @@ pub fn fast_gaussian_u16(
     radius: u32,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
+    edge_mode: EdgeMode,
 ) {
-    let acq_radius = std::cmp::min(radius, 255);
-    match channels {
-        FastBlurChannels::Channels3 => {
-            fast_gaussian_impl::<u16, 3>(
-                bytes,
-                stride,
-                width,
-                height,
-                acq_radius,
-                threading_policy,
-            );
-        }
-        FastBlurChannels::Channels4 => {
-            fast_gaussian_impl::<u16, 4>(
-                bytes,
-                stride,
-                width,
-                height,
-                acq_radius,
-                threading_policy,
-            );
-        }
-    }
+    let radius = std::cmp::min(radius, 255);
+    impl_margin_call!(
+        u16,
+        channels,
+        edge_mode,
+        bytes,
+        stride,
+        width,
+        height,
+        radius,
+        threading_policy
+    );
 }
 
 /// Performs gaussian approximation on the image.
@@ -548,6 +672,7 @@ pub fn fast_gaussian_u16(
 /// * `radius` - almost any radius is supported
 /// * `channels` - Count of channels in the image
 /// * `transfer_function` - Transfer function in linear colorspace
+/// * `edge_mode` - Edge handling mode, *Kernel clip* is not supported!
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
@@ -558,27 +683,19 @@ pub fn fast_gaussian_f32(
     radius: u32,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
+    edge_mode: EdgeMode,
 ) {
-    match channels {
-        FastBlurChannels::Channels3 => {
-            fast_gaussian_f32::fast_gaussian_impl_f32::<3>(
-                bytes,
-                width,
-                height,
-                radius,
-                threading_policy,
-            );
-        }
-        FastBlurChannels::Channels4 => {
-            fast_gaussian_f32::fast_gaussian_impl_f32::<4>(
-                bytes,
-                width,
-                height,
-                radius,
-                threading_policy,
-            );
-        }
-    }
+    impl_margin_call!(
+        f32,
+        channels,
+        edge_mode,
+        bytes,
+        width * 4,
+        width,
+        height,
+        radius,
+        threading_policy
+    );
 }
 
 /// Performs gaussian approximation on the image in linear colorspace
@@ -596,6 +713,7 @@ pub fn fast_gaussian_f32(
 /// * `channels` - Count of channels of the image, only 3 and 4 is supported, alpha position, and channels order does not matter
 /// * `threading_policy` - Threads usage policy
 /// * `transfer_function` - Transfer function in linear colorspace
+/// * `edge_mode` - Edge handling mode, *Kernel clip* is not supported!
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
@@ -608,6 +726,7 @@ pub fn fast_gaussian_in_linear(
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
     transfer_function: TransferFunction,
+    edge_mode: EdgeMode,
 ) {
     let mut linear_data: Vec<f32> =
         vec![0f32; width as usize * height as usize * channels.get_channels()];
@@ -639,6 +758,7 @@ pub fn fast_gaussian_in_linear(
         radius,
         channels,
         threading_policy,
+        edge_mode,
     );
 
     inverse_transformer(
@@ -663,7 +783,9 @@ pub fn fast_gaussian_in_linear(
 /// * `width` - Width of the image
 /// * `height` - Height of the image
 /// * `radius` - almost any radius is supported
-/// * `channels` - Count of channels in the image
+/// * `channels` - Count of channels of the image, only 3 and 4 is supported, alpha position, and channels order does not matter
+/// * `threading_policy` - Threads usage policy
+/// * `edge_mode` - Edge handling mode, *Kernel clip* is not supported!
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
@@ -673,7 +795,18 @@ pub fn fast_gaussian_f16(
     height: u32,
     radius: u32,
     channels: FastBlurChannels,
+    threading_policy: ThreadingPolicy,
+    edge_mode: EdgeMode,
 ) {
-    let stride = width * channels.get_channels() as u32;
-    fast_gaussian_f16::fast_gaussian_impl_f16(bytes, stride, width, height, radius, channels);
+    impl_margin_call!(
+        half::f16,
+        channels,
+        edge_mode,
+        unsafe { std::mem::transmute(bytes) },
+        width * 4,
+        width,
+        height,
+        radius,
+        threading_policy
+    );
 }

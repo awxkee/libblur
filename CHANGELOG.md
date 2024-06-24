@@ -1,1 +1,1 @@
-Added blurs in linear colorspace, bugfixes in stack blur
+Lot of bugfixes, added edge mode for fast gaussian

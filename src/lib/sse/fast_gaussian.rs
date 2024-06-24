@@ -26,15 +26,21 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::mul_table::{MUL_TABLE_DOUBLE, SHR_TABLE_DOUBLE};
+use crate::reflect_index;
 use crate::sse::utils::load_u8_s32_fast;
 use crate::sse::{_mm_mul_epi64, _mm_packus_epi64};
 use crate::unsafe_slice::UnsafeSlice;
+use crate::{clamp_edge, EdgeMode};
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-pub fn fast_gaussian_horizontal_pass_sse_u8<T, const CHANNELS_COUNT: usize>(
+pub fn fast_gaussian_horizontal_pass_sse_u8<
+    T,
+    const CHANNELS_COUNT: usize,
+    const EDGE_MODE: usize,
+>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -43,6 +49,7 @@ pub fn fast_gaussian_horizontal_pass_sse_u8<T, const CHANNELS_COUNT: usize>(
     start: u32,
     end: u32,
 ) {
+    let edge_mode: EdgeMode = EDGE_MODE.into();
     let bytes: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(undefined_slice) };
     let mut buffer: [[i32; 4]; 1024] = [[0; 4]; 1024];
     let initial_sum = ((radius * radius) >> 1) as i32;
@@ -113,8 +120,7 @@ pub fn fast_gaussian_horizontal_pass_sse_u8<T, const CHANNELS_COUNT: usize>(
             }
 
             let next_row_y = (y as usize) * (stride as usize);
-            let next_row_x =
-                (std::cmp::min(std::cmp::max(x + radius_64, 0), width_wide - 1) as u32) as usize;
+            let next_row_x = clamp_edge!(edge_mode, x + radius_64, 0, width_wide - 1);
             let next_row_px = next_row_x * CHANNELS_COUNT;
 
             let s_ptr = unsafe { bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut u8 };
@@ -132,7 +138,11 @@ pub fn fast_gaussian_horizontal_pass_sse_u8<T, const CHANNELS_COUNT: usize>(
     }
 }
 
-pub(crate) fn fast_gaussian_vertical_pass_sse_u8<T, const CHANNELS_COUNT: usize>(
+pub(crate) fn fast_gaussian_vertical_pass_sse_u8<
+    T,
+    const CHANNELS_COUNT: usize,
+    const EDGE_MODE: usize,
+>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -141,6 +151,7 @@ pub(crate) fn fast_gaussian_vertical_pass_sse_u8<T, const CHANNELS_COUNT: usize>
     start: u32,
     end: u32,
 ) {
+    let edge_mode: EdgeMode = EDGE_MODE.into();
     let bytes: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(undefined_slice) };
     let mut buffer: [[i32; 4]; 1024] = [[0; 4]; 1024];
     let initial_sum = ((radius * radius) >> 1) as i32;
@@ -211,9 +222,8 @@ pub(crate) fn fast_gaussian_vertical_pass_sse_u8<T, const CHANNELS_COUNT: usize>
                 diffs = unsafe { _mm_sub_epi32(diffs, stored) };
             }
 
-            let next_row_y = (std::cmp::min(std::cmp::max(y + radius_64, 0), height_wide - 1)
-                as usize)
-                * (stride as usize);
+            let next_row_y =
+                clamp_edge!(edge_mode, y + radius_64, 0, height_wide - 1) * (stride as usize);
             let next_row_x = (x * CHANNELS_COUNT as u32) as usize;
 
             let s_ptr = unsafe { bytes.slice.as_ptr().add(next_row_y + next_row_x) as *mut u8 };

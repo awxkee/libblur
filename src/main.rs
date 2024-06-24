@@ -92,27 +92,16 @@ fn main() {
     // bytes = dst_bytes;
 
     let start_time = Instant::now();
-    libblur::gaussian_box_blur_in_linear(
-        &bytes,
-        stride as u32,
-        &mut dst_bytes,
-        stride as u32,
-        dimensions.0,
-        dimensions.1,
-        100,
-        FastBlurChannels::Channels4,
-        ThreadingPolicy::Single,
-        TransferFunction::Rec709,
-    );
-    // libblur::fast_gaussian_next_in_linear(
+
+    // libblur::fast_gaussian_next(
     //     &mut dst_bytes,
     //     stride as u32,
     //     dimensions.0,
     //     dimensions.1,
-    //     93,
+    //     50,
     //     FastBlurChannels::Channels4,
     //     ThreadingPolicy::Single,
-    //     TransferFunction::Rec709,
+    //     EdgeMode::Reflect,
     // );
 
     // libblur::gaussian_blur_in_linear(
@@ -134,19 +123,19 @@ fn main() {
     // Print the elapsed time in milliseconds
     println!("Elapsed time: {:.2?}", elapsed_time);
 
-    // libblur::gaussian_blur(
-    //     &bytes,
-    //     stride as u32,
-    //     &mut dst_bytes,
-    //     stride as u32,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     75 * 2 + 1,
-    //     75f32*2f32 / 6f32,
-    //     FastBlurChannels::Channels4,
-    //     EdgeMode::Reflect,
-    //     ThreadingPolicy::Adaptive,
-    // );
+    libblur::gaussian_blur(
+        &bytes,
+        stride as u32,
+        &mut dst_bytes,
+        stride as u32,
+        dimensions.0,
+        dimensions.1,
+        75 * 2 + 1,
+        75f32*2f32 / 6f32,
+        FastBlurChannels::Channels4,
+        EdgeMode::Wrap,
+        ThreadingPolicy::Adaptive,
+    );
     bytes = dst_bytes;
     // libblur::median_blur(
     //     &bytes,

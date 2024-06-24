@@ -26,11 +26,16 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::neon::load_f32;
+use crate::reflect_index;
 use crate::unsafe_slice::UnsafeSlice;
-use crate::FastBlurChannels;
+use crate::{clamp_edge, EdgeMode, FastBlurChannels};
 use std::arch::aarch64::*;
 
-pub fn fast_gaussian_next_vertical_pass_neon_f32<T, const CHANNELS_COUNT: usize>(
+pub fn fast_gaussian_next_vertical_pass_neon_f32<
+    T,
+    const CHANNELS_COUNT: usize,
+    const EDGE_MODE: usize,
+>(
     undef_bytes: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -39,6 +44,7 @@ pub fn fast_gaussian_next_vertical_pass_neon_f32<T, const CHANNELS_COUNT: usize>
     start: u32,
     end: u32,
 ) {
+    let edge_mode: EdgeMode = EDGE_MODE.into();
     let bytes: &UnsafeSlice<'_, f32> = unsafe { std::mem::transmute(undef_bytes) };
     let channels: FastBlurChannels = CHANNELS_COUNT.into();
     let mut buffer: [[f32; 4]; 1024] = [[0f32; 4]; 1024];
@@ -122,10 +128,7 @@ pub fn fast_gaussian_next_vertical_pass_neon_f32<T, const CHANNELS_COUNT: usize>
                 diffs = unsafe { vsubq_f32(diffs, vmulq_n_f32(stored, 3f32)) };
             }
 
-            let next_row_y = (std::cmp::min(
-                std::cmp::max(y + ((3 * radius_64) >> 1), 0),
-                height_wide - 1,
-            ) as usize)
+            let next_row_y = clamp_edge!(edge_mode, y + ((3 * radius_64) >> 1), 0, height_wide - 1)
                 * (stride as usize);
             let next_row_x = (x * channels_count) as usize;
 
@@ -150,7 +153,11 @@ pub fn fast_gaussian_next_vertical_pass_neon_f32<T, const CHANNELS_COUNT: usize>
     }
 }
 
-pub fn fast_gaussian_next_horizontal_pass_neon_f32<T, const CHANNELS_COUNT: usize>(
+pub fn fast_gaussian_next_horizontal_pass_neon_f32<
+    T,
+    const CHANNELS_COUNT: usize,
+    const EDGE_MODE: usize,
+>(
     undef_bytes: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -159,6 +166,7 @@ pub fn fast_gaussian_next_horizontal_pass_neon_f32<T, const CHANNELS_COUNT: usiz
     start: u32,
     end: u32,
 ) {
+    let edge_mode: EdgeMode = EDGE_MODE.into();
     let mut buffer: [[f32; 4]; 1024] = [[0f32; 4]; 1024];
     let bytes: &UnsafeSlice<'_, f32> = unsafe { std::mem::transmute(undef_bytes) };
     let channels: FastBlurChannels = CHANNELS_COUNT.into();
@@ -242,9 +250,8 @@ pub fn fast_gaussian_next_horizontal_pass_neon_f32<T, const CHANNELS_COUNT: usiz
             }
 
             let next_row_y = (y as usize) * (stride as usize);
-            let next_row_x =
-                std::cmp::min(std::cmp::max(x + 3 * radius_64 / 2, 0), width_wide - 1) as u32;
-            let next_row_px = next_row_x as usize * channels_count as usize;
+            let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide - 1);
+            let next_row_px = next_row_x * channels_count as usize;
 
             let s_ptr = unsafe { bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut f32 };
             let pixel_color = load_f32(

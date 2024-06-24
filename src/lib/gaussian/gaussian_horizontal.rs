@@ -27,7 +27,7 @@
 
 use crate::gaussian::gaussian_filter::GaussianFilter;
 use crate::unsafe_slice::UnsafeSlice;
-use crate::{reflect_index, EdgeMode};
+use crate::{clamp_edge, reflect_index, EdgeMode};
 use num_traits::FromPrimitive;
 
 pub(crate) fn gaussian_blur_horizontal_pass_impl<
@@ -87,21 +87,8 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_c<
         for x in 0..width {
             let mut weights: [f32; 4] = [0f32; 4];
             for r in -half_kernel..=half_kernel {
-                let px = match edge_mode {
-                    EdgeMode::Clamp | EdgeMode::KernelClip => {
-                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize
-                            * CHANNEL_CONFIGURATION
-                    }
-                    EdgeMode::Wrap => {
-                        let cx = (x as i64 + r as i64).rem_euclid(width as i64 - 1);
-                        cx as usize * CHANNEL_CONFIGURATION
-                    }
-                    EdgeMode::Reflect => {
-                        let cx = reflect_index(x as i64 + r as i64, width as i64 - 1i64);
-                        cx * CHANNEL_CONFIGURATION
-                    }
-                };
+                let px = clamp_edge!(edge_mode, x as i64 + r as i64, 0, (width - 1) as i64)
+                    * CHANNEL_CONFIGURATION;
                 let y_offset = y_src_shift + px;
                 let weight = unsafe { *kernel.get_unchecked((r + half_kernel) as usize) };
                 weights[0] += (unsafe { *src.get_unchecked(y_offset) }.into()) * weight;
