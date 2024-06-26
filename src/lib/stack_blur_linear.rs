@@ -29,6 +29,7 @@ use crate::{FastBlurChannels, ThreadingPolicy};
 use colorutils_rs::{
     linear_to_rgb, linear_to_rgba, rgb_to_linear, rgba_to_linear, TransferFunction,
 };
+use std::mem::size_of;
 
 /// Stack blur that will be performed in linear color space
 ///

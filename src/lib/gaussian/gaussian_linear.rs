@@ -29,6 +29,7 @@ use crate::{gaussian_blur_f32, EdgeMode, FastBlurChannels, ThreadingPolicy};
 use colorutils_rs::{
     linear_to_rgb, linear_to_rgba, rgb_to_linear, rgba_to_linear, TransferFunction,
 };
+use std::mem::size_of;
 
 /// Performs gaussian blur on the image in linear colorspace
 ///
