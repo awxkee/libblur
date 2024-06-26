@@ -26,6 +26,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use num_traits::cast::FromPrimitive;
+use num_traits::AsPrimitive;
 use rayon::ThreadPool;
 
 use crate::channels_configuration::FastBlurChannels;
@@ -48,6 +49,7 @@ use crate::gaussian::gaussian_sse::sse_support::{
     gaussian_blur_horizontal_pass_impl_sse, gaussian_blur_vertical_pass_impl_sse,
 };
 use crate::gaussian::gaussian_vertical::gaussian_blur_vertical_pass_c_impl;
+use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::ThreadingPolicy;
 
@@ -55,7 +57,6 @@ fn gaussian_blur_horizontal_pass<
     T: FromPrimitive + Default + Into<f32> + Send + Sync,
     const CHANNEL_CONFIGURATION: usize,
     const EDGE_MODE: usize,
-    const USE_ROUNDING: bool,
 >(
     src: &[T],
     src_stride: u32,
@@ -68,7 +69,8 @@ fn gaussian_blur_horizontal_pass<
     thread_pool: &ThreadPool,
     thread_count: u32,
 ) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy,
+    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static,
+    f32: AsPrimitive<T> + ToStorage<T>,
 {
     let mut _dispatcher: fn(
         src: &[T],
@@ -80,7 +82,7 @@ fn gaussian_blur_horizontal_pass<
         kernel: &[f32],
         start_y: u32,
         end_y: u32,
-    ) = gaussian_blur_horizontal_pass_impl::<T, CHANNEL_CONFIGURATION, EDGE_MODE, USE_ROUNDING>;
+    ) = gaussian_blur_horizontal_pass_impl::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
     let edge_mode: EdgeMode = EDGE_MODE.into();
     if std::any::type_name::<T>() == "u8" && edge_mode == EdgeMode::Clamp {
         #[cfg(all(
@@ -127,7 +129,6 @@ fn gaussian_blur_vertical_pass_impl<
     T: FromPrimitive + Default + Into<f32> + Send + Sync,
     const CHANNEL_CONFIGURATION: usize,
     const EDGE_MODE: usize,
-    const USE_ROUNDING: bool,
 >(
     src: &[T],
     src_stride: u32,
@@ -140,9 +141,10 @@ fn gaussian_blur_vertical_pass_impl<
     start_y: u32,
     end_y: u32,
 ) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy,
+    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static,
+    f32: AsPrimitive<T> + ToStorage<T>,
 {
-    gaussian_blur_vertical_pass_c_impl::<T, CHANNEL_CONFIGURATION, EDGE_MODE, USE_ROUNDING>(
+    gaussian_blur_vertical_pass_c_impl::<T, CHANNEL_CONFIGURATION, EDGE_MODE>(
         src,
         src_stride,
         unsafe_dst,
@@ -160,7 +162,6 @@ fn gaussian_blur_vertical_pass<
     T: FromPrimitive + Default + Into<f32> + Send + Sync,
     const CHANNEL_CONFIGURATION: usize,
     const EDGE_MODE: usize,
-    const USE_ROUNDING: bool,
 >(
     src: &[T],
     src_stride: u32,
@@ -173,7 +174,8 @@ fn gaussian_blur_vertical_pass<
     thread_pool: &ThreadPool,
     thread_count: u32,
 ) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy,
+    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static,
+    f32: AsPrimitive<T> + ToStorage<T>,
 {
     let mut _dispatcher: fn(
         src: &[T],
@@ -186,7 +188,7 @@ fn gaussian_blur_vertical_pass<
         kernel: &[f32],
         start_y: u32,
         end_y: u32,
-    ) = gaussian_blur_vertical_pass_impl::<T, CHANNEL_CONFIGURATION, EDGE_MODE, USE_ROUNDING>;
+    ) = gaussian_blur_vertical_pass_impl::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
     let edge_mode: EdgeMode = EDGE_MODE.into();
     if std::any::type_name::<T>() == "u8" && edge_mode == EdgeMode::Clamp {
         #[cfg(all(
@@ -234,7 +236,6 @@ fn gaussian_blur_vertical_pass<
 fn gaussian_blur_impl<
     T: FromPrimitive + Default + Into<f32> + Send + Sync,
     const CHANNEL_CONFIGURATION: usize,
-    const USE_ROUNDING: bool,
 >(
     src: &[T],
     src_stride: u32,
@@ -247,7 +248,8 @@ fn gaussian_blur_impl<
     threading_policy: ThreadingPolicy,
     edge_mode: EdgeMode,
 ) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy,
+    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static,
+    f32: AsPrimitive<T> + ToStorage<T>,
 {
     if kernel_size % 2 == 0 {
         panic!("kernel size must be odd");
@@ -264,12 +266,7 @@ fn gaussian_blur_impl<
     match edge_mode {
         EdgeMode::Reflect => {
             let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
-            gaussian_blur_horizontal_pass::<
-                T,
-                CHANNEL_CONFIGURATION,
-                { EdgeMode::Reflect as usize },
-                USE_ROUNDING,
-            >(
+            gaussian_blur_horizontal_pass::<T, CHANNEL_CONFIGURATION, { EdgeMode::Reflect as usize }>(
                 &src,
                 src_stride,
                 &mut transient,
@@ -281,12 +278,7 @@ fn gaussian_blur_impl<
                 &pool,
                 thread_count,
             );
-            gaussian_blur_vertical_pass::<
-                T,
-                CHANNEL_CONFIGURATION,
-                { EdgeMode::Reflect as usize },
-                USE_ROUNDING,
-            >(
+            gaussian_blur_vertical_pass::<T, CHANNEL_CONFIGURATION, { EdgeMode::Reflect as usize }>(
                 &transient,
                 dst_stride,
                 dst,
@@ -301,12 +293,7 @@ fn gaussian_blur_impl<
         }
         EdgeMode::Wrap => {
             let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
-            gaussian_blur_horizontal_pass::<
-                T,
-                CHANNEL_CONFIGURATION,
-                { EdgeMode::Wrap as usize },
-                USE_ROUNDING,
-            >(
+            gaussian_blur_horizontal_pass::<T, CHANNEL_CONFIGURATION, { EdgeMode::Wrap as usize }>(
                 &src,
                 src_stride,
                 &mut transient,
@@ -318,12 +305,7 @@ fn gaussian_blur_impl<
                 &pool,
                 thread_count,
             );
-            gaussian_blur_vertical_pass::<
-                T,
-                CHANNEL_CONFIGURATION,
-                { EdgeMode::Wrap as usize },
-                USE_ROUNDING,
-            >(
+            gaussian_blur_vertical_pass::<T, CHANNEL_CONFIGURATION, { EdgeMode::Wrap as usize }>(
                 &transient,
                 dst_stride,
                 dst,
@@ -338,11 +320,37 @@ fn gaussian_blur_impl<
         }
         EdgeMode::Clamp => {
             let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
+            gaussian_blur_horizontal_pass::<T, CHANNEL_CONFIGURATION, { EdgeMode::Clamp as usize }>(
+                &src,
+                src_stride,
+                &mut transient,
+                dst_stride,
+                width,
+                height,
+                kernel.len(),
+                &kernel,
+                &pool,
+                thread_count,
+            );
+            gaussian_blur_vertical_pass::<T, CHANNEL_CONFIGURATION, { EdgeMode::Clamp as usize }>(
+                &transient,
+                dst_stride,
+                dst,
+                dst_stride,
+                width,
+                height,
+                kernel.len(),
+                &kernel,
+                &pool,
+                thread_count,
+            );
+        }
+        EdgeMode::Reflect101 => {
+            let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
             gaussian_blur_horizontal_pass::<
                 T,
                 CHANNEL_CONFIGURATION,
-                { EdgeMode::Clamp as usize },
-                USE_ROUNDING,
+                { EdgeMode::Reflect101 as usize },
             >(
                 &src,
                 src_stride,
@@ -358,8 +366,7 @@ fn gaussian_blur_impl<
             gaussian_blur_vertical_pass::<
                 T,
                 CHANNEL_CONFIGURATION,
-                { EdgeMode::Clamp as usize },
-                USE_ROUNDING,
+                { EdgeMode::Reflect101 as usize },
             >(
                 &transient,
                 dst_stride,
@@ -376,11 +383,7 @@ fn gaussian_blur_impl<
         EdgeMode::KernelClip => {
             let horizontal_filter = create_filter(width as usize, kernel_size, sigma);
             let vertical_filter = create_filter(height as usize, kernel_size, sigma);
-            gaussian_blur_horizontal_pass_edge_clip_dispatch::<
-                T,
-                CHANNEL_CONFIGURATION,
-                USE_ROUNDING,
-            >(
+            gaussian_blur_horizontal_pass_edge_clip_dispatch::<T, CHANNEL_CONFIGURATION>(
                 &src,
                 dst_stride,
                 &mut transient,
@@ -391,7 +394,7 @@ fn gaussian_blur_impl<
                 &pool,
                 thread_count,
             );
-            gaussian_blur_vertical_pass_edge_clip_dispatch::<T, CHANNEL_CONFIGURATION, USE_ROUNDING>(
+            gaussian_blur_vertical_pass_edge_clip_dispatch::<T, CHANNEL_CONFIGURATION>(
                 &transient,
                 dst_stride,
                 dst,
@@ -440,7 +443,7 @@ pub fn gaussian_blur(
 ) {
     match channels {
         FastBlurChannels::Channels3 => {
-            gaussian_blur_impl::<u8, 3, true>(
+            gaussian_blur_impl::<u8, 3>(
                 src,
                 src_stride,
                 dst,
@@ -454,7 +457,7 @@ pub fn gaussian_blur(
             );
         }
         FastBlurChannels::Channels4 => {
-            gaussian_blur_impl::<u8, 4, true>(
+            gaussian_blur_impl::<u8, 4>(
                 src,
                 src_stride,
                 dst,
@@ -501,7 +504,7 @@ pub fn gaussian_blur_u16(
 ) {
     match channels {
         FastBlurChannels::Channels3 => {
-            gaussian_blur_impl::<u16, 3, true>(
+            gaussian_blur_impl::<u16, 3>(
                 src,
                 width * channels.get_channels() as u32,
                 dst,
@@ -515,7 +518,7 @@ pub fn gaussian_blur_u16(
             );
         }
         FastBlurChannels::Channels4 => {
-            gaussian_blur_impl::<u16, 4, true>(
+            gaussian_blur_impl::<u16, 4>(
                 src,
                 width * channels.get_channels() as u32,
                 dst,
@@ -562,7 +565,7 @@ pub fn gaussian_blur_f32(
 ) {
     match channels {
         FastBlurChannels::Channels3 => {
-            gaussian_blur_impl::<f32, 3, false>(
+            gaussian_blur_impl::<f32, 3>(
                 src,
                 width * channels.get_channels() as u32,
                 dst,
@@ -576,7 +579,7 @@ pub fn gaussian_blur_f32(
             );
         }
         FastBlurChannels::Channels4 => {
-            gaussian_blur_impl::<f32, 4, false>(
+            gaussian_blur_impl::<f32, 4>(
                 src,
                 width * channels.get_channels() as u32,
                 dst,

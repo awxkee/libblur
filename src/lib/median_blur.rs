@@ -253,11 +253,12 @@ fn median_blur_impl<const CHANNELS_CONFIGURATION: usize>(
             } else {
                 unsafe {
                     let bytes_offset = y_dst_offset + px;
-                    unsafe_dst.write(bytes_offset, *src.get_unchecked(y_src_offset + px));
-                    unsafe_dst.write(bytes_offset + 1, *src.get_unchecked(bytes_offset + 1));
-                    unsafe_dst.write(bytes_offset + 2, *src.get_unchecked(bytes_offset + 2));
+                    let src_offset = y_src_offset + px;
+                    unsafe_dst.write(bytes_offset, *src.get_unchecked(src_offset));
+                    unsafe_dst.write(bytes_offset + 1, *src.get_unchecked(src_offset + 1));
+                    unsafe_dst.write(bytes_offset + 2, *src.get_unchecked(src_offset + 2));
                     if CHANNELS_CONFIGURATION == 4 {
-                        unsafe_dst.write(bytes_offset + 3, *src.get_unchecked(bytes_offset + 3));
+                        unsafe_dst.write(bytes_offset + 3, *src.get_unchecked(src_offset + 3));
                     }
                 }
             }

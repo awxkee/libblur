@@ -1,1 +1,1 @@
-Lot of bugfixes, added edge mode for fast gaussian
+Improvements, bugfixes

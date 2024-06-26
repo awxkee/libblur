@@ -40,7 +40,9 @@ pub(crate) fn get_gaussian_kernel_1d(width: u32, sigma: f32) -> Vec<f32> {
     if sum_norm != 0f32 {
         let sum_scale = 1f32 / sum_norm;
         for x in 0..width as usize {
-            kernel[x] = kernel[x] * sum_scale;
+            unsafe {
+                *kernel.get_unchecked_mut(x) = (*kernel.get_unchecked(x)) * sum_scale;
+            }
         }
     }
 

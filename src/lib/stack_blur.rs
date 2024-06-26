@@ -99,6 +99,8 @@ fn stack_blur_pass<T, J, I, const COMPONENTS: usize>(
         + FromPrimitive
         + std::ops::Mul<Output = I>
         + std::ops::Shr<Output = I>,
+    i32: AsPrimitive<J>,
+    u32: AsPrimitive<J>,
 {
     let div = ((radius * 2) + 1) as usize;
     let (mut xp, mut yp);
@@ -136,28 +138,28 @@ fn stack_blur_pass<T, J, I, const COMPONENTS: usize>(
         let max_y = (thread + 1) * height as usize / total_threads;
 
         for y in min_y..max_y {
-            sum_r = J::from_i32(0i32).unwrap();
-            sum_g = J::from_i32(0i32).unwrap();
-            sum_b = J::from_i32(0i32).unwrap();
-            sum_a = J::from_i32(0i32).unwrap();
-            sum_in_r = J::from_i32(0i32).unwrap();
-            sum_in_g = J::from_i32(0i32).unwrap();
-            sum_in_b = J::from_i32(0i32).unwrap();
-            sum_in_a = J::from_i32(0i32).unwrap();
-            sum_out_r = J::from_i32(0i32).unwrap();
-            sum_out_g = J::from_i32(0i32).unwrap();
-            sum_out_b = J::from_i32(0i32).unwrap();
-            sum_out_a = J::from_i32(0i32).unwrap();
+            sum_r = 0i32.as_();
+            sum_g = 0i32.as_();
+            sum_b = 0i32.as_();
+            sum_a = 0i32.as_();
+            sum_in_r = 0i32.as_();
+            sum_in_g = 0i32.as_();
+            sum_in_b = 0i32.as_();
+            sum_in_a = 0i32.as_();
+            sum_out_r = 0i32.as_();
+            sum_out_g = 0i32.as_();
+            sum_out_b = 0i32.as_();
+            sum_out_a = 0i32.as_();
 
             src_ptr = stride as usize * y; // start of line (0,y)
 
-            let src_r = pixels[src_ptr + 0].as_();
+            let src_r = pixels[src_ptr].as_();
             let src_g = pixels[src_ptr + 1].as_();
             let src_b = pixels[src_ptr + 2].as_();
             let src_a = if COMPONENTS == 4 {
                 pixels[src_ptr + 3].as_()
             } else {
-                J::from_i32(0i32).unwrap()
+                0i32.as_()
             };
 
             for i in 0..=radius {
@@ -169,7 +171,7 @@ fn stack_blur_pass<T, J, I, const COMPONENTS: usize>(
                     stack_value.a = src_a;
                 }
 
-                let fi = J::from_u32(i + 1).unwrap();
+                let fi = (i + 1).as_();
                 sum_r += src_r * fi;
                 sum_g += src_g * fi;
                 sum_b += src_b * fi;
@@ -191,13 +193,13 @@ fn stack_blur_pass<T, J, I, const COMPONENTS: usize>(
                 }
                 let stack_ptr = unsafe { &mut *stacks.get_unchecked_mut((i + radius) as usize) };
 
-                let src_r = pixels[src_ptr + 0].as_();
+                let src_r = pixels[src_ptr].as_();
                 let src_g = pixels[src_ptr + 1].as_();
                 let src_b = pixels[src_ptr + 2].as_();
                 let src_a = if COMPONENTS == 4 {
                     pixels[src_ptr + 3].as_()
                 } else {
-                    J::from_i32(0i32).unwrap()
+                    0i32.as_()
                 };
 
                 stack_ptr.r = src_r;
@@ -207,7 +209,7 @@ fn stack_blur_pass<T, J, I, const COMPONENTS: usize>(
                     stack_ptr.a = src_a;
                 }
 
-                let re = J::from_u32(radius + 1 - i).unwrap();
+                let re = (radius + 1 - i).as_();
                 sum_r += src_r * re;
                 sum_g += src_g * re;
                 sum_b += src_b * re;
@@ -236,7 +238,7 @@ fn stack_blur_pass<T, J, I, const COMPONENTS: usize>(
                     let sum_r_i64: I = sum_r.as_();
                     let sum_g_i64: I = sum_g.as_();
                     let sum_b_i64: I = sum_b.as_();
-                    pixels.write(dst_ptr + 0, ((sum_r_i64 * mul_sum) >> shr_sum).as_());
+                    pixels.write(dst_ptr, ((sum_r_i64 * mul_sum) >> shr_sum).as_());
                     pixels.write(dst_ptr + 1, ((sum_g_i64 * mul_sum) >> shr_sum).as_());
                     pixels.write(dst_ptr + 2, ((sum_b_i64 * mul_sum) >> shr_sum).as_());
                     if COMPONENTS == 4 {
@@ -271,13 +273,13 @@ fn stack_blur_pass<T, J, I, const COMPONENTS: usize>(
                     xp += 1;
                 }
 
-                let src_r = pixels[src_ptr + 0].as_();
+                let src_r = pixels[src_ptr].as_();
                 let src_g = pixels[src_ptr + 1].as_();
                 let src_b = pixels[src_ptr + 2].as_();
                 let src_a = if COMPONENTS == 4 {
                     pixels[src_ptr + 3].as_()
                 } else {
-                    J::from_i32(0i32).unwrap()
+                    0i32.as_()
                 };
 
                 stack.r = src_r;
@@ -326,28 +328,28 @@ fn stack_blur_pass<T, J, I, const COMPONENTS: usize>(
         let max_x = (thread + 1) * width as usize / total_threads;
 
         for x in min_x..max_x {
-            sum_r = J::from_i32(0i32).unwrap();
-            sum_g = J::from_i32(0i32).unwrap();
-            sum_b = J::from_i32(0i32).unwrap();
-            sum_a = J::from_i32(0i32).unwrap();
-            sum_in_r = J::from_i32(0i32).unwrap();
-            sum_in_g = J::from_i32(0i32).unwrap();
-            sum_in_b = J::from_i32(0i32).unwrap();
-            sum_in_a = J::from_i32(0i32).unwrap();
-            sum_out_r = J::from_i32(0i32).unwrap();
-            sum_out_g = J::from_i32(0i32).unwrap();
-            sum_out_b = J::from_i32(0i32).unwrap();
-            sum_out_a = J::from_i32(0i32).unwrap();
+            sum_r = 0i32.as_();
+            sum_g = 0i32.as_();
+            sum_b = 0i32.as_();
+            sum_a = 0i32.as_();
+            sum_in_r = 0i32.as_();
+            sum_in_g = 0i32.as_();
+            sum_in_b = 0i32.as_();
+            sum_in_a = 0i32.as_();
+            sum_out_r = 0i32.as_();
+            sum_out_g = 0i32.as_();
+            sum_out_b = 0i32.as_();
+            sum_out_a = 0i32.as_();
 
             src_ptr = COMPONENTS * x; // x,0
 
-            let src_r = pixels[src_ptr + 0].as_();
+            let src_r = pixels[src_ptr].as_();
             let src_g = pixels[src_ptr + 1].as_();
             let src_b = pixels[src_ptr + 2].as_();
             let src_a = if COMPONENTS == 4 {
                 pixels[src_ptr + 3].as_()
             } else {
-                J::from_i32(0i32).unwrap()
+                0i32.as_()
             };
 
             for i in 0..=radius {
@@ -359,7 +361,7 @@ fn stack_blur_pass<T, J, I, const COMPONENTS: usize>(
                     stack_value.a = src_a;
                 }
 
-                let ji = J::from_u32(i + 1).unwrap();
+                let ji = (i + 1).as_();
                 sum_r += src_r * ji;
                 sum_g += src_g * ji;
                 sum_b += src_b * ji;
@@ -382,13 +384,13 @@ fn stack_blur_pass<T, J, I, const COMPONENTS: usize>(
 
                 let stack_ptr = unsafe { &mut *stacks.get_unchecked_mut((i + radius) as usize) };
 
-                let src_r = pixels[src_ptr + 0].as_();
+                let src_r = pixels[src_ptr].as_();
                 let src_g = pixels[src_ptr + 1].as_();
                 let src_b = pixels[src_ptr + 2].as_();
                 let src_a = if COMPONENTS == 4 {
                     pixels[src_ptr + 3].as_()
                 } else {
-                    J::from_i32(0i32).unwrap()
+                    0i32.as_()
                 };
 
                 stack_ptr.r = src_r;
@@ -398,7 +400,7 @@ fn stack_blur_pass<T, J, I, const COMPONENTS: usize>(
                     stack_ptr.a = src_a;
                 }
 
-                let rji = J::from_u32(radius + 1 - i).unwrap();
+                let rji = (radius + 1 - i).as_();
                 sum_r += src_r * rji;
                 sum_g += src_g * rji;
                 sum_b += src_b * rji;
@@ -425,7 +427,7 @@ fn stack_blur_pass<T, J, I, const COMPONENTS: usize>(
                     let sum_r_i64: I = sum_r.as_();
                     let sum_g_i64: I = sum_g.as_();
                     let sum_b_i64: I = sum_b.as_();
-                    pixels.write(dst_ptr + 0, ((sum_r_i64 * mul_sum) >> shr_sum).as_());
+                    pixels.write(dst_ptr, ((sum_r_i64 * mul_sum) >> shr_sum).as_());
                     pixels.write(dst_ptr + 1, ((sum_g_i64 * mul_sum) >> shr_sum).as_());
                     pixels.write(dst_ptr + 2, ((sum_b_i64 * mul_sum) >> shr_sum).as_());
                     if COMPONENTS == 4 {
@@ -460,13 +462,13 @@ fn stack_blur_pass<T, J, I, const COMPONENTS: usize>(
                     yp += 1;
                 }
 
-                let src_r = pixels[src_ptr + 0].as_();
+                let src_r = pixels[src_ptr].as_();
                 let src_g = pixels[src_ptr + 1].as_();
                 let src_b = pixels[src_ptr + 2].as_();
                 let src_a = if COMPONENTS == 4 {
                     pixels[src_ptr + 3].as_()
                 } else {
-                    J::from_i32(0i32).unwrap()
+                    0i32.as_()
                 };
 
                 stack_ptr.r = src_r;

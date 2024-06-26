@@ -40,7 +40,7 @@ use crate::sse::{fast_gaussian_horizontal_pass_sse_u8, fast_gaussian_vertical_pa
 use crate::threading_policy::ThreadingPolicy;
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
-use crate::{clamp_edge, EdgeMode};
+use crate::{clamp_edge, reflect_101, EdgeMode};
 use colorutils_rs::{
     linear_to_rgb, linear_to_rgba, rgb_to_linear, rgba_to_linear, TransferFunction,
 };
@@ -94,7 +94,9 @@ macro_rules! write_out_blurred {
 }
 
 macro_rules! impl_generic_call {
-    ($store_type:ty, $channels_type:expr, $edge_mode:expr, $bytes:expr, $stride:expr, $width:expr, $height:expr, $radius:expr, $threading_policy:expr) => {
+    ($store_type:ty, $channels_type:expr, $edge_mode:expr,
+        $bytes:expr, $stride:expr, $width:expr, $height:expr,
+        $radius:expr, $threading_policy:expr) => {
         match $channels_type {
             FastBlurChannels::Channels3 => {
                 fast_gaussian_impl::<$store_type, 3, $edge_mode>(
@@ -121,7 +123,9 @@ macro_rules! impl_generic_call {
 }
 
 macro_rules! impl_margin_call {
-    ($store_type:ty, $channels_type:expr, $edge_mode:expr, $bytes:expr, $stride:expr, $width:expr, $height:expr, $radius:expr, $threading_policy:expr) => {
+    ($store_type:ty, $channels_type:expr, $edge_mode:expr,
+        $bytes:expr, $stride:expr, $width:expr, $height:expr,
+        $radius:expr, $threading_policy:expr) => {
         match $edge_mode {
             EdgeMode::Clamp => {
                 impl_generic_call!(
@@ -157,6 +161,19 @@ macro_rules! impl_margin_call {
                     $store_type,
                     $channels_type,
                     { EdgeMode::Reflect as usize },
+                    $bytes,
+                    $stride,
+                    $width,
+                    $height,
+                    $radius,
+                    $threading_policy
+                );
+            }
+            EdgeMode::Reflect101 => {
+                impl_generic_call!(
+                    $store_type,
+                    $channels_type,
+                    { EdgeMode::Reflect101 as usize },
                     $bytes,
                     $stride,
                     $width,
@@ -240,24 +257,25 @@ fn fast_gaussian_vertical_pass<
         + std::ops::SubAssign
         + AsPrimitive<M>,
     M: Copy + FromPrimitive + std::ops::Mul<Output = M> + AsPrimitive<T> + Float + ToStorage<T>,
+    i32: AsPrimitive<J>,
 {
     let edge_mode: EdgeMode = EDGE_MODE.into();
-    let mut buffer_r: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
-    let mut buffer_g: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
-    let mut buffer_b: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
-    let mut buffer_a: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
+    let mut buffer_r: [J; 1024] = [0i32.as_(); 1024];
+    let mut buffer_g: [J; 1024] = [0i32.as_(); 1024];
+    let mut buffer_b: [J; 1024] = [0i32.as_(); 1024];
+    let mut buffer_a: [J; 1024] = [0i32.as_(); 1024];
     let radius_64 = radius as i64;
     let height_wide = height as i64;
     let initial = J::from_i64(T::get_initial(radius as usize)).unwrap();
     let weight = M::from_f64(1f64 / (radius as f64 * radius as f64)).unwrap();
     for x in start..std::cmp::min(width, end) {
-        let mut dif_r: J = J::from_i32(0i32).unwrap();
+        let mut dif_r: J = 0i32.as_();
         let mut sum_r: J = initial;
-        let mut dif_g: J = J::from_i32(0i32).unwrap();
+        let mut dif_g: J = 0i32.as_();
         let mut sum_g: J = initial;
-        let mut dif_b: J = J::from_i32(0i32).unwrap();
+        let mut dif_b: J = 0i32.as_();
         let mut sum_b: J = initial;
-        let mut dif_a: J = J::from_i32(0i32).unwrap();
+        let mut dif_a: J = 0i32.as_();
         let mut sum_a: J = initial;
 
         let current_px = (x * CHANNELS_CONFIGURATION as u32) as usize;
@@ -349,13 +367,14 @@ fn fast_gaussian_horizontal_pass<
         + std::ops::SubAssign
         + AsPrimitive<M>,
     M: Copy + FromPrimitive + std::ops::Mul<Output = M> + AsPrimitive<T> + Float + ToStorage<T>,
+    i32: AsPrimitive<J>,
 {
     let edge_mode: EdgeMode = EDGE_MODE.into();
     let channels: FastBlurChannels = CHANNELS_CONFIGURATION.into();
-    let mut buffer_r: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
-    let mut buffer_g: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
-    let mut buffer_b: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
-    let mut buffer_a: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
+    let mut buffer_r: [J; 1024] = [0i32.as_(); 1024];
+    let mut buffer_g: [J; 1024] = [0i32.as_(); 1024];
+    let mut buffer_b: [J; 1024] = [0i32.as_(); 1024];
+    let mut buffer_a: [J; 1024] = [0i32.as_(); 1024];
     let radius_64 = radius as i64;
     let width_wide = width as i64;
     let weight = M::from_f64(1f64 / (radius as f64 * radius as f64)).unwrap();
@@ -365,13 +384,13 @@ fn fast_gaussian_horizontal_pass<
     };
     let initial = J::from_i64(T::get_initial(radius as usize)).unwrap();
     for y in start..std::cmp::min(height, end) {
-        let mut dif_r: J = J::from_i32(0i32).unwrap();
+        let mut dif_r: J = 0i32.as_();
         let mut sum_r: J = initial;
-        let mut dif_g: J = J::from_i32(0i32).unwrap();
+        let mut dif_g: J = 0i32.as_();
         let mut sum_g: J = initial;
-        let mut dif_b: J = J::from_i32(0i32).unwrap();
+        let mut dif_b: J = 0i32.as_();
         let mut sum_b: J = initial;
-        let mut dif_a: J = J::from_i32(0i32).unwrap();
+        let mut dif_a: J = 0i32.as_();
         let mut sum_a: J = initial;
 
         let current_y = ((y as i64) * (stride as i64)) as usize;
@@ -690,7 +709,7 @@ pub fn fast_gaussian_f32(
         channels,
         edge_mode,
         bytes,
-        width * 4,
+        width * channels.get_channels() as u32,
         width,
         height,
         radius,
@@ -803,7 +822,7 @@ pub fn fast_gaussian_f16(
         channels,
         edge_mode,
         unsafe { std::mem::transmute(bytes) },
-        width * 4,
+        width * channels.get_channels() as u32,
         width,
         height,
         radius,

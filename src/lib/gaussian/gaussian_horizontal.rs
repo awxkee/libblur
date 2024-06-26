@@ -26,15 +26,15 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::gaussian::gaussian_filter::GaussianFilter;
+use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
-use crate::{clamp_edge, reflect_index, EdgeMode};
-use num_traits::FromPrimitive;
+use crate::{clamp_edge, reflect_101, reflect_index, EdgeMode};
+use num_traits::{AsPrimitive, FromPrimitive};
 
 pub(crate) fn gaussian_blur_horizontal_pass_impl<
     T: FromPrimitive + Default + Into<f32> + Send + Sync,
     const CHANNEL_CONFIGURATION: usize,
     const EDGE_MODE: usize,
-    const USE_ROUNDING: bool,
 >(
     src: &[T],
     src_stride: u32,
@@ -46,9 +46,10 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl<
     start_y: u32,
     end_y: u32,
 ) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy,
+    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static,
+    f32: AsPrimitive<T> + ToStorage<T>,
 {
-    gaussian_blur_horizontal_pass_impl_c::<T, CHANNEL_CONFIGURATION, EDGE_MODE, USE_ROUNDING>(
+    gaussian_blur_horizontal_pass_impl_c::<T, CHANNEL_CONFIGURATION, EDGE_MODE>(
         src,
         src_stride,
         unsafe_dst,
@@ -65,7 +66,6 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_c<
     T: FromPrimitive + Default + Into<f32> + Send + Sync,
     const CHANNEL_CONFIGURATION: usize,
     const EDGE_MODE: usize,
-    const USE_ROUNDING: bool,
 >(
     src: &[T],
     src_stride: u32,
@@ -77,7 +77,8 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_c<
     start_y: u32,
     end_y: u32,
 ) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy,
+    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static,
+    f32: AsPrimitive<T> + ToStorage<T>,
 {
     let edge_mode: EdgeMode = EDGE_MODE.into();
     let half_kernel = (kernel_size / 2) as i32;
@@ -85,61 +86,29 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_c<
         let y_src_shift = y as usize * src_stride as usize;
         let y_dst_shift = y as usize * dst_stride as usize;
         for x in 0..width {
-            let mut weights: [f32; 4] = [0f32; 4];
+            let (mut weight0, mut weight1, mut weight2, mut weight3) = (0f32, 0f32, 0f32, 0f32);
             for r in -half_kernel..=half_kernel {
                 let px = clamp_edge!(edge_mode, x as i64 + r as i64, 0, (width - 1) as i64)
                     * CHANNEL_CONFIGURATION;
                 let y_offset = y_src_shift + px;
                 let weight = unsafe { *kernel.get_unchecked((r + half_kernel) as usize) };
-                weights[0] += (unsafe { *src.get_unchecked(y_offset) }.into()) * weight;
-                weights[1] += (unsafe { *src.get_unchecked(y_offset + 1) }.into()) * weight;
-                weights[2] += (unsafe { *src.get_unchecked(y_offset + 2) }.into()) * weight;
+                weight0 += (unsafe { *src.get_unchecked(y_offset) }.into()) * weight;
+                weight1 += (unsafe { *src.get_unchecked(y_offset + 1) }.into()) * weight;
+                weight2 += (unsafe { *src.get_unchecked(y_offset + 2) }.into()) * weight;
                 if CHANNEL_CONFIGURATION == 4 {
-                    weights[3] += (unsafe { *src.get_unchecked(y_offset + 3) }.into()) * weight;
+                    weight3 += (unsafe { *src.get_unchecked(y_offset + 3) }.into()) * weight;
                 }
             }
 
             let px = x as usize * CHANNEL_CONFIGURATION;
 
             unsafe {
-                if USE_ROUNDING {
-                    unsafe_dst.write(
-                        y_dst_shift + px,
-                        T::from_f32(weights[0].round()).unwrap_or_default(),
-                    );
-                    unsafe_dst.write(
-                        y_dst_shift + px + 1,
-                        T::from_f32(weights[1].round()).unwrap_or_default(),
-                    );
-                    unsafe_dst.write(
-                        y_dst_shift + px + 2,
-                        T::from_f32(weights[2].round()).unwrap_or_default(),
-                    );
-                    if CHANNEL_CONFIGURATION == 4 {
-                        unsafe_dst.write(
-                            y_dst_shift + px + 3,
-                            T::from_f32(weights[3].round()).unwrap_or_default(),
-                        );
-                    }
-                } else {
-                    unsafe_dst.write(
-                        y_dst_shift + px,
-                        T::from_f32(weights[0]).unwrap_or_default(),
-                    );
-                    unsafe_dst.write(
-                        y_dst_shift + px + 1,
-                        T::from_f32(weights[1]).unwrap_or_default(),
-                    );
-                    unsafe_dst.write(
-                        y_dst_shift + px + 2,
-                        T::from_f32(weights[2]).unwrap_or_default(),
-                    );
-                    if CHANNEL_CONFIGURATION == 4 {
-                        unsafe_dst.write(
-                            y_dst_shift + px + 3,
-                            T::from_f32(weights[3]).unwrap_or_default(),
-                        );
-                    }
+                let bytes_offset = y_dst_shift + px;
+                unsafe_dst.write(bytes_offset, weight0.to_());
+                unsafe_dst.write(bytes_offset + 1, weight1.to_());
+                unsafe_dst.write(bytes_offset + 2, weight2.to_());
+                if CHANNEL_CONFIGURATION == 4 {
+                    unsafe_dst.write(bytes_offset + 3, weight3.to_());
                 }
             }
         }
@@ -149,7 +118,6 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_c<
 pub(crate) fn gaussian_blur_horizontal_pass_impl_clip_edge<
     T: FromPrimitive + Default + Into<f32> + Send + Sync,
     const CHANNEL_CONFIGURATION: usize,
-    const USE_ROUNDING: bool,
 >(
     src: &[T],
     src_stride: u32,
@@ -160,7 +128,8 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_clip_edge<
     start_y: u32,
     end_y: u32,
 ) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy,
+    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static,
+    f32: AsPrimitive<T> + ToStorage<T>,
 {
     for y in start_y..end_y {
         let y_src_shift = y as usize * src_stride as usize;
@@ -187,44 +156,11 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_clip_edge<
             let px = x as usize * CHANNEL_CONFIGURATION;
 
             unsafe {
-                if USE_ROUNDING {
-                    unsafe_dst.write(
-                        y_dst_shift + px,
-                        T::from_f32(weights[0].round()).unwrap_or_default(),
-                    );
-                    unsafe_dst.write(
-                        y_dst_shift + px + 1,
-                        T::from_f32(weights[1].round()).unwrap_or_default(),
-                    );
-                    unsafe_dst.write(
-                        y_dst_shift + px + 2,
-                        T::from_f32(weights[2].round()).unwrap_or_default(),
-                    );
-                    if CHANNEL_CONFIGURATION == 4 {
-                        unsafe_dst.write(
-                            y_dst_shift + px + 3,
-                            T::from_f32(weights[3].round()).unwrap_or_default(),
-                        );
-                    }
-                } else {
-                    unsafe_dst.write(
-                        y_dst_shift + px,
-                        T::from_f32(weights[0]).unwrap_or_default(),
-                    );
-                    unsafe_dst.write(
-                        y_dst_shift + px + 1,
-                        T::from_f32(weights[1]).unwrap_or_default(),
-                    );
-                    unsafe_dst.write(
-                        y_dst_shift + px + 2,
-                        T::from_f32(weights[2]).unwrap_or_default(),
-                    );
-                    if CHANNEL_CONFIGURATION == 4 {
-                        unsafe_dst.write(
-                            y_dst_shift + px + 3,
-                            T::from_f32(weights[3]).unwrap_or_default(),
-                        );
-                    }
+                unsafe_dst.write(y_dst_shift + px, weights[0].to_());
+                unsafe_dst.write(y_dst_shift + px + 1, weights[1].to_());
+                unsafe_dst.write(y_dst_shift + px + 2, weights[2].to_());
+                if CHANNEL_CONFIGURATION == 4 {
+                    unsafe_dst.write(y_dst_shift + px + 3, weights[3].to_());
                 }
             }
         }

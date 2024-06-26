@@ -40,7 +40,7 @@ use crate::sse::{
 };
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
-use crate::{clamp_edge, EdgeMode, FastBlurChannels, ThreadingPolicy};
+use crate::{clamp_edge, reflect_101, EdgeMode, FastBlurChannels, ThreadingPolicy};
 use colorutils_rs::{
     linear_to_rgb, linear_to_rgba, rgb_to_linear, rgba_to_linear, TransferFunction,
 };
@@ -120,6 +120,19 @@ macro_rules! impl_margin_call {
                     $store_type,
                     $channels_type,
                     { EdgeMode::Reflect as usize },
+                    $bytes,
+                    $stride,
+                    $width,
+                    $height,
+                    $radius,
+                    $threading_policy
+                );
+            }
+            EdgeMode::Reflect101 => {
+                impl_generic_call!(
+                    $store_type,
+                    $channels_type,
+                    { EdgeMode::Reflect101 as usize },
                     $bytes,
                     $stride,
                     $width,
@@ -216,29 +229,30 @@ fn fast_gaussian_next_vertical_pass<
         + std::ops::SubAssign
         + AsPrimitive<M>,
     M: Copy + FromPrimitive + std::ops::Mul<Output = M> + AsPrimitive<T> + Float + ToStorage<T>,
+    i32: AsPrimitive<J>,
 {
     let edge_mode: EdgeMode = EDGE_MODE.into();
-    let mut buffer_r: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
-    let mut buffer_g: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
-    let mut buffer_b: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
-    let mut buffer_a: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
+    let mut buffer_r: [J; 1024] = [0i32.as_(); 1024];
+    let mut buffer_g: [J; 1024] = [0i32.as_(); 1024];
+    let mut buffer_b: [J; 1024] = [0i32.as_(); 1024];
+    let mut buffer_a: [J; 1024] = [0i32.as_(); 1024];
     let radius_64 = radius as i64;
     let height_wide = height as i64;
     let weight =
         M::from_f64(1.0f64 / ((radius as f64) * (radius as f64) * (radius as f64))).unwrap();
     for x in start..std::cmp::min(width, end) {
-        let mut dif_r: J = J::from_i32(0i32).unwrap();
-        let mut der_r: J = J::from_i32(0i32).unwrap();
-        let mut sum_r: J = J::from_i32(0i32).unwrap();
-        let mut dif_g: J = J::from_i32(0i32).unwrap();
-        let mut der_g: J = J::from_i32(0i32).unwrap();
-        let mut sum_g: J = J::from_i32(0i32).unwrap();
-        let mut dif_b: J = J::from_i32(0i32).unwrap();
-        let mut der_b: J = J::from_i32(0i32).unwrap();
-        let mut sum_b: J = J::from_i32(0i32).unwrap();
-        let mut dif_a: J = J::from_i32(0i32).unwrap();
-        let mut der_a: J = J::from_i32(0i32).unwrap();
-        let mut sum_a: J = J::from_i32(0i32).unwrap();
+        let mut dif_r: J = 0i32.as_();
+        let mut der_r: J = 0i32.as_();
+        let mut sum_r: J = 0i32.as_();
+        let mut dif_g: J = 0i32.as_();
+        let mut der_g: J = 0i32.as_();
+        let mut sum_g: J = 0i32.as_();
+        let mut dif_b: J = 0i32.as_();
+        let mut der_b: J = 0i32.as_();
+        let mut sum_b: J = 0i32.as_();
+        let mut dif_a: J = 0i32.as_();
+        let mut der_a: J = 0i32.as_();
+        let mut sum_a: J = 0i32.as_();
 
         let current_px = (x * CHANNEL_CONFIGURATION as u32) as usize;
 
@@ -338,29 +352,30 @@ fn fast_gaussian_next_horizontal_pass<
         + AsPrimitive<M>,
     M: Copy + FromPrimitive + std::ops::Mul<Output = M> + AsPrimitive<T> + Float + ToStorage<T>,
     f32: AsPrimitive<T>,
+    i32: AsPrimitive<J>,
 {
     let edge_mode: EdgeMode = EDGE_MODE.into();
-    let mut buffer_r: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
-    let mut buffer_g: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
-    let mut buffer_b: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
-    let mut buffer_a: [J; 1024] = [J::from_i32(0i32).unwrap(); 1024];
+    let mut buffer_r: [J; 1024] = [0i32.as_(); 1024];
+    let mut buffer_g: [J; 1024] = [0i32.as_(); 1024];
+    let mut buffer_b: [J; 1024] = [0i32.as_(); 1024];
+    let mut buffer_a: [J; 1024] = [0i32.as_(); 1024];
     let radius_64 = radius as i64;
     let width_wide = width as i64;
     let weight =
         M::from_f64(1.0f64 / ((radius as f64) * (radius as f64) * (radius as f64))).unwrap();
     for y in start..std::cmp::min(height, end) {
-        let mut dif_r: J = J::from_i32(0i32).unwrap();
-        let mut der_r: J = J::from_i32(0i32).unwrap();
-        let mut sum_r: J = J::from_i32(0i32).unwrap();
-        let mut dif_g: J = J::from_i32(0i32).unwrap();
-        let mut der_g: J = J::from_i32(0i32).unwrap();
-        let mut sum_g: J = J::from_i32(0i32).unwrap();
-        let mut dif_b: J = J::from_i32(0i32).unwrap();
-        let mut der_b: J = J::from_i32(0i32).unwrap();
-        let mut sum_b: J = J::from_i32(0i32).unwrap();
-        let mut dif_a: J = J::from_i32(0i32).unwrap();
-        let mut der_a: J = J::from_i32(0i32).unwrap();
-        let mut sum_a: J = J::from_i32(0i32).unwrap();
+        let mut dif_r: J = 0i32.as_();
+        let mut der_r: J = 0i32.as_();
+        let mut sum_r: J = 0i32.as_();
+        let mut dif_g: J = 0i32.as_();
+        let mut der_g: J = 0i32.as_();
+        let mut sum_g: J = 0i32.as_();
+        let mut dif_b: J = 0i32.as_();
+        let mut der_b: J = 0i32.as_();
+        let mut sum_b: J = 0i32.as_();
+        let mut dif_a: J = 0i32.as_();
+        let mut der_a: J = 0i32.as_();
+        let mut sum_a: J = 0i32.as_();
 
         let current_y = ((y as i64) * (stride as i64)) as usize;
 
@@ -681,7 +696,6 @@ pub fn fast_gaussian_next_u16(
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn fast_gaussian_next_f32(
     bytes: &mut [f32],
-    stride: u32,
     width: u32,
     height: u32,
     radius: u32,
@@ -694,7 +708,7 @@ pub fn fast_gaussian_next_f32(
         channels,
         edge_mode,
         bytes,
-        stride,
+        width * channels.get_channels() as u32,
         width,
         height,
         radius,
@@ -721,7 +735,6 @@ pub fn fast_gaussian_next_f32(
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn fast_gaussian_next_f16(
     bytes: &mut [u16],
-    stride: u32,
     width: u32,
     height: u32,
     radius: u32,
@@ -734,7 +747,7 @@ pub fn fast_gaussian_next_f16(
         channels,
         edge_mode,
         unsafe { std::mem::transmute(bytes) },
-        stride,
+        width * channels.get_channels() as u32,
         width,
         height,
         radius,
@@ -788,7 +801,7 @@ pub fn fast_gaussian_next_in_linear(
         &in_place,
         stride,
         &mut linear_data,
-        width * std::mem::size_of::<f32>() as u32 * channels.get_channels() as u32,
+        width * size_of::<f32>() as u32 * channels.get_channels() as u32,
         width,
         height,
         transfer_function,
@@ -796,7 +809,6 @@ pub fn fast_gaussian_next_in_linear(
 
     fast_gaussian_next_f32(
         &mut linear_data,
-        stride,
         width,
         height,
         radius,
@@ -807,7 +819,7 @@ pub fn fast_gaussian_next_in_linear(
 
     inverse_transformer(
         &linear_data,
-        width * std::mem::size_of::<f32>() as u32 * channels.get_channels() as u32,
+        width * size_of::<f32>() as u32 * channels.get_channels() as u32,
         in_place,
         stride,
         width,

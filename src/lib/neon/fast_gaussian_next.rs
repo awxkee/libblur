@@ -27,7 +27,7 @@
 
 use crate::neon::load_u8_s32_fast;
 use crate::reflect_index;
-use crate::{clamp_edge, EdgeMode};
+use crate::{clamp_edge, reflect_101, EdgeMode};
 use std::arch::aarch64::*;
 
 use crate::unsafe_slice::UnsafeSlice;

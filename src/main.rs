@@ -32,7 +32,7 @@ fn main() {
     //     vst1q_s64(t.as_mut_ptr(), mul);
     //     println!("{:?}", t);
     // }
-    let img = ImageReader::open("assets/test_image_4.png")
+    let img = ImageReader::open("assets/beach_horizon.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -42,7 +42,7 @@ fn main() {
 
     println!("{:?}", img.color());
     let src_bytes = img.as_bytes();
-    let components = 4;
+    let components = 3;
     let stride = dimensions.0 as usize * components;
     let mut bytes: Vec<u8> = Vec::with_capacity(dimensions.1 as usize * stride);
     for i in 0..dimensions.1 as usize * stride {
@@ -93,16 +93,17 @@ fn main() {
 
     let start_time = Instant::now();
 
-    // libblur::fast_gaussian_next(
-    //     &mut dst_bytes,
-    //     stride as u32,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     50,
-    //     FastBlurChannels::Channels4,
-    //     ThreadingPolicy::Single,
-    //     EdgeMode::Reflect,
-    // );
+    libblur::fast_gaussian_in_linear(
+        &mut dst_bytes,
+        stride as u32,
+        dimensions.0,
+        dimensions.1,
+        168,
+        FastBlurChannels::Channels3,
+        ThreadingPolicy::Single,
+        TransferFunction::Srgb,
+        EdgeMode::Reflect,
+    );
 
     // libblur::gaussian_blur_in_linear(
     //     &bytes,
@@ -123,19 +124,19 @@ fn main() {
     // Print the elapsed time in milliseconds
     println!("Elapsed time: {:.2?}", elapsed_time);
 
-    libblur::gaussian_blur(
-        &bytes,
-        stride as u32,
-        &mut dst_bytes,
-        stride as u32,
-        dimensions.0,
-        dimensions.1,
-        75 * 2 + 1,
-        75f32*2f32 / 6f32,
-        FastBlurChannels::Channels4,
-        EdgeMode::Wrap,
-        ThreadingPolicy::Adaptive,
-    );
+    // libblur::gaussian_blur(
+    //     &bytes,
+    //     stride as u32,
+    //     &mut dst_bytes,
+    //     stride as u32,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     75 * 2 + 1,
+    //     75f32*2f32 / 6f32,
+    //     FastBlurChannels::Channels4,
+    //     EdgeMode::Wrap,
+    //     ThreadingPolicy::Adaptive,
+    // );
     bytes = dst_bytes;
     // libblur::median_blur(
     //     &bytes,

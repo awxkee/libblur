@@ -25,10 +25,10 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::neon::load_f32;
+use crate::neon::load_f32_fast;
 use crate::reflect_index;
 use crate::unsafe_slice::UnsafeSlice;
-use crate::{clamp_edge, EdgeMode, FastBlurChannels};
+use crate::{clamp_edge, reflect_101, EdgeMode, FastBlurChannels};
 use std::arch::aarch64::*;
 
 pub fn fast_gaussian_next_vertical_pass_neon_f32<
@@ -48,11 +48,6 @@ pub fn fast_gaussian_next_vertical_pass_neon_f32<
     let bytes: &UnsafeSlice<'_, f32> = unsafe { std::mem::transmute(undef_bytes) };
     let channels: FastBlurChannels = CHANNELS_COUNT.into();
     let mut buffer: [[f32; 4]; 1024] = [[0f32; 4]; 1024];
-
-    let safe_pixel_count_x = match channels {
-        FastBlurChannels::Channels3 => 3,
-        FastBlurChannels::Channels4 => 2,
-    };
 
     let height_wide = height as i64;
 
@@ -134,14 +129,10 @@ pub fn fast_gaussian_next_vertical_pass_neon_f32<
 
             let s_ptr = unsafe { bytes.slice.as_ptr().add(next_row_y + next_row_x) as *mut f32 };
 
-            let pixel_color = load_f32(
-                s_ptr,
-                (x as i64 + safe_pixel_count_x) < width as i64,
-                channels_count as usize,
-            );
+            let pixel_color = unsafe { load_f32_fast::<CHANNELS_COUNT>(s_ptr) };
 
             let arr_index = ((y + 2 * radius_64) & 1023) as usize;
-            let buf_ptr = buffer[arr_index].as_mut_ptr();
+            let buf_ptr = unsafe { buffer.as_mut_ptr().add(arr_index) as *mut f32 };
 
             diffs = unsafe { vaddq_f32(diffs, pixel_color) };
             ders = unsafe { vaddq_f32(ders, diffs) };
@@ -170,10 +161,6 @@ pub fn fast_gaussian_next_horizontal_pass_neon_f32<
     let mut buffer: [[f32; 4]; 1024] = [[0f32; 4]; 1024];
     let bytes: &UnsafeSlice<'_, f32> = unsafe { std::mem::transmute(undef_bytes) };
     let channels: FastBlurChannels = CHANNELS_COUNT.into();
-    let safe_pixel_count_x = match channels {
-        FastBlurChannels::Channels3 => 3,
-        FastBlurChannels::Channels4 => 2,
-    };
 
     let width_wide = width as i64;
 
@@ -233,10 +220,10 @@ pub fn fast_gaussian_next_horizontal_pass_neon_f32<
             } else if x + radius_64 >= 0 {
                 let arr_index = (x & 1023) as usize;
                 let arr_index_1 = ((x + radius_64) & 1023) as usize;
-                let buf_ptr = buffer[arr_index].as_mut_ptr();
+                let buf_ptr = unsafe { buffer.as_mut_ptr().add(arr_index) as *mut f32 };
                 let stored = unsafe { vld1q_f32(buf_ptr) };
 
-                let buf_ptr_1 = buffer[arr_index_1].as_mut_ptr();
+                let buf_ptr_1 = unsafe { buffer.as_mut_ptr().add(arr_index_1) as *mut f32 };
                 let stored_1 = unsafe { vld1q_f32(buf_ptr_1) };
 
                 let new_diff = unsafe { vmulq_n_f32(vsubq_f32(stored, stored_1), 3f32) };
@@ -244,7 +231,7 @@ pub fn fast_gaussian_next_horizontal_pass_neon_f32<
                 diffs = unsafe { vaddq_f32(diffs, new_diff) };
             } else if x + 2 * radius_64 >= 0 {
                 let arr_index = ((x + radius_64) & 1023) as usize;
-                let buf_ptr = buffer[arr_index].as_mut_ptr();
+                let buf_ptr = unsafe { buffer.as_mut_ptr().add(arr_index) as *mut f32 };
                 let stored = unsafe { vld1q_f32(buf_ptr) };
                 diffs = unsafe { vsubq_f32(diffs, vmulq_n_f32(stored, 3f32)) };
             }
@@ -254,14 +241,10 @@ pub fn fast_gaussian_next_horizontal_pass_neon_f32<
             let next_row_px = next_row_x * channels_count as usize;
 
             let s_ptr = unsafe { bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut f32 };
-            let pixel_color = load_f32(
-                s_ptr,
-                next_row_x as i64 + safe_pixel_count_x < width as i64,
-                channels_count as usize,
-            );
+            let pixel_color = unsafe { load_f32_fast::<CHANNELS_COUNT>(s_ptr) };
 
             let arr_index = ((x + 2 * radius_64) & 1023) as usize;
-            let buf_ptr = buffer[arr_index].as_mut_ptr();
+            let buf_ptr = unsafe { buffer.as_mut_ptr().add(arr_index) as *mut f32 };
 
             diffs = unsafe { vaddq_f32(diffs, pixel_color) };
             ders = unsafe { vaddq_f32(ders, diffs) };

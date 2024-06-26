@@ -39,14 +39,14 @@ use crate::gaussian::gaussian_sse_filter::sse_filter::{
     gaussian_blur_horizontal_pass_filter_sse, gaussian_blur_vertical_pass_filter_sse,
 };
 use crate::gaussian::gaussian_vertical::gaussian_blur_vertical_pass_clip_edge_impl;
+use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
-use num_traits::FromPrimitive;
+use num_traits::{AsPrimitive, FromPrimitive};
 use rayon::ThreadPool;
 
 pub(crate) fn gaussian_blur_vertical_pass_edge_clip_dispatch<
     T: FromPrimitive + Default + Into<f32> + Send + Sync,
     const CHANNEL_CONFIGURATION: usize,
-    const USE_ROUNDING: bool,
 >(
     src: &[T],
     src_stride: u32,
@@ -58,7 +58,8 @@ pub(crate) fn gaussian_blur_vertical_pass_edge_clip_dispatch<
     thread_pool: &ThreadPool,
     thread_count: u32,
 ) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy,
+    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static,
+    f32: ToStorage<T>,
 {
     let mut _dispatcher: fn(
         src: &[T],
@@ -70,7 +71,7 @@ pub(crate) fn gaussian_blur_vertical_pass_edge_clip_dispatch<
         filter: &Vec<GaussianFilter>,
         start_y: u32,
         end_y: u32,
-    ) = gaussian_blur_vertical_pass_clip_edge_impl::<T, CHANNEL_CONFIGURATION, USE_ROUNDING>;
+    ) = gaussian_blur_vertical_pass_clip_edge_impl::<T, CHANNEL_CONFIGURATION>;
     if std::any::type_name::<T>() == "u8" {
         #[cfg(all(
             any(target_arch = "x86_64", target_arch = "x86"),
@@ -115,7 +116,6 @@ pub(crate) fn gaussian_blur_vertical_pass_edge_clip_dispatch<
 pub(crate) fn gaussian_blur_horizontal_pass_edge_clip_dispatch<
     T: FromPrimitive + Default + Into<f32> + Send + Sync,
     const CHANNEL_CONFIGURATION: usize,
-    const USE_ROUNDING: bool,
 >(
     src: &[T],
     src_stride: u32,
@@ -127,7 +127,8 @@ pub(crate) fn gaussian_blur_horizontal_pass_edge_clip_dispatch<
     thread_pool: &ThreadPool,
     thread_count: u32,
 ) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy,
+    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static,
+    f32: AsPrimitive<T> + ToStorage<T>,
 {
     let mut _dispatcher: fn(
         src: &[T],
@@ -138,7 +139,7 @@ pub(crate) fn gaussian_blur_horizontal_pass_edge_clip_dispatch<
         filter: &Vec<GaussianFilter>,
         start_y: u32,
         end_y: u32,
-    ) = gaussian_blur_horizontal_pass_impl_clip_edge::<T, CHANNEL_CONFIGURATION, USE_ROUNDING>;
+    ) = gaussian_blur_horizontal_pass_impl_clip_edge::<T, CHANNEL_CONFIGURATION>;
     if std::any::type_name::<T>() == "u8" {
         #[cfg(all(
             any(target_arch = "x86_64", target_arch = "x86"),

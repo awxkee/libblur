@@ -26,7 +26,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use std::arch::aarch64::*;
-use std::ptr;
 
 #[inline(always)]
 pub(crate) unsafe fn load_u8_s32_fast<const CHANNELS_COUNT: usize>(ptr: *const u8) -> int32x4_t {
@@ -250,23 +249,6 @@ pub(crate) unsafe fn load_u8_u16<const CHANNELS_COUNT: usize>(ptr: *const u8) ->
     };
     let store: [u16; 4] = [u_first, u_second, u_third, u_fourth];
     let pixel_color = unsafe { vld1_u16(store.as_ptr()) };
-    return pixel_color;
-}
-
-#[allow(dead_code)]
-#[inline(always)]
-pub(crate) fn load_f32(ptr: *const f32, use_vld: bool, channels_count: usize) -> float32x4_t {
-    let mut safe_transient_store: [f32; 4] = [0f32; 4];
-    let edge_ptr: *const f32;
-    if use_vld {
-        edge_ptr = ptr;
-    } else {
-        unsafe {
-            ptr::copy_nonoverlapping(ptr, safe_transient_store.as_mut_ptr(), channels_count);
-        }
-        edge_ptr = safe_transient_store.as_ptr();
-    }
-    let pixel_color = unsafe { vld1q_f32(edge_ptr) };
     return pixel_color;
 }
 
