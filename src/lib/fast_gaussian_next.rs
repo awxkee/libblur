@@ -45,6 +45,7 @@ use colorutils_rs::{
     linear_to_rgb, linear_to_rgba, rgb_to_linear, rgba_to_linear, TransferFunction,
 };
 use num_traits::{AsPrimitive, Float, FromPrimitive};
+use std::mem::size_of;
 
 const BASE_RADIUS_I64_CUTOFF: u32 = 125;
 
