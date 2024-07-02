@@ -26,7 +26,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 mod gaussian;
-mod gaussian_f16;
 mod gaussian_filter;
 mod gaussian_horizontal;
 mod gaussian_kernel;

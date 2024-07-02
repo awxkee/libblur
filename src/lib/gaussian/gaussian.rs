@@ -31,7 +31,6 @@ use rayon::ThreadPool;
 
 use crate::channels_configuration::FastBlurChannels;
 use crate::edge_mode::EdgeMode;
-use crate::gaussian::gaussian_f16::gaussian_f16::gaussian_blur_impl_f16;
 use crate::gaussian::gaussian_filter::create_filter;
 use crate::gaussian::gaussian_horizontal::gaussian_blur_horizontal_pass_impl;
 use crate::gaussian::gaussian_kernel::get_gaussian_kernel_1d;
@@ -54,7 +53,7 @@ use crate::unsafe_slice::UnsafeSlice;
 use crate::ThreadingPolicy;
 
 fn gaussian_blur_horizontal_pass<
-    T: FromPrimitive + Default + Into<f32> + Send + Sync,
+    T: FromPrimitive + Default + Send + Sync,
     const CHANNEL_CONFIGURATION: usize,
     const EDGE_MODE: usize,
 >(
@@ -69,7 +68,7 @@ fn gaussian_blur_horizontal_pass<
     thread_pool: &ThreadPool,
     thread_count: u32,
 ) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static,
+    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static + AsPrimitive<f32>,
     f32: AsPrimitive<T> + ToStorage<T>,
 {
     let mut _dispatcher: fn(
@@ -126,7 +125,7 @@ fn gaussian_blur_horizontal_pass<
 }
 
 fn gaussian_blur_vertical_pass_impl<
-    T: FromPrimitive + Default + Into<f32> + Send + Sync,
+    T: FromPrimitive + Default + Send + Sync,
     const CHANNEL_CONFIGURATION: usize,
     const EDGE_MODE: usize,
 >(
@@ -141,7 +140,7 @@ fn gaussian_blur_vertical_pass_impl<
     start_y: u32,
     end_y: u32,
 ) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static,
+    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static + AsPrimitive<f32>,
     f32: AsPrimitive<T> + ToStorage<T>,
 {
     gaussian_blur_vertical_pass_c_impl::<T, CHANNEL_CONFIGURATION, EDGE_MODE>(
@@ -159,7 +158,7 @@ fn gaussian_blur_vertical_pass_impl<
 }
 
 fn gaussian_blur_vertical_pass<
-    T: FromPrimitive + Default + Into<f32> + Send + Sync,
+    T: FromPrimitive + Default + Send + Sync,
     const CHANNEL_CONFIGURATION: usize,
     const EDGE_MODE: usize,
 >(
@@ -174,7 +173,7 @@ fn gaussian_blur_vertical_pass<
     thread_pool: &ThreadPool,
     thread_count: u32,
 ) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static,
+    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static + AsPrimitive<f32>,
     f32: AsPrimitive<T> + ToStorage<T>,
 {
     let mut _dispatcher: fn(
@@ -234,7 +233,7 @@ fn gaussian_blur_vertical_pass<
 }
 
 fn gaussian_blur_impl<
-    T: FromPrimitive + Default + Into<f32> + Send + Sync,
+    T: FromPrimitive + Default + Send + Sync,
     const CHANNEL_CONFIGURATION: usize,
 >(
     src: &[T],
@@ -248,7 +247,7 @@ fn gaussian_blur_impl<
     threading_policy: ThreadingPolicy,
     edge_mode: EdgeMode,
 ) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static,
+    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static + AsPrimitive<f32>,
     f32: AsPrimitive<T> + ToStorage<T>,
 {
     if kernel_size % 2 == 0 {
@@ -608,6 +607,7 @@ pub fn gaussian_blur_f32(
 /// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted.
 /// * `sigma` - Sigma for a gaussian kernel, corresponds to kernel flattening level. Default - kernel_size / 6
 /// * `channels` - Count of channels in the image
+/// * `edge_mode` - Rule to handle edge mode
 /// * `threading_policy` - Threading policy according to *ThreadingPolicy*
 ///
 /// # Panics
@@ -620,18 +620,37 @@ pub fn gaussian_blur_f16(
     kernel_size: u32,
     sigma: f32,
     channels: FastBlurChannels,
+    edge_mode: EdgeMode,
     threading_policy: ThreadingPolicy,
 ) {
-    gaussian_blur_impl_f16(
-        src,
-        width * channels.get_channels() as u32,
-        dst,
-        width * channels.get_channels() as u32,
-        width,
-        height,
-        kernel_size,
-        sigma,
-        channels,
-        threading_policy,
-    );
+    match channels {
+        FastBlurChannels::Channels3 => {
+            gaussian_blur_impl::<half::f16, 3>(
+                unsafe { std::mem::transmute(src) },
+                width * channels.get_channels() as u32,
+                unsafe { std::mem::transmute(dst) },
+                width * channels.get_channels() as u32,
+                width,
+                height,
+                kernel_size,
+                sigma,
+                threading_policy,
+                edge_mode,
+            );
+        }
+        FastBlurChannels::Channels4 => {
+            gaussian_blur_impl::<half::f16, 4>(
+                unsafe { std::mem::transmute(src) },
+                width * channels.get_channels() as u32,
+                unsafe { std::mem::transmute(dst) },
+                width * channels.get_channels() as u32,
+                width,
+                height,
+                kernel_size,
+                sigma,
+                threading_policy,
+                edge_mode,
+            );
+        }
+    }
 }

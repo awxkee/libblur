@@ -25,6 +25,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use crate::reflect_101;
 use crate::reflect_index;
 use crate::sse::utils::load_u8_s32_fast;
 use crate::unsafe_slice::UnsafeSlice;

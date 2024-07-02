@@ -32,7 +32,7 @@ use crate::{clamp_edge, reflect_101, reflect_index, EdgeMode};
 use num_traits::{AsPrimitive, FromPrimitive};
 
 pub fn gaussian_blur_vertical_pass_c_impl<
-    T: FromPrimitive + Default + Into<f32> + Send + Sync + Copy + 'static,
+    T: FromPrimitive + Default + Send + Sync + Copy + 'static + AsPrimitive<f32>,
     const CHANNEL_CONFIGURATION: usize,
     const EDGE_MODE: usize,
 >(
@@ -137,7 +137,7 @@ pub fn gaussian_blur_vertical_pass_c_impl<
 
 #[inline]
 pub fn gaussian_vertical_row<
-    T: FromPrimitive + Default + Into<f32> + Send + Sync + Copy + 'static,
+    T: FromPrimitive + Default + Send + Sync + Copy + 'static + AsPrimitive<f32>,
     const ROW_SIZE: usize,
     const EDGE_MODE: usize,
 >(
@@ -166,7 +166,7 @@ pub fn gaussian_vertical_row<
             unsafe {
                 let v = *src.get_unchecked(y_src_shift + px);
                 let w0 = weights.get_unchecked_mut(i);
-                *w0 = *w0 + v.into() * weight;
+                *w0 = *w0 + v.as_() * weight;
             }
         }
     }
@@ -180,7 +180,7 @@ pub fn gaussian_vertical_row<
 }
 
 pub fn gaussian_blur_vertical_pass_clip_edge_impl<
-    T: FromPrimitive + Default + Into<f32> + Send + Sync + Copy + 'static,
+    T: FromPrimitive + Default + Send + Sync + Copy + 'static + AsPrimitive<f32>,
     const CHANNEL_CONFIGURATION: usize,
 >(
     src: &[T],
@@ -238,7 +238,7 @@ pub fn gaussian_blur_vertical_pass_clip_edge_impl<
 
 #[inline]
 pub fn gaussian_vertical_row_clip_edge<
-    T: FromPrimitive + Default + Into<f32> + Send + Sync + Copy + 'static,
+    T: FromPrimitive + Default + Send + Sync + Copy + 'static + AsPrimitive<f32>,
     const ROW_SIZE: usize,
 >(
     src: &[T],
@@ -266,7 +266,7 @@ pub fn gaussian_vertical_row_clip_edge<
             unsafe {
                 let v = *src.get_unchecked(y_src_shift + px);
                 let w0 = weights.get_unchecked_mut(i);
-                *w0 = *w0 + v.into() * weight;
+                *w0 = *w0 + v.as_() * weight;
             }
         }
     }

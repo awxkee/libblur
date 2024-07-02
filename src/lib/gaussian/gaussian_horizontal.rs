@@ -32,7 +32,7 @@ use crate::{clamp_edge, reflect_101, reflect_index, EdgeMode};
 use num_traits::{AsPrimitive, FromPrimitive};
 
 pub(crate) fn gaussian_blur_horizontal_pass_impl<
-    T: FromPrimitive + Default + Into<f32> + Send + Sync,
+    T: FromPrimitive + Default + Send + Sync,
     const CHANNEL_CONFIGURATION: usize,
     const EDGE_MODE: usize,
 >(
@@ -46,7 +46,7 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl<
     start_y: u32,
     end_y: u32,
 ) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static,
+    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static + AsPrimitive<f32>,
     f32: AsPrimitive<T> + ToStorage<T>,
 {
     gaussian_blur_horizontal_pass_impl_c::<T, CHANNEL_CONFIGURATION, EDGE_MODE>(
@@ -63,7 +63,7 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl<
 }
 
 pub(crate) fn gaussian_blur_horizontal_pass_impl_c<
-    T: FromPrimitive + Default + Into<f32> + Send + Sync,
+    T: FromPrimitive + Default + Send + Sync,
     const CHANNEL_CONFIGURATION: usize,
     const EDGE_MODE: usize,
 >(
@@ -77,7 +77,7 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_c<
     start_y: u32,
     end_y: u32,
 ) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static,
+    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static + AsPrimitive<f32>,
     f32: AsPrimitive<T> + ToStorage<T>,
 {
     let edge_mode: EdgeMode = EDGE_MODE.into();
@@ -92,11 +92,11 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_c<
                     * CHANNEL_CONFIGURATION;
                 let y_offset = y_src_shift + px;
                 let weight = unsafe { *kernel.get_unchecked((r + half_kernel) as usize) };
-                weight0 += (unsafe { *src.get_unchecked(y_offset) }.into()) * weight;
-                weight1 += (unsafe { *src.get_unchecked(y_offset + 1) }.into()) * weight;
-                weight2 += (unsafe { *src.get_unchecked(y_offset + 2) }.into()) * weight;
+                weight0 += (unsafe { *src.get_unchecked(y_offset) }.as_()) * weight;
+                weight1 += (unsafe { *src.get_unchecked(y_offset + 1) }.as_()) * weight;
+                weight2 += (unsafe { *src.get_unchecked(y_offset + 2) }.as_()) * weight;
                 if CHANNEL_CONFIGURATION == 4 {
-                    weight3 += (unsafe { *src.get_unchecked(y_offset + 3) }.into()) * weight;
+                    weight3 += (unsafe { *src.get_unchecked(y_offset + 3) }.as_()) * weight;
                 }
             }
 
@@ -116,7 +116,7 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_c<
 }
 
 pub(crate) fn gaussian_blur_horizontal_pass_impl_clip_edge<
-    T: FromPrimitive + Default + Into<f32> + Send + Sync,
+    T: FromPrimitive + Default + Send + Sync,
     const CHANNEL_CONFIGURATION: usize,
 >(
     src: &[T],
@@ -128,7 +128,7 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_clip_edge<
     start_y: u32,
     end_y: u32,
 ) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static,
+    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static + AsPrimitive<f32>,
     f32: AsPrimitive<T> + ToStorage<T>,
 {
     for y in start_y..end_y {
@@ -145,11 +145,11 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_clip_edge<
                 let px = (filter_start + j) * CHANNEL_CONFIGURATION;
                 let weight = unsafe { *filter_weights.get_unchecked(j) };
                 let y_offset = y_src_shift + px;
-                weights[0] += (unsafe { *src.get_unchecked(y_offset) }.into()) * weight;
-                weights[1] += (unsafe { *src.get_unchecked(y_offset + 1) }.into()) * weight;
-                weights[2] += (unsafe { *src.get_unchecked(y_offset + 2) }.into()) * weight;
+                weights[0] += (unsafe { *src.get_unchecked(y_offset) }.as_()) * weight;
+                weights[1] += (unsafe { *src.get_unchecked(y_offset + 1) }.as_()) * weight;
+                weights[2] += (unsafe { *src.get_unchecked(y_offset + 2) }.as_()) * weight;
                 if CHANNEL_CONFIGURATION == 4 {
-                    weights[3] += (unsafe { *src.get_unchecked(y_offset + 3) }.into()) * weight;
+                    weights[3] += (unsafe { *src.get_unchecked(y_offset + 3) }.as_()) * weight;
                 }
             }
 

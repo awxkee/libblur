@@ -122,6 +122,21 @@ macro_rules! impl_generic_call {
     };
 }
 
+macro_rules! impl_generic_call_plane_count {
+    ($store_type:ty, $channels_type:expr, $edge_mode:expr,
+        $bytes:expr, $stride:expr, $width:expr, $height:expr,
+        $radius:expr, $threading_policy:expr) => {
+        fast_gaussian_impl::<$store_type, $channels_type, $edge_mode>(
+            $bytes,
+            $stride,
+            $width,
+            $height,
+            $radius,
+            $threading_policy,
+        );
+    };
+}
+
 macro_rules! impl_margin_call {
     ($store_type:ty, $channels_type:expr, $edge_mode:expr,
         $bytes:expr, $stride:expr, $width:expr, $height:expr,
@@ -171,6 +186,70 @@ macro_rules! impl_margin_call {
             }
             EdgeMode::Reflect101 => {
                 impl_generic_call!(
+                    $store_type,
+                    $channels_type,
+                    { EdgeMode::Reflect101 as usize },
+                    $bytes,
+                    $stride,
+                    $width,
+                    $height,
+                    $radius,
+                    $threading_policy
+                );
+            }
+        }
+    };
+}
+
+macro_rules! impl_margin_call_plane {
+    ($store_type:ty, $channels_type:expr, $edge_mode:expr,
+        $bytes:expr, $stride:expr, $width:expr, $height:expr,
+        $radius:expr, $threading_policy:expr) => {
+        match $edge_mode {
+            EdgeMode::Clamp => {
+                impl_generic_call_plane_count!(
+                    $store_type,
+                    $channels_type,
+                    { EdgeMode::Clamp as usize },
+                    $bytes,
+                    $stride,
+                    $width,
+                    $height,
+                    $radius,
+                    $threading_policy
+                );
+            }
+            EdgeMode::KernelClip => {
+                panic!("Kernel clip is supported only in gaussian")
+            }
+            EdgeMode::Wrap => {
+                impl_generic_call_plane_count!(
+                    $store_type,
+                    $channels_type,
+                    { EdgeMode::Wrap as usize },
+                    $bytes,
+                    $stride,
+                    $width,
+                    $height,
+                    $radius,
+                    $threading_policy
+                );
+            }
+            EdgeMode::Reflect => {
+                impl_generic_call_plane_count!(
+                    $store_type,
+                    $channels_type,
+                    { EdgeMode::Reflect as usize },
+                    $bytes,
+                    $stride,
+                    $width,
+                    $height,
+                    $radius,
+                    $threading_policy
+                );
+            }
+            EdgeMode::Reflect101 => {
+                impl_generic_call_plane_count!(
                     $store_type,
                     $channels_type,
                     { EdgeMode::Reflect101 as usize },
@@ -287,8 +366,12 @@ fn fast_gaussian_vertical_pass<
                 let bytes_offset = current_y + current_px;
 
                 write_out_blurred!(sum_r, weight, bytes, bytes_offset);
-                write_out_blurred!(sum_g, weight, bytes, bytes_offset + 1);
-                write_out_blurred!(sum_b, weight, bytes, bytes_offset + 2);
+                if CHANNELS_CONFIGURATION > 1 {
+                    write_out_blurred!(sum_g, weight, bytes, bytes_offset + 1);
+                }
+                if CHANNELS_CONFIGURATION > 2 {
+                    write_out_blurred!(sum_b, weight, bytes, bytes_offset + 2);
+                }
                 if CHANNELS_CONFIGURATION == 4 {
                     write_out_blurred!(sum_a, weight, bytes, bytes_offset + 3);
                 }
@@ -296,16 +379,24 @@ fn fast_gaussian_vertical_pass<
                 let arr_index = ((y - radius_64) & 1023) as usize;
                 let d_arr_index = (y & 1023) as usize;
                 update_differences_inside!(dif_r, buffer_r, arr_index, d_arr_index);
-                update_differences_inside!(dif_g, buffer_g, arr_index, d_arr_index);
-                update_differences_inside!(dif_b, buffer_b, arr_index, d_arr_index);
+                if CHANNELS_CONFIGURATION > 1 {
+                    update_differences_inside!(dif_g, buffer_g, arr_index, d_arr_index);
+                }
+                if CHANNELS_CONFIGURATION > 2 {
+                    update_differences_inside!(dif_b, buffer_b, arr_index, d_arr_index);
+                }
                 if CHANNELS_CONFIGURATION == 4 {
                     update_differences_inside!(dif_a, buffer_a, arr_index, d_arr_index);
                 }
             } else if y + radius_64 >= 0 {
                 let arr_index = (y & 1023) as usize;
                 update_differences_out!(dif_r, buffer_r, arr_index);
-                update_differences_out!(dif_g, buffer_g, arr_index);
-                update_differences_out!(dif_b, buffer_b, arr_index);
+                if CHANNELS_CONFIGURATION > 1 {
+                    update_differences_out!(dif_g, buffer_g, arr_index);
+                }
+                if CHANNELS_CONFIGURATION > 2 {
+                    update_differences_out!(dif_b, buffer_b, arr_index);
+                }
                 if CHANNELS_CONFIGURATION == 4 {
                     update_differences_out!(dif_a, buffer_a, arr_index);
                 }
@@ -320,8 +411,12 @@ fn fast_gaussian_vertical_pass<
             let arr_index = ((y + radius_64) & 1023) as usize;
 
             update_sum_in!(bytes, px_idx, dif_r, sum_r, buffer_r, arr_index);
-            update_sum_in!(bytes, px_idx + 1, dif_g, sum_g, buffer_g, arr_index);
-            update_sum_in!(bytes, px_idx + 2, dif_b, sum_b, buffer_b, arr_index);
+            if CHANNELS_CONFIGURATION > 1 {
+                update_sum_in!(bytes, px_idx + 1, dif_g, sum_g, buffer_g, arr_index);
+            }
+            if CHANNELS_CONFIGURATION > 2 {
+                update_sum_in!(bytes, px_idx + 2, dif_b, sum_b, buffer_b, arr_index);
+            }
 
             if CHANNELS_CONFIGURATION == 4 {
                 update_sum_in!(bytes, px_idx + 3, dif_a, sum_a, buffer_a, arr_index);
@@ -370,7 +465,6 @@ fn fast_gaussian_horizontal_pass<
     i32: AsPrimitive<J>,
 {
     let edge_mode: EdgeMode = EDGE_MODE.into();
-    let channels: FastBlurChannels = CHANNELS_CONFIGURATION.into();
     let mut buffer_r: [J; 1024] = [0i32.as_(); 1024];
     let mut buffer_g: [J; 1024] = [0i32.as_(); 1024];
     let mut buffer_b: [J; 1024] = [0i32.as_(); 1024];
@@ -378,10 +472,6 @@ fn fast_gaussian_horizontal_pass<
     let radius_64 = radius as i64;
     let width_wide = width as i64;
     let weight = M::from_f64(1f64 / (radius as f64 * radius as f64)).unwrap();
-    let channels_count = match channels {
-        FastBlurChannels::Channels3 => 3,
-        FastBlurChannels::Channels4 => 4,
-    };
     let initial = J::from_i64(T::get_initial(radius as usize)).unwrap();
     for y in start..std::cmp::min(height, end) {
         let mut dif_r: J = 0i32.as_();
@@ -398,13 +488,17 @@ fn fast_gaussian_horizontal_pass<
         let start_x = 0 - 2 * radius_64;
         for x in start_x..(width as i64) {
             if x >= 0 {
-                let current_px = (x * channels_count) as usize;
+                let current_px = (x * CHANNELS_CONFIGURATION as i64) as usize;
 
                 let bytes_offset = current_y + current_px;
 
                 write_out_blurred!(sum_r, weight, bytes, bytes_offset);
-                write_out_blurred!(sum_g, weight, bytes, bytes_offset + 1);
-                write_out_blurred!(sum_b, weight, bytes, bytes_offset + 2);
+                if CHANNELS_CONFIGURATION > 1 {
+                    write_out_blurred!(sum_g, weight, bytes, bytes_offset + 1);
+                }
+                if CHANNELS_CONFIGURATION > 2 {
+                    write_out_blurred!(sum_b, weight, bytes, bytes_offset + 2);
+                }
                 if CHANNELS_CONFIGURATION == 4 {
                     write_out_blurred!(sum_a, weight, bytes, bytes_offset + 3);
                 }
@@ -412,16 +506,24 @@ fn fast_gaussian_horizontal_pass<
                 let arr_index = ((x - radius_64) & 1023) as usize;
                 let d_arr_index = (x & 1023) as usize;
                 update_differences_inside!(dif_r, buffer_r, arr_index, d_arr_index);
-                update_differences_inside!(dif_g, buffer_g, arr_index, d_arr_index);
-                update_differences_inside!(dif_b, buffer_b, arr_index, d_arr_index);
+                if CHANNELS_CONFIGURATION > 1 {
+                    update_differences_inside!(dif_g, buffer_g, arr_index, d_arr_index);
+                }
+                if CHANNELS_CONFIGURATION > 2 {
+                    update_differences_inside!(dif_b, buffer_b, arr_index, d_arr_index);
+                }
                 if CHANNELS_CONFIGURATION == 4 {
                     update_differences_inside!(dif_a, buffer_a, arr_index, d_arr_index);
                 }
             } else if x + radius_64 >= 0 {
                 let arr_index = (x & 1023) as usize;
                 update_differences_out!(dif_r, buffer_r, arr_index);
-                update_differences_out!(dif_g, buffer_g, arr_index);
-                update_differences_out!(dif_b, buffer_b, arr_index);
+                if CHANNELS_CONFIGURATION > 1 {
+                    update_differences_out!(dif_g, buffer_g, arr_index);
+                }
+                if CHANNELS_CONFIGURATION > 2 {
+                    update_differences_out!(dif_b, buffer_b, arr_index);
+                }
                 if CHANNELS_CONFIGURATION == 4 {
                     update_differences_out!(dif_a, buffer_a, arr_index);
                 }
@@ -429,15 +531,19 @@ fn fast_gaussian_horizontal_pass<
 
             let next_row_y = (y as usize) * (stride as usize);
             let next_row_x =
-                clamp_edge!(edge_mode, x + radius_64, 0, width_wide - 1) * channels_count as usize;
+                clamp_edge!(edge_mode, x + radius_64, 0, width_wide - 1) * CHANNELS_CONFIGURATION;
 
             let bytes_offset = next_row_y + next_row_x;
 
             let arr_index = ((x + radius_64) & 1023) as usize;
 
             update_sum_in!(bytes, bytes_offset, dif_r, sum_r, buffer_r, arr_index);
-            update_sum_in!(bytes, bytes_offset + 1, dif_g, sum_g, buffer_g, arr_index);
-            update_sum_in!(bytes, bytes_offset + 2, dif_b, sum_b, buffer_b, arr_index);
+            if CHANNELS_CONFIGURATION > 1 {
+                update_sum_in!(bytes, bytes_offset + 1, dif_g, sum_g, buffer_g, arr_index);
+            }
+            if CHANNELS_CONFIGURATION > 2 {
+                update_sum_in!(bytes, bytes_offset + 2, dif_b, sum_b, buffer_b, arr_index);
+            }
 
             if CHANNELS_CONFIGURATION == 4 {
                 update_sum_in!(bytes, bytes_offset + 3, dif_a, sum_a, buffer_a, arr_index);
@@ -494,50 +600,55 @@ fn fast_gaussian_impl<
         } else {
             fast_gaussian_horizontal_pass::<T, i64, f64, CHANNEL_CONFIGURATION, EDGE_MODE>
         };
-    if std::any::type_name::<T>() == "f32"
-        || std::any::type_name::<T>() == "f16"
-        || std::any::type_name::<T>() == "half::f16"
-    {
-        _dispatcher_vertical = if BASE_RADIUS_I64_CUTOFF > radius {
-            fast_gaussian_vertical_pass::<T, f32, f32, CHANNEL_CONFIGURATION, EDGE_MODE>
-        } else {
-            fast_gaussian_vertical_pass::<T, f64, f64, CHANNEL_CONFIGURATION, EDGE_MODE>
-        };
-        _dispatcher_horizontal = if BASE_RADIUS_I64_CUTOFF > radius {
-            fast_gaussian_horizontal_pass::<T, f32, f32, CHANNEL_CONFIGURATION, EDGE_MODE>
-        } else {
-            fast_gaussian_horizontal_pass::<T, f64, f64, CHANNEL_CONFIGURATION, EDGE_MODE>
-        };
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    if CHANNEL_CONFIGURATION >= 3 {
+        if std::any::type_name::<T>() == "f32"
+            || std::any::type_name::<T>() == "f16"
+            || std::any::type_name::<T>() == "half::f16"
         {
-            _dispatcher_vertical =
-                fast_gaussian_vertical_pass_neon_f32::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
-            _dispatcher_horizontal =
-                fast_gaussian_horizontal_pass_neon_f32::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
-        }
-    }
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-    {
-        if std::any::type_name::<T>() == "u8" {
-            if BASE_RADIUS_I64_CUTOFF > radius {
+            _dispatcher_vertical = if BASE_RADIUS_I64_CUTOFF > radius {
+                fast_gaussian_vertical_pass::<T, f32, f32, CHANNEL_CONFIGURATION, EDGE_MODE>
+            } else {
+                fast_gaussian_vertical_pass::<T, f64, f64, CHANNEL_CONFIGURATION, EDGE_MODE>
+            };
+            _dispatcher_horizontal = if BASE_RADIUS_I64_CUTOFF > radius {
+                fast_gaussian_horizontal_pass::<T, f32, f32, CHANNEL_CONFIGURATION, EDGE_MODE>
+            } else {
+                fast_gaussian_horizontal_pass::<T, f64, f64, CHANNEL_CONFIGURATION, EDGE_MODE>
+            };
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            {
                 _dispatcher_vertical =
-                    fast_gaussian_vertical_pass_neon_u8::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
+                    fast_gaussian_vertical_pass_neon_f32::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
                 _dispatcher_horizontal =
-                    fast_gaussian_horizontal_pass_neon_u8::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
+                    fast_gaussian_horizontal_pass_neon_f32::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
             }
         }
-    }
-    #[cfg(all(
-        any(target_arch = "x86_64", target_arch = "x86"),
-        target_feature = "sse4.1"
-    ))]
-    {
-        if std::any::type_name::<T>() == "u8" {
-            if BASE_RADIUS_I64_CUTOFF > radius {
-                _dispatcher_vertical =
-                    fast_gaussian_vertical_pass_sse_u8::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
-                _dispatcher_horizontal =
-                    fast_gaussian_horizontal_pass_sse_u8::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            if std::any::type_name::<T>() == "u8" {
+                if BASE_RADIUS_I64_CUTOFF > radius {
+                    _dispatcher_vertical =
+                        fast_gaussian_vertical_pass_neon_u8::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
+                    _dispatcher_horizontal = fast_gaussian_horizontal_pass_neon_u8::<
+                        T,
+                        CHANNEL_CONFIGURATION,
+                        EDGE_MODE,
+                    >;
+                }
+            }
+        }
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "sse4.1"
+        ))]
+        {
+            if std::any::type_name::<T>() == "u8" {
+                if BASE_RADIUS_I64_CUTOFF > radius {
+                    _dispatcher_vertical =
+                        fast_gaussian_vertical_pass_sse_u8::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
+                    _dispatcher_horizontal =
+                        fast_gaussian_horizontal_pass_sse_u8::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
+                }
             }
         }
     }
@@ -823,6 +934,87 @@ pub fn fast_gaussian_f16(
         edge_mode,
         unsafe { std::mem::transmute(bytes) },
         width * channels.get_channels() as u32,
+        width,
+        height,
+        radius,
+        threading_policy
+    );
+}
+
+/// Performs gaussian approximation on the plane.
+///
+/// Fast gaussian approximation for u8 plane, limited to 319 radius, sometimes on the very bright images may start ringing on a very large radius.
+/// Approximation based on binomial filter. Algorithm is close to stack blur with better results and a little slower speed
+/// Results better than in stack blur however this a little slower.
+/// This is a very fast approximation using i32 accumulator size with radius less that *BASE_RADIUS_I64_CUTOFF*,
+/// after it to avoid overflowing fallback to i64 accumulator will be used with some computational slowdown with factor ~2
+/// O(1) complexity.
+///
+/// # Arguments
+///
+/// * `stride` - Lane length, default is width if not aligned
+/// * `width` - Width of the image
+/// * `height` - Height of the image
+/// * `radius` - Radius more than 319 is not supported. To use larger radius convert image to f32 and use function for f32
+/// * `threading_policy` - Threads usage policy
+/// * `edge_mode` - Edge handling mode, *Kernel clip* is not supported!
+///
+/// # Panics
+/// Panic is stride/width/height/channel configuration do not match provided
+pub fn fast_gaussian_plane(
+    bytes: &mut [u8],
+    stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    threading_policy: ThreadingPolicy,
+    edge_mode: EdgeMode,
+) {
+    let radius = std::cmp::min(radius, 319);
+    impl_margin_call_plane!(
+        u8,
+        1,
+        edge_mode,
+        bytes,
+        stride,
+        width,
+        height,
+        radius,
+        threading_policy
+    );
+}
+
+/// Performs gaussian approximation on the f32 plane.
+///
+/// Fast gaussian approximation for f32 plane. No limitations are expected.
+/// Approximation based on binomial filter. Algorithm is close to stack blur with better results and a little slower speed
+/// O(1) complexity.
+///
+/// # Arguments
+///
+/// * `width` - Width of the image
+/// * `height` - Height of the image
+/// * `radius` - almost any radius is supported
+/// * `channels` - Count of channels in the image
+/// * `transfer_function` - Transfer function in linear colorspace
+/// * `edge_mode` - Edge handling mode, *Kernel clip* is not supported!
+///
+/// # Panics
+/// Panic is stride/width/height/channel configuration do not match provided
+pub fn fast_gaussian_plane_f32(
+    bytes: &mut [f32],
+    width: u32,
+    height: u32,
+    radius: u32,
+    threading_policy: ThreadingPolicy,
+    edge_mode: EdgeMode,
+) {
+    impl_margin_call_plane!(
+        f32,
+        1,
+        edge_mode,
+        bytes,
+        width,
         width,
         height,
         radius,

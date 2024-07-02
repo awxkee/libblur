@@ -45,7 +45,7 @@ use num_traits::{AsPrimitive, FromPrimitive};
 use rayon::ThreadPool;
 
 pub(crate) fn gaussian_blur_vertical_pass_edge_clip_dispatch<
-    T: FromPrimitive + Default + Into<f32> + Send + Sync,
+    T: FromPrimitive + Default + Send + Sync,
     const CHANNEL_CONFIGURATION: usize,
 >(
     src: &[T],
@@ -58,7 +58,7 @@ pub(crate) fn gaussian_blur_vertical_pass_edge_clip_dispatch<
     thread_pool: &ThreadPool,
     thread_count: u32,
 ) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static,
+    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static + AsPrimitive<f32>,
     f32: ToStorage<T>,
 {
     let mut _dispatcher: fn(
@@ -114,7 +114,7 @@ pub(crate) fn gaussian_blur_vertical_pass_edge_clip_dispatch<
 }
 
 pub(crate) fn gaussian_blur_horizontal_pass_edge_clip_dispatch<
-    T: FromPrimitive + Default + Into<f32> + Send + Sync,
+    T: FromPrimitive + Default + Send + Sync,
     const CHANNEL_CONFIGURATION: usize,
 >(
     src: &[T],
@@ -127,7 +127,7 @@ pub(crate) fn gaussian_blur_horizontal_pass_edge_clip_dispatch<
     thread_pool: &ThreadPool,
     thread_count: u32,
 ) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static,
+    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static + AsPrimitive<f32>,
     f32: AsPrimitive<T> + ToStorage<T>,
 {
     let mut _dispatcher: fn(

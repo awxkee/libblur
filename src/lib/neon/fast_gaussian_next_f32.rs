@@ -205,13 +205,13 @@ pub fn fast_gaussian_next_horizontal_pass_neon_f32<
                 let d_arr_index_2 = ((x - radius_64) & 1023) as usize;
                 let d_arr_index = (x & 1023) as usize;
 
-                let buf_ptr = buffer[d_arr_index].as_mut_ptr();
+                let buf_ptr = unsafe { buffer.as_mut_ptr().add(d_arr_index) as *mut f32 };
                 let stored = unsafe { vld1q_f32(buf_ptr) };
 
-                let buf_ptr_1 = buffer[d_arr_index_1].as_mut_ptr();
+                let buf_ptr_1 = unsafe { buffer.as_mut_ptr().add(d_arr_index_1) as *mut f32 };
                 let stored_1 = unsafe { vld1q_f32(buf_ptr_1) };
 
-                let buf_ptr_2 = buffer[d_arr_index_2].as_mut_ptr();
+                let buf_ptr_2 = unsafe { buffer.as_mut_ptr().add(d_arr_index_2) as *mut f32 };
                 let stored_2 = unsafe { vld1q_f32(buf_ptr_2) };
 
                 let new_diff =

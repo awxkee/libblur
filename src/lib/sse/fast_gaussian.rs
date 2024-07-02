@@ -26,6 +26,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::mul_table::{MUL_TABLE_DOUBLE, SHR_TABLE_DOUBLE};
+use crate::reflect_101;
 use crate::reflect_index;
 use crate::sse::utils::load_u8_s32_fast;
 use crate::sse::{_mm_mul_epi64, _mm_packus_epi64};

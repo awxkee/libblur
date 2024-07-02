@@ -7,7 +7,7 @@ You may receive gaussian blur in 100 FPS for 4K photo.
 
 Much faster than `image` default blur.
 
-When 4-channels mode is in use that always considered thad alpha channel is the last.
+When 4-channels mode is in use that always considered that alpha channel is the last.
 
 Also there are some available options to perform blurring in linear colorspace, or if methods do not fit you `f32`
 options also available
