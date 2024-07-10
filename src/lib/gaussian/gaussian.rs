@@ -83,18 +83,20 @@ fn gaussian_blur_horizontal_pass<
         end_y: u32,
     ) = gaussian_blur_horizontal_pass_impl::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
     let edge_mode: EdgeMode = EDGE_MODE.into();
-    if std::any::type_name::<T>() == "u8" && edge_mode == EdgeMode::Clamp {
-        #[cfg(all(
-            any(target_arch = "x86_64", target_arch = "x86"),
-            target_feature = "sse4.1"
-        ))]
-        {
-            _dispatcher = gaussian_blur_horizontal_pass_impl_sse::<T, CHANNEL_CONFIGURATION>;
-        }
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-        {
-            _dispatcher =
-                neon_support::gaussian_blur_horizontal_pass_neon::<T, CHANNEL_CONFIGURATION>;
+    if CHANNEL_CONFIGURATION >= 3 {
+        if std::any::type_name::<T>() == "u8" && edge_mode == EdgeMode::Clamp {
+            #[cfg(all(
+                any(target_arch = "x86_64", target_arch = "x86"),
+                target_feature = "sse4.1"
+            ))]
+            {
+                _dispatcher = gaussian_blur_horizontal_pass_impl_sse::<T, CHANNEL_CONFIGURATION>;
+            }
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            {
+                _dispatcher =
+                    neon_support::gaussian_blur_horizontal_pass_neon::<T, CHANNEL_CONFIGURATION>;
+            }
         }
     }
     let unsafe_dst = UnsafeSlice::new(dst);
@@ -195,10 +197,12 @@ fn gaussian_blur_vertical_pass<
             target_feature = "sse4.1"
         ))]
         {
+            // Generally vertical pass do not depends on any specific channel configuration so it is allowed to make a vectorized calls for any channel
             _dispatcher = gaussian_blur_vertical_pass_impl_sse::<T, CHANNEL_CONFIGURATION>;
         }
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
+            // Generally vertical pass do not depends on any specific channel configuration so it is allowed to make a vectorized calls for any channel
             _dispatcher =
                 neon_support::gaussian_blur_vertical_pass_neon::<T, CHANNEL_CONFIGURATION>;
         }
@@ -441,6 +445,20 @@ pub fn gaussian_blur(
     threading_policy: ThreadingPolicy,
 ) {
     match channels {
+        FastBlurChannels::Plane => {
+            gaussian_blur_impl::<u8, 1>(
+                src,
+                src_stride,
+                dst,
+                dst_stride,
+                width,
+                height,
+                kernel_size,
+                sigma,
+                threading_policy,
+                edge_mode,
+            );
+        }
         FastBlurChannels::Channels3 => {
             gaussian_blur_impl::<u8, 3>(
                 src,
@@ -502,6 +520,20 @@ pub fn gaussian_blur_u16(
     threading_policy: ThreadingPolicy,
 ) {
     match channels {
+        FastBlurChannels::Plane => {
+            gaussian_blur_impl::<u16, 1>(
+                src,
+                width * channels.get_channels() as u32,
+                dst,
+                width * channels.get_channels() as u32,
+                width,
+                height,
+                kernel_size,
+                sigma,
+                threading_policy,
+                edge_mode,
+            );
+        }
         FastBlurChannels::Channels3 => {
             gaussian_blur_impl::<u16, 3>(
                 src,
@@ -563,6 +595,20 @@ pub fn gaussian_blur_f32(
     threading_policy: ThreadingPolicy,
 ) {
     match channels {
+        FastBlurChannels::Plane => {
+            gaussian_blur_impl::<f32, 1>(
+                src,
+                width * channels.get_channels() as u32,
+                dst,
+                width * channels.get_channels() as u32,
+                width,
+                height,
+                kernel_size,
+                sigma,
+                threading_policy,
+                edge_mode,
+            );
+        }
         FastBlurChannels::Channels3 => {
             gaussian_blur_impl::<f32, 3>(
                 src,
@@ -624,6 +670,20 @@ pub fn gaussian_blur_f16(
     threading_policy: ThreadingPolicy,
 ) {
     match channels {
+        FastBlurChannels::Plane => {
+            gaussian_blur_impl::<half::f16, 1>(
+                unsafe { std::mem::transmute(src) },
+                width * channels.get_channels() as u32,
+                unsafe { std::mem::transmute(dst) },
+                width * channels.get_channels() as u32,
+                width,
+                height,
+                kernel_size,
+                sigma,
+                threading_policy,
+                edge_mode,
+            );
+        }
         FastBlurChannels::Channels3 => {
             gaussian_blur_impl::<half::f16, 3>(
                 unsafe { std::mem::transmute(src) },

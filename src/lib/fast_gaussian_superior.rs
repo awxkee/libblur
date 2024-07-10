@@ -28,10 +28,50 @@
 use crate::{FastBlurChannels, ThreadingPolicy};
 
 mod fast_gaussian_superior {
-    use num_traits::{FromPrimitive, ToPrimitive};
+    use num_traits::{AsPrimitive, FromPrimitive, ToPrimitive};
 
+    use crate::to_storage::ToStorage;
     use crate::unsafe_slice::UnsafeSlice;
     use crate::ThreadingPolicy;
+
+    macro_rules! update_differences_inside {
+        ($dif:expr, $buffer:expr, $d_idx:expr, $d_idx_1:expr, $d_idx_2:expr, $d_idx_3:expr) => {{
+            $dif += -4 * ((*$buffer.get_unchecked($d_idx)) + (*$buffer.get_unchecked($d_idx_1)))
+                + 6 * (*$buffer.get_unchecked($d_idx_2))
+                + (*$buffer.get_unchecked($d_idx_3));
+        }};
+    }
+
+    macro_rules! update_differences_3_rad {
+        ($dif:expr, $buffer:expr, $d_idx:expr) => {{
+            $dif -= 4 * unsafe { *$buffer.get_unchecked($d_idx) };
+        }};
+    }
+
+    macro_rules! update_differences_2_rad {
+        ($dif:expr, $buffer:expr, $d_idx:expr) => {{
+            $dif += 6 * unsafe { *$buffer.get_unchecked($d_idx) };
+        }};
+    }
+
+    macro_rules! update_differences_1_rad {
+        ($dif:expr, $buffer:expr, $d_idx:expr) => {{
+            $dif -= 4 * unsafe { *$buffer.get_unchecked($d_idx) };
+        }};
+    }
+
+    macro_rules! update_sum_in {
+        ($bytes:expr, $bytes_offset:expr, $dif:expr, $der_2:expr, $der_1:expr, $sum:expr, $buffer:expr, $arr_index:expr) => {{
+            let ug8 = $bytes[$bytes_offset];
+            $dif += ug8.into();
+            $der_2 += $dif;
+            $der_1 += $der_2;
+            $sum += $der_1;
+            unsafe {
+                *$buffer.get_unchecked_mut($arr_index) = ug8.into();
+            }
+        }};
+    }
 
     fn fast_gaussian_vertical_pass<
         T: FromPrimitive + ToPrimitive + Default + Into<i64> + Send + Sync,
@@ -45,7 +85,8 @@ mod fast_gaussian_superior {
         start: u32,
         end: u32,
     ) where
-        T: std::ops::AddAssign + std::ops::SubAssign + Copy,
+        T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static,
+        f64: ToStorage<T> + AsPrimitive<T>,
     {
         let mut buffer_r: [i64; 2048] = [0; 2048];
         let mut buffer_g: [i64; 2048] = [0; 2048];
@@ -79,78 +120,89 @@ mod fast_gaussian_superior {
             for y in start_y..height_wide {
                 let current_y = (y * (stride as i64)) as usize;
                 if y >= 0 {
-                    let new_r = T::from_u32(((sum_r as f64) * weight) as u32).unwrap_or_default();
-                    let new_g = T::from_u32(((sum_g as f64) * weight) as u32).unwrap_or_default();
-                    let new_b = T::from_u32(((sum_b as f64) * weight) as u32).unwrap_or_default();
+                    let new_r = ((sum_r as f64) * weight).to_();
+                    let new_g = if CHANNELS_COUNT > 1 {
+                        ((sum_g as f64) * weight).to_()
+                    } else {
+                        0f64.to_()
+                    };
+                    let new_b = if CHANNELS_COUNT > 2 {
+                        ((sum_b as f64) * weight).to_()
+                    } else {
+                        0f64.as_()
+                    };
 
                     let bytes_offset = current_y + current_px;
 
                     unsafe {
                         bytes.write(bytes_offset, new_r);
-                        bytes.write(bytes_offset + 1, new_g);
-                        bytes.write(bytes_offset + 2, new_b);
+                        if CHANNELS_COUNT > 1 {
+                            bytes.write(bytes_offset + 1, new_g);
+                        }
+                        if CHANNELS_COUNT > 2 {
+                            bytes.write(bytes_offset + 2, new_b);
+                        }
                         if CHANNELS_COUNT == 4 {
-                            let new_a =
-                                T::from_u32(((sum_a as f64) * weight) as u32).unwrap_or_default();
+                            let new_a = ((sum_a as f64) * weight).to_();
                             bytes.write(bytes_offset + 3, new_a);
                         }
                     }
 
-                    let arr_index_3 = (y & 2047) as usize;
-                    let arr_index_2 = ((y + radius_64) & 2047) as usize;
-                    let arr_index_1 = ((y - radius_64) & 2047) as usize;
-                    let arr_index_4 = ((y - 2 * radius_64) & 2047) as usize;
+                    let idx3 = (y & 2047) as usize;
+                    let idx2 = ((y + radius_64) & 2047) as usize;
+                    let idx1 = ((y - radius_64) & 2047) as usize;
+                    let idx4 = ((y - 2 * radius_64) & 2047) as usize;
 
                     unsafe {
-                        dif_r += -4
-                            * ((*buffer_r.get_unchecked(arr_index_1))
-                                + (*buffer_r.get_unchecked(arr_index_2)))
-                            + 6 * (*buffer_r.get_unchecked(arr_index_3))
-                            + (*buffer_r.get_unchecked(arr_index_4));
-                        dif_g += -4
-                            * ((*buffer_g.get_unchecked(arr_index_1))
-                                + (*buffer_g.get_unchecked(arr_index_2)))
-                            + 6 * (*buffer_g.get_unchecked(arr_index_3))
-                            + (*buffer_g.get_unchecked(arr_index_4));
-                        dif_b += -4
-                            * ((*buffer_b.get_unchecked(arr_index_1))
-                                + (*buffer_b.get_unchecked(arr_index_2)))
-                            + 6 * (*buffer_b.get_unchecked(arr_index_3))
-                            + (*buffer_b.get_unchecked(arr_index_4));
+                        update_differences_inside!(dif_r, buffer_r, idx1, idx2, idx3, idx4);
+                        if CHANNELS_COUNT > 1 {
+                            update_differences_inside!(dif_g, buffer_g, idx1, idx2, idx3, idx4);
+                        }
+                        if CHANNELS_COUNT > 2 {
+                            update_differences_inside!(dif_b, buffer_b, idx1, idx2, idx3, idx4);
+                        }
                         if CHANNELS_COUNT == 4 {
-                            dif_a += -4
-                                * ((*buffer_a.get_unchecked(arr_index_1))
-                                    + (*buffer_a.get_unchecked(arr_index_2)))
-                                + 6 * (*buffer_a.get_unchecked(arr_index_3))
-                                + (*buffer_a.get_unchecked(arr_index_4));
+                            update_differences_inside!(dif_a, buffer_a, idx1, idx2, idx3, idx4);
                         }
                     };
                 } else {
                     if y + 3 * radius_64 >= 0 {
                         let arr_index = ((y + radius_64) & 2047) as usize;
-                        dif_r -= 4 * unsafe { *buffer_r.get_unchecked(arr_index) };
-                        dif_g -= 4 * unsafe { *buffer_g.get_unchecked(arr_index) };
-                        dif_b -= 4 * unsafe { *buffer_b.get_unchecked(arr_index) };
+                        update_differences_3_rad!(dif_r, buffer_r, arr_index);
+                        if CHANNELS_COUNT > 1 {
+                            update_differences_3_rad!(dif_g, buffer_g, arr_index);
+                        }
+                        if CHANNELS_COUNT > 2 {
+                            update_differences_3_rad!(dif_b, buffer_b, arr_index);
+                        }
                         if CHANNELS_COUNT == 4 {
-                            dif_a -= 4 * unsafe { *buffer_a.get_unchecked(arr_index) };
+                            update_differences_3_rad!(dif_a, buffer_a, arr_index);
                         }
                     }
                     if y + 2 * radius_64 >= 0 {
                         let arr_index = (y & 2047) as usize;
-                        dif_r += 6 * unsafe { *buffer_r.get_unchecked(arr_index) };
-                        dif_g += 6 * unsafe { *buffer_g.get_unchecked(arr_index) };
-                        dif_b += 6 * unsafe { *buffer_b.get_unchecked(arr_index) };
+                        update_differences_2_rad!(dif_r, buffer_r, arr_index);
+                        if CHANNELS_COUNT > 1 {
+                            update_differences_2_rad!(dif_g, buffer_g, arr_index);
+                        }
+                        if CHANNELS_COUNT > 2 {
+                            update_differences_2_rad!(dif_b, buffer_b, arr_index);
+                        }
                         if CHANNELS_COUNT == 4 {
-                            dif_a += 6 * unsafe { *buffer_a.get_unchecked(arr_index) };
+                            update_differences_2_rad!(dif_a, buffer_a, arr_index);
                         }
                     }
                     if y + radius_64 >= 0 {
                         let arr_index = ((y - radius_64) & 2047) as usize;
-                        dif_r -= 4 * unsafe { *buffer_r.get_unchecked(arr_index) };
-                        dif_g -= 4 * unsafe { *buffer_g.get_unchecked(arr_index) };
-                        dif_b -= 4 * unsafe { *buffer_b.get_unchecked(arr_index) };
+                        update_differences_1_rad!(dif_r, buffer_r, arr_index);
+                        if CHANNELS_COUNT > 1 {
+                            update_differences_1_rad!(dif_g, buffer_g, arr_index);
+                        }
+                        if CHANNELS_COUNT > 2 {
+                            update_differences_1_rad!(dif_b, buffer_b, arr_index);
+                        }
                         if CHANNELS_COUNT == 4 {
-                            dif_a -= 4 * unsafe { *buffer_a.get_unchecked(arr_index) };
+                            update_differences_1_rad!(dif_a, buffer_a, arr_index);
                         }
                     }
                 }
@@ -163,45 +215,47 @@ mod fast_gaussian_superior {
 
                 let px_idx = next_row_y + next_row_x;
 
-                let ur8 = bytes[px_idx];
-                let ug8 = bytes[px_idx + 1];
-                let ub8 = bytes[px_idx + 2];
+                let a_idx = ((y + 2 * radius_64) & 2047) as usize;
 
-                let arr_index = ((y + 2 * radius_64) & 2047) as usize;
+                update_sum_in!(bytes, px_idx, dif_r, der_2_r, der_1_r, sum_r, buffer_r, a_idx);
 
-                dif_r += ur8.into();
-                der_2_r += dif_r;
-                der_1_r += der_2_r;
-                sum_r += der_1_r;
-                unsafe {
-                    *buffer_r.get_unchecked_mut(arr_index) = ur8.into();
+                if CHANNELS_COUNT > 1 {
+                    update_sum_in!(
+                        bytes,
+                        px_idx + 1,
+                        dif_g,
+                        der_2_g,
+                        der_1_g,
+                        sum_g,
+                        buffer_g,
+                        a_idx
+                    );
                 }
 
-                dif_g += ug8.into();
-                der_2_g += dif_g;
-                der_1_g += der_2_g;
-                sum_g += der_1_g;
-                unsafe {
-                    *buffer_g.get_unchecked_mut(arr_index) = ug8.into();
-                }
-
-                dif_b += ub8.into();
-                der_2_b += dif_b;
-                der_1_b += der_2_b;
-                sum_b += der_1_b;
-                unsafe {
-                    *buffer_b.get_unchecked_mut(arr_index) = ub8.into();
+                if CHANNELS_COUNT > 2 {
+                    update_sum_in!(
+                        bytes,
+                        px_idx + 2,
+                        dif_b,
+                        der_2_b,
+                        der_1_b,
+                        sum_b,
+                        buffer_b,
+                        a_idx
+                    );
                 }
 
                 if CHANNELS_COUNT == 4 {
-                    let ua8 = bytes[px_idx + 3];
-                    dif_a += ua8.into();
-                    der_2_a += dif_a;
-                    der_1_a += der_2_a;
-                    sum_a += der_1_a;
-                    unsafe {
-                        *buffer_a.get_unchecked_mut(arr_index) = ua8.into();
-                    }
+                    update_sum_in!(
+                        bytes,
+                        px_idx + 3,
+                        dif_a,
+                        der_2_a,
+                        der_1_a,
+                        sum_a,
+                        buffer_a,
+                        a_idx
+                    );
                 }
             }
         }
@@ -219,7 +273,8 @@ mod fast_gaussian_superior {
         start: u32,
         end: u32,
     ) where
-        T: std::ops::AddAssign + std::ops::SubAssign + Copy,
+        T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static,
+        f64: ToStorage<T> + AsPrimitive<T>,
     {
         let mut buffer_r: [i64; 2048] = [0; 2048];
         let mut buffer_g: [i64; 2048] = [0; 2048];
@@ -252,78 +307,89 @@ mod fast_gaussian_superior {
             for x in (0i64 - 4i64 * radius_64)..(width as i64) {
                 if x >= 0 {
                     let current_px = (std::cmp::max(x, 0) as u32) as usize * CHANNELS_COUNT;
-                    let new_r = T::from_u32(((sum_r as f64) * weight) as u32).unwrap_or_default();
-                    let new_g = T::from_u32(((sum_g as f64) * weight) as u32).unwrap_or_default();
-                    let new_b = T::from_u32(((sum_b as f64) * weight) as u32).unwrap_or_default();
+                    let new_r = ((sum_r as f64) * weight).to_();
+                    let new_g = if CHANNELS_COUNT > 1 {
+                        ((sum_g as f64) * weight).to_()
+                    } else {
+                        0f64.to_()
+                    };
+                    let new_b = if CHANNELS_COUNT > 2 {
+                        ((sum_b as f64) * weight).to_()
+                    } else {
+                        0f64.as_()
+                    };
 
                     let bytes_offset = current_y + current_px;
 
                     unsafe {
                         bytes.write(bytes_offset, new_r);
-                        bytes.write(bytes_offset + 1, new_g);
-                        bytes.write(bytes_offset + 2, new_b);
+                        if CHANNELS_COUNT > 1 {
+                            bytes.write(bytes_offset + 1, new_g);
+                        }
+                        if CHANNELS_COUNT > 2 {
+                            bytes.write(bytes_offset + 2, new_b);
+                        }
                         if CHANNELS_COUNT == 4 {
-                            let new_a =
-                                T::from_u32(((sum_a as f64) * weight) as u32).unwrap_or_default();
+                            let new_a = ((sum_a as f64) * weight).to_();
                             bytes.write(bytes_offset + 3, new_a);
                         }
                     }
 
-                    let arr_index_3 = (x & 2047) as usize;
-                    let arr_index_2 = ((x + radius_64) & 2047) as usize;
-                    let arr_index_1 = ((x - radius_64) & 2047) as usize;
-                    let arr_index_4 = ((x - 2 * radius_64) & 2047) as usize;
+                    let idx3 = (x & 2047) as usize;
+                    let idx2 = ((x + radius_64) & 2047) as usize;
+                    let idx1 = ((x - radius_64) & 2047) as usize;
+                    let idx4 = ((x - 2 * radius_64) & 2047) as usize;
 
                     unsafe {
-                        dif_r += -4
-                            * ((*buffer_r.get_unchecked(arr_index_1))
-                                + (*buffer_r.get_unchecked(arr_index_2)))
-                            + 6 * (*buffer_r.get_unchecked(arr_index_3))
-                            + (*buffer_r.get_unchecked(arr_index_4));
-                        dif_g += -4
-                            * ((*buffer_g.get_unchecked(arr_index_1))
-                                + (*buffer_g.get_unchecked(arr_index_2)))
-                            + 6 * (*buffer_g.get_unchecked(arr_index_3))
-                            + (*buffer_g.get_unchecked(arr_index_4));
-                        dif_b += -4
-                            * ((*buffer_b.get_unchecked(arr_index_1))
-                                + (*buffer_b.get_unchecked(arr_index_2)))
-                            + 6 * (*buffer_b.get_unchecked(arr_index_3))
-                            + (*buffer_b.get_unchecked(arr_index_4));
+                        update_differences_inside!(dif_r, buffer_r, idx1, idx2, idx3, idx4);
+                        if CHANNELS_COUNT > 1 {
+                            update_differences_inside!(dif_g, buffer_g, idx1, idx2, idx3, idx4);
+                        }
+                        if CHANNELS_COUNT > 2 {
+                            update_differences_inside!(dif_b, buffer_b, idx1, idx2, idx3, idx4);
+                        }
                         if CHANNELS_COUNT == 4 {
-                            dif_a += -4
-                                * ((*buffer_a.get_unchecked(arr_index_1))
-                                    + (*buffer_a.get_unchecked(arr_index_2)))
-                                + 6 * (*buffer_a.get_unchecked(arr_index_3))
-                                + (*buffer_a.get_unchecked(arr_index_4));
+                            update_differences_inside!(dif_a, buffer_a, idx1, idx2, idx3, idx4);
                         }
                     }
                 } else {
                     if x + 3 * radius_64 >= 0 {
                         let arr_index = ((x + radius_64) & 2047) as usize;
-                        dif_r -= 4 * unsafe { *buffer_r.get_unchecked(arr_index) };
-                        dif_g -= 4 * unsafe { *buffer_g.get_unchecked(arr_index) };
-                        dif_b -= 4 * unsafe { *buffer_b.get_unchecked(arr_index) };
+                        update_differences_3_rad!(dif_r, buffer_r, arr_index);
+                        if CHANNELS_COUNT > 1 {
+                            update_differences_3_rad!(dif_g, buffer_g, arr_index);
+                        }
+                        if CHANNELS_COUNT > 2 {
+                            update_differences_3_rad!(dif_b, buffer_b, arr_index);
+                        }
                         if CHANNELS_COUNT == 4 {
-                            dif_a -= 4 * unsafe { *buffer_a.get_unchecked(arr_index) };
+                            update_differences_3_rad!(dif_a, buffer_a, arr_index);
                         }
                     }
                     if x + 2 * radius_64 >= 0 {
                         let arr_index = (x & 2047) as usize;
-                        dif_r += 6 * unsafe { *buffer_r.get_unchecked(arr_index) };
-                        dif_g += 6 * unsafe { *buffer_g.get_unchecked(arr_index) };
-                        dif_b += 6 * unsafe { *buffer_b.get_unchecked(arr_index) };
+                        update_differences_2_rad!(dif_r, buffer_r, arr_index);
+                        if CHANNELS_COUNT > 1 {
+                            update_differences_2_rad!(dif_g, buffer_g, arr_index);
+                        }
+                        if CHANNELS_COUNT > 2 {
+                            update_differences_2_rad!(dif_b, buffer_b, arr_index);
+                        }
                         if CHANNELS_COUNT == 4 {
-                            dif_a += 6 * unsafe { *buffer_a.get_unchecked(arr_index) };
+                            update_differences_2_rad!(dif_a, buffer_a, arr_index);
                         }
                     }
                     if x + radius_64 >= 0 {
                         let arr_index = ((x - radius_64) & 2047) as usize;
-                        dif_r -= 4 * unsafe { *buffer_r.get_unchecked(arr_index) };
-                        dif_g -= 4 * unsafe { *buffer_g.get_unchecked(arr_index) };
-                        dif_b -= 4 * unsafe { *buffer_b.get_unchecked(arr_index) };
+                        update_differences_1_rad!(dif_r, buffer_r, arr_index);
+                        if CHANNELS_COUNT > 1 {
+                            update_differences_1_rad!(dif_g, buffer_g, arr_index);
+                        }
+                        if CHANNELS_COUNT > 2 {
+                            update_differences_1_rad!(dif_b, buffer_b, arr_index);
+                        }
                         if CHANNELS_COUNT == 4 {
-                            dif_a -= 4 * unsafe { *buffer_a.get_unchecked(arr_index) };
+                            update_differences_1_rad!(dif_a, buffer_a, arr_index);
                         }
                     }
                 }
@@ -334,47 +400,49 @@ mod fast_gaussian_superior {
                         as usize
                         * CHANNELS_COUNT;
 
-                let bytes_offset = next_row_y + next_row_x;
+                let px_idx = next_row_y + next_row_x;
 
-                let ur8 = bytes[bytes_offset];
-                let ug8 = bytes[bytes_offset + 1];
-                let ub8 = bytes[bytes_offset + 2];
+                let a_idx = ((x + 2 * radius_64) & 2047) as usize;
 
-                let arr_index = ((x + 2 * radius_64) & 2047) as usize;
+                update_sum_in!(bytes, px_idx, dif_r, der_2_r, der_1_r, sum_r, buffer_r, a_idx);
 
-                dif_r += ur8.into();
-                der_2_r += dif_r;
-                der_1_r += der_2_r;
-                sum_r += der_1_r;
-                unsafe {
-                    *buffer_r.get_unchecked_mut(arr_index) = ur8.into();
+                if CHANNELS_COUNT > 1 {
+                    update_sum_in!(
+                        bytes,
+                        px_idx + 1,
+                        dif_g,
+                        der_2_g,
+                        der_1_g,
+                        sum_g,
+                        buffer_g,
+                        a_idx
+                    );
                 }
 
-                dif_g += ug8.into();
-                der_2_g += dif_g;
-                der_1_g += der_2_g;
-                sum_g += der_1_g;
-                unsafe {
-                    *buffer_g.get_unchecked_mut(arr_index) = ug8.into();
-                }
-
-                dif_b += ub8.into();
-                der_2_b += dif_b;
-                der_1_b += der_2_b;
-                sum_b += der_1_b;
-                unsafe {
-                    *buffer_b.get_unchecked_mut(arr_index) = ub8.into();
+                if CHANNELS_COUNT > 2 {
+                    update_sum_in!(
+                        bytes,
+                        px_idx + 2,
+                        dif_b,
+                        der_2_b,
+                        der_1_b,
+                        sum_b,
+                        buffer_b,
+                        a_idx
+                    );
                 }
 
                 if CHANNELS_COUNT == 4 {
-                    let ua8 = bytes[bytes_offset + 3];
-                    dif_a += ua8.into();
-                    der_2_a += dif_a;
-                    der_1_a += der_2_a;
-                    sum_a += der_1_a;
-                    unsafe {
-                        *buffer_a.get_unchecked_mut(arr_index) = ua8.into();
-                    }
+                    update_sum_in!(
+                        bytes,
+                        px_idx + 3,
+                        dif_a,
+                        der_2_a,
+                        der_1_a,
+                        sum_a,
+                        buffer_a,
+                        a_idx
+                    );
                 }
             }
         }
@@ -391,7 +459,8 @@ mod fast_gaussian_superior {
         radius: u32,
         threading_policy: ThreadingPolicy,
     ) where
-        T: std::ops::AddAssign + std::ops::SubAssign + Copy,
+        T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static,
+        f64: ToStorage<T> + AsPrimitive<T>,
     {
         let unsafe_image = UnsafeSlice::new(bytes);
         let thread_count = threading_policy.get_threads_count(width, height) as u32;
@@ -463,6 +532,16 @@ pub fn fast_gaussian_superior(
 ) {
     let acq_radius = std::cmp::min(radius, 256);
     match channels {
+        FastBlurChannels::Plane => {
+            fast_gaussian_superior::fast_gaussian_impl::<u8, 1>(
+                bytes,
+                stride,
+                width,
+                height,
+                acq_radius,
+                threading_policy,
+            );
+        }
         FastBlurChannels::Channels3 => {
             fast_gaussian_superior::fast_gaussian_impl::<u8, 3>(
                 bytes,

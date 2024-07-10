@@ -26,13 +26,14 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #[repr(C)]
-#[allow(dead_code)]
 #[derive(Clone, Copy, Ord, PartialOrd, Eq, PartialEq)]
-/// Declared channels count, generally channels order do not matter for blurring,
+/// Declares channels count, generally channels order do not matter for blurring,
 /// except cases when transformation into linear colorspace is performed
-/// in this case alpha plane expected to be last so if colorspace has 4 channels then it should be
+/// in case of linear transformation alpha plane expected to be last so if colorspace has 4 channels then it should be
 /// RGBA, BGRA etc
 pub enum FastBlurChannels {
+    /// Single plane image
+    Plane = 1,
     /// RGB, BGR etc
     Channels3 = 3,
     /// RGBA, BGRA etc
@@ -42,6 +43,7 @@ pub enum FastBlurChannels {
 impl FastBlurChannels {
     pub fn get_channels(&self) -> usize {
         match self {
+            FastBlurChannels::Plane => 1,
             FastBlurChannels::Channels3 => 3,
             FastBlurChannels::Channels4 => 4,
         }
@@ -51,6 +53,7 @@ impl FastBlurChannels {
 impl From<usize> for FastBlurChannels {
     fn from(value: usize) -> Self {
         return match value {
+            1 => FastBlurChannels::Plane,
             3 => FastBlurChannels::Channels3,
             4 => FastBlurChannels::Channels4,
             _ => {

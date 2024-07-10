@@ -1,6 +1,6 @@
 [package]
 name = "libblur"
-version = "0.12.2"
+version = "0.13.0"
 edition = "2021"
 description = "Fast image blurring in pure Rust"
 readme = "../../README.md"
@@ -19,7 +19,8 @@ edition = "2021"
 path = "lib.rs"
 
 [dependencies]
-colorutils-rs = "0.4.10"
+colorutils-rs = "0.4.12"
+erydanos = "0.1.1"
 half = { version = "2.4.1", features = ["num-traits"] }
 num-traits = "0.2.18"
 rayon = "1.10.0"

@@ -41,6 +41,8 @@ use crate::sse::{
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, reflect_101, EdgeMode, FastBlurChannels, ThreadingPolicy};
+use colorutils_rs::linear_to_planar::linear_to_plane;
+use colorutils_rs::planar_to_linear::plane_to_linear;
 use colorutils_rs::{
     linear_to_rgb, linear_to_rgba, rgb_to_linear, rgba_to_linear, TransferFunction,
 };
@@ -60,6 +62,16 @@ R    R   OOOOO   UUUUU    T    IIIII N    N EEEEEEE  SSSSS
 macro_rules! impl_generic_call {
     ($store_type:ty, $channels_type:expr, $edge_mode:expr, $bytes:expr, $stride:expr, $width:expr, $height:expr, $radius:expr, $threading_policy:expr) => {
         match $channels_type {
+            FastBlurChannels::Plane => {
+                fast_gaussian_next_impl::<$store_type, 1, $edge_mode>(
+                    $bytes,
+                    $stride,
+                    $width,
+                    $height,
+                    $radius,
+                    $threading_policy,
+                );
+            }
             FastBlurChannels::Channels3 => {
                 fast_gaussian_next_impl::<$store_type, 3, $edge_mode>(
                     $bytes,
@@ -85,7 +97,9 @@ macro_rules! impl_generic_call {
 }
 
 macro_rules! impl_margin_call {
-    ($store_type:ty, $channels_type:expr, $edge_mode:expr, $bytes:expr, $stride:expr, $width:expr, $height:expr, $radius:expr, $threading_policy:expr) => {
+    ($store_type:ty, $channels_type:expr, $edge_mode:expr,
+    $bytes:expr, $stride:expr, $width:expr, $height:expr,
+    $radius:expr, $threading_policy:expr) => {
         match $edge_mode {
             EdgeMode::Clamp => {
                 impl_generic_call!(
@@ -264,8 +278,12 @@ fn fast_gaussian_next_vertical_pass<
                 let bytes_offset = current_y + current_px;
 
                 write_out_blurred!(sum_r, weight, bytes, bytes_offset);
-                write_out_blurred!(sum_g, weight, bytes, bytes_offset + 1);
-                write_out_blurred!(sum_b, weight, bytes, bytes_offset + 2);
+                if CHANNEL_CONFIGURATION > 1 {
+                    write_out_blurred!(sum_g, weight, bytes, bytes_offset + 1);
+                }
+                if CHANNEL_CONFIGURATION > 2 {
+                    write_out_blurred!(sum_b, weight, bytes, bytes_offset + 2);
+                }
                 if CHANNEL_CONFIGURATION == 4 {
                     write_out_blurred!(sum_a, weight, bytes, bytes_offset + 3);
                 }
@@ -274,8 +292,12 @@ fn fast_gaussian_next_vertical_pass<
                 let d_idx_2 = ((y - radius_64) & 1023) as usize;
                 let d_idx = (y & 1023) as usize;
                 update_differences_inside!(dif_r, buffer_r, d_idx, d_idx_1, d_idx_2);
-                update_differences_inside!(dif_g, buffer_g, d_idx, d_idx_1, d_idx_2);
-                update_differences_inside!(dif_b, buffer_b, d_idx, d_idx_1, d_idx_2);
+                if CHANNEL_CONFIGURATION > 1 {
+                    update_differences_inside!(dif_g, buffer_g, d_idx, d_idx_1, d_idx_2);
+                }
+                if CHANNEL_CONFIGURATION > 2 {
+                    update_differences_inside!(dif_b, buffer_b, d_idx, d_idx_1, d_idx_2);
+                }
                 if CHANNEL_CONFIGURATION == 4 {
                     update_differences_inside!(dif_a, buffer_a, d_idx, d_idx_1, d_idx_2);
                 }
@@ -283,16 +305,24 @@ fn fast_gaussian_next_vertical_pass<
                 let arr_index = (y & 1023) as usize;
                 let arr_index_1 = ((y + radius_64) & 1023) as usize;
                 update_differences_one_rad!(dif_r, buffer_r, arr_index, arr_index_1);
-                update_differences_one_rad!(dif_g, buffer_g, arr_index, arr_index_1);
-                update_differences_one_rad!(dif_b, buffer_b, arr_index, arr_index_1);
+                if CHANNEL_CONFIGURATION > 1 {
+                    update_differences_one_rad!(dif_g, buffer_g, arr_index, arr_index_1);
+                }
+                if CHANNEL_CONFIGURATION > 2 {
+                    update_differences_one_rad!(dif_b, buffer_b, arr_index, arr_index_1);
+                }
                 if CHANNEL_CONFIGURATION == 4 {
                     update_differences_one_rad!(dif_a, buffer_a, arr_index, arr_index_1);
                 }
             } else if y + 2 * radius_64 >= 0 {
                 let arr_index = ((y + radius_64) & 1023) as usize;
                 update_differences_two_rad!(dif_r, buffer_r, arr_index);
-                update_differences_two_rad!(dif_g, buffer_g, arr_index);
-                update_differences_two_rad!(dif_b, buffer_b, arr_index);
+                if CHANNEL_CONFIGURATION > 1 {
+                    update_differences_two_rad!(dif_g, buffer_g, arr_index);
+                }
+                if CHANNEL_CONFIGURATION > 2 {
+                    update_differences_two_rad!(dif_b, buffer_b, arr_index);
+                }
                 if CHANNEL_CONFIGURATION == 4 {
                     update_differences_two_rad!(dif_a, buffer_a, arr_index);
                 }
@@ -306,9 +336,12 @@ fn fast_gaussian_next_vertical_pass<
 
             let arr_index = ((y + 2 * radius_64) & 1023) as usize;
             update_sum_in!(bytes, px_idx, dif_r, der_r, sum_r, buffer_r, arr_index);
-            update_sum_in!(bytes, px_idx + 1, dif_g, der_g, sum_g, buffer_g, arr_index);
-            update_sum_in!(bytes, px_idx + 2, dif_b, der_b, sum_b, buffer_b, arr_index);
-
+            if CHANNEL_CONFIGURATION > 1 {
+                update_sum_in!(bytes, px_idx + 1, dif_g, der_g, sum_g, buffer_g, arr_index);
+            }
+            if CHANNEL_CONFIGURATION > 2 {
+                update_sum_in!(bytes, px_idx + 2, dif_b, der_b, sum_b, buffer_b, arr_index);
+            }
             if CHANNEL_CONFIGURATION == 4 {
                 update_sum_in!(bytes, px_idx + 3, dif_a, der_a, sum_a, buffer_a, arr_index);
             }
@@ -387,8 +420,12 @@ fn fast_gaussian_next_horizontal_pass<
                 let bytes_offset = current_y + current_px;
 
                 write_out_blurred!(sum_r, weight, bytes, bytes_offset);
-                write_out_blurred!(sum_g, weight, bytes, bytes_offset + 1);
-                write_out_blurred!(sum_b, weight, bytes, bytes_offset + 2);
+                if CHANNEL_CONFIGURATION > 1 {
+                    write_out_blurred!(sum_g, weight, bytes, bytes_offset + 1);
+                }
+                if CHANNEL_CONFIGURATION > 2 {
+                    write_out_blurred!(sum_b, weight, bytes, bytes_offset + 2);
+                }
                 if CHANNEL_CONFIGURATION == 4 {
                     write_out_blurred!(sum_a, weight, bytes, bytes_offset + 3);
                 }
@@ -397,8 +434,12 @@ fn fast_gaussian_next_horizontal_pass<
                 let d_idx_2 = ((x - radius_64) & 1023) as usize;
                 let d_idx = (x & 1023) as usize;
                 update_differences_inside!(dif_r, buffer_r, d_idx, d_idx_1, d_idx_2);
-                update_differences_inside!(dif_g, buffer_g, d_idx, d_idx_1, d_idx_2);
-                update_differences_inside!(dif_b, buffer_b, d_idx, d_idx_1, d_idx_2);
+                if CHANNEL_CONFIGURATION > 1 {
+                    update_differences_inside!(dif_g, buffer_g, d_idx, d_idx_1, d_idx_2);
+                }
+                if CHANNEL_CONFIGURATION > 2 {
+                    update_differences_inside!(dif_b, buffer_b, d_idx, d_idx_1, d_idx_2);
+                }
                 if CHANNEL_CONFIGURATION == 4 {
                     update_differences_inside!(dif_a, buffer_a, d_idx, d_idx_1, d_idx_2);
                 }
@@ -406,16 +447,24 @@ fn fast_gaussian_next_horizontal_pass<
                 let arr_index = (x & 1023) as usize;
                 let arr_index_1 = ((x + radius_64) & 1023) as usize;
                 update_differences_one_rad!(dif_r, buffer_r, arr_index, arr_index_1);
-                update_differences_one_rad!(dif_g, buffer_g, arr_index, arr_index_1);
-                update_differences_one_rad!(dif_b, buffer_b, arr_index, arr_index_1);
+                if CHANNEL_CONFIGURATION > 1 {
+                    update_differences_one_rad!(dif_g, buffer_g, arr_index, arr_index_1);
+                }
+                if CHANNEL_CONFIGURATION > 2 {
+                    update_differences_one_rad!(dif_b, buffer_b, arr_index, arr_index_1);
+                }
                 if CHANNEL_CONFIGURATION == 4 {
                     update_differences_one_rad!(dif_a, buffer_a, arr_index, arr_index_1);
                 }
             } else if x + 2 * radius_64 >= 0 {
                 let arr_index = ((x + radius_64) & 1023) as usize;
                 update_differences_two_rad!(dif_r, buffer_r, arr_index);
-                update_differences_two_rad!(dif_g, buffer_g, arr_index);
-                update_differences_two_rad!(dif_b, buffer_b, arr_index);
+                if CHANNEL_CONFIGURATION > 1 {
+                    update_differences_two_rad!(dif_g, buffer_g, arr_index);
+                }
+                if CHANNEL_CONFIGURATION > 2 {
+                    update_differences_two_rad!(dif_b, buffer_b, arr_index);
+                }
                 if CHANNEL_CONFIGURATION == 4 {
                     update_differences_two_rad!(dif_a, buffer_a, arr_index);
                 }
@@ -430,9 +479,12 @@ fn fast_gaussian_next_horizontal_pass<
             let arr_index = ((x + 2 * radius_64) & 1023) as usize;
 
             update_sum_in!(bytes, px_off, dif_r, der_r, sum_r, buffer_r, arr_index);
-            update_sum_in!(bytes, px_off + 1, dif_g, der_g, sum_g, buffer_g, arr_index);
-            update_sum_in!(bytes, px_off + 2, dif_b, der_b, sum_b, buffer_b, arr_index);
-
+            if CHANNEL_CONFIGURATION > 1 {
+                update_sum_in!(bytes, px_off + 1, dif_g, der_g, sum_g, buffer_g, arr_index);
+            }
+            if CHANNEL_CONFIGURATION > 2 {
+                update_sum_in!(bytes, px_off + 2, dif_b, der_b, sum_b, buffer_b, arr_index);
+            }
             if CHANNEL_CONFIGURATION == 4 {
                 update_sum_in!(bytes, px_off + 3, dif_a, der_a, sum_a, buffer_a, arr_index);
             }
@@ -506,45 +558,53 @@ fn fast_gaussian_next_impl<
         };
     }
 
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-    {
-        if BASE_RADIUS_I64_CUTOFF > radius {
-            if std::any::type_name::<T>() == "u8" {
-                _dispatcher_vertical =
-                    fast_gaussian_next_vertical_pass_neon_u8::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
-                _dispatcher_horizontal = fast_gaussian_next_horizontal_pass_neon_u8::<
-                    T,
-                    CHANNEL_CONFIGURATION,
-                    EDGE_MODE,
-                >;
-            } else if std::any::type_name::<T>() == "f32" {
-                _dispatcher_horizontal = fast_gaussian_next_horizontal_pass_neon_f32::<
-                    T,
-                    CHANNEL_CONFIGURATION,
-                    EDGE_MODE,
-                >;
-                _dispatcher_vertical = fast_gaussian_next_vertical_pass_neon_f32::<
-                    T,
-                    CHANNEL_CONFIGURATION,
-                    EDGE_MODE,
-                >;
+    if CHANNEL_CONFIGURATION >= 3 {
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            if BASE_RADIUS_I64_CUTOFF > radius {
+                if std::any::type_name::<T>() == "u8" {
+                    _dispatcher_vertical = fast_gaussian_next_vertical_pass_neon_u8::<
+                        T,
+                        CHANNEL_CONFIGURATION,
+                        EDGE_MODE,
+                    >;
+                    _dispatcher_horizontal = fast_gaussian_next_horizontal_pass_neon_u8::<
+                        T,
+                        CHANNEL_CONFIGURATION,
+                        EDGE_MODE,
+                    >;
+                } else if std::any::type_name::<T>() == "f32" {
+                    _dispatcher_horizontal = fast_gaussian_next_horizontal_pass_neon_f32::<
+                        T,
+                        CHANNEL_CONFIGURATION,
+                        EDGE_MODE,
+                    >;
+                    _dispatcher_vertical = fast_gaussian_next_vertical_pass_neon_f32::<
+                        T,
+                        CHANNEL_CONFIGURATION,
+                        EDGE_MODE,
+                    >;
+                }
             }
         }
-    }
-    #[cfg(all(
-        any(target_arch = "x86_64", target_arch = "x86"),
-        target_feature = "sse4.1"
-    ))]
-    {
-        if BASE_RADIUS_I64_CUTOFF > radius {
-            if std::any::type_name::<T>() == "u8" {
-                _dispatcher_vertical =
-                    fast_gaussian_next_vertical_pass_sse_u8::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
-                _dispatcher_horizontal = fast_gaussian_next_horizontal_pass_sse_u8::<
-                    T,
-                    CHANNEL_CONFIGURATION,
-                    EDGE_MODE,
-                >;
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "sse4.1"
+        ))]
+        {
+            if BASE_RADIUS_I64_CUTOFF > radius {
+                if std::any::type_name::<T>() == "u8" {
+                    _dispatcher_vertical = fast_gaussian_next_vertical_pass_sse_u8::<
+                        T,
+                        CHANNEL_CONFIGURATION,
+                        EDGE_MODE,
+                    >;
+                    _dispatcher_horizontal = fast_gaussian_next_horizontal_pass_sse_u8::<
+                        T,
+                        CHANNEL_CONFIGURATION,
+                        EDGE_MODE,
+                    >;
+                }
             }
         }
     }
@@ -789,11 +849,13 @@ pub fn fast_gaussian_next_in_linear(
         vec![0f32; width as usize * height as usize * channels.get_channels()];
 
     let forward_transformer = match channels {
+        FastBlurChannels::Plane => plane_to_linear,
         FastBlurChannels::Channels3 => rgb_to_linear,
         FastBlurChannels::Channels4 => rgba_to_linear,
     };
 
     let inverse_transformer = match channels {
+        FastBlurChannels::Plane => linear_to_plane,
         FastBlurChannels::Channels3 => linear_to_rgb,
         FastBlurChannels::Channels4 => linear_to_rgba,
     };

@@ -26,6 +26,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{gaussian_blur_f32, EdgeMode, FastBlurChannels, ThreadingPolicy};
+use colorutils_rs::linear_to_planar::linear_to_plane;
+use colorutils_rs::planar_to_linear::plane_to_linear;
 use colorutils_rs::{
     linear_to_rgb, linear_to_rgba, rgb_to_linear, rgba_to_linear, TransferFunction,
 };
@@ -72,11 +74,13 @@ pub fn gaussian_blur_in_linear(
         vec![0f32; width as usize * height as usize * channels.get_channels()];
 
     let forward_transformer = match channels {
+        FastBlurChannels::Plane => plane_to_linear,
         FastBlurChannels::Channels3 => rgb_to_linear,
         FastBlurChannels::Channels4 => rgba_to_linear,
     };
 
     let inverse_transformer = match channels {
+        FastBlurChannels::Plane => linear_to_plane,
         FastBlurChannels::Channels3 => linear_to_rgb,
         FastBlurChannels::Channels4 => linear_to_rgba,
     };

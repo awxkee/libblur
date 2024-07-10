@@ -78,10 +78,12 @@ pub(crate) fn gaussian_blur_vertical_pass_edge_clip_dispatch<
             target_feature = "sse4.1"
         ))]
         {
+            // Generally vertical pass do not depends on any specific channel configuration so it is allowed to make a vectorized calls for any channels
             _dispatcher = gaussian_blur_vertical_pass_filter_sse::<T, CHANNEL_CONFIGURATION>;
         }
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
+            // Generally vertical pass do not depends on any specific channel configuration so it is allowed to make a vectorized calls for any channels
             _dispatcher = gaussian_blur_vertical_pass_filter_neon::<T, CHANNEL_CONFIGURATION>;
         }
     }
@@ -140,17 +142,19 @@ pub(crate) fn gaussian_blur_horizontal_pass_edge_clip_dispatch<
         start_y: u32,
         end_y: u32,
     ) = gaussian_blur_horizontal_pass_impl_clip_edge::<T, CHANNEL_CONFIGURATION>;
-    if std::any::type_name::<T>() == "u8" {
-        #[cfg(all(
-            any(target_arch = "x86_64", target_arch = "x86"),
-            target_feature = "sse4.1"
-        ))]
-        {
-            _dispatcher = gaussian_blur_horizontal_pass_filter_sse::<T, CHANNEL_CONFIGURATION>;
-        }
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-        {
-            _dispatcher = gaussian_blur_horizontal_pass_filter_neon::<T, CHANNEL_CONFIGURATION>;
+    if CHANNEL_CONFIGURATION >= 3 {
+        if std::any::type_name::<T>() == "u8" {
+            #[cfg(all(
+                any(target_arch = "x86_64", target_arch = "x86"),
+                target_feature = "sse4.1"
+            ))]
+            {
+                _dispatcher = gaussian_blur_horizontal_pass_filter_sse::<T, CHANNEL_CONFIGURATION>;
+            }
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            {
+                _dispatcher = gaussian_blur_horizontal_pass_filter_neon::<T, CHANNEL_CONFIGURATION>;
+            }
         }
     }
     let unsafe_dst = UnsafeSlice::new(dst);

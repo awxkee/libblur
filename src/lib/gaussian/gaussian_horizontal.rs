@@ -82,7 +82,80 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_c<
 {
     let edge_mode: EdgeMode = EDGE_MODE.into();
     let half_kernel = (kernel_size / 2) as i32;
-    for y in start_y..end_y {
+    let mut _cy = start_y;
+
+    for y in (_cy..end_y.saturating_sub(2)).step_by(2) {
+        let y_src_shift = y as usize * src_stride as usize;
+        let y_dst_shift = y as usize * dst_stride as usize;
+        for x in 0..width {
+            let (mut weight0, mut weight1, mut weight2, mut weight3) = (0f32, 0f32, 0f32, 0f32);
+            let (mut weight4, mut weight5, mut weight6, mut weight7) = (0f32, 0f32, 0f32, 0f32);
+            for r in -half_kernel..=half_kernel {
+                let px = clamp_edge!(edge_mode, x as i64 + r as i64, 0, (width - 1) as i64)
+                    * CHANNEL_CONFIGURATION;
+                let y_offset = y_src_shift + px;
+                let y_offset_next = y_offset + src_stride as usize;
+
+                let weight = unsafe { *kernel.get_unchecked((r + half_kernel) as usize) };
+
+                weight0 += (unsafe { *src.get_unchecked(y_offset) }.as_()) * weight;
+                if CHANNEL_CONFIGURATION > 1 {
+                    weight1 += (unsafe { *src.get_unchecked(y_offset + 1) }.as_()) * weight;
+                }
+                if CHANNEL_CONFIGURATION > 2 {
+                    weight2 += (unsafe { *src.get_unchecked(y_offset + 2) }.as_()) * weight;
+                }
+                if CHANNEL_CONFIGURATION == 4 {
+                    weight3 += (unsafe { *src.get_unchecked(y_offset + 3) }.as_()) * weight;
+                }
+
+                weight4 += (unsafe { *src.get_unchecked(y_offset_next) }.as_()) * weight;
+                if CHANNEL_CONFIGURATION > 1 {
+                    weight5 += (unsafe { *src.get_unchecked(y_offset_next + 1) }.as_()) * weight;
+                }
+                if CHANNEL_CONFIGURATION > 2 {
+                    weight6 += (unsafe { *src.get_unchecked(y_offset_next + 2) }.as_()) * weight;
+                }
+                if CHANNEL_CONFIGURATION == 4 {
+                    weight7 += (unsafe { *src.get_unchecked(y_offset_next + 3) }.as_()) * weight;
+                }
+            }
+
+            let px = x as usize * CHANNEL_CONFIGURATION;
+
+            let bytes_offset = y_dst_shift + px;
+            unsafe {
+                unsafe_dst.write(bytes_offset, weight0.to_());
+                if CHANNEL_CONFIGURATION > 1 {
+                    unsafe_dst.write(bytes_offset + 1, weight1.to_());
+                }
+                if CHANNEL_CONFIGURATION > 2 {
+                    unsafe_dst.write(bytes_offset + 2, weight2.to_());
+                }
+                if CHANNEL_CONFIGURATION == 4 {
+                    unsafe_dst.write(bytes_offset + 3, weight3.to_());
+                }
+            }
+
+            unsafe {
+                let bytes_offset = bytes_offset + dst_stride as usize;
+                unsafe_dst.write(bytes_offset, weight4.to_());
+                if CHANNEL_CONFIGURATION > 1 {
+                    unsafe_dst.write(bytes_offset + 1, weight5.to_());
+                }
+                if CHANNEL_CONFIGURATION > 2 {
+                    unsafe_dst.write(bytes_offset + 2, weight6.to_());
+                }
+                if CHANNEL_CONFIGURATION == 4 {
+                    unsafe_dst.write(bytes_offset + 3, weight7.to_());
+                }
+            }
+        }
+
+        _cy = y;
+    }
+
+    for y in _cy..end_y {
         let y_src_shift = y as usize * src_stride as usize;
         let y_dst_shift = y as usize * dst_stride as usize;
         for x in 0..width {
@@ -93,8 +166,12 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_c<
                 let y_offset = y_src_shift + px;
                 let weight = unsafe { *kernel.get_unchecked((r + half_kernel) as usize) };
                 weight0 += (unsafe { *src.get_unchecked(y_offset) }.as_()) * weight;
-                weight1 += (unsafe { *src.get_unchecked(y_offset + 1) }.as_()) * weight;
-                weight2 += (unsafe { *src.get_unchecked(y_offset + 2) }.as_()) * weight;
+                if CHANNEL_CONFIGURATION > 1 {
+                    weight1 += (unsafe { *src.get_unchecked(y_offset + 1) }.as_()) * weight;
+                }
+                if CHANNEL_CONFIGURATION > 2 {
+                    weight2 += (unsafe { *src.get_unchecked(y_offset + 2) }.as_()) * weight;
+                }
                 if CHANNEL_CONFIGURATION == 4 {
                     weight3 += (unsafe { *src.get_unchecked(y_offset + 3) }.as_()) * weight;
                 }
@@ -105,8 +182,12 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_c<
             unsafe {
                 let bytes_offset = y_dst_shift + px;
                 unsafe_dst.write(bytes_offset, weight0.to_());
-                unsafe_dst.write(bytes_offset + 1, weight1.to_());
-                unsafe_dst.write(bytes_offset + 2, weight2.to_());
+                if CHANNEL_CONFIGURATION > 1 {
+                    unsafe_dst.write(bytes_offset + 1, weight1.to_());
+                }
+                if CHANNEL_CONFIGURATION > 2 {
+                    unsafe_dst.write(bytes_offset + 2, weight2.to_());
+                }
                 if CHANNEL_CONFIGURATION == 4 {
                     unsafe_dst.write(bytes_offset + 3, weight3.to_());
                 }
@@ -131,11 +212,14 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_clip_edge<
     T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static + AsPrimitive<f32>,
     f32: AsPrimitive<T> + ToStorage<T>,
 {
-    for y in start_y..end_y {
+    let mut _cy = start_y;
+
+    for y in (_cy..end_y.saturating_sub(2)).step_by(2) {
         let y_src_shift = y as usize * src_stride as usize;
         let y_dst_shift = y as usize * dst_stride as usize;
         for x in 0..width {
-            let mut weights: [f32; 4] = [0f32; 4];
+            let (mut weight0, mut weight1, mut weight2, mut weight3) = (0f32, 0f32, 0f32, 0f32);
+            let (mut weight4, mut weight5, mut weight6, mut weight7) = (0f32, 0f32, 0f32, 0f32);
 
             let current_filter = unsafe { filter.get_unchecked(x as usize) };
             let filter_start = current_filter.start;
@@ -145,22 +229,103 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_clip_edge<
                 let px = (filter_start + j) * CHANNEL_CONFIGURATION;
                 let weight = unsafe { *filter_weights.get_unchecked(j) };
                 let y_offset = y_src_shift + px;
-                weights[0] += (unsafe { *src.get_unchecked(y_offset) }.as_()) * weight;
-                weights[1] += (unsafe { *src.get_unchecked(y_offset + 1) }.as_()) * weight;
-                weights[2] += (unsafe { *src.get_unchecked(y_offset + 2) }.as_()) * weight;
+                let y_offset_next = y_offset + src_stride as usize;
+
+                weight0 += (unsafe { *src.get_unchecked(y_offset) }.as_()) * weight;
+                if CHANNEL_CONFIGURATION > 1 {
+                    weight1 += (unsafe { *src.get_unchecked(y_offset + 1) }.as_()) * weight;
+                }
+                if CHANNEL_CONFIGURATION > 2 {
+                    weight2 += (unsafe { *src.get_unchecked(y_offset + 2) }.as_()) * weight;
+                }
                 if CHANNEL_CONFIGURATION == 4 {
-                    weights[3] += (unsafe { *src.get_unchecked(y_offset + 3) }.as_()) * weight;
+                    weight3 += (unsafe { *src.get_unchecked(y_offset + 3) }.as_()) * weight;
+                }
+
+                weight4 += (unsafe { *src.get_unchecked(y_offset_next) }.as_()) * weight;
+                if CHANNEL_CONFIGURATION > 1 {
+                    weight5 += (unsafe { *src.get_unchecked(y_offset_next + 1) }.as_()) * weight;
+                }
+                if CHANNEL_CONFIGURATION > 2 {
+                    weight6 += (unsafe { *src.get_unchecked(y_offset_next + 2) }.as_()) * weight;
+                }
+                if CHANNEL_CONFIGURATION == 4 {
+                    weight7 += (unsafe { *src.get_unchecked(y_offset_next + 3) }.as_()) * weight;
+                }
+            }
+
+            let px = x as usize * CHANNEL_CONFIGURATION;
+
+            let offset = y_dst_shift + px;
+            unsafe {
+                unsafe_dst.write(offset, weight0.to_());
+                if CHANNEL_CONFIGURATION > 1 {
+                    unsafe_dst.write(offset + 1, weight1.to_());
+                }
+                if CHANNEL_CONFIGURATION > 2 {
+                    unsafe_dst.write(offset + 2, weight2.to_());
+                }
+                if CHANNEL_CONFIGURATION == 4 {
+                    unsafe_dst.write(offset + 3, weight3.to_());
+                }
+            }
+
+            unsafe {
+                let bytes_offset = offset + dst_stride as usize;
+                unsafe_dst.write(bytes_offset, weight4.to_());
+                if CHANNEL_CONFIGURATION > 1 {
+                    unsafe_dst.write(bytes_offset + 1, weight5.to_());
+                }
+                if CHANNEL_CONFIGURATION > 2 {
+                    unsafe_dst.write(bytes_offset + 2, weight6.to_());
+                }
+                if CHANNEL_CONFIGURATION == 4 {
+                    unsafe_dst.write(bytes_offset + 3, weight7.to_());
+                }
+            }
+        }
+        _cy = y;
+    }
+
+    for y in _cy..end_y {
+        let y_src_shift = y as usize * src_stride as usize;
+        let y_dst_shift = y as usize * dst_stride as usize;
+        for x in 0..width {
+            let (mut weight0, mut weight1, mut weight2, mut weight3) = (0f32, 0f32, 0f32, 0f32);
+
+            let current_filter = unsafe { filter.get_unchecked(x as usize) };
+            let filter_start = current_filter.start;
+            let filter_weights = &current_filter.filter;
+
+            for j in 0..current_filter.size {
+                let px = (filter_start + j) * CHANNEL_CONFIGURATION;
+                let weight = unsafe { *filter_weights.get_unchecked(j) };
+                let y_offset = y_src_shift + px;
+                weight0 += (unsafe { *src.get_unchecked(y_offset) }.as_()) * weight;
+                if CHANNEL_CONFIGURATION > 1 {
+                    weight1 += (unsafe { *src.get_unchecked(y_offset + 1) }.as_()) * weight;
+                }
+                if CHANNEL_CONFIGURATION > 2 {
+                    weight2 += (unsafe { *src.get_unchecked(y_offset + 2) }.as_()) * weight;
+                }
+                if CHANNEL_CONFIGURATION == 4 {
+                    weight3 += (unsafe { *src.get_unchecked(y_offset + 3) }.as_()) * weight;
                 }
             }
 
             let px = x as usize * CHANNEL_CONFIGURATION;
 
             unsafe {
-                unsafe_dst.write(y_dst_shift + px, weights[0].to_());
-                unsafe_dst.write(y_dst_shift + px + 1, weights[1].to_());
-                unsafe_dst.write(y_dst_shift + px + 2, weights[2].to_());
+                let offset = y_dst_shift + px;
+                unsafe_dst.write(offset, weight0.to_());
+                if CHANNEL_CONFIGURATION > 1 {
+                    unsafe_dst.write(offset + 1, weight1.to_());
+                }
+                if CHANNEL_CONFIGURATION > 2 {
+                    unsafe_dst.write(offset + 2, weight2.to_());
+                }
                 if CHANNEL_CONFIGURATION == 4 {
-                    unsafe_dst.write(y_dst_shift + px + 3, weights[3].to_());
+                    unsafe_dst.write(offset + 3, weight3.to_());
                 }
             }
         }

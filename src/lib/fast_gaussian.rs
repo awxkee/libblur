@@ -41,6 +41,8 @@ use crate::threading_policy::ThreadingPolicy;
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, reflect_101, EdgeMode};
+use colorutils_rs::linear_to_planar::linear_to_plane;
+use colorutils_rs::planar_to_linear::plane_to_linear;
 use colorutils_rs::{
     linear_to_rgb, linear_to_rgba, rgb_to_linear, rgba_to_linear, TransferFunction,
 };
@@ -98,6 +100,16 @@ macro_rules! impl_generic_call {
         $bytes:expr, $stride:expr, $width:expr, $height:expr,
         $radius:expr, $threading_policy:expr) => {
         match $channels_type {
+            FastBlurChannels::Plane => {
+                fast_gaussian_impl::<$store_type, 1, $edge_mode>(
+                    $bytes,
+                    $stride,
+                    $width,
+                    $height,
+                    $radius,
+                    $threading_policy,
+                );
+            }
             FastBlurChannels::Channels3 => {
                 fast_gaussian_impl::<$store_type, 3, $edge_mode>(
                     $bytes,
@@ -709,7 +721,7 @@ fn fast_gaussian_impl<
 /// Approximation based on binomial filter. Algorithm is close to stack blur with better results and a little slower speed
 /// Results better than in stack blur however this a little slower.
 /// This is a very fast approximation using i32 accumulator size with radius less that *BASE_RADIUS_I64_CUTOFF*,
-/// after it to avoid overflowing fallback to i64 accumulator will be used with some computational slowdown with factor ~2
+/// after it to avoid overflowing fallback to i64 accumulator will be used with some computational slowdown with factor ~2.
 /// O(1) complexity.
 ///
 /// # Arguments
@@ -751,7 +763,7 @@ pub fn fast_gaussian(
 /// Performs gaussian approximation on the image.
 ///
 /// Fast gaussian approximation for u16 image, limited to 319 radius, sometimes on the very bright images may start ringing on a very large radius.
-/// Approximation based on binomial filter. Algorithm is close to stack blur with better results and a little slower speed
+/// Approximation based on binomial filter. Algorithm is close to stack blur with better results and a little slower speed.
 /// O(1) complexity.
 ///
 /// # Arguments
@@ -831,7 +843,7 @@ pub fn fast_gaussian_f32(
 /// Performs gaussian approximation on the image in linear colorspace
 ///
 /// This is fast approximation that first converts in linear colorspace, performs blur and converts back,
-/// operation will be performed in f32 so its cost is significant
+/// operation will be performed in f32 so its cost is significant.
 /// O(1) complexity.
 ///
 /// # Arguments
@@ -862,11 +874,13 @@ pub fn fast_gaussian_in_linear(
         vec![0f32; width as usize * height as usize * channels.get_channels()];
 
     let forward_transformer = match channels {
+        FastBlurChannels::Plane => plane_to_linear,
         FastBlurChannels::Channels3 => rgb_to_linear,
         FastBlurChannels::Channels4 => rgba_to_linear,
     };
 
     let inverse_transformer = match channels {
+        FastBlurChannels::Plane => linear_to_plane,
         FastBlurChannels::Channels3 => linear_to_rgb,
         FastBlurChannels::Channels4 => linear_to_rgba,
     };
@@ -905,7 +919,7 @@ pub fn fast_gaussian_in_linear(
 /// Performs gaussian approximation on the image.
 ///
 /// Fast gaussian approximation for f32 image. No limitations are expected.
-/// Approximation based on binomial filter. Algorithm is close to stack blur with better results and a little slower speed
+/// Approximation based on binomial filter. Algorithm is close to stack blur with better results and a little slower speed.
 /// O(1) complexity.
 ///
 /// # Arguments
@@ -947,7 +961,7 @@ pub fn fast_gaussian_f16(
 /// Approximation based on binomial filter. Algorithm is close to stack blur with better results and a little slower speed
 /// Results better than in stack blur however this a little slower.
 /// This is a very fast approximation using i32 accumulator size with radius less that *BASE_RADIUS_I64_CUTOFF*,
-/// after it to avoid overflowing fallback to i64 accumulator will be used with some computational slowdown with factor ~2
+/// after it to avoid overflowing fallback to i64 accumulator will be used with some computational slowdown with factor ~2.
 /// O(1) complexity.
 ///
 /// # Arguments
@@ -987,7 +1001,7 @@ pub fn fast_gaussian_plane(
 /// Performs gaussian approximation on the f32 plane.
 ///
 /// Fast gaussian approximation for f32 plane. No limitations are expected.
-/// Approximation based on binomial filter. Algorithm is close to stack blur with better results and a little slower speed
+/// Approximation based on binomial filter. Algorithm is close to stack blur with better results and a little slower speed.
 /// O(1) complexity.
 ///
 /// # Arguments

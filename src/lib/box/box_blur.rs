@@ -25,6 +25,8 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use colorutils_rs::linear_to_planar::linear_to_plane;
+use colorutils_rs::planar_to_linear::plane_to_linear;
 use colorutils_rs::{
     linear_to_rgb, linear_to_rgba, rgb_to_linear, rgba_to_linear, TransferFunction,
 };
@@ -40,15 +42,11 @@ use crate::r#box::box_blur_neon::neon_support;
     target_feature = "sse4.1"
 ))]
 use crate::r#box::box_blur_sse::sse_support;
+use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::ThreadingPolicy;
 
-fn box_blur_horizontal_pass_impl<
-    T,
-    J,
-    const CHANNELS_CONFIGURATION: usize,
-    const USE_ROUNDING: bool,
->(
+fn box_blur_horizontal_pass_impl<T, J, const CHANNELS_CONFIGURATION: usize>(
     src: &[T],
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<T>,
@@ -72,117 +70,86 @@ fn box_blur_horizontal_pass_impl<
         + std::ops::AddAssign
         + std::ops::SubAssign
         + AsPrimitive<f32>,
+    f32: ToStorage<T>,
 {
-    let box_channels: FastBlurChannels = CHANNELS_CONFIGURATION.into();
     let kernel_size = radius * 2 + 1;
     let edge_count = J::from_u32((kernel_size / 2) + 1).unwrap();
     let half_kernel = kernel_size / 2;
-    let channels_count = match box_channels {
-        FastBlurChannels::Channels3 => 3,
-        FastBlurChannels::Channels4 => 4,
-    } as usize;
 
     let weight = 1f32 / (radius * 2) as f32;
 
     for y in start_y..end_y {
-        let mut kernel: [J; 4] = [J::from_u32(0u32).unwrap(); 4];
+        let mut weight0;
+        let mut weight1 = J::from_u32(0u32).unwrap();
+        let mut weight2 = J::from_u32(0u32).unwrap();
+        let mut weight3 = J::from_u32(0u32).unwrap();
         let y_src_shift = (y * src_stride) as usize;
         let y_dst_shift = (y * dst_stride) as usize;
         // replicate edge
-        kernel[0] = (unsafe { *src.get_unchecked(y_src_shift) }.as_()) * edge_count;
-        kernel[1] = (unsafe { *src.get_unchecked(y_src_shift + 1) }.as_()) * edge_count;
-        kernel[2] = (unsafe { *src.get_unchecked(y_src_shift + 2) }.as_()) * edge_count;
-        match box_channels {
-            FastBlurChannels::Channels3 => {}
-            FastBlurChannels::Channels4 => {
-                kernel[3] = (unsafe { *src.get_unchecked(y_src_shift + 3) }.as_()) * edge_count;
-            }
+        weight0 = (unsafe { *src.get_unchecked(y_src_shift) }.as_()) * edge_count;
+        if CHANNELS_CONFIGURATION > 1 {
+            weight1 = (unsafe { *src.get_unchecked(y_src_shift + 1) }.as_()) * edge_count;
+        }
+        if CHANNELS_CONFIGURATION > 2 {
+            weight2 = (unsafe { *src.get_unchecked(y_src_shift + 2) }.as_()) * edge_count;
+        }
+        if CHANNELS_CONFIGURATION == 4 {
+            weight3 = (unsafe { *src.get_unchecked(y_src_shift + 3) }.as_()) * edge_count;
         }
 
         for x in 1..std::cmp::min(half_kernel, width) {
-            let px = x as usize * channels_count;
-            kernel[0] += unsafe { *src.get_unchecked(y_src_shift + px) }.as_();
-            kernel[1] += unsafe { *src.get_unchecked(y_src_shift + px + 1) }.as_();
-            kernel[2] += unsafe { *src.get_unchecked(y_src_shift + px + 2) }.as_();
-            match box_channels {
-                FastBlurChannels::Channels3 => {}
-                FastBlurChannels::Channels4 => {
-                    kernel[3] += unsafe { *src.get_unchecked(y_src_shift + px + 3) }.as_();
-                }
+            let px = x as usize * CHANNELS_CONFIGURATION;
+            weight0 += unsafe { *src.get_unchecked(y_src_shift + px) }.as_();
+            if CHANNELS_CONFIGURATION > 1 {
+                weight1 += unsafe { *src.get_unchecked(y_src_shift + px + 1) }.as_();
+            }
+            if CHANNELS_CONFIGURATION > 2 {
+                weight2 += unsafe { *src.get_unchecked(y_src_shift + px + 2) }.as_();
+            }
+            if CHANNELS_CONFIGURATION == 4 {
+                weight3 += unsafe { *src.get_unchecked(y_src_shift + px + 3) }.as_();
             }
         }
 
         for x in 0..width {
-            let next = std::cmp::min(x + half_kernel, width - 1) as usize * channels_count;
+            let next = std::cmp::min(x + half_kernel, width - 1) as usize * CHANNELS_CONFIGURATION;
             let previous =
-                std::cmp::max(x as i64 - half_kernel as i64, 0) as usize * channels_count;
-            let px = x as usize * channels_count;
+                std::cmp::max(x as i64 - half_kernel as i64, 0) as usize * CHANNELS_CONFIGURATION;
+            let px = x as usize * CHANNELS_CONFIGURATION;
             // Prune previous and add next and compute mean
 
-            kernel[0] += unsafe { *src.get_unchecked(y_src_shift + next) }.as_();
-            kernel[1] += unsafe { *src.get_unchecked(y_src_shift + next + 1) }.as_();
-            kernel[2] += unsafe { *src.get_unchecked(y_src_shift + next + 2) }.as_();
+            weight0 += unsafe { *src.get_unchecked(y_src_shift + next) }.as_();
+            if CHANNELS_CONFIGURATION > 1 {
+                weight1 += unsafe { *src.get_unchecked(y_src_shift + next + 1) }.as_();
+            }
+            if CHANNELS_CONFIGURATION > 2 {
+                weight2 += unsafe { *src.get_unchecked(y_src_shift + next + 2) }.as_();
+            }
 
-            kernel[0] -= unsafe { *src.get_unchecked(y_src_shift + previous) }.as_();
-            kernel[1] -= unsafe { *src.get_unchecked(y_src_shift + previous + 1) }.as_();
-            kernel[2] -= unsafe { *src.get_unchecked(y_src_shift + previous + 2) }.as_();
+            weight0 -= unsafe { *src.get_unchecked(y_src_shift + previous) }.as_();
+            if CHANNELS_CONFIGURATION > 1 {
+                weight1 -= unsafe { *src.get_unchecked(y_src_shift + previous + 1) }.as_();
+            }
+            if CHANNELS_CONFIGURATION > 2 {
+                weight2 -= unsafe { *src.get_unchecked(y_src_shift + previous + 2) }.as_();
+            }
 
-            match box_channels {
-                FastBlurChannels::Channels3 => {}
-                FastBlurChannels::Channels4 => {
-                    kernel[3] += unsafe { *src.get_unchecked(y_src_shift + next + 3) }.as_();
-                    kernel[3] -= unsafe { *src.get_unchecked(y_src_shift + previous + 3) }.as_();
-                }
+            if CHANNELS_CONFIGURATION == 4 {
+                weight3 += unsafe { *src.get_unchecked(y_src_shift + next + 3) }.as_();
+                weight3 -= unsafe { *src.get_unchecked(y_src_shift + previous + 3) }.as_();
             }
 
             let write_offset = y_dst_shift + px;
             unsafe {
-                if USE_ROUNDING {
-                    unsafe_dst.write(
-                        write_offset + 0,
-                        T::from_f32((kernel[0].as_() * weight).round()).unwrap_or_default(),
-                    );
-                    unsafe_dst.write(
-                        write_offset + 1,
-                        T::from_f32((kernel[1].as_() * weight).round()).unwrap_or_default(),
-                    );
-                    unsafe_dst.write(
-                        write_offset + 2,
-                        T::from_f32((kernel[2].as_() * weight).round()).unwrap_or_default(),
-                    );
-
-                    match box_channels {
-                        FastBlurChannels::Channels3 => {}
-                        FastBlurChannels::Channels4 => {
-                            unsafe_dst.write(
-                                write_offset + 3,
-                                T::from_f32((kernel[3].as_() * weight).round()).unwrap_or_default(),
-                            );
-                        }
-                    }
-                } else {
-                    unsafe_dst.write(
-                        write_offset + 0,
-                        T::from_f32(kernel[0].as_() * weight).unwrap_or_default(),
-                    );
-                    unsafe_dst.write(
-                        write_offset + 1,
-                        T::from_f32(kernel[1].as_() * weight).unwrap_or_default(),
-                    );
-                    unsafe_dst.write(
-                        write_offset + 2,
-                        T::from_f32(kernel[2].as_() * weight).unwrap_or_default(),
-                    );
-
-                    match box_channels {
-                        FastBlurChannels::Channels3 => {}
-                        FastBlurChannels::Channels4 => {
-                            unsafe_dst.write(
-                                write_offset + 3,
-                                T::from_f32(kernel[3].as_() * weight).unwrap_or_default(),
-                            );
-                        }
-                    }
+                unsafe_dst.write(write_offset + 0, (weight0.as_() * weight).to_());
+                if CHANNELS_CONFIGURATION > 1 {
+                    unsafe_dst.write(write_offset + 1, (weight1.as_() * weight).to_());
+                }
+                if CHANNELS_CONFIGURATION > 2 {
+                    unsafe_dst.write(write_offset + 2, (weight2.as_() * weight).to_());
+                }
+                if CHANNELS_CONFIGURATION == 4 {
+                    unsafe_dst.write(write_offset + 3, (weight3.as_() * weight).to_());
                 }
             }
         }
@@ -210,6 +177,7 @@ fn box_blur_horizontal_pass<
         + AsPrimitive<u64>
         + AsPrimitive<f32>
         + AsPrimitive<f64>,
+    f32: ToStorage<T>,
 {
     let mut _dispatcher_horizontal: fn(
         src: &[T],
@@ -220,29 +188,27 @@ fn box_blur_horizontal_pass<
         radius: u32,
         start_y: u32,
         end_y: u32,
-    ) = box_blur_horizontal_pass_impl::<T, u32, CHANNEL_CONFIGURATION, false>;
-    if std::any::type_name::<T>() == "u8" || std::any::type_name::<T>() == "u16" {
-        _dispatcher_horizontal =
-            box_blur_horizontal_pass_impl::<T, u32, CHANNEL_CONFIGURATION, true>;
-    } else if std::any::type_name::<T>() == "f32" {
-        _dispatcher_horizontal =
-            box_blur_horizontal_pass_impl::<T, f32, CHANNEL_CONFIGURATION, false>;
+    ) = box_blur_horizontal_pass_impl::<T, u32, CHANNEL_CONFIGURATION>;
+    if std::any::type_name::<T>() == "f32" || std::any::type_name::<T>() == "f16" {
+        _dispatcher_horizontal = box_blur_horizontal_pass_impl::<T, f32, CHANNEL_CONFIGURATION>;
     }
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-    {
-        if std::any::type_name::<T>() == "u8" {
-            _dispatcher_horizontal =
-                neon_support::box_blur_horizontal_pass_neon::<T, CHANNEL_CONFIGURATION>;
+    if CHANNEL_CONFIGURATION >= 3 {
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            if std::any::type_name::<T>() == "u8" {
+                _dispatcher_horizontal =
+                    neon_support::box_blur_horizontal_pass_neon::<T, CHANNEL_CONFIGURATION>;
+            }
         }
-    }
-    #[cfg(all(
-        any(target_arch = "x86_64", target_arch = "x86"),
-        target_feature = "sse4.1"
-    ))]
-    {
-        if std::any::type_name::<T>() == "u8" {
-            _dispatcher_horizontal =
-                sse_support::box_blur_horizontal_pass_sse::<T, { CHANNEL_CONFIGURATION }>;
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "sse4.1"
+        ))]
+        {
+            if std::any::type_name::<T>() == "u8" {
+                _dispatcher_horizontal =
+                    sse_support::box_blur_horizontal_pass_sse::<T, { CHANNEL_CONFIGURATION }>;
+            }
         }
     }
     let unsafe_dst = UnsafeSlice::new(dst);
@@ -271,7 +237,7 @@ fn box_blur_horizontal_pass<
     });
 }
 
-fn box_blur_vertical_pass_impl<T, J, const CHANNEL_CONFIGURATION: usize, const USE_ROUNDING: bool>(
+fn box_blur_vertical_pass_impl<T, J, const CHANNELS_CONFIGURATION: usize>(
     src: &[T],
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<T>,
@@ -296,43 +262,44 @@ fn box_blur_vertical_pass_impl<T, J, const CHANNEL_CONFIGURATION: usize, const U
         + std::ops::AddAssign
         + std::ops::SubAssign
         + AsPrimitive<f32>,
+    f32: ToStorage<T>,
 {
-    let box_channels: FastBlurChannels = CHANNEL_CONFIGURATION.into();
     let kernel_size = radius * 2 + 1;
 
     let edge_count = J::from_u32((kernel_size / 2) + 1).unwrap();
     let half_kernel = kernel_size / 2;
-    let channels_count = match box_channels {
-        FastBlurChannels::Channels3 => 3,
-        FastBlurChannels::Channels4 => 4,
-    };
 
     let weight = 1f32 / (radius * 2) as f32;
 
     for x in start_x..end_x {
-        let mut kernel: [J; 4] = [J::from_u32(0u32).unwrap(); 4];
+        let mut weight0;
+        let mut weight1 = J::from_u32(0u32).unwrap();
+        let mut weight2 = J::from_u32(0u32).unwrap();
+        let mut weight3 = J::from_u32(0u32).unwrap();
         // replicate edge
-        let px = x as usize * channels_count;
-        kernel[0] = (unsafe { *src.get_unchecked(px) }.as_()) * edge_count;
-        kernel[1] = (unsafe { *src.get_unchecked(px + 1) }.as_()) * edge_count;
-        kernel[2] = (unsafe { *src.get_unchecked(px + 2) }.as_()) * edge_count;
-        match box_channels {
-            FastBlurChannels::Channels3 => {}
-            FastBlurChannels::Channels4 => {
-                kernel[3] = (unsafe { *src.get_unchecked(px + 3) }.as_()) * edge_count;
-            }
+        let px = x as usize * CHANNELS_CONFIGURATION;
+        weight0 = (unsafe { *src.get_unchecked(px) }.as_()) * edge_count;
+        if CHANNELS_CONFIGURATION > 1 {
+            weight1 = (unsafe { *src.get_unchecked(px + 1) }.as_()) * edge_count;
+        }
+        if CHANNELS_CONFIGURATION > 2 {
+            weight2 = (unsafe { *src.get_unchecked(px + 2) }.as_()) * edge_count;
+        }
+        if CHANNELS_CONFIGURATION == 4 {
+            weight3 = (unsafe { *src.get_unchecked(px + 3) }.as_()) * edge_count;
         }
 
         for y in 1..std::cmp::min(half_kernel, height) {
             let y_src_shift = y as usize * src_stride as usize;
-            kernel[0] += unsafe { *src.get_unchecked(y_src_shift + px) }.as_();
-            kernel[1] += unsafe { *src.get_unchecked(y_src_shift + px + 1) }.as_();
-            kernel[2] += unsafe { *src.get_unchecked(y_src_shift + px + 2) }.as_();
-            match box_channels {
-                FastBlurChannels::Channels3 => {}
-                FastBlurChannels::Channels4 => {
-                    kernel[3] += unsafe { *src.get_unchecked(y_src_shift + px + 3) }.as_();
-                }
+            weight0 += unsafe { *src.get_unchecked(y_src_shift + px) }.as_();
+            if CHANNELS_CONFIGURATION > 1 {
+                weight1 += unsafe { *src.get_unchecked(y_src_shift + px + 1) }.as_();
+            }
+            if CHANNELS_CONFIGURATION > 2 {
+                weight2 += unsafe { *src.get_unchecked(y_src_shift + px + 2) }.as_();
+            }
+            if CHANNELS_CONFIGURATION == 4 {
+                weight3 += unsafe { *src.get_unchecked(y_src_shift + px + 3) }.as_();
             }
         }
 
@@ -343,70 +310,38 @@ fn box_blur_vertical_pass_impl<T, J, const CHANNEL_CONFIGURATION: usize, const U
             let y_dst_shift = dst_stride as usize * y as usize;
             // Prune previous and add next and compute mean
 
-            kernel[0] += unsafe { *src.get_unchecked(next + px) }.as_();
-            kernel[1] += unsafe { *src.get_unchecked(next + px + 1) }.as_();
-            kernel[2] += unsafe { *src.get_unchecked(next + px + 2) }.as_();
+            weight0 += unsafe { *src.get_unchecked(next + px) }.as_();
+            if CHANNELS_CONFIGURATION > 1 {
+                weight1 += unsafe { *src.get_unchecked(next + px + 1) }.as_();
+            }
+            if CHANNELS_CONFIGURATION > 2 {
+                weight2 += unsafe { *src.get_unchecked(next + px + 2) }.as_();
+            }
 
-            kernel[0] -= unsafe { *src.get_unchecked(previous + px) }.as_();
-            kernel[1] -= unsafe { *src.get_unchecked(previous + px + 1) }.as_();
-            kernel[2] -= unsafe { *src.get_unchecked(previous + px + 2) }.as_();
+            weight0 -= unsafe { *src.get_unchecked(previous + px) }.as_();
+            if CHANNELS_CONFIGURATION > 1 {
+                weight1 -= unsafe { *src.get_unchecked(previous + px + 1) }.as_();
+            }
+            if CHANNELS_CONFIGURATION > 2 {
+                weight2 -= unsafe { *src.get_unchecked(previous + px + 2) }.as_();
+            }
 
-            match box_channels {
-                FastBlurChannels::Channels3 => {}
-                FastBlurChannels::Channels4 => {
-                    kernel[3] += unsafe { *src.get_unchecked(next + px + 3) }.as_();
-                    kernel[3] -= unsafe { *src.get_unchecked(previous + px + 3) }.as_();
-                }
+            if CHANNELS_CONFIGURATION == 4 {
+                weight3 += unsafe { *src.get_unchecked(next + px + 3) }.as_();
+                weight3 -= unsafe { *src.get_unchecked(previous + px + 3) }.as_();
             }
 
             let write_offset = y_dst_shift + px;
             unsafe {
-                if USE_ROUNDING {
-                    unsafe_dst.write(
-                        write_offset + 0,
-                        T::from_f32((kernel[0].as_() * weight).round()).unwrap_or_default(),
-                    );
-                    unsafe_dst.write(
-                        write_offset + 1,
-                        T::from_f32((kernel[1].as_() * weight).round()).unwrap_or_default(),
-                    );
-                    unsafe_dst.write(
-                        write_offset + 2,
-                        T::from_f32((kernel[2].as_() * weight).round()).unwrap_or_default(),
-                    );
-
-                    match box_channels {
-                        FastBlurChannels::Channels3 => {}
-                        FastBlurChannels::Channels4 => {
-                            unsafe_dst.write(
-                                write_offset + 3,
-                                T::from_f32((kernel[3].as_() * weight).round()).unwrap_or_default(),
-                            );
-                        }
-                    }
-                } else {
-                    unsafe_dst.write(
-                        write_offset + 0,
-                        T::from_f32(kernel[0].as_() * weight).unwrap_or_default(),
-                    );
-                    unsafe_dst.write(
-                        write_offset + 1,
-                        T::from_f32(kernel[1].as_() * weight).unwrap_or_default(),
-                    );
-                    unsafe_dst.write(
-                        write_offset + 2,
-                        T::from_f32(kernel[2].as_() * weight).unwrap_or_default(),
-                    );
-
-                    match box_channels {
-                        FastBlurChannels::Channels3 => {}
-                        FastBlurChannels::Channels4 => {
-                            unsafe_dst.write(
-                                write_offset + 3,
-                                T::from_f32(kernel[3].as_() * weight).unwrap_or_default(),
-                            );
-                        }
-                    }
+                unsafe_dst.write(write_offset + 0, (weight0.as_() * weight).to_());
+                if CHANNELS_CONFIGURATION > 1 {
+                    unsafe_dst.write(write_offset + 1, (weight1.as_() * weight).to_());
+                }
+                if CHANNELS_CONFIGURATION > 2 {
+                    unsafe_dst.write(write_offset + 2, (weight2.as_() * weight).to_());
+                }
+                if CHANNELS_CONFIGURATION == 4 {
+                    unsafe_dst.write(write_offset + 3, (weight3.as_() * weight).to_());
                 }
             }
         }
@@ -434,6 +369,7 @@ fn box_blur_vertical_pass<
         + AsPrimitive<u64>
         + AsPrimitive<f32>
         + AsPrimitive<f64>,
+    f32: ToStorage<T>,
 {
     let mut _dispatcher_vertical: fn(
         src: &[T],
@@ -445,27 +381,27 @@ fn box_blur_vertical_pass<
         radius: u32,
         start_x: u32,
         end_x: u32,
-    ) = box_blur_vertical_pass_impl::<T, u32, CHANNEL_CONFIGURATION, false>;
-    if std::any::type_name::<T>() == "u8" || std::any::type_name::<T>() == "u16" {
-        _dispatcher_vertical = box_blur_vertical_pass_impl::<T, u32, CHANNEL_CONFIGURATION, true>;
-    } else if std::any::type_name::<T>() == "f32" {
-        _dispatcher_vertical = box_blur_vertical_pass_impl::<T, f32, CHANNEL_CONFIGURATION, false>;
+    ) = box_blur_vertical_pass_impl::<T, u32, CHANNEL_CONFIGURATION>;
+    if std::any::type_name::<T>() == "f32" || std::any::type_name::<T>() == "f16" {
+        _dispatcher_vertical = box_blur_vertical_pass_impl::<T, f32, CHANNEL_CONFIGURATION>;
     }
-    #[cfg(all(
-        any(target_arch = "x86_64", target_arch = "x86"),
-        target_feature = "sse4.1"
-    ))]
-    {
-        if std::any::type_name::<T>() == "u8" {
-            _dispatcher_vertical =
-                sse_support::box_blur_vertical_pass_sse::<T, CHANNEL_CONFIGURATION>;
+    if CHANNEL_CONFIGURATION >= 3 {
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "sse4.1"
+        ))]
+        {
+            if std::any::type_name::<T>() == "u8" {
+                _dispatcher_vertical =
+                    sse_support::box_blur_vertical_pass_sse::<T, CHANNEL_CONFIGURATION>;
+            }
         }
-    }
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-    {
-        if std::any::type_name::<T>() == "u8" {
-            _dispatcher_vertical =
-                neon_support::box_blur_vertical_pass_neon::<T, CHANNEL_CONFIGURATION>;
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            if std::any::type_name::<T>() == "u8" {
+                _dispatcher_vertical =
+                    neon_support::box_blur_vertical_pass_neon::<T, CHANNEL_CONFIGURATION>;
+            }
         }
     }
     let unsafe_dst = UnsafeSlice::new(dst);
@@ -517,6 +453,7 @@ fn box_blur_impl<
         + AsPrimitive<u64>
         + AsPrimitive<f32>
         + AsPrimitive<f64>,
+    f32: ToStorage<T>,
 {
     let mut transient: Vec<T> =
         vec![T::from_u32(0).unwrap_or_default(); dst_stride as usize * height as usize];
@@ -577,6 +514,19 @@ pub fn box_blur(
         .build()
         .unwrap();
     match channels {
+        FastBlurChannels::Plane => {
+            box_blur_impl::<u8, 1>(
+                src,
+                src_stride,
+                dst,
+                dst_stride,
+                width,
+                height,
+                radius,
+                &pool,
+                thread_count,
+            );
+        }
         FastBlurChannels::Channels3 => {
             box_blur_impl::<u8, 3>(
                 src,
@@ -638,6 +588,19 @@ pub fn box_blur_u16(
         .build()
         .unwrap();
     match channels {
+        FastBlurChannels::Plane => {
+            box_blur_impl::<u16, 1>(
+                src,
+                stride,
+                dst,
+                stride,
+                width,
+                height,
+                radius,
+                &pool,
+                thread_count,
+            );
+        }
         FastBlurChannels::Channels3 => {
             box_blur_impl::<u16, 3>(
                 src,
@@ -698,6 +661,19 @@ pub fn box_blur_f32(
         .build()
         .unwrap();
     match channels {
+        FastBlurChannels::Plane => {
+            box_blur_impl::<f32, 1>(
+                src,
+                stride,
+                dst,
+                stride,
+                width,
+                height,
+                radius,
+                &pool,
+                thread_count,
+            );
+        }
         FastBlurChannels::Channels3 => {
             box_blur_impl::<f32, 3>(
                 src,
@@ -763,11 +739,13 @@ pub fn box_blur_in_linear(
         vec![0f32; width as usize * height as usize * channels.get_channels()];
 
     let forward_transformer = match channels {
+        FastBlurChannels::Plane => plane_to_linear,
         FastBlurChannels::Channels3 => rgb_to_linear,
         FastBlurChannels::Channels4 => rgba_to_linear,
     };
 
     let inverse_transformer = match channels {
+        FastBlurChannels::Plane => linear_to_plane,
         FastBlurChannels::Channels3 => linear_to_rgb,
         FastBlurChannels::Channels4 => linear_to_rgba,
     };
@@ -823,6 +801,7 @@ fn tent_blur_impl<
         + AsPrimitive<u64>
         + AsPrimitive<f32>
         + AsPrimitive<f64>,
+    f32: ToStorage<T>,
 {
     let thread_count = threading_policy.get_threads_count(width, height) as u32;
     let pool = rayon::ThreadPoolBuilder::new()
@@ -886,6 +865,18 @@ pub fn tent_blur(
     threading_policy: ThreadingPolicy,
 ) {
     match channels {
+        FastBlurChannels::Plane => {
+            tent_blur_impl::<u8, 1>(
+                src,
+                src_stride,
+                dst,
+                dst_stride,
+                width,
+                height,
+                radius,
+                threading_policy,
+            );
+        }
         FastBlurChannels::Channels3 => {
             tent_blur_impl::<u8, 3>(
                 src,
@@ -943,6 +934,18 @@ pub fn tent_blur_u16(
 ) {
     let stride = width * channels.get_channels() as u32;
     match channels {
+        FastBlurChannels::Plane => {
+            tent_blur_impl::<u16, 1>(
+                src,
+                stride,
+                dst,
+                stride,
+                width,
+                height,
+                radius,
+                threading_policy,
+            );
+        }
         FastBlurChannels::Channels3 => {
             tent_blur_impl::<u16, 3>(
                 src,
@@ -997,6 +1000,18 @@ pub fn tent_blur_f32(
 ) {
     let stride = width * channels.get_channels() as u32;
     match channels {
+        FastBlurChannels::Plane => {
+            tent_blur_impl::<f32, 1>(
+                src,
+                stride,
+                dst,
+                stride,
+                width,
+                height,
+                radius,
+                threading_policy,
+            );
+        }
         FastBlurChannels::Channels3 => {
             tent_blur_impl::<f32, 3>(
                 src,
@@ -1063,11 +1078,13 @@ pub fn tent_blur_in_linear(
         vec![0f32; width as usize * height as usize * channels.get_channels()];
 
     let forward_transformer = match channels {
+        FastBlurChannels::Plane => plane_to_linear,
         FastBlurChannels::Channels3 => rgb_to_linear,
         FastBlurChannels::Channels4 => rgba_to_linear,
     };
 
     let inverse_transformer = match channels {
+        FastBlurChannels::Plane => linear_to_plane,
         FastBlurChannels::Channels3 => linear_to_rgb,
         FastBlurChannels::Channels4 => linear_to_rgba,
     };
@@ -1123,6 +1140,7 @@ fn gaussian_box_blur_impl<
         + AsPrimitive<u64>
         + AsPrimitive<f32>
         + AsPrimitive<f64>,
+    f32: ToStorage<T>,
 {
     let thread_count = threading_policy.get_threads_count(width, height) as u32;
     let pool = rayon::ThreadPoolBuilder::new()
@@ -1200,6 +1218,18 @@ pub fn gaussian_box_blur(
     threading_policy: ThreadingPolicy,
 ) {
     match channels {
+        FastBlurChannels::Plane => {
+            gaussian_box_blur_impl::<u8, 1>(
+                src,
+                src_stride,
+                dst,
+                dst_stride,
+                width,
+                height,
+                radius,
+                threading_policy,
+            );
+        }
         FastBlurChannels::Channels3 => {
             gaussian_box_blur_impl::<u8, 3>(
                 src,
@@ -1258,6 +1288,18 @@ pub fn gaussian_box_blur_u16(
 ) {
     let stride = width * channels.get_channels() as u32;
     match channels {
+        FastBlurChannels::Plane => {
+            gaussian_box_blur_impl::<u16, 1>(
+                src,
+                stride,
+                dst,
+                stride,
+                width,
+                height,
+                radius,
+                threading_policy,
+            );
+        }
         FastBlurChannels::Channels3 => {
             gaussian_box_blur_impl::<u16, 3>(
                 src,
@@ -1315,6 +1357,18 @@ pub fn gaussian_box_blur_f32(
 ) {
     let stride = width * channels.get_channels() as u32;
     match channels {
+        FastBlurChannels::Plane => {
+            gaussian_box_blur_impl::<f32, 1>(
+                src,
+                stride,
+                dst,
+                stride,
+                width,
+                height,
+                radius,
+                threading_policy,
+            );
+        }
         FastBlurChannels::Channels3 => {
             gaussian_box_blur_impl::<f32, 3>(
                 src,
@@ -1381,11 +1435,13 @@ pub fn gaussian_box_blur_in_linear(
         vec![0f32; width as usize * height as usize * channels.get_channels()];
 
     let forward_transformer = match channels {
+        FastBlurChannels::Plane => plane_to_linear,
         FastBlurChannels::Channels3 => rgb_to_linear,
         FastBlurChannels::Channels4 => rgba_to_linear,
     };
 
     let inverse_transformer = match channels {
+        FastBlurChannels::Plane => linear_to_plane,
         FastBlurChannels::Channels3 => linear_to_rgb,
         FastBlurChannels::Channels4 => linear_to_rgba,
     };

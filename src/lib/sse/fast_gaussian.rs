@@ -29,13 +29,14 @@ use crate::mul_table::{MUL_TABLE_DOUBLE, SHR_TABLE_DOUBLE};
 use crate::reflect_101;
 use crate::reflect_index;
 use crate::sse::utils::load_u8_s32_fast;
-use crate::sse::{_mm_mul_epi64, _mm_packus_epi64};
+use crate::sse::{_mm_packus_epi64};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, EdgeMode};
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
+use erydanos::sse::epi64::_mm_mul_epi64;
 
 pub fn fast_gaussian_horizontal_pass_sse_u8<
     T,
@@ -104,7 +105,7 @@ pub fn fast_gaussian_horizontal_pass_sse_u8<
                 let arr_index = ((x - radius_64) & 1023) as usize;
                 let d_arr_index = (x & 1023) as usize;
 
-                let d_buf_ptr = buffer[d_arr_index].as_mut_ptr();
+                let d_buf_ptr = unsafe { buffer.as_mut_ptr().add(d_arr_index) as *const i32 };
                 let mut d_stored = unsafe { _mm_loadu_si128(d_buf_ptr as *const __m128i) };
                 d_stored = unsafe { _mm_slli_epi32::<1>(d_stored) };
 

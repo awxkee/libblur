@@ -65,17 +65,21 @@ fn add_rgb_pixels<const CHANNEL_CONFIGURATION: usize>(
             let x = *k + 1;
             *k = x;
         }
-        let v1 = unsafe { *src.get_unchecked(bytes_offset + 1) };
-        unsafe {
-            let k = histogram.g.get_unchecked_mut(usize::from(v1));
-            let x = *k + 1;
-            *k = x;
+        if CHANNEL_CONFIGURATION > 1 {
+            let v1 = unsafe { *src.get_unchecked(bytes_offset + 1) };
+            unsafe {
+                let k = histogram.g.get_unchecked_mut(usize::from(v1));
+                let x = *k + 1;
+                *k = x;
+            }
         }
-        let v2 = unsafe { *src.get_unchecked(bytes_offset + 2) };
-        unsafe {
-            let k = histogram.b.get_unchecked_mut(usize::from(v2));
-            let x = *k + 1;
-            *k = x;
+        if CHANNEL_CONFIGURATION > 2 {
+            let v2 = unsafe { *src.get_unchecked(bytes_offset + 2) };
+            unsafe {
+                let k = histogram.b.get_unchecked_mut(usize::from(v2));
+                let x = *k + 1;
+                *k = x;
+            }
         }
         if CHANNEL_CONFIGURATION == 4 {
             unsafe {
@@ -117,17 +121,21 @@ fn remove_rgb_pixels<const CHANNELS_CONFIGURATION: usize>(
             let x = *k - 1;
             *k = x;
         }
-        let v1 = unsafe { *src.get_unchecked(bytes_offset + 1) };
-        unsafe {
-            let k = histogram.g.get_unchecked_mut(usize::from(v1));
-            let x = *k - 1;
-            *k = x;
+        if CHANNELS_CONFIGURATION > 1 {
+            let v1 = unsafe { *src.get_unchecked(bytes_offset + 1) };
+            unsafe {
+                let k = histogram.g.get_unchecked_mut(usize::from(v1));
+                let x = *k - 1;
+                *k = x;
+            }
         }
-        let v2 = unsafe { *src.get_unchecked(bytes_offset + 2) };
-        unsafe {
-            let k = histogram.b.get_unchecked_mut(usize::from(v2));
-            let x = *k - 1;
-            *k = x;
+        if CHANNELS_CONFIGURATION > 2 {
+            let v2 = unsafe { *src.get_unchecked(bytes_offset + 2) };
+            unsafe {
+                let k = histogram.b.get_unchecked_mut(usize::from(v2));
+                let x = *k - 1;
+                *k = x;
+            }
         }
         if CHANNELS_CONFIGURATION == 4 {
             let v3 = unsafe { *src.get_unchecked(bytes_offset + 3) };
@@ -235,14 +243,18 @@ fn median_blur_impl<const CHANNELS_CONFIGURATION: usize>(
                 unsafe {
                     let bytes_offset = y_dst_offset + px;
                     unsafe_dst.write(bytes_offset, median_filter(histogram.r, histogram.n) as u8);
-                    unsafe_dst.write(
-                        bytes_offset + 1,
-                        median_filter(histogram.g, histogram.n) as u8,
-                    );
-                    unsafe_dst.write(
-                        bytes_offset + 2,
-                        median_filter(histogram.b, histogram.n) as u8,
-                    );
+                    if CHANNELS_CONFIGURATION > 1 {
+                        unsafe_dst.write(
+                            bytes_offset + 1,
+                            median_filter(histogram.g, histogram.n) as u8,
+                        );
+                    }
+                    if CHANNELS_CONFIGURATION > 2 {
+                        unsafe_dst.write(
+                            bytes_offset + 2,
+                            median_filter(histogram.b, histogram.n) as u8,
+                        );
+                    }
                     if CHANNELS_CONFIGURATION == 4 {
                         unsafe_dst.write(
                             bytes_offset + 3,
@@ -255,8 +267,12 @@ fn median_blur_impl<const CHANNELS_CONFIGURATION: usize>(
                     let bytes_offset = y_dst_offset + px;
                     let src_offset = y_src_offset + px;
                     unsafe_dst.write(bytes_offset, *src.get_unchecked(src_offset));
-                    unsafe_dst.write(bytes_offset + 1, *src.get_unchecked(src_offset + 1));
-                    unsafe_dst.write(bytes_offset + 2, *src.get_unchecked(src_offset + 2));
+                    if CHANNELS_CONFIGURATION > 1 {
+                        unsafe_dst.write(bytes_offset + 1, *src.get_unchecked(src_offset + 1));
+                    }
+                    if CHANNELS_CONFIGURATION > 2 {
+                        unsafe_dst.write(bytes_offset + 2, *src.get_unchecked(src_offset + 2));
+                    }
                     if CHANNELS_CONFIGURATION == 4 {
                         unsafe_dst.write(bytes_offset + 3, *src.get_unchecked(src_offset + 3));
                     }
@@ -308,6 +324,19 @@ pub fn median_blur(
                 end_y = height;
             }
             scope.spawn(move |_| match channels {
+                FastBlurChannels::Plane => {
+                    median_blur_impl::<1>(
+                        src,
+                        src_stride,
+                        &unsafe_dst,
+                        dst_stride,
+                        width,
+                        height,
+                        radius,
+                        start_y,
+                        end_y,
+                    );
+                }
                 FastBlurChannels::Channels3 => {
                     median_blur_impl::<3>(
                         src,

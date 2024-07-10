@@ -29,6 +29,7 @@
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
+use erydanos::sse::epi64::_mm_mul_epi64;
 
 #[allow(non_camel_case_types)]
 #[derive(Clone, Copy)]
@@ -126,33 +127,6 @@ pub(crate) unsafe fn _mm_mul_ps_epi32(ab: __m128i, cd: __m128) -> __m128i {
     const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
     let rs = _mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(cvt, cd));
     _mm_cvtps_epi32(rs)
-}
-
-#[inline(always)]
-pub(crate) unsafe fn _mm_mul_epi64(ab: __m128i, cd: __m128i) -> __m128i {
-    /* ac = (ab & 0xFFFFFFFF) * (cd & 0xFFFFFFFF); */
-    let ac = _mm_mul_epu32(ab, cd);
-
-    /* b = ab >> 32; */
-    let b = _mm_srli_epi64::<32>(ab);
-
-    /* bc = b * (cd & 0xFFFFFFFF); */
-    let bc = _mm_mul_epu32(b, cd);
-
-    /* d = cd >> 32; */
-    let d = _mm_srli_epi64::<32>(cd);
-
-    /* ad = (ab & 0xFFFFFFFF) * d; */
-    let ad = _mm_mul_epu32(ab, d);
-
-    /* high = bc + ad; */
-    let mut high = _mm_add_epi64(bc, ad);
-
-    /* high <<= 32; */
-    high = _mm_slli_epi64::<32>(high);
-
-    /* return ac + high; */
-    return _mm_add_epi64(high, ac);
 }
 
 #[inline(always)]

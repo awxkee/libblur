@@ -25,11 +25,12 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use std::arch::aarch64::*;
+
 use crate::neon::load_f32_fast;
 use crate::reflect_index;
 use crate::unsafe_slice::UnsafeSlice;
-use crate::{clamp_edge, reflect_101, EdgeMode, FastBlurChannels};
-use std::arch::aarch64::*;
+use crate::{clamp_edge, reflect_101, EdgeMode};
 
 pub fn fast_gaussian_next_vertical_pass_neon_f32<
     T,
@@ -46,7 +47,6 @@ pub fn fast_gaussian_next_vertical_pass_neon_f32<
 ) {
     let edge_mode: EdgeMode = EDGE_MODE.into();
     let bytes: &UnsafeSlice<'_, f32> = unsafe { std::mem::transmute(undef_bytes) };
-    let channels: FastBlurChannels = CHANNELS_COUNT.into();
     let mut buffer: [[f32; 4]; 1024] = [[0f32; 4]; 1024];
 
     let height_wide = height as i64;
@@ -54,10 +54,6 @@ pub fn fast_gaussian_next_vertical_pass_neon_f32<
     let radius_64 = radius as i64;
     let weight = 1.0f32 / ((radius as f32) * (radius as f32) * (radius as f32));
     let f_weight = unsafe { vdupq_n_f32(weight) };
-    let channels_count = match channels {
-        FastBlurChannels::Channels3 => 3,
-        FastBlurChannels::Channels4 => 4,
-    };
     for x in start..std::cmp::min(width, end) {
         let mut diffs: float32x4_t = unsafe { vdupq_n_f32(0f32) };
         let mut ders: float32x4_t = unsafe { vdupq_n_f32(0f32) };
@@ -68,7 +64,7 @@ pub fn fast_gaussian_next_vertical_pass_neon_f32<
             let current_y = (y * (stride as i64)) as usize;
 
             if y >= 0 {
-                let current_px = ((std::cmp::max(x, 0)) * channels_count) as usize;
+                let current_px = (std::cmp::max(x, 0)) as usize * CHANNELS_COUNT;
 
                 let prepared_px = unsafe { vmulq_f32(summs, f_weight) };
                 if CHANNELS_COUNT == 4 {
@@ -125,7 +121,7 @@ pub fn fast_gaussian_next_vertical_pass_neon_f32<
 
             let next_row_y = clamp_edge!(edge_mode, y + ((3 * radius_64) >> 1), 0, height_wide - 1)
                 * (stride as usize);
-            let next_row_x = (x * channels_count) as usize;
+            let next_row_x = x as usize * CHANNELS_COUNT;
 
             let s_ptr = unsafe { bytes.slice.as_ptr().add(next_row_y + next_row_x) as *mut f32 };
 
@@ -160,17 +156,13 @@ pub fn fast_gaussian_next_horizontal_pass_neon_f32<
     let edge_mode: EdgeMode = EDGE_MODE.into();
     let mut buffer: [[f32; 4]; 1024] = [[0f32; 4]; 1024];
     let bytes: &UnsafeSlice<'_, f32> = unsafe { std::mem::transmute(undef_bytes) };
-    let channels: FastBlurChannels = CHANNELS_COUNT.into();
 
     let width_wide = width as i64;
 
     let radius_64 = radius as i64;
     let weight = 1.0f32 / ((radius as f32) * (radius as f32) * (radius as f32));
     let f_weight = unsafe { vdupq_n_f32(weight) };
-    let channels_count = match channels {
-        FastBlurChannels::Channels3 => 3,
-        FastBlurChannels::Channels4 => 4,
-    };
+
     for y in start..std::cmp::min(height, end) {
         let mut diffs: float32x4_t = unsafe { vdupq_n_f32(0f32) };
         let mut ders: float32x4_t = unsafe { vdupq_n_f32(0f32) };
@@ -180,7 +172,7 @@ pub fn fast_gaussian_next_horizontal_pass_neon_f32<
 
         for x in (0 - 3 * radius_64)..(width as i64) {
             if x >= 0 {
-                let current_px = x as usize * channels_count as usize;
+                let current_px = x as usize * CHANNELS_COUNT as usize;
 
                 let prepared_px = unsafe { vmulq_f32(summs, f_weight) };
 
@@ -238,7 +230,7 @@ pub fn fast_gaussian_next_horizontal_pass_neon_f32<
 
             let next_row_y = (y as usize) * (stride as usize);
             let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide - 1);
-            let next_row_px = next_row_x * channels_count as usize;
+            let next_row_px = next_row_x * CHANNELS_COUNT;
 
             let s_ptr = unsafe { bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut f32 };
             let pixel_color = unsafe { load_f32_fast::<CHANNELS_COUNT>(s_ptr) };

@@ -26,6 +26,8 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::{FastBlurChannels, ThreadingPolicy};
+use colorutils_rs::linear_to_planar::linear_to_plane;
+use colorutils_rs::planar_to_linear::plane_to_linear;
 use colorutils_rs::{
     linear_to_rgb, linear_to_rgba, rgb_to_linear, rgba_to_linear, TransferFunction,
 };
@@ -33,8 +35,8 @@ use std::mem::size_of;
 
 /// Stack blur that will be performed in linear color space
 ///
-/// Blurs in linear color space produces most pleasant results and mathematically correct to do so however significantly slower
-/// This method is significantly slower than regular `u8` stack blur in perceptual colorspace
+/// Blurs in linear color space produces most pleasant results and mathematically correct to do so however significantly slower.
+/// This method is significantly slower than regular `u8` stack blur in perceptual colorspace.
 /// This is a very fast approximation using f32 accumulator size with radius less that *BASE_RADIUS_F64_CUTOFF*,
 /// after it to avoid overflowing fallback to f64 accumulator will be used with some computational slowdown with factor ~1.5-2
 ///
@@ -64,11 +66,13 @@ pub fn stack_blur_in_linear(
         vec![0f32; width as usize * height as usize * channels.get_channels()];
 
     let forward_transformer = match channels {
+        FastBlurChannels::Plane => plane_to_linear,
         FastBlurChannels::Channels3 => rgb_to_linear,
         FastBlurChannels::Channels4 => rgba_to_linear,
     };
 
     let inverse_transformer = match channels {
+        FastBlurChannels::Plane => linear_to_plane,
         FastBlurChannels::Channels3 => linear_to_rgb,
         FastBlurChannels::Channels4 => linear_to_rgba,
     };

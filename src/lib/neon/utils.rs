@@ -25,6 +25,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use erydanos::neon::general::vmulq_s64;
 use std::arch::aarch64::*;
 
 #[inline(always)]
@@ -140,42 +141,6 @@ pub unsafe fn vsubq_s64x2(ab: int64x2x2_t, cd: int64x2x2_t) -> int64x2x2_t {
 }
 
 #[inline(always)]
-pub unsafe fn vmulq_s64(ab: int64x2_t, cd: int64x2_t) -> int64x2_t {
-    /* ac = (ab & 0xFFFFFFFF) * (cd & 0xFFFFFFFF); */
-    let ac = vmulq_u32(
-        vreinterpretq_u32_u64(vreinterpretq_u64_s64(ab)),
-        vreinterpretq_u32_u64(vreinterpretq_u64_s64(cd)),
-    );
-
-    /* b = ab >> 32; */
-    let b = vshrq_n_u64::<32>(vreinterpretq_u64_s64(ab));
-
-    /* bc = b * (cd & 0xFFFFFFFF); */
-    let bc = vmulq_u32(
-        vreinterpretq_u32_u64(b),
-        vreinterpretq_u32_u64(vreinterpretq_u64_s64(cd)),
-    );
-
-    /* d = cd >> 32; */
-    let d = vshrq_n_u64::<32>(vreinterpretq_u64_s64(cd));
-
-    /* ad = (ab & 0xFFFFFFFF) * d; */
-    let ad = vmulq_u32(
-        vreinterpretq_u32_u64(vreinterpretq_u64_s64(ab)),
-        vreinterpretq_u32_u64(d),
-    );
-
-    /* high = bc + ad; */
-    let mut high = vaddq_s64(vreinterpretq_s64_u32(bc), vreinterpretq_s64_u32(ad));
-
-    /* high <<= 32; */
-    high = vshlq_n_s64::<32>(high);
-
-    /* return ac + high; */
-    return vaddq_s64(high, vreinterpretq_s64_u32(ac));
-}
-
-#[inline(always)]
 pub(crate) unsafe fn vdupq_n_s64x2(v: i64) -> int64x2x2_t {
     let vl = vdupq_n_s64(v);
     int64x2x2_t(vl, vl)
@@ -230,14 +195,6 @@ pub(crate) unsafe fn load_u8_u16_x2_fast<const CHANNELS_COUNT: usize>(
     };
 }
 
-#[allow(dead_code)]
-#[inline(always)]
-pub(crate) fn load_u8_s16<const CHANNELS_COUNT: usize>(ptr: *const u8) -> int16x4_t {
-    let pixel_color = unsafe { vreinterpret_s16_u16(load_u8_u16::<CHANNELS_COUNT>(ptr)) };
-    return pixel_color;
-}
-
-#[allow(dead_code)]
 #[inline(always)]
 pub(crate) unsafe fn load_u8_u16<const CHANNELS_COUNT: usize>(ptr: *const u8) -> uint16x4_t {
     let u_first = u16::from_le_bytes([ptr.read(), 0]);
