@@ -35,6 +35,7 @@ mod gaussian_neon_filter;
 mod gaussian_sse;
 mod gaussian_sse_filter;
 mod gaussian_vertical;
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 mod gauss_neon;
 
 pub use gaussian::*;

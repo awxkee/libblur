@@ -25,6 +25,8 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+use crate::gaussian::gauss_neon::horiz_one_channel_f32::gaussian_horiz_one_chan_filter_f32;
 use crate::gaussian::gaussian_filter::GaussianFilter;
 use crate::gaussian::gaussian_horizontal::gaussian_blur_horizontal_pass_impl_clip_edge;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
@@ -155,6 +157,12 @@ pub(crate) fn gaussian_blur_horizontal_pass_edge_clip_dispatch<
             {
                 _dispatcher = gaussian_blur_horizontal_pass_filter_neon::<T, CHANNEL_CONFIGURATION>;
             }
+        }
+    }
+    if CHANNEL_CONFIGURATION == 1 {
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            _dispatcher = gaussian_horiz_one_chan_filter_f32::<T>;
         }
     }
     let unsafe_dst = UnsafeSlice::new(dst);
