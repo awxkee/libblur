@@ -31,6 +31,11 @@ use rayon::ThreadPool;
 
 use crate::channels_configuration::FastBlurChannels;
 use crate::edge_mode::EdgeMode;
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+use crate::gaussian::gauss_neon::horiz_four_channel::gaussian_blur_horizontal_pass_neon;
+use crate::gaussian::gauss_neon::horiz_one_channel_f32::gaussian_horiz_one_chan_f32;
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+use crate::gaussian::gauss_neon::vert_four_channel::gaussian_blur_vertical_pass_neon;
 use crate::gaussian::gaussian_filter::create_filter;
 use crate::gaussian::gaussian_horizontal::gaussian_blur_horizontal_pass_impl;
 use crate::gaussian::gaussian_kernel::get_gaussian_kernel_1d;
@@ -38,8 +43,6 @@ use crate::gaussian::gaussian_kernel_filter_dispatch::{
     gaussian_blur_horizontal_pass_edge_clip_dispatch,
     gaussian_blur_vertical_pass_edge_clip_dispatch,
 };
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use crate::gaussian::gaussian_neon::neon_support;
 #[cfg(all(
     any(target_arch = "x86_64", target_arch = "x86"),
     target_feature = "sse4.1"
@@ -94,8 +97,15 @@ fn gaussian_blur_horizontal_pass<
             }
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             {
-                _dispatcher =
-                    neon_support::gaussian_blur_horizontal_pass_neon::<T, CHANNEL_CONFIGURATION>;
+                _dispatcher = gaussian_blur_horizontal_pass_neon::<T, CHANNEL_CONFIGURATION>;
+            }
+        }
+    }
+    if std::any::type_name::<T>() == "f32" {
+        if edge_mode == EdgeMode::Clamp && CHANNEL_CONFIGURATION == 1 {
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            {
+                _dispatcher = gaussian_horiz_one_chan_f32::<T>;
             }
         }
     }
@@ -203,8 +213,7 @@ fn gaussian_blur_vertical_pass<
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             // Generally vertical pass do not depends on any specific channel configuration so it is allowed to make a vectorized calls for any channel
-            _dispatcher =
-                neon_support::gaussian_blur_vertical_pass_neon::<T, CHANNEL_CONFIGURATION>;
+            _dispatcher = gaussian_blur_vertical_pass_neon::<T, CHANNEL_CONFIGURATION>;
         }
     }
     let unsafe_dst = UnsafeSlice::new(dst);
