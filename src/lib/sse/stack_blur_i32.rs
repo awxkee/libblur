@@ -29,11 +29,11 @@ use crate::mul_table::{MUL_TABLE_STACK_BLUR, SHR_TABLE_STACK_BLUR};
 use crate::sse::utils::{_mm_packus_epi64, load_u8_s32_fast, store_u8_s32};
 use crate::stack_blur::StackBlurPass;
 use crate::unsafe_slice::UnsafeSlice;
+use erydanos::sse::epi64::_mm_mul_epi64;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
-use erydanos::sse::epi64::_mm_mul_epi64;
 
 pub fn stack_blur_pass_sse<const COMPONENTS: usize>(
     pixels: &UnsafeSlice<u8>,

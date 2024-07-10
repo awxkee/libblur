@@ -75,7 +75,7 @@ Do not use when you need gaussian. Based on binomial filter, generally speed clo
 blur ( except NEON or except non multithreaded stack blur, on NEON much faster or overcome non multithreaded
 stackblur ), however results better as I see. Max radius ~320 for u8, for u16 will be less.
 
-O(1) complexity.
+O(log R) complexity.
 
 ```rust
 libblur::fast_gaussian( & mut bytes, stride, width0, height, radius, FastBlurChannels::Channels3);
@@ -115,7 +115,7 @@ Very fast.
 Produces very pleasant results close to gaussian.
 If 4K photo blurred in 10 ms this method will be done in 15 ms. Max radius ~150-180 for u8, for u16 will be less.
 
-O(1) complexity.
+O(log R) complexity.
 
 ```rust
 libblur::fast_gaussian_next( & mut bytes, stride, width, height, radius, FastBlurChannels::Channels3);
@@ -174,7 +174,7 @@ Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded
 
 Excellent results. Have improvements, however, much slower than any approximations slow. Use when use need gaussian
 methods - smoothing, anti-alias,
-FFT analysis etc.
+FFT, advanced analysis etc.
 
 Kernel size must be odd. Will panic if kernel size is not odd.
 

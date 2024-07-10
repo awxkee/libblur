@@ -28,15 +28,15 @@
 use crate::mul_table::{MUL_TABLE_DOUBLE, SHR_TABLE_DOUBLE};
 use crate::reflect_101;
 use crate::reflect_index;
+use crate::sse::_mm_packus_epi64;
 use crate::sse::utils::load_u8_s32_fast;
-use crate::sse::{_mm_packus_epi64};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, EdgeMode};
+use erydanos::sse::epi64::_mm_mul_epi64;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
-use erydanos::sse::epi64::_mm_mul_epi64;
 
 pub fn fast_gaussian_horizontal_pass_sse_u8<
     T,

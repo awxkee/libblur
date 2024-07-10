@@ -26,7 +26,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use crate::gaussian::gauss_neon::horiz_one_channel_f32::gaussian_horiz_one_chan_filter_f32;
+use crate::gaussian::gauss_neon::*;
 use crate::gaussian::gaussian_filter::GaussianFilter;
 use crate::gaussian::gaussian_horizontal::gaussian_blur_horizontal_pass_impl_clip_edge;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
@@ -159,10 +159,20 @@ pub(crate) fn gaussian_blur_horizontal_pass_edge_clip_dispatch<
             }
         }
     }
-    if CHANNEL_CONFIGURATION == 1 {
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-        {
-            _dispatcher = gaussian_horiz_one_chan_filter_f32::<T>;
+    if std::any::type_name::<T>() == "f32" {
+        if CHANNEL_CONFIGURATION == 1 {
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            {
+                _dispatcher = gaussian_horiz_one_chan_filter_f32::<T>;
+            }
+        }
+    }
+    if std::any::type_name::<T>() == "u8" {
+        if CHANNEL_CONFIGURATION == 1 {
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            {
+                _dispatcher = gaussian_horiz_one_chan_filter_u8::<T>;
+            }
         }
     }
     let unsafe_dst = UnsafeSlice::new(dst);

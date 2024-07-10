@@ -286,9 +286,10 @@ pub fn gaussian_horiz_one_chan_filter_f32<T>(
                 while r + 32 < current_filter.size
                     && ((filter_start as i64 + r as i64 + 32i64) < width as i64)
                 {
-                    let current_x =
-                        std::cmp::min(std::cmp::max(filter_start as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize;
+                    let current_x = std::cmp::min(
+                        std::cmp::max(filter_start as i64 + r as i64, 0),
+                        (width - 1) as i64,
+                    ) as usize;
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors_f32_set0_0 = vld1q_f32_x4(s_ptr);
@@ -337,9 +338,10 @@ pub fn gaussian_horiz_one_chan_filter_f32<T>(
                 while r + 16 < current_filter.size
                     && ((filter_start as i64 + r as i64 + 16i64) < width as i64)
                 {
-                    let current_x =
-                        std::cmp::min(std::cmp::max(filter_start as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize;
+                    let current_x = std::cmp::min(
+                        std::cmp::max(filter_start as i64 + r as i64, 0),
+                        (width - 1) as i64,
+                    ) as usize;
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors_f32_set_0 = vld1q_f32_x4(s_ptr);
@@ -363,9 +365,10 @@ pub fn gaussian_horiz_one_chan_filter_f32<T>(
                 while r + 4 < current_filter.size
                     && ((filter_start as i64 + r as i64 + 4i64) < width as i64)
                 {
-                    let current_x =
-                        std::cmp::min(std::cmp::max(filter_start as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize;
+                    let current_x = std::cmp::min(
+                        std::cmp::max(filter_start as i64 + r as i64, 0),
+                        (width - 1) as i64,
+                    ) as usize;
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors_f32_0 = vld1q_f32(s_ptr);
@@ -380,9 +383,10 @@ pub fn gaussian_horiz_one_chan_filter_f32<T>(
                 }
 
                 while r < current_filter.size {
-                    let current_x =
-                        std::cmp::min(std::cmp::max(filter_start as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize;
+                    let current_x = std::cmp::min(
+                        std::cmp::max(filter_start as i64 + r as i64, 0),
+                        (width - 1) as i64,
+                    ) as usize;
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors_f32_0 = vld1q_lane_f32::<0>(s_ptr, zeros);
@@ -429,9 +433,10 @@ pub fn gaussian_horiz_one_chan_filter_f32<T>(
                 while r + 32 < current_filter.size
                     && ((filter_start as i64 + r as i64 + 32i64) < width as i64)
                 {
-                    let current_x =
-                        std::cmp::min(std::cmp::max(filter_start as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize;
+                    let current_x = std::cmp::min(
+                        std::cmp::max(filter_start as i64 + r as i64, 0),
+                        (width - 1) as i64,
+                    ) as usize;
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors_f32_set_0 = vld1q_f32_x4(s_ptr);
@@ -456,9 +461,10 @@ pub fn gaussian_horiz_one_chan_filter_f32<T>(
                 while r + 16 < current_filter.size
                     && ((filter_start as i64 + r as i64 + 16i64) < width as i64)
                 {
-                    let current_x =
-                        std::cmp::min(std::cmp::max(filter_start as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize;
+                    let current_x = std::cmp::min(
+                        std::cmp::max(filter_start as i64 + r as i64, 0),
+                        (width - 1) as i64,
+                    ) as usize;
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors_f32_set = vld1q_f32_x4(s_ptr);
@@ -475,9 +481,10 @@ pub fn gaussian_horiz_one_chan_filter_f32<T>(
                 while r + 4 < current_filter.size
                     && ((filter_start as i64 + r as i64 + 4i64) < width as i64)
                 {
-                    let current_x =
-                        std::cmp::min(std::cmp::max(filter_start as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize;
+                    let current_x = std::cmp::min(
+                        std::cmp::max(filter_start as i64 + r as i64, 0),
+                        (width - 1) as i64,
+                    ) as usize;
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors_f32 = vld1q_f32(s_ptr);
@@ -489,9 +496,10 @@ pub fn gaussian_horiz_one_chan_filter_f32<T>(
                 }
 
                 while r < current_filter.size {
-                    let current_x =
-                        std::cmp::min(std::cmp::max(filter_start as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize;
+                    let current_x = std::cmp::min(
+                        std::cmp::max(filter_start as i64 + r as i64, 0),
+                        (width - 1) as i64,
+                    ) as usize;
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors_f32 = vld1q_lane_f32::<0>(s_ptr, zeros);

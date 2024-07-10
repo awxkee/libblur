@@ -1,6 +1,6 @@
-use std::arch::aarch64::*;
 use crate::neon::{load_u8_u32_fast, load_u8_u32_one, prefer_vfma_f32, prefer_vfmaq_f32};
 use crate::unsafe_slice::UnsafeSlice;
+use std::arch::aarch64::*;
 
 pub fn gaussian_blur_vertical_pass_neon<T, const CHANNEL_CONFIGURATION: usize>(
     undef_src: &[T],

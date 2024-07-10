@@ -25,6 +25,8 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+mod gauss_neon;
 mod gaussian;
 mod gaussian_filter;
 mod gaussian_horizontal;
@@ -35,8 +37,6 @@ mod gaussian_neon_filter;
 mod gaussian_sse;
 mod gaussian_sse_filter;
 mod gaussian_vertical;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-mod gauss_neon;
 
 pub use gaussian::*;
 pub use gaussian_linear::gaussian_blur_in_linear;

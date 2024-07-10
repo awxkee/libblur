@@ -72,7 +72,7 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
     //     EdgeMode::Reflect101,
     // );
 
-    libblur::gaussian_blur_in_linear(
+    libblur::gaussian_blur(
         &plane_1,
         width as u32,
         &mut dst_plane_1,
@@ -84,10 +84,9 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
         FastBlurChannels::Plane,
         EdgeMode::KernelClip,
         ThreadingPolicy::Single,
-        TransferFunction::Srgb,
     );
 
-    libblur::gaussian_blur_in_linear(
+    libblur::gaussian_blur(
         &plane_2,
         width as u32,
         &mut dst_plane_2,
@@ -99,10 +98,9 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
         FastBlurChannels::Plane,
         EdgeMode::KernelClip,
         ThreadingPolicy::Single,
-        TransferFunction::Srgb,
     );
 
-    libblur::gaussian_blur_in_linear(
+    libblur::gaussian_blur(
         &plane_3,
         width as u32,
         &mut dst_plane_3,
@@ -114,7 +112,6 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
         FastBlurChannels::Plane,
         EdgeMode::KernelClip,
         ThreadingPolicy::Single,
-        TransferFunction::Srgb,
     );
 
     merge_channels_3(
