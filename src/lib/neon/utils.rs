@@ -242,3 +242,9 @@ pub(crate) unsafe fn prefer_vfma_f32(
         return vmla_f32(a, b, c);
     }
 }
+
+#[inline(always)]
+pub(crate) unsafe fn vhsumq_f32(a: float32x4_t) -> f32 {
+    let va = vadd_f32(vget_low_f32(a), vget_high_f32(a));
+    vpadds_f32(va)
+}
