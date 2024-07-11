@@ -251,3 +251,14 @@ pub(crate) unsafe fn vhsumq_f32(a: float32x4_t) -> f32 {
     let va = vadd_f32(vget_low_f32(a), vget_high_f32(a));
     vpadds_f32(va)
 }
+
+#[inline(always)]
+pub(crate) unsafe fn vsplit_rgb(
+    px: float32x4x4_t,
+) -> (float32x4_t, float32x4_t, float32x4_t, float32x4_t) {
+    let first_pixel = vsetq_lane_f32::<3>(0f32, px.0);
+    let second_pixel = vsetq_lane_f32::<3>(0f32, vextq_f32::<3>(px.0, px.1));
+    let third_pixel = vsetq_lane_f32::<3>(0f32, vextq_f32::<2>(px.1, px.2));
+    let four_pixel = vsetq_lane_f32::<3>(0f32, px.3);
+    (first_pixel, second_pixel, third_pixel, four_pixel)
+}

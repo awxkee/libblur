@@ -35,7 +35,7 @@ use crate::gaussian::gauss_sse::*;
 use crate::gaussian::gaussian_filter::GaussianFilter;
 use crate::gaussian::gaussian_horizontal::gaussian_blur_horizontal_pass_impl_clip_edge;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use crate::gaussian::gaussian_neon_filter::neon_gaussian_filter::{
+use crate::gaussian::gauss_neon::{
     gaussian_blur_horizontal_pass_filter_neon, gaussian_blur_vertical_pass_filter_neon,
 };
 #[cfg(all(

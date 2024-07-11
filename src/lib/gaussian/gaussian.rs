@@ -121,6 +121,11 @@ fn gaussian_blur_horizontal_pass<
             {
                 _dispatcher = gaussian_horiz_one_chan_f32::<T>;
             }
+        } else if edge_mode == EdgeMode::Clamp && CHANNEL_CONFIGURATION >= 3 {
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            {
+                _dispatcher = gaussian_horiz_t_f_chan_f32::<T, CHANNEL_CONFIGURATION>;
+            }
         }
     }
     if edge_mode == EdgeMode::Clamp && CHANNEL_CONFIGURATION == 1 {
