@@ -25,23 +25,9 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-mod gauss_neon;
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "sse4.1"
-))]
-mod gauss_sse;
-mod gaussian;
-mod gaussian_filter;
-mod gaussian_horizontal;
-mod gaussian_kernel;
-mod gaussian_kernel_filter_dispatch;
-mod gaussian_linear;
-mod gaussian_neon_filter;
-mod gaussian_sse;
-mod gaussian_sse_filter;
-mod gaussian_vertical;
+mod horiz_one_channel_f32;
+mod horiz_one_channel_u8;
 
-pub use gaussian::*;
-pub use gaussian_linear::gaussian_blur_in_linear;
+pub use horiz_one_channel_f32::gaussian_horiz_one_chan_f32;
+pub use horiz_one_channel_f32::gaussian_horiz_one_chan_filter_f32;
+pub use horiz_one_channel_u8::*;

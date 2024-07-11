@@ -27,6 +27,11 @@
 
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::gaussian::gauss_neon::*;
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+))]
+use crate::gaussian::gauss_sse::*;
 use crate::gaussian::gaussian_filter::GaussianFilter;
 use crate::gaussian::gaussian_horizontal::gaussian_blur_horizontal_pass_impl_clip_edge;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
@@ -165,6 +170,13 @@ pub(crate) fn gaussian_blur_horizontal_pass_edge_clip_dispatch<
             {
                 _dispatcher = gaussian_horiz_one_chan_filter_f32::<T>;
             }
+            #[cfg(all(
+                any(target_arch = "x86_64", target_arch = "x86"),
+                target_feature = "sse4.1"
+            ))]
+            {
+                _dispatcher = gaussian_horiz_one_chan_filter_f32::<T>;
+            }
         }
     }
     if std::any::type_name::<T>() == "u8" {
@@ -172,6 +184,13 @@ pub(crate) fn gaussian_blur_horizontal_pass_edge_clip_dispatch<
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             {
                 _dispatcher = gaussian_horiz_one_chan_filter_u8::<T>;
+            }
+            #[cfg(all(
+                any(target_arch = "x86_64", target_arch = "x86"),
+                target_feature = "sse4.1"
+            ))]
+            {
+                _dispatcher = gaussian_sse_horiz_one_chan_filter_u8::<T>;
             }
         }
     }

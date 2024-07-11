@@ -11,7 +11,7 @@ name = "fast-blur"
 path = "src/main.rs"
 
 [dependencies]
-colorutils-rs = "0.4.9"
+colorutils-rs = "0.4.13"
 half = "2.4.1"
 image = "0.25.1"
 libblur = {path = "src/lib"}

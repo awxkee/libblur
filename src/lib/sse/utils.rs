@@ -213,3 +213,35 @@ pub unsafe fn _mm_prefer_fma_ps(a: __m128, b: __m128, c: __m128) -> __m128 {
 pub unsafe fn _mm_prefer_fma_ps(a: __m128, b: __m128, c: __m128) -> __m128 {
     return _mm_fmadd_ps(b, c, a);
 }
+
+#[inline(always)]
+pub unsafe fn _mm_hsum_ps(v: __m128) -> f32 {
+    let mut shuf = _mm_movehdup_ps(v);
+    let mut sums = _mm_add_ps(v, shuf);
+    shuf = _mm_movehl_ps(shuf, sums);
+    sums = _mm_add_ss(sums, shuf);
+    _mm_cvtss_f32(sums)
+}
+
+#[inline(always)]
+pub unsafe fn _mm_loadu_si128_x2(ptr: *const u8) -> (__m128i, __m128i) {
+    (
+        _mm_loadu_si128(ptr as *const __m128i),
+        _mm_loadu_si128(ptr.add(16) as *const __m128i),
+    )
+}
+
+#[inline(always)]
+pub unsafe fn _mm_loadu_ps_x4(ptr: *const f32) -> (__m128, __m128, __m128, __m128) {
+    (
+        _mm_loadu_ps(ptr),
+        _mm_loadu_ps(ptr.add(4)),
+        _mm_loadu_ps(ptr.add(8)),
+        _mm_loadu_ps(ptr.add(12)),
+    )
+}
+
+#[inline(always)]
+pub unsafe fn _mm_loadu_ps_x2(ptr: *const f32) -> (__m128, __m128) {
+    (_mm_loadu_ps(ptr), _mm_loadu_ps(ptr.add(4)))
+}

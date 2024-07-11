@@ -33,6 +33,16 @@ use crate::channels_configuration::FastBlurChannels;
 use crate::edge_mode::EdgeMode;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::gaussian::gauss_neon::*;
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+))]
+use crate::gaussian::gauss_sse::gaussian_horiz_one_chan_f32;
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+))]
+use crate::gaussian::gauss_sse::gaussian_sse_horiz_one_chan_u8;
 use crate::gaussian::gaussian_filter::create_filter;
 use crate::gaussian::gaussian_horizontal::gaussian_blur_horizontal_pass_impl;
 use crate::gaussian::gaussian_kernel::get_gaussian_kernel_1d;
@@ -104,12 +114,26 @@ fn gaussian_blur_horizontal_pass<
             {
                 _dispatcher = gaussian_horiz_one_chan_f32::<T>;
             }
+            #[cfg(all(
+                any(target_arch = "x86_64", target_arch = "x86"),
+                target_feature = "sse4.1"
+            ))]
+            {
+                _dispatcher = gaussian_horiz_one_chan_f32::<T>;
+            }
         }
     }
     if edge_mode == EdgeMode::Clamp && CHANNEL_CONFIGURATION == 1 {
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         if std::any::type_name::<T>() == "u8" {
             _dispatcher = gaussian_horiz_one_chan_u8::<T>;
+        }
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "sse4.1"
+        ))]
+        if std::any::type_name::<T>() == "u8" {
+            _dispatcher = gaussian_sse_horiz_one_chan_u8::<T>;
         }
     }
     let unsafe_dst = UnsafeSlice::new(dst);

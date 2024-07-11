@@ -19,7 +19,7 @@ edition = "2021"
 path = "lib.rs"
 
 [dependencies]
-colorutils-rs = "0.4.12"
+colorutils-rs = "0.4.13"
 erydanos = "0.1.1"
 half = { version = "2.4.1", features = ["num-traits"] }
 num-traits = "0.2.18"

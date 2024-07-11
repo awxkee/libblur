@@ -192,11 +192,11 @@ checksum = "3d7b894f5411737b7867f4827955924d7c254fc9f4d91a6aad6b097804b1018b"
 
 [[package]]
 name = "colorutils-rs"
-version = "0.4.12"
+version = "0.4.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd41eb63f0fbecbb8c132a40e32a750cf3af7b4c77f9a8913163c43d59ce63ed"
+checksum = "08db9a0e25441c6250724934d84fd943125768dcd92d925ab9eb902296b136e4"
 dependencies = [
- "erydanos",
+ "erydanos 0.2.3",
  "half 2.4.1",
 ]
 
@@ -314,6 +314,15 @@ name = "erydanos"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3159c4da878d5762f804f7cafac570729d0a6c27183aa75473fccee4fe98d01f"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
+name = "erydanos"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1a140744bdb5b8777d9714a8d6a72c5e58d4eb2b0c3c8a85c8bada86efd9fa21"
 dependencies = [
  "num-traits",
 ]
@@ -558,7 +567,7 @@ name = "libblur"
 version = "0.13.0"
 dependencies = [
  "colorutils-rs",
- "erydanos",
+ "erydanos 0.1.1",
  "half 2.4.1",
  "num-traits",
  "rayon",

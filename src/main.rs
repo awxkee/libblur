@@ -79,10 +79,10 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
         width as u32,
         width as u32,
         height as u32,
-        75 * 2 + 1,
-        75f32 * 2f32 / 6f32,
+        25 * 2 + 1,
+        25f32 * 2f32 / 6f32,
         FastBlurChannels::Plane,
-        EdgeMode::KernelClip,
+        EdgeMode::Clamp,
         ThreadingPolicy::Single,
     );
 
@@ -93,10 +93,10 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
         width as u32,
         width as u32,
         height as u32,
-        75 * 2 + 1,
-        75f32 * 2f32 / 6f32,
+        25 * 2 + 1,
+        25f32 * 2f32 / 6f32,
         FastBlurChannels::Plane,
-        EdgeMode::KernelClip,
+        EdgeMode::Clamp,
         ThreadingPolicy::Single,
     );
 
@@ -107,10 +107,10 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
         width as u32,
         width as u32,
         height as u32,
-        75 * 2 + 1,
-        75f32 * 2f32 / 6f32,
+        25 * 2 + 1,
+        25f32 * 2f32 / 6f32,
         FastBlurChannels::Plane,
-        EdgeMode::KernelClip,
+        EdgeMode::Clamp,
         ThreadingPolicy::Single,
     );
 
