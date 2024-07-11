@@ -33,7 +33,7 @@ use crate::sse::{
 };
 use crate::stack_blur::StackBlurPass;
 use crate::unsafe_slice::UnsafeSlice;
-use erydanos::sse::epi64::_mm_mul_epi64;
+use erydanos::_mm_mul_epi64;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]

@@ -31,7 +31,7 @@ use crate::neon::{
 };
 use crate::stack_blur::StackBlurPass;
 use crate::unsafe_slice::UnsafeSlice;
-use erydanos::neon::general::vmulq_s64;
+use erydanos::vmulq_s64;
 use std::arch::aarch64::*;
 
 pub fn stack_blur_pass_neon_i64<const COMPONENTS: usize>(

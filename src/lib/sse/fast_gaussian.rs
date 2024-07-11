@@ -32,7 +32,7 @@ use crate::sse::_mm_packus_epi64;
 use crate::sse::utils::load_u8_s32_fast;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, EdgeMode};
-use erydanos::sse::epi64::_mm_mul_epi64;
+use erydanos::_mm_mul_epi64;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
