@@ -67,6 +67,24 @@ pub fn gaussian_sse_horiz_one_chan_u8<T>(
 
                 let mut r = -half_kernel;
 
+                let edge_value_check = x as i64 + r as i64;
+                if edge_value_check < 0 {
+                    let diff = edge_value_check.abs();
+                    let s_ptr = src.as_ptr().add(y_src_shift); // Here we're always at zero
+                    let value0 = s_ptr.read_unaligned() as f32;
+                    let pixel_colors_f32_0 = _mm_setr_ps(value0, 0f32, 0f32, 0f32);
+                    let s_ptr_next = src.as_ptr().add(y_src_shift_next); // Here we're always at zero
+                    let value1 = s_ptr_next.read_unaligned() as f32;
+                    let pixel_colors_f32_1 = _mm_setr_ps(value1, 0f32, 0f32, 0f32);
+                    for i in 0..diff as usize {
+                        let weights = kernel.as_ptr().add(i);
+                        let f_weight = _mm_setr_ps(weights.read_unaligned(), 0f32, 0f32, 0f32);
+                        store0 = _mm_prefer_fma_ps(store0, pixel_colors_f32_0, f_weight);
+                        store1 = _mm_prefer_fma_ps(store1, pixel_colors_f32_1, f_weight);
+                    }
+                    r += diff as i32;
+                }
+
                 while r + 32 <= half_kernel && ((x as i64 + r as i64 + 32i64) < width as i64) {
                     let current_x =
                         std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
@@ -299,9 +317,23 @@ pub fn gaussian_sse_horiz_one_chan_u8<T>(
                 let y_src_shift = y as usize * src_stride as usize;
                 let y_dst_shift = y as usize * dst_stride as usize;
 
-                let mut store = _mm_set1_ps(0f32);
+                let mut store = _mm_setzero_ps();
 
                 let mut r = -half_kernel;
+
+                let edge_value_check = x as i64 + r as i64;
+                if edge_value_check < 0 {
+                    let diff = edge_value_check.abs();
+                    let s_ptr = src.as_ptr().add(y_src_shift); // Here we're always at zero
+                    let value = s_ptr.read_unaligned() as f32;
+                    let pixel_colors_f32 = _mm_setr_ps(value, 0f32, 0f32, 0f32);
+                    for i in 0..diff as usize {
+                        let weights = kernel.as_ptr().add(i);
+                        let f_weight = _mm_setr_ps(weights.read_unaligned(), 0f32, 0f32, 0f32);
+                        store = _mm_prefer_fma_ps(store, pixel_colors_f32, f_weight);
+                    }
+                    r += diff as i32;
+                }
 
                 while r + 32 <= half_kernel && ((x as i64 + r as i64 + 32i64) < width as i64) {
                     let current_x =

@@ -101,6 +101,11 @@ pub(crate) unsafe fn load_f32_fast<const CHANNELS_COUNT: usize>(ptr: *const f32)
 }
 
 #[inline(always)]
+pub(crate) unsafe fn load_u8_f32_fast<const CHANNELS_COUNT: usize>(ptr: *const u8) -> float32x4_t {
+    vcvtq_f32_u32(load_u8_u32_fast::<CHANNELS_COUNT>(ptr))
+}
+
+#[inline(always)]
 pub(crate) unsafe fn load_u8_u32_fast<const CHANNELS_COUNT: usize>(ptr: *const u8) -> uint32x4_t {
     let u_first = u32::from_le_bytes([ptr.read_unaligned(), 0, 0, 0]);
     let u_second = u32::from_le_bytes([ptr.add(1).read_unaligned(), 0, 0, 0]);
@@ -209,7 +214,6 @@ pub(crate) unsafe fn load_u8_u16<const CHANNELS_COUNT: usize>(ptr: *const u8) ->
     return pixel_color;
 }
 
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 #[inline(always)]
 pub(crate) unsafe fn prefer_vfmaq_f32(
     a: float32x4_t,
@@ -226,7 +230,6 @@ pub(crate) unsafe fn prefer_vfmaq_f32(
     }
 }
 
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 #[inline(always)]
 pub(crate) unsafe fn prefer_vfma_f32(
     a: float32x2_t,

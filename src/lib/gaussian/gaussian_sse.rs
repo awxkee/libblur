@@ -71,6 +71,25 @@ pub mod sse_support {
                 let mut r = -half_kernel;
 
                 unsafe {
+                    let edge_value_check = x as i64 + r as i64;
+                    if edge_value_check < 0 {
+                        let diff = edge_value_check.abs();
+                        let s_ptr = src.as_ptr().add(y_src_shift); // Here we're always at zero
+                        let pixel_colors_f32_0 = load_u8_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr);
+                        let s_ptr_next = src.as_ptr().add(y_src_shift + src_stride as usize); // Here we're always at zero
+                        let pixel_colors_f32_1 =
+                            load_u8_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr_next);
+                        for i in 0..diff as usize {
+                            let weights = kernel.as_ptr().add(i);
+                            let f_weight = _mm_set1_ps(weights.read_unaligned());
+                            store_0 = _mm_prefer_fma_ps(store_0, pixel_colors_f32_0, f_weight);
+                            store_1 = _mm_prefer_fma_ps(store_1, pixel_colors_f32_1, f_weight);
+                        }
+                        r += diff as i32;
+                    }
+                }
+
+                unsafe {
                     while r + 4 <= half_kernel
                         && x as i64 + r as i64 + (if CHANNEL_CONFIGURATION == 4 { 4 } else { 6 })
                             < width as i64
@@ -205,7 +224,7 @@ pub mod sse_support {
                         let weight = *kernel.get_unchecked((r + half_kernel) as usize);
                         let f_weight = _mm_set1_ps(weight);
                         store_0 = _mm_prefer_fma_ps(store_0, pixel_colors_f32_0, f_weight);
-                        store_1 = _mm_prefer_fma_ps(store_0, pixel_colors_f32_1, f_weight);
+                        store_1 = _mm_prefer_fma_ps(store_1, pixel_colors_f32_1, f_weight);
 
                         r += 1;
                     }
@@ -241,7 +260,7 @@ pub mod sse_support {
                 let pixel = unsafe { _mm_extract_epi32::<0>(px_8) };
                 if CHANNEL_CONFIGURATION == 4 {
                     unsafe {
-                        let unsafe_offset = y_dst_shift + src_stride as usize + px;
+                        let unsafe_offset = y_dst_shift + dst_stride as usize + px;
                         let dst_ptr = unsafe_dst.slice.as_ptr().add(unsafe_offset) as *mut i32;
                         dst_ptr.write_unaligned(pixel);
                     }
@@ -249,7 +268,7 @@ pub mod sse_support {
                     let pixel_bytes = pixel.to_le_bytes();
 
                     unsafe {
-                        let unsafe_offset = y_dst_shift + src_stride as usize + px;
+                        let unsafe_offset = y_dst_shift + dst_stride as usize + px;
                         unsafe_dst.write(unsafe_offset, pixel_bytes[0]);
                         unsafe_dst.write(unsafe_offset + 1, pixel_bytes[1]);
                         unsafe_dst.write(unsafe_offset + 2, pixel_bytes[2]);
@@ -264,9 +283,24 @@ pub mod sse_support {
             let y_src_shift = y as usize * src_stride as usize;
             let y_dst_shift = y as usize * dst_stride as usize;
             for x in 0..width {
-                let mut store = unsafe { _mm_set1_ps(0f32) };
+                let mut store = unsafe { _mm_setzero_ps() };
 
                 let mut r = -half_kernel;
+
+                unsafe {
+                    let edge_value_check = x as i64 + r as i64;
+                    if edge_value_check < 0 {
+                        let diff = edge_value_check.abs();
+                        let s_ptr = src.as_ptr().add(y_src_shift); // Here we're always at zero
+                        let pixel_colors_f32_0 = load_u8_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr);
+                        for i in 0..diff as usize {
+                            let weights = kernel.as_ptr().add(i);
+                            let f_weight = _mm_set1_ps(weights.read_unaligned());
+                            store = _mm_prefer_fma_ps(store, pixel_colors_f32_0, f_weight);
+                        }
+                        r += diff as i32;
+                    }
+                }
 
                 unsafe {
                     while r + 4 <= half_kernel && x as i64 + r as i64 + 6 < width as i64 {

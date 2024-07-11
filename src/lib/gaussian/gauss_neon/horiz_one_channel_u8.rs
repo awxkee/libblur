@@ -95,7 +95,8 @@ pub fn gaussian_horiz_one_chan_u8<T>(
 
                     {
                         let pixel_colors_low_u16 = vmovl_u8(vget_low_u8(pixel_colors_u8x2.0));
-                        let pixel_color0 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_low_u16)));
+                        let pixel_color0 =
+                            vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_low_u16)));
                         let pixel_color1 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_low_u16));
                         store0 = prefer_vfmaq_f32(store0, pixel_color0, weights0.0);
                         store0 = prefer_vfmaq_f32(store0, pixel_color1, weights0.1);
@@ -110,7 +111,8 @@ pub fn gaussian_horiz_one_chan_u8<T>(
 
                     {
                         let pixel_colors_low_u16 = vmovl_u8(vget_low_u8(pixel_colors_u8x2.1));
-                        let pixel_color0 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_low_u16)));
+                        let pixel_color0 =
+                            vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_low_u16)));
                         let pixel_color1 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_low_u16));
                         store0 = prefer_vfmaq_f32(store0, pixel_color0, weights1.0);
                         store0 = prefer_vfmaq_f32(store0, pixel_color1, weights1.1);
@@ -127,7 +129,8 @@ pub fn gaussian_horiz_one_chan_u8<T>(
 
                     {
                         let pixel_colors_low_u16 = vmovl_u8(vget_low_u8(pixel_colors_u8x2_next.0));
-                        let pixel_color0 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_low_u16)));
+                        let pixel_color0 =
+                            vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_low_u16)));
                         let pixel_color1 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_low_u16));
                         store1 = prefer_vfmaq_f32(store1, pixel_color0, weights0.0);
                         store1 = prefer_vfmaq_f32(store1, pixel_color1, weights0.1);
@@ -142,7 +145,8 @@ pub fn gaussian_horiz_one_chan_u8<T>(
 
                     {
                         let pixel_colors_low_u16 = vmovl_u8(vget_low_u8(pixel_colors_u8x2_next.1));
-                        let pixel_color0 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_low_u16)));
+                        let pixel_color0 =
+                            vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_low_u16)));
                         let pixel_color1 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_low_u16));
                         store1 = prefer_vfmaq_f32(store1, pixel_color0, weights1.0);
                         store1 = prefer_vfmaq_f32(store1, pixel_color1, weights1.1);

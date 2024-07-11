@@ -206,21 +206,21 @@ fn main() {
     //     EdgeMode::Reflect,
     // );
     //
-    // libblur::gaussian_blur(
-    //     &bytes,
-    //     stride as u32,
-    //     &mut dst_bytes,
-    //     stride as u32,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     75 * 2 + 1,
-    //     75f32 * 2f32 / 6f32,
-    //     FastBlurChannels::Channels3,
-    //     EdgeMode::Clamp,
-    //     ThreadingPolicy::Adaptive,
-    // );
+    libblur::gaussian_blur(
+        &bytes,
+        stride as u32,
+        &mut dst_bytes,
+        stride as u32,
+        dimensions.0,
+        dimensions.1,
+        25 * 2 + 1,
+        25f32 * 2f32 / 6f32,
+        FastBlurChannels::Channels3,
+        EdgeMode::Clamp,
+        ThreadingPolicy::Adaptive,
+    );
 
-    dst_bytes = perform_planar_pass_3(&bytes, dimensions.0 as usize, dimensions.1 as usize);
+    // dst_bytes = perform_planar_pass_3(&bytes, dimensions.0 as usize, dimensions.1 as usize);
 
     let elapsed_time = start_time.elapsed();
     // Print the elapsed time in milliseconds
