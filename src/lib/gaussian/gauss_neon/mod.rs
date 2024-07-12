@@ -25,17 +25,17 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+mod filter_u8;
 mod horiz_four_channel;
+mod horiz_four_channel_f32;
 mod horiz_one_channel_f32;
 mod horiz_one_channel_u8;
 mod vert_four_channel;
-mod filter_u8;
-mod horiz_four_channel_f32;
 
+pub use filter_u8::gaussian_blur_horizontal_pass_filter_neon;
+pub use filter_u8::gaussian_blur_vertical_pass_filter_neon;
 pub use horiz_four_channel::*;
+pub use horiz_four_channel_f32::gaussian_horiz_t_f_chan_f32;
 pub use horiz_one_channel_f32::*;
 pub use horiz_one_channel_u8::*;
 pub use vert_four_channel::*;
-pub use filter_u8::gaussian_blur_vertical_pass_filter_neon;
-pub use filter_u8::gaussian_blur_horizontal_pass_filter_neon;
-pub use horiz_four_channel_f32::gaussian_horiz_t_f_chan_f32;

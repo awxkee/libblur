@@ -42,20 +42,25 @@ use crate::gaussian::gauss_sse::gaussian_horiz_one_chan_f32;
     any(target_arch = "x86_64", target_arch = "x86"),
     target_feature = "sse4.1"
 ))]
+use crate::gaussian::gauss_sse::gaussian_horiz_sse_t_f_chan_f32;
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+))]
 use crate::gaussian::gauss_sse::gaussian_sse_horiz_one_chan_u8;
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+))]
+use crate::gaussian::gauss_sse::{
+    gaussian_blur_horizontal_pass_impl_sse, gaussian_blur_vertical_pass_impl_sse,
+};
 use crate::gaussian::gaussian_filter::create_filter;
 use crate::gaussian::gaussian_horizontal::gaussian_blur_horizontal_pass_impl;
 use crate::gaussian::gaussian_kernel::get_gaussian_kernel_1d;
 use crate::gaussian::gaussian_kernel_filter_dispatch::{
     gaussian_blur_horizontal_pass_edge_clip_dispatch,
     gaussian_blur_vertical_pass_edge_clip_dispatch,
-};
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "sse4.1"
-))]
-use crate::gaussian::gaussian_sse::sse_support::{
-    gaussian_blur_horizontal_pass_impl_sse, gaussian_blur_vertical_pass_impl_sse,
 };
 use crate::gaussian::gaussian_vertical::gaussian_blur_vertical_pass_c_impl;
 use crate::to_storage::ToStorage;
@@ -125,6 +130,13 @@ fn gaussian_blur_horizontal_pass<
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             {
                 _dispatcher = gaussian_horiz_t_f_chan_f32::<T, CHANNEL_CONFIGURATION>;
+            }
+            #[cfg(all(
+                any(target_arch = "x86_64", target_arch = "x86"),
+                target_feature = "sse4.1"
+            ))]
+            {
+                _dispatcher = gaussian_horiz_sse_t_f_chan_f32::<T, CHANNEL_CONFIGURATION>;
             }
         }
     }

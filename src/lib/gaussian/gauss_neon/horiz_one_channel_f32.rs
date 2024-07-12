@@ -30,6 +30,15 @@ use crate::neon::{prefer_vfmaq_f32, vhsumq_f32};
 use crate::unsafe_slice::UnsafeSlice;
 use std::arch::aarch64::*;
 
+macro_rules! accumulate_4_items {
+    ($store0:expr, $pixel_colors:expr, $weights:expr) => {{
+        $store0 = prefer_vfmaq_f32($store0, $pixel_colors.0, $weights.0);
+        $store0 = prefer_vfmaq_f32($store0, $pixel_colors.1, $weights.1);
+        $store0 = prefer_vfmaq_f32($store0, $pixel_colors.2, $weights.2);
+        $store0 = prefer_vfmaq_f32($store0, $pixel_colors.3, $weights.3);
+    }};
+}
+
 pub fn gaussian_horiz_one_chan_f32<T>(
     undef_src: &[T],
     src_stride: u32,
@@ -97,33 +106,11 @@ pub fn gaussian_horiz_one_chan_f32<T>(
                     let weights_set_0 = vld1q_f32_x4(weight);
                     let weights_set_1 = vld1q_f32_x4(weight.add(16));
 
-                    store0 = prefer_vfmaq_f32(store0, pixel_colors_f32_set0_0.0, weights_set_0.0);
-                    store0 = prefer_vfmaq_f32(store0, pixel_colors_f32_set0_0.1, weights_set_0.1);
-                    store0 = prefer_vfmaq_f32(store0, pixel_colors_f32_set0_0.2, weights_set_0.2);
-                    store0 = prefer_vfmaq_f32(store0, pixel_colors_f32_set0_0.3, weights_set_0.3);
+                    accumulate_4_items!(store0, pixel_colors_f32_set0_0, weights_set_0);
+                    accumulate_4_items!(store0, pixel_colors_f32_set0_1, weights_set_1);
 
-                    store0 = prefer_vfmaq_f32(store0, pixel_colors_f32_set0_1.0, weights_set_1.0);
-                    store0 = prefer_vfmaq_f32(store0, pixel_colors_f32_set0_1.1, weights_set_1.1);
-                    store0 = prefer_vfmaq_f32(store0, pixel_colors_f32_set0_1.2, weights_set_1.2);
-                    store0 = prefer_vfmaq_f32(store0, pixel_colors_f32_set0_1.3, weights_set_1.3);
-
-                    store1 =
-                        prefer_vfmaq_f32(store1, pixel_colors_f32_set_next_0.0, weights_set_0.0);
-                    store1 =
-                        prefer_vfmaq_f32(store1, pixel_colors_f32_set_next_0.1, weights_set_0.1);
-                    store1 =
-                        prefer_vfmaq_f32(store1, pixel_colors_f32_set_next_0.2, weights_set_0.2);
-                    store1 =
-                        prefer_vfmaq_f32(store1, pixel_colors_f32_set_next_0.3, weights_set_0.3);
-
-                    store1 =
-                        prefer_vfmaq_f32(store1, pixel_colors_f32_set_next_1.0, weights_set_1.0);
-                    store1 =
-                        prefer_vfmaq_f32(store1, pixel_colors_f32_set_next_1.1, weights_set_1.1);
-                    store1 =
-                        prefer_vfmaq_f32(store1, pixel_colors_f32_set_next_1.2, weights_set_1.2);
-                    store1 =
-                        prefer_vfmaq_f32(store1, pixel_colors_f32_set_next_1.3, weights_set_1.3);
+                    accumulate_4_items!(store1, pixel_colors_f32_set_next_0, weights_set_0);
+                    accumulate_4_items!(store1, pixel_colors_f32_set_next_1, weights_set_1);
 
                     r += 32;
                 }
@@ -139,15 +126,9 @@ pub fn gaussian_horiz_one_chan_f32<T>(
                     let pixel_colors_f32_set_1 = vld1q_f32_x4(s_ptr_next);
                     let weight = kernel.as_ptr().add((r + half_kernel) as usize);
                     let weights_set = vld1q_f32_x4(weight);
-                    store0 = prefer_vfmaq_f32(store0, pixel_colors_f32_set_0.0, weights_set.0);
-                    store0 = prefer_vfmaq_f32(store0, pixel_colors_f32_set_0.1, weights_set.1);
-                    store0 = prefer_vfmaq_f32(store0, pixel_colors_f32_set_0.2, weights_set.2);
-                    store0 = prefer_vfmaq_f32(store0, pixel_colors_f32_set_0.3, weights_set.3);
 
-                    store1 = prefer_vfmaq_f32(store1, pixel_colors_f32_set_1.0, weights_set.0);
-                    store1 = prefer_vfmaq_f32(store1, pixel_colors_f32_set_1.1, weights_set.1);
-                    store1 = prefer_vfmaq_f32(store1, pixel_colors_f32_set_1.2, weights_set.2);
-                    store1 = prefer_vfmaq_f32(store1, pixel_colors_f32_set_1.3, weights_set.3);
+                    accumulate_4_items!(store0, pixel_colors_f32_set_0, weights_set);
+                    accumulate_4_items!(store1, pixel_colors_f32_set_1, weights_set);
 
                     r += 16;
                 }
@@ -237,15 +218,8 @@ pub fn gaussian_horiz_one_chan_f32<T>(
                     let weights_set_0 = vld1q_f32_x4(weight);
                     let weights_set_1 = vld1q_f32_x4(weight.add(16));
 
-                    store = prefer_vfmaq_f32(store, pixel_colors_f32_set_0.0, weights_set_0.0);
-                    store = prefer_vfmaq_f32(store, pixel_colors_f32_set_0.1, weights_set_0.1);
-                    store = prefer_vfmaq_f32(store, pixel_colors_f32_set_0.2, weights_set_0.2);
-                    store = prefer_vfmaq_f32(store, pixel_colors_f32_set_0.3, weights_set_0.3);
-
-                    store = prefer_vfmaq_f32(store, pixel_colors_f32_set_1.0, weights_set_1.0);
-                    store = prefer_vfmaq_f32(store, pixel_colors_f32_set_1.1, weights_set_1.1);
-                    store = prefer_vfmaq_f32(store, pixel_colors_f32_set_1.2, weights_set_1.2);
-                    store = prefer_vfmaq_f32(store, pixel_colors_f32_set_1.3, weights_set_1.3);
+                    accumulate_4_items!(store, pixel_colors_f32_set_0, weights_set_0);
+                    accumulate_4_items!(store, pixel_colors_f32_set_1, weights_set_1);
 
                     r += 32;
                 }
@@ -259,10 +233,8 @@ pub fn gaussian_horiz_one_chan_f32<T>(
                     let pixel_colors_f32_set = vld1q_f32_x4(s_ptr);
                     let weight = kernel.as_ptr().add((r + half_kernel) as usize);
                     let weights_set = vld1q_f32_x4(weight);
-                    store = prefer_vfmaq_f32(store, pixel_colors_f32_set.0, weights_set.0);
-                    store = prefer_vfmaq_f32(store, pixel_colors_f32_set.1, weights_set.1);
-                    store = prefer_vfmaq_f32(store, pixel_colors_f32_set.2, weights_set.2);
-                    store = prefer_vfmaq_f32(store, pixel_colors_f32_set.3, weights_set.3);
+
+                    accumulate_4_items!(store, pixel_colors_f32_set, weights_set);
 
                     r += 16;
                 }
@@ -360,33 +332,11 @@ pub fn gaussian_horiz_one_chan_filter_f32<T>(
                     let weights_set_0 = vld1q_f32_x4(weight);
                     let weights_set_1 = vld1q_f32_x4(weight.add(16));
 
-                    store0 = prefer_vfmaq_f32(store0, pixel_colors_f32_set0_0.0, weights_set_0.0);
-                    store0 = prefer_vfmaq_f32(store0, pixel_colors_f32_set0_0.1, weights_set_0.1);
-                    store0 = prefer_vfmaq_f32(store0, pixel_colors_f32_set0_0.2, weights_set_0.2);
-                    store0 = prefer_vfmaq_f32(store0, pixel_colors_f32_set0_0.3, weights_set_0.3);
+                    accumulate_4_items!(store0, pixel_colors_f32_set0_0, weights_set_0);
+                    accumulate_4_items!(store0, pixel_colors_f32_set0_1, weights_set_1);
 
-                    store0 = prefer_vfmaq_f32(store0, pixel_colors_f32_set0_1.0, weights_set_1.0);
-                    store0 = prefer_vfmaq_f32(store0, pixel_colors_f32_set0_1.1, weights_set_1.1);
-                    store0 = prefer_vfmaq_f32(store0, pixel_colors_f32_set0_1.2, weights_set_1.2);
-                    store0 = prefer_vfmaq_f32(store0, pixel_colors_f32_set0_1.3, weights_set_1.3);
-
-                    store1 =
-                        prefer_vfmaq_f32(store1, pixel_colors_f32_set_next_0.0, weights_set_0.0);
-                    store1 =
-                        prefer_vfmaq_f32(store1, pixel_colors_f32_set_next_0.1, weights_set_0.1);
-                    store1 =
-                        prefer_vfmaq_f32(store1, pixel_colors_f32_set_next_0.2, weights_set_0.2);
-                    store1 =
-                        prefer_vfmaq_f32(store1, pixel_colors_f32_set_next_0.3, weights_set_0.3);
-
-                    store1 =
-                        prefer_vfmaq_f32(store1, pixel_colors_f32_set_next_1.0, weights_set_1.0);
-                    store1 =
-                        prefer_vfmaq_f32(store1, pixel_colors_f32_set_next_1.1, weights_set_1.1);
-                    store1 =
-                        prefer_vfmaq_f32(store1, pixel_colors_f32_set_next_1.2, weights_set_1.2);
-                    store1 =
-                        prefer_vfmaq_f32(store1, pixel_colors_f32_set_next_1.3, weights_set_1.3);
+                    accumulate_4_items!(store1, pixel_colors_f32_set_next_0, weights_set_0);
+                    accumulate_4_items!(store1, pixel_colors_f32_set_next_1, weights_set_1);
 
                     r += 32;
                 }
@@ -405,15 +355,9 @@ pub fn gaussian_horiz_one_chan_filter_f32<T>(
                     let pixel_colors_f32_set_1 = vld1q_f32_x4(s_ptr_next);
                     let weight = filter_weights.as_ptr().add(r);
                     let weights_set = vld1q_f32_x4(weight);
-                    store0 = prefer_vfmaq_f32(store0, pixel_colors_f32_set_0.0, weights_set.0);
-                    store0 = prefer_vfmaq_f32(store0, pixel_colors_f32_set_0.1, weights_set.1);
-                    store0 = prefer_vfmaq_f32(store0, pixel_colors_f32_set_0.2, weights_set.2);
-                    store0 = prefer_vfmaq_f32(store0, pixel_colors_f32_set_0.3, weights_set.3);
 
-                    store1 = prefer_vfmaq_f32(store1, pixel_colors_f32_set_1.0, weights_set.0);
-                    store1 = prefer_vfmaq_f32(store1, pixel_colors_f32_set_1.1, weights_set.1);
-                    store1 = prefer_vfmaq_f32(store1, pixel_colors_f32_set_1.2, weights_set.2);
-                    store1 = prefer_vfmaq_f32(store1, pixel_colors_f32_set_1.3, weights_set.3);
+                    accumulate_4_items!(store0, pixel_colors_f32_set_0, weights_set);
+                    accumulate_4_items!(store1, pixel_colors_f32_set_1, weights_set);
 
                     r += 16;
                 }
@@ -501,15 +445,8 @@ pub fn gaussian_horiz_one_chan_filter_f32<T>(
                     let weights_set_0 = vld1q_f32_x4(weight);
                     let weights_set_1 = vld1q_f32_x4(weight.add(16));
 
-                    store = prefer_vfmaq_f32(store, pixel_colors_f32_set_0.0, weights_set_0.0);
-                    store = prefer_vfmaq_f32(store, pixel_colors_f32_set_0.1, weights_set_0.1);
-                    store = prefer_vfmaq_f32(store, pixel_colors_f32_set_0.2, weights_set_0.2);
-                    store = prefer_vfmaq_f32(store, pixel_colors_f32_set_0.3, weights_set_0.3);
-
-                    store = prefer_vfmaq_f32(store, pixel_colors_f32_set_1.0, weights_set_1.0);
-                    store = prefer_vfmaq_f32(store, pixel_colors_f32_set_1.1, weights_set_1.1);
-                    store = prefer_vfmaq_f32(store, pixel_colors_f32_set_1.2, weights_set_1.2);
-                    store = prefer_vfmaq_f32(store, pixel_colors_f32_set_1.3, weights_set_1.3);
+                    accumulate_4_items!(store, pixel_colors_f32_set_0, weights_set_0);
+                    accumulate_4_items!(store, pixel_colors_f32_set_1, weights_set_1);
 
                     r += 32;
                 }
@@ -526,10 +463,8 @@ pub fn gaussian_horiz_one_chan_filter_f32<T>(
                     let pixel_colors_f32_set = vld1q_f32_x4(s_ptr);
                     let weight = filter_weights.as_ptr().add(r);
                     let weights_set = vld1q_f32_x4(weight);
-                    store = prefer_vfmaq_f32(store, pixel_colors_f32_set.0, weights_set.0);
-                    store = prefer_vfmaq_f32(store, pixel_colors_f32_set.1, weights_set.1);
-                    store = prefer_vfmaq_f32(store, pixel_colors_f32_set.2, weights_set.2);
-                    store = prefer_vfmaq_f32(store, pixel_colors_f32_set.3, weights_set.3);
+
+                    accumulate_4_items!(store, pixel_colors_f32_set, weights_set);
 
                     r += 16;
                 }

@@ -25,62 +25,66 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::neon::{load_f32_fast, prefer_vfmaq_f32, store_f32, vsplit_rgb};
+use crate::sse::{_mm_loadu_ps_x4, _mm_split_rgb_5_ps, load_f32, store_f32};
 use crate::unsafe_slice::UnsafeSlice;
-use std::arch::aarch64::*;
+use erydanos::_mm_prefer_fma_ps;
+#[cfg(target_arch = "x86")]
+use std::arch::x86::*;
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::*;
 
 macro_rules! accumulate_5_items {
-    ($store0:expr, $set:expr, $f_weights:expr, $last_weight:expr) => {{
-        $store0 = prefer_vfmaq_f32(
+    ($store0:expr, $pixel_colors_0:expr, $f_weights:expr, $last_weight:expr) => {{
+        $store0 = _mm_prefer_fma_ps(
             $store0,
-            $set.0,
-            vdupq_n_f32(vgetq_lane_f32::<0>($f_weights)),
+            $pixel_colors_0.0,
+            _mm_set1_ps(f32::from_bits(_mm_extract_ps::<0>($f_weights) as u32)),
         );
-        $store0 = prefer_vfmaq_f32(
+        $store0 = _mm_prefer_fma_ps(
             $store0,
-            $set.1,
-            vdupq_n_f32(vgetq_lane_f32::<1>($f_weights)),
+            $pixel_colors_0.1,
+            _mm_set1_ps(f32::from_bits(_mm_extract_ps::<1>($f_weights) as u32)),
         );
-        $store0 = prefer_vfmaq_f32(
+        $store0 = _mm_prefer_fma_ps(
             $store0,
-            $set.2,
-            vdupq_n_f32(vgetq_lane_f32::<2>($f_weights)),
+            $pixel_colors_0.2,
+            _mm_set1_ps(f32::from_bits(_mm_extract_ps::<2>($f_weights) as u32)),
         );
-        $store0 = prefer_vfmaq_f32(
+        $store0 = _mm_prefer_fma_ps(
             $store0,
-            $set.3,
-            vdupq_n_f32(vgetq_lane_f32::<3>($f_weights)),
+            $pixel_colors_0.3,
+            _mm_set1_ps(f32::from_bits(_mm_extract_ps::<3>($f_weights) as u32)),
         );
-        $store0 = prefer_vfmaq_f32($store0, $set.4, vdupq_n_f32($last_weight));
+        $store0 = _mm_prefer_fma_ps($store0, $pixel_colors_0.4, _mm_set1_ps($last_weight));
     }};
 }
 
 macro_rules! accumulate_4_items {
-    ($store0:expr, $set:expr, $f_weights:expr) => {{
-        $store0 = prefer_vfmaq_f32(
+    ($store0:expr, $pixel_colors_0:expr, $f_weights:expr) => {{
+        $store0 = _mm_prefer_fma_ps(
             $store0,
-            $set.0,
-            vdupq_n_f32(vgetq_lane_f32::<0>($f_weights)),
+            $pixel_colors_0.0,
+            _mm_set1_ps(f32::from_bits(_mm_extract_ps::<0>($f_weights) as u32)),
         );
-        $store0 = prefer_vfmaq_f32(
+        $store0 = _mm_prefer_fma_ps(
             $store0,
-            $set.1,
-            vdupq_n_f32(vgetq_lane_f32::<1>($f_weights)),
+            $pixel_colors_0.1,
+            _mm_set1_ps(f32::from_bits(_mm_extract_ps::<1>($f_weights) as u32)),
         );
-        $store0 = prefer_vfmaq_f32(
+        $store0 = _mm_prefer_fma_ps(
             $store0,
-            $set.2,
-            vdupq_n_f32(vgetq_lane_f32::<2>($f_weights)),
+            $pixel_colors_0.2,
+            _mm_set1_ps(f32::from_bits(_mm_extract_ps::<2>($f_weights) as u32)),
         );
-        $store0 = prefer_vfmaq_f32(
+        $store0 = _mm_prefer_fma_ps(
             $store0,
-            $set.3,
-            vdupq_n_f32(vgetq_lane_f32::<3>($f_weights)),
+            $pixel_colors_0.3,
+            _mm_set1_ps(f32::from_bits(_mm_extract_ps::<3>($f_weights) as u32)),
         );
     }};
 }
 
-pub fn gaussian_horiz_t_f_chan_f32<T, const CHANNEL_CONFIGURATION: usize>(
+pub fn gaussian_horiz_sse_t_f_chan_f32<T, const CHANNEL_CONFIGURATION: usize>(
     undef_src: &[T],
     src_stride: u32,
     undef_unsafe_dst: &UnsafeSlice<T>,
@@ -103,8 +107,8 @@ pub fn gaussian_horiz_t_f_chan_f32<T, const CHANNEL_CONFIGURATION: usize>(
                 let y_src_shift = y as usize * src_stride as usize;
                 let y_dst_shift = y as usize * dst_stride as usize;
 
-                let mut store0: float32x4_t = vdupq_n_f32(0.);
-                let mut store1: float32x4_t = vdupq_n_f32(0.);
+                let mut store0 = _mm_setzero_ps();
+                let mut store1 = _mm_setzero_ps();
 
                 let mut r = -half_kernel;
 
@@ -112,14 +116,14 @@ pub fn gaussian_horiz_t_f_chan_f32<T, const CHANNEL_CONFIGURATION: usize>(
                 if edge_value_check < 0 {
                     let diff = edge_value_check.abs();
                     let s_ptr = src.as_ptr().add(y_src_shift); // Here we're always at zero
-                    let pixel_colors_0 = load_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr);
+                    let pixel_colors_0 = load_f32::<CHANNEL_CONFIGURATION>(s_ptr);
                     let s_ptr_next = src.as_ptr().add(y_src_shift + src_stride as usize); // Here we're always at zero
-                    let pixel_colors_1 = load_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr_next);
+                    let pixel_colors_1 = load_f32::<CHANNEL_CONFIGURATION>(s_ptr_next);
                     for i in 0..diff as usize {
                         let weights = kernel.as_ptr().add(i);
-                        let f_weight = vdupq_n_f32(weights.read_unaligned());
-                        store0 = prefer_vfmaq_f32(store0, pixel_colors_0, f_weight);
-                        store1 = prefer_vfmaq_f32(store1, pixel_colors_1, f_weight);
+                        let f_weight = _mm_set1_ps(weights.read_unaligned());
+                        store0 = _mm_prefer_fma_ps(store0, pixel_colors_0, f_weight);
+                        store1 = _mm_prefer_fma_ps(store1, pixel_colors_1, f_weight);
                     }
                     r += diff as i32;
                 }
@@ -132,11 +136,11 @@ pub fn gaussian_horiz_t_f_chan_f32<T, const CHANNEL_CONFIGURATION: usize>(
                         ) as usize;
                         let px = current_x * CHANNEL_CONFIGURATION;
                         let s_ptr = src.as_ptr().add(y_src_shift + px);
-                        let pixel_colors_0 = vld1q_f32_x4(s_ptr);
-                        let pixel_colors_1 = vld1q_f32_x4(s_ptr.add(src_stride as usize));
+                        let pixel_colors_0 = _mm_loadu_ps_x4(s_ptr);
+                        let pixel_colors_1 = _mm_loadu_ps_x4(s_ptr.add(src_stride as usize));
                         let weight = kernel.as_ptr().add((r + half_kernel) as usize);
 
-                        let f_weights = vld1q_f32(weight);
+                        let f_weights = _mm_loadu_ps(weight);
 
                         accumulate_4_items!(store0, pixel_colors_0, f_weights);
                         accumulate_4_items!(store1, pixel_colors_1, f_weights);
@@ -152,13 +156,13 @@ pub fn gaussian_horiz_t_f_chan_f32<T, const CHANNEL_CONFIGURATION: usize>(
                         let px = current_x * CHANNEL_CONFIGURATION;
                         let s_ptr = src.as_ptr().add(y_src_shift + px);
                         // (r0 g0 b0 r1) (g1 b1 r2 g2) (b2 r3 g3 b3) (r4 g4 b5 undef)
-                        let pixel_colors_0 = vld1q_f32_x4(s_ptr);
-                        let pixel_colors_1 = vld1q_f32_x4(s_ptr.add(src_stride as usize));
+                        let pixel_colors_0 = _mm_loadu_ps_x4(s_ptr);
+                        let pixel_colors_1 = _mm_loadu_ps_x4(s_ptr.add(src_stride as usize));
                         // r0 g0 b0 0
-                        let set0 = vsplit_rgb(pixel_colors_0);
-                        let set1 = vsplit_rgb(pixel_colors_1);
+                        let set0 = _mm_split_rgb_5_ps(pixel_colors_0);
+                        let set1 = _mm_split_rgb_5_ps(pixel_colors_1);
                         let weight = kernel.as_ptr().add((r + half_kernel) as usize);
-                        let f_weights = vld1q_f32(weight);
+                        let f_weights = _mm_loadu_ps(weight);
                         let last_weight = weight.add(4).read_unaligned();
 
                         accumulate_5_items!(store0, set0, f_weights, last_weight);
@@ -174,13 +178,13 @@ pub fn gaussian_horiz_t_f_chan_f32<T, const CHANNEL_CONFIGURATION: usize>(
                             as usize;
                     let px = current_x * CHANNEL_CONFIGURATION;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
-                    let pixel_colors_0 = load_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr);
+                    let pixel_colors_0 = load_f32::<CHANNEL_CONFIGURATION>(s_ptr);
                     let s_ptr_next = s_ptr.add(src_stride as usize);
-                    let pixel_colors_1 = load_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr_next);
+                    let pixel_colors_1 = load_f32::<CHANNEL_CONFIGURATION>(s_ptr_next);
                     let weight = kernel.as_ptr().add((r + half_kernel) as usize);
-                    let f_weight: float32x4_t = vdupq_n_f32(weight.read_unaligned());
-                    store0 = prefer_vfmaq_f32(store0, pixel_colors_0, f_weight);
-                    store1 = prefer_vfmaq_f32(store1, pixel_colors_1, f_weight);
+                    let f_weight = _mm_set1_ps(weight.read_unaligned());
+                    store0 = _mm_prefer_fma_ps(store0, pixel_colors_0, f_weight);
+                    store1 = _mm_prefer_fma_ps(store1, pixel_colors_1, f_weight);
 
                     r += 1;
                 }
@@ -201,7 +205,7 @@ pub fn gaussian_horiz_t_f_chan_f32<T, const CHANNEL_CONFIGURATION: usize>(
                 let y_src_shift = y as usize * src_stride as usize;
                 let y_dst_shift = y as usize * dst_stride as usize;
 
-                let mut store: float32x4_t = vdupq_n_f32(0f32);
+                let mut store = _mm_setzero_ps();
 
                 let mut r = -half_kernel;
 
@@ -209,11 +213,11 @@ pub fn gaussian_horiz_t_f_chan_f32<T, const CHANNEL_CONFIGURATION: usize>(
                 if edge_value_check < 0 {
                     let diff = edge_value_check.abs();
                     let s_ptr = src.as_ptr().add(y_src_shift); // Here we're always at zero
-                    let pixel_colors_f32 = load_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr);
+                    let pixel_colors_f32 = load_f32::<CHANNEL_CONFIGURATION>(s_ptr);
                     for i in 0..diff as usize {
                         let weights = kernel.as_ptr().add(i);
-                        let f_weight = vdupq_n_f32(weights.read_unaligned());
-                        store = prefer_vfmaq_f32(store, pixel_colors_f32, f_weight);
+                        let f_weight = _mm_set1_ps(weights.read_unaligned());
+                        store = _mm_prefer_fma_ps(store, pixel_colors_f32, f_weight);
                     }
                     r += diff as i32;
                 }
@@ -226,10 +230,10 @@ pub fn gaussian_horiz_t_f_chan_f32<T, const CHANNEL_CONFIGURATION: usize>(
                         ) as usize;
                         let px = current_x * CHANNEL_CONFIGURATION;
                         let s_ptr = src.as_ptr().add(y_src_shift + px);
-                        let px = vld1q_f32_x4(s_ptr);
+                        let px = _mm_loadu_ps_x4(s_ptr);
                         let weight = kernel.as_ptr().add((r + half_kernel) as usize);
 
-                        let f_weights = vld1q_f32(weight);
+                        let f_weights = _mm_loadu_ps(weight);
 
                         accumulate_4_items!(store, px, f_weights);
 
@@ -244,14 +248,14 @@ pub fn gaussian_horiz_t_f_chan_f32<T, const CHANNEL_CONFIGURATION: usize>(
                         let px = current_x * CHANNEL_CONFIGURATION;
                         let s_ptr = src.as_ptr().add(y_src_shift + px);
                         // (r0 g0 b0 r1) (g1 b1 r2 g2) (b2 r3 g3 b3) (r4 g4 b5 undef)
-                        let pixel_colors_o = vld1q_f32_x4(s_ptr);
+                        let pixel_colors_o = _mm_loadu_ps_x4(s_ptr);
                         // r0 g0 b0 0
-                        let set = vsplit_rgb(pixel_colors_o);
+                        let pixel_set = _mm_split_rgb_5_ps(pixel_colors_o);
                         let weight = kernel.as_ptr().add((r + half_kernel) as usize);
-                        let f_weights = vld1q_f32(weight);
+                        let f_weights = _mm_loadu_ps(weight);
                         let last_weight = weight.add(4).read_unaligned();
 
-                        accumulate_5_items!(store, set, f_weights, last_weight);
+                        accumulate_5_items!(store, pixel_set, f_weights, last_weight);
 
                         r += 5;
                     }
@@ -263,10 +267,10 @@ pub fn gaussian_horiz_t_f_chan_f32<T, const CHANNEL_CONFIGURATION: usize>(
                             as usize;
                     let px = current_x * CHANNEL_CONFIGURATION;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
-                    let pixel_colors_f32 = load_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr);
+                    let pixel_colors_f32 = load_f32::<CHANNEL_CONFIGURATION>(s_ptr);
                     let weight = kernel.as_ptr().add((r + half_kernel) as usize);
-                    let f_weight: float32x4_t = vdupq_n_f32(weight.read_unaligned());
-                    store = prefer_vfmaq_f32(store, pixel_colors_f32, f_weight);
+                    let f_weight = _mm_set1_ps(weight.read_unaligned());
+                    store = _mm_prefer_fma_ps(store, pixel_colors_f32, f_weight);
 
                     r += 1;
                 }

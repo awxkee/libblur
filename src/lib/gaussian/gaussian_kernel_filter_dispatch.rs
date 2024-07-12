@@ -27,13 +27,6 @@
 
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::gaussian::gauss_neon::*;
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "sse4.1"
-))]
-use crate::gaussian::gauss_sse::*;
-use crate::gaussian::gaussian_filter::GaussianFilter;
-use crate::gaussian::gaussian_horizontal::gaussian_blur_horizontal_pass_impl_clip_edge;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::gaussian::gauss_neon::{
     gaussian_blur_horizontal_pass_filter_neon, gaussian_blur_vertical_pass_filter_neon,
@@ -42,9 +35,16 @@ use crate::gaussian::gauss_neon::{
     any(target_arch = "x86_64", target_arch = "x86"),
     target_feature = "sse4.1"
 ))]
-use crate::gaussian::gaussian_sse_filter::sse_filter::{
+use crate::gaussian::gauss_sse::*;
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+))]
+use crate::gaussian::gauss_sse::{
     gaussian_blur_horizontal_pass_filter_sse, gaussian_blur_vertical_pass_filter_sse,
 };
+use crate::gaussian::gaussian_filter::GaussianFilter;
+use crate::gaussian::gaussian_horizontal::gaussian_blur_horizontal_pass_impl_clip_edge;
 use crate::gaussian::gaussian_vertical::gaussian_blur_vertical_pass_clip_edge_impl;
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;

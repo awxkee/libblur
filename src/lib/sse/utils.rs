@@ -202,18 +202,6 @@ pub(crate) unsafe fn store_u8_s32<const CHANNELS_COUNT: usize>(dst_ptr: *mut u8,
     }
 }
 
-#[cfg(not(target_feature = "fma"))]
-#[inline]
-pub unsafe fn _mm_prefer_fma_ps(a: __m128, b: __m128, c: __m128) -> __m128 {
-    return _mm_add_ps(_mm_mul_ps(b, c), a);
-}
-
-#[cfg(target_feature = "fma")]
-#[inline]
-pub unsafe fn _mm_prefer_fma_ps(a: __m128, b: __m128, c: __m128) -> __m128 {
-    return _mm_fmadd_ps(b, c, a);
-}
-
 #[inline(always)]
 pub unsafe fn _mm_hsum_ps(v: __m128) -> f32 {
     let mut shuf = _mm_movehdup_ps(v);
@@ -244,4 +232,33 @@ pub unsafe fn _mm_loadu_ps_x4(ptr: *const f32) -> (__m128, __m128, __m128, __m12
 #[inline(always)]
 pub unsafe fn _mm_loadu_ps_x2(ptr: *const f32) -> (__m128, __m128) {
     (_mm_loadu_ps(ptr), _mm_loadu_ps(ptr.add(4)))
+}
+
+#[inline(always)]
+pub unsafe fn _mm_erase_last_ps(item: __m128) -> __m128 {
+    #[allow(overflowing_literals)]
+    let mask = _mm_castsi128_ps(_mm_setr_epi32(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0));
+    _mm_and_ps(item, mask)
+}
+
+#[inline(always)]
+pub unsafe fn _mm_split_rgb_5_ps(
+    vals: (__m128, __m128, __m128, __m128),
+) -> (__m128, __m128, __m128, __m128, __m128) {
+    let first = _mm_erase_last_ps(vals.0);
+
+    let second = _mm_erase_last_ps(_mm_castsi128_ps(_mm_alignr_epi8::<12>(
+        _mm_castps_si128(vals.1),
+        _mm_castps_si128(vals.0),
+    )));
+    let third = _mm_erase_last_ps(_mm_castsi128_ps(_mm_alignr_epi8::<8>(
+        _mm_castps_si128(vals.2),
+        _mm_castps_si128(vals.1),
+    )));
+    let fourth = _mm_erase_last_ps(_mm_castsi128_ps(_mm_alignr_epi8::<4>(
+        _mm_castps_si128(vals.3),
+        _mm_castps_si128(vals.2),
+    )));
+    let fifth = _mm_erase_last_ps(vals.3);
+    (first, second, third, fourth, fifth)
 }

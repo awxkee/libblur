@@ -72,7 +72,7 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
     //     EdgeMode::Reflect101,
     // );
 
-    libblur::gaussian_blur(
+    libblur::gaussian_blur_in_linear(
         &plane_1,
         width as u32,
         &mut dst_plane_1,
@@ -84,9 +84,10 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
         FastBlurChannels::Plane,
         EdgeMode::Clamp,
         ThreadingPolicy::Single,
+        TransferFunction::Srgb,
     );
 
-    libblur::gaussian_blur(
+    libblur::gaussian_blur_in_linear(
         &plane_2,
         width as u32,
         &mut dst_plane_2,
@@ -98,9 +99,10 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
         FastBlurChannels::Plane,
         EdgeMode::Clamp,
         ThreadingPolicy::Single,
+        TransferFunction::Srgb,
     );
 
-    libblur::gaussian_blur(
+    libblur::gaussian_blur_in_linear(
         &plane_3,
         width as u32,
         &mut dst_plane_3,
@@ -112,6 +114,7 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
         FastBlurChannels::Plane,
         EdgeMode::Clamp,
         ThreadingPolicy::Single,
+        TransferFunction::Srgb,
     );
 
     merge_channels_3(
@@ -134,7 +137,7 @@ fn main() {
     //     vst1q_s64(t.as_mut_ptr(), mul);
     //     println!("{:?}", t);
     // }
-    let img = ImageReader::open("assets/test_image_2.png")
+    let img = ImageReader::open("assets/test_image_1_small.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -144,7 +147,7 @@ fn main() {
 
     println!("{:?}", img.color());
     let src_bytes = img.as_bytes();
-    let components = 4;
+    let components = 3;
     let stride = dimensions.0 as usize * components;
     let mut bytes: Vec<u8> = Vec::with_capacity(dimensions.1 as usize * stride);
     for i in 0..dimensions.1 as usize * stride {
@@ -206,22 +209,22 @@ fn main() {
     //     EdgeMode::Reflect,
     // );
     //
-    libblur::gaussian_blur_in_linear(
-        &bytes,
-        stride as u32,
-        &mut dst_bytes,
-        stride as u32,
-        dimensions.0,
-        dimensions.1,
-        25 * 2 + 1,
-        25f32 * 2f32 / 6f32,
-        FastBlurChannels::Channels4,
-        EdgeMode::Clamp,
-        ThreadingPolicy::Single,
-        TransferFunction::Srgb,
-    );
+    // libblur::gaussian_blur_in_linear(
+    //     &bytes,
+    //     stride as u32,
+    //     &mut dst_bytes,
+    //     stride as u32,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     25 * 2 + 1,
+    //     25f32 * 2f32 / 6f32,
+    //     FastBlurChannels::Channels3,
+    //     EdgeMode::Clamp,
+    //     ThreadingPolicy::Single,
+    //     TransferFunction::Srgb,
+    // );
 
-    // dst_bytes = perform_planar_pass_3(&bytes, dimensions.0 as usize, dimensions.1 as usize);
+    dst_bytes = perform_planar_pass_3(&bytes, dimensions.0 as usize, dimensions.1 as usize);
 
     let elapsed_time = start_time.elapsed();
     // Print the elapsed time in milliseconds

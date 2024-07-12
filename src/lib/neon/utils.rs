@@ -255,10 +255,22 @@ pub(crate) unsafe fn vhsumq_f32(a: float32x4_t) -> f32 {
 #[inline(always)]
 pub(crate) unsafe fn vsplit_rgb(
     px: float32x4x4_t,
-) -> (float32x4_t, float32x4_t, float32x4_t, float32x4_t) {
+) -> (
+    float32x4_t,
+    float32x4_t,
+    float32x4_t,
+    float32x4_t,
+    float32x4_t,
+) {
     let first_pixel = vsetq_lane_f32::<3>(0f32, px.0);
     let second_pixel = vsetq_lane_f32::<3>(0f32, vextq_f32::<3>(px.0, px.1));
     let third_pixel = vsetq_lane_f32::<3>(0f32, vextq_f32::<2>(px.1, px.2));
-    let four_pixel = vsetq_lane_f32::<3>(0f32, px.3);
-    (first_pixel, second_pixel, third_pixel, four_pixel)
+    let four_pixel = vsetq_lane_f32::<3>(0f32, vextq_f32::<1>(px.2, px.3));
+    (
+        first_pixel,
+        second_pixel,
+        third_pixel,
+        four_pixel,
+        vsetq_lane_f32::<3>(0f32, px.3),
+    )
 }
