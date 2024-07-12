@@ -63,6 +63,17 @@ macro_rules! accumulate_2_forward {
     }};
 }
 
+macro_rules! read_f32_by_u8_x4 {
+    ($ptr:expr) => {{
+        _mm_setr_epi32(
+            $ptr.read_unaligned() as i32,
+            $ptr.add(1).read_unaligned() as i32,
+            $ptr.add(2).read_unaligned() as i32,
+            $ptr.add(3).read_unaligned() as i32,
+        )
+    }};
+}
+
 pub fn gaussian_sse_horiz_one_chan_u8<T>(
     undef_src: &[T],
     src_stride: u32,
@@ -133,8 +144,10 @@ pub fn gaussian_sse_horiz_one_chan_u8<T>(
                     let s_ptr_next = src.as_ptr().add(y_src_shift_next + px);
                     let pixel_colors_u8x2 = _mm_loadu_si128_x2(s_ptr);
                     let pixel_colors_u8x2_1 = _mm_loadu_si128_x2(s_ptr_next);
-                    let pixel_colors_u8x2_2 = _mm_loadu_si128_x2(s_ptr_next.add(src_stride as usize));
-                    let pixel_colors_u8x2_3 = _mm_loadu_si128_x2(s_ptr_next.add(src_stride as usize * 2));
+                    let pixel_colors_u8x2_2 =
+                        _mm_loadu_si128_x2(s_ptr_next.add(src_stride as usize));
+                    let pixel_colors_u8x2_3 =
+                        _mm_loadu_si128_x2(s_ptr_next.add(src_stride as usize * 2));
                     let weight = kernel.as_ptr().add((r + half_kernel) as usize);
                     let weights0 = _mm_loadu_ps_x4(weight);
                     let weights1 = _mm_loadu_ps_x4(weight.add(16));
@@ -163,8 +176,10 @@ pub fn gaussian_sse_horiz_one_chan_u8<T>(
                     let s_ptr_next = src.as_ptr().add(y_src_shift_next + px);
                     let pixel_colors_u8_0 = _mm_loadu_si128(s_ptr as *const __m128i);
                     let pixel_colors_u8_1 = _mm_loadu_si128(s_ptr_next as *const __m128i);
-                    let pixel_colors_u8_2 = _mm_loadu_si128(s_ptr_next.add(src_stride as usize) as *const __m128i);
-                    let pixel_colors_u8_3 = _mm_loadu_si128(s_ptr_next.add(src_stride as usize * 2) as *const __m128i);
+                    let pixel_colors_u8_2 =
+                        _mm_loadu_si128(s_ptr_next.add(src_stride as usize) as *const __m128i);
+                    let pixel_colors_u8_3 =
+                        _mm_loadu_si128(s_ptr_next.add(src_stride as usize * 2) as *const __m128i);
                     let weight = kernel.as_ptr().add((r + half_kernel) as usize);
                     let weights = _mm_loadu_ps_x4(weight);
 
@@ -204,36 +219,16 @@ pub fn gaussian_sse_horiz_one_chan_u8<T>(
                             as usize;
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
-                    let pixel_colors_i32_0 = _mm_setr_epi32(
-                        s_ptr.read_unaligned() as i32,
-                        s_ptr.add(1).read_unaligned() as i32,
-                        s_ptr.add(2).read_unaligned() as i32,
-                        s_ptr.add(3).read_unaligned() as i32,
-                    );
+                    let pixel_colors_i32_0 = read_f32_by_u8_x4!(s_ptr);
 
                     let s_ptr_next = src.as_ptr().add(y_src_shift_next + px);
-                    let pixel_colors_i32_1 = _mm_setr_epi32(
-                        s_ptr_next.read_unaligned() as i32,
-                        s_ptr_next.add(1).read_unaligned() as i32,
-                        s_ptr_next.add(2).read_unaligned() as i32,
-                        s_ptr_next.add(3).read_unaligned() as i32,
-                    );
+                    let pixel_colors_i32_1 = read_f32_by_u8_x4!(s_ptr_next);
 
                     let s_ptr_next_2 = s_ptr_next.add(src_stride as usize);
-                    let pixel_colors_i32_2 = _mm_setr_epi32(
-                        s_ptr_next_2.read_unaligned() as i32,
-                        s_ptr_next_2.add(1).read_unaligned() as i32,
-                        s_ptr_next_2.add(2).read_unaligned() as i32,
-                        s_ptr_next_2.add(3).read_unaligned() as i32,
-                    );
+                    let pixel_colors_i32_2 = read_f32_by_u8_x4!(s_ptr_next_2);
 
                     let s_ptr_next_3 = s_ptr_next_2.add(src_stride as usize);
-                    let pixel_colors_i32_3 = _mm_setr_epi32(
-                        s_ptr_next_3.read_unaligned() as i32,
-                        s_ptr_next_3.add(1).read_unaligned() as i32,
-                        s_ptr_next_3.add(2).read_unaligned() as i32,
-                        s_ptr_next_3.add(3).read_unaligned() as i32,
-                    );
+                    let pixel_colors_i32_3 = read_f32_by_u8_x4!(s_ptr_next_3);
 
                     let pixel_colors_f32_0 = _mm_cvtepi32_ps(pixel_colors_i32_0);
                     let pixel_colors_f32_1 = _mm_cvtepi32_ps(pixel_colors_i32_1);
@@ -403,20 +398,10 @@ pub fn gaussian_sse_horiz_one_chan_u8<T>(
                             as usize;
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
-                    let pixel_colors_i32_0 = _mm_setr_epi32(
-                        s_ptr.read_unaligned() as i32,
-                        s_ptr.add(1).read_unaligned() as i32,
-                        s_ptr.add(2).read_unaligned() as i32,
-                        s_ptr.add(3).read_unaligned() as i32,
-                    );
+                    let pixel_colors_i32_0 = read_f32_by_u8_x4!(s_ptr);
 
                     let s_ptr_next = src.as_ptr().add(y_src_shift_next + px);
-                    let pixel_colors_i32_1 = _mm_setr_epi32(
-                        s_ptr_next.read_unaligned() as i32,
-                        s_ptr_next.add(1).read_unaligned() as i32,
-                        s_ptr_next.add(2).read_unaligned() as i32,
-                        s_ptr_next.add(3).read_unaligned() as i32,
-                    );
+                    let pixel_colors_i32_1 = read_f32_by_u8_x4!(s_ptr_next);
 
                     let pixel_colors_f32_0 = _mm_cvtepi32_ps(pixel_colors_i32_0);
                     let pixel_colors_f32_1 = _mm_cvtepi32_ps(pixel_colors_i32_1);
@@ -538,12 +523,7 @@ pub fn gaussian_sse_horiz_one_chan_u8<T>(
                             as usize;
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
-                    let pixel_colors_i32 = _mm_setr_epi32(
-                        s_ptr.read_unaligned() as i32,
-                        s_ptr.add(1).read_unaligned() as i32,
-                        s_ptr.add(2).read_unaligned() as i32,
-                        s_ptr.add(3).read_unaligned() as i32,
-                    );
+                    let pixel_colors_i32 = read_f32_by_u8_x4!(s_ptr);
                     let pixel_colors_f32 = _mm_cvtepi32_ps(pixel_colors_i32);
                     let weight = kernel.as_ptr().add((r + half_kernel) as usize);
                     let f_weight = _mm_loadu_ps(weight);
