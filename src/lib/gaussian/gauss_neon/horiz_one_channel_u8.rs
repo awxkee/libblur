@@ -30,6 +30,32 @@ use crate::neon::{prefer_vfmaq_f32, vhsumq_f32};
 use crate::unsafe_slice::UnsafeSlice;
 use std::arch::aarch64::*;
 
+macro_rules! accumulate_4_forward {
+    ($store:expr, $pixel_colors:expr, $weights:expr) => {{
+        let pixel_colors_low_u16 = vmovl_u8(vget_low_u8($pixel_colors));
+        let pixel_color0 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_low_u16)));
+        let pixel_color1 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_low_u16));
+        $store = prefer_vfmaq_f32($store, pixel_color0, $weights.0);
+        $store = prefer_vfmaq_f32($store, pixel_color1, $weights.1);
+
+        let pixel_colors_high_u16 = vmovl_high_u8($pixel_colors);
+        let pixel_color2 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_high_u16)));
+        let pixel_color3 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_high_u16));
+        $store = prefer_vfmaq_f32($store, pixel_color2, $weights.2);
+        $store = prefer_vfmaq_f32($store, pixel_color3, $weights.3);
+    }};
+}
+
+macro_rules! accumulate_2_forward {
+    ($store:expr, $pixel_colors:expr, $weights:expr) => {{
+        let pixel_u16 = vmovl_u8($pixel_colors);
+        let pixel_color_low = vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_u16)));
+        let pixel_color_high = vcvtq_f32_u32(vmovl_high_u16(pixel_u16));
+        $store = prefer_vfmaq_f32($store, pixel_color_low, $weights.0);
+        $store = prefer_vfmaq_f32($store, pixel_color_high, $weights.1);
+    }};
+}
+
 pub fn gaussian_horiz_one_chan_u8<T>(
     undef_src: &[T],
     src_stride: u32,
@@ -93,71 +119,13 @@ pub fn gaussian_horiz_one_chan_u8<T>(
                     let weights0 = vld1q_f32_x4(weight);
                     let weights1 = vld1q_f32_x4(weight.add(16));
 
-                    {
-                        let pixel_colors_low_u16 = vmovl_u8(vget_low_u8(pixel_colors_u8x2.0));
-                        let pixel_color0 =
-                            vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_low_u16)));
-                        let pixel_color1 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_low_u16));
-                        store0 = prefer_vfmaq_f32(store0, pixel_color0, weights0.0);
-                        store0 = prefer_vfmaq_f32(store0, pixel_color1, weights0.1);
-
-                        let pixel_colors_high_u16 = vmovl_high_u8(pixel_colors_u8x2.0);
-                        let pixel_color2 =
-                            vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_high_u16)));
-                        let pixel_color3 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_high_u16));
-                        store0 = prefer_vfmaq_f32(store0, pixel_color2, weights0.2);
-                        store0 = prefer_vfmaq_f32(store0, pixel_color3, weights0.3);
-                    }
-
-                    {
-                        let pixel_colors_low_u16 = vmovl_u8(vget_low_u8(pixel_colors_u8x2.1));
-                        let pixel_color0 =
-                            vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_low_u16)));
-                        let pixel_color1 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_low_u16));
-                        store0 = prefer_vfmaq_f32(store0, pixel_color0, weights1.0);
-                        store0 = prefer_vfmaq_f32(store0, pixel_color1, weights1.1);
-
-                        let pixel_colors_high_u16 = vmovl_high_u8(pixel_colors_u8x2.1);
-                        let pixel_color2 =
-                            vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_high_u16)));
-                        let pixel_color3 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_high_u16));
-                        store0 = prefer_vfmaq_f32(store0, pixel_color2, weights1.2);
-                        store0 = prefer_vfmaq_f32(store0, pixel_color3, weights1.3);
-                    }
+                    accumulate_4_forward!(store0, pixel_colors_u8x2.0, weights0);
+                    accumulate_4_forward!(store0, pixel_colors_u8x2.1, weights1);
 
                     // Next row
 
-                    {
-                        let pixel_colors_low_u16 = vmovl_u8(vget_low_u8(pixel_colors_u8x2_next.0));
-                        let pixel_color0 =
-                            vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_low_u16)));
-                        let pixel_color1 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_low_u16));
-                        store1 = prefer_vfmaq_f32(store1, pixel_color0, weights0.0);
-                        store1 = prefer_vfmaq_f32(store1, pixel_color1, weights0.1);
-
-                        let pixel_colors_high_u16 = vmovl_high_u8(pixel_colors_u8x2_next.0);
-                        let pixel_color2 =
-                            vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_high_u16)));
-                        let pixel_color3 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_high_u16));
-                        store1 = prefer_vfmaq_f32(store1, pixel_color2, weights0.2);
-                        store1 = prefer_vfmaq_f32(store1, pixel_color3, weights0.3);
-                    }
-
-                    {
-                        let pixel_colors_low_u16 = vmovl_u8(vget_low_u8(pixel_colors_u8x2_next.1));
-                        let pixel_color0 =
-                            vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_low_u16)));
-                        let pixel_color1 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_low_u16));
-                        store1 = prefer_vfmaq_f32(store1, pixel_color0, weights1.0);
-                        store1 = prefer_vfmaq_f32(store1, pixel_color1, weights1.1);
-
-                        let pixel_colors_high_u16 = vmovl_high_u8(pixel_colors_u8x2_next.1);
-                        let pixel_color2 =
-                            vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_high_u16)));
-                        let pixel_color3 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_high_u16));
-                        store1 = prefer_vfmaq_f32(store1, pixel_color2, weights1.2);
-                        store1 = prefer_vfmaq_f32(store1, pixel_color3, weights1.3);
-                    }
+                    accumulate_4_forward!(store1, pixel_colors_u8x2_next.0, weights0);
+                    accumulate_4_forward!(store1, pixel_colors_u8x2_next.1, weights1);
 
                     r += 32;
                 }
@@ -174,31 +142,8 @@ pub fn gaussian_horiz_one_chan_u8<T>(
                     let weight = kernel.as_ptr().add((r + half_kernel) as usize);
                     let weights = vld1q_f32_x4(weight);
 
-                    let pixel_colors_low_u16 = vmovl_u8(vget_low_u8(pixel_colors_u8_0));
-                    let pixel_color0 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_low_u16)));
-                    let pixel_color1 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_low_u16));
-                    store0 = prefer_vfmaq_f32(store0, pixel_color0, weights.0);
-                    store0 = prefer_vfmaq_f32(store0, pixel_color1, weights.1);
-
-                    let pixel_colors_high_u16 = vmovl_high_u8(pixel_colors_u8_0);
-                    let pixel_color2 =
-                        vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_high_u16)));
-                    let pixel_color3 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_high_u16));
-                    store0 = prefer_vfmaq_f32(store0, pixel_color2, weights.2);
-                    store0 = prefer_vfmaq_f32(store0, pixel_color3, weights.3);
-
-                    let pixel_colors_low_u16 = vmovl_u8(vget_low_u8(pixel_colors_u8_1));
-                    let pixel_color0 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_low_u16)));
-                    let pixel_color1 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_low_u16));
-                    store1 = prefer_vfmaq_f32(store1, pixel_color0, weights.0);
-                    store1 = prefer_vfmaq_f32(store1, pixel_color1, weights.1);
-
-                    let pixel_colors_high_u16 = vmovl_high_u8(pixel_colors_u8_1);
-                    let pixel_color2 =
-                        vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_high_u16)));
-                    let pixel_color3 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_high_u16));
-                    store1 = prefer_vfmaq_f32(store1, pixel_color2, weights.2);
-                    store1 = prefer_vfmaq_f32(store1, pixel_color3, weights.3);
+                    accumulate_4_forward!(store0, pixel_colors_u8_0, weights);
+                    accumulate_4_forward!(store1, pixel_colors_u8_1, weights);
 
                     r += 16;
                 }
@@ -210,21 +155,13 @@ pub fn gaussian_horiz_one_chan_u8<T>(
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let s_ptr_next = src.as_ptr().add(y_src_shift_next + px);
-                    let pixel_colors_u16_0 = vmovl_u8(vld1_u8(s_ptr));
-                    let pixel_colors_u16_1 = vmovl_u8(vld1_u8(s_ptr_next));
+                    let pixel_colors_u8_0 = vld1_u8(s_ptr);
+                    let pixel_colors_u8_1 = vld1_u8(s_ptr_next);
                     let weight = kernel.as_ptr().add((r + half_kernel) as usize);
                     let weights = vld1q_f32_x2(weight);
-                    let pixel_color_low =
-                        vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_u16_0)));
-                    let pixel_color_high = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_u16_0));
-                    store0 = prefer_vfmaq_f32(store0, pixel_color_low, weights.0);
-                    store0 = prefer_vfmaq_f32(store0, pixel_color_high, weights.1);
 
-                    let pixel_color_low =
-                        vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_u16_1)));
-                    let pixel_color_high = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_u16_1));
-                    store1 = prefer_vfmaq_f32(store1, pixel_color_low, weights.0);
-                    store1 = prefer_vfmaq_f32(store1, pixel_color_high, weights.1);
+                    accumulate_2_forward!(store0, pixel_colors_u8_0, weights);
+                    accumulate_2_forward!(store1, pixel_colors_u8_1, weights);
 
                     r += 8;
                 }
@@ -336,31 +273,8 @@ pub fn gaussian_horiz_one_chan_u8<T>(
                     let weights0 = vld1q_f32_x4(weight);
                     let weights1 = vld1q_f32_x4(weight.add(16));
 
-                    let pixel_colors_low_u16 = vmovl_u8(vget_low_u8(pixel_colors_u8x2.0));
-                    let pixel_color0 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_low_u16)));
-                    let pixel_color1 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_low_u16));
-                    store = prefer_vfmaq_f32(store, pixel_color0, weights0.0);
-                    store = prefer_vfmaq_f32(store, pixel_color1, weights0.1);
-
-                    let pixel_colors_high_u16 = vmovl_high_u8(pixel_colors_u8x2.0);
-                    let pixel_color2 =
-                        vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_high_u16)));
-                    let pixel_color3 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_high_u16));
-                    store = prefer_vfmaq_f32(store, pixel_color2, weights0.2);
-                    store = prefer_vfmaq_f32(store, pixel_color3, weights0.3);
-
-                    let pixel_colors_low_u16 = vmovl_u8(vget_low_u8(pixel_colors_u8x2.1));
-                    let pixel_color0 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_low_u16)));
-                    let pixel_color1 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_low_u16));
-                    store = prefer_vfmaq_f32(store, pixel_color0, weights1.0);
-                    store = prefer_vfmaq_f32(store, pixel_color1, weights1.1);
-
-                    let pixel_colors_high_u16 = vmovl_high_u8(pixel_colors_u8x2.1);
-                    let pixel_color2 =
-                        vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_high_u16)));
-                    let pixel_color3 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_high_u16));
-                    store = prefer_vfmaq_f32(store, pixel_color2, weights1.2);
-                    store = prefer_vfmaq_f32(store, pixel_color3, weights1.3);
+                    accumulate_4_forward!(store, pixel_colors_u8x2.0, weights0);
+                    accumulate_4_forward!(store, pixel_colors_u8x2.1, weights1);
 
                     r += 32;
                 }
@@ -374,18 +288,8 @@ pub fn gaussian_horiz_one_chan_u8<T>(
                     let pixel_colors_u8 = vld1q_u8(s_ptr);
                     let weight = kernel.as_ptr().add((r + half_kernel) as usize);
                     let weights = vld1q_f32_x4(weight);
-                    let pixel_colors_low_u16 = vmovl_u8(vget_low_u8(pixel_colors_u8));
-                    let pixel_color0 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_low_u16)));
-                    let pixel_color1 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_low_u16));
-                    store = prefer_vfmaq_f32(store, pixel_color0, weights.0);
-                    store = prefer_vfmaq_f32(store, pixel_color1, weights.1);
 
-                    let pixel_colors_high_u16 = vmovl_high_u8(pixel_colors_u8);
-                    let pixel_color2 =
-                        vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_high_u16)));
-                    let pixel_color3 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_high_u16));
-                    store = prefer_vfmaq_f32(store, pixel_color2, weights.2);
-                    store = prefer_vfmaq_f32(store, pixel_color3, weights.3);
+                    accumulate_4_forward!(store, pixel_colors_u8, weights);
 
                     r += 16;
                 }
@@ -396,13 +300,11 @@ pub fn gaussian_horiz_one_chan_u8<T>(
                             as usize;
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
-                    let pixel_colors_u16 = vmovl_u8(vld1_u8(s_ptr));
+                    let pixel_colors_u8 = vld1_u8(s_ptr);
                     let weight = kernel.as_ptr().add((r + half_kernel) as usize);
                     let weights = vld1q_f32_x2(weight);
-                    let pixel_color_low = vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_u16)));
-                    let pixel_color_high = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_u16));
-                    store = prefer_vfmaq_f32(store, pixel_color_low, weights.0);
-                    store = prefer_vfmaq_f32(store, pixel_color_high, weights.1);
+
+                    accumulate_2_forward!(store, pixel_colors_u8, weights);
 
                     r += 8;
                 }
@@ -503,59 +405,13 @@ pub fn gaussian_horiz_one_chan_filter_u8<T>(
                     let weights0 = vld1q_f32_x4(weight);
                     let weights1 = vld1q_f32_x4(weight.add(16));
 
-                    let pixel_colors_low_u16 = vmovl_u8(vget_low_u8(pixel_colors_u8x2.0));
-                    let pixel_color0 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_low_u16)));
-                    let pixel_color1 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_low_u16));
-                    store0 = prefer_vfmaq_f32(store0, pixel_color0, weights0.0);
-                    store0 = prefer_vfmaq_f32(store0, pixel_color1, weights0.1);
-
-                    let pixel_colors_high_u16 = vmovl_high_u8(pixel_colors_u8x2.0);
-                    let pixel_color2 =
-                        vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_high_u16)));
-                    let pixel_color3 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_high_u16));
-                    store0 = prefer_vfmaq_f32(store0, pixel_color2, weights0.2);
-                    store0 = prefer_vfmaq_f32(store0, pixel_color3, weights0.3);
-
-                    let pixel_colors_low_u16 = vmovl_u8(vget_low_u8(pixel_colors_u8x2.1));
-                    let pixel_color0 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_low_u16)));
-                    let pixel_color1 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_low_u16));
-                    store0 = prefer_vfmaq_f32(store0, pixel_color0, weights1.0);
-                    store0 = prefer_vfmaq_f32(store0, pixel_color1, weights1.1);
-
-                    let pixel_colors_high_u16 = vmovl_high_u8(pixel_colors_u8x2.1);
-                    let pixel_color2 =
-                        vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_high_u16)));
-                    let pixel_color3 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_high_u16));
-                    store0 = prefer_vfmaq_f32(store0, pixel_color2, weights1.2);
-                    store0 = prefer_vfmaq_f32(store0, pixel_color3, weights1.3);
+                    accumulate_4_forward!(store0, pixel_colors_u8x2.0, weights0);
+                    accumulate_4_forward!(store0, pixel_colors_u8x2.1, weights1);
 
                     // Next row
 
-                    let pixel_colors_low_u16 = vmovl_u8(vget_low_u8(pixel_colors_u8x2_next.0));
-                    let pixel_color0 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_low_u16)));
-                    let pixel_color1 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_low_u16));
-                    store1 = prefer_vfmaq_f32(store1, pixel_color0, weights0.0);
-                    store1 = prefer_vfmaq_f32(store1, pixel_color1, weights0.1);
-
-                    let pixel_colors_high_u16 = vmovl_high_u8(pixel_colors_u8x2_next.0);
-                    let pixel_color2 =
-                        vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_high_u16)));
-                    let pixel_color3 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_high_u16));
-                    store1 = prefer_vfmaq_f32(store1, pixel_color2, weights0.2);
-                    store1 = prefer_vfmaq_f32(store1, pixel_color3, weights0.3);
-
-                    let pixel_colors_low_u16 = vmovl_u8(vget_low_u8(pixel_colors_u8x2_next.1));
-                    let pixel_color0 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_low_u16)));
-                    let pixel_color1 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_low_u16));
-                    store1 = prefer_vfmaq_f32(store1, pixel_color0, weights1.0);
-                    store1 = prefer_vfmaq_f32(store1, pixel_color1, weights1.1);
-
-                    let pixel_colors_high_u16 = vmovl_high_u8(pixel_colors_u8x2_next.1);
-                    let pixel_color2 =
-                        vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_high_u16)));
-                    let pixel_color3 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_high_u16));
-                    store1 = prefer_vfmaq_f32(store1, pixel_color2, weights1.2);
-                    store1 = prefer_vfmaq_f32(store1, pixel_color3, weights1.3);
+                    accumulate_4_forward!(store1, pixel_colors_u8x2_next.0, weights0);
+                    accumulate_4_forward!(store1, pixel_colors_u8x2_next.1, weights1);
 
                     r += 32;
                 }
@@ -575,31 +431,8 @@ pub fn gaussian_horiz_one_chan_filter_u8<T>(
                     let weight = filter_weights.as_ptr().add(r);
                     let weights = vld1q_f32_x4(weight);
 
-                    let pixel_colors_low_u16 = vmovl_u8(vget_low_u8(pixel_colors_u8_0));
-                    let pixel_color0 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_low_u16)));
-                    let pixel_color1 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_low_u16));
-                    store0 = prefer_vfmaq_f32(store0, pixel_color0, weights.0);
-                    store0 = prefer_vfmaq_f32(store0, pixel_color1, weights.1);
-
-                    let pixel_colors_high_u16 = vmovl_high_u8(pixel_colors_u8_0);
-                    let pixel_color2 =
-                        vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_high_u16)));
-                    let pixel_color3 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_high_u16));
-                    store0 = prefer_vfmaq_f32(store0, pixel_color2, weights.2);
-                    store0 = prefer_vfmaq_f32(store0, pixel_color3, weights.3);
-
-                    let pixel_colors_low_u16 = vmovl_u8(vget_low_u8(pixel_colors_u8_1));
-                    let pixel_color0 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_low_u16)));
-                    let pixel_color1 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_low_u16));
-                    store1 = prefer_vfmaq_f32(store1, pixel_color0, weights.0);
-                    store1 = prefer_vfmaq_f32(store1, pixel_color1, weights.1);
-
-                    let pixel_colors_high_u16 = vmovl_high_u8(pixel_colors_u8_1);
-                    let pixel_color2 =
-                        vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_high_u16)));
-                    let pixel_color3 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_high_u16));
-                    store1 = prefer_vfmaq_f32(store1, pixel_color2, weights.2);
-                    store1 = prefer_vfmaq_f32(store1, pixel_color3, weights.3);
+                    accumulate_4_forward!(store0, pixel_colors_u8_0, weights);
+                    accumulate_4_forward!(store1, pixel_colors_u8_1, weights);
 
                     r += 16;
                 }
@@ -614,21 +447,13 @@ pub fn gaussian_horiz_one_chan_filter_u8<T>(
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let s_ptr_next = src.as_ptr().add(y_src_shift_next + px);
-                    let pixel_colors_u16_0 = vmovl_u8(vld1_u8(s_ptr));
-                    let pixel_colors_u16_1 = vmovl_u8(vld1_u8(s_ptr_next));
+                    let pixel_colors_u8_0 = vld1_u8(s_ptr);
+                    let pixel_colors_u8_1 = vld1_u8(s_ptr_next);
                     let weight = filter_weights.as_ptr().add(r);
                     let weights = vld1q_f32_x2(weight);
-                    let pixel_color_low =
-                        vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_u16_0)));
-                    let pixel_color_high = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_u16_0));
-                    store0 = prefer_vfmaq_f32(store0, pixel_color_low, weights.0);
-                    store0 = prefer_vfmaq_f32(store0, pixel_color_high, weights.1);
 
-                    let pixel_color_low =
-                        vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_u16_1)));
-                    let pixel_color_high = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_u16_1));
-                    store1 = prefer_vfmaq_f32(store1, pixel_color_low, weights.0);
-                    store1 = prefer_vfmaq_f32(store1, pixel_color_high, weights.1);
+                    accumulate_2_forward!(store0, pixel_colors_u8_0, weights);
+                    accumulate_2_forward!(store1, pixel_colors_u8_1, weights);
 
                     r += 8;
                 }
@@ -735,31 +560,8 @@ pub fn gaussian_horiz_one_chan_filter_u8<T>(
                     let weights0 = vld1q_f32_x4(weight);
                     let weights1 = vld1q_f32_x4(weight.add(16));
 
-                    let pixel_colors_low_u16 = vmovl_u8(vget_low_u8(pixel_colors_u8x2.0));
-                    let pixel_color0 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_low_u16)));
-                    let pixel_color1 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_low_u16));
-                    store = prefer_vfmaq_f32(store, pixel_color0, weights0.0);
-                    store = prefer_vfmaq_f32(store, pixel_color1, weights0.1);
-
-                    let pixel_colors_high_u16 = vmovl_high_u8(pixel_colors_u8x2.0);
-                    let pixel_color2 =
-                        vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_high_u16)));
-                    let pixel_color3 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_high_u16));
-                    store = prefer_vfmaq_f32(store, pixel_color2, weights0.2);
-                    store = prefer_vfmaq_f32(store, pixel_color3, weights0.3);
-
-                    let pixel_colors_low_u16 = vmovl_u8(vget_low_u8(pixel_colors_u8x2.1));
-                    let pixel_color0 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_low_u16)));
-                    let pixel_color1 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_low_u16));
-                    store = prefer_vfmaq_f32(store, pixel_color0, weights1.0);
-                    store = prefer_vfmaq_f32(store, pixel_color1, weights1.1);
-
-                    let pixel_colors_high_u16 = vmovl_high_u8(pixel_colors_u8x2.1);
-                    let pixel_color2 =
-                        vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_high_u16)));
-                    let pixel_color3 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_high_u16));
-                    store = prefer_vfmaq_f32(store, pixel_color2, weights1.2);
-                    store = prefer_vfmaq_f32(store, pixel_color3, weights1.3);
+                    accumulate_4_forward!(store, pixel_colors_u8x2.0, weights0);
+                    accumulate_4_forward!(store, pixel_colors_u8x2.1, weights1);
 
                     r += 32;
                 }
@@ -776,18 +578,8 @@ pub fn gaussian_horiz_one_chan_filter_u8<T>(
                     let pixel_colors_u8 = vld1q_u8(s_ptr);
                     let weight = filter_weights.as_ptr().add(r);
                     let weights = vld1q_f32_x4(weight);
-                    let pixel_colors_low_u16 = vmovl_u8(vget_low_u8(pixel_colors_u8));
-                    let pixel_color0 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_low_u16)));
-                    let pixel_color1 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_low_u16));
-                    store = prefer_vfmaq_f32(store, pixel_color0, weights.0);
-                    store = prefer_vfmaq_f32(store, pixel_color1, weights.1);
 
-                    let pixel_colors_high_u16 = vmovl_high_u8(pixel_colors_u8);
-                    let pixel_color2 =
-                        vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_high_u16)));
-                    let pixel_color3 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_high_u16));
-                    store = prefer_vfmaq_f32(store, pixel_color2, weights.2);
-                    store = prefer_vfmaq_f32(store, pixel_color3, weights.3);
+                    accumulate_4_forward!(store, pixel_colors_u8, weights);
 
                     r += 16;
                 }
@@ -801,13 +593,11 @@ pub fn gaussian_horiz_one_chan_filter_u8<T>(
                     ) as usize;
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
-                    let pixel_colors_u16 = vmovl_u8(vld1_u8(s_ptr));
+                    let pixel_colors_u8 = vld1_u8(s_ptr);
                     let weight = filter_weights.as_ptr().add(r);
                     let weights = vld1q_f32_x2(weight);
-                    let pixel_color_low = vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_u16)));
-                    let pixel_color_high = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_u16));
-                    store = prefer_vfmaq_f32(store, pixel_color_low, weights.0);
-                    store = prefer_vfmaq_f32(store, pixel_color_high, weights.1);
+
+                    accumulate_2_forward!(store, pixel_colors_u8, weights);
 
                     r += 8;
                 }

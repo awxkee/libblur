@@ -34,6 +34,35 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
+macro_rules! accumulate_4_forward {
+    ($store0:expr, $pixel_colors:expr, $weights:expr) => {{
+        let zeros_si = _mm_setzero_si128();
+        let pixel_colors_low_u16 = _mm_unpacklo_epi8($pixel_colors, zeros_si);
+        let pixel_color0 = _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_low_u16, zeros_si));
+        let pixel_color1 = _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_low_u16, zeros_si));
+        $store0 = _mm_prefer_fma_ps($store0, pixel_color0, $weights.0);
+        $store0 = _mm_prefer_fma_ps($store0, pixel_color1, $weights.1);
+
+        let pixel_colors_high_u16 = _mm_unpackhi_epi8($pixel_colors, zeros_si);
+        let pixel_color2 = _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_high_u16, zeros_si));
+        let pixel_color3 = _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_high_u16, zeros_si));
+        $store0 = _mm_prefer_fma_ps($store0, pixel_color2, $weights.2);
+        $store0 = _mm_prefer_fma_ps($store0, pixel_color3, $weights.3);
+    }};
+}
+
+macro_rules! accumulate_2_forward {
+    ($store0:expr, $pixel_colors:expr, $weights:expr) => {{
+        let zeros_si = _mm_setzero_si128();
+        let pixel_colors_u16 = _mm_unpacklo_epi8($pixel_colors, zeros_si);
+
+        let pixel_color_low = _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_u16, zeros_si));
+        let pixel_color_high = _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_u16, zeros_si));
+        $store0 = _mm_prefer_fma_ps($store0, pixel_color_low, $weights.0);
+        $store0 = _mm_prefer_fma_ps($store0, pixel_color_high, $weights.1);
+    }};
+}
+
 pub fn gaussian_sse_horiz_one_chan_u8<T>(
     undef_src: &[T],
     src_stride: u32,
@@ -50,8 +79,6 @@ pub fn gaussian_sse_horiz_one_chan_u8<T>(
     let half_kernel = (kernel_size / 2) as i32;
 
     let mut _cy = start_y;
-
-    let zeros_si = unsafe { _mm_setzero_si128() };
 
     for y in (_cy..end_y.saturating_sub(2)).step_by(2) {
         unsafe {
@@ -97,75 +124,13 @@ pub fn gaussian_sse_horiz_one_chan_u8<T>(
                     let weights0 = _mm_loadu_ps_x4(weight);
                     let weights1 = _mm_loadu_ps_x4(weight.add(16));
 
-                    let pixel_colors_low_u16 = _mm_unpacklo_epi8(pixel_colors_u8x2.0, zeros_si);
-                    let pixel_color0 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_low_u16, zeros_si));
-                    let pixel_color1 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_low_u16, zeros_si));
-                    store0 = _mm_prefer_fma_ps(store0, pixel_color0, weights0.0);
-                    store0 = _mm_prefer_fma_ps(store0, pixel_color1, weights0.1);
-
-                    let pixel_colors_high_u16 = _mm_unpackhi_epi8(pixel_colors_u8x2.0, zeros_si);
-                    let pixel_color2 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_high_u16, zeros_si));
-                    let pixel_color3 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_high_u16, zeros_si));
-                    store0 = _mm_prefer_fma_ps(store0, pixel_color2, weights0.2);
-                    store0 = _mm_prefer_fma_ps(store0, pixel_color3, weights0.3);
-
-                    let pixel_colors_low_u16 = _mm_unpacklo_epi8(pixel_colors_u8x2.1, zeros_si);
-                    let pixel_color0 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_low_u16, zeros_si));
-                    let pixel_color1 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_low_u16, zeros_si));
-                    store0 = _mm_prefer_fma_ps(store0, pixel_color0, weights1.0);
-                    store0 = _mm_prefer_fma_ps(store0, pixel_color1, weights1.1);
-
-                    let pixel_colors_high_u16 = _mm_unpackhi_epi8(pixel_colors_u8x2.1, zeros_si);
-                    let pixel_color2 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_high_u16, zeros_si));
-                    let pixel_color3 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_high_u16, zeros_si));
-                    store0 = _mm_prefer_fma_ps(store0, pixel_color2, weights1.2);
-                    store0 = _mm_prefer_fma_ps(store0, pixel_color3, weights1.3);
+                    accumulate_4_forward!(store0, pixel_colors_u8x2.0, weights0);
+                    accumulate_4_forward!(store0, pixel_colors_u8x2.1, weights1);
 
                     // Next row
 
-                    let pixel_colors_low_u16 =
-                        _mm_unpacklo_epi8(pixel_colors_u8x2_next.0, zeros_si);
-                    let pixel_color0 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_low_u16, zeros_si));
-                    let pixel_color1 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_low_u16, zeros_si));
-                    store1 = _mm_prefer_fma_ps(store1, pixel_color0, weights0.0);
-                    store1 = _mm_prefer_fma_ps(store1, pixel_color1, weights0.1);
-
-                    let pixel_colors_high_u16 =
-                        _mm_unpackhi_epi8(pixel_colors_u8x2_next.0, zeros_si);
-                    let pixel_color2 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_high_u16, zeros_si));
-                    let pixel_color3 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_high_u16, zeros_si));
-                    store1 = _mm_prefer_fma_ps(store1, pixel_color2, weights0.2);
-                    store1 = _mm_prefer_fma_ps(store1, pixel_color3, weights0.3);
-
-                    let pixel_colors_low_u16 =
-                        _mm_unpacklo_epi8(pixel_colors_u8x2_next.1, zeros_si);
-                    let pixel_color0 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_low_u16, zeros_si));
-                    let pixel_color1 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_low_u16, zeros_si));
-                    store1 = _mm_prefer_fma_ps(store1, pixel_color0, weights1.0);
-                    store1 = _mm_prefer_fma_ps(store1, pixel_color1, weights1.1);
-
-                    let pixel_colors_high_u16 =
-                        _mm_unpackhi_epi8(pixel_colors_u8x2_next.1, zeros_si);
-                    let pixel_color2 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_high_u16, zeros_si));
-                    let pixel_color3 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_high_u16, zeros_si));
-                    store1 = _mm_prefer_fma_ps(store1, pixel_color2, weights1.2);
-                    store1 = _mm_prefer_fma_ps(store1, pixel_color3, weights1.3);
+                    accumulate_4_forward!(store1, pixel_colors_u8x2_next.0, weights0);
+                    accumulate_4_forward!(store1, pixel_colors_u8x2_next.1, weights1);
 
                     r += 32;
                 }
@@ -182,37 +147,8 @@ pub fn gaussian_sse_horiz_one_chan_u8<T>(
                     let weight = kernel.as_ptr().add((r + half_kernel) as usize);
                     let weights = _mm_loadu_ps_x4(weight);
 
-                    let pixel_colors_low_u16 = _mm_unpacklo_epi8(pixel_colors_u8_0, zeros_si);
-                    let pixel_color0 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_low_u16, zeros_si));
-                    let pixel_color1 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_low_u16, zeros_si));
-                    store0 = _mm_prefer_fma_ps(store0, pixel_color0, weights.0);
-                    store0 = _mm_prefer_fma_ps(store0, pixel_color1, weights.1);
-
-                    let pixel_colors_high_u16 = _mm_unpackhi_epi8(pixel_colors_u8_0, zeros_si);
-                    let pixel_color2 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_high_u16, zeros_si));
-                    let pixel_color3 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_high_u16, zeros_si));
-                    store0 = _mm_prefer_fma_ps(store0, pixel_color2, weights.2);
-                    store0 = _mm_prefer_fma_ps(store0, pixel_color3, weights.3);
-
-                    let pixel_colors_low_u16 = _mm_unpacklo_epi8(pixel_colors_u8_1, zeros_si);
-                    let pixel_color0 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_low_u16, zeros_si));
-                    let pixel_color1 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_low_u16, zeros_si));
-                    store1 = _mm_prefer_fma_ps(store1, pixel_color0, weights.0);
-                    store1 = _mm_prefer_fma_ps(store1, pixel_color1, weights.1);
-
-                    let pixel_colors_high_u16 = _mm_unpackhi_epi8(pixel_colors_u8_1, zeros_si);
-                    let pixel_color2 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_high_u16, zeros_si));
-                    let pixel_color3 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_high_u16, zeros_si));
-                    store1 = _mm_prefer_fma_ps(store1, pixel_color2, weights.2);
-                    store1 = _mm_prefer_fma_ps(store1, pixel_color3, weights.3);
+                    accumulate_4_forward!(store0, pixel_colors_u8_0, weights);
+                    accumulate_4_forward!(store1, pixel_colors_u8_1, weights);
 
                     r += 16;
                 }
@@ -224,24 +160,13 @@ pub fn gaussian_sse_horiz_one_chan_u8<T>(
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let s_ptr_next = src.as_ptr().add(y_src_shift_next + px);
-                    let pixel_colors_u16_0 = _mm_unpacklo_epi8(_mm_loadu_si64(s_ptr), zeros_si);
-                    let pixel_colors_u16_1 =
-                        _mm_unpacklo_epi8(_mm_loadu_si64(s_ptr_next), zeros_si);
+                    let pixel_colors_u8_0 = _mm_loadu_si64(s_ptr);
+                    let pixel_colors_u8_1 = _mm_loadu_si64(s_ptr_next);
                     let weight = kernel.as_ptr().add((r + half_kernel) as usize);
                     let weights = _mm_loadu_ps_x2(weight);
-                    let pixel_color_low =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_u16_0, zeros_si));
-                    let pixel_color_high =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_u16_0, zeros_si));
-                    store0 = _mm_prefer_fma_ps(store0, pixel_color_low, weights.0);
-                    store0 = _mm_prefer_fma_ps(store0, pixel_color_high, weights.1);
 
-                    let pixel_color_low =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_u16_1, zeros_si));
-                    let pixel_color_high =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_u16_1, zeros_si));
-                    store1 = _mm_prefer_fma_ps(store1, pixel_color_low, weights.0);
-                    store1 = _mm_prefer_fma_ps(store1, pixel_color_high, weights.1);
+                    accumulate_2_forward!(store0, pixel_colors_u8_0, weights);
+                    accumulate_2_forward!(store1, pixel_colors_u8_1, weights);
 
                     r += 8;
                 }
@@ -345,37 +270,8 @@ pub fn gaussian_sse_horiz_one_chan_u8<T>(
                     let weights0 = _mm_loadu_ps_x4(weight);
                     let weights1 = _mm_loadu_ps_x4(weight.add(16));
 
-                    let pixel_colors_low_u16 = _mm_unpacklo_epi8(pixel_colors_u8x2.0, zeros_si);
-                    let pixel_color0 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_low_u16, zeros_si));
-                    let pixel_color1 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_low_u16, zeros_si));
-                    store = _mm_prefer_fma_ps(store, pixel_color0, weights0.0);
-                    store = _mm_prefer_fma_ps(store, pixel_color1, weights0.1);
-
-                    let pixel_colors_high_u16 = _mm_unpackhi_epi8(pixel_colors_u8x2.0, zeros_si);
-                    let pixel_color2 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_high_u16, zeros_si));
-                    let pixel_color3 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_high_u16, zeros_si));
-                    store = _mm_prefer_fma_ps(store, pixel_color2, weights0.2);
-                    store = _mm_prefer_fma_ps(store, pixel_color3, weights0.3);
-
-                    let pixel_colors_low_u16 = _mm_unpacklo_epi8(pixel_colors_u8x2.1, zeros_si);
-                    let pixel_color0 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_low_u16, zeros_si));
-                    let pixel_color1 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_low_u16, zeros_si));
-                    store = _mm_prefer_fma_ps(store, pixel_color0, weights1.0);
-                    store = _mm_prefer_fma_ps(store, pixel_color1, weights1.1);
-
-                    let pixel_colors_high_u16 = _mm_unpackhi_epi8(pixel_colors_u8x2.1, zeros_si);
-                    let pixel_color2 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_high_u16, zeros_si));
-                    let pixel_color3 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_high_u16, zeros_si));
-                    store = _mm_prefer_fma_ps(store, pixel_color2, weights1.2);
-                    store = _mm_prefer_fma_ps(store, pixel_color3, weights1.3);
+                    accumulate_4_forward!(store, pixel_colors_u8x2.0, weights0);
+                    accumulate_4_forward!(store, pixel_colors_u8x2.1, weights1);
 
                     r += 32;
                 }
@@ -389,21 +285,8 @@ pub fn gaussian_sse_horiz_one_chan_u8<T>(
                     let pixel_colors_u8 = _mm_loadu_si128(s_ptr as *const __m128i);
                     let weight = kernel.as_ptr().add((r + half_kernel) as usize);
                     let weights = _mm_loadu_ps_x4(weight);
-                    let pixel_colors_low_u16 = _mm_unpacklo_epi8(pixel_colors_u8, zeros_si);
-                    let pixel_color0 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_low_u16, zeros_si));
-                    let pixel_color1 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_low_u16, zeros_si));
-                    store = _mm_prefer_fma_ps(store, pixel_color0, weights.0);
-                    store = _mm_prefer_fma_ps(store, pixel_color1, weights.1);
 
-                    let pixel_colors_high_u16 = _mm_unpackhi_epi8(pixel_colors_u8, zeros_si);
-                    let pixel_color2 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_high_u16, zeros_si));
-                    let pixel_color3 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_high_u16, zeros_si));
-                    store = _mm_prefer_fma_ps(store, pixel_color2, weights.2);
-                    store = _mm_prefer_fma_ps(store, pixel_color3, weights.3);
+                    accumulate_4_forward!(store, pixel_colors_u8, weights);
 
                     r += 16;
                 }
@@ -414,15 +297,11 @@ pub fn gaussian_sse_horiz_one_chan_u8<T>(
                             as usize;
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
-                    let pixel_colors_u16 = _mm_unpacklo_epi8(_mm_loadu_si64(s_ptr), zeros_si);
+                    let pixel_colors_u16 = _mm_loadu_si64(s_ptr);
                     let weight = kernel.as_ptr().add((r + half_kernel) as usize);
                     let weights = _mm_loadu_ps_x2(weight);
-                    let pixel_color_low =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_u16, zeros_si));
-                    let pixel_color_high =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_u16, zeros_si));
-                    store = _mm_prefer_fma_ps(store, pixel_color_low, weights.0);
-                    store = _mm_prefer_fma_ps(store, pixel_color_high, weights.1);
+
+                    accumulate_2_forward!(store, pixel_colors_u16, weights);
 
                     r += 8;
                 }
@@ -486,8 +365,6 @@ pub fn gaussian_sse_horiz_one_chan_filter_u8<T>(
 
     let mut _cy = start_y;
 
-    let zeros_si = unsafe { _mm_setzero_si128() };
-
     for y in (_cy..end_y.saturating_sub(2)).step_by(2) {
         unsafe {
             for x in 0..width {
@@ -521,75 +398,13 @@ pub fn gaussian_sse_horiz_one_chan_filter_u8<T>(
                     let weights0 = _mm_loadu_ps_x4(weight);
                     let weights1 = _mm_loadu_ps_x4(weight.add(16));
 
-                    let pixel_colors_low_u16 = _mm_unpacklo_epi8(pixel_colors_u8x2.0, zeros_si);
-                    let pixel_color0 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_low_u16, zeros_si));
-                    let pixel_color1 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_low_u16, zeros_si));
-                    store0 = _mm_prefer_fma_ps(store0, pixel_color0, weights0.0);
-                    store0 = _mm_prefer_fma_ps(store0, pixel_color1, weights0.1);
-
-                    let pixel_colors_high_u16 = _mm_unpackhi_epi8(pixel_colors_u8x2.0, zeros_si);
-                    let pixel_color2 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_high_u16, zeros_si));
-                    let pixel_color3 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_high_u16, zeros_si));
-                    store0 = _mm_prefer_fma_ps(store0, pixel_color2, weights0.2);
-                    store0 = _mm_prefer_fma_ps(store0, pixel_color3, weights0.3);
-
-                    let pixel_colors_low_u16 = _mm_unpacklo_epi8(pixel_colors_u8x2.1, zeros_si);
-                    let pixel_color0 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_low_u16, zeros_si));
-                    let pixel_color1 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_low_u16, zeros_si));
-                    store0 = _mm_prefer_fma_ps(store0, pixel_color0, weights1.0);
-                    store0 = _mm_prefer_fma_ps(store0, pixel_color1, weights1.1);
-
-                    let pixel_colors_high_u16 = _mm_unpackhi_epi8(pixel_colors_u8x2.1, zeros_si);
-                    let pixel_color2 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_high_u16, zeros_si));
-                    let pixel_color3 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_high_u16, zeros_si));
-                    store0 = _mm_prefer_fma_ps(store0, pixel_color2, weights1.2);
-                    store0 = _mm_prefer_fma_ps(store0, pixel_color3, weights1.3);
+                    accumulate_4_forward!(store0, pixel_colors_u8x2.0, weights0);
+                    accumulate_4_forward!(store0, pixel_colors_u8x2.1, weights1);
 
                     // Next row
 
-                    let pixel_colors_low_u16 =
-                        _mm_unpacklo_epi8(pixel_colors_u8x2_next.0, zeros_si);
-                    let pixel_color0 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_low_u16, zeros_si));
-                    let pixel_color1 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_low_u16, zeros_si));
-                    store1 = _mm_prefer_fma_ps(store1, pixel_color0, weights0.0);
-                    store1 = _mm_prefer_fma_ps(store1, pixel_color1, weights0.1);
-
-                    let pixel_colors_high_u16 =
-                        _mm_unpackhi_epi8(pixel_colors_u8x2_next.0, zeros_si);
-                    let pixel_color2 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_high_u16, zeros_si));
-                    let pixel_color3 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_high_u16, zeros_si));
-                    store1 = _mm_prefer_fma_ps(store1, pixel_color2, weights0.2);
-                    store1 = _mm_prefer_fma_ps(store1, pixel_color3, weights0.3);
-
-                    let pixel_colors_low_u16 =
-                        _mm_unpacklo_epi8(pixel_colors_u8x2_next.1, zeros_si);
-                    let pixel_color0 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_low_u16, zeros_si));
-                    let pixel_color1 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_low_u16, zeros_si));
-                    store1 = _mm_prefer_fma_ps(store1, pixel_color0, weights1.0);
-                    store1 = _mm_prefer_fma_ps(store1, pixel_color1, weights1.1);
-
-                    let pixel_colors_high_u16 =
-                        _mm_unpackhi_epi8(pixel_colors_u8x2_next.1, zeros_si);
-                    let pixel_color2 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_high_u16, zeros_si));
-                    let pixel_color3 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_high_u16, zeros_si));
-                    store1 = _mm_prefer_fma_ps(store1, pixel_color2, weights1.2);
-                    store1 = _mm_prefer_fma_ps(store1, pixel_color3, weights1.3);
+                    accumulate_4_forward!(store1, pixel_colors_u8x2_next.0, weights0);
+                    accumulate_4_forward!(store1, pixel_colors_u8x2_next.1, weights1);
 
                     r += 32;
                 }
@@ -609,37 +424,8 @@ pub fn gaussian_sse_horiz_one_chan_filter_u8<T>(
                     let weight = filter_weights.as_ptr().add(r);
                     let weights = _mm_loadu_ps_x4(weight);
 
-                    let pixel_colors_low_u16 = _mm_unpacklo_epi8(pixel_colors_u8_0, zeros_si);
-                    let pixel_color0 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_low_u16, zeros_si));
-                    let pixel_color1 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_low_u16, zeros_si));
-                    store0 = _mm_prefer_fma_ps(store0, pixel_color0, weights.0);
-                    store0 = _mm_prefer_fma_ps(store0, pixel_color1, weights.1);
-
-                    let pixel_colors_high_u16 = _mm_unpackhi_epi8(pixel_colors_u8_0, zeros_si);
-                    let pixel_color2 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_high_u16, zeros_si));
-                    let pixel_color3 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_high_u16, zeros_si));
-                    store0 = _mm_prefer_fma_ps(store0, pixel_color2, weights.2);
-                    store0 = _mm_prefer_fma_ps(store0, pixel_color3, weights.3);
-
-                    let pixel_colors_low_u16 = _mm_unpacklo_epi8(pixel_colors_u8_1, zeros_si);
-                    let pixel_color0 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_low_u16, zeros_si));
-                    let pixel_color1 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_low_u16, zeros_si));
-                    store1 = _mm_prefer_fma_ps(store1, pixel_color0, weights.0);
-                    store1 = _mm_prefer_fma_ps(store1, pixel_color1, weights.1);
-
-                    let pixel_colors_high_u16 = _mm_unpackhi_epi8(pixel_colors_u8_1, zeros_si);
-                    let pixel_color2 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_high_u16, zeros_si));
-                    let pixel_color3 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_high_u16, zeros_si));
-                    store1 = _mm_prefer_fma_ps(store1, pixel_color2, weights.2);
-                    store1 = _mm_prefer_fma_ps(store1, pixel_color3, weights.3);
+                    accumulate_4_forward!(store0, pixel_colors_u8_0, weights);
+                    accumulate_4_forward!(store0, pixel_colors_u8_1, weights);
 
                     r += 16;
                 }
@@ -654,24 +440,13 @@ pub fn gaussian_sse_horiz_one_chan_filter_u8<T>(
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let s_ptr_next = src.as_ptr().add(y_src_shift_next + px);
-                    let pixel_colors_u16_0 = _mm_unpacklo_epi8(_mm_loadu_si64(s_ptr), zeros_si);
-                    let pixel_colors_u16_1 =
-                        _mm_unpacklo_epi8(_mm_loadu_si64(s_ptr_next), zeros_si);
+                    let pixel_colors_u16_0 = _mm_loadu_si64(s_ptr);
+                    let pixel_colors_u16_1 = _mm_loadu_si64(s_ptr_next);
                     let weight = filter_weights.as_ptr().add(r);
                     let weights = _mm_loadu_ps_x2(weight);
-                    let pixel_color_low =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_u16_0, zeros_si));
-                    let pixel_color_high =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_u16_0, zeros_si));
-                    store0 = _mm_prefer_fma_ps(store0, pixel_color_low, weights.0);
-                    store0 = _mm_prefer_fma_ps(store0, pixel_color_high, weights.1);
 
-                    let pixel_color_low =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_u16_1, zeros_si));
-                    let pixel_color_high =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_u16_1, zeros_si));
-                    store1 = _mm_prefer_fma_ps(store1, pixel_color_low, weights.0);
-                    store1 = _mm_prefer_fma_ps(store1, pixel_color_high, weights.1);
+                    accumulate_2_forward!(store0, pixel_colors_u16_0, weights);
+                    accumulate_2_forward!(store1, pixel_colors_u16_1, weights);
 
                     r += 8;
                 }
@@ -772,37 +547,8 @@ pub fn gaussian_sse_horiz_one_chan_filter_u8<T>(
                     let weights0 = _mm_loadu_ps_x4(weight);
                     let weights1 = _mm_loadu_ps_x4(weight.add(16));
 
-                    let pixel_colors_low_u16 = _mm_unpacklo_epi8(pixel_colors_u8x2.0, zeros_si);
-                    let pixel_color0 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_low_u16, zeros_si));
-                    let pixel_color1 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_low_u16, zeros_si));
-                    store = _mm_prefer_fma_ps(store, pixel_color0, weights0.0);
-                    store = _mm_prefer_fma_ps(store, pixel_color1, weights0.1);
-
-                    let pixel_colors_high_u16 = _mm_unpackhi_epi8(pixel_colors_u8x2.0, zeros_si);
-                    let pixel_color2 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_high_u16, zeros_si));
-                    let pixel_color3 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_high_u16, zeros_si));
-                    store = _mm_prefer_fma_ps(store, pixel_color2, weights0.2);
-                    store = _mm_prefer_fma_ps(store, pixel_color3, weights0.3);
-
-                    let pixel_colors_low_u16 = _mm_unpacklo_epi8(pixel_colors_u8x2.1, zeros_si);
-                    let pixel_color0 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_low_u16, zeros_si));
-                    let pixel_color1 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_low_u16, zeros_si));
-                    store = _mm_prefer_fma_ps(store, pixel_color0, weights1.0);
-                    store = _mm_prefer_fma_ps(store, pixel_color1, weights1.1);
-
-                    let pixel_colors_high_u16 = _mm_unpackhi_epi8(pixel_colors_u8x2.1, zeros_si);
-                    let pixel_color2 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_high_u16, zeros_si));
-                    let pixel_color3 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_high_u16, zeros_si));
-                    store = _mm_prefer_fma_ps(store, pixel_color2, weights1.2);
-                    store = _mm_prefer_fma_ps(store, pixel_color3, weights1.3);
+                    accumulate_4_forward!(store, pixel_colors_u8x2.0, weights0);
+                    accumulate_4_forward!(store, pixel_colors_u8x2.1, weights1);
 
                     r += 32;
                 }
@@ -819,21 +565,8 @@ pub fn gaussian_sse_horiz_one_chan_filter_u8<T>(
                     let pixel_colors_u8 = _mm_loadu_si128(s_ptr as *const __m128i);
                     let weight = filter_weights.as_ptr().add(r);
                     let weights = _mm_loadu_ps_x4(weight);
-                    let pixel_colors_low_u16 = _mm_unpacklo_epi8(pixel_colors_u8, zeros_si);
-                    let pixel_color0 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_low_u16, zeros_si));
-                    let pixel_color1 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_low_u16, zeros_si));
-                    store = _mm_prefer_fma_ps(store, pixel_color0, weights.0);
-                    store = _mm_prefer_fma_ps(store, pixel_color1, weights.1);
 
-                    let pixel_colors_high_u16 = _mm_unpackhi_epi8(pixel_colors_u8, zeros_si);
-                    let pixel_color2 =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_high_u16, zeros_si));
-                    let pixel_color3 =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_high_u16, zeros_si));
-                    store = _mm_prefer_fma_ps(store, pixel_color2, weights.2);
-                    store = _mm_prefer_fma_ps(store, pixel_color3, weights.3);
+                    accumulate_4_forward!(store, pixel_colors_u8, weights);
 
                     r += 16;
                 }
@@ -847,16 +580,11 @@ pub fn gaussian_sse_horiz_one_chan_filter_u8<T>(
                     ) as usize;
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
-                    let pixel_colors_u16 =
-                        _mm_unpacklo_epi8(_mm_loadu_si64(s_ptr), _mm_setzero_si128());
+                    let pixel_colors_u16 = _mm_loadu_si64(s_ptr);
                     let weight = filter_weights.as_ptr().add(r);
                     let weights = _mm_loadu_ps_x2(weight);
-                    let pixel_color_low =
-                        _mm_cvtepi32_ps(_mm_unpacklo_epi16(pixel_colors_u16, zeros_si));
-                    let pixel_color_high =
-                        _mm_cvtepi32_ps(_mm_unpackhi_epi16(pixel_colors_u16, zeros_si));
-                    store = _mm_prefer_fma_ps(store, pixel_color_low, weights.0);
-                    store = _mm_prefer_fma_ps(store, pixel_color_high, weights.1);
+
+                    accumulate_2_forward!(store, pixel_colors_u16, weights);
 
                     r += 8;
                 }

@@ -3,10 +3,7 @@ mod split;
 
 use crate::merge::merge_channels_3;
 use crate::split::split_channels_3;
-use colorutils_rs::{
-    linear_to_rgba, luv_with_alpha_to_bgra, luv_with_alpha_to_rgba, rgba_to_linear,
-    rgba_to_luv_with_alpha, rgba_to_sigmoidal, sigmoidal_to_rgba, TransferFunction,
-};
+use colorutils_rs::TransferFunction;
 use image::io::Reader as ImageReader;
 use image::{EncodableLayout, GenericImageView};
 use libblur::{EdgeMode, FastBlurChannels, ThreadingPolicy};
@@ -33,6 +30,7 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
     let mut plane_2 = vec![0u8; width * height];
     let mut plane_3 = vec![0u8; width * height];
     let mut merged_planes: Vec<u8> = vec![0u8; width * height * 3];
+
     split_channels_3(img, width, height, &mut plane_1, &mut plane_2, &mut plane_3);
 
     let mut dst_plane_1 = vec![0u8; width * height];
@@ -137,7 +135,7 @@ fn main() {
     //     vst1q_s64(t.as_mut_ptr(), mul);
     //     println!("{:?}", t);
     // }
-    let img = ImageReader::open("assets/test_image_1_small.jpg")
+    let img = ImageReader::open("assets/test_image_1.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -209,22 +207,21 @@ fn main() {
     //     EdgeMode::Reflect,
     // );
     //
-    // libblur::gaussian_blur_in_linear(
-    //     &bytes,
-    //     stride as u32,
-    //     &mut dst_bytes,
-    //     stride as u32,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     25 * 2 + 1,
-    //     25f32 * 2f32 / 6f32,
-    //     FastBlurChannels::Channels3,
-    //     EdgeMode::Clamp,
-    //     ThreadingPolicy::Single,
-    //     TransferFunction::Srgb,
-    // );
+    libblur::gaussian_blur(
+        &bytes,
+        stride as u32,
+        &mut dst_bytes,
+        stride as u32,
+        dimensions.0,
+        dimensions.1,
+        25 * 2 + 1,
+        25f32 * 2f32 / 6f32,
+        FastBlurChannels::Channels3,
+        EdgeMode::KernelClip,
+        ThreadingPolicy::Single,
+    );
 
-    dst_bytes = perform_planar_pass_3(&bytes, dimensions.0 as usize, dimensions.1 as usize);
+    // dst_bytes = perform_planar_pass_3(&bytes, dimensions.0 as usize, dimensions.1 as usize);
 
     let elapsed_time = start_time.elapsed();
     // Print the elapsed time in milliseconds

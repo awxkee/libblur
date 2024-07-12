@@ -198,6 +198,13 @@ Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded
 | libblur | 172.21ms |
 | OpenCV  | 304.40ms |
 
+Example comparison time for blurring image 3000x4000 single plane 8-bit in multithreaded mode with 151 kernel size.
+
+|         |  Time   |
+|---------|:-------:|
+| libblur | 43.87ms |
+| OpenCV  | 75.94ms |
+
 ### Gaussian box blur
 
 Generally 3 sequential box blurs it is almost gaussian

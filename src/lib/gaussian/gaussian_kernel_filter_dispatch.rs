@@ -177,6 +177,11 @@ pub(crate) fn gaussian_blur_horizontal_pass_edge_clip_dispatch<
             {
                 _dispatcher = gaussian_horiz_one_chan_filter_f32::<T>;
             }
+        } else if CHANNEL_CONFIGURATION == 3 {
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            {
+                _dispatcher = gaussian_horiz_t_f_chan_filter_f32::<T, CHANNEL_CONFIGURATION>;
+            }
         }
     }
     if std::any::type_name::<T>() == "u8" {

@@ -129,6 +129,32 @@ pub fn gaussian_horiz_sse_t_f_chan_f32<T, const CHANNEL_CONFIGURATION: usize>(
                 }
 
                 if CHANNEL_CONFIGURATION == 4 {
+                    while r + 8 <= half_kernel && ((x as i64 + r as i64 + 8i64) < width as i64) {
+                        let current_x = std::cmp::min(
+                            std::cmp::max(x as i64 + r as i64, 0),
+                            (width - 1) as i64,
+                        ) as usize;
+                        let px = current_x * CHANNEL_CONFIGURATION;
+                        let s_ptr = src.as_ptr().add(y_src_shift + px);
+                        let pixel_colors_0 = _mm_loadu_ps_x4(s_ptr);
+                        let pixel_colors_1 = _mm_loadu_ps_x4(s_ptr.add(src_stride as usize));
+                        let pixel_colors_n_0 = _mm_loadu_ps_x4(s_ptr.add(16));
+                        let pixel_colors_n_1 =
+                            _mm_loadu_ps_x4(s_ptr.add(src_stride as usize).add(16));
+                        let weight = kernel.as_ptr().add((r + half_kernel) as usize);
+
+                        let f_weights = _mm_loadu_ps(weight);
+                        let f_weights_n = _mm_loadu_ps(weight.add(4));
+
+                        accumulate_4_items!(store0, pixel_colors_0, f_weights);
+                        accumulate_4_items!(store1, pixel_colors_1, f_weights);
+
+                        accumulate_4_items!(store0, pixel_colors_n_0, f_weights_n);
+                        accumulate_4_items!(store1, pixel_colors_n_1, f_weights_n);
+
+                        r += 8;
+                    }
+
                     while r + 4 <= half_kernel && ((x as i64 + r as i64 + 4i64) < width as i64) {
                         let current_x = std::cmp::min(
                             std::cmp::max(x as i64 + r as i64, 0),

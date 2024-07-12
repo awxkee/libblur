@@ -2,7 +2,7 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use image::io::Reader as ImageReader;
 use image::GenericImageView;
 
-use libblur::{FastBlurChannels, ThreadingPolicy};
+use libblur::{EdgeMode, FastBlurChannels, ThreadingPolicy};
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     let img = ImageReader::open("assets/test_image_4.png")
@@ -31,6 +31,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 77,
                 FastBlurChannels::Channels4,
                 ThreadingPolicy::Single,
+                EdgeMode::Clamp
             );
         })
     });

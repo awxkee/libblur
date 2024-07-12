@@ -25,7 +25,8 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::neon::{load_f32_fast, prefer_vfmaq_f32, store_f32, vsplit_rgb};
+use crate::gaussian::gaussian_filter::GaussianFilter;
+use crate::neon::{load_f32_fast, prefer_vfmaq_f32, store_f32, vsplit_rgb_5};
 use crate::unsafe_slice::UnsafeSlice;
 use std::arch::aarch64::*;
 
@@ -125,6 +126,31 @@ pub fn gaussian_horiz_t_f_chan_f32<T, const CHANNEL_CONFIGURATION: usize>(
                 }
 
                 if CHANNEL_CONFIGURATION == 4 {
+                    while r + 8 <= half_kernel && ((x as i64 + r as i64 + 8i64) < width as i64) {
+                        let current_x = std::cmp::min(
+                            std::cmp::max(x as i64 + r as i64, 0),
+                            (width - 1) as i64,
+                        ) as usize;
+                        let px = current_x * CHANNEL_CONFIGURATION;
+                        let s_ptr = src.as_ptr().add(y_src_shift + px);
+                        let pixel_colors_0 = vld1q_f32_x4(s_ptr);
+                        let pixel_colors_1 = vld1q_f32_x4(s_ptr.add(src_stride as usize));
+                        let pixel_colors_n_0 = vld1q_f32_x4(s_ptr.add(16));
+                        let pixel_colors_n_1 = vld1q_f32_x4(s_ptr.add(src_stride as usize).add(16));
+                        let weight = kernel.as_ptr().add((r + half_kernel) as usize);
+
+                        let f_weights0 = vld1q_f32(weight);
+                        let f_weights1 = vld1q_f32(weight.add(4));
+
+                        accumulate_4_items!(store0, pixel_colors_0, f_weights0);
+                        accumulate_4_items!(store1, pixel_colors_1, f_weights0);
+
+                        accumulate_4_items!(store0, pixel_colors_n_0, f_weights1);
+                        accumulate_4_items!(store1, pixel_colors_n_1, f_weights1);
+
+                        r += 8;
+                    }
+
                     while r + 4 <= half_kernel && ((x as i64 + r as i64 + 4i64) < width as i64) {
                         let current_x = std::cmp::min(
                             std::cmp::max(x as i64 + r as i64, 0),
@@ -155,8 +181,8 @@ pub fn gaussian_horiz_t_f_chan_f32<T, const CHANNEL_CONFIGURATION: usize>(
                         let pixel_colors_0 = vld1q_f32_x4(s_ptr);
                         let pixel_colors_1 = vld1q_f32_x4(s_ptr.add(src_stride as usize));
                         // r0 g0 b0 0
-                        let set0 = vsplit_rgb(pixel_colors_0);
-                        let set1 = vsplit_rgb(pixel_colors_1);
+                        let set0 = vsplit_rgb_5(pixel_colors_0);
+                        let set1 = vsplit_rgb_5(pixel_colors_1);
                         let weight = kernel.as_ptr().add((r + half_kernel) as usize);
                         let f_weights = vld1q_f32(weight);
                         let last_weight = weight.add(4).read_unaligned();
@@ -219,6 +245,26 @@ pub fn gaussian_horiz_t_f_chan_f32<T, const CHANNEL_CONFIGURATION: usize>(
                 }
 
                 if CHANNEL_CONFIGURATION == 4 {
+                    while r + 8 <= half_kernel && ((x as i64 + r as i64 + 8i64) < width as i64) {
+                        let current_x = std::cmp::min(
+                            std::cmp::max(x as i64 + r as i64, 0),
+                            (width - 1) as i64,
+                        ) as usize;
+                        let px = current_x * CHANNEL_CONFIGURATION;
+                        let s_ptr = src.as_ptr().add(y_src_shift + px);
+                        let pixel_colors_0 = vld1q_f32_x4(s_ptr);
+                        let pixel_colors_n_0 = vld1q_f32_x4(s_ptr.add(16));
+                        let weight = kernel.as_ptr().add((r + half_kernel) as usize);
+
+                        let f_weights0 = vld1q_f32(weight);
+                        let f_weights1 = vld1q_f32(weight.add(4));
+
+                        accumulate_4_items!(store, pixel_colors_0, f_weights0);
+                        accumulate_4_items!(store, pixel_colors_n_0, f_weights1);
+
+                        r += 8;
+                    }
+
                     while r + 4 <= half_kernel && ((x as i64 + r as i64 + 4i64) < width as i64) {
                         let current_x = std::cmp::min(
                             std::cmp::max(x as i64 + r as i64, 0),
@@ -246,7 +292,7 @@ pub fn gaussian_horiz_t_f_chan_f32<T, const CHANNEL_CONFIGURATION: usize>(
                         // (r0 g0 b0 r1) (g1 b1 r2 g2) (b2 r3 g3 b3) (r4 g4 b5 undef)
                         let pixel_colors_o = vld1q_f32_x4(s_ptr);
                         // r0 g0 b0 0
-                        let set = vsplit_rgb(pixel_colors_o);
+                        let set = vsplit_rgb_5(pixel_colors_o);
                         let weight = kernel.as_ptr().add((r + half_kernel) as usize);
                         let f_weights = vld1q_f32(weight);
                         let last_weight = weight.add(4).read_unaligned();
@@ -265,6 +311,241 @@ pub fn gaussian_horiz_t_f_chan_f32<T, const CHANNEL_CONFIGURATION: usize>(
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors_f32 = load_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr);
                     let weight = kernel.as_ptr().add((r + half_kernel) as usize);
+                    let f_weight: float32x4_t = vdupq_n_f32(weight.read_unaligned());
+                    store = prefer_vfmaq_f32(store, pixel_colors_f32, f_weight);
+
+                    r += 1;
+                }
+
+                let offset = y_dst_shift + x as usize * CHANNEL_CONFIGURATION;
+                let dst_ptr = unsafe_dst.slice.as_ptr().add(offset) as *mut f32;
+                store_f32::<CHANNEL_CONFIGURATION>(dst_ptr, store);
+            }
+        }
+    }
+}
+
+pub fn gaussian_horiz_t_f_chan_filter_f32<T, const CHANNEL_CONFIGURATION: usize>(
+    undef_src: &[T],
+    src_stride: u32,
+    undef_unsafe_dst: &UnsafeSlice<T>,
+    dst_stride: u32,
+    width: u32,
+    filter: &Vec<GaussianFilter>,
+    start_y: u32,
+    end_y: u32,
+) {
+    unsafe {
+        let src: &[f32] = std::mem::transmute(undef_src);
+        let unsafe_dst: &UnsafeSlice<'_, f32> = std::mem::transmute(undef_unsafe_dst);
+
+        let mut _cy = start_y;
+
+        for y in (_cy..end_y.saturating_sub(2)).step_by(2) {
+            for x in 0..width {
+                let y_src_shift = y as usize * src_stride as usize;
+                let y_dst_shift = y as usize * dst_stride as usize;
+
+                let mut store0: float32x4_t = vdupq_n_f32(0.);
+                let mut store1: float32x4_t = vdupq_n_f32(0.);
+
+                let current_filter = filter.get_unchecked(x as usize);
+                let filter_start = current_filter.start;
+                let filter_weights = &current_filter.filter;
+
+                let mut r = 0;
+
+                if CHANNEL_CONFIGURATION == 4 {
+                    while r + 8 < current_filter.size
+                        && ((filter_start as i64 + r as i64 + 8i64) < width as i64)
+                    {
+                        let current_x = std::cmp::min(
+                            std::cmp::max(filter_start as i64 + r as i64, 0),
+                            (width - 1) as i64,
+                        ) as usize;
+                        let px = current_x * CHANNEL_CONFIGURATION;
+                        let s_ptr = src.as_ptr().add(y_src_shift + px);
+                        let pixel_colors_0 = vld1q_f32_x4(s_ptr);
+                        let pixel_colors_1 = vld1q_f32_x4(s_ptr.add(src_stride as usize));
+                        let pixel_colors_n_0 = vld1q_f32_x4(s_ptr.add(16));
+                        let pixel_colors_n_1 = vld1q_f32_x4(s_ptr.add(src_stride as usize).add(16));
+                        let weight = filter_weights.as_ptr().add(r);
+
+                        let f_weights0 = vld1q_f32(weight);
+                        let f_weights1 = vld1q_f32(weight.add(4));
+
+                        accumulate_4_items!(store0, pixel_colors_0, f_weights0);
+                        accumulate_4_items!(store1, pixel_colors_1, f_weights0);
+
+                        accumulate_4_items!(store0, pixel_colors_n_0, f_weights1);
+                        accumulate_4_items!(store1, pixel_colors_n_1, f_weights1);
+
+                        r += 8;
+                    }
+
+                    while r + 8 < current_filter.size
+                        && ((filter_start as i64 + r as i64 + 8i64) < width as i64)
+                    {
+                        let current_x = std::cmp::min(
+                            std::cmp::max(filter_start as i64 + r as i64, 0),
+                            (width - 1) as i64,
+                        ) as usize;
+                        let px = current_x * CHANNEL_CONFIGURATION;
+                        let s_ptr = src.as_ptr().add(y_src_shift + px);
+                        let pixel_colors_0 = vld1q_f32_x4(s_ptr);
+                        let pixel_colors_1 = vld1q_f32_x4(s_ptr.add(src_stride as usize));
+                        let weight = filter_weights.as_ptr().add(r);
+
+                        let f_weights = vld1q_f32(weight);
+
+                        accumulate_4_items!(store0, pixel_colors_0, f_weights);
+                        accumulate_4_items!(store1, pixel_colors_1, f_weights);
+
+                        r += 4;
+                    }
+                } else if CHANNEL_CONFIGURATION == 3 {
+                    while r + 5 < current_filter.size
+                        && ((filter_start as i64 + r as i64 + 6i64) < width as i64)
+                    {
+                        let current_x = std::cmp::min(
+                            std::cmp::max(filter_start as i64 + r as i64, 0),
+                            (width - 1) as i64,
+                        ) as usize;
+                        let px = current_x * CHANNEL_CONFIGURATION;
+                        let s_ptr = src.as_ptr().add(y_src_shift + px);
+                        // (r0 g0 b0 r1) (g1 b1 r2 g2) (b2 r3 g3 b3) (r4 g4 b5 undef)
+                        let pixel_colors_0 = vld1q_f32_x4(s_ptr);
+                        let pixel_colors_1 = vld1q_f32_x4(s_ptr.add(src_stride as usize));
+                        // r0 g0 b0 0
+                        let set0 = vsplit_rgb_5(pixel_colors_0);
+                        let set1 = vsplit_rgb_5(pixel_colors_1);
+                        let weight = filter_weights.as_ptr().add(r);
+                        let f_weights = vld1q_f32(weight);
+                        let last_weight = weight.add(4).read_unaligned();
+
+                        accumulate_5_items!(store0, set0, f_weights, last_weight);
+                        accumulate_5_items!(store1, set1, f_weights, last_weight);
+
+                        r += 5;
+                    }
+                }
+
+                while r < current_filter.size {
+                    let current_x = std::cmp::min(
+                        std::cmp::max(filter_start as i64 + r as i64, 0),
+                        (width - 1) as i64,
+                    ) as usize;
+                    let px = current_x * CHANNEL_CONFIGURATION;
+                    let s_ptr = src.as_ptr().add(y_src_shift + px);
+                    let pixel_colors_0 = load_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr);
+                    let s_ptr_next = s_ptr.add(src_stride as usize);
+                    let pixel_colors_1 = load_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr_next);
+                    let weight = filter_weights.as_ptr().add(r);
+                    let f_weight: float32x4_t = vdupq_n_f32(weight.read_unaligned());
+                    store0 = prefer_vfmaq_f32(store0, pixel_colors_0, f_weight);
+                    store1 = prefer_vfmaq_f32(store1, pixel_colors_1, f_weight);
+
+                    r += 1;
+                }
+
+                let offset = y_dst_shift + x as usize * CHANNEL_CONFIGURATION;
+                let dst_ptr = unsafe_dst.slice.as_ptr().add(offset) as *mut f32;
+                store_f32::<CHANNEL_CONFIGURATION>(dst_ptr, store0);
+
+                let offset = offset + dst_stride as usize;
+                let dst_ptr = unsafe_dst.slice.as_ptr().add(offset) as *mut f32;
+                store_f32::<CHANNEL_CONFIGURATION>(dst_ptr, store1);
+            }
+            _cy = y;
+        }
+
+        for y in _cy..end_y {
+            for x in 0..width {
+                let y_src_shift = y as usize * src_stride as usize;
+                let y_dst_shift = y as usize * dst_stride as usize;
+
+                let mut store: float32x4_t = vdupq_n_f32(0f32);
+
+                let mut r = 0;
+
+                let current_filter = filter.get_unchecked(x as usize);
+                let filter_start = current_filter.start;
+                let filter_weights = &current_filter.filter;
+
+                if CHANNEL_CONFIGURATION == 4 {
+                    while r + 8 < current_filter.size
+                        && ((filter_start as i64 + r as i64 + 8i64) < width as i64)
+                    {
+                        let current_x = std::cmp::min(
+                            std::cmp::max(filter_start as i64 + r as i64, 0),
+                            (width - 1) as i64,
+                        ) as usize;
+                        let px = current_x * CHANNEL_CONFIGURATION;
+                        let s_ptr = src.as_ptr().add(y_src_shift + px);
+                        let pixel_colors_0 = vld1q_f32_x4(s_ptr);
+                        let pixel_colors_n_0 = vld1q_f32_x4(s_ptr.add(16));
+                        let weight = filter_weights.as_ptr().add(r);
+
+                        let f_weights0 = vld1q_f32(weight);
+                        let f_weights1 = vld1q_f32(weight.add(4));
+
+                        accumulate_4_items!(store, pixel_colors_0, f_weights0);
+
+                        accumulate_4_items!(store, pixel_colors_n_0, f_weights1);
+
+                        r += 8;
+                    }
+
+                    while r + 4 < current_filter.size
+                        && ((filter_start as i64 + r as i64 + 4i64) < width as i64)
+                    {
+                        let current_x = std::cmp::min(
+                            std::cmp::max(filter_start as i64 + r as i64, 0),
+                            (width - 1) as i64,
+                        ) as usize;
+                        let px = current_x * CHANNEL_CONFIGURATION;
+                        let s_ptr = src.as_ptr().add(y_src_shift + px);
+                        let px = vld1q_f32_x4(s_ptr);
+                        let weight = filter_weights.as_ptr().add(r);
+
+                        let f_weights = vld1q_f32(weight);
+
+                        accumulate_4_items!(store, px, f_weights);
+
+                        r += 4;
+                    }
+                } else if CHANNEL_CONFIGURATION == 3 {
+                    while r + 5 < current_filter.size
+                        && ((filter_start as i64 + r as i64 + 6i64) < width as i64)
+                    {
+                        let current_x = std::cmp::min(
+                            std::cmp::max(filter_start as i64 + r as i64, 0),
+                            (width - 1) as i64,
+                        ) as usize;
+                        let px = current_x * CHANNEL_CONFIGURATION;
+                        let s_ptr = src.as_ptr().add(y_src_shift + px);
+                        // (r0 g0 b0 r1) (g1 b1 r2 g2) (b2 r3 g3 b3) (r4 g4 b5 undef)
+                        let pixel_colors_o = vld1q_f32_x4(s_ptr);
+                        // r0 g0 b0 0
+                        let set = vsplit_rgb_5(pixel_colors_o);
+                        let weight = filter_weights.as_ptr().add(r);
+                        let f_weights = vld1q_f32(weight);
+                        let last_weight = weight.add(4).read_unaligned();
+
+                        accumulate_5_items!(store, set, f_weights, last_weight);
+
+                        r += 5;
+                    }
+                }
+
+                while r < current_filter.size {
+                    let current_x =
+                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
+                            as usize;
+                    let px = current_x * CHANNEL_CONFIGURATION;
+                    let s_ptr = src.as_ptr().add(y_src_shift + px);
+                    let pixel_colors_f32 = load_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr);
+                    let weight = filter_weights.as_ptr().add(r);
                     let f_weight: float32x4_t = vdupq_n_f32(weight.read_unaligned());
                     store = prefer_vfmaq_f32(store, pixel_colors_f32, f_weight);
 

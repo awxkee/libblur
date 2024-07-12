@@ -182,25 +182,6 @@ pub(crate) unsafe fn load_u8_s64x2_fast<const CHANNELS_COUNT: usize>(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn load_u8_u16_x2_fast<const CHANNELS_COUNT: usize>(
-    ptr: *const u8,
-) -> uint16x8_t {
-    return if CHANNELS_COUNT == 3 {
-        let first_integer_part = (ptr as *const u32).read_unaligned().to_le_bytes();
-        let u_first = u16::from_le_bytes([first_integer_part[0], 0]);
-        let u_second = u16::from_le_bytes([first_integer_part[1], 0]);
-        let u_third = u16::from_le_bytes([first_integer_part[2], 0]);
-        let u_fourth = u16::from_le_bytes([first_integer_part[3], 0]);
-        let u_fifth = u16::from_le_bytes([ptr.add(4).read_unaligned(), 0]);
-        let u_sixth = u16::from_le_bytes([ptr.add(5).read_unaligned(), 0]);
-        let store: [u16; 8] = [u_first, u_second, u_third, u_fourth, u_fifth, u_sixth, 0, 0];
-        vld1q_u16(store.as_ptr())
-    } else {
-        vmovl_u8(vld1_u8(ptr))
-    };
-}
-
-#[inline(always)]
 pub(crate) unsafe fn load_u8_u16<const CHANNELS_COUNT: usize>(ptr: *const u8) -> uint16x4_t {
     let u_first = u16::from_le_bytes([ptr.read(), 0]);
     let u_second = u16::from_le_bytes([ptr.add(1).read_unaligned(), 0]);
@@ -253,20 +234,12 @@ pub(crate) unsafe fn vhsumq_f32(a: float32x4_t) -> f32 {
 }
 
 #[inline(always)]
-pub(crate) unsafe fn vsplit_rgb(
-    px: float32x4x4_t,
-) -> (
-    float32x4_t,
-    float32x4_t,
-    float32x4_t,
-    float32x4_t,
-    float32x4_t,
-) {
+pub(crate) unsafe fn vsplit_rgb_5(px: float32x4x4_t) -> Float32x5T {
     let first_pixel = vsetq_lane_f32::<3>(0f32, px.0);
     let second_pixel = vsetq_lane_f32::<3>(0f32, vextq_f32::<3>(px.0, px.1));
     let third_pixel = vsetq_lane_f32::<3>(0f32, vextq_f32::<2>(px.1, px.2));
     let four_pixel = vsetq_lane_f32::<3>(0f32, vextq_f32::<1>(px.2, px.3));
-    (
+    Float32x5T(
         first_pixel,
         second_pixel,
         third_pixel,
@@ -274,3 +247,11 @@ pub(crate) unsafe fn vsplit_rgb(
         vsetq_lane_f32::<3>(0f32, px.3),
     )
 }
+
+pub(crate) struct Float32x5T(
+    pub float32x4_t,
+    pub float32x4_t,
+    pub float32x4_t,
+    pub float32x4_t,
+    pub float32x4_t,
+);

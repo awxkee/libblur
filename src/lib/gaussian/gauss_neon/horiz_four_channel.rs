@@ -27,8 +27,81 @@
 
 use std::arch::aarch64::*;
 
-use crate::neon::{load_u8_f32_fast, load_u8_u16_x2_fast, load_u8_u32_fast, prefer_vfmaq_f32};
+use crate::neon::{load_u8_f32_fast, load_u8_u32_fast, prefer_vfmaq_f32};
 use crate::unsafe_slice::UnsafeSlice;
+
+#[macro_export]
+macro_rules! accumulate_4_forward_u8 {
+    ($store:expr, $pixel_colors:expr, $weights:expr) => {{
+        let mut pixel_colors_u16 = vmovl_u8(vget_low_u8($pixel_colors));
+        let mut pixel_colors_u32 = vmovl_u16(vget_low_u16(pixel_colors_u16));
+        let mut pixel_colors_f32 = vcvtq_f32_u32(pixel_colors_u32);
+
+        $store = prefer_vfmaq_f32(
+            $store,
+            pixel_colors_f32,
+            vdupq_n_f32(vgetq_lane_f32::<0>($weights)),
+        );
+
+        pixel_colors_u32 = vmovl_high_u16(pixel_colors_u16);
+        pixel_colors_f32 = vcvtq_f32_u32(pixel_colors_u32);
+
+        $store = prefer_vfmaq_f32(
+            $store,
+            pixel_colors_f32,
+            vdupq_n_f32(vgetq_lane_f32::<1>($weights)),
+        );
+
+        pixel_colors_u16 = vmovl_u8(vget_high_u8($pixel_colors));
+
+        pixel_colors_u32 = vmovl_u16(vget_low_u16(pixel_colors_u16));
+        let mut pixel_colors_f32 = vcvtq_f32_u32(pixel_colors_u32);
+        $store = prefer_vfmaq_f32(
+            $store,
+            pixel_colors_f32,
+            vdupq_n_f32(vgetq_lane_f32::<2>($weights)),
+        );
+
+        pixel_colors_u32 = vmovl_high_u16(pixel_colors_u16);
+        pixel_colors_f32 = vcvtq_f32_u32(pixel_colors_u32);
+
+        $store = prefer_vfmaq_f32(
+            $store,
+            pixel_colors_f32,
+            vdupq_n_f32(vgetq_lane_f32::<3>($weights)),
+        );
+    }};
+}
+
+#[macro_export]
+macro_rules! accumulate_2_forward_u8 {
+    ($store:expr, $pixel_colors:expr, $weights:expr) => {{
+        let pixel_colors_u16 = vmovl_u8($pixel_colors);
+        let pixel_colors_f32 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_u16)));
+        $store = prefer_vfmaq_f32(
+            $store,
+            pixel_colors_f32,
+            vdupq_n_f32(vget_lane_f32::<0>($weights)),
+        );
+
+        let pixel_colors_f32 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_u16));
+        $store = prefer_vfmaq_f32(
+            $store,
+            pixel_colors_f32,
+            vdupq_n_f32(vget_lane_f32::<1>($weights)),
+        );
+    }};
+}
+
+#[macro_export]
+macro_rules! accumulate_4_by_4_forward_u8 {
+    ($store:expr, $pixel_colors:expr, $weights:expr) => {{
+        accumulate_4_forward_u8!($store, $pixel_colors.0, $weights.0);
+        accumulate_4_forward_u8!($store, $pixel_colors.1, $weights.1);
+        accumulate_4_forward_u8!($store, $pixel_colors.2, $weights.2);
+        accumulate_4_forward_u8!($store, $pixel_colors.3, $weights.3);
+    }};
+}
 
 pub fn gaussian_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usize>(
     undef_src: &[T],
@@ -79,6 +152,27 @@ pub fn gaussian_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
                     r += diff as i32;
                 }
 
+                if CHANNEL_CONFIGURATION == 4 {
+                    while r + 16 <= half_kernel && x as i64 + r as i64 + 16i64 < width as i64 {
+                        let px = std::cmp::min(
+                            std::cmp::max(x as i64 + r as i64, 0),
+                            (width - 1) as i64,
+                        ) as usize
+                            * CHANNEL_CONFIGURATION;
+                        let s_ptr = src.as_ptr().add(y_src_shift + px);
+                        let pixel_colors_0 = vld1q_u8_x4(s_ptr);
+                        let pixel_colors_1 = vld1q_u8_x4(s_ptr.add(src_stride as usize));
+
+                        let weights_ptr = kernel.as_ptr().add((r + half_kernel) as usize);
+                        let weights = vld1q_f32_x4(weights_ptr);
+
+                        accumulate_4_by_4_forward_u8!(store_0, pixel_colors_0, weights);
+                        accumulate_4_by_4_forward_u8!(store_1, pixel_colors_1, weights);
+
+                        r += 16;
+                    }
+                }
+
                 while r + 4 <= half_kernel
                     && x as i64 + r as i64 + (if CHANNEL_CONFIGURATION == 4 { 4 } else { 6 })
                         < width as i64
@@ -94,54 +188,12 @@ pub fn gaussian_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
                         pixel_colors_0 = vqtbl1q_u8(pixel_colors_0, shuffle);
                         pixel_colors_1 = vqtbl1q_u8(pixel_colors_1, shuffle);
                     }
-                    let mut pixel_colors_u16_0 = vmovl_u8(vget_low_u8(pixel_colors_0));
-                    let mut pixel_colors_u32_0 = vmovl_u16(vget_low_u16(pixel_colors_u16_0));
-                    let mut pixel_colors_f32_0 = vcvtq_f32_u32(pixel_colors_u32_0);
 
-                    let mut pixel_colors_u16_1 = vmovl_u8(vget_low_u8(pixel_colors_1));
-                    let mut pixel_colors_u32_1 = vmovl_u16(vget_low_u16(pixel_colors_u16_1));
-                    let mut pixel_colors_f32_1 = vcvtq_f32_u32(pixel_colors_u32_1);
+                    let weights_ptr = kernel.as_ptr().add((r + half_kernel) as usize);
+                    let weights: float32x4_t = vld1q_f32(weights_ptr);
 
-                    let mut weight = *kernel.get_unchecked((r + half_kernel) as usize);
-                    let mut f_weight: float32x4_t = vdupq_n_f32(weight);
-                    store_0 = prefer_vfmaq_f32(store_0, pixel_colors_f32_0, f_weight);
-                    store_1 = prefer_vfmaq_f32(store_1, pixel_colors_f32_1, f_weight);
-
-                    pixel_colors_u32_0 = vmovl_high_u16(pixel_colors_u16_0);
-                    pixel_colors_f32_0 = vcvtq_f32_u32(pixel_colors_u32_0);
-
-                    pixel_colors_u32_1 = vmovl_high_u16(pixel_colors_u16_1);
-                    pixel_colors_f32_1 = vcvtq_f32_u32(pixel_colors_u32_1);
-
-                    weight = *kernel.get_unchecked((r + half_kernel + 1) as usize);
-                    f_weight = vdupq_n_f32(weight);
-                    store_0 = prefer_vfmaq_f32(store_0, pixel_colors_f32_0, f_weight);
-                    store_1 = prefer_vfmaq_f32(store_1, pixel_colors_f32_1, f_weight);
-
-                    pixel_colors_u16_0 = vmovl_u8(vget_high_u8(pixel_colors_0));
-                    pixel_colors_u16_1 = vmovl_u8(vget_high_u8(pixel_colors_1));
-
-                    pixel_colors_u32_0 = vmovl_u16(vget_low_u16(pixel_colors_u16_0));
-                    pixel_colors_u32_1 = vmovl_u16(vget_low_u16(pixel_colors_u16_1));
-
-                    pixel_colors_f32_0 = vcvtq_f32_u32(pixel_colors_u32_0);
-                    pixel_colors_f32_1 = vcvtq_f32_u32(pixel_colors_u32_1);
-
-                    weight = *kernel.get_unchecked((r + half_kernel + 2) as usize);
-                    let mut f_weight: float32x4_t = vdupq_n_f32(weight);
-                    store_0 = prefer_vfmaq_f32(store_0, pixel_colors_f32_0, f_weight);
-                    store_1 = prefer_vfmaq_f32(store_1, pixel_colors_f32_1, f_weight);
-
-                    pixel_colors_u32_0 = vmovl_high_u16(pixel_colors_u16_0);
-                    pixel_colors_f32_0 = vcvtq_f32_u32(pixel_colors_u32_0);
-
-                    pixel_colors_u32_1 = vmovl_high_u16(pixel_colors_u16_1);
-                    pixel_colors_f32_1 = vcvtq_f32_u32(pixel_colors_u32_1);
-
-                    weight = *kernel.get_unchecked((r + half_kernel + 3) as usize);
-                    f_weight = vdupq_n_f32(weight);
-                    store_0 = prefer_vfmaq_f32(store_0, pixel_colors_f32_0, f_weight);
-                    store_1 = prefer_vfmaq_f32(store_1, pixel_colors_f32_1, f_weight);
+                    accumulate_4_forward_u8!(store_0, pixel_colors_0, weights);
+                    accumulate_4_forward_u8!(store_1, pixel_colors_1, weights);
 
                     r += 4;
                 }
@@ -157,33 +209,17 @@ pub fn gaussian_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let mut pixel_colors_0: uint8x8_t = vld1_u8(s_ptr);
                     let mut pixel_colors_1: uint8x8_t = vld1_u8(s_ptr.add(src_stride as usize));
+
+                    let weights_ptr = kernel.as_ptr().add((r + half_kernel) as usize);
+                    let weights = vld1_f32(weights_ptr);
+
                     if CHANNEL_CONFIGURATION == 3 {
                         pixel_colors_0 = vtbl1_u8(pixel_colors_0, shuffle_1);
                         pixel_colors_1 = vtbl1_u8(pixel_colors_1, shuffle_1);
                     }
-                    let pixel_colors_u16_0 = vmovl_u8(pixel_colors_0);
-                    let mut pixel_colors_u32_0 = vmovl_u16(vget_low_u16(pixel_colors_u16_0));
-                    let mut pixel_colors_f32_0 = vcvtq_f32_u32(pixel_colors_u32_0);
 
-                    let pixel_colors_u16_1 = vmovl_u8(pixel_colors_1);
-                    let mut pixel_colors_u32_1 = vmovl_u16(vget_low_u16(pixel_colors_u16_1));
-                    let mut pixel_colors_f32_1 = vcvtq_f32_u32(pixel_colors_u32_1);
-
-                    let mut weight = *kernel.get_unchecked((r + half_kernel) as usize);
-                    let mut f_weight: float32x4_t = vdupq_n_f32(weight);
-                    store_0 = prefer_vfmaq_f32(store_0, pixel_colors_f32_0, f_weight);
-                    store_1 = prefer_vfmaq_f32(store_1, pixel_colors_f32_1, f_weight);
-
-                    pixel_colors_u32_0 = vmovl_high_u16(pixel_colors_u16_0);
-                    pixel_colors_f32_0 = vcvtq_f32_u32(pixel_colors_u32_0);
-
-                    pixel_colors_u32_1 = vmovl_high_u16(pixel_colors_u16_1);
-                    pixel_colors_f32_1 = vcvtq_f32_u32(pixel_colors_u32_1);
-
-                    weight = *kernel.get_unchecked((r + half_kernel + 1) as usize);
-                    f_weight = vdupq_n_f32(weight);
-                    store_0 = prefer_vfmaq_f32(store_0, pixel_colors_f32_0, f_weight);
-                    store_1 = prefer_vfmaq_f32(store_1, pixel_colors_f32_1, f_weight);
+                    accumulate_2_forward_u8!(store_0, pixel_colors_0, weights);
+                    accumulate_2_forward_u8!(store_1, pixel_colors_1, weights);
 
                     r += 2;
                 }
@@ -274,34 +310,11 @@ pub fn gaussian_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
                     if CHANNEL_CONFIGURATION == 3 {
                         pixel_colors = vqtbl1q_u8(pixel_colors, shuffle);
                     }
-                    let mut pixel_colors_u16 = vmovl_u8(vget_low_u8(pixel_colors));
-                    let mut pixel_colors_u32 = vmovl_u16(vget_low_u16(pixel_colors_u16));
-                    let mut pixel_colors_f32 = vcvtq_f32_u32(pixel_colors_u32);
-                    let mut weight = *kernel.get_unchecked((r + half_kernel) as usize);
-                    let mut f_weight: float32x4_t = vdupq_n_f32(weight);
-                    store = prefer_vfmaq_f32(store, pixel_colors_f32, f_weight);
 
-                    pixel_colors_u32 = vmovl_high_u16(pixel_colors_u16);
-                    pixel_colors_f32 = vcvtq_f32_u32(pixel_colors_u32);
+                    let weights_ptr = kernel.as_ptr().add((r + half_kernel) as usize);
+                    let weights = vld1q_f32(weights_ptr);
 
-                    weight = *kernel.get_unchecked((r + half_kernel + 1) as usize);
-                    f_weight = vdupq_n_f32(weight);
-                    store = prefer_vfmaq_f32(store, pixel_colors_f32, f_weight);
-
-                    pixel_colors_u16 = vmovl_u8(vget_high_u8(pixel_colors));
-
-                    pixel_colors_u32 = vmovl_u16(vget_low_u16(pixel_colors_u16));
-                    let mut pixel_colors_f32 = vcvtq_f32_u32(pixel_colors_u32);
-                    let mut weight = *kernel.get_unchecked((r + half_kernel + 2) as usize);
-                    let mut f_weight: float32x4_t = vdupq_n_f32(weight);
-                    store = prefer_vfmaq_f32(store, pixel_colors_f32, f_weight);
-
-                    pixel_colors_u32 = vmovl_high_u16(pixel_colors_u16);
-                    pixel_colors_f32 = vcvtq_f32_u32(pixel_colors_u32);
-
-                    weight = *kernel.get_unchecked((r + half_kernel + 3) as usize);
-                    f_weight = vdupq_n_f32(weight);
-                    store = prefer_vfmaq_f32(store, pixel_colors_f32, f_weight);
+                    accumulate_4_forward_u8!(store, pixel_colors, weights);
 
                     r += 4;
                 }
@@ -312,16 +325,14 @@ pub fn gaussian_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
                             as usize;
                     let px = current_x * CHANNEL_CONFIGURATION;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
-                    let weight_0 = *kernel.get_unchecked((r + half_kernel) as usize);
-                    let weight_1 = *kernel.get_unchecked((r + half_kernel + 1) as usize);
-                    let pixel_colors_u32 = load_u8_u16_x2_fast::<CHANNEL_CONFIGURATION>(s_ptr);
-                    let pixel_colors_f32 = vcvtq_f32_u32(vmovl_u16(vget_low_u16(pixel_colors_u32)));
-                    let f_weight = vdupq_n_f32(weight_0);
-                    store = prefer_vfmaq_f32(store, pixel_colors_f32, f_weight);
+                    let weights_ptr = kernel.as_ptr().add((r + half_kernel) as usize);
+                    let weights = vld1_f32(weights_ptr);
+                    let mut pixel_color = vld1_u8(s_ptr);
+                    if CHANNEL_CONFIGURATION == 3 {
+                        pixel_color = vtbl1_u8(pixel_color, shuffle_1);
+                    }
 
-                    let pixel_colors_f32 = vcvtq_f32_u32(vmovl_high_u16(pixel_colors_u32));
-                    let f_weight = vdupq_n_f32(weight_1);
-                    store = prefer_vfmaq_f32(store, pixel_colors_f32, f_weight);
+                    accumulate_2_forward_u8!(store, pixel_color, weights);
 
                     r += 2;
                 }
