@@ -73,6 +73,251 @@ pub fn gaussian_horiz_one_chan_u8<T>(
 
     let mut _cy = start_y;
 
+    for y in (_cy..end_y.saturating_sub(4)).step_by(4) {
+        unsafe {
+            for x in 0..width {
+                let y_src_shift = y as usize * src_stride as usize;
+                let y_dst_shift = y as usize * dst_stride as usize;
+
+                let y_src_shift_next = y_src_shift + src_stride as usize;
+
+                let mut store0: float32x4_t = vdupq_n_f32(0.);
+                let mut store1: float32x4_t = vdupq_n_f32(0.);
+                let mut store2: float32x4_t = vdupq_n_f32(0.);
+                let mut store3: float32x4_t = vdupq_n_f32(0.);
+
+                let zeros = vdupq_n_f32(0.);
+
+                let mut r = -half_kernel;
+
+                let edge_value_check = x as i64 + r as i64;
+                if edge_value_check < 0 {
+                    let diff = edge_value_check.abs();
+                    let s_ptr = src.as_ptr().add(y_src_shift); // Here we're always at zero
+                    let value0 = s_ptr.read_unaligned() as f32;
+                    let pixel_colors_f32_0 = vld1q_f32([value0, 0f32, 0f32, 0f32].as_ptr());
+                    let s_ptr_next = src.as_ptr().add(y_src_shift_next); // Here we're always at zero
+                    let value1 = s_ptr_next.read_unaligned() as f32;
+                    let pixel_colors_f32_1 = vld1q_f32([value1, 0f32, 0f32, 0f32].as_ptr());
+
+                    let s_ptr_next_2 = src.as_ptr().add(y_src_shift_next + src_stride as usize); // Here we're always at zero
+                    let value2 = s_ptr_next_2.read_unaligned() as f32;
+                    let pixel_colors_f32_2 = vld1q_f32([value2, 0f32, 0f32, 0f32].as_ptr());
+
+                    let s_ptr_next_3 = src.as_ptr().add(y_src_shift_next + src_stride as usize * 2); // Here we're always at zero
+                    let value3 = s_ptr_next_3.read_unaligned() as f32;
+                    let pixel_colors_f32_3 = vld1q_f32([value3, 0f32, 0f32, 0f32].as_ptr());
+                    for i in 0..diff as usize {
+                        let weights = kernel.as_ptr().add(i);
+                        let f_weight = vld1q_lane_f32::<0>(weights, zeros);
+                        store0 = prefer_vfmaq_f32(store0, pixel_colors_f32_0, f_weight);
+                        store1 = prefer_vfmaq_f32(store1, pixel_colors_f32_1, f_weight);
+                        store2 = prefer_vfmaq_f32(store2, pixel_colors_f32_2, f_weight);
+                        store3 = prefer_vfmaq_f32(store3, pixel_colors_f32_3, f_weight);
+                    }
+                    r += diff as i32;
+                }
+
+                while r + 32 <= half_kernel && ((x as i64 + r as i64 + 32i64) < width as i64) {
+                    let current_x =
+                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
+                            as usize;
+                    let px = current_x;
+                    let s_ptr = src.as_ptr().add(y_src_shift + px);
+                    let s_ptr_next = src.as_ptr().add(y_src_shift_next + px);
+                    let pixel_colors_u8x2_0 = vld1q_u8_x2(s_ptr);
+                    let pixel_colors_u8x2_1 = vld1q_u8_x2(s_ptr_next);
+                    let pixel_colors_u8x2_2 = vld1q_u8_x2(s_ptr_next.add(src_stride as usize));
+                    let pixel_colors_u8x2_3 = vld1q_u8_x2(s_ptr_next.add(src_stride as usize * 2));
+                    let weight = kernel.as_ptr().add((r + half_kernel) as usize);
+                    let weights0 = vld1q_f32_x4(weight);
+                    let weights1 = vld1q_f32_x4(weight.add(16));
+
+                    accumulate_4_forward!(store0, pixel_colors_u8x2_0.0, weights0);
+                    accumulate_4_forward!(store0, pixel_colors_u8x2_0.1, weights1);
+
+                    accumulate_4_forward!(store1, pixel_colors_u8x2_1.0, weights0);
+                    accumulate_4_forward!(store1, pixel_colors_u8x2_1.1, weights1);
+
+                    accumulate_4_forward!(store2, pixel_colors_u8x2_2.0, weights0);
+                    accumulate_4_forward!(store2, pixel_colors_u8x2_2.1, weights1);
+
+                    accumulate_4_forward!(store3, pixel_colors_u8x2_3.0, weights0);
+                    accumulate_4_forward!(store3, pixel_colors_u8x2_3.1, weights1);
+
+                    r += 32;
+                }
+
+                while r + 16 <= half_kernel && ((x as i64 + r as i64 + 16i64) < width as i64) {
+                    let current_x =
+                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
+                            as usize;
+                    let px = current_x;
+                    let s_ptr = src.as_ptr().add(y_src_shift + px);
+                    let s_ptr_next = src.as_ptr().add(y_src_shift_next + px);
+                    let pixel_colors_u8_0 = vld1q_u8(s_ptr);
+                    let pixel_colors_u8_1 = vld1q_u8(s_ptr_next);
+                    let pixel_colors_u8_2 = vld1q_u8(s_ptr_next.add(src_stride as usize));
+                    let pixel_colors_u8_3 = vld1q_u8(s_ptr_next.add(src_stride as usize * 2));
+                    let weight = kernel.as_ptr().add((r + half_kernel) as usize);
+                    let weights = vld1q_f32_x4(weight);
+
+                    accumulate_4_forward!(store0, pixel_colors_u8_0, weights);
+                    accumulate_4_forward!(store1, pixel_colors_u8_1, weights);
+                    accumulate_4_forward!(store2, pixel_colors_u8_2, weights);
+                    accumulate_4_forward!(store3, pixel_colors_u8_3, weights);
+
+                    r += 16;
+                }
+
+                while r + 8 <= half_kernel && ((x as i64 + r as i64 + 8i64) < width as i64) {
+                    let current_x =
+                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
+                            as usize;
+                    let px = current_x;
+                    let s_ptr = src.as_ptr().add(y_src_shift + px);
+                    let s_ptr_next = src.as_ptr().add(y_src_shift_next + px);
+                    let pixel_colors_u8_0 = vld1_u8(s_ptr);
+                    let pixel_colors_u8_1 = vld1_u8(s_ptr_next);
+                    let pixel_colors_u8_2 = vld1_u8(s_ptr_next.add(src_stride as usize));
+                    let pixel_colors_u8_3 = vld1_u8(s_ptr_next.add(src_stride as usize * 2));
+                    let weight = kernel.as_ptr().add((r + half_kernel) as usize);
+                    let weights = vld1q_f32_x2(weight);
+
+                    accumulate_2_forward!(store0, pixel_colors_u8_0, weights);
+                    accumulate_2_forward!(store1, pixel_colors_u8_1, weights);
+                    accumulate_2_forward!(store2, pixel_colors_u8_2, weights);
+                    accumulate_2_forward!(store3, pixel_colors_u8_3, weights);
+
+                    r += 8;
+                }
+
+                while r + 4 <= half_kernel && ((x as i64 + r as i64 + 4i64) < width as i64) {
+                    let current_x =
+                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
+                            as usize;
+                    let px = current_x;
+                    let s_ptr = src.as_ptr().add(y_src_shift + px);
+                    let pixel_colors_i32_0 = vld1q_u32(
+                        [
+                            s_ptr.read_unaligned() as u32,
+                            s_ptr.add(1).read_unaligned() as u32,
+                            s_ptr.add(2).read_unaligned() as u32,
+                            s_ptr.add(3).read_unaligned() as u32,
+                        ]
+                        .as_ptr(),
+                    );
+
+                    let s_ptr_next = src.as_ptr().add(y_src_shift_next + px);
+                    let pixel_colors_i32_1 = vld1q_u32(
+                        [
+                            s_ptr_next.read_unaligned() as u32,
+                            s_ptr_next.add(1).read_unaligned() as u32,
+                            s_ptr_next.add(2).read_unaligned() as u32,
+                            s_ptr_next.add(3).read_unaligned() as u32,
+                        ]
+                        .as_ptr(),
+                    );
+
+                    let s_ptr_next_2 = s_ptr_next.add(src_stride as usize);
+                    let pixel_colors_i32_2 = vld1q_u32(
+                        [
+                            s_ptr_next_2.read_unaligned() as u32,
+                            s_ptr_next_2.add(1).read_unaligned() as u32,
+                            s_ptr_next_2.add(2).read_unaligned() as u32,
+                            s_ptr_next_2.add(3).read_unaligned() as u32,
+                        ]
+                        .as_ptr(),
+                    );
+
+                    let s_ptr_next_3 = s_ptr_next.add(src_stride as usize * 2);
+                    let pixel_colors_i32_3 = vld1q_u32(
+                        [
+                            s_ptr_next_3.read_unaligned() as u32,
+                            s_ptr_next_3.add(1).read_unaligned() as u32,
+                            s_ptr_next_3.add(2).read_unaligned() as u32,
+                            s_ptr_next_3.add(3).read_unaligned() as u32,
+                        ]
+                        .as_ptr(),
+                    );
+
+                    let pixel_colors_f32_0 = vcvtq_f32_u32(pixel_colors_i32_0);
+                    let pixel_colors_f32_1 = vcvtq_f32_u32(pixel_colors_i32_1);
+                    let pixel_colors_f32_2 = vcvtq_f32_u32(pixel_colors_i32_2);
+                    let pixel_colors_f32_3 = vcvtq_f32_u32(pixel_colors_i32_3);
+                    let weight = kernel.as_ptr().add((r + half_kernel) as usize);
+                    let f_weight: float32x4_t = vld1q_f32(weight);
+                    store0 = prefer_vfmaq_f32(store0, pixel_colors_f32_0, f_weight);
+                    store1 = prefer_vfmaq_f32(store1, pixel_colors_f32_1, f_weight);
+                    store2 = prefer_vfmaq_f32(store2, pixel_colors_f32_2, f_weight);
+                    store3 = prefer_vfmaq_f32(store3, pixel_colors_f32_3, f_weight);
+
+                    r += 4;
+                }
+
+                while r <= half_kernel {
+                    let current_x =
+                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
+                            as usize;
+                    let px = current_x;
+                    let s_ptr = src.as_ptr().add(y_src_shift + px);
+                    let s_ptr_next = src.as_ptr().add(y_src_shift_next + px);
+                    let pixel_colors_f32_0 =
+                        vld1q_f32([s_ptr.read_unaligned() as f32, 0f32, 0f32, 0f32].as_ptr());
+                    let pixel_colors_f32_1 =
+                        vld1q_f32([s_ptr_next.read_unaligned() as f32, 0f32, 0f32, 0f32].as_ptr());
+                    let pixel_colors_f32_2 = vld1q_f32(
+                        [
+                            s_ptr_next.add(src_stride as usize).read_unaligned() as f32,
+                            0f32,
+                            0f32,
+                            0f32,
+                        ]
+                        .as_ptr(),
+                    );
+                    let pixel_colors_f32_3 = vld1q_f32(
+                        [
+                            s_ptr_next.add(src_stride as usize * 2).read_unaligned() as f32,
+                            0f32,
+                            0f32,
+                            0f32,
+                        ]
+                        .as_ptr(),
+                    );
+                    let weight = *kernel.get_unchecked((r + half_kernel) as usize);
+                    let f_weight: float32x4_t = vdupq_n_f32(weight);
+                    store0 = prefer_vfmaq_f32(store0, pixel_colors_f32_0, f_weight);
+                    store1 = prefer_vfmaq_f32(store1, pixel_colors_f32_1, f_weight);
+                    store2 = prefer_vfmaq_f32(store2, pixel_colors_f32_2, f_weight);
+                    store3 = prefer_vfmaq_f32(store3, pixel_colors_f32_3, f_weight);
+
+                    r += 1;
+                }
+
+                let agg0 = vhsumq_f32(store0);
+                let offset0 = y_dst_shift + x as usize;
+                let dst_ptr0 = unsafe_dst.slice.as_ptr().add(offset0) as *mut u8;
+                dst_ptr0.write_unaligned(agg0.round().min(255f32).max(0f32) as u8);
+
+                let agg1 = vhsumq_f32(store1);
+                let offset1 = offset0 + dst_stride as usize;
+                let dst_ptr1 = unsafe_dst.slice.as_ptr().add(offset1) as *mut u8;
+                dst_ptr1.write_unaligned(agg1.round().min(255f32).max(0f32) as u8);
+
+                let agg2 = vhsumq_f32(store2);
+                let offset2 = offset0 + dst_stride as usize * 2;
+                let dst_ptr2 = unsafe_dst.slice.as_ptr().add(offset2) as *mut u8;
+                dst_ptr2.write_unaligned(agg2.round().min(255f32).max(0f32) as u8);
+
+                let agg3 = vhsumq_f32(store3);
+                let offset3 = offset0 + dst_stride as usize * 3;
+                let dst_ptr3 = unsafe_dst.slice.as_ptr().add(offset3) as *mut u8;
+                dst_ptr3.write_unaligned(agg3.round().min(255f32).max(0f32) as u8);
+            }
+        }
+        _cy = y;
+    }
+
     for y in (_cy..end_y.saturating_sub(2)).step_by(2) {
         unsafe {
             for x in 0..width {

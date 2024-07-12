@@ -31,6 +31,7 @@ use crate::sse::{
     load_u8_f32_fast, load_u8_u32_one,
 };
 use crate::unsafe_slice::UnsafeSlice;
+use crate::write_u8_by_channels_sse;
 use erydanos::_mm_prefer_fma_ps;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
@@ -154,7 +155,12 @@ pub fn gaussian_blur_horizontal_pass_filter_sse<T, const CHANNEL_CONFIGURATION: 
                     let mut pixel_colors_1 = _mm_loadu_si128(s_ptr_1 as *const __m128i);
 
                     let weights_ptr = filter_weights.as_ptr().add(j);
-                    let weights = _mm_loadu_ps(weights_ptr);
+                    let weights = _mm_setr_ps(
+                        weights_ptr.read_unaligned(),
+                        weights_ptr.add(1).read_unaligned(),
+                        0.,
+                        0.,
+                    );
                     if CHANNEL_CONFIGURATION == 3 {
                         pixel_colors_0 = _mm_shuffle_epi8(pixel_colors_0, shuffle_rgb);
                         pixel_colors_1 = _mm_shuffle_epi8(pixel_colors_1, shuffle_rgb);
@@ -181,42 +187,15 @@ pub fn gaussian_blur_horizontal_pass_filter_sse<T, const CHANNEL_CONFIGURATION: 
                     j += 1;
                 }
 
-                let px = x as usize * CHANNEL_CONFIGURATION;
-
-                const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
-                let px_32 = _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(store_0));
-                let px_16 = _mm_packus_epi32(px_32, px_32);
-                let px_8 = _mm_packus_epi16(px_16, px_16);
-                let pixel = _mm_extract_epi32::<0>(px_8);
-
-                if CHANNEL_CONFIGURATION == 4 {
-                    let unsafe_offset = y_dst_shift + px;
-                    let dst_ptr = unsafe_dst.slice.as_ptr().add(unsafe_offset) as *mut i32;
-                    dst_ptr.write_unaligned(pixel);
-                } else {
-                    let pixel_bytes = pixel.to_le_bytes();
-                    let unsafe_offset = y_dst_shift + px;
-                    unsafe_dst.write(unsafe_offset, pixel_bytes[0]);
-                    unsafe_dst.write(unsafe_offset + 1, pixel_bytes[1]);
-                    unsafe_dst.write(unsafe_offset + 2, pixel_bytes[2]);
-                }
-
-                let px_32 = _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(store_1));
-                let px_16 = _mm_packus_epi32(px_32, px_32);
-                let px_8 = _mm_packus_epi16(px_16, px_16);
-                let pixel = _mm_extract_epi32::<0>(px_8);
-
-                if CHANNEL_CONFIGURATION == 4 {
-                    let unsafe_offset = y_dst_shift + src_stride as usize + px;
-                    let dst_ptr = unsafe_dst.slice.as_ptr().add(unsafe_offset) as *mut i32;
-                    dst_ptr.write_unaligned(pixel);
-                } else {
-                    let pixel_bytes = pixel.to_le_bytes();
-                    let unsafe_offset = y_dst_shift + src_stride as usize + px;
-                    unsafe_dst.write(unsafe_offset, pixel_bytes[0]);
-                    unsafe_dst.write(unsafe_offset + 1, pixel_bytes[1]);
-                    unsafe_dst.write(unsafe_offset + 2, pixel_bytes[2]);
-                }
+                write_u8_by_channels_sse!(
+                    store_0,
+                    CHANNEL_CONFIGURATION,
+                    unsafe_dst,
+                    y_dst_shift,
+                    x
+                );
+                let off1 = y_dst_shift + dst_stride as usize;
+                write_u8_by_channels_sse!(store_1, CHANNEL_CONFIGURATION, unsafe_dst, off1, x);
             }
 
             cy = y;
@@ -293,24 +272,7 @@ pub fn gaussian_blur_horizontal_pass_filter_sse<T, const CHANNEL_CONFIGURATION: 
                     j += 1;
                 }
 
-                let px = x as usize * CHANNEL_CONFIGURATION;
-
-                const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
-                let px_32 = _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(store));
-                let px_16 = _mm_packus_epi32(px_32, px_32);
-                let px_8 = _mm_packus_epi16(px_16, px_16);
-                let pixel = _mm_extract_epi32::<0>(px_8);
-
-                if CHANNEL_CONFIGURATION == 4 {
-                    let dst_ptr = unsafe_dst.slice.as_ptr().add(y_dst_shift + px) as *mut i32;
-                    dst_ptr.write_unaligned(pixel);
-                } else {
-                    let pixel_bytes = pixel.to_le_bytes();
-                    let unsafe_offset = y_dst_shift + px;
-                    unsafe_dst.write(unsafe_offset, pixel_bytes[0]);
-                    unsafe_dst.write(unsafe_offset + 1, pixel_bytes[1]);
-                    unsafe_dst.write(unsafe_offset + 2, pixel_bytes[2]);
-                }
+                write_u8_by_channels_sse!(store, CHANNEL_CONFIGURATION, unsafe_dst, y_dst_shift, x);
             }
         }
     }

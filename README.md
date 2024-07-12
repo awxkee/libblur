@@ -188,21 +188,21 @@ Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded 
 
 |         |   Time   |
 |---------|:--------:|
-| libblur | 171.81ms |
+| libblur | 122.02ms |
 | OpenCV  | 251.10ms |
 
 Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded mode with 151 kernel size.
 
 |         |   Time   |
 |---------|:--------:|
-| libblur | 172.21ms |
-| OpenCV  | 304.40ms |
+| libblur | 131.21ms |
+| OpenCV  | 193.67ms |
 
 Example comparison time for blurring image 3000x4000 single plane 8-bit in multithreaded mode with 151 kernel size.
 
 |         |  Time   |
 |---------|:-------:|
-| libblur | 43.87ms |
+| libblur | 41.65ms |
 | OpenCV  | 75.94ms |
 
 ### Gaussian box blur
