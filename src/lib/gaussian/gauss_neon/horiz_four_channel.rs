@@ -29,6 +29,7 @@ use std::arch::aarch64::*;
 
 use crate::neon::{load_u8_f32_fast, load_u8_u32_fast, prefer_vfmaq_f32};
 use crate::unsafe_slice::UnsafeSlice;
+use crate::write_u8_by_channels;
 
 #[macro_export]
 macro_rules! accumulate_4_forward_u8 {
@@ -243,38 +244,14 @@ pub fn gaussian_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
                     r += 1;
                 }
 
-                let px = x as usize * CHANNEL_CONFIGURATION;
-
-                let px_16 = vqmovn_u32(vcvtaq_u32_f32(store_0));
-                let px_8 = vqmovn_u16(vcombine_u16(px_16, px_16));
-                let pixel_0 = vget_lane_u32::<0>(vreinterpret_u32_u8(px_8));
-
-                let px_16 = vqmovn_u32(vcvtaq_u32_f32(store_1));
-                let px_8 = vqmovn_u16(vcombine_u16(px_16, px_16));
-                let pixel_1 = vget_lane_u32::<0>(vreinterpret_u32_u8(px_8));
-
-                if CHANNEL_CONFIGURATION == 4 {
-                    let unsafe_offset = y_dst_shift + px;
-                    let dst_ptr = unsafe_dst.slice.as_ptr().add(unsafe_offset) as *mut u32;
-                    dst_ptr.write_unaligned(pixel_0);
-                } else {
-                    let pixel_bytes_0 = pixel_0.to_le_bytes();
-                    let offset = y_dst_shift + px;
-                    unsafe_dst.write(offset, pixel_bytes_0[0]);
-                    unsafe_dst.write(offset + 1, pixel_bytes_0[1]);
-                    unsafe_dst.write(offset + 2, pixel_bytes_0[2]);
-                }
-
-                let offset = y_dst_shift + px + src_stride as usize;
-                if CHANNEL_CONFIGURATION == 4 {
-                    let dst_ptr = unsafe_dst.slice.as_ptr().add(offset) as *mut u32;
-                    dst_ptr.write_unaligned(pixel_1);
-                } else {
-                    let pixel_bytes_1 = pixel_1.to_le_bytes();
-                    unsafe_dst.write(offset, pixel_bytes_1[0]);
-                    unsafe_dst.write(offset + 1, pixel_bytes_1[1]);
-                    unsafe_dst.write(offset + 2, pixel_bytes_1[2]);
-                }
+                write_u8_by_channels!(store_0, CHANNEL_CONFIGURATION, unsafe_dst, y_dst_shift, x);
+                write_u8_by_channels!(
+                    store_1,
+                    CHANNEL_CONFIGURATION,
+                    unsafe_dst,
+                    y_dst_shift + src_stride as usize,
+                    x
+                );
             }
             cy = y;
         }
@@ -352,22 +329,7 @@ pub fn gaussian_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
                     r += 1;
                 }
 
-                let px = x as usize * CHANNEL_CONFIGURATION;
-
-                let px_16 = vqmovn_u32(vcvtaq_u32_f32(store));
-                let px_8 = vqmovn_u16(vcombine_u16(px_16, px_16));
-                let pixel = vget_lane_u32::<0>(vreinterpret_u32_u8(px_8));
-
-                let offset = y_dst_shift + px;
-                if CHANNEL_CONFIGURATION == 4 {
-                    let dst_ptr = unsafe_dst.slice.as_ptr().add(offset) as *mut u32;
-                    dst_ptr.write_unaligned(pixel);
-                } else {
-                    let bits = pixel.to_le_bytes();
-                    unsafe_dst.write(offset, bits[0]);
-                    unsafe_dst.write(offset + 1, bits[1]);
-                    unsafe_dst.write(offset + 2, bits[2]);
-                }
+                write_u8_by_channels!(store, CHANNEL_CONFIGURATION, unsafe_dst, y_dst_shift, x);
             }
         }
     }

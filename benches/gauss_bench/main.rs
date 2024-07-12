@@ -168,7 +168,14 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         let mut plane_2 = vec![0u8; width * height];
         let mut plane_3 = vec![0u8; width * height];
 
-        split_channels_3(&src_bytes, width, height, &mut plane_1, &mut plane_2, &mut plane_3);
+        split_channels_3(
+            &src_bytes,
+            width,
+            height,
+            &mut plane_1,
+            &mut plane_2,
+            &mut plane_3,
+        );
 
         c.bench_function("Plane Gauss Blur Clamp", |b| {
             b.iter(|| {
@@ -194,7 +201,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             &find_file(&"assets/test_image_1.jpg", false, false).unwrap(),
             IMREAD_COLOR,
         )
-            .unwrap();
+        .unwrap();
         let mut planes = Vector::<Mat>::new();
         split(&src, &mut planes).unwrap();
         let source_plane = planes.get(0).unwrap();
@@ -210,7 +217,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                     (77f64 * 2f64 + 1f64) / 6f64,
                     BORDER_DEFAULT,
                 )
-                    .unwrap();
+                .unwrap();
             })
         });
     }

@@ -31,7 +31,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 77,
                 FastBlurChannels::Channels4,
                 ThreadingPolicy::Single,
-                EdgeMode::Clamp
+                EdgeMode::Clamp,
             );
         })
     });

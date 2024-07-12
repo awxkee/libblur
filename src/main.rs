@@ -135,7 +135,7 @@ fn main() {
     //     vst1q_s64(t.as_mut_ptr(), mul);
     //     println!("{:?}", t);
     // }
-    let img = ImageReader::open("assets/test_image_1.jpg")
+    let img = ImageReader::open("assets/test_image_1_small.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -217,7 +217,7 @@ fn main() {
         25 * 2 + 1,
         25f32 * 2f32 / 6f32,
         FastBlurChannels::Channels3,
-        EdgeMode::KernelClip,
+        EdgeMode::Clamp,
         ThreadingPolicy::Single,
     );
 

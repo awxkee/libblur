@@ -262,3 +262,27 @@ pub unsafe fn _mm_split_rgb_5_ps(
     let fifth = _mm_erase_last_ps(vals.3);
     (first, second, third, fourth, fifth)
 }
+
+#[inline(always)]
+pub unsafe fn _mm_broadcast_first(item: __m128) -> __m128 {
+    const FLAG: i32 = shuffle(0, 0, 0, 0);
+    _mm_shuffle_ps::<FLAG>(item, item)
+}
+
+#[inline(always)]
+pub unsafe fn _mm_broadcast_second(item: __m128) -> __m128 {
+    const FLAG: i32 = shuffle(1, 1, 1, 1);
+    _mm_shuffle_ps::<FLAG>(item, item)
+}
+
+#[inline(always)]
+pub unsafe fn _mm_broadcast_third(item: __m128) -> __m128 {
+    const FLAG: i32 = shuffle(2, 2, 2, 2);
+    _mm_shuffle_ps::<FLAG>(item, item)
+}
+
+#[inline(always)]
+pub unsafe fn _mm_broadcast_fourth(item: __m128) -> __m128 {
+    const FLAG: i32 = shuffle(3, 3, 3, 3);
+    _mm_shuffle_ps::<FLAG>(item, item)
+}

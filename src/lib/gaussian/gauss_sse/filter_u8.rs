@@ -26,13 +26,61 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::gaussian::gaussian_filter::GaussianFilter;
-use crate::sse::{load_u8_f32_fast, load_u8_u32_one};
+use crate::sse::{
+    _mm_broadcast_first, _mm_broadcast_fourth, _mm_broadcast_second, _mm_broadcast_third,
+    load_u8_f32_fast, load_u8_u32_one,
+};
 use crate::unsafe_slice::UnsafeSlice;
 use erydanos::_mm_prefer_fma_ps;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
+
+#[macro_export]
+macro_rules! accumulate_4_forward_sse_u8 {
+    ($store:expr, $pixel_colors:expr, $weights:expr) => {{
+        let zeros_si = _mm_setzero_si128();
+        let mut pixel_colors_u16 = _mm_unpacklo_epi8($pixel_colors, zeros_si);
+        let mut pixel_colors_u32 = _mm_unpacklo_epi16(pixel_colors_u16, zeros_si);
+        let mut pixel_colors_f32 = _mm_cvtepi32_ps(pixel_colors_u32);
+
+        let first_weight = _mm_broadcast_first($weights);
+        $store = _mm_prefer_fma_ps($store, pixel_colors_f32, first_weight);
+
+        pixel_colors_u32 = _mm_unpackhi_epi16(pixel_colors_u16, zeros_si);
+        pixel_colors_f32 = _mm_cvtepi32_ps(pixel_colors_u32);
+
+        $store = _mm_prefer_fma_ps($store, pixel_colors_f32, _mm_broadcast_second($weights));
+
+        pixel_colors_u16 = _mm_unpackhi_epi8($pixel_colors, zeros_si);
+        pixel_colors_u32 = _mm_unpacklo_epi16(pixel_colors_u16, zeros_si);
+        let mut pixel_colors_f32 = _mm_cvtepi32_ps(pixel_colors_u32);
+        $store = _mm_prefer_fma_ps($store, pixel_colors_f32, _mm_broadcast_third($weights));
+
+        pixel_colors_u32 = _mm_unpackhi_epi16(pixel_colors_u16, zeros_si);
+        pixel_colors_f32 = _mm_cvtepi32_ps(pixel_colors_u32);
+
+        $store = _mm_prefer_fma_ps($store, pixel_colors_f32, _mm_broadcast_fourth($weights));
+    }};
+}
+
+#[macro_export]
+macro_rules! accumulate_2_forward_sse_u8 {
+    ($store:expr, $pixel_colors:expr, $weights:expr) => {{
+        let zeros_si = _mm_setzero_si128();
+        let pixel_colors_u16 = _mm_unpacklo_epi8($pixel_colors, zeros_si);
+        let mut pixel_colors_u32 = _mm_unpacklo_epi16(pixel_colors_u16, zeros_si);
+        let mut pixel_colors_f32 = _mm_cvtepi32_ps(pixel_colors_u32);
+        let first_weight = _mm_broadcast_first($weights);
+        $store = _mm_prefer_fma_ps($store, pixel_colors_f32, first_weight);
+
+        pixel_colors_u32 = _mm_unpackhi_epi16(pixel_colors_u16, zeros_si);
+        pixel_colors_f32 = _mm_cvtepi32_ps(pixel_colors_u32);
+
+        $store = _mm_prefer_fma_ps($store, pixel_colors_f32, _mm_broadcast_second($weights));
+    }};
+}
 
 pub fn gaussian_blur_horizontal_pass_filter_sse<T, const CHANNEL_CONFIGURATION: usize>(
     undef_src: &[T],
@@ -44,32 +92,29 @@ pub fn gaussian_blur_horizontal_pass_filter_sse<T, const CHANNEL_CONFIGURATION: 
     start_y: u32,
     end_y: u32,
 ) {
-    let src: &[u8] = unsafe { std::mem::transmute(undef_src) };
-    let unsafe_dst: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(undef_unsafe_dst) };
-    #[rustfmt::skip]
-        let shuffle_rgb =
-            unsafe { _mm_setr_epi8(0, 1, 2, -1, 3, 4,
-                                   5, -1, 6, 7, 8, -1,
-                                   9, 10, 11, -1) };
+    unsafe {
+        let src: &[u8] = std::mem::transmute(undef_src);
+        let unsafe_dst: &UnsafeSlice<'_, u8> = std::mem::transmute(undef_unsafe_dst);
+        #[rustfmt::skip]
+        let shuffle_rgb = _mm_setr_epi8(0, 1, 2, -1, 3, 4,
+                                                5, -1, 6, 7, 8, -1,
+                                                9, 10, 11, -1);
 
-    let zeros_si = unsafe { _mm_setzero_si128() };
+        let mut cy = start_y;
 
-    let mut cy = start_y;
+        for y in (cy..end_y.saturating_sub(2)).step_by(2) {
+            let y_src_shift = y as usize * src_stride as usize;
+            let y_dst_shift = y as usize * dst_stride as usize;
+            for x in 0..width {
+                let mut store_0 = _mm_setzero_ps();
+                let mut store_1 = _mm_setzero_ps();
 
-    for y in (cy..end_y.saturating_sub(2)).step_by(2) {
-        let y_src_shift = y as usize * src_stride as usize;
-        let y_dst_shift = y as usize * dst_stride as usize;
-        for x in 0..width {
-            let mut store_0 = unsafe { _mm_setzero_ps() };
-            let mut store_1 = unsafe { _mm_setzero_ps() };
+                let current_filter = filter.get_unchecked(x as usize);
+                let filter_start = current_filter.start;
+                let filter_weights = &current_filter.filter;
 
-            let current_filter = unsafe { filter.get_unchecked(x as usize) };
-            let filter_start = current_filter.start;
-            let filter_weights = &current_filter.filter;
+                let mut j = 0usize;
 
-            let mut j = 0usize;
-
-            unsafe {
                 while j + 4 < current_filter.size
                     && filter_start as i64
                         + j as i64
@@ -81,64 +126,21 @@ pub fn gaussian_blur_horizontal_pass_filter_sse<T, const CHANNEL_CONFIGURATION: 
                     let s_ptr_1 = s_ptr.add(src_stride as usize);
                     let mut pixel_colors_0 = _mm_loadu_si128(s_ptr as *const __m128i);
                     let mut pixel_colors_1 = _mm_loadu_si128(s_ptr_1 as *const __m128i);
+
+                    let weights_ptr = filter_weights.as_ptr().add(j);
+                    let weights = _mm_loadu_ps(weights_ptr);
+
                     if CHANNEL_CONFIGURATION == 3 {
                         pixel_colors_0 = _mm_shuffle_epi8(pixel_colors_0, shuffle_rgb);
                         pixel_colors_1 = _mm_shuffle_epi8(pixel_colors_1, shuffle_rgb);
                     }
-                    let mut pixel_colors_u16_0 = _mm_unpacklo_epi8(pixel_colors_0, zeros_si);
-                    let mut pixel_colors_u32_0 = _mm_unpacklo_epi16(pixel_colors_u16_0, zeros_si);
-                    let mut pixel_colors_f32_0 = _mm_cvtepi32_ps(pixel_colors_u32_0);
 
-                    let mut pixel_colors_u16_1 = _mm_unpacklo_epi8(pixel_colors_1, zeros_si);
-                    let mut pixel_colors_u32_1 = _mm_unpacklo_epi16(pixel_colors_u16_1, zeros_si);
-                    let mut pixel_colors_f32_1 = _mm_cvtepi32_ps(pixel_colors_u32_1);
-
-                    let mut weight = *filter_weights.get_unchecked(j);
-                    let mut f_weight = _mm_set1_ps(weight);
-                    store_0 = _mm_prefer_fma_ps(store_0, pixel_colors_f32_0, f_weight);
-                    store_1 = _mm_prefer_fma_ps(store_1, pixel_colors_f32_1, f_weight);
-
-                    pixel_colors_u32_0 = _mm_unpackhi_epi16(pixel_colors_u16_0, zeros_si);
-                    pixel_colors_f32_0 = _mm_cvtepi32_ps(pixel_colors_u32_0);
-
-                    pixel_colors_u32_1 = _mm_unpackhi_epi16(pixel_colors_u16_1, zeros_si);
-                    pixel_colors_f32_1 = _mm_cvtepi32_ps(pixel_colors_u32_1);
-
-                    weight = *filter_weights.get_unchecked(j + 1);
-                    f_weight = _mm_set1_ps(weight);
-                    store_0 = _mm_prefer_fma_ps(store_0, pixel_colors_f32_0, f_weight);
-                    store_1 = _mm_prefer_fma_ps(store_1, pixel_colors_f32_1, f_weight);
-
-                    pixel_colors_u16_0 = _mm_unpackhi_epi8(pixel_colors_0, zeros_si);
-                    pixel_colors_u32_0 = _mm_unpacklo_epi16(pixel_colors_u16_0, zeros_si);
-
-                    pixel_colors_u16_1 = _mm_unpackhi_epi8(pixel_colors_1, zeros_si);
-                    pixel_colors_u32_1 = _mm_unpacklo_epi16(pixel_colors_u16_1, zeros_si);
-
-                    pixel_colors_f32_0 = _mm_cvtepi32_ps(pixel_colors_u32_0);
-                    pixel_colors_f32_1 = _mm_cvtepi32_ps(pixel_colors_u32_1);
-
-                    let mut weight = *filter_weights.get_unchecked(j + 2);
-                    let mut f_weight = _mm_set1_ps(weight);
-                    store_0 = _mm_prefer_fma_ps(store_0, pixel_colors_f32_0, f_weight);
-                    store_1 = _mm_prefer_fma_ps(store_1, pixel_colors_f32_1, f_weight);
-
-                    pixel_colors_u32_0 = _mm_unpackhi_epi16(pixel_colors_u16_0, zeros_si);
-                    pixel_colors_f32_0 = _mm_cvtepi32_ps(pixel_colors_u32_0);
-
-                    pixel_colors_u32_1 = _mm_unpackhi_epi16(pixel_colors_u16_1, zeros_si);
-                    pixel_colors_f32_1 = _mm_cvtepi32_ps(pixel_colors_u32_1);
-
-                    weight = *filter_weights.get_unchecked(j + 3);
-                    f_weight = _mm_set1_ps(weight);
-                    store_0 = _mm_prefer_fma_ps(store_0, pixel_colors_f32_0, f_weight);
-                    store_1 = _mm_prefer_fma_ps(store_1, pixel_colors_f32_1, f_weight);
+                    accumulate_4_forward_sse_u8!(store_0, pixel_colors_0, weights);
+                    accumulate_4_forward_sse_u8!(store_1, pixel_colors_1, weights);
 
                     j += 4;
                 }
-            }
 
-            unsafe {
                 while j + 2 < current_filter.size
                     && filter_start as i64
                         + j as i64
@@ -150,39 +152,20 @@ pub fn gaussian_blur_horizontal_pass_filter_sse<T, const CHANNEL_CONFIGURATION: 
                     let s_ptr_1 = s_ptr.add(src_stride as usize);
                     let mut pixel_colors_0 = _mm_loadu_si128(s_ptr as *const __m128i);
                     let mut pixel_colors_1 = _mm_loadu_si128(s_ptr_1 as *const __m128i);
+
+                    let weights_ptr = filter_weights.as_ptr().add(j);
+                    let weights = _mm_loadu_ps(weights_ptr);
                     if CHANNEL_CONFIGURATION == 3 {
                         pixel_colors_0 = _mm_shuffle_epi8(pixel_colors_0, shuffle_rgb);
                         pixel_colors_1 = _mm_shuffle_epi8(pixel_colors_1, shuffle_rgb);
                     }
-                    let pixel_colors_u16_0 = _mm_unpacklo_epi8(pixel_colors_0, zeros_si);
-                    let mut pixel_colors_u32_0 = _mm_unpacklo_epi16(pixel_colors_u16_0, zeros_si);
-                    let mut pixel_colors_f32_0 = _mm_cvtepi32_ps(pixel_colors_u32_0);
 
-                    let pixel_colors_u16_1 = _mm_unpacklo_epi8(pixel_colors_1, zeros_si);
-                    let mut pixel_colors_u32_1 = _mm_unpacklo_epi16(pixel_colors_u16_1, zeros_si);
-                    let mut pixel_colors_f32_1 = _mm_cvtepi32_ps(pixel_colors_u32_1);
-
-                    let mut weight = *filter_weights.get_unchecked(j);
-                    let mut f_weight = _mm_set1_ps(weight);
-                    store_0 = _mm_prefer_fma_ps(store_0, pixel_colors_f32_0, f_weight);
-                    store_1 = _mm_prefer_fma_ps(store_1, pixel_colors_f32_1, f_weight);
-
-                    pixel_colors_u32_0 = _mm_unpackhi_epi16(pixel_colors_u16_0, zeros_si);
-                    pixel_colors_f32_0 = _mm_cvtepi32_ps(pixel_colors_u32_0);
-
-                    pixel_colors_u32_1 = _mm_unpackhi_epi16(pixel_colors_u16_1, zeros_si);
-                    pixel_colors_f32_1 = _mm_cvtepi32_ps(pixel_colors_u32_1);
-
-                    weight = *filter_weights.get_unchecked(j + 1);
-                    f_weight = _mm_set1_ps(weight);
-                    store_0 = _mm_prefer_fma_ps(store_0, pixel_colors_f32_0, f_weight);
-                    store_1 = _mm_prefer_fma_ps(store_1, pixel_colors_f32_1, f_weight);
+                    accumulate_2_forward_sse_u8!(store_0, pixel_colors_0, weights);
+                    accumulate_2_forward_sse_u8!(store_1, pixel_colors_1, weights);
 
                     j += 2;
                 }
-            }
 
-            unsafe {
                 while j < current_filter.size {
                     let current_x = filter_start + j;
                     let px = current_x * CHANNEL_CONFIGURATION;
@@ -197,71 +180,60 @@ pub fn gaussian_blur_horizontal_pass_filter_sse<T, const CHANNEL_CONFIGURATION: 
 
                     j += 1;
                 }
-            }
 
-            let px = x as usize * CHANNEL_CONFIGURATION;
+                let px = x as usize * CHANNEL_CONFIGURATION;
 
-            const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
-            let px_32 = unsafe { _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(store_0)) };
-            let px_16 = unsafe { _mm_packus_epi32(px_32, px_32) };
-            let px_8 = unsafe { _mm_packus_epi16(px_16, px_16) };
-            let pixel = unsafe { _mm_extract_epi32::<0>(px_8) };
+                const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
+                let px_32 = _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(store_0));
+                let px_16 = _mm_packus_epi32(px_32, px_32);
+                let px_8 = _mm_packus_epi16(px_16, px_16);
+                let pixel = _mm_extract_epi32::<0>(px_8);
 
-            if CHANNEL_CONFIGURATION == 4 {
-                unsafe {
+                if CHANNEL_CONFIGURATION == 4 {
                     let unsafe_offset = y_dst_shift + px;
                     let dst_ptr = unsafe_dst.slice.as_ptr().add(unsafe_offset) as *mut i32;
                     dst_ptr.write_unaligned(pixel);
-                }
-            } else {
-                let pixel_bytes = pixel.to_le_bytes();
-                unsafe {
+                } else {
+                    let pixel_bytes = pixel.to_le_bytes();
                     let unsafe_offset = y_dst_shift + px;
                     unsafe_dst.write(unsafe_offset, pixel_bytes[0]);
                     unsafe_dst.write(unsafe_offset + 1, pixel_bytes[1]);
                     unsafe_dst.write(unsafe_offset + 2, pixel_bytes[2]);
                 }
-            }
 
-            let px_32 = unsafe { _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(store_1)) };
-            let px_16 = unsafe { _mm_packus_epi32(px_32, px_32) };
-            let px_8 = unsafe { _mm_packus_epi16(px_16, px_16) };
-            let pixel = unsafe { _mm_extract_epi32::<0>(px_8) };
+                let px_32 = _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(store_1));
+                let px_16 = _mm_packus_epi32(px_32, px_32);
+                let px_8 = _mm_packus_epi16(px_16, px_16);
+                let pixel = _mm_extract_epi32::<0>(px_8);
 
-            if CHANNEL_CONFIGURATION == 4 {
-                unsafe {
+                if CHANNEL_CONFIGURATION == 4 {
                     let unsafe_offset = y_dst_shift + src_stride as usize + px;
                     let dst_ptr = unsafe_dst.slice.as_ptr().add(unsafe_offset) as *mut i32;
                     dst_ptr.write_unaligned(pixel);
-                }
-            } else {
-                let pixel_bytes = pixel.to_le_bytes();
-
-                unsafe {
+                } else {
+                    let pixel_bytes = pixel.to_le_bytes();
                     let unsafe_offset = y_dst_shift + src_stride as usize + px;
                     unsafe_dst.write(unsafe_offset, pixel_bytes[0]);
                     unsafe_dst.write(unsafe_offset + 1, pixel_bytes[1]);
                     unsafe_dst.write(unsafe_offset + 2, pixel_bytes[2]);
                 }
             }
+
+            cy = y;
         }
 
-        cy = y;
-    }
+        for y in cy..end_y {
+            let y_src_shift = y as usize * src_stride as usize;
+            let y_dst_shift = y as usize * dst_stride as usize;
+            for x in 0..width {
+                let mut store = _mm_setzero_ps();
 
-    for y in cy..end_y {
-        let y_src_shift = y as usize * src_stride as usize;
-        let y_dst_shift = y as usize * dst_stride as usize;
-        for x in 0..width {
-            let mut store = unsafe { _mm_setzero_ps() };
+                let current_filter = filter.get_unchecked(x as usize);
+                let filter_start = current_filter.start;
+                let filter_weights = &current_filter.filter;
 
-            let current_filter = unsafe { filter.get_unchecked(x as usize) };
-            let filter_start = current_filter.start;
-            let filter_weights = &current_filter.filter;
+                let mut j = 0usize;
 
-            let mut j = 0usize;
-
-            unsafe {
                 while j + 4 < current_filter.size
                     && filter_start as i64
                         + j as i64
@@ -271,42 +243,19 @@ pub fn gaussian_blur_horizontal_pass_filter_sse<T, const CHANNEL_CONFIGURATION: 
                     let px = (filter_start + j) * CHANNEL_CONFIGURATION;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let mut pixel_colors = _mm_loadu_si128(s_ptr as *const __m128i);
+
+                    let weights_ptr = filter_weights.as_ptr().add(j);
+                    let weights = _mm_loadu_ps(weights_ptr);
+
                     if CHANNEL_CONFIGURATION == 3 {
                         pixel_colors = _mm_shuffle_epi8(pixel_colors, shuffle_rgb);
                     }
-                    let mut pixel_colors_u16 = _mm_unpacklo_epi8(pixel_colors, zeros_si);
-                    let mut pixel_colors_u32 = _mm_unpacklo_epi16(pixel_colors_u16, zeros_si);
-                    let mut pixel_colors_f32 = _mm_cvtepi32_ps(pixel_colors_u32);
-                    let mut weight = *filter_weights.get_unchecked(j);
-                    let mut f_weight = _mm_set1_ps(weight);
-                    store = _mm_prefer_fma_ps(store, pixel_colors_f32, f_weight);
 
-                    pixel_colors_u32 = _mm_unpackhi_epi16(pixel_colors_u16, zeros_si);
-                    pixel_colors_f32 = _mm_cvtepi32_ps(pixel_colors_u32);
-
-                    weight = *filter_weights.get_unchecked(j + 1);
-                    f_weight = _mm_set1_ps(weight);
-                    store = _mm_prefer_fma_ps(store, pixel_colors_f32, f_weight);
-
-                    pixel_colors_u16 = _mm_unpackhi_epi8(pixel_colors, zeros_si);
-                    pixel_colors_u32 = _mm_unpacklo_epi16(pixel_colors_u16, zeros_si);
-                    let mut pixel_colors_f32 = _mm_cvtepi32_ps(pixel_colors_u32);
-                    let mut weight = *filter_weights.get_unchecked(j + 2);
-                    let mut f_weight = _mm_set1_ps(weight);
-                    store = _mm_prefer_fma_ps(store, pixel_colors_f32, f_weight);
-
-                    pixel_colors_u32 = _mm_unpackhi_epi16(pixel_colors_u16, zeros_si);
-                    pixel_colors_f32 = _mm_cvtepi32_ps(pixel_colors_u32);
-
-                    weight = *filter_weights.get_unchecked(j + 3);
-                    f_weight = _mm_set1_ps(weight);
-                    store = _mm_prefer_fma_ps(store, pixel_colors_f32, f_weight);
+                    accumulate_4_forward_sse_u8!(store, pixel_colors, weights);
 
                     j += 4;
                 }
-            }
 
-            unsafe {
                 while j + 2 < current_filter.size
                     && filter_start as i64
                         + j as i64
@@ -316,27 +265,22 @@ pub fn gaussian_blur_horizontal_pass_filter_sse<T, const CHANNEL_CONFIGURATION: 
                     let px = (filter_start + j) * CHANNEL_CONFIGURATION;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let mut pixel_colors = _mm_loadu_si128(s_ptr as *const __m128i);
+                    let weights_ptr = filter_weights.as_ptr().add(j);
+                    let weights = _mm_setr_ps(
+                        weights_ptr.read_unaligned(),
+                        weights_ptr.add(1).read_unaligned(),
+                        0.,
+                        0.,
+                    );
                     if CHANNEL_CONFIGURATION == 3 {
                         pixel_colors = _mm_shuffle_epi8(pixel_colors, shuffle_rgb);
                     }
-                    let pixel_colors_u16 = _mm_unpacklo_epi8(pixel_colors, zeros_si);
-                    let mut pixel_colors_u32 = _mm_unpacklo_epi16(pixel_colors_u16, zeros_si);
-                    let mut pixel_colors_f32 = _mm_cvtepi32_ps(pixel_colors_u32);
-                    let mut weight = *filter_weights.get_unchecked(j);
-                    let mut f_weight = _mm_set1_ps(weight);
-                    store = _mm_prefer_fma_ps(store, pixel_colors_f32, f_weight);
 
-                    pixel_colors_u32 = _mm_unpackhi_epi16(pixel_colors_u16, zeros_si);
-                    pixel_colors_f32 = _mm_cvtepi32_ps(pixel_colors_u32);
+                    accumulate_2_forward_sse_u8!(store, pixel_colors, weights);
 
-                    weight = *filter_weights.get_unchecked(j + 1);
-                    f_weight = _mm_set1_ps(weight);
-                    store = _mm_prefer_fma_ps(store, pixel_colors_f32, f_weight);
                     j += 2;
                 }
-            }
 
-            unsafe {
                 while j < current_filter.size {
                     let current_x = filter_start + j;
                     let px = current_x * CHANNEL_CONFIGURATION;
@@ -348,24 +292,20 @@ pub fn gaussian_blur_horizontal_pass_filter_sse<T, const CHANNEL_CONFIGURATION: 
 
                     j += 1;
                 }
-            }
 
-            let px = x as usize * CHANNEL_CONFIGURATION;
+                let px = x as usize * CHANNEL_CONFIGURATION;
 
-            const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
-            let px_32 = unsafe { _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(store)) };
-            let px_16 = unsafe { _mm_packus_epi32(px_32, px_32) };
-            let px_8 = unsafe { _mm_packus_epi16(px_16, px_16) };
-            let pixel = unsafe { _mm_extract_epi32::<0>(px_8) };
+                const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
+                let px_32 = _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(store));
+                let px_16 = _mm_packus_epi32(px_32, px_32);
+                let px_8 = _mm_packus_epi16(px_16, px_16);
+                let pixel = _mm_extract_epi32::<0>(px_8);
 
-            if CHANNEL_CONFIGURATION == 4 {
-                unsafe {
+                if CHANNEL_CONFIGURATION == 4 {
                     let dst_ptr = unsafe_dst.slice.as_ptr().add(y_dst_shift + px) as *mut i32;
                     dst_ptr.write_unaligned(pixel);
-                }
-            } else {
-                let pixel_bytes = pixel.to_le_bytes();
-                unsafe {
+                } else {
+                    let pixel_bytes = pixel.to_le_bytes();
                     let unsafe_offset = y_dst_shift + px;
                     unsafe_dst.write(unsafe_offset, pixel_bytes[0]);
                     unsafe_dst.write(unsafe_offset + 1, pixel_bytes[1]);
