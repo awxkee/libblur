@@ -80,7 +80,7 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
         25 * 2 + 1,
         25f32 * 2f32 / 6f32,
         FastBlurChannels::Plane,
-        EdgeMode::Clamp,
+        EdgeMode::KernelClip,
         ThreadingPolicy::Single,
     );
 
@@ -132,7 +132,7 @@ fn main() {
     //     vst1q_s64(t.as_mut_ptr(), mul);
     //     println!("{:?}", t);
     // }
-    let img = ImageReader::open("assets/test_image_1.jpg")
+    let img = ImageReader::open("assets/test_image_1_small.jpg")
         .unwrap()
         .decode()
         .unwrap();
