@@ -61,8 +61,8 @@ pub fn fast_gaussian_next_vertical_pass_sse_u8<
     let f_weight = unsafe { _mm_set1_ps(weight) };
     for x in start..std::cmp::min(width, end) {
         let mut diffs = unsafe { _mm_setzero_si128() };
-        let mut ders = unsafe {  _mm_setzero_si128() };
-        let mut summs = unsafe {  _mm_setzero_si128() };
+        let mut ders = unsafe { _mm_setzero_si128() };
+        let mut summs = unsafe { _mm_setzero_si128() };
 
         let start_y = 0 - 3 * radius as i64;
         for y in start_y..height_wide {
@@ -185,9 +185,9 @@ pub(crate) fn fast_gaussian_next_horizontal_pass_sse_u8<
     let weight = 1.0f32 / ((radius as f32) * (radius as f32) * (radius as f32));
     let f_weight = unsafe { _mm_set1_ps(weight) };
     for y in start..std::cmp::min(height, end) {
-        let mut diffs = unsafe {  _mm_setzero_si128() };
-        let mut ders = unsafe {  _mm_setzero_si128() };
-        let mut summs = unsafe {  _mm_setzero_si128() };
+        let mut diffs = unsafe { _mm_setzero_si128() };
+        let mut ders = unsafe { _mm_setzero_si128() };
+        let mut summs = unsafe { _mm_setzero_si128() };
 
         let current_y = ((y as i64) * (stride as i64)) as usize;
 

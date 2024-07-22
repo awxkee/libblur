@@ -192,18 +192,18 @@ fn main() {
     //     FastBlurChannels::Channels3,
     //     ThreadingPolicy::Single,
     // );
-    // libblur::fast_gaussian_in_linear(
-    //     &mut dst_bytes,
-    //     stride as u32,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     168,
-    //     FastBlurChannels::Channels3,
-    //     ThreadingPolicy::Single,
-    //     TransferFunction::Srgb,
-    //     EdgeMode::Reflect,
-    // );
-    //
+    libblur::fast_gaussian_in_linear(
+        &mut dst_bytes,
+        stride as u32,
+        dimensions.0,
+        dimensions.1,
+        25,
+        FastBlurChannels::Channels3,
+        ThreadingPolicy::Single,
+        TransferFunction::Srgb,
+        EdgeMode::Reflect,
+    );
+
     // libblur::gaussian_blur(
     //     &bytes,
     //     stride as u32,
@@ -218,7 +218,7 @@ fn main() {
     //     ThreadingPolicy::Single,
     // );
 
-    dst_bytes = perform_planar_pass_3(&bytes, dimensions.0 as usize, dimensions.1 as usize);
+    // dst_bytes = perform_planar_pass_3(&bytes, dimensions.0 as usize, dimensions.1 as usize);
 
     let elapsed_time = start_time.elapsed();
     // Print the elapsed time in milliseconds
@@ -256,7 +256,7 @@ fn main() {
 
     if components == 3 {
         image::save_buffer(
-            "blurred_stack_cpu.jpg",
+            "blurred_stack_oklab.jpg",
             bytes.as_bytes(),
             dimensions.0,
             dimensions.1,

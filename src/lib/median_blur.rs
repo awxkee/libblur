@@ -173,7 +173,9 @@ fn median_filter(x: [i32; 256], n: i32) -> i32 {
     let mut n = n / 2;
     let mut i = 0i64;
     while i < 256 && i >= 0 {
-        n -= x[i as usize];
+        unsafe {
+            n -= *x.get_unchecked(i as usize);
+        }
         if n > 0 {
             i += 1;
         } else {

@@ -25,6 +25,14 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use colorutils_rs::linear_to_planar::linear_to_plane;
+use colorutils_rs::planar_to_linear::plane_to_linear;
+use colorutils_rs::{
+    linear_to_rgb, linear_to_rgba, rgb_to_linear, rgba_to_linear, TransferFunction,
+};
+use num_traits::cast::FromPrimitive;
+use num_traits::{AsPrimitive, Float};
+
 use crate::channels_configuration::FastBlurChannels;
 use crate::edge_mode::reflect_index;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
@@ -41,13 +49,6 @@ use crate::threading_policy::ThreadingPolicy;
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, reflect_101, EdgeMode};
-use colorutils_rs::linear_to_planar::linear_to_plane;
-use colorutils_rs::planar_to_linear::plane_to_linear;
-use colorutils_rs::{
-    linear_to_rgb, linear_to_rgba, rgb_to_linear, rgba_to_linear, TransferFunction,
-};
-use num_traits::cast::FromPrimitive;
-use num_traits::{AsPrimitive, Float};
 
 const BASE_RADIUS_I64_CUTOFF: u32 = 180;
 

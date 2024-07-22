@@ -11,7 +11,7 @@ name = "fast-blur"
 path = "src/main.rs"
 
 [dependencies]
-colorutils-rs = "0.4.13"
+colorutils-rs = "0.5.2"
 half = "2.4.1"
 image = "0.25.1"
 libblur = {path = "src/lib"}
@@ -19,7 +19,7 @@ rayon = "1.10.0"
 
 [dev-dependencies]
 criterion = "0.3"
-opencv = { version = "0.92.0", default-features = false, features = ["imgcodecs", "imgproc"] }
+#opencv = { version = "0.92.0", default-features = false, features = ["imgcodecs", "imgproc"] }
 
 [[bench]]
 name = "gauss_bench"
