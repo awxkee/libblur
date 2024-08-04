@@ -31,6 +31,8 @@ mod stack_blur_f32;
 mod stack_blur_i32;
 mod stack_blur_i64;
 mod utils;
+#[cfg(target_feature = "f16c")]
+mod stack_blur_f16;
 
 pub use fast_gaussian::*;
 pub use fast_gaussian_next::*;
@@ -38,3 +40,5 @@ pub use stack_blur_f32::stack_blur_pass_sse_f;
 pub use stack_blur_i32::stack_blur_pass_sse;
 pub use stack_blur_i64::stack_blur_pass_sse_i64;
 pub use utils::*;
+#[cfg(target_feature = "f16c")]
+pub use stack_blur_f16::stack_blur_pass_sse_f16;

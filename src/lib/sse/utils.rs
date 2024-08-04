@@ -25,11 +25,13 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use erydanos::_mm_mul_epi64;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
+
+use erydanos::_mm_mul_epi64;
+use half::f16;
 
 #[allow(non_camel_case_types)]
 #[derive(Clone, Copy)]
@@ -285,4 +287,75 @@ pub unsafe fn _mm_broadcast_third(item: __m128) -> __m128 {
 pub unsafe fn _mm_broadcast_fourth(item: __m128) -> __m128 {
     const FLAG: i32 = shuffle(3, 3, 3, 3);
     _mm_shuffle_ps::<FLAG>(item, item)
+}
+
+#[cfg(target_feature = "f16c")]
+#[inline]
+pub(crate) unsafe fn load_f32_f16<const CHANNELS_COUNT: usize>(ptr: *const f16) -> __m128 {
+    if CHANNELS_COUNT == 4 {
+        let in_regi = _mm_loadu_si64(ptr as *const u8);
+        return _mm_cvtph_ps(in_regi);
+    } else if CHANNELS_COUNT == 3 {
+        let casted_ptr = ptr as *const i16;
+        let in_regi = _mm_setr_epi16(
+            casted_ptr.read_unaligned(),
+            casted_ptr.add(1).read_unaligned(),
+            casted_ptr.add(2).read_unaligned(),
+            0,
+            0,
+            0,
+            0,
+            0,
+        );
+        return _mm_cvtph_ps(in_regi);
+    } else if CHANNELS_COUNT == 2 {
+        let casted_ptr = ptr as *const i16;
+        let in_regi = _mm_setr_epi16(
+            casted_ptr.read_unaligned(),
+            casted_ptr.add(1).read_unaligned(),
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+        );
+        return _mm_cvtph_ps(in_regi);
+    }
+    let casted_ptr = ptr as *const i16;
+    let in_regi = _mm_setr_epi16(casted_ptr.read_unaligned(), 0, 0, 0, 0, 0, 0, 0);
+    return _mm_cvtph_ps(in_regi);
+}
+
+#[cfg(target_feature = "f16c")]
+#[inline(always)]
+pub(crate) unsafe fn store_f32_f16<const CHANNELS_COUNT: usize>(dst_ptr: *mut f16, in_regi: __m128) {
+    let out_regi = _mm_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(in_regi);
+    if CHANNELS_COUNT == 4 {
+        std::ptr::copy_nonoverlapping(&out_regi as *const _ as *mut u8, dst_ptr as *mut u8, 8);
+    } else if CHANNELS_COUNT == 3 {
+        let casted_ptr = dst_ptr as *mut i16;
+        let item0 = _mm_extract_epi32::<0>(out_regi) as i16;
+        let item1 = _mm_extract_epi16::<1>(out_regi) as i16;
+        let item2 = _mm_extract_epi16::<2>(out_regi) as i16;
+        casted_ptr.write_unaligned(item0);
+        casted_ptr
+            .add(1)
+            .write_unaligned(item1);
+        casted_ptr
+            .add(2)
+            .write_unaligned(item2);
+    } else if CHANNELS_COUNT == 2 {
+        let casted_ptr = dst_ptr as *mut i16;
+        let item0 = _mm_extract_epi32::<0>(out_regi) as i16;
+        let item1 = _mm_extract_epi16::<1>(out_regi) as i16;
+        casted_ptr.write_unaligned(item0);
+        casted_ptr
+            .add(1)
+            .write_unaligned(item1);
+    } else {
+        let casted_ptr = dst_ptr as *mut i16;
+        let item0 = _mm_extract_epi32::<0>(out_regi) as i16;
+        casted_ptr.write_unaligned(item0);
+    }
 }

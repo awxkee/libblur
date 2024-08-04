@@ -218,14 +218,13 @@ fn main() {
 
     let mut f16_bytes: Vec<f16> = dst_bytes.iter().map(|&x| f16::from_f32(x as f32 *(1./255.))).collect();
 
-    fast_gaussian_f16(
+    stack_blur_f16(
         &mut f16_bytes,
         dimensions.0,
         dimensions.1,
         60,
         FastBlurChannels::Channels4,
         ThreadingPolicy::Single,
-        EdgeMode::Clamp,
     );
 
     dst_bytes = f16_bytes.iter().map(|&x| (x.to_f32() * 255f32) as u8).collect();
