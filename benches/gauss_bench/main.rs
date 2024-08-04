@@ -1,9 +1,9 @@
-use criterion::{criterion_group, criterion_main, Criterion};
-use image::io::Reader as ImageReader;
+use criterion::{Criterion, criterion_group, criterion_main};
 use image::GenericImageView;
+use image::io::Reader as ImageReader;
 use libblur::{EdgeMode, FastBlurChannels, ThreadingPolicy};
 use opencv::core::{
-    find_file, mean, split, Mat, MatTraitConst, MatTraitConstManual, Size, Vector, BORDER_DEFAULT,
+    BORDER_DEFAULT, find_file, Mat, MatTraitConst, MatTraitConstManual, mean, Size, split, Vector,
 };
 use opencv::imgcodecs::{imread, IMREAD_COLOR};
 

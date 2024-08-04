@@ -39,6 +39,11 @@ mod gaussian_kernel;
 mod gaussian_kernel_filter_dispatch;
 mod gaussian_linear;
 mod gaussian_vertical;
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "avx2"
+))]
+mod avx;
 
 pub use gaussian::*;
 pub use gaussian_linear::gaussian_blur_in_linear;

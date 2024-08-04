@@ -31,6 +31,11 @@ use rayon::ThreadPool;
 
 use crate::channels_configuration::FastBlurChannels;
 use crate::edge_mode::EdgeMode;
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "avx2"
+))]
+use crate::gaussian::avx::gaussian_blur_vertical_pass_impl_avx;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::gaussian::gauss_neon::*;
 #[cfg(all(
@@ -253,6 +258,13 @@ fn gaussian_blur_vertical_pass<
         {
             // Generally vertical pass do not depends on any specific channel configuration so it is allowed to make a vectorized calls for any channel
             _dispatcher = gaussian_blur_vertical_pass_impl_sse::<T, CHANNEL_CONFIGURATION>;
+        }
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "avx2"
+        ))]
+        {
+            _dispatcher = gaussian_blur_vertical_pass_impl_avx::<T, CHANNEL_CONFIGURATION>;
         }
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
