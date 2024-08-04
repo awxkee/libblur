@@ -33,10 +33,18 @@ use crate::neon::{
 use crate::reflect_index;
 #[cfg(all(
     any(target_arch = "x86_64", target_arch = "x86"),
+    all(target_feature = "sse4.1", target_feature = "f16c")
+))]
+use crate::sse::{
+    fast_gaussian_next_horizontal_pass_sse_f16, fast_gaussian_next_vertical_pass_sse_f16,
+};
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
     target_feature = "sse4.1"
 ))]
 use crate::sse::{
-    fast_gaussian_next_horizontal_pass_sse_u8, fast_gaussian_next_vertical_pass_sse_u8,
+    fast_gaussian_next_horizontal_pass_sse_f32, fast_gaussian_next_horizontal_pass_sse_u8,
+    fast_gaussian_next_vertical_pass_sse_f32, fast_gaussian_next_vertical_pass_sse_u8,
 };
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
@@ -46,6 +54,7 @@ use colorutils_rs::planar_to_linear::plane_to_linear;
 use colorutils_rs::{
     linear_to_rgb, linear_to_rgba, rgb_to_linear, rgba_to_linear, TransferFunction,
 };
+use half::f16;
 use num_traits::{AsPrimitive, Float, FromPrimitive};
 use std::mem::size_of;
 
@@ -557,6 +566,38 @@ fn fast_gaussian_next_impl<
         } else {
             fast_gaussian_next_horizontal_pass::<T, f64, f64, CHANNEL_CONFIGURATION, EDGE_MODE>
         };
+        if std::any::type_name::<T>() == "f32" {
+            #[cfg(all(
+                any(target_arch = "x86_64", target_arch = "x86"),
+                target_feature = "sse4.1"
+            ))]
+            {
+                _dispatcher_vertical =
+                    fast_gaussian_next_vertical_pass_sse_f32::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
+                _dispatcher_horizontal = fast_gaussian_next_horizontal_pass_sse_f32::<
+                    T,
+                    CHANNEL_CONFIGURATION,
+                    EDGE_MODE,
+                >;
+            }
+        } else if std::any::type_name::<T>() == "f16"
+            || std::any::type_name::<T>() == "half::f16"
+            || std::any::type_name::<T>() == "half::binary16::f16"
+        {
+            #[cfg(all(
+                any(target_arch = "x86_64", target_arch = "x86"),
+                all(target_feature = "sse4.1", target_feature = "f16c")
+            ))]
+            {
+                _dispatcher_vertical =
+                    fast_gaussian_next_vertical_pass_sse_f16::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
+                _dispatcher_horizontal = fast_gaussian_next_horizontal_pass_sse_f16::<
+                    T,
+                    CHANNEL_CONFIGURATION,
+                    EDGE_MODE,
+                >;
+            }
+        }
     }
 
     if CHANNEL_CONFIGURATION >= 3 {
@@ -796,7 +837,7 @@ pub fn fast_gaussian_next_f32(
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn fast_gaussian_next_f16(
-    bytes: &mut [u16],
+    bytes: &mut [f16],
     width: u32,
     height: u32,
     radius: u32,

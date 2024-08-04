@@ -248,7 +248,7 @@ pub(crate) fn fast_gaussian_next_horizontal_pass_sse_u8<
             } else if x + radius_64 >= 0 {
                 let arr_index = (x & 1023) as usize;
                 let arr_index_1 = ((x + radius_64) & 1023) as usize;
-                let buf_ptr = buffer[arr_index].as_mut_ptr();
+                let buf_ptr = unsafe {  buffer.as_mut_ptr().add(arr_index) as *mut i32 };
                 let stored = unsafe { _mm_loadu_si128(buf_ptr as *const __m128i) };
 
                 let buf_ptr_1 = buffer[arr_index_1].as_mut_ptr();

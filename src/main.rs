@@ -7,10 +7,7 @@ use colorutils_rs::TransferFunction;
 use half::f16;
 use image::io::Reader as ImageReader;
 use image::{EncodableLayout, GenericImageView};
-use libblur::{
-    fast_gaussian, fast_gaussian_f16, fast_gaussian_f32, stack_blur_f16, stack_blur_f32, EdgeMode,
-    FastBlurChannels, ThreadingPolicy,
-};
+use libblur::{fast_gaussian, fast_gaussian_f16, fast_gaussian_f32, stack_blur_f16, stack_blur_f32, EdgeMode, FastBlurChannels, ThreadingPolicy, fast_gaussian_next_f32, fast_gaussian_next_f16};
 use std::time::Instant;
 
 #[allow(dead_code)]
@@ -224,7 +221,7 @@ fn main() {
         .map(|&x| f16::from_f32(x as f32 * (1. / 255.)))
         .collect();
 
-    fast_gaussian_f16(
+    fast_gaussian_next_f16(
         &mut f16_bytes,
         dimensions.0,
         dimensions.1,

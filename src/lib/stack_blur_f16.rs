@@ -252,7 +252,7 @@ fn stack_blur_worker_vertical(
 /// * `in_place` - mutable buffer contains image data that will be used as a source and destination
 /// * `width` - image width
 /// * `height` - image height
-/// * `radius` - radius almost is not limited for f32 implementation
+/// * `radius` - radius almost is not limited for f16 implementation
 /// * `channels` - Count of channels of the image, only 3 and 4 is supported, alpha position, and channels order does not matter
 /// * `threading_policy` - Threads usage policy
 ///
