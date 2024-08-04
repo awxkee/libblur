@@ -32,7 +32,9 @@ use std::arch::x86_64::*;
 
 use erydanos::_mm256_prefer_fma_ps;
 
-use crate::gaussian::avx::utils::{avx2_pack_u16, avx2_pack_u32, load_u8_f32_fast, load_u8_u32_one};
+use crate::gaussian::avx::utils::{
+    avx2_pack_u16, avx2_pack_u32, load_u8_f32_fast, load_u8_u32_one,
+};
 use crate::unsafe_slice::UnsafeSlice;
 
 pub fn gaussian_blur_vertical_pass_impl_avx<T, const CHANNEL_CONFIGURATION: usize>(

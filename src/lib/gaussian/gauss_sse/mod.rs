@@ -27,6 +27,7 @@
 
 mod base;
 mod filter_u8;
+mod filter_vertical_f32;
 mod horiz_four_channel_f32;
 mod horiz_one_channel_f32;
 mod horiz_one_channel_u8;
@@ -36,6 +37,7 @@ pub use base::gaussian_blur_horizontal_pass_impl_sse;
 pub use base::gaussian_blur_vertical_pass_impl_sse;
 pub use filter_u8::gaussian_blur_horizontal_pass_filter_sse;
 pub use filter_u8::gaussian_blur_vertical_pass_filter_sse;
+pub use filter_vertical_f32::gaussian_blur_vertical_pass_filter_f32_sse;
 pub use horiz_four_channel_f32::gaussian_horiz_sse_t_f_chan_f32;
 pub use horiz_one_channel_f32::gaussian_horiz_one_chan_f32;
 pub use horiz_one_channel_f32::gaussian_horiz_one_chan_filter_f32;

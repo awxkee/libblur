@@ -64,6 +64,15 @@ pub(crate) unsafe fn load_u8_f32_fast<const CHANNELS_COUNT: usize>(ptr: *const u
         4 => u32::from_le_bytes([ptr.add(3).read_unaligned(), 0, 0, 0]),
         _ => 0,
     };
-    let v_int = _mm256_setr_epi32(u_first as i32, u_second as i32, u_third as i32, u_fourth as i32, 0,0,0,0);
+    let v_int = _mm256_setr_epi32(
+        u_first as i32,
+        u_second as i32,
+        u_third as i32,
+        u_fourth as i32,
+        0,
+        0,
+        0,
+        0,
+    );
     return _mm256_cvtepi32_ps(v_int);
 }

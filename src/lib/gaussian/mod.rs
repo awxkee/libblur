@@ -25,6 +25,11 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "avx2"
+))]
+mod avx;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 mod gauss_neon;
 #[cfg(all(
@@ -39,11 +44,6 @@ mod gaussian_kernel;
 mod gaussian_kernel_filter_dispatch;
 mod gaussian_linear;
 mod gaussian_vertical;
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "avx2"
-))]
-mod avx;
 
 pub use gaussian::*;
 pub use gaussian_linear::gaussian_blur_in_linear;

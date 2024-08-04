@@ -25,6 +25,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use crate::gaussian::gaussian_filter::GaussianFilter;
 use crate::unsafe_slice::UnsafeSlice;
 use erydanos::_mm_prefer_fma_ps;
 #[cfg(target_arch = "x86")]
@@ -32,21 +33,19 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-pub fn gaussian_blur_vertical_pass_impl_f32_sse<T, const CHANNEL_CONFIGURATION: usize>(
+pub fn gaussian_blur_vertical_pass_filter_f32_sse<T, const CHANNEL_CONFIGURATION: usize>(
     undef_src: &[T],
     src_stride: u32,
     undef_unsafe_dst: &UnsafeSlice<T>,
     dst_stride: u32,
     width: u32,
-    height: u32,
-    kernel_size: usize,
-    kernel: &[f32],
+    _: u32,
+    filter: &Vec<GaussianFilter>,
     start_y: u32,
     end_y: u32,
 ) {
     let src: &[f32] = unsafe { std::mem::transmute(undef_src) };
-    let unsafe_dst: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(undef_unsafe_dst) };
-    let half_kernel = (kernel_size / 2) as i32;
+    let unsafe_dst: &UnsafeSlice<'_, f32> = unsafe { std::mem::transmute(undef_unsafe_dst) };
 
     let zeros = unsafe { _mm_setzero_ps() };
     let total_length = width as usize * CHANNEL_CONFIGURATION;
@@ -54,6 +53,10 @@ pub fn gaussian_blur_vertical_pass_impl_f32_sse<T, const CHANNEL_CONFIGURATION: 
         let y_dst_shift = y as usize * dst_stride as usize;
 
         let mut cx = 0usize;
+
+        let current_filter = unsafe { filter.get_unchecked(y as usize) };
+        let filter_start = current_filter.start;
+        let filter_weights = &current_filter.filter;
 
         unsafe {
             while cx + 24 < total_length {
@@ -64,14 +67,13 @@ pub fn gaussian_blur_vertical_pass_impl_f32_sse<T, const CHANNEL_CONFIGURATION: 
                 let mut store4 = zeros;
                 let mut store5 = zeros;
 
-                let mut r = -half_kernel;
-                while r <= half_kernel {
-                    let weight = *kernel.get_unchecked((r + half_kernel) as usize);
+                let mut j = 0usize;
+                while j < current_filter.size {
+                    let weight = *filter_weights.get_unchecked(j);
                     let f_weight = _mm_set1_ps(weight);
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
-                    let y_src_shift = py as usize * src_stride as usize;
+                    let py = filter_start + j;
+                    let y_src_shift = py * src_stride as usize;
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let px_0 = _mm_loadu_ps(s_ptr);
                     let px_1 = _mm_loadu_ps(s_ptr.add(4));
@@ -86,7 +88,7 @@ pub fn gaussian_blur_vertical_pass_impl_f32_sse<T, const CHANNEL_CONFIGURATION: 
                     store4 = _mm_prefer_fma_ps(store4, px_4, f_weight);
                     store5 = _mm_prefer_fma_ps(store5, px_5, f_weight);
 
-                    r += 1;
+                    j += 1;
                 }
 
                 let dst_ptr = (unsafe_dst.slice.as_ptr() as *mut f32).add(y_dst_shift + cx);
@@ -106,14 +108,13 @@ pub fn gaussian_blur_vertical_pass_impl_f32_sse<T, const CHANNEL_CONFIGURATION: 
                 let mut store2 = zeros;
                 let mut store3 = zeros;
 
-                let mut r = -half_kernel;
-                while r <= half_kernel {
-                    let weight = *kernel.get_unchecked((r + half_kernel) as usize);
+                let mut j = 0usize;
+                while j < current_filter.size {
+                    let weight = *filter_weights.get_unchecked(j);
                     let f_weight = _mm_set1_ps(weight);
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
-                    let y_src_shift = py as usize * src_stride as usize;
+                    let py = filter_start + j;
+                    let y_src_shift = py * src_stride as usize;
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let px_0 = _mm_loadu_ps(s_ptr);
                     let px_1 = _mm_loadu_ps(s_ptr.add(4));
@@ -124,7 +125,7 @@ pub fn gaussian_blur_vertical_pass_impl_f32_sse<T, const CHANNEL_CONFIGURATION: 
                     store2 = _mm_prefer_fma_ps(store2, px_2, f_weight);
                     store3 = _mm_prefer_fma_ps(store3, px_3, f_weight);
 
-                    r += 1;
+                    j += 1;
                 }
 
                 let dst_ptr = (unsafe_dst.slice.as_ptr() as *mut f32).add(y_dst_shift + cx);
@@ -140,20 +141,20 @@ pub fn gaussian_blur_vertical_pass_impl_f32_sse<T, const CHANNEL_CONFIGURATION: 
                 let mut store0 = zeros;
                 let mut store1 = zeros;
 
-                let mut r = -half_kernel;
-                while r <= half_kernel {
-                    let weight = *kernel.get_unchecked((r + half_kernel) as usize);
+                let mut j = 0usize;
+                while j < current_filter.size {
+                    let weight = *filter_weights.get_unchecked(j);
                     let f_weight = _mm_set1_ps(weight);
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
-                    let y_src_shift = py as usize * src_stride as usize;
+                    let py = filter_start + j;
+                    let y_src_shift = py * src_stride as usize;
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let px_0 = _mm_loadu_ps(s_ptr);
                     let px_1 = _mm_loadu_ps(s_ptr.add(4));
                     store0 = _mm_prefer_fma_ps(store0, px_0, f_weight);
                     store1 = _mm_prefer_fma_ps(store1, px_1, f_weight);
-                    r += 1;
+
+                    j += 1;
                 }
 
                 let dst_ptr = (unsafe_dst.slice.as_ptr() as *mut f32).add(y_dst_shift + cx);
@@ -166,19 +167,18 @@ pub fn gaussian_blur_vertical_pass_impl_f32_sse<T, const CHANNEL_CONFIGURATION: 
             while cx + 4 < total_length {
                 let mut store0 = zeros;
 
-                let mut r = -half_kernel;
-                while r <= half_kernel {
-                    let weight = *kernel.get_unchecked((r + half_kernel) as usize);
+                let mut j = 0usize;
+                while j < current_filter.size {
+                    let weight = *filter_weights.get_unchecked(j);
                     let f_weight = _mm_set1_ps(weight);
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
-                    let y_src_shift = py as usize * src_stride as usize;
+                    let py = filter_start + j;
+                    let y_src_shift = py * src_stride as usize;
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let lo_lo = _mm_loadu_ps(s_ptr);
                     store0 = _mm_prefer_fma_ps(store0, lo_lo, f_weight);
 
-                    r += 1;
+                    j += 1;
                 }
 
                 let dst_ptr = (unsafe_dst.slice.as_ptr() as *mut f32).add(y_dst_shift + cx);
@@ -190,23 +190,21 @@ pub fn gaussian_blur_vertical_pass_impl_f32_sse<T, const CHANNEL_CONFIGURATION: 
             while cx < total_length {
                 let mut store0 = zeros;
 
-                let mut r = -half_kernel;
-                while r <= half_kernel {
-                    let weight = *kernel.get_unchecked((r + half_kernel) as usize);
+                let mut j = 0usize;
+                while j < current_filter.size {
+                    let weight = *filter_weights.get_unchecked(j);
                     let f_weight = _mm_set1_ps(weight);
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
-                    let y_src_shift = py as usize * src_stride as usize;
+                    let py = filter_start + j;
+                    let y_src_shift = py * src_stride as usize;
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let f_pixel = _mm_setr_ps(s_ptr.read_unaligned(), 0., 0., 0.);
                     store0 = _mm_prefer_fma_ps(store0, f_pixel, f_weight);
 
-                    r += 1;
+                    j += 1;
                 }
 
                 let dst_ptr = (unsafe_dst.slice.as_ptr() as *mut f32).add(y_dst_shift + cx);
-
                 let pixel = _mm_extract_ps::<0>(store0);
                 (dst_ptr as *mut i32).write_unaligned(pixel);
 

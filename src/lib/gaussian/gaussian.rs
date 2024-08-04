@@ -35,7 +35,9 @@ use crate::edge_mode::EdgeMode;
     any(target_arch = "x86_64", target_arch = "x86"),
     target_feature = "avx2"
 ))]
-use crate::gaussian::avx::{gaussian_blur_vertical_pass_impl_avx, gaussian_blur_vertical_pass_impl_f32_avx};
+use crate::gaussian::avx::{
+    gaussian_blur_vertical_pass_impl_avx, gaussian_blur_vertical_pass_impl_f32_avx,
+};
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::gaussian::gauss_neon::*;
 #[cfg(all(
@@ -58,7 +60,8 @@ use crate::gaussian::gauss_sse::gaussian_sse_horiz_one_chan_u8;
     target_feature = "sse4.1"
 ))]
 use crate::gaussian::gauss_sse::{
-    gaussian_blur_horizontal_pass_impl_sse, gaussian_blur_vertical_pass_impl_sse, gaussian_blur_vertical_pass_impl_f32_sse,
+    gaussian_blur_horizontal_pass_impl_sse, gaussian_blur_vertical_pass_impl_f32_sse,
+    gaussian_blur_vertical_pass_impl_sse,
 };
 use crate::gaussian::gaussian_filter::create_filter;
 use crate::gaussian::gaussian_horizontal::gaussian_blur_horizontal_pass_impl;

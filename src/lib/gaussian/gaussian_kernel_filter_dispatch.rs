@@ -41,7 +41,8 @@ use crate::gaussian::gauss_sse::*;
     target_feature = "sse4.1"
 ))]
 use crate::gaussian::gauss_sse::{
-    gaussian_blur_horizontal_pass_filter_sse, gaussian_blur_vertical_pass_filter_sse,
+    gaussian_blur_horizontal_pass_filter_sse, gaussian_blur_vertical_pass_filter_f32_sse,
+    gaussian_blur_vertical_pass_filter_sse,
 };
 use crate::gaussian::gaussian_filter::GaussianFilter;
 use crate::gaussian::gaussian_horizontal::gaussian_blur_horizontal_pass_impl_clip_edge;
@@ -50,6 +51,11 @@ use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
 use num_traits::{AsPrimitive, FromPrimitive};
 use rayon::ThreadPool;
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "avx2"
+))]
+use crate::gaussian::avx::gaussian_blur_vertical_pass_filter_f32_avx;
 
 pub(crate) fn gaussian_blur_vertical_pass_edge_clip_dispatch<
     T: FromPrimitive + Default + Send + Sync,
@@ -95,8 +101,27 @@ pub(crate) fn gaussian_blur_vertical_pass_edge_clip_dispatch<
         }
     }
     if std::any::type_name::<T>() == "f32" {
-        // Generally vertical pass do not depends on any specific channel configuration so it is allowed to make a vectorized calls for any channels
-        _dispatcher = gaussian_blur_vertical_pass_filter_f32_neon::<T, CHANNEL_CONFIGURATION>;
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            // Generally vertical pass do not depends on any specific channel configuration so it is allowed to make a vectorized calls for any channels
+            _dispatcher = gaussian_blur_vertical_pass_filter_f32_neon::<T, CHANNEL_CONFIGURATION>;
+        }
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "sse4.1"
+        ))]
+        {
+            // Generally vertical pass do not depends on any specific channel configuration so it is allowed to make a vectorized calls for any channels
+            _dispatcher = gaussian_blur_vertical_pass_filter_f32_sse::<T, CHANNEL_CONFIGURATION>;
+        }
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "avx2"
+        ))]
+        {
+            // Generally vertical pass do not depends on any specific channel configuration so it is allowed to make a vectorized calls for any channels
+            _dispatcher = gaussian_blur_vertical_pass_filter_f32_avx::<T, CHANNEL_CONFIGURATION>;
+        }
     }
     let unsafe_dst = UnsafeSlice::new(dst);
     thread_pool.scope(|scope| {
