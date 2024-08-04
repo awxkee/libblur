@@ -1,57 +1,60 @@
-// Copyright (c) Radzivon Bartoshyk. All rights reserved.
-//
-// Redistribution and use in source and binary forms, with or without modification,
-// are permitted provided that the following conditions are met:
-//
-// 1.  Redistributions of source code must retain the above copyright notice, this
-// list of conditions and the following disclaimer.
-//
-// 2.  Redistributions in binary form must reproduce the above copyright notice,
-// this list of conditions and the following disclaimer in the documentation
-// and/or other materials provided with the distribution.
-//
-// 3.  Neither the name of the copyright holder nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-// OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
+/*
+ * // Copyright (c) Radzivon Bartoshyk. All rights reserved.
+ * //
+ * // Redistribution and use in source and binary forms, with or without modification,
+ * // are permitted provided that the following conditions are met:
+ * //
+ * // 1.  Redistributions of source code must retain the above copyright notice, this
+ * // list of conditions and the following disclaimer.
+ * //
+ * // 2.  Redistributions in binary form must reproduce the above copyright notice,
+ * // this list of conditions and the following disclaimer in the documentation
+ * // and/or other materials provided with the distribution.
+ * //
+ * // 3.  Neither the name of the copyright holder nor the names of its
+ * // contributors may be used to endorse or promote products derived from
+ * // this software without specific prior written permission.
+ * //
+ * // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * // AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * // IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * // DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * // FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * // DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * // SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * // CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 use std::arch::aarch64::*;
 
+use crate::gaussian::gaussian_filter::GaussianFilter;
 use crate::neon::{prefer_vfma_f32, prefer_vfmaq_f32};
 use crate::unsafe_slice::UnsafeSlice;
 
-pub fn gaussian_blur_vertical_pass_f32_neon<T, const CHANNEL_CONFIGURATION: usize>(
+pub fn gaussian_blur_vertical_pass_filter_f32_neon<T, const CHANNEL_CONFIGURATION: usize>(
     undef_src: &[T],
     src_stride: u32,
     undef_unsafe_dst: &UnsafeSlice<T>,
     dst_stride: u32,
     width: u32,
-    height: u32,
-    kernel_size: usize,
-    kernel: &[f32],
+    _: u32,
+    filter: &Vec<GaussianFilter>,
     start_y: u32,
     end_y: u32,
 ) {
     let src: &[f32] = unsafe { std::mem::transmute(undef_src) };
     let unsafe_dst: &UnsafeSlice<'_, f32> = unsafe { std::mem::transmute(undef_unsafe_dst) };
-    let half_kernel = (kernel_size / 2) as i32;
-
     let zeros = unsafe { vdupq_n_f32(0f32) };
 
     let total_size = CHANNEL_CONFIGURATION * width as usize;
 
     for y in start_y..end_y {
         let y_dst_shift = y as usize * dst_stride as usize;
+
+        let current_filter = unsafe { filter.get_unchecked(y as usize) };
+        let filter_start = current_filter.start;
+        let filter_weights = &current_filter.filter;
 
         let mut cx = 0usize;
 
@@ -66,14 +69,13 @@ pub fn gaussian_blur_vertical_pass_f32_neon<T, const CHANNEL_CONFIGURATION: usiz
                 let mut store6 = zeros;
                 let mut store7 = zeros;
 
-                let mut r = -half_kernel;
-                while r <= half_kernel {
-                    let weight = *kernel.get_unchecked((r + half_kernel) as usize);
+                let mut j = 0usize;
+                while j < current_filter.size {
+                    let weight = *filter_weights.get_unchecked(j);
                     let f_weight: float32x4_t = vdupq_n_f32(weight);
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
-                    let y_src_shift = py as usize * src_stride as usize;
+                    let py = filter_start + j;
+                    let y_src_shift = py * src_stride as usize;
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let quadruple_0 = vld1q_f32_x4(s_ptr);
                     let quadruple_1 = vld1q_f32_x4(s_ptr.add(16));
@@ -86,7 +88,7 @@ pub fn gaussian_blur_vertical_pass_f32_neon<T, const CHANNEL_CONFIGURATION: usiz
                     store6 = prefer_vfmaq_f32(store6, quadruple_1.2, f_weight);
                     store7 = prefer_vfmaq_f32(store7, quadruple_1.3, f_weight);
 
-                    r += 1;
+                    j += 1;
                 }
 
                 let dst_ptr = unsafe_dst.slice.as_ptr().add(y_dst_shift + cx) as *mut f32;
@@ -106,14 +108,13 @@ pub fn gaussian_blur_vertical_pass_f32_neon<T, const CHANNEL_CONFIGURATION: usiz
                 let mut store2: float32x4_t = zeros;
                 let mut store3: float32x4_t = zeros;
 
-                let mut r = -half_kernel;
-                while r <= half_kernel {
-                    let weight = *kernel.get_unchecked((r + half_kernel) as usize);
+                let mut j = 0usize;
+                while j < current_filter.size {
+                    let weight = *filter_weights.get_unchecked(j);
                     let f_weight: float32x4_t = vdupq_n_f32(weight);
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
-                    let y_src_shift = py as usize * src_stride as usize;
+                    let py = filter_start + j;
+                    let y_src_shift = py * src_stride as usize;
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let quadruple = vld1q_f32_x4(s_ptr);
                     store0 = prefer_vfmaq_f32(store0, quadruple.0, f_weight);
@@ -121,7 +122,7 @@ pub fn gaussian_blur_vertical_pass_f32_neon<T, const CHANNEL_CONFIGURATION: usiz
                     store2 = prefer_vfmaq_f32(store2, quadruple.2, f_weight);
                     store3 = prefer_vfmaq_f32(store3, quadruple.3, f_weight);
 
-                    r += 1;
+                    j += 1;
                 }
 
                 let dst_ptr = unsafe_dst.slice.as_ptr().add(y_dst_shift + cx) as *mut f32;
@@ -134,20 +135,19 @@ pub fn gaussian_blur_vertical_pass_f32_neon<T, const CHANNEL_CONFIGURATION: usiz
                 let mut store0: float32x4_t = zeros;
                 let mut store1: float32x4_t = zeros;
 
-                let mut r = -half_kernel;
-                while r <= half_kernel {
-                    let weight = *kernel.get_unchecked((r + half_kernel) as usize);
+                let mut j = 0usize;
+                while j < current_filter.size {
+                    let weight = *filter_weights.get_unchecked(j);
                     let f_weight: float32x4_t = vdupq_n_f32(weight);
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
-                    let y_src_shift = py as usize * src_stride as usize;
+                    let py = filter_start + j;
+                    let y_src_shift = py * src_stride as usize;
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let pairs = vld1q_f32_x2(s_ptr);
                     store0 = prefer_vfmaq_f32(store0, pairs.0, f_weight);
                     store1 = prefer_vfmaq_f32(store1, pairs.1, f_weight);
 
-                    r += 1;
+                    j += 1;
                 }
 
                 let dst_ptr = unsafe_dst.slice.as_ptr().add(y_dst_shift + cx) as *mut f32;
@@ -159,20 +159,20 @@ pub fn gaussian_blur_vertical_pass_f32_neon<T, const CHANNEL_CONFIGURATION: usiz
             while cx + 4 < total_size {
                 let mut store0: float32x4_t = zeros;
 
-                let mut r = -half_kernel;
-                while r <= half_kernel {
-                    let weight = *kernel.get_unchecked((r + half_kernel) as usize);
+                let mut j = 0usize;
+                while j < current_filter.size {
+                    let weight = *filter_weights.get_unchecked(j);
                     let f_weight: float32x4_t = vdupq_n_f32(weight);
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
-                    let y_src_shift = py as usize * src_stride as usize;
+                    let py = filter_start + j;
+                    let y_src_shift = py * src_stride as usize;
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let pixel = vld1q_f32(s_ptr);
                     store0 = prefer_vfmaq_f32(store0, pixel, f_weight);
 
-                    r += 1;
+                    j += 1;
                 }
+
                 let dst_ptr = unsafe_dst.slice.as_ptr().add(y_dst_shift + cx) as *mut f32;
                 vst1q_f32(dst_ptr, store0);
 
@@ -182,20 +182,19 @@ pub fn gaussian_blur_vertical_pass_f32_neon<T, const CHANNEL_CONFIGURATION: usiz
             while cx < total_size {
                 let mut store0 = vdup_n_f32(0f32);
 
-                let mut r = -half_kernel;
-                while r <= half_kernel {
-                    let weight = *kernel.get_unchecked((r + half_kernel) as usize);
+                let mut j = 0usize;
+                while j < current_filter.size {
+                    let weight = *filter_weights.get_unchecked(j);
                     let f_weight = vdup_n_f32(weight);
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
-                    let y_src_shift = py as usize * src_stride as usize;
+                    let py = filter_start + j;
+                    let y_src_shift = py * src_stride as usize;
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let px = s_ptr.read_unaligned().to_bits() as u64;
                     let pixel = vcreate_f32(px);
                     store0 = prefer_vfma_f32(store0, pixel, f_weight);
 
-                    r += 1;
+                    j += 1;
                 }
 
                 let dst_ptr = unsafe_dst.slice.as_ptr().add(y_dst_shift + cx) as *mut f32;
