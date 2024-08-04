@@ -200,7 +200,7 @@ fn main() {
     //     EdgeMode::Clamp,
     // );
 
-    libblur::gaussian_blur(
+    libblur::gaussian_blur_in_linear(
         &bytes,
         stride as u32,
         &mut dst_bytes,
@@ -212,6 +212,7 @@ fn main() {
         FastBlurChannels::Channels4,
         EdgeMode::Clamp,
         ThreadingPolicy::Single,
+        TransferFunction::Srgb,
     );
 
     // dst_bytes = perform_planar_pass_3(&bytes, dimensions.0 as usize, dimensions.1 as usize);

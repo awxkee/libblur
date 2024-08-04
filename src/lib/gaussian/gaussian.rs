@@ -58,7 +58,7 @@ use crate::gaussian::gauss_sse::gaussian_sse_horiz_one_chan_u8;
     target_feature = "sse4.1"
 ))]
 use crate::gaussian::gauss_sse::{
-    gaussian_blur_horizontal_pass_impl_sse, gaussian_blur_vertical_pass_impl_sse,
+    gaussian_blur_horizontal_pass_impl_sse, gaussian_blur_vertical_pass_impl_sse, gaussian_blur_vertical_pass_impl_f32_sse,
 };
 use crate::gaussian::gaussian_filter::create_filter;
 use crate::gaussian::gaussian_horizontal::gaussian_blur_horizontal_pass_impl;
@@ -270,6 +270,16 @@ fn gaussian_blur_vertical_pass<
         {
             // Generally vertical pass do not depends on any specific channel configuration so it is allowed to make a vectorized calls for any channel
             _dispatcher = gaussian_blur_vertical_pass_neon::<T, CHANNEL_CONFIGURATION>;
+        }
+    }
+    if std::any::type_name::<T>() == "f32" && edge_mode == EdgeMode::Clamp {
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "sse4.1"
+        ))]
+        {
+            // Generally vertical pass do not depends on any specific channel configuration so it is allowed to make a vectorized calls for any channel
+            _dispatcher = gaussian_blur_vertical_pass_impl_f32_sse::<T, CHANNEL_CONFIGURATION>;
         }
     }
     let unsafe_dst = UnsafeSlice::new(dst);
