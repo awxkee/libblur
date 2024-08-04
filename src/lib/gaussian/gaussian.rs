@@ -35,7 +35,7 @@ use crate::edge_mode::EdgeMode;
     any(target_arch = "x86_64", target_arch = "x86"),
     target_feature = "avx2"
 ))]
-use crate::gaussian::avx::gaussian_blur_vertical_pass_impl_avx;
+use crate::gaussian::avx::{gaussian_blur_vertical_pass_impl_avx, gaussian_blur_vertical_pass_impl_f32_avx};
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::gaussian::gauss_neon::*;
 #[cfg(all(
@@ -280,6 +280,14 @@ fn gaussian_blur_vertical_pass<
         {
             // Generally vertical pass do not depends on any specific channel configuration so it is allowed to make a vectorized calls for any channel
             _dispatcher = gaussian_blur_vertical_pass_impl_f32_sse::<T, CHANNEL_CONFIGURATION>;
+        }
+        #[cfg(all(
+            any(target_arch = "x86_64", target_arch = "x86"),
+            target_feature = "avx2"
+        ))]
+        {
+            // Generally vertical pass do not depends on any specific channel configuration so it is allowed to make a vectorized calls for any channel
+            _dispatcher = gaussian_blur_vertical_pass_impl_f32_avx::<T, CHANNEL_CONFIGURATION>;
         }
     }
     let unsafe_dst = UnsafeSlice::new(dst);
