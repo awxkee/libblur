@@ -25,18 +25,16 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::mul_table::{MUL_TABLE_DOUBLE, SHR_TABLE_DOUBLE};
-use crate::reflect_101;
-use crate::reflect_index;
-use crate::sse::_mm_packus_epi64;
-use crate::sse::utils::load_u8_s32_fast;
-use crate::unsafe_slice::UnsafeSlice;
-use crate::{clamp_edge, EdgeMode};
-use erydanos::_mm_mul_epi64;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
+
+use crate::reflect_101;
+use crate::reflect_index;
+use crate::sse::utils::load_u8_s32_fast;
+use crate::unsafe_slice::UnsafeSlice;
+use crate::{clamp_edge, EdgeMode};
 
 pub fn fast_gaussian_horizontal_pass_sse_u8<
     T,
@@ -58,10 +56,9 @@ pub fn fast_gaussian_horizontal_pass_sse_u8<
 
     let radius_64 = radius as i64;
     let width_wide = width as i64;
-    let mul_value = MUL_TABLE_DOUBLE[radius as usize];
-    let shr_value = SHR_TABLE_DOUBLE[radius as usize];
-    let v_mul_value = unsafe { _mm_set1_epi64x(mul_value as i64) };
-    let v_shr_value = unsafe { _mm_setr_epi32(shr_value, 0, 0, 0) };
+    const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
+
+    let v_weight = unsafe { _mm_set1_ps(1f32 / (radius as f32 * radius as f32)) };
     for y in start..std::cmp::min(height, end) {
         let mut diffs = unsafe { _mm_setzero_si128() };
         let mut summs = unsafe { _mm_set1_epi32(initial_sum) };
@@ -73,16 +70,13 @@ pub fn fast_gaussian_horizontal_pass_sse_u8<
             if x >= 0 {
                 let current_px = ((std::cmp::max(x, 0) as u32) * CHANNELS_COUNT as u32) as usize;
 
-                let hi_a = unsafe { _mm_unpackhi_epi32(summs, _mm_setzero_si128()) };
-                let lo_b = unsafe { _mm_unpacklo_epi32(summs, _mm_setzero_si128()) };
-                let blurred_hi =
-                    unsafe { _mm_srl_epi64(_mm_mul_epi64(hi_a, v_mul_value), v_shr_value) };
-                let blurred_lo =
-                    unsafe { _mm_srl_epi64(_mm_mul_epi64(lo_b, v_mul_value), v_shr_value) };
-                let prepared_px_s32 = unsafe { _mm_packus_epi64(blurred_lo, blurred_hi) };
-                let prepared_u16 = unsafe { _mm_packus_epi32(prepared_px_s32, prepared_px_s32) };
-                let prepared_u8 = unsafe { _mm_packus_epi16(prepared_u16, prepared_u16) };
-                let pixel = unsafe { _mm_extract_epi32::<0>(prepared_u8) };
+                let pixel_f32 = unsafe {
+                    _mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(_mm_cvtepi32_ps(summs), v_weight))
+                };
+                let pixel_u32 = unsafe { _mm_cvtps_epi32(pixel_f32) };
+                let pixel_u16 = unsafe { _mm_packus_epi32(pixel_u32, pixel_u32) };
+                let pixel_u8 = unsafe { _mm_packus_epi16(pixel_u16, pixel_u16) };
+                let pixel = unsafe { _mm_extract_epi32::<0>(pixel_u8) };
 
                 let bytes_offset = current_y + current_px;
 
@@ -161,10 +155,11 @@ pub(crate) fn fast_gaussian_vertical_pass_sse_u8<
     let height_wide = height as i64;
 
     let radius_64 = radius as i64;
-    let mul_value = MUL_TABLE_DOUBLE[radius as usize];
-    let shr_value = SHR_TABLE_DOUBLE[radius as usize];
-    let v_mul_value = unsafe { _mm_set1_epi64x(mul_value as i64) };
-    let v_shr_value = unsafe { _mm_setr_epi32(shr_value, 0, 0, 0) };
+
+    const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
+
+    let v_weight = unsafe { _mm_set1_ps(1f32 / (radius as f32 * radius as f32)) };
+
     for x in start..std::cmp::min(width, end) {
         let mut diffs = unsafe { _mm_setzero_si128() };
         let mut summs = unsafe { _mm_set1_epi32(initial_sum) };
@@ -176,16 +171,13 @@ pub(crate) fn fast_gaussian_vertical_pass_sse_u8<
             if y >= 0 {
                 let current_px = ((std::cmp::max(x, 0)) * CHANNELS_COUNT as u32) as usize;
 
-                let hi_a = unsafe { _mm_unpackhi_epi32(summs, _mm_setzero_si128()) };
-                let lo_b = unsafe { _mm_unpacklo_epi32(summs, _mm_setzero_si128()) };
-                let blurred_hi =
-                    unsafe { _mm_srl_epi64(_mm_mul_epi64(hi_a, v_mul_value), v_shr_value) };
-                let blurred_lo =
-                    unsafe { _mm_srl_epi64(_mm_mul_epi64(lo_b, v_mul_value), v_shr_value) };
-                let prepared_px_s32 = unsafe { _mm_packus_epi64(blurred_lo, blurred_hi) };
-                let prepared_u16 = unsafe { _mm_packus_epi32(prepared_px_s32, prepared_px_s32) };
-                let prepared_u8 = unsafe { _mm_packus_epi16(prepared_u16, prepared_u16) };
-                let pixel = unsafe { _mm_extract_epi32::<0>(prepared_u8) };
+                let pixel_f32 = unsafe {
+                    _mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(_mm_cvtepi32_ps(summs), v_weight))
+                };
+                let pixel_u32 = unsafe { _mm_cvtps_epi32(pixel_f32) };
+                let pixel_u16 = unsafe { _mm_packus_epi32(pixel_u32, pixel_u32) };
+                let pixel_u8 = unsafe { _mm_packus_epi16(pixel_u16, pixel_u16) };
+                let pixel = unsafe { _mm_extract_epi32::<0>(pixel_u8) };
 
                 let bytes_offset = current_y + current_px;
 
@@ -212,7 +204,7 @@ pub(crate) fn fast_gaussian_vertical_pass_sse_u8<
                 let mut d_stored = unsafe { _mm_loadu_si128(d_buf_ptr as *const __m128i) };
                 d_stored = unsafe { _mm_slli_epi32::<1>(d_stored) };
 
-                let buf_ptr = unsafe { buffer.as_mut_ptr().add(arr_index) as * mut i32 };
+                let buf_ptr = unsafe { buffer.as_mut_ptr().add(arr_index) as *mut i32 };
                 let a_stored = unsafe { _mm_loadu_si128(buf_ptr as *const __m128i) };
 
                 diffs = unsafe { _mm_add_epi32(diffs, _mm_sub_epi32(a_stored, d_stored)) };

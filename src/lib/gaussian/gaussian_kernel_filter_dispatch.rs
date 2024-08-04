@@ -25,6 +25,11 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "avx2"
+))]
+use crate::gaussian::avx::gaussian_blur_vertical_pass_filter_f32_avx;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::gaussian::gauss_neon::*;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
@@ -51,11 +56,6 @@ use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
 use num_traits::{AsPrimitive, FromPrimitive};
 use rayon::ThreadPool;
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "avx2"
-))]
-use crate::gaussian::avx::gaussian_blur_vertical_pass_filter_f32_avx;
 
 pub(crate) fn gaussian_blur_vertical_pass_edge_clip_dispatch<
     T: FromPrimitive + Default + Send + Sync,

@@ -329,7 +329,10 @@ pub(crate) unsafe fn load_f32_f16<const CHANNELS_COUNT: usize>(ptr: *const f16) 
 
 #[cfg(target_feature = "f16c")]
 #[inline(always)]
-pub(crate) unsafe fn store_f32_f16<const CHANNELS_COUNT: usize>(dst_ptr: *mut f16, in_regi: __m128) {
+pub(crate) unsafe fn store_f32_f16<const CHANNELS_COUNT: usize>(
+    dst_ptr: *mut f16,
+    in_regi: __m128,
+) {
     let out_regi = _mm_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(in_regi);
     if CHANNELS_COUNT == 4 {
         std::ptr::copy_nonoverlapping(&out_regi as *const _ as *mut u8, dst_ptr as *mut u8, 8);
@@ -339,20 +342,14 @@ pub(crate) unsafe fn store_f32_f16<const CHANNELS_COUNT: usize>(dst_ptr: *mut f1
         let item1 = _mm_extract_epi16::<1>(out_regi) as i16;
         let item2 = _mm_extract_epi16::<2>(out_regi) as i16;
         casted_ptr.write_unaligned(item0);
-        casted_ptr
-            .add(1)
-            .write_unaligned(item1);
-        casted_ptr
-            .add(2)
-            .write_unaligned(item2);
+        casted_ptr.add(1).write_unaligned(item1);
+        casted_ptr.add(2).write_unaligned(item2);
     } else if CHANNELS_COUNT == 2 {
         let casted_ptr = dst_ptr as *mut i16;
         let item0 = _mm_extract_epi32::<0>(out_regi) as i16;
         let item1 = _mm_extract_epi16::<1>(out_regi) as i16;
         casted_ptr.write_unaligned(item0);
-        casted_ptr
-            .add(1)
-            .write_unaligned(item1);
+        casted_ptr.add(1).write_unaligned(item1);
     } else {
         let casted_ptr = dst_ptr as *mut i16;
         let item0 = _mm_extract_epi32::<0>(out_regi) as i16;

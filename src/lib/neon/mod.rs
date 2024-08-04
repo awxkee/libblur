@@ -25,27 +25,29 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+mod f16_utils;
 mod fast_gaussian;
+mod fast_gaussian_f16;
 mod fast_gaussian_f32;
 mod fast_gaussian_next;
 mod fast_gaussian_next_f32;
+mod stack_blur_f16;
 mod stack_blur_f32;
 mod stack_blur_i32;
 mod stack_blur_i64;
 mod utils;
-mod f16_utils;
-mod stack_blur_f16;
-mod fast_gaussian_f16;
 
 pub use fast_gaussian::*;
+pub use fast_gaussian_f16::{
+    fast_gaussian_horizontal_pass_neon_f16, fast_gaussian_vertical_pass_neon_f16,
+};
 pub use fast_gaussian_f32::fast_gaussian_horizontal_pass_neon_f32;
 pub use fast_gaussian_f32::fast_gaussian_vertical_pass_neon_f32;
 pub use fast_gaussian_next::*;
 pub use fast_gaussian_next_f32::fast_gaussian_next_horizontal_pass_neon_f32;
 pub use fast_gaussian_next_f32::fast_gaussian_next_vertical_pass_neon_f32;
+pub use stack_blur_f16::stack_blur_pass_neon_f16;
 pub use stack_blur_f32::stack_blur_pass_neon_f32;
 pub use stack_blur_i32::*;
 pub use stack_blur_i64::stack_blur_pass_neon_i64;
 pub use utils::*;
-pub use stack_blur_f16::stack_blur_pass_neon_f16;
-pub use fast_gaussian_f16::{fast_gaussian_vertical_pass_neon_f16, fast_gaussian_horizontal_pass_neon_f16};

@@ -29,15 +29,15 @@ use half::f16;
 
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::stack_blur_pass_neon_f16;
-use crate::stack_blur::StackBlurPass;
-use crate::stack_blur_f32::stack_blur_pass_f;
-use crate::unsafe_slice::UnsafeSlice;
-use crate::{FastBlurChannels, ThreadingPolicy};
 #[cfg(all(
     any(target_arch = "x86_64", target_arch = "x86"),
     all(target_feature = "sse4.1", target_feature = "f16c")
 ))]
 use crate::sse::stack_blur_pass_sse_f16;
+use crate::stack_blur::StackBlurPass;
+use crate::stack_blur_f32::stack_blur_pass_f;
+use crate::unsafe_slice::UnsafeSlice;
+use crate::{FastBlurChannels, ThreadingPolicy};
 
 fn stack_blur_worker_horizontal(
     slice: &UnsafeSlice<f16>,
