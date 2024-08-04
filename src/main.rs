@@ -210,7 +210,7 @@ fn main() {
         25 * 2 + 1,
         25f32 * 2f32 / 6f32,
         FastBlurChannels::Channels4,
-        EdgeMode::Clamp,
+        EdgeMode::KernelClip,
         ThreadingPolicy::Single,
         TransferFunction::Srgb,
     );

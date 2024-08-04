@@ -289,6 +289,11 @@ fn gaussian_blur_vertical_pass<
             // Generally vertical pass do not depends on any specific channel configuration so it is allowed to make a vectorized calls for any channel
             _dispatcher = gaussian_blur_vertical_pass_impl_f32_avx::<T, CHANNEL_CONFIGURATION>;
         }
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            // Generally vertical pass do not depends on any specific channel configuration so it is allowed to make a vectorized calls for any channel
+            _dispatcher = gaussian_blur_vertical_pass_f32_neon::<T, CHANNEL_CONFIGURATION>;
+        }
     }
     let unsafe_dst = UnsafeSlice::new(dst);
     thread_pool.scope(|scope| {

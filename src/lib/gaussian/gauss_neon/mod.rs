@@ -31,6 +31,7 @@ mod horiz_four_channel_f32;
 mod horiz_one_channel_f32;
 mod horiz_one_channel_u8;
 mod vert_four_channel;
+mod vertical_f32;
 
 pub use filter_u8::gaussian_blur_horizontal_pass_filter_neon;
 pub use filter_u8::gaussian_blur_vertical_pass_filter_neon;
@@ -40,3 +41,4 @@ pub use horiz_four_channel_f32::gaussian_horiz_t_f_chan_filter_f32;
 pub use horiz_one_channel_f32::*;
 pub use horiz_one_channel_u8::*;
 pub use vert_four_channel::*;
+pub use vertical_f32::gaussian_blur_vertical_pass_f32_neon;
