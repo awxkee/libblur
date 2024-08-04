@@ -35,6 +35,7 @@ use crate::reflect_index;
 use crate::sse::utils::load_u8_s32_fast;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, EdgeMode};
+use crate::sse::store_u8_u32;
 
 pub fn fast_gaussian_horizontal_pass_sse_u8<
     T,
@@ -74,26 +75,13 @@ pub fn fast_gaussian_horizontal_pass_sse_u8<
                     _mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(_mm_cvtepi32_ps(summs), v_weight))
                 };
                 let pixel_u32 = unsafe { _mm_cvtps_epi32(pixel_f32) };
-                let pixel_u16 = unsafe { _mm_packus_epi32(pixel_u32, pixel_u32) };
-                let pixel_u8 = unsafe { _mm_packus_epi16(pixel_u16, pixel_u16) };
-                let pixel = unsafe { _mm_extract_epi32::<0>(pixel_u8) };
 
                 let bytes_offset = current_y + current_px;
 
-                if CHANNELS_COUNT == 4 {
-                    unsafe {
-                        let dst_ptr =
-                            (bytes.slice.as_ptr() as *mut u8).add(bytes_offset) as *mut i32;
-                        dst_ptr.write_unaligned(pixel);
-                    }
-                } else {
-                    let bits = pixel.to_le_bytes();
-
-                    unsafe {
-                        bytes.write(current_y + current_px, bits[0]);
-                        bytes.write(current_y + current_px + 1, bits[1]);
-                        bytes.write(current_y + current_px + 2, bits[2]);
-                    }
+                unsafe {
+                    let dst_ptr =
+                        (bytes.slice.as_ptr() as *mut u8).add(bytes_offset);
+                    store_u8_u32::<CHANNELS_COUNT>(dst_ptr, pixel_u32);
                 }
 
                 let arr_index = ((x - radius_64) & 1023) as usize;
@@ -175,26 +163,13 @@ pub(crate) fn fast_gaussian_vertical_pass_sse_u8<
                     _mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(_mm_cvtepi32_ps(summs), v_weight))
                 };
                 let pixel_u32 = unsafe { _mm_cvtps_epi32(pixel_f32) };
-                let pixel_u16 = unsafe { _mm_packus_epi32(pixel_u32, pixel_u32) };
-                let pixel_u8 = unsafe { _mm_packus_epi16(pixel_u16, pixel_u16) };
-                let pixel = unsafe { _mm_extract_epi32::<0>(pixel_u8) };
 
                 let bytes_offset = current_y + current_px;
 
-                if CHANNELS_COUNT == 4 {
-                    unsafe {
-                        let dst_ptr =
-                            (bytes.slice.as_ptr() as *mut u8).add(bytes_offset) as *mut i32;
-                        dst_ptr.write_unaligned(pixel);
-                    }
-                } else {
-                    let bits = pixel.to_le_bytes();
-
-                    unsafe {
-                        bytes.write(bytes_offset, bits[0]);
-                        bytes.write(bytes_offset + 1, bits[1]);
-                        bytes.write(bytes_offset + 2, bits[2]);
-                    }
+                unsafe {
+                    let dst_ptr =
+                        (bytes.slice.as_ptr() as *mut u8).add(bytes_offset);
+                    store_u8_u32::<CHANNELS_COUNT>(dst_ptr, pixel_u32);
                 }
 
                 let arr_index = ((y - radius_64) & 1023) as usize;

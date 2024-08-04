@@ -25,7 +25,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::neon::load_u8_s32_fast;
+use crate::neon::{load_u8_s32_fast, store_u8x8_m4};
 use crate::reflect_index;
 use crate::{clamp_edge, reflect_101, EdgeMode};
 use std::arch::aarch64::*;
@@ -71,25 +71,11 @@ pub fn fast_gaussian_next_vertical_pass_neon_u8<
                 let prepared_u16 = unsafe { vqmovun_s32(prepared_px_s32) };
                 let prepared_u8 = unsafe { vqmovn_u16(vcombine_u16(prepared_u16, prepared_u16)) };
 
-                let casted_u32 = unsafe { vreinterpret_u32_u8(prepared_u8) };
-                let pixel = unsafe { vget_lane_u32::<0>(casted_u32) };
-
                 let bytes_offset = current_y + current_px;
 
-                if CHANNELS_COUNT == 4 {
-                    unsafe {
-                        let dst_ptr =
-                            (bytes.slice.as_ptr() as *mut u8).add(bytes_offset) as *mut u32;
-                        dst_ptr.write_unaligned(pixel);
-                    }
-                } else {
-                    let bits = pixel.to_le_bytes();
-
-                    unsafe {
-                        bytes.write(bytes_offset, bits[0]);
-                        bytes.write(bytes_offset + 1, bits[1]);
-                        bytes.write(bytes_offset + 2, bits[2]);
-                    }
+                unsafe {
+                    let dst_ptr = (bytes.slice.as_ptr() as *mut u8).add(bytes_offset);
+                    store_u8x8_m4::<CHANNELS_COUNT>(dst_ptr, prepared_u8)
                 }
 
                 let d_arr_index_1 = ((y + radius_64) & 1023) as usize;
@@ -185,25 +171,12 @@ pub(crate) fn fast_gaussian_next_horizontal_pass_neon_u8<
                     unsafe { vcvtaq_s32_f32(vmulq_f32(vcvtq_f32_s32(summs), f_weight)) };
                 let prepared_u16 = unsafe { vqmovun_s32(prepared_px_s32) };
                 let prepared_u8 = unsafe { vqmovn_u16(vcombine_u16(prepared_u16, prepared_u16)) };
-                let casted_u32 = unsafe { vreinterpret_u32_u8(prepared_u8) };
-                let pixel = unsafe { vget_lane_u32::<0>(casted_u32) };
 
                 let bytes_offset = current_y + current_px;
 
-                if CHANNELS_COUNT == 4 {
-                    unsafe {
-                        let dst_ptr =
-                            (bytes.slice.as_ptr() as *mut u8).add(bytes_offset) as *mut u32;
-                        dst_ptr.write_unaligned(pixel);
-                    }
-                } else {
-                    let bits = pixel.to_le_bytes();
-
-                    unsafe {
-                        bytes.write(bytes_offset, bits[0]);
-                        bytes.write(bytes_offset + 1, bits[1]);
-                        bytes.write(bytes_offset + 2, bits[2]);
-                    }
+                unsafe {
+                    let dst_ptr = (bytes.slice.as_ptr() as *mut u8).add(bytes_offset);
+                    store_u8x8_m4::<CHANNELS_COUNT>(dst_ptr, prepared_u8)
                 }
 
                 let d_arr_index_1 = ((x + radius_64) & 1023) as usize;

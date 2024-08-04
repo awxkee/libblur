@@ -31,6 +31,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 use erydanos::_mm_mul_epi64;
+#[cfg(target_feature = "f16c")]
 use half::f16;
 
 #[allow(non_camel_case_types)]
@@ -188,6 +189,7 @@ pub(crate) unsafe fn store_f32<const CHANNELS_COUNT: usize>(dst_ptr: *mut f32, r
     }
 }
 
+/// Stores u32 up to x4 as u8 up to x4 based on channels count
 #[inline(always)]
 pub(crate) unsafe fn store_u8_s32<const CHANNELS_COUNT: usize>(dst_ptr: *mut u8, regi: __m128i) {
     let s16 = _mm_packs_epi32(regi, regi);
@@ -196,11 +198,42 @@ pub(crate) unsafe fn store_u8_s32<const CHANNELS_COUNT: usize>(dst_ptr: *mut u8,
     if CHANNELS_COUNT == 4 {
         let casted_dst = dst_ptr as *mut i32;
         casted_dst.write_unaligned(pixel_s32);
-    } else {
+    } else if CHANNELS_COUNT == 3 {
         let pixel_bytes = pixel_s32.to_le_bytes();
         dst_ptr.write_unaligned(pixel_bytes[0]);
         dst_ptr.add(1).write_unaligned(pixel_bytes[1]);
         dst_ptr.add(2).write_unaligned(pixel_bytes[2]);
+    } else if CHANNELS_COUNT == 2 {
+        let pixel_bytes = pixel_s32.to_le_bytes();
+        dst_ptr.write_unaligned(pixel_bytes[0]);
+        dst_ptr.add(1).write_unaligned(pixel_bytes[1]);
+    } else {
+        let pixel_bytes = pixel_s32.to_le_bytes();
+        dst_ptr.write_unaligned(pixel_bytes[0]);
+    }
+}
+
+/// Stores u32 up to x4 as u8 up to x4 based on channels count
+#[inline(always)]
+pub(crate) unsafe fn store_u8_u32<const CHANNELS_COUNT: usize>(dst_ptr: *mut u8, regi: __m128i) {
+    let s16 = _mm_packus_epi32(regi, regi);
+    let v8 = _mm_packus_epi16(s16, s16);
+    let pixel_s32 = _mm_extract_epi32::<0>(v8);
+    if CHANNELS_COUNT == 4 {
+        let casted_dst = dst_ptr as *mut i32;
+        casted_dst.write_unaligned(pixel_s32);
+    } else if CHANNELS_COUNT == 3 {
+        let pixel_bytes = pixel_s32.to_le_bytes();
+        dst_ptr.write_unaligned(pixel_bytes[0]);
+        dst_ptr.add(1).write_unaligned(pixel_bytes[1]);
+        dst_ptr.add(2).write_unaligned(pixel_bytes[2]);
+    } else if CHANNELS_COUNT == 2 {
+        let pixel_bytes = pixel_s32.to_le_bytes();
+        dst_ptr.write_unaligned(pixel_bytes[0]);
+        dst_ptr.add(1).write_unaligned(pixel_bytes[1]);
+    } else {
+        let pixel_bytes = pixel_s32.to_le_bytes();
+        dst_ptr.write_unaligned(pixel_bytes[0]);
     }
 }
 

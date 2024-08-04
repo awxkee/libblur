@@ -27,7 +27,7 @@
 
 use std::arch::aarch64::*;
 
-use crate::neon::load_f32_fast;
+use crate::neon::{load_f32_fast, store_f32};
 use crate::reflect_index;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, reflect_101, EdgeMode};
@@ -67,21 +67,9 @@ pub fn fast_gaussian_next_vertical_pass_neon_f32<
                 let current_px = (std::cmp::max(x, 0)) as usize * CHANNELS_COUNT;
 
                 let prepared_px = unsafe { vmulq_f32(summs, f_weight) };
-                if CHANNELS_COUNT == 4 {
-                    unsafe {
-                        let dst_ptr = bytes.slice.as_ptr().add(current_y + current_px) as *mut f32;
-                        vst1q_f32(dst_ptr, prepared_px);
-                    }
-                } else {
-                    let new_r = unsafe { vgetq_lane_f32::<0>(prepared_px) };
-                    let new_g = unsafe { vgetq_lane_f32::<1>(prepared_px) };
-                    let new_b = unsafe { vgetq_lane_f32::<2>(prepared_px) };
-                    let dst_offset = current_y + current_px;
-                    unsafe {
-                        bytes.write(dst_offset, new_r);
-                        bytes.write(dst_offset + 1, new_g);
-                        bytes.write(dst_offset + 2, new_b);
-                    }
+                unsafe {
+                    let dst_ptr = bytes.slice.as_ptr().add(current_y + current_px) as *mut f32;
+                    store_f32::<CHANNELS_COUNT>(dst_ptr, prepared_px);
                 }
 
                 let d_arr_index_1 = ((y + radius_64) & 1023) as usize;
@@ -172,25 +160,13 @@ pub fn fast_gaussian_next_horizontal_pass_neon_f32<
 
         for x in (0 - 3 * radius_64)..(width as i64) {
             if x >= 0 {
-                let current_px = x as usize * CHANNELS_COUNT as usize;
+                let current_px = x as usize * CHANNELS_COUNT;
 
                 let prepared_px = unsafe { vmulq_f32(summs, f_weight) };
 
-                if CHANNELS_COUNT == 4 {
-                    unsafe {
-                        let dst_ptr = bytes.slice.as_ptr().add(current_y + current_px) as *mut f32;
-                        vst1q_f32(dst_ptr, prepared_px);
-                    }
-                } else {
-                    let new_r = unsafe { vgetq_lane_f32::<0>(prepared_px) };
-                    let new_g = unsafe { vgetq_lane_f32::<1>(prepared_px) };
-                    let new_b = unsafe { vgetq_lane_f32::<2>(prepared_px) };
-                    let dst_offset = current_y + current_px;
-                    unsafe {
-                        bytes.write(dst_offset, new_r);
-                        bytes.write(dst_offset + 1, new_g);
-                        bytes.write(dst_offset + 2, new_b);
-                    }
+                unsafe {
+                    let dst_ptr = bytes.slice.as_ptr().add(current_y + current_px) as *mut f32;
+                    store_f32::<CHANNELS_COUNT>(dst_ptr, prepared_px);
                 }
 
                 let d_arr_index_1 = ((x + radius_64) & 1023) as usize;

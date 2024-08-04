@@ -34,6 +34,7 @@ use crate::{clamp_edge, EdgeMode};
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
+use crate::sse::store_u8_u32;
 
 pub fn fast_gaussian_next_vertical_pass_sse_u8<
     T,
@@ -77,27 +78,13 @@ pub fn fast_gaussian_next_vertical_pass_sse_u8<
                         f_weight,
                     )))
                 };
-                let prepared_u16 = unsafe { _mm_packus_epi32(prepared_px_s32, prepared_px_s32) };
-                let prepared_u8 = unsafe { _mm_packus_epi16(prepared_u16, prepared_u16) };
-
-                let pixel = unsafe { _mm_extract_epi32::<0>(prepared_u8) };
 
                 let bytes_offset = current_y + current_px;
 
-                if CHANNELS_COUNT == 4 {
-                    unsafe {
-                        let dst_ptr =
-                            (bytes.slice.as_ptr() as *mut u8).add(bytes_offset) as *mut i32;
-                        dst_ptr.write_unaligned(pixel);
-                    }
-                } else {
-                    let bits = pixel.to_le_bytes();
-
-                    unsafe {
-                        bytes.write(bytes_offset, bits[0]);
-                        bytes.write(bytes_offset + 1, bits[1]);
-                        bytes.write(bytes_offset + 2, bits[2]);
-                    }
+                unsafe {
+                    let dst_ptr =
+                        (bytes.slice.as_ptr() as *mut u8).add(bytes_offset);
+                    store_u8_u32::<CHANNELS_COUNT>(dst_ptr, prepared_px_s32);
                 }
 
                 let d_arr_index_1 = ((y + radius_64) & 1023) as usize;
@@ -202,27 +189,13 @@ pub(crate) fn fast_gaussian_next_horizontal_pass_sse_u8<
                         f_weight,
                     )))
                 };
-                let prepared_u16 = unsafe { _mm_packus_epi32(prepared_px_s32, prepared_px_s32) };
-                let prepared_u8 = unsafe { _mm_packus_epi16(prepared_u16, prepared_u16) };
-
-                let pixel = unsafe { _mm_extract_epi32::<0>(prepared_u8) };
 
                 let bytes_offset = current_y + current_px;
 
-                if CHANNELS_COUNT == 4 {
-                    unsafe {
-                        let dst_ptr =
-                            (bytes.slice.as_ptr() as *mut u8).add(bytes_offset) as *mut i32;
-                        dst_ptr.write_unaligned(pixel);
-                    }
-                } else {
-                    let bits = pixel.to_le_bytes();
-
-                    unsafe {
-                        bytes.write(bytes_offset, bits[0]);
-                        bytes.write(bytes_offset + 1, bits[1]);
-                        bytes.write(bytes_offset + 2, bits[2]);
-                    }
+                unsafe {
+                    let dst_ptr =
+                        (bytes.slice.as_ptr() as *mut u8).add(bytes_offset);
+                    store_u8_u32::<CHANNELS_COUNT>(dst_ptr, prepared_px_s32);
                 }
 
                 let d_arr_index_1 = ((x + radius_64) & 1023) as usize;
@@ -248,7 +221,7 @@ pub(crate) fn fast_gaussian_next_horizontal_pass_sse_u8<
             } else if x + radius_64 >= 0 {
                 let arr_index = (x & 1023) as usize;
                 let arr_index_1 = ((x + radius_64) & 1023) as usize;
-                let buf_ptr = unsafe {  buffer.as_mut_ptr().add(arr_index) as *mut i32 };
+                let buf_ptr = unsafe { buffer.as_mut_ptr().add(arr_index) as *mut i32 };
                 let stored = unsafe { _mm_loadu_si128(buf_ptr as *const __m128i) };
 
                 let buf_ptr_1 = buffer[arr_index_1].as_mut_ptr();

@@ -111,15 +111,26 @@ pub(crate) unsafe fn load_u8_f32_fast<const CHANNELS_COUNT: usize>(ptr: *const u
 
 #[inline(always)]
 pub(crate) unsafe fn load_u8_u32_fast<const CHANNELS_COUNT: usize>(ptr: *const u8) -> uint32x4_t {
-    let u_first = u32::from_le_bytes([ptr.read_unaligned(), 0, 0, 0]);
-    let u_second = u32::from_le_bytes([ptr.add(1).read_unaligned(), 0, 0, 0]);
-    let u_third = u32::from_le_bytes([ptr.add(2).read_unaligned(), 0, 0, 0]);
-    let u_fourth = match CHANNELS_COUNT {
-        4 => u32::from_le_bytes([ptr.add(3).read_unaligned(), 0, 0, 0]),
-        _ => 0,
-    };
-    let store: [u32; 4] = [u_first, u_second, u_third, u_fourth];
-    return vld1q_u32(store.as_ptr());
+    if CHANNELS_COUNT == 3 || CHANNELS_COUNT == 4 {
+        let u_first = u32::from_le_bytes([ptr.read_unaligned(), 0, 0, 0]);
+        let u_second = u32::from_le_bytes([ptr.add(1).read_unaligned(), 0, 0, 0]);
+        let u_third = u32::from_le_bytes([ptr.add(2).read_unaligned(), 0, 0, 0]);
+        let u_fourth = match CHANNELS_COUNT {
+            4 => u32::from_le_bytes([ptr.add(3).read_unaligned(), 0, 0, 0]),
+            _ => 0,
+        };
+        let store: [u32; 4] = [u_first, u_second, u_third, u_fourth];
+        return vld1q_u32(store.as_ptr());
+    } else if CHANNELS_COUNT == 2 {
+        let u_first = u32::from_le_bytes([ptr.read_unaligned(), 0, 0, 0]);
+        let u_second = u32::from_le_bytes([ptr.add(1).read_unaligned(), 0, 0, 0]);
+        let store: [u32; 4] = [u_first, u_second, 0, 0];
+        return vld1q_u32(store.as_ptr());
+    } else {
+        let u_first = u32::from_le_bytes([ptr.read_unaligned(), 0, 0, 0]);
+        let store: [u32; 4] = [u_first, 0, 0, 0];
+        return vld1q_u32(store.as_ptr());
+    }
 }
 
 #[inline(always)]
@@ -324,5 +335,31 @@ pub(crate) unsafe fn store_f32_f16<const CHANNELS_COUNT: usize>(
         let casted_out = xreinterpret_u16_f16(out_regi);
         let casted_ptr = dst_ptr as *mut u16;
         casted_ptr.write_unaligned(vget_lane_u16::<0>(casted_out));
+    }
+}
+
+/// Stores up to 4 values from uint8x8_t
+#[inline(always)]
+pub(crate) unsafe fn store_u8x8_m4<const CHANNELS_COUNT: usize>(
+    dst_ptr: *mut u8,
+    in_regi: uint8x8_t,
+) {
+    let casted_u32 = unsafe { vreinterpret_u32_u8(in_regi) };
+    let pixel = unsafe { vget_lane_u32::<0>(casted_u32) };
+
+    if CHANNELS_COUNT == 4 {
+        (dst_ptr as *mut u32).write_unaligned(pixel);
+    } else if CHANNELS_COUNT == 3 {
+        let bits = pixel.to_le_bytes();
+        dst_ptr.write_unaligned(bits[0]);
+        dst_ptr.add(1).write_unaligned(bits[1]);
+        dst_ptr.add(2).write_unaligned(bits[2]);
+    } else if CHANNELS_COUNT == 2 {
+        let bits = pixel.to_le_bytes();
+        dst_ptr.write_unaligned(bits[0]);
+        dst_ptr.add(1).write_unaligned(bits[1]);
+    } else {
+        let bits = pixel.to_le_bytes();
+        dst_ptr.write_unaligned(bits[0]);
     }
 }

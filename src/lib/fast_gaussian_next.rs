@@ -27,7 +27,8 @@
 
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::{
-    fast_gaussian_next_horizontal_pass_neon_f32, fast_gaussian_next_horizontal_pass_neon_u8,
+    fast_gaussian_next_horizontal_pass_neon_f16, fast_gaussian_next_horizontal_pass_neon_f32,
+    fast_gaussian_next_horizontal_pass_neon_u8, fast_gaussian_next_vertical_pass_neon_f16,
     fast_gaussian_next_vertical_pass_neon_f32, fast_gaussian_next_vertical_pass_neon_u8,
 };
 use crate::reflect_index;
@@ -597,59 +598,72 @@ fn fast_gaussian_next_impl<
                     EDGE_MODE,
                 >;
             }
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            {
+                _dispatcher_vertical = fast_gaussian_next_vertical_pass_neon_f16::<
+                    T,
+                    CHANNEL_CONFIGURATION,
+                    EDGE_MODE,
+                >;
+                _dispatcher_horizontal = fast_gaussian_next_horizontal_pass_neon_f16::<
+                    T,
+                    CHANNEL_CONFIGURATION,
+                    EDGE_MODE,
+                >;
+            }
         }
     }
 
-    if CHANNEL_CONFIGURATION >= 3 {
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-        {
-            if BASE_RADIUS_I64_CUTOFF > radius {
-                if std::any::type_name::<T>() == "u8" {
-                    _dispatcher_vertical = fast_gaussian_next_vertical_pass_neon_u8::<
-                        T,
-                        CHANNEL_CONFIGURATION,
-                        EDGE_MODE,
-                    >;
-                    _dispatcher_horizontal = fast_gaussian_next_horizontal_pass_neon_u8::<
-                        T,
-                        CHANNEL_CONFIGURATION,
-                        EDGE_MODE,
-                    >;
-                } else if std::any::type_name::<T>() == "f32" {
-                    _dispatcher_horizontal = fast_gaussian_next_horizontal_pass_neon_f32::<
-                        T,
-                        CHANNEL_CONFIGURATION,
-                        EDGE_MODE,
-                    >;
-                    _dispatcher_vertical = fast_gaussian_next_vertical_pass_neon_f32::<
-                        T,
-                        CHANNEL_CONFIGURATION,
-                        EDGE_MODE,
-                    >;
-                }
-            }
-        }
-        #[cfg(all(
-            any(target_arch = "x86_64", target_arch = "x86"),
-            target_feature = "sse4.1"
-        ))]
-        {
-            if BASE_RADIUS_I64_CUTOFF > radius {
-                if std::any::type_name::<T>() == "u8" {
-                    _dispatcher_vertical = fast_gaussian_next_vertical_pass_sse_u8::<
-                        T,
-                        CHANNEL_CONFIGURATION,
-                        EDGE_MODE,
-                    >;
-                    _dispatcher_horizontal = fast_gaussian_next_horizontal_pass_sse_u8::<
-                        T,
-                        CHANNEL_CONFIGURATION,
-                        EDGE_MODE,
-                    >;
-                }
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    {
+        if BASE_RADIUS_I64_CUTOFF > radius {
+            if std::any::type_name::<T>() == "u8" {
+                _dispatcher_vertical = fast_gaussian_next_vertical_pass_neon_u8::<
+                    T,
+                    CHANNEL_CONFIGURATION,
+                    EDGE_MODE,
+                >;
+                _dispatcher_horizontal = fast_gaussian_next_horizontal_pass_neon_u8::<
+                    T,
+                    CHANNEL_CONFIGURATION,
+                    EDGE_MODE,
+                >;
+            } else if std::any::type_name::<T>() == "f32" {
+                _dispatcher_horizontal = fast_gaussian_next_horizontal_pass_neon_f32::<
+                    T,
+                    CHANNEL_CONFIGURATION,
+                    EDGE_MODE,
+                >;
+                _dispatcher_vertical = fast_gaussian_next_vertical_pass_neon_f32::<
+                    T,
+                    CHANNEL_CONFIGURATION,
+                    EDGE_MODE,
+                >;
             }
         }
     }
+
+    #[cfg(all(
+        any(target_arch = "x86_64", target_arch = "x86"),
+        target_feature = "sse4.1"
+    ))]
+    {
+        if BASE_RADIUS_I64_CUTOFF > radius {
+            if std::any::type_name::<T>() == "u8" {
+                _dispatcher_vertical = fast_gaussian_next_vertical_pass_sse_u8::<
+                    T,
+                    CHANNEL_CONFIGURATION,
+                    EDGE_MODE,
+                >;
+                _dispatcher_horizontal = fast_gaussian_next_horizontal_pass_sse_u8::<
+                    T,
+                    CHANNEL_CONFIGURATION,
+                    EDGE_MODE,
+                >;
+            }
+        }
+    }
+
     let thread_count = threading_policy.get_threads_count(width, height) as u32;
     let pool = rayon::ThreadPoolBuilder::new()
         .num_threads(thread_count as usize)
