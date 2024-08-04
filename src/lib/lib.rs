@@ -42,6 +42,7 @@ mod neon;
 ))]
 mod sse;
 mod stack_blur;
+mod stack_blur_f16;
 mod stack_blur_f32;
 mod stack_blur_linear;
 mod threading_policy;
@@ -83,6 +84,7 @@ pub use r#box::tent_blur_f32;
 pub use r#box::tent_blur_in_linear;
 pub use r#box::tent_blur_u16;
 pub use stack_blur::stack_blur;
+pub use stack_blur_f16::stack_blur_f16;
 pub use stack_blur_f32::stack_blur_f32;
 pub use stack_blur_linear::stack_blur_in_linear;
 pub use threading_policy::ThreadingPolicy;

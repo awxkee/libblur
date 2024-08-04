@@ -25,7 +25,11 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use crate::neon::f16_utils::{
+    xreinterpret_f16_u16, xreinterpret_u16_f16, xvcvt_f16_f32, xvcvt_f32_f16, xvld_f16, xvst_f16,
+};
 use erydanos::vmulq_s64;
+use half::f16;
 use std::arch::aarch64::*;
 
 #[inline(always)]
@@ -255,3 +259,70 @@ pub(crate) struct Float32x5T(
     pub float32x4_t,
     pub float32x4_t,
 );
+
+#[inline(always)]
+pub(crate) unsafe fn load_f32_f16<const CHANNELS_COUNT: usize>(ptr: *const f16) -> float32x4_t {
+    if CHANNELS_COUNT == 4 {
+        let cvt = xvld_f16(ptr);
+        return xvcvt_f32_f16(cvt);
+    } else if CHANNELS_COUNT == 3 {
+        let recast = ptr as *const u16;
+        let cvt = xreinterpret_f16_u16(vld1_u16(
+            [
+                recast.read_unaligned(),
+                recast.add(1).read_unaligned(),
+                recast.add(2).read_unaligned(),
+                0,
+            ]
+            .as_ptr(),
+        ));
+        return xvcvt_f32_f16(cvt);
+    } else if CHANNELS_COUNT == 2 {
+        let recast = ptr as *const u16;
+        let cvt = xreinterpret_f16_u16(vld1_u16(
+            [
+                recast.read_unaligned(),
+                recast.add(1).read_unaligned(),
+                0,
+                0,
+            ]
+            .as_ptr(),
+        ));
+        return xvcvt_f32_f16(cvt);
+    }
+    let recast = ptr as *const u16;
+    let cvt = xreinterpret_f16_u16(vld1_u16([recast.read_unaligned(), 0, 0, 0].as_ptr()));
+    return xvcvt_f32_f16(cvt);
+}
+
+#[inline(always)]
+pub(crate) unsafe fn store_f32_f16<const CHANNELS_COUNT: usize>(
+    dst_ptr: *mut f16,
+    in_regi: float32x4_t,
+) {
+    let out_regi = xvcvt_f16_f32(in_regi);
+    if CHANNELS_COUNT == 4 {
+        xvst_f16(dst_ptr, out_regi);
+    } else if CHANNELS_COUNT == 3 {
+        let casted_out = xreinterpret_u16_f16(out_regi);
+        let casted_ptr = dst_ptr as *mut u16;
+        casted_ptr.write_unaligned(vget_lane_u16::<0>(casted_out));
+        casted_ptr
+            .add(1)
+            .write_unaligned(vget_lane_u16::<1>(casted_out));
+        casted_ptr
+            .add(2)
+            .write_unaligned(vget_lane_u16::<2>(casted_out));
+    } else if CHANNELS_COUNT == 2 {
+        let casted_out = xreinterpret_u16_f16(out_regi);
+        let casted_ptr = dst_ptr as *mut u16;
+        casted_ptr.write_unaligned(vget_lane_u16::<0>(casted_out));
+        casted_ptr
+            .add(1)
+            .write_unaligned(vget_lane_u16::<1>(casted_out));
+    } else {
+        let casted_out = xreinterpret_u16_f16(out_regi);
+        let casted_ptr = dst_ptr as *mut u16;
+        casted_ptr.write_unaligned(vget_lane_u16::<0>(casted_out));
+    }
+}

@@ -6,8 +6,9 @@ use crate::split::split_channels_3;
 use colorutils_rs::TransferFunction;
 use image::io::Reader as ImageReader;
 use image::{EncodableLayout, GenericImageView};
-use libblur::{EdgeMode, FastBlurChannels, ThreadingPolicy};
+use libblur::{EdgeMode, fast_gaussian_f16, FastBlurChannels, stack_blur_f16, stack_blur_f32, ThreadingPolicy};
 use std::time::Instant;
+use half::f16;
 
 #[allow(dead_code)]
 fn f32_to_f16(bytes: Vec<f32>) -> Vec<u16> {
@@ -200,20 +201,34 @@ fn main() {
     //     EdgeMode::Clamp,
     // );
 
-    libblur::gaussian_blur_in_linear(
-        &bytes,
-        stride as u32,
-        &mut dst_bytes,
-        stride as u32,
+    // libblur::gaussian_blur_in_linear(
+    //     &bytes,
+    //     stride as u32,
+    //     &mut dst_bytes,
+    //     stride as u32,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     67 * 2 + 1,
+    //     67. * 2f32 / 6f32,
+    //     FastBlurChannels::Channels4,
+    //     EdgeMode::KernelClip,
+    //     ThreadingPolicy::Single,
+    //     TransferFunction::Srgb,
+    // );
+
+    let mut f16_bytes: Vec<f16> = dst_bytes.iter().map(|&x| f16::from_f32(x as f32 *(1./255.))).collect();
+
+    fast_gaussian_f16(
+        &mut f16_bytes,
         dimensions.0,
         dimensions.1,
-        67 * 2 + 1,
-        67. * 2f32 / 6f32,
+        60,
         FastBlurChannels::Channels4,
-        EdgeMode::KernelClip,
         ThreadingPolicy::Single,
-        TransferFunction::Srgb,
+        EdgeMode::Clamp,
     );
+
+    dst_bytes = f16_bytes.iter().map(|&x| (x.to_f32() * 255f32) as u8).collect();
 
     // dst_bytes = perform_planar_pass_3(&bytes, dimensions.0 as usize, dimensions.1 as usize);
 

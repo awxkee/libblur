@@ -40,7 +40,7 @@ use crate::{FastBlurChannels, ThreadingPolicy};
 use num_traits::{AsPrimitive, FromPrimitive};
 use std::ops::AddAssign;
 
-fn stack_blur_pass_f<T, J, const COMPONENTS: usize>(
+pub(crate) fn stack_blur_pass_f<T, J, const COMPONENTS: usize>(
     pixels: &UnsafeSlice<T>,
     stride: u32,
     width: u32,

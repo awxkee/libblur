@@ -545,6 +545,7 @@ fn fast_gaussian_next_impl<
     if std::any::type_name::<T>() == "f32"
         || std::any::type_name::<T>() == "f16"
         || std::any::type_name::<T>() == "half::f16"
+        || std::any::type_name::<T>() == "half::binary16::f16"
     {
         _dispatcher_vertical = if BASE_RADIUS_I64_CUTOFF > radius {
             fast_gaussian_next_vertical_pass::<T, f32, f32, CHANNEL_CONFIGURATION, EDGE_MODE>

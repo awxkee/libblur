@@ -30,6 +30,7 @@ use colorutils_rs::planar_to_linear::plane_to_linear;
 use colorutils_rs::{
     linear_to_rgb, linear_to_rgba, rgb_to_linear, rgba_to_linear, TransferFunction,
 };
+use half::f16;
 use num_traits::cast::FromPrimitive;
 use num_traits::{AsPrimitive, Float};
 
@@ -37,7 +38,8 @@ use crate::channels_configuration::FastBlurChannels;
 use crate::edge_mode::reflect_index;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::{
-    fast_gaussian_horizontal_pass_neon_f32, fast_gaussian_horizontal_pass_neon_u8,
+    fast_gaussian_horizontal_pass_neon_f16, fast_gaussian_horizontal_pass_neon_f32,
+    fast_gaussian_horizontal_pass_neon_u8, fast_gaussian_vertical_pass_neon_f16,
     fast_gaussian_vertical_pass_neon_f32, fast_gaussian_vertical_pass_neon_u8,
 };
 #[cfg(all(
@@ -617,6 +619,7 @@ fn fast_gaussian_impl<
         if std::any::type_name::<T>() == "f32"
             || std::any::type_name::<T>() == "f16"
             || std::any::type_name::<T>() == "half::f16"
+            || std::any::type_name::<T>() == "half::binary16::f16"
         {
             _dispatcher_vertical = if BASE_RADIUS_I64_CUTOFF > radius {
                 fast_gaussian_vertical_pass::<T, f32, f32, CHANNEL_CONFIGURATION, EDGE_MODE>
@@ -628,12 +631,31 @@ fn fast_gaussian_impl<
             } else {
                 fast_gaussian_horizontal_pass::<T, f64, f64, CHANNEL_CONFIGURATION, EDGE_MODE>
             };
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            if std::any::type_name::<T>() == "f32" {
+                #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+                {
+                    _dispatcher_vertical =
+                        fast_gaussian_vertical_pass_neon_f32::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
+                    _dispatcher_horizontal = fast_gaussian_horizontal_pass_neon_f32::<
+                        T,
+                        CHANNEL_CONFIGURATION,
+                        EDGE_MODE,
+                    >;
+                }
+            } else if std::any::type_name::<T>() == "f16"
+                || std::any::type_name::<T>() == "half::f16"
+                || std::any::type_name::<T>() == "half::binary16::f16"
             {
-                _dispatcher_vertical =
-                    fast_gaussian_vertical_pass_neon_f32::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
-                _dispatcher_horizontal =
-                    fast_gaussian_horizontal_pass_neon_f32::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
+                #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+                {
+                    _dispatcher_vertical =
+                        fast_gaussian_vertical_pass_neon_f16::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
+                    _dispatcher_horizontal = fast_gaussian_horizontal_pass_neon_f16::<
+                        T,
+                        CHANNEL_CONFIGURATION,
+                        EDGE_MODE,
+                    >;
+                }
             }
         }
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
@@ -935,7 +957,7 @@ pub fn fast_gaussian_in_linear(
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn fast_gaussian_f16(
-    bytes: &mut [u16],
+    bytes: &mut [f16],
     width: u32,
     height: u32,
     radius: u32,

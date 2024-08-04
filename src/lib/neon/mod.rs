@@ -33,6 +33,9 @@ mod stack_blur_f32;
 mod stack_blur_i32;
 mod stack_blur_i64;
 mod utils;
+mod f16_utils;
+mod stack_blur_f16;
+mod fast_gaussian_f16;
 
 pub use fast_gaussian::*;
 pub use fast_gaussian_f32::fast_gaussian_horizontal_pass_neon_f32;
@@ -44,3 +47,5 @@ pub use stack_blur_f32::stack_blur_pass_neon_f32;
 pub use stack_blur_i32::*;
 pub use stack_blur_i64::stack_blur_pass_neon_i64;
 pub use utils::*;
+pub use stack_blur_f16::stack_blur_pass_neon_f16;
+pub use fast_gaussian_f16::{fast_gaussian_vertical_pass_neon_f16, fast_gaussian_horizontal_pass_neon_f16};
