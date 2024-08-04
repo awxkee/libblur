@@ -63,7 +63,7 @@ pub fn fast_gaussian_horizontal_pass_sse_u8<
     let v_mul_value = unsafe { _mm_set1_epi64x(mul_value as i64) };
     let v_shr_value = unsafe { _mm_setr_epi32(shr_value, 0, 0, 0) };
     for y in start..std::cmp::min(height, end) {
-        let mut diffs = unsafe { _mm_set1_epi32(0) };
+        let mut diffs = unsafe { _mm_setzero_si128() };
         let mut summs = unsafe { _mm_set1_epi32(initial_sum) };
 
         let current_y = ((y as i64) * (stride as i64)) as usize;
@@ -166,7 +166,7 @@ pub(crate) fn fast_gaussian_vertical_pass_sse_u8<
     let v_mul_value = unsafe { _mm_set1_epi64x(mul_value as i64) };
     let v_shr_value = unsafe { _mm_setr_epi32(shr_value, 0, 0, 0) };
     for x in start..std::cmp::min(width, end) {
-        let mut diffs = unsafe { _mm_set1_epi32(0) };
+        let mut diffs = unsafe { _mm_setzero_si128() };
         let mut summs = unsafe { _mm_set1_epi32(initial_sum) };
 
         let start_y = 0 - 2 * radius as i64;
@@ -212,7 +212,7 @@ pub(crate) fn fast_gaussian_vertical_pass_sse_u8<
                 let mut d_stored = unsafe { _mm_loadu_si128(d_buf_ptr as *const __m128i) };
                 d_stored = unsafe { _mm_slli_epi32::<1>(d_stored) };
 
-                let buf_ptr = buffer[arr_index].as_mut_ptr();
+                let buf_ptr = unsafe { buffer.as_mut_ptr().add(arr_index) as * mut i32 };
                 let a_stored = unsafe { _mm_loadu_si128(buf_ptr as *const __m128i) };
 
                 diffs = unsafe { _mm_add_epi32(diffs, _mm_sub_epi32(a_stored, d_stored)) };

@@ -51,6 +51,11 @@ use crate::threading_policy::ThreadingPolicy;
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, reflect_101, EdgeMode};
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+))]
+use crate::sse::{fast_gaussian_vertical_pass_sse_f32, fast_gaussian_horizontal_pass_sse_f32};
 
 const BASE_RADIUS_I64_CUTOFF: u32 = 180;
 
@@ -641,6 +646,14 @@ fn fast_gaussian_impl<
                         CHANNEL_CONFIGURATION,
                         EDGE_MODE,
                     >;
+                }
+                #[cfg(all(
+                    any(target_arch = "x86_64", target_arch = "x86"),
+                    target_feature = "sse4.1"
+                ))]
+                {
+                    _dispatcher_vertical = fast_gaussian_vertical_pass_sse_f32::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
+                    _dispatcher_horizontal = fast_gaussian_horizontal_pass_sse_f32::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
                 }
             } else if std::any::type_name::<T>() == "f16"
                 || std::any::type_name::<T>() == "half::f16"
