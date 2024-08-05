@@ -25,7 +25,10 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::sse::{_mm_loadu_ps_x4, _mm_split_rgb_5_ps, load_f32, store_f32};
+use crate::sse::{
+    _mm_broadcast_first, _mm_broadcast_fourth, _mm_broadcast_second, _mm_broadcast_third,
+    _mm_loadu_ps_x4, _mm_split_rgb_5_ps, load_f32, store_f32,
+};
 use crate::unsafe_slice::UnsafeSlice;
 use erydanos::_mm_prefer_fma_ps;
 #[cfg(target_arch = "x86")]
@@ -35,52 +38,20 @@ use std::arch::x86_64::*;
 
 macro_rules! accumulate_5_items {
     ($store0:expr, $pixel_colors_0:expr, $f_weights:expr, $last_weight:expr) => {{
-        $store0 = _mm_prefer_fma_ps(
-            $store0,
-            $pixel_colors_0.0,
-            _mm_set1_ps(f32::from_bits(_mm_extract_ps::<0>($f_weights) as u32)),
-        );
-        $store0 = _mm_prefer_fma_ps(
-            $store0,
-            $pixel_colors_0.1,
-            _mm_set1_ps(f32::from_bits(_mm_extract_ps::<1>($f_weights) as u32)),
-        );
-        $store0 = _mm_prefer_fma_ps(
-            $store0,
-            $pixel_colors_0.2,
-            _mm_set1_ps(f32::from_bits(_mm_extract_ps::<2>($f_weights) as u32)),
-        );
-        $store0 = _mm_prefer_fma_ps(
-            $store0,
-            $pixel_colors_0.3,
-            _mm_set1_ps(f32::from_bits(_mm_extract_ps::<3>($f_weights) as u32)),
-        );
+        $store0 = _mm_prefer_fma_ps($store0, $pixel_colors_0.0, _mm_broadcast_first($f_weights));
+        $store0 = _mm_prefer_fma_ps($store0, $pixel_colors_0.1, _mm_broadcast_second($f_weights));
+        $store0 = _mm_prefer_fma_ps($store0, $pixel_colors_0.2, _mm_broadcast_third($f_weights));
+        $store0 = _mm_prefer_fma_ps($store0, $pixel_colors_0.3, _mm_broadcast_fourth($f_weights));
         $store0 = _mm_prefer_fma_ps($store0, $pixel_colors_0.4, _mm_set1_ps($last_weight));
     }};
 }
 
 macro_rules! accumulate_4_items {
     ($store0:expr, $pixel_colors_0:expr, $f_weights:expr) => {{
-        $store0 = _mm_prefer_fma_ps(
-            $store0,
-            $pixel_colors_0.0,
-            _mm_set1_ps(f32::from_bits(_mm_extract_ps::<0>($f_weights) as u32)),
-        );
-        $store0 = _mm_prefer_fma_ps(
-            $store0,
-            $pixel_colors_0.1,
-            _mm_set1_ps(f32::from_bits(_mm_extract_ps::<1>($f_weights) as u32)),
-        );
-        $store0 = _mm_prefer_fma_ps(
-            $store0,
-            $pixel_colors_0.2,
-            _mm_set1_ps(f32::from_bits(_mm_extract_ps::<2>($f_weights) as u32)),
-        );
-        $store0 = _mm_prefer_fma_ps(
-            $store0,
-            $pixel_colors_0.3,
-            _mm_set1_ps(f32::from_bits(_mm_extract_ps::<3>($f_weights) as u32)),
-        );
+        $store0 = _mm_prefer_fma_ps($store0, $pixel_colors_0.0, _mm_broadcast_first($f_weights));
+        $store0 = _mm_prefer_fma_ps($store0, $pixel_colors_0.1, _mm_broadcast_second($f_weights));
+        $store0 = _mm_prefer_fma_ps($store0, $pixel_colors_0.2, _mm_broadcast_third($f_weights));
+        $store0 = _mm_prefer_fma_ps($store0, $pixel_colors_0.3, _mm_broadcast_fourth($f_weights));
     }};
 }
 
@@ -121,7 +92,7 @@ pub fn gaussian_horiz_sse_t_f_chan_f32<T, const CHANNEL_CONFIGURATION: usize>(
                     let pixel_colors_1 = load_f32::<CHANNEL_CONFIGURATION>(s_ptr_next);
                     for i in 0..diff as usize {
                         let weights = kernel.as_ptr().add(i);
-                        let f_weight = _mm_set1_ps(weights.read_unaligned());
+                        let f_weight = _mm_load1_ps(weights);
                         store0 = _mm_prefer_fma_ps(store0, pixel_colors_0, f_weight);
                         store1 = _mm_prefer_fma_ps(store1, pixel_colors_1, f_weight);
                     }
@@ -208,7 +179,7 @@ pub fn gaussian_horiz_sse_t_f_chan_f32<T, const CHANNEL_CONFIGURATION: usize>(
                     let s_ptr_next = s_ptr.add(src_stride as usize);
                     let pixel_colors_1 = load_f32::<CHANNEL_CONFIGURATION>(s_ptr_next);
                     let weight = kernel.as_ptr().add((r + half_kernel) as usize);
-                    let f_weight = _mm_set1_ps(weight.read_unaligned());
+                    let f_weight = _mm_load1_ps(weight);
                     store0 = _mm_prefer_fma_ps(store0, pixel_colors_0, f_weight);
                     store1 = _mm_prefer_fma_ps(store1, pixel_colors_1, f_weight);
 
@@ -242,7 +213,7 @@ pub fn gaussian_horiz_sse_t_f_chan_f32<T, const CHANNEL_CONFIGURATION: usize>(
                     let pixel_colors_f32 = load_f32::<CHANNEL_CONFIGURATION>(s_ptr);
                     for i in 0..diff as usize {
                         let weights = kernel.as_ptr().add(i);
-                        let f_weight = _mm_set1_ps(weights.read_unaligned());
+                        let f_weight = _mm_load1_ps(weights);
                         store = _mm_prefer_fma_ps(store, pixel_colors_f32, f_weight);
                     }
                     r += diff as i32;
@@ -295,7 +266,7 @@ pub fn gaussian_horiz_sse_t_f_chan_f32<T, const CHANNEL_CONFIGURATION: usize>(
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors_f32 = load_f32::<CHANNEL_CONFIGURATION>(s_ptr);
                     let weight = kernel.as_ptr().add((r + half_kernel) as usize);
-                    let f_weight = _mm_set1_ps(weight.read_unaligned());
+                    let f_weight = _mm_load1_ps(weight);
                     store = _mm_prefer_fma_ps(store, pixel_colors_f32, f_weight);
 
                     r += 1;

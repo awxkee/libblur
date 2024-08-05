@@ -36,12 +36,12 @@ use rayon::ThreadPool;
 
 use crate::channels_configuration::FastBlurChannels;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use crate::r#box::box_blur_neon::neon_support;
+use crate::r#box::box_blur_neon::*;
 #[cfg(all(
     any(target_arch = "x86_64", target_arch = "x86"),
     target_feature = "sse4.1"
 ))]
-use crate::r#box::box_blur_sse::sse_support;
+use crate::r#box::box_blur_sse::*;
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::ThreadingPolicy;
@@ -189,15 +189,18 @@ fn box_blur_horizontal_pass<
         start_y: u32,
         end_y: u32,
     ) = box_blur_horizontal_pass_impl::<T, u32, CHANNEL_CONFIGURATION>;
-    if std::any::type_name::<T>() == "f32" || std::any::type_name::<T>() == "f16" {
+    if std::any::type_name::<T>() == "f32"
+        || std::any::type_name::<T>() == "f16"
+        || std::any::type_name::<T>() == "half::f16"
+        || std::any::type_name::<T>() == "half::binary16::f16"
+    {
         _dispatcher_horizontal = box_blur_horizontal_pass_impl::<T, f32, CHANNEL_CONFIGURATION>;
     }
     if CHANNEL_CONFIGURATION >= 3 {
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             if std::any::type_name::<T>() == "u8" {
-                _dispatcher_horizontal =
-                    neon_support::box_blur_horizontal_pass_neon::<T, CHANNEL_CONFIGURATION>;
+                _dispatcher_horizontal = box_blur_horizontal_pass_neon::<T, CHANNEL_CONFIGURATION>;
             }
         }
         #[cfg(all(
@@ -207,7 +210,7 @@ fn box_blur_horizontal_pass<
         {
             if std::any::type_name::<T>() == "u8" {
                 _dispatcher_horizontal =
-                    sse_support::box_blur_horizontal_pass_sse::<T, { CHANNEL_CONFIGURATION }>;
+                    box_blur_horizontal_pass_sse::<T, { CHANNEL_CONFIGURATION }>;
             }
         }
     }
@@ -382,7 +385,11 @@ fn box_blur_vertical_pass<
         start_x: u32,
         end_x: u32,
     ) = box_blur_vertical_pass_impl::<T, u32, CHANNEL_CONFIGURATION>;
-    if std::any::type_name::<T>() == "f32" || std::any::type_name::<T>() == "f16" {
+    if std::any::type_name::<T>() == "f32"
+        || std::any::type_name::<T>() == "f16"
+        || std::any::type_name::<T>() == "half::f16"
+        || std::any::type_name::<T>() == "half::binary16::f16"
+    {
         _dispatcher_vertical = box_blur_vertical_pass_impl::<T, f32, CHANNEL_CONFIGURATION>;
     }
     if CHANNEL_CONFIGURATION >= 3 {
@@ -392,15 +399,13 @@ fn box_blur_vertical_pass<
         ))]
         {
             if std::any::type_name::<T>() == "u8" {
-                _dispatcher_vertical =
-                    sse_support::box_blur_vertical_pass_sse::<T, CHANNEL_CONFIGURATION>;
+                _dispatcher_vertical = box_blur_vertical_pass_sse::<T, CHANNEL_CONFIGURATION>;
             }
         }
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             if std::any::type_name::<T>() == "u8" {
-                _dispatcher_vertical =
-                    neon_support::box_blur_vertical_pass_neon::<T, CHANNEL_CONFIGURATION>;
+                _dispatcher_vertical = box_blur_vertical_pass_neon::<T, CHANNEL_CONFIGURATION>;
             }
         }
     }

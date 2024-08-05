@@ -155,12 +155,8 @@ pub fn gaussian_blur_horizontal_pass_filter_sse<T, const CHANNEL_CONFIGURATION: 
                     let mut pixel_colors_1 = _mm_loadu_si128(s_ptr_1 as *const __m128i);
 
                     let weights_ptr = filter_weights.as_ptr().add(j);
-                    let weights = _mm_setr_ps(
-                        weights_ptr.read_unaligned(),
-                        weights_ptr.add(1).read_unaligned(),
-                        0.,
-                        0.,
-                    );
+                    let weights = _mm_castsi128_ps(_mm_loadu_si64(weights_ptr as *const u8));
+
                     if CHANNEL_CONFIGURATION == 3 {
                         pixel_colors_0 = _mm_shuffle_epi8(pixel_colors_0, shuffle_rgb);
                         pixel_colors_1 = _mm_shuffle_epi8(pixel_colors_1, shuffle_rgb);
@@ -245,12 +241,7 @@ pub fn gaussian_blur_horizontal_pass_filter_sse<T, const CHANNEL_CONFIGURATION: 
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let mut pixel_colors = _mm_loadu_si128(s_ptr as *const __m128i);
                     let weights_ptr = filter_weights.as_ptr().add(j);
-                    let weights = _mm_setr_ps(
-                        weights_ptr.read_unaligned(),
-                        weights_ptr.add(1).read_unaligned(),
-                        0.,
-                        0.,
-                    );
+                    let weights = _mm_castsi128_ps(_mm_loadu_si64(weights_ptr as *const u8));
                     if CHANNEL_CONFIGURATION == 3 {
                         pixel_colors = _mm_shuffle_epi8(pixel_colors, shuffle_rgb);
                     }

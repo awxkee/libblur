@@ -71,9 +71,9 @@ pub fn stack_blur_pass_sse_f16<const COMPONENTS: usize>(
             let max_y = (thread + 1) * height as usize / total_threads;
 
             for y in min_y..max_y {
-                sums = _mm_set1_ps(0f32);
-                sum_in = _mm_set1_ps(0f32);
-                sum_out = _mm_set1_ps(0f32);
+                sums = _mm_set1_ps(0.);
+                sum_in = _mm_set1_ps(0.);
+                sum_out = _mm_set1_ps(0.);
 
                 src_ptr = stride as usize * y; // start of line (0,y)
 
@@ -157,9 +157,9 @@ pub fn stack_blur_pass_sse_f16<const COMPONENTS: usize>(
             let max_x = (thread + 1) * width as usize / total_threads;
 
             for x in min_x..max_x {
-                sums = _mm_set1_ps(0f32);
-                sum_in = _mm_set1_ps(0f32);
-                sum_out = _mm_set1_ps(0f32);
+                sums = _mm_set1_ps(0.);
+                sum_in = _mm_set1_ps(0.);
+                sum_out = _mm_set1_ps(0.);
 
                 src_ptr = COMPONENTS * x; // x,0
 

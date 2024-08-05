@@ -7,7 +7,11 @@ use colorutils_rs::TransferFunction;
 use half::f16;
 use image::io::Reader as ImageReader;
 use image::{EncodableLayout, GenericImageView};
-use libblur::{fast_gaussian, fast_gaussian_f16, fast_gaussian_f32, fast_gaussian_next_f16, fast_gaussian_next_f32, stack_blur_f16, stack_blur_f32, EdgeMode, FastBlurChannels, ThreadingPolicy, fast_gaussian_next};
+use libblur::{
+    fast_gaussian, fast_gaussian_f16, fast_gaussian_f32, fast_gaussian_next,
+    fast_gaussian_next_f16, fast_gaussian_next_f32, stack_blur, stack_blur_f16, stack_blur_f32,
+    stack_blur_in_linear, EdgeMode, FastBlurChannels, ThreadingPolicy,
+};
 use std::time::Instant;
 
 #[allow(dead_code)]
@@ -133,7 +137,7 @@ fn main() {
     //     vst1q_s64(t.as_mut_ptr(), mul);
     //     println!("{:?}", t);
     // }
-    let img = ImageReader::open("assets/test_image_1_small.jpg")
+    let img = ImageReader::open("assets/test_image_1.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -221,15 +225,29 @@ fn main() {
     //     .map(|&x| f16::from_f32(x as f32 * (1. / 255.)))
     //     .collect();
 
-    // fast_gaussian_next(
+    libblur::gaussian_blur_in_linear(
+        &bytes,
+        stride as u32,
+        &mut dst_bytes,
+        stride as u32,
+        dimensions.0,
+        dimensions.1,
+        67 * 2 + 1,
+        67. * 2f32 / 6f32,
+        FastBlurChannels::Channels3,
+        EdgeMode::Clamp,
+        ThreadingPolicy::Single,
+        TransferFunction::Srgb,
+    );
+
+    // stack_blur(
     //     &mut dst_bytes,
     //     dimensions.0 * 3,
     //     dimensions.0,
     //     dimensions.1,
-    //     15,
+    //     75,
     //     FastBlurChannels::Channels3,
     //     ThreadingPolicy::Single,
-    //     EdgeMode::Clamp,
     // );
 
     // dst_bytes = f16_bytes
@@ -237,7 +255,7 @@ fn main() {
     //     .map(|&x| (x.to_f32() * 255f32) as u8)
     //     .collect();
 
-    dst_bytes = perform_planar_pass_3(&bytes, dimensions.0 as usize, dimensions.1 as usize);
+    // dst_bytes = perform_planar_pass_3(&bytes, dimensions.0 as usize, dimensions.1 as usize);
 
     let elapsed_time = start_time.elapsed();
     // Print the elapsed time in milliseconds

@@ -27,6 +27,7 @@
 
 use crate::reflect_101;
 use crate::reflect_index;
+use crate::sse::store_u8_u32;
 use crate::sse::utils::load_u8_s32_fast;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, EdgeMode};
@@ -34,7 +35,6 @@ use crate::{clamp_edge, EdgeMode};
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
-use crate::sse::store_u8_u32;
 
 pub fn fast_gaussian_next_vertical_pass_sse_u8<
     T,
@@ -82,8 +82,7 @@ pub fn fast_gaussian_next_vertical_pass_sse_u8<
                 let bytes_offset = current_y + current_px;
 
                 unsafe {
-                    let dst_ptr =
-                        (bytes.slice.as_ptr() as *mut u8).add(bytes_offset);
+                    let dst_ptr = (bytes.slice.as_ptr() as *mut u8).add(bytes_offset);
                     store_u8_u32::<CHANNELS_COUNT>(dst_ptr, prepared_px_s32);
                 }
 
@@ -193,8 +192,7 @@ pub(crate) fn fast_gaussian_next_horizontal_pass_sse_u8<
                 let bytes_offset = current_y + current_px;
 
                 unsafe {
-                    let dst_ptr =
-                        (bytes.slice.as_ptr() as *mut u8).add(bytes_offset);
+                    let dst_ptr = (bytes.slice.as_ptr() as *mut u8).add(bytes_offset);
                     store_u8_u32::<CHANNELS_COUNT>(dst_ptr, prepared_px_s32);
                 }
 

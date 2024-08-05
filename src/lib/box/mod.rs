@@ -26,7 +26,12 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 mod box_blur;
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 mod box_blur_neon;
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    target_feature = "sse4.1"
+))]
 mod box_blur_sse;
 
 pub use box_blur::*;

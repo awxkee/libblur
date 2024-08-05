@@ -67,8 +67,8 @@ pub fn gaussian_blur_vertical_pass_neon<T, const CHANNEL_CONFIGURATION: usize>(
 
                 let mut r = -half_kernel;
                 while r <= half_kernel {
-                    let weight = *kernel.get_unchecked((r + half_kernel) as usize);
-                    let f_weight: float32x4_t = vdupq_n_f32(weight);
+                    let weight = kernel.as_ptr().add((r + half_kernel) as usize);
+                    let f_weight: float32x4_t = vld1q_dup_f32(weight);
 
                     let py =
                         std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
@@ -133,8 +133,8 @@ pub fn gaussian_blur_vertical_pass_neon<T, const CHANNEL_CONFIGURATION: usize>(
 
                 let mut r = -half_kernel;
                 while r <= half_kernel {
-                    let weight = *kernel.get_unchecked((r + half_kernel) as usize);
-                    let f_weight: float32x4_t = vdupq_n_f32(weight);
+                    let weight = kernel.as_ptr().add((r + half_kernel) as usize);
+                    let f_weight: float32x4_t = vld1q_dup_f32(weight);
 
                     let py =
                         std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
@@ -177,8 +177,8 @@ pub fn gaussian_blur_vertical_pass_neon<T, const CHANNEL_CONFIGURATION: usize>(
 
                 let mut r = -half_kernel;
                 while r <= half_kernel {
-                    let weight = *kernel.get_unchecked((r + half_kernel) as usize);
-                    let f_weight: float32x4_t = vdupq_n_f32(weight);
+                    let weight = kernel.as_ptr().add((r + half_kernel) as usize);
+                    let f_weight: float32x4_t = vld1q_dup_f32(weight);
 
                     let py =
                         std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
@@ -212,8 +212,8 @@ pub fn gaussian_blur_vertical_pass_neon<T, const CHANNEL_CONFIGURATION: usize>(
 
                 let mut r = -half_kernel;
                 while r <= half_kernel {
-                    let weight = *kernel.get_unchecked((r + half_kernel) as usize);
-                    let f_weight: float32x4_t = vdupq_n_f32(weight);
+                    let weight = kernel.as_ptr().add((r + half_kernel) as usize);
+                    let f_weight: float32x4_t = vld1q_dup_f32(weight);
 
                     let py =
                         std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
@@ -245,8 +245,8 @@ pub fn gaussian_blur_vertical_pass_neon<T, const CHANNEL_CONFIGURATION: usize>(
 
                 let mut r = -half_kernel;
                 while r <= half_kernel {
-                    let weight = *kernel.get_unchecked((r + half_kernel) as usize);
-                    let f_weight = vdup_n_f32(weight);
+                    let weight = kernel.as_ptr().add((r + half_kernel) as usize);
+                    let f_weight = vld1_dup_f32(weight);
 
                     let py =
                         std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);

@@ -154,7 +154,7 @@ pub fn gaussian_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
                         load_u8_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr_next_3);
                     for i in 0..diff as usize {
                         let weights = kernel.as_ptr().add(i);
-                        let f_weight = vdupq_n_f32(weights.read_unaligned());
+                        let f_weight = vld1q_dup_f32(weights);
                         store_0 = prefer_vfmaq_f32(store_0, pixel_colors_f32_0, f_weight);
                         store_1 = prefer_vfmaq_f32(store_1, pixel_colors_f32_1, f_weight);
                         store_2 = prefer_vfmaq_f32(store_2, pixel_colors_f32_2, f_weight);
@@ -273,8 +273,8 @@ pub fn gaussian_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
                     let pixel_colors_f32_1 = vcvtq_f32_u32(pixel_colors_u32_1);
                     let pixel_colors_f32_2 = vcvtq_f32_u32(pixel_colors_u32_2);
                     let pixel_colors_f32_3 = vcvtq_f32_u32(pixel_colors_u32_3);
-                    let weight = *kernel.get_unchecked((r + half_kernel) as usize);
-                    let f_weight: float32x4_t = vdupq_n_f32(weight);
+                    let weight = kernel.as_ptr().add((r + half_kernel) as usize);
+                    let f_weight: float32x4_t = vld1q_dup_f32(weight);
                     store_0 = prefer_vfmaq_f32(store_0, pixel_colors_f32_0, f_weight);
                     store_1 = prefer_vfmaq_f32(store_1, pixel_colors_f32_1, f_weight);
                     store_2 = prefer_vfmaq_f32(store_2, pixel_colors_f32_2, f_weight);
@@ -312,7 +312,7 @@ pub fn gaussian_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
                     let pixel_colors_f32_1 = load_u8_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr_next);
                     for i in 0..diff as usize {
                         let weights = kernel.as_ptr().add(i);
-                        let f_weight = vdupq_n_f32(weights.read_unaligned());
+                        let f_weight = vld1q_dup_f32(weights);
                         store_0 = prefer_vfmaq_f32(store_0, pixel_colors_f32_0, f_weight);
                         store_1 = prefer_vfmaq_f32(store_1, pixel_colors_f32_1, f_weight);
                     }
@@ -439,7 +439,7 @@ pub fn gaussian_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
                     let pixel_colors_f32_0 = load_u8_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr);
                     for i in 0..diff as usize {
                         let weights = kernel.as_ptr().add(i);
-                        let f_weight = vdupq_n_f32(weights.read_unaligned());
+                        let f_weight = vld1q_dup_f32(weights);
                         store = prefer_vfmaq_f32(store, pixel_colors_f32_0, f_weight);
                     }
                     r += diff as i32;
@@ -490,8 +490,8 @@ pub fn gaussian_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors_u32 = load_u8_u32_fast::<CHANNEL_CONFIGURATION>(s_ptr);
                     let pixel_colors_f32 = vcvtq_f32_u32(pixel_colors_u32);
-                    let weight = *kernel.get_unchecked((r + half_kernel) as usize);
-                    let f_weight: float32x4_t = vdupq_n_f32(weight);
+                    let weight = kernel.as_ptr().add((r + half_kernel) as usize);
+                    let f_weight: float32x4_t = vld1q_dup_f32(weight);
                     store = prefer_vfmaq_f32(store, pixel_colors_f32, f_weight);
 
                     r += 1;

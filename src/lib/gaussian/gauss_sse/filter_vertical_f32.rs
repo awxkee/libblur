@@ -69,8 +69,8 @@ pub fn gaussian_blur_vertical_pass_filter_f32_sse<T, const CHANNEL_CONFIGURATION
 
                 let mut j = 0usize;
                 while j < current_filter.size {
-                    let weight = *filter_weights.get_unchecked(j);
-                    let f_weight = _mm_set1_ps(weight);
+                    let weight = filter_weights.as_ptr().add(j);
+                    let f_weight = _mm_load1_ps(weight);
 
                     let py = filter_start + j;
                     let y_src_shift = py * src_stride as usize;
@@ -110,8 +110,8 @@ pub fn gaussian_blur_vertical_pass_filter_f32_sse<T, const CHANNEL_CONFIGURATION
 
                 let mut j = 0usize;
                 while j < current_filter.size {
-                    let weight = *filter_weights.get_unchecked(j);
-                    let f_weight = _mm_set1_ps(weight);
+                    let weight = filter_weights.as_ptr().add(j);
+                    let f_weight = _mm_load1_ps(weight);
 
                     let py = filter_start + j;
                     let y_src_shift = py * src_stride as usize;
@@ -143,8 +143,8 @@ pub fn gaussian_blur_vertical_pass_filter_f32_sse<T, const CHANNEL_CONFIGURATION
 
                 let mut j = 0usize;
                 while j < current_filter.size {
-                    let weight = *filter_weights.get_unchecked(j);
-                    let f_weight = _mm_set1_ps(weight);
+                    let weight = filter_weights.as_ptr().add(j);
+                    let f_weight = _mm_load1_ps(weight);
 
                     let py = filter_start + j;
                     let y_src_shift = py * src_stride as usize;
@@ -169,8 +169,8 @@ pub fn gaussian_blur_vertical_pass_filter_f32_sse<T, const CHANNEL_CONFIGURATION
 
                 let mut j = 0usize;
                 while j < current_filter.size {
-                    let weight = *filter_weights.get_unchecked(j);
-                    let f_weight = _mm_set1_ps(weight);
+                    let weight = filter_weights.as_ptr().add(j);
+                    let f_weight = _mm_load1_ps(weight);
 
                     let py = filter_start + j;
                     let y_src_shift = py * src_stride as usize;
@@ -192,8 +192,8 @@ pub fn gaussian_blur_vertical_pass_filter_f32_sse<T, const CHANNEL_CONFIGURATION
 
                 let mut j = 0usize;
                 while j < current_filter.size {
-                    let weight = *filter_weights.get_unchecked(j);
-                    let f_weight = _mm_set1_ps(weight);
+                    let weight = filter_weights.as_ptr().add(j);
+                    let f_weight = _mm_load1_ps(weight);
 
                     let py = filter_start + j;
                     let y_src_shift = py * src_stride as usize;

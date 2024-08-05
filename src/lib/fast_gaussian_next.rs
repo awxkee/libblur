@@ -618,11 +618,8 @@ fn fast_gaussian_next_impl<
     {
         if BASE_RADIUS_I64_CUTOFF > radius {
             if std::any::type_name::<T>() == "u8" {
-                _dispatcher_vertical = fast_gaussian_next_vertical_pass_neon_u8::<
-                    T,
-                    CHANNEL_CONFIGURATION,
-                    EDGE_MODE,
-                >;
+                _dispatcher_vertical =
+                    fast_gaussian_next_vertical_pass_neon_u8::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
                 _dispatcher_horizontal = fast_gaussian_next_horizontal_pass_neon_u8::<
                     T,
                     CHANNEL_CONFIGURATION,
@@ -650,11 +647,8 @@ fn fast_gaussian_next_impl<
     {
         if BASE_RADIUS_I64_CUTOFF > radius {
             if std::any::type_name::<T>() == "u8" {
-                _dispatcher_vertical = fast_gaussian_next_vertical_pass_sse_u8::<
-                    T,
-                    CHANNEL_CONFIGURATION,
-                    EDGE_MODE,
-                >;
+                _dispatcher_vertical =
+                    fast_gaussian_next_vertical_pass_sse_u8::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
                 _dispatcher_horizontal = fast_gaussian_next_horizontal_pass_sse_u8::<
                     T,
                     CHANNEL_CONFIGURATION,

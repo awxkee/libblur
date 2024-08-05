@@ -30,7 +30,7 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-use erydanos::_mm_mul_epi64;
+use erydanos::{_mm_extract_epi64x, _mm_mul_epi64};
 #[cfg(target_feature = "f16c")]
 use half::f16;
 
@@ -172,18 +172,14 @@ pub(crate) unsafe fn store_f32<const CHANNELS_COUNT: usize>(dst_ptr: *mut f32, r
     if CHANNELS_COUNT == 4 {
         _mm_storeu_ps(dst_ptr, regi);
     } else if CHANNELS_COUNT == 3 {
-        dst_ptr.write_unaligned(f32::from_bits(_mm_extract_ps::<0>(regi) as u32));
-        dst_ptr
-            .add(1)
-            .write_unaligned(f32::from_bits(_mm_extract_ps::<1>(regi) as u32));
+        let lo_part = _mm_extract_epi64x::<0>(_mm_castps_si128(regi));
+        (dst_ptr as *mut i64).write_unaligned(lo_part);
         dst_ptr
             .add(2)
             .write_unaligned(f32::from_bits(_mm_extract_ps::<2>(regi) as u32));
     } else if CHANNELS_COUNT == 2 {
-        dst_ptr.write_unaligned(f32::from_bits(_mm_extract_ps::<0>(regi) as u32));
-        dst_ptr
-            .add(1)
-            .write_unaligned(f32::from_bits(_mm_extract_ps::<1>(regi) as u32));
+        let lo_part = _mm_extract_epi64x::<0>(_mm_castps_si128(regi));
+        (dst_ptr as *mut i64).write_unaligned(lo_part);
     } else {
         dst_ptr.write_unaligned(f32::from_bits(_mm_extract_ps::<0>(regi) as u32));
     }
@@ -200,13 +196,13 @@ pub(crate) unsafe fn store_u8_s32<const CHANNELS_COUNT: usize>(dst_ptr: *mut u8,
         casted_dst.write_unaligned(pixel_s32);
     } else if CHANNELS_COUNT == 3 {
         let pixel_bytes = pixel_s32.to_le_bytes();
-        dst_ptr.write_unaligned(pixel_bytes[0]);
-        dst_ptr.add(1).write_unaligned(pixel_bytes[1]);
+        let first_byte = u16::from_le_bytes([pixel_bytes[0], pixel_bytes[1]]);
+        (dst_ptr as *mut u16).write_unaligned(first_byte);
         dst_ptr.add(2).write_unaligned(pixel_bytes[2]);
     } else if CHANNELS_COUNT == 2 {
         let pixel_bytes = pixel_s32.to_le_bytes();
-        dst_ptr.write_unaligned(pixel_bytes[0]);
-        dst_ptr.add(1).write_unaligned(pixel_bytes[1]);
+        let first_byte = u16::from_le_bytes([pixel_bytes[0], pixel_bytes[1]]);
+        (dst_ptr as *mut u16).write_unaligned(first_byte);
     } else {
         let pixel_bytes = pixel_s32.to_le_bytes();
         dst_ptr.write_unaligned(pixel_bytes[0]);
@@ -224,13 +220,13 @@ pub(crate) unsafe fn store_u8_u32<const CHANNELS_COUNT: usize>(dst_ptr: *mut u8,
         casted_dst.write_unaligned(pixel_s32);
     } else if CHANNELS_COUNT == 3 {
         let pixel_bytes = pixel_s32.to_le_bytes();
-        dst_ptr.write_unaligned(pixel_bytes[0]);
-        dst_ptr.add(1).write_unaligned(pixel_bytes[1]);
+        let first_byte = u16::from_le_bytes([pixel_bytes[0], pixel_bytes[1]]);
+        (dst_ptr as *mut u16).write_unaligned(first_byte);
         dst_ptr.add(2).write_unaligned(pixel_bytes[2]);
     } else if CHANNELS_COUNT == 2 {
         let pixel_bytes = pixel_s32.to_le_bytes();
-        dst_ptr.write_unaligned(pixel_bytes[0]);
-        dst_ptr.add(1).write_unaligned(pixel_bytes[1]);
+        let first_byte = u16::from_le_bytes([pixel_bytes[0], pixel_bytes[1]]);
+        (dst_ptr as *mut u16).write_unaligned(first_byte);
     } else {
         let pixel_bytes = pixel_s32.to_le_bytes();
         dst_ptr.write_unaligned(pixel_bytes[0]);

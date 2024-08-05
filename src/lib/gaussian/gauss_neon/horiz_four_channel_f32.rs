@@ -32,52 +32,20 @@ use std::arch::aarch64::*;
 
 macro_rules! accumulate_5_items {
     ($store0:expr, $set:expr, $f_weights:expr, $last_weight:expr) => {{
-        $store0 = prefer_vfmaq_f32(
-            $store0,
-            $set.0,
-            vdupq_n_f32(vgetq_lane_f32::<0>($f_weights)),
-        );
-        $store0 = prefer_vfmaq_f32(
-            $store0,
-            $set.1,
-            vdupq_n_f32(vgetq_lane_f32::<1>($f_weights)),
-        );
-        $store0 = prefer_vfmaq_f32(
-            $store0,
-            $set.2,
-            vdupq_n_f32(vgetq_lane_f32::<2>($f_weights)),
-        );
-        $store0 = prefer_vfmaq_f32(
-            $store0,
-            $set.3,
-            vdupq_n_f32(vgetq_lane_f32::<3>($f_weights)),
-        );
+        $store0 = prefer_vfmaq_f32($store0, $set.0, vdupq_laneq_f32::<0>($f_weights));
+        $store0 = prefer_vfmaq_f32($store0, $set.1, vdupq_laneq_f32::<1>($f_weights));
+        $store0 = prefer_vfmaq_f32($store0, $set.2, vdupq_laneq_f32::<2>($f_weights));
+        $store0 = prefer_vfmaq_f32($store0, $set.3, vdupq_laneq_f32::<3>($f_weights));
         $store0 = prefer_vfmaq_f32($store0, $set.4, vdupq_n_f32($last_weight));
     }};
 }
 
 macro_rules! accumulate_4_items {
     ($store0:expr, $set:expr, $f_weights:expr) => {{
-        $store0 = prefer_vfmaq_f32(
-            $store0,
-            $set.0,
-            vdupq_n_f32(vgetq_lane_f32::<0>($f_weights)),
-        );
-        $store0 = prefer_vfmaq_f32(
-            $store0,
-            $set.1,
-            vdupq_n_f32(vgetq_lane_f32::<1>($f_weights)),
-        );
-        $store0 = prefer_vfmaq_f32(
-            $store0,
-            $set.2,
-            vdupq_n_f32(vgetq_lane_f32::<2>($f_weights)),
-        );
-        $store0 = prefer_vfmaq_f32(
-            $store0,
-            $set.3,
-            vdupq_n_f32(vgetq_lane_f32::<3>($f_weights)),
-        );
+        $store0 = prefer_vfmaq_f32($store0, $set.0, vdupq_laneq_f32::<0>($f_weights));
+        $store0 = prefer_vfmaq_f32($store0, $set.1, vdupq_laneq_f32::<1>($f_weights));
+        $store0 = prefer_vfmaq_f32($store0, $set.2, vdupq_laneq_f32::<2>($f_weights));
+        $store0 = prefer_vfmaq_f32($store0, $set.3, vdupq_laneq_f32::<3>($f_weights));
     }};
 }
 

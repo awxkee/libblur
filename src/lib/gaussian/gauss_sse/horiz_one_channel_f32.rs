@@ -82,8 +82,8 @@ pub fn gaussian_horiz_one_chan_f32<T>(
                     let s_ptr_next = src.as_ptr().add(y_src_shift_next); // Here we're always at zero
                     let pixel_colors_f32_1 = _mm_setr_ps(s_ptr_next.read_unaligned(), 0., 0., 0.);
                     for i in 0..diff as usize {
-                        let weight = *kernel.get_unchecked(i);
-                        let f_weight = _mm_setr_ps(weight, 0., 0., 0.);
+                        let weight = kernel.as_ptr().add(i);
+                        let f_weight = _mm_load_ss(weight);
                         store0 = _mm_prefer_fma_ps(store0, pixel_colors_f32_0, f_weight);
                         store1 = _mm_prefer_fma_ps(store1, pixel_colors_f32_1, f_weight);
                     }
@@ -199,8 +199,8 @@ pub fn gaussian_horiz_one_chan_f32<T>(
                     let s_ptr = src.as_ptr().add(y_src_shift); // Here we're always at zero
                     let pixel_colors_f32 = _mm_setr_ps(s_ptr.read_unaligned(), 0., 0., 0.);
                     for i in 0..diff as usize {
-                        let weight = *kernel.get_unchecked(i);
-                        let f_weight = _mm_setr_ps(weight, 0., 0., 0.);
+                        let weight = kernel.as_ptr().add(i);
+                        let f_weight = _mm_load_ss(weight);
                         store = _mm_prefer_fma_ps(store, pixel_colors_f32, f_weight);
                     }
                     r += diff as i32;
@@ -260,8 +260,8 @@ pub fn gaussian_horiz_one_chan_f32<T>(
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors_f32 = _mm_setr_ps(s_ptr.read_unaligned(), 0., 0., 0.);
-                    let weight = *kernel.get_unchecked((r + half_kernel) as usize);
-                    let f_weight = _mm_setr_ps(weight, 0., 0., 0.);
+                    let weight = kernel.as_ptr().add((r + half_kernel) as usize);
+                    let f_weight = _mm_load_ss(weight);
                     store = _mm_prefer_fma_ps(store, pixel_colors_f32, f_weight);
 
                     r += 1;
@@ -490,8 +490,8 @@ pub fn gaussian_horiz_one_chan_filter_f32<T>(
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors_f32 = _mm_setr_ps(s_ptr.read_unaligned(), 0., 0., 0.);
-                    let weight = filter_weights.as_ptr().add(r).read_unaligned();
-                    let f_weight = _mm_setr_ps(weight, 0., 0., 0.);
+                    let weight = filter_weights.as_ptr().add(r);
+                    let f_weight = _mm_load_ss(weight);
                     store = _mm_prefer_fma_ps(store, pixel_colors_f32, f_weight);
 
                     r += 1;

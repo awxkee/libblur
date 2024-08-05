@@ -66,8 +66,8 @@ pub fn gaussian_blur_vertical_pass_impl_f32_sse<T, const CHANNEL_CONFIGURATION: 
 
                 let mut r = -half_kernel;
                 while r <= half_kernel {
-                    let weight = *kernel.get_unchecked((r + half_kernel) as usize);
-                    let f_weight = _mm_set1_ps(weight);
+                    let weight = kernel.as_ptr().add((r + half_kernel) as usize);
+                    let f_weight = _mm_load1_ps(weight);
 
                     let py =
                         std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
@@ -108,8 +108,8 @@ pub fn gaussian_blur_vertical_pass_impl_f32_sse<T, const CHANNEL_CONFIGURATION: 
 
                 let mut r = -half_kernel;
                 while r <= half_kernel {
-                    let weight = *kernel.get_unchecked((r + half_kernel) as usize);
-                    let f_weight = _mm_set1_ps(weight);
+                    let weight = kernel.as_ptr().add((r + half_kernel) as usize);
+                    let f_weight = _mm_load1_ps(weight);
 
                     let py =
                         std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
@@ -142,8 +142,8 @@ pub fn gaussian_blur_vertical_pass_impl_f32_sse<T, const CHANNEL_CONFIGURATION: 
 
                 let mut r = -half_kernel;
                 while r <= half_kernel {
-                    let weight = *kernel.get_unchecked((r + half_kernel) as usize);
-                    let f_weight = _mm_set1_ps(weight);
+                    let weight = kernel.as_ptr().add((r + half_kernel) as usize);
+                    let f_weight = _mm_load1_ps(weight);
 
                     let py =
                         std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
@@ -168,8 +168,8 @@ pub fn gaussian_blur_vertical_pass_impl_f32_sse<T, const CHANNEL_CONFIGURATION: 
 
                 let mut r = -half_kernel;
                 while r <= half_kernel {
-                    let weight = *kernel.get_unchecked((r + half_kernel) as usize);
-                    let f_weight = _mm_set1_ps(weight);
+                    let weight = kernel.as_ptr().add((r + half_kernel) as usize);
+                    let f_weight = _mm_load1_ps(weight);
 
                     let py =
                         std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
@@ -192,8 +192,8 @@ pub fn gaussian_blur_vertical_pass_impl_f32_sse<T, const CHANNEL_CONFIGURATION: 
 
                 let mut r = -half_kernel;
                 while r <= half_kernel {
-                    let weight = *kernel.get_unchecked((r + half_kernel) as usize);
-                    let f_weight = _mm_set1_ps(weight);
+                    let weight = kernel.as_ptr().add((r + half_kernel) as usize);
+                    let f_weight = _mm_load1_ps(weight);
 
                     let py =
                         std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
