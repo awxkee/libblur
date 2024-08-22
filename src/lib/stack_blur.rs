@@ -34,6 +34,8 @@ use crate::unsafe_slice::UnsafeSlice;
 use crate::{FastBlurChannels, ThreadingPolicy};
 use num_traits::{AsPrimitive, FromPrimitive};
 use std::ops::AddAssign;
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+use crate::cpu_features::{is_x86_avx512dq_supported, is_x86_avx512vl_supported};
 
 const BASE_RADIUS_I64_CUTOFF: u32 = 150;
 
@@ -685,9 +687,9 @@ fn stack_blur_worker_horizontal(
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-    let _is_avx512dq_available = std::arch::is_x86_feature_detected!("avx512dq");
+    let _is_avx512dq_available = is_x86_avx512dq_supported();
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-    let _is_avx512vl_available = std::arch::is_x86_feature_detected!("avx512vl");
+    let _is_avx512vl_available = is_x86_avx512vl_supported();
     match channels {
         FastBlurChannels::Plane => {
             let mut _dispatcher: fn(
@@ -845,9 +847,9 @@ fn stack_blur_worker_vertical(
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-    let _is_avx512dq_available = std::arch::is_x86_feature_detected!("avx512dq");
+    let _is_avx512dq_available = is_x86_avx512dq_supported();
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-    let _is_avx512vl_available = std::arch::is_x86_feature_detected!("avx512vl");
+    let _is_avx512vl_available = is_x86_avx512vl_supported();
     match channels {
         FastBlurChannels::Plane => {
             let mut _dispatcher: fn(

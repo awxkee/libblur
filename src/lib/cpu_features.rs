@@ -27,7 +27,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(any(
+    all(target_arch = "aarch64", target_feature = "neon"),
+    any(target_arch = "x86", target_arch = "x86_64")
+))]
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 #[allow(dead_code)]
 fn apple_has_cpu_feature(feature_name: &str) -> bool {
@@ -55,7 +58,36 @@ fn apple_has_cpu_feature(feature_name: &str) -> bool {
     }
 }
 
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[allow(dead_code)]
+pub fn is_x86_avx512dq_supported() -> bool {
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    {
+        return apple_has_cpu_feature("hw.optional.avx512dq");
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+    {
+        return std::arch::is_x86_feature_detected!("avx512dq");
+    }
+}
+
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[allow(dead_code)]
+pub fn is_x86_avx512vl_supported() -> bool {
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    {
+        return apple_has_cpu_feature("hw.optional.avx512vl");
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+    {
+        return std::arch::is_x86_feature_detected!("avx512vl");
+    }
+}
+
+#[cfg(not(any(
+    all(target_arch = "aarch64", target_feature = "neon"),
+    any(target_arch = "x86", target_arch = "x86_64")
+)))]
 #[cfg(not(any(target_os = "macos", target_os = "ios")))]
 fn apple_has_cpu_feature(_feature_name: &str) -> bool {
     false
@@ -91,7 +123,6 @@ pub fn is_aarch_f16c_supported() -> bool {
         return true;
     }
 }
-
 
 /// Test aarch64 cpu with *fhm conversion* instructions.
 /// on *Apple* platform [libc](https://developer.apple.com/documentation/kernel/1387446-sysctlbyname/determining_instruction_set_characteristics) be used
