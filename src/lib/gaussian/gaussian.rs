@@ -273,10 +273,7 @@ fn gaussian_blur_vertical_pass<
     ) = gaussian_blur_vertical_pass_impl::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
     let edge_mode: EdgeMode = EDGE_MODE.into();
     if std::any::type_name::<T>() == "u8" && edge_mode == EdgeMode::Clamp {
-        #[cfg(all(
-            any(target_arch = "x86_64", target_arch = "x86"),
-            target_feature = "sse4.1"
-        ))]
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
             // Generally vertical pass do not depends on any specific channel configuration so it is allowed to make a vectorized calls for any channel
             if _is_sse_available {
