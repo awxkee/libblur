@@ -89,6 +89,7 @@ pub fn is_x86_avx512vl_supported() -> bool {
     any(target_arch = "x86", target_arch = "x86_64")
 )))]
 #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+#[allow(dead_code)]
 fn apple_has_cpu_feature(_feature_name: &str) -> bool {
     false
 }
