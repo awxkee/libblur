@@ -43,8 +43,6 @@ pub(crate) fn box_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usiz
 ) {
     let src: &[u8] = unsafe { std::mem::transmute(undefined_src) };
     let unsafe_dst: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(undefined_dst) };
-    let eraser_store: [u32; 4] = [1u32, 1u32, 1u32, 0u32];
-    let eraser: uint32x4_t = unsafe { vld1q_u32(eraser_store.as_ptr()) };
 
     let kernel_size = radius * 2 + 1;
     let edge_count = (kernel_size / 2) + 1;
@@ -167,13 +165,6 @@ pub(crate) fn box_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usiz
 
             let px = x as usize * CHANNEL_CONFIGURATION;
 
-            if CHANNEL_CONFIGURATION == 3 {
-                store_0 = unsafe { vmulq_u32(store_0, eraser) };
-                store_1 = unsafe { vmulq_u32(store_1, eraser) };
-                store_2 = unsafe { vmulq_u32(store_2, eraser) };
-                store_3 = unsafe { vmulq_u32(store_3, eraser) };
-            }
-
             let scale_store = unsafe { vmulq_u32_f32(store_0, v_weight) };
             let px_16 = unsafe { vqmovn_u32(scale_store) };
             let px_8 = unsafe { vqmovn_u16(vcombine_u16(px_16, px_16)) };
@@ -289,10 +280,6 @@ pub(crate) fn box_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usiz
 
             let px = x as usize * CHANNEL_CONFIGURATION;
 
-            if CHANNEL_CONFIGURATION == 3 {
-                store = unsafe { vmulq_u32(store, eraser) };
-            }
-
             let scale_store = unsafe { vmulq_u32_f32(store, v_weight) };
 
             let bytes_offset = y_dst_shift + px;
@@ -317,8 +304,6 @@ pub(crate) fn box_blur_vertical_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
 ) {
     let src: &[u8] = unsafe { std::mem::transmute(undefined_src) };
     let unsafe_dst: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(undefined_unsafe_dst) };
-    let eraser_store: [u32; 4] = [1u32, 1u32, 1u32, 0u32];
-    let eraser: uint32x4_t = unsafe { vld1q_u32(eraser_store.as_ptr()) };
 
     let kernel_size = radius * 2 + 1;
     let edge_count = (kernel_size / 2) + 1;
@@ -385,11 +370,6 @@ pub(crate) fn box_blur_vertical_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
             }
 
             let px = x as usize * CHANNEL_CONFIGURATION;
-
-            if CHANNEL_CONFIGURATION == 3 {
-                store_0 = unsafe { vmulq_u32(store_0, eraser) };
-                store_1 = unsafe { vmulq_u32(store_1, eraser) };
-            }
 
             let scale_store_0 = unsafe { vmulq_u32_f32(store_0, v_weight) };
             let scale_store_1 = unsafe { vmulq_u32_f32(store_1, v_weight) };
@@ -477,10 +457,6 @@ pub(crate) fn box_blur_vertical_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
             }
 
             let px = x as usize * CHANNEL_CONFIGURATION;
-
-            if CHANNEL_CONFIGURATION == 3 {
-                store = unsafe { vmulq_u32(store, eraser) };
-            }
 
             let scale_store = unsafe { vmulq_u32_f32(store, v_weight) };
             let bytes_offset = y_dst_shift + px;

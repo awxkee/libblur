@@ -35,6 +35,8 @@ use num_traits::cast::FromPrimitive;
 use num_traits::{AsPrimitive, Float};
 
 use crate::channels_configuration::FastBlurChannels;
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+use crate::cpu_features::is_aarch_f16c_supported;
 use crate::edge_mode::reflect_index;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::{
@@ -42,21 +44,12 @@ use crate::neon::{
     fast_gaussian_horizontal_pass_neon_u8, fast_gaussian_vertical_pass_neon_f16,
     fast_gaussian_vertical_pass_neon_f32, fast_gaussian_vertical_pass_neon_u8,
 };
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    all(target_feature = "sse4.1", target_feature = "f16c")
-))]
-use crate::sse::{fast_gaussian_horizontal_pass_sse_f16, fast_gaussian_vertical_pass_sse_f16};
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "sse4.1"
-))]
-use crate::sse::{fast_gaussian_horizontal_pass_sse_f32, fast_gaussian_vertical_pass_sse_f32};
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "sse4.1"
-))]
-use crate::sse::{fast_gaussian_horizontal_pass_sse_u8, fast_gaussian_vertical_pass_sse_u8};
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+use crate::sse::{
+    fast_gaussian_horizontal_pass_sse_f16, fast_gaussian_horizontal_pass_sse_f32,
+    fast_gaussian_horizontal_pass_sse_u8, fast_gaussian_vertical_pass_sse_f16,
+    fast_gaussian_vertical_pass_sse_f32, fast_gaussian_vertical_pass_sse_u8,
+};
 use crate::threading_policy::ThreadingPolicy;
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
@@ -65,11 +58,11 @@ use crate::{clamp_edge, reflect_101, EdgeMode};
 const BASE_RADIUS_I64_CUTOFF: u32 = 180;
 
 /**
-      RRRRRR  OOOOO  U     U TTTTTTT IIIII NN   N EEEEEEE SSSSS
-      R     R O     O U     U   T     I   I N N  N E       S
-     RRRRRR  O     O U     U   T     I   I N  N N EEEEE    SSS
-     R   R   O     O U     U   T     I   I N   NN E            S
-     R    R   OOOOO   UUUUU    T    IIIII N    N EEEEEEE  SSSSS
+ RRRRRR  OOOOO  U     U TTTTTTT IIIII NN   N EEEEEEE SSSSS
+ R     R O     O U     U   T     I   I N N  N E       S
+RRRRRR  O     O U     U   T     I   I N  N N EEEEE    SSS
+R   R   O     O U     U   T     I   I N   NN E            S
+R    R   OOOOO   UUUUU    T    IIIII N    N EEEEEEE  SSSSS
 **/
 
 macro_rules! update_differences_inside {
@@ -112,38 +105,12 @@ macro_rules! impl_generic_call {
     ($store_type:ty, $channels_type:expr, $edge_mode:expr,
         $bytes:expr, $stride:expr, $width:expr, $height:expr,
         $radius:expr, $threading_policy:expr) => {
-        match $channels_type {
-            FastBlurChannels::Plane => {
-                fast_gaussian_impl::<$store_type, 1, $edge_mode>(
-                    $bytes,
-                    $stride,
-                    $width,
-                    $height,
-                    $radius,
-                    $threading_policy,
-                );
-            }
-            FastBlurChannels::Channels3 => {
-                fast_gaussian_impl::<$store_type, 3, $edge_mode>(
-                    $bytes,
-                    $stride,
-                    $width,
-                    $height,
-                    $radius,
-                    $threading_policy,
-                );
-            }
-            FastBlurChannels::Channels4 => {
-                fast_gaussian_impl::<$store_type, 4, $edge_mode>(
-                    $bytes,
-                    $stride,
-                    $width,
-                    $height,
-                    $radius,
-                    $threading_policy,
-                );
-            }
-        }
+        let _dispatch = match $channels_type {
+            FastBlurChannels::Plane => fast_gaussian_impl::<$store_type, 1, $edge_mode>,
+            FastBlurChannels::Channels3 => fast_gaussian_impl::<$store_type, 3, $edge_mode>,
+            FastBlurChannels::Channels4 => fast_gaussian_impl::<$store_type, 4, $edge_mode>,
+        };
+        _dispatch($bytes, $stride, $width, $height, $radius, $threading_policy);
     };
 }
 
@@ -600,6 +567,11 @@ fn fast_gaussian_impl<
     f32: AsPrimitive<T> + ToStorage<T>,
     f64: AsPrimitive<T> + ToStorage<T>,
 {
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    let _is_f16c_available = std::arch::is_x86_feature_detected!("f16c");
+
     let unsafe_image = UnsafeSlice::new(bytes);
     let thread_count = threading_policy.get_threads_count(width, height) as u32;
     let pool = rayon::ThreadPoolBuilder::new()
@@ -652,18 +624,20 @@ fn fast_gaussian_impl<
                         EDGE_MODE,
                     >;
                 }
-                #[cfg(all(
-                    any(target_arch = "x86_64", target_arch = "x86"),
-                    target_feature = "sse4.1"
-                ))]
+                #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
                 {
-                    _dispatcher_vertical =
-                        fast_gaussian_vertical_pass_sse_f32::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
-                    _dispatcher_horizontal = fast_gaussian_horizontal_pass_sse_f32::<
-                        T,
-                        CHANNEL_CONFIGURATION,
-                        EDGE_MODE,
-                    >;
+                    if _is_sse_available {
+                        _dispatcher_vertical = fast_gaussian_vertical_pass_sse_f32::<
+                            T,
+                            CHANNEL_CONFIGURATION,
+                            EDGE_MODE,
+                        >;
+                        _dispatcher_horizontal = fast_gaussian_horizontal_pass_sse_f32::<
+                            T,
+                            CHANNEL_CONFIGURATION,
+                            EDGE_MODE,
+                        >;
+                    }
                 }
             } else if std::any::type_name::<T>() == "f16"
                 || std::any::type_name::<T>() == "half::f16"
@@ -671,26 +645,33 @@ fn fast_gaussian_impl<
             {
                 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
                 {
-                    _dispatcher_vertical =
-                        fast_gaussian_vertical_pass_neon_f16::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
-                    _dispatcher_horizontal = fast_gaussian_horizontal_pass_neon_f16::<
-                        T,
-                        CHANNEL_CONFIGURATION,
-                        EDGE_MODE,
-                    >;
+                    if is_aarch_f16c_supported() {
+                        _dispatcher_vertical = fast_gaussian_vertical_pass_neon_f16::<
+                            T,
+                            CHANNEL_CONFIGURATION,
+                            EDGE_MODE,
+                        >;
+                        _dispatcher_horizontal = fast_gaussian_horizontal_pass_neon_f16::<
+                            T,
+                            CHANNEL_CONFIGURATION,
+                            EDGE_MODE,
+                        >;
+                    }
                 }
-                #[cfg(all(
-                    any(target_arch = "x86_64", target_arch = "x86"),
-                    all(target_feature = "sse4.1", target_feature = "f16c")
-                ))]
+                #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
                 {
-                    _dispatcher_vertical =
-                        fast_gaussian_vertical_pass_sse_f16::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
-                    _dispatcher_horizontal = fast_gaussian_horizontal_pass_sse_f16::<
-                        T,
-                        CHANNEL_CONFIGURATION,
-                        EDGE_MODE,
-                    >;
+                    if _is_sse_available && _is_f16c_available {
+                        _dispatcher_vertical = fast_gaussian_vertical_pass_sse_f16::<
+                            T,
+                            CHANNEL_CONFIGURATION,
+                            EDGE_MODE,
+                        >;
+                        _dispatcher_horizontal = fast_gaussian_horizontal_pass_sse_f16::<
+                            T,
+                            CHANNEL_CONFIGURATION,
+                            EDGE_MODE,
+                        >;
+                    }
                 }
             }
         }
@@ -708,17 +689,22 @@ fn fast_gaussian_impl<
                 }
             }
         }
-        #[cfg(all(
-            any(target_arch = "x86_64", target_arch = "x86"),
-            target_feature = "sse4.1"
-        ))]
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
-            if std::any::type_name::<T>() == "u8" {
-                if BASE_RADIUS_I64_CUTOFF > radius {
-                    _dispatcher_vertical =
-                        fast_gaussian_vertical_pass_sse_u8::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
-                    _dispatcher_horizontal =
-                        fast_gaussian_horizontal_pass_sse_u8::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
+            if _is_sse_available {
+                if std::any::type_name::<T>() == "u8" {
+                    if BASE_RADIUS_I64_CUTOFF > radius {
+                        _dispatcher_vertical = fast_gaussian_vertical_pass_sse_u8::<
+                            T,
+                            CHANNEL_CONFIGURATION,
+                            EDGE_MODE,
+                        >;
+                        _dispatcher_horizontal = fast_gaussian_horizontal_pass_sse_u8::<
+                            T,
+                            CHANNEL_CONFIGURATION,
+                            EDGE_MODE,
+                        >;
+                    }
                 }
             }
         }

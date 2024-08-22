@@ -28,11 +28,10 @@
 use half::f16;
 
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+use crate::cpu_features::is_aarch_f16c_supported;
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::stack_blur_pass_neon_f16;
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    all(target_feature = "sse4.1", target_feature = "f16c")
-))]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse::stack_blur_pass_sse_f16;
 use crate::stack_blur::StackBlurPass;
 use crate::stack_blur_f32::stack_blur_pass_f;
@@ -49,6 +48,10 @@ fn stack_blur_worker_horizontal(
     thread: usize,
     thread_count: usize,
 ) {
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    let _is_f16c_available = std::arch::is_x86_feature_detected!("f16c");
     match channels {
         FastBlurChannels::Plane => {
             let mut _dispatcher: fn(
@@ -85,14 +88,15 @@ fn stack_blur_worker_horizontal(
             ) = stack_blur_pass_f::<f16, f32, 3>;
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             {
-                _dispatcher = stack_blur_pass_neon_f16::<3>;
+                if is_aarch_f16c_supported() {
+                    _dispatcher = stack_blur_pass_neon_f16::<3>;
+                }
             }
-            #[cfg(all(
-                any(target_arch = "x86_64", target_arch = "x86"),
-                all(target_feature = "sse4.1", target_feature = "f16c")
-            ))]
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
-                _dispatcher = stack_blur_pass_sse_f16::<3>;
+                if _is_sse_available && _is_f16c_available {
+                    _dispatcher = stack_blur_pass_sse_f16::<3>;
+                }
             }
             _dispatcher(
                 &slice,
@@ -118,14 +122,15 @@ fn stack_blur_worker_horizontal(
             ) = stack_blur_pass_f::<f16, f32, 4>;
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             {
-                _dispatcher = stack_blur_pass_neon_f16::<4>;
+                if is_aarch_f16c_supported() {
+                    _dispatcher = stack_blur_pass_neon_f16::<4>;
+                }
             }
-            #[cfg(all(
-                any(target_arch = "x86_64", target_arch = "x86"),
-                all(target_feature = "sse4.1", target_feature = "f16c")
-            ))]
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
-                _dispatcher = stack_blur_pass_sse_f16::<4>;
+                if _is_sse_available && _is_f16c_available {
+                    _dispatcher = stack_blur_pass_sse_f16::<4>;
+                }
             }
             _dispatcher(
                 &slice,
@@ -151,6 +156,10 @@ fn stack_blur_worker_vertical(
     thread: usize,
     thread_count: usize,
 ) {
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    let _is_f16c_available = std::arch::is_x86_feature_detected!("f16c");
     match channels {
         FastBlurChannels::Plane => {
             let mut _dispatcher: fn(
@@ -187,14 +196,15 @@ fn stack_blur_worker_vertical(
             ) = stack_blur_pass_f::<f16, f32, 3>;
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             {
-                _dispatcher = stack_blur_pass_neon_f16::<3>;
+                if is_aarch_f16c_supported() {
+                    _dispatcher = stack_blur_pass_neon_f16::<3>;
+                }
             }
-            #[cfg(all(
-                any(target_arch = "x86_64", target_arch = "x86"),
-                all(target_feature = "sse4.1", target_feature = "f16c")
-            ))]
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
-                _dispatcher = stack_blur_pass_sse_f16::<3>;
+                if _is_sse_available && _is_f16c_available {
+                    _dispatcher = stack_blur_pass_sse_f16::<3>;
+                }
             }
             _dispatcher(
                 &slice,
@@ -220,14 +230,15 @@ fn stack_blur_worker_vertical(
             ) = stack_blur_pass_f::<f16, f32, 4>;
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             {
-                _dispatcher = stack_blur_pass_neon_f16::<4>;
+                if is_aarch_f16c_supported() {
+                    _dispatcher = stack_blur_pass_neon_f16::<4>;
+                }
             }
-            #[cfg(all(
-                any(target_arch = "x86_64", target_arch = "x86"),
-                all(target_feature = "sse4.1", target_feature = "f16c")
-            ))]
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
-                _dispatcher = stack_blur_pass_sse_f16::<4>;
+                if _is_sse_available && _is_f16c_available {
+                    _dispatcher = stack_blur_pass_sse_f16::<4>;
+                }
             }
             _dispatcher(
                 &slice,

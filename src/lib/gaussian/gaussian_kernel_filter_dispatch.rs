@@ -25,10 +25,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "avx2"
-))]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::gaussian::avx::gaussian_blur_vertical_pass_filter_f32_avx;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::gaussian::gauss_neon::*;
@@ -36,19 +33,8 @@ use crate::gaussian::gauss_neon::*;
 use crate::gaussian::gauss_neon::{
     gaussian_blur_horizontal_pass_filter_neon, gaussian_blur_vertical_pass_filter_neon,
 };
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "sse4.1"
-))]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::gaussian::gauss_sse::*;
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "sse4.1"
-))]
-use crate::gaussian::gauss_sse::{
-    gaussian_blur_horizontal_pass_filter_sse, gaussian_blur_vertical_pass_filter_f32_sse,
-    gaussian_blur_vertical_pass_filter_sse,
-};
 use crate::gaussian::gaussian_filter::GaussianFilter;
 use crate::gaussian::gaussian_horizontal::gaussian_blur_horizontal_pass_impl_clip_edge;
 use crate::gaussian::gaussian_vertical::gaussian_blur_vertical_pass_clip_edge_impl;
@@ -68,12 +54,18 @@ pub(crate) fn gaussian_blur_vertical_pass_edge_clip_dispatch<
     width: u32,
     height: u32,
     filter: &Vec<GaussianFilter>,
-    thread_pool: &ThreadPool,
+    thread_pool: &Option<ThreadPool>,
     thread_count: u32,
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static + AsPrimitive<f32>,
     f32: ToStorage<T>,
 {
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    let _is_fma_available = std::arch::is_x86_feature_detected!("fma");
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    let _is_avx_available = std::arch::is_x86_feature_detected!("avx2");
     let mut _dispatcher: fn(
         src: &[T],
         src_stride: u32,
@@ -86,13 +78,18 @@ pub(crate) fn gaussian_blur_vertical_pass_edge_clip_dispatch<
         end_y: u32,
     ) = gaussian_blur_vertical_pass_clip_edge_impl::<T, CHANNEL_CONFIGURATION>;
     if std::any::type_name::<T>() == "u8" {
-        #[cfg(all(
-            any(target_arch = "x86_64", target_arch = "x86"),
-            target_feature = "sse4.1"
-        ))]
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
             // Generally vertical pass do not depends on any specific channel configuration so it is allowed to make a vectorized calls for any channels
-            _dispatcher = gaussian_blur_vertical_pass_filter_sse::<T, CHANNEL_CONFIGURATION>;
+            if _is_sse_available {
+                if _is_fma_available {
+                    _dispatcher =
+                        gaussian_blur_vertical_pass_filter_sse::<T, CHANNEL_CONFIGURATION, true>;
+                } else {
+                    _dispatcher =
+                        gaussian_blur_vertical_pass_filter_sse::<T, CHANNEL_CONFIGURATION, false>;
+                }
+            }
         }
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
@@ -106,49 +103,85 @@ pub(crate) fn gaussian_blur_vertical_pass_edge_clip_dispatch<
             // Generally vertical pass do not depends on any specific channel configuration so it is allowed to make a vectorized calls for any channels
             _dispatcher = gaussian_blur_vertical_pass_filter_f32_neon::<T, CHANNEL_CONFIGURATION>;
         }
-        #[cfg(all(
-            any(target_arch = "x86_64", target_arch = "x86"),
-            target_feature = "sse4.1"
-        ))]
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
             // Generally vertical pass do not depends on any specific channel configuration so it is allowed to make a vectorized calls for any channels
-            _dispatcher = gaussian_blur_vertical_pass_filter_f32_sse::<T, CHANNEL_CONFIGURATION>;
+            if _is_sse_available {
+                if _is_fma_available {
+                    _dispatcher = gaussian_blur_vertical_pass_filter_f32_sse::<
+                        T,
+                        CHANNEL_CONFIGURATION,
+                        true,
+                    >;
+                } else {
+                    _dispatcher = gaussian_blur_vertical_pass_filter_f32_sse::<
+                        T,
+                        CHANNEL_CONFIGURATION,
+                        false,
+                    >;
+                }
+            }
         }
-        #[cfg(all(
-            any(target_arch = "x86_64", target_arch = "x86"),
-            target_feature = "avx2"
-        ))]
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
             // Generally vertical pass do not depends on any specific channel configuration so it is allowed to make a vectorized calls for any channels
-            _dispatcher = gaussian_blur_vertical_pass_filter_f32_avx::<T, CHANNEL_CONFIGURATION>;
+            if _is_avx_available {
+                if _is_fma_available {
+                    _dispatcher = gaussian_blur_vertical_pass_filter_f32_avx::<
+                        T,
+                        CHANNEL_CONFIGURATION,
+                        true,
+                    >;
+                } else {
+                    _dispatcher = gaussian_blur_vertical_pass_filter_f32_avx::<
+                        T,
+                        CHANNEL_CONFIGURATION,
+                        false,
+                    >;
+                }
+            }
         }
     }
     let unsafe_dst = UnsafeSlice::new(dst);
-    thread_pool.scope(|scope| {
-        let segment_size = height / thread_count;
+    if let Some(thread_pool) = thread_pool {
+        thread_pool.scope(|scope| {
+            let segment_size = height / thread_count;
 
-        for i in 0..thread_count {
-            let start_y = i * segment_size;
-            let mut end_y = (i + 1) * segment_size;
-            if i == thread_count - 1 {
-                end_y = height;
+            for i in 0..thread_count {
+                let start_y = i * segment_size;
+                let mut end_y = (i + 1) * segment_size;
+                if i == thread_count - 1 {
+                    end_y = height;
+                }
+
+                scope.spawn(move |_| {
+                    _dispatcher(
+                        src,
+                        src_stride,
+                        &unsafe_dst,
+                        dst_stride,
+                        width,
+                        height,
+                        filter,
+                        start_y,
+                        end_y,
+                    );
+                });
             }
-
-            scope.spawn(move |_| {
-                _dispatcher(
-                    src,
-                    src_stride,
-                    &unsafe_dst,
-                    dst_stride,
-                    width,
-                    height,
-                    filter,
-                    start_y,
-                    end_y,
-                );
-            });
-        }
-    });
+        });
+    } else {
+        _dispatcher(
+            src,
+            src_stride,
+            &unsafe_dst,
+            dst_stride,
+            width,
+            height,
+            filter,
+            0,
+            height,
+        );
+    }
 }
 
 pub(crate) fn gaussian_blur_horizontal_pass_edge_clip_dispatch<
@@ -162,12 +195,17 @@ pub(crate) fn gaussian_blur_horizontal_pass_edge_clip_dispatch<
     width: u32,
     height: u32,
     filter: &Vec<GaussianFilter>,
-    thread_pool: &ThreadPool,
+    thread_pool: &Option<ThreadPool>,
     thread_count: u32,
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static + AsPrimitive<f32>,
     f32: AsPrimitive<T> + ToStorage<T>,
 {
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    let _is_fma_available = std::arch::is_x86_feature_detected!("fma");
+
     let mut _dispatcher: fn(
         src: &[T],
         src_stride: u32,
@@ -180,12 +218,23 @@ pub(crate) fn gaussian_blur_horizontal_pass_edge_clip_dispatch<
     ) = gaussian_blur_horizontal_pass_impl_clip_edge::<T, CHANNEL_CONFIGURATION>;
     if CHANNEL_CONFIGURATION >= 3 {
         if std::any::type_name::<T>() == "u8" {
-            #[cfg(all(
-                any(target_arch = "x86_64", target_arch = "x86"),
-                target_feature = "sse4.1"
-            ))]
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
-                _dispatcher = gaussian_blur_horizontal_pass_filter_sse::<T, CHANNEL_CONFIGURATION>;
+                if _is_sse_available {
+                    if _is_fma_available {
+                        _dispatcher = gaussian_blur_horizontal_pass_filter_sse::<
+                            T,
+                            CHANNEL_CONFIGURATION,
+                            true,
+                        >;
+                    } else {
+                        _dispatcher = gaussian_blur_horizontal_pass_filter_sse::<
+                            T,
+                            CHANNEL_CONFIGURATION,
+                            false,
+                        >;
+                    }
+                }
             }
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             {
@@ -199,12 +248,11 @@ pub(crate) fn gaussian_blur_horizontal_pass_edge_clip_dispatch<
             {
                 _dispatcher = gaussian_horiz_one_chan_filter_f32::<T>;
             }
-            #[cfg(all(
-                any(target_arch = "x86_64", target_arch = "x86"),
-                target_feature = "sse4.1"
-            ))]
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
-                _dispatcher = gaussian_horiz_one_chan_filter_f32::<T>;
+                if _is_sse_available {
+                    _dispatcher = gaussian_horiz_one_chan_filter_f32::<T>;
+                }
             }
         } else if CHANNEL_CONFIGURATION == 3 || CHANNEL_CONFIGURATION == 4 {
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
@@ -219,37 +267,49 @@ pub(crate) fn gaussian_blur_horizontal_pass_edge_clip_dispatch<
             {
                 _dispatcher = gaussian_horiz_one_chan_filter_u8::<T>;
             }
-            #[cfg(all(
-                any(target_arch = "x86_64", target_arch = "x86"),
-                target_feature = "sse4.1"
-            ))]
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
-                _dispatcher = gaussian_sse_horiz_one_chan_filter_u8::<T>;
+                if _is_sse_available {
+                    _dispatcher = gaussian_sse_horiz_one_chan_filter_u8::<T>;
+                }
             }
         }
     }
     let unsafe_dst = UnsafeSlice::new(dst);
-    thread_pool.scope(|scope| {
-        let segment_size = height / thread_count;
-        for i in 0..thread_count {
-            let start_y = i * segment_size;
-            let mut end_y = (i + 1) * segment_size;
-            if i == thread_count - 1 {
-                end_y = height;
-            }
+    if let Some(thread_pool) = thread_pool {
+        thread_pool.scope(|scope| {
+            let segment_size = height / thread_count;
+            for i in 0..thread_count {
+                let start_y = i * segment_size;
+                let mut end_y = (i + 1) * segment_size;
+                if i == thread_count - 1 {
+                    end_y = height;
+                }
 
-            scope.spawn(move |_| {
-                _dispatcher(
-                    src,
-                    src_stride,
-                    &unsafe_dst,
-                    dst_stride,
-                    width,
-                    filter,
-                    start_y,
-                    end_y,
-                );
-            });
-        }
-    });
+                scope.spawn(move |_| {
+                    _dispatcher(
+                        src,
+                        src_stride,
+                        &unsafe_dst,
+                        dst_stride,
+                        width,
+                        filter,
+                        start_y,
+                        end_y,
+                    );
+                });
+            }
+        });
+    } else {
+        _dispatcher(
+            src,
+            src_stride,
+            &unsafe_dst,
+            dst_stride,
+            width,
+            filter,
+            0,
+            height,
+        );
+    }
 }

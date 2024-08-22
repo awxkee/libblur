@@ -26,25 +26,18 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+use crate::cpu_features::is_aarch_f16c_supported;
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::{
     fast_gaussian_next_horizontal_pass_neon_f16, fast_gaussian_next_horizontal_pass_neon_f32,
     fast_gaussian_next_horizontal_pass_neon_u8, fast_gaussian_next_vertical_pass_neon_f16,
     fast_gaussian_next_vertical_pass_neon_f32, fast_gaussian_next_vertical_pass_neon_u8,
 };
 use crate::reflect_index;
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    all(target_feature = "sse4.1", target_feature = "f16c")
-))]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse::{
-    fast_gaussian_next_horizontal_pass_sse_f16, fast_gaussian_next_vertical_pass_sse_f16,
-};
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "sse4.1"
-))]
-use crate::sse::{
-    fast_gaussian_next_horizontal_pass_sse_f32, fast_gaussian_next_horizontal_pass_sse_u8,
+    fast_gaussian_next_horizontal_pass_sse_f16, fast_gaussian_next_horizontal_pass_sse_f32,
+    fast_gaussian_next_horizontal_pass_sse_u8, fast_gaussian_next_vertical_pass_sse_f16,
     fast_gaussian_next_vertical_pass_sse_f32, fast_gaussian_next_vertical_pass_sse_u8,
 };
 use crate::to_storage::ToStorage;
@@ -71,38 +64,12 @@ R    R   OOOOO   UUUUU    T    IIIII N    N EEEEEEE  SSSSS
 
 macro_rules! impl_generic_call {
     ($store_type:ty, $channels_type:expr, $edge_mode:expr, $bytes:expr, $stride:expr, $width:expr, $height:expr, $radius:expr, $threading_policy:expr) => {
-        match $channels_type {
-            FastBlurChannels::Plane => {
-                fast_gaussian_next_impl::<$store_type, 1, $edge_mode>(
-                    $bytes,
-                    $stride,
-                    $width,
-                    $height,
-                    $radius,
-                    $threading_policy,
-                );
-            }
-            FastBlurChannels::Channels3 => {
-                fast_gaussian_next_impl::<$store_type, 3, $edge_mode>(
-                    $bytes,
-                    $stride,
-                    $width,
-                    $height,
-                    $radius,
-                    $threading_policy,
-                );
-            }
-            FastBlurChannels::Channels4 => {
-                fast_gaussian_next_impl::<$store_type, 4, $edge_mode>(
-                    $bytes,
-                    $stride,
-                    $width,
-                    $height,
-                    $radius,
-                    $threading_policy,
-                );
-            }
-        }
+        let _dispatcher = match $channels_type {
+            FastBlurChannels::Plane => fast_gaussian_next_impl::<$store_type, 1, $edge_mode>,
+            FastBlurChannels::Channels3 => fast_gaussian_next_impl::<$store_type, 3, $edge_mode>,
+            FastBlurChannels::Channels4 => fast_gaussian_next_impl::<$store_type, 4, $edge_mode>,
+        };
+        _dispatcher($bytes, $stride, $width, $height, $radius, $threading_policy);
     };
 }
 
@@ -525,6 +492,11 @@ fn fast_gaussian_next_impl<
     f32: AsPrimitive<T> + ToStorage<T>,
     f64: AsPrimitive<T> + ToStorage<T>,
 {
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    let _is_f16c_available = std::arch::is_x86_feature_detected!("f16c");
+
     let mut _dispatcher_vertical: fn(
         bytes: &UnsafeSlice<T>,
         stride: u32,
@@ -568,48 +540,54 @@ fn fast_gaussian_next_impl<
             fast_gaussian_next_horizontal_pass::<T, f64, f64, CHANNEL_CONFIGURATION, EDGE_MODE>
         };
         if std::any::type_name::<T>() == "f32" {
-            #[cfg(all(
-                any(target_arch = "x86_64", target_arch = "x86"),
-                target_feature = "sse4.1"
-            ))]
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
-                _dispatcher_vertical =
-                    fast_gaussian_next_vertical_pass_sse_f32::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
-                _dispatcher_horizontal = fast_gaussian_next_horizontal_pass_sse_f32::<
-                    T,
-                    CHANNEL_CONFIGURATION,
-                    EDGE_MODE,
-                >;
+                if _is_sse_available {
+                    _dispatcher_vertical = fast_gaussian_next_vertical_pass_sse_f32::<
+                        T,
+                        CHANNEL_CONFIGURATION,
+                        EDGE_MODE,
+                    >;
+                    _dispatcher_horizontal = fast_gaussian_next_horizontal_pass_sse_f32::<
+                        T,
+                        CHANNEL_CONFIGURATION,
+                        EDGE_MODE,
+                    >;
+                }
             }
         } else if std::any::type_name::<T>() == "f16"
             || std::any::type_name::<T>() == "half::f16"
             || std::any::type_name::<T>() == "half::binary16::f16"
         {
-            #[cfg(all(
-                any(target_arch = "x86_64", target_arch = "x86"),
-                all(target_feature = "sse4.1", target_feature = "f16c")
-            ))]
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
-                _dispatcher_vertical =
-                    fast_gaussian_next_vertical_pass_sse_f16::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
-                _dispatcher_horizontal = fast_gaussian_next_horizontal_pass_sse_f16::<
-                    T,
-                    CHANNEL_CONFIGURATION,
-                    EDGE_MODE,
-                >;
+                if _is_f16c_available && _is_sse_available {
+                    _dispatcher_vertical = fast_gaussian_next_vertical_pass_sse_f16::<
+                        T,
+                        CHANNEL_CONFIGURATION,
+                        EDGE_MODE,
+                    >;
+                    _dispatcher_horizontal = fast_gaussian_next_horizontal_pass_sse_f16::<
+                        T,
+                        CHANNEL_CONFIGURATION,
+                        EDGE_MODE,
+                    >;
+                }
             }
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             {
-                _dispatcher_vertical = fast_gaussian_next_vertical_pass_neon_f16::<
-                    T,
-                    CHANNEL_CONFIGURATION,
-                    EDGE_MODE,
-                >;
-                _dispatcher_horizontal = fast_gaussian_next_horizontal_pass_neon_f16::<
-                    T,
-                    CHANNEL_CONFIGURATION,
-                    EDGE_MODE,
-                >;
+                if is_aarch_f16c_supported() {
+                    _dispatcher_vertical = fast_gaussian_next_vertical_pass_neon_f16::<
+                        T,
+                        CHANNEL_CONFIGURATION,
+                        EDGE_MODE,
+                    >;
+                    _dispatcher_horizontal = fast_gaussian_next_horizontal_pass_neon_f16::<
+                        T,
+                        CHANNEL_CONFIGURATION,
+                        EDGE_MODE,
+                    >;
+                }
             }
         }
     }
@@ -640,68 +618,84 @@ fn fast_gaussian_next_impl<
         }
     }
 
-    #[cfg(all(
-        any(target_arch = "x86_64", target_arch = "x86"),
-        target_feature = "sse4.1"
-    ))]
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     {
         if BASE_RADIUS_I64_CUTOFF > radius {
             if std::any::type_name::<T>() == "u8" {
-                _dispatcher_vertical =
-                    fast_gaussian_next_vertical_pass_sse_u8::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
-                _dispatcher_horizontal = fast_gaussian_next_horizontal_pass_sse_u8::<
-                    T,
-                    CHANNEL_CONFIGURATION,
-                    EDGE_MODE,
-                >;
+                if _is_sse_available {
+                    _dispatcher_vertical = fast_gaussian_next_vertical_pass_sse_u8::<
+                        T,
+                        CHANNEL_CONFIGURATION,
+                        EDGE_MODE,
+                    >;
+                    _dispatcher_horizontal = fast_gaussian_next_horizontal_pass_sse_u8::<
+                        T,
+                        CHANNEL_CONFIGURATION,
+                        EDGE_MODE,
+                    >;
+                }
             }
         }
     }
 
     let thread_count = threading_policy.get_threads_count(width, height) as u32;
-    let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(thread_count as usize)
-        .build()
-        .unwrap();
+    if thread_count == 1 {
+        let unsafe_image = UnsafeSlice::new(bytes);
+        _dispatcher_vertical(&unsafe_image, stride, width, height, radius, 0, width);
+        _dispatcher_horizontal(&unsafe_image, stride, width, height, radius, 0, height);
+    } else {
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(thread_count as usize)
+            .build()
+            .unwrap();
 
-    let unsafe_image = UnsafeSlice::new(bytes);
-    pool.scope(|scope| {
-        let segment_size = width / thread_count;
+        let unsafe_image = UnsafeSlice::new(bytes);
+        pool.scope(|scope| {
+            let segment_size = width / thread_count;
 
-        for i in 0..thread_count {
-            let start_x = i * segment_size;
-            let mut end_x = (i + 1) * segment_size;
-            if i == thread_count - 1 {
-                end_x = width;
+            for i in 0..thread_count {
+                let start_x = i * segment_size;
+                let mut end_x = (i + 1) * segment_size;
+                if i == thread_count - 1 {
+                    end_x = width;
+                }
+                scope.spawn(move |_| {
+                    _dispatcher_vertical(
+                        &unsafe_image,
+                        stride,
+                        width,
+                        height,
+                        radius,
+                        start_x,
+                        end_x,
+                    );
+                });
             }
-            scope.spawn(move |_| {
-                _dispatcher_vertical(&unsafe_image, stride, width, height, radius, start_x, end_x);
-            });
-        }
-    });
+        });
 
-    pool.scope(|scope| {
-        let segment_size = height / thread_count;
+        pool.scope(|scope| {
+            let segment_size = height / thread_count;
 
-        for i in 0..thread_count {
-            let start_y = i * segment_size;
-            let mut end_y = (i + 1) * segment_size;
-            if i == thread_count - 1 {
-                end_y = height;
+            for i in 0..thread_count {
+                let start_y = i * segment_size;
+                let mut end_y = (i + 1) * segment_size;
+                if i == thread_count - 1 {
+                    end_y = height;
+                }
+                scope.spawn(move |_| {
+                    _dispatcher_horizontal(
+                        &unsafe_image,
+                        stride,
+                        width,
+                        height,
+                        radius,
+                        start_y,
+                        end_y,
+                    );
+                });
             }
-            scope.spawn(move |_| {
-                _dispatcher_horizontal(
-                    &unsafe_image,
-                    stride,
-                    width,
-                    height,
-                    radius,
-                    start_y,
-                    end_y,
-                );
-            });
-        }
-    });
+        });
+    }
 }
 
 /// Performs gaussian approximation on the image.

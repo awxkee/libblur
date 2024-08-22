@@ -43,6 +43,32 @@ pub(crate) fn box_blur_horizontal_pass_sse<T, const CHANNELS: usize>(
     start_y: u32,
     end_y: u32,
 ) {
+    unsafe {
+        box_blur_horizontal_pass_impl::<T, CHANNELS>(
+            undefined_src,
+            src_stride,
+            undefined_unsafe_dst,
+            dst_stride,
+            width,
+            radius,
+            start_y,
+            end_y,
+        );
+    }
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+unsafe fn box_blur_horizontal_pass_impl<T, const CHANNELS: usize>(
+    undefined_src: &[T],
+    src_stride: u32,
+    undefined_unsafe_dst: &UnsafeSlice<T>,
+    dst_stride: u32,
+    width: u32,
+    radius: u32,
+    start_y: u32,
+    end_y: u32,
+) {
     let src: &[u8] = unsafe { std::mem::transmute(undefined_src) };
     let unsafe_dst: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(undefined_unsafe_dst) };
     let eraser_store: [i32; 4] = if CHANNELS == 3 {

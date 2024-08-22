@@ -37,10 +37,7 @@ use rayon::ThreadPool;
 use crate::channels_configuration::FastBlurChannels;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::r#box::box_blur_neon::*;
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "sse4.1"
-))]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::r#box::box_blur_sse::*;
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
@@ -167,7 +164,7 @@ fn box_blur_horizontal_pass<
     width: u32,
     height: u32,
     radius: u32,
-    pool: &ThreadPool,
+    pool: &Option<ThreadPool>,
     thread_count: u32,
 ) where
     T: std::ops::AddAssign
@@ -179,6 +176,8 @@ fn box_blur_horizontal_pass<
         + AsPrimitive<f64>,
     f32: ToStorage<T>,
 {
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
     let mut _dispatcher_horizontal: fn(
         src: &[T],
         src_stride: u32,
@@ -203,41 +202,51 @@ fn box_blur_horizontal_pass<
                 _dispatcher_horizontal = box_blur_horizontal_pass_neon::<T, CHANNEL_CONFIGURATION>;
             }
         }
-        #[cfg(all(
-            any(target_arch = "x86_64", target_arch = "x86"),
-            target_feature = "sse4.1"
-        ))]
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
-            if std::any::type_name::<T>() == "u8" {
+            if std::any::type_name::<T>() == "u8" && _is_sse_available {
                 _dispatcher_horizontal =
                     box_blur_horizontal_pass_sse::<T, { CHANNEL_CONFIGURATION }>;
             }
         }
     }
     let unsafe_dst = UnsafeSlice::new(dst);
-    pool.scope(|scope| {
-        let segment_size = height / thread_count;
-        for i in 0..thread_count {
-            let start_y = i * segment_size;
-            let mut end_y = (i + 1) * segment_size;
-            if i == thread_count - 1 {
-                end_y = height;
-            }
+    if let Some(pool) = pool {
+        pool.scope(|scope| {
+            let segment_size = height / thread_count;
+            for i in 0..thread_count {
+                let start_y = i * segment_size;
+                let mut end_y = (i + 1) * segment_size;
+                if i == thread_count - 1 {
+                    end_y = height;
+                }
 
-            scope.spawn(move |_| {
-                _dispatcher_horizontal(
-                    src,
-                    src_stride,
-                    &unsafe_dst,
-                    dst_stride,
-                    width,
-                    radius,
-                    start_y,
-                    end_y,
-                );
-            });
-        }
-    });
+                scope.spawn(move |_| {
+                    _dispatcher_horizontal(
+                        src,
+                        src_stride,
+                        &unsafe_dst,
+                        dst_stride,
+                        width,
+                        radius,
+                        start_y,
+                        end_y,
+                    );
+                });
+            }
+        });
+    } else {
+        _dispatcher_horizontal(
+            src,
+            src_stride,
+            &unsafe_dst,
+            dst_stride,
+            width,
+            radius,
+            0,
+            height,
+        );
+    }
 }
 
 fn box_blur_vertical_pass_impl<T, J, const CHANNELS_CONFIGURATION: usize>(
@@ -362,7 +371,7 @@ fn box_blur_vertical_pass<
     width: u32,
     height: u32,
     radius: u32,
-    pool: &ThreadPool,
+    pool: &Option<ThreadPool>,
     thread_count: u32,
 ) where
     T: std::ops::AddAssign
@@ -374,6 +383,8 @@ fn box_blur_vertical_pass<
         + AsPrimitive<f64>,
     f32: ToStorage<T>,
 {
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
     let mut _dispatcher_vertical: fn(
         src: &[T],
         src_stride: u32,
@@ -393,12 +404,9 @@ fn box_blur_vertical_pass<
         _dispatcher_vertical = box_blur_vertical_pass_impl::<T, f32, CHANNEL_CONFIGURATION>;
     }
     if CHANNEL_CONFIGURATION >= 3 {
-        #[cfg(all(
-            any(target_arch = "x86_64", target_arch = "x86"),
-            target_feature = "sse4.1"
-        ))]
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
-            if std::any::type_name::<T>() == "u8" {
+            if std::any::type_name::<T>() == "u8" && _is_sse_available {
                 _dispatcher_vertical = box_blur_vertical_pass_sse::<T, CHANNEL_CONFIGURATION>;
             }
         }
@@ -411,30 +419,44 @@ fn box_blur_vertical_pass<
     }
     let unsafe_dst = UnsafeSlice::new(dst);
 
-    pool.scope(|scope| {
-        let segment_size = width / thread_count;
-        for i in 0..thread_count {
-            let start_x = i * segment_size;
-            let mut end_x = (i + 1) * segment_size;
-            if i == thread_count - 1 {
-                end_x = width;
-            }
+    if let Some(pool) = pool {
+        pool.scope(|scope| {
+            let segment_size = width / thread_count;
+            for i in 0..thread_count {
+                let start_x = i * segment_size;
+                let mut end_x = (i + 1) * segment_size;
+                if i == thread_count - 1 {
+                    end_x = width;
+                }
 
-            scope.spawn(move |_| {
-                _dispatcher_vertical(
-                    src,
-                    src_stride,
-                    &unsafe_dst,
-                    dst_stride,
-                    width,
-                    height,
-                    radius,
-                    start_x,
-                    end_x,
-                );
-            });
-        }
-    });
+                scope.spawn(move |_| {
+                    _dispatcher_vertical(
+                        src,
+                        src_stride,
+                        &unsafe_dst,
+                        dst_stride,
+                        width,
+                        height,
+                        radius,
+                        start_x,
+                        end_x,
+                    );
+                });
+            }
+        });
+    } else {
+        _dispatcher_vertical(
+            src,
+            src_stride,
+            &unsafe_dst,
+            dst_stride,
+            width,
+            height,
+            radius,
+            0,
+            width,
+        );
+    }
 }
 
 fn box_blur_impl<
@@ -448,7 +470,7 @@ fn box_blur_impl<
     width: u32,
     height: u32,
     radius: u32,
-    pool: &ThreadPool,
+    pool: &Option<ThreadPool>,
     thread_count: u32,
 ) where
     T: std::ops::AddAssign
@@ -514,51 +536,32 @@ pub fn box_blur(
     threading_policy: ThreadingPolicy,
 ) {
     let thread_count = threading_policy.get_threads_count(width, height) as u32;
-    let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(thread_count as usize)
-        .build()
-        .unwrap();
-    match channels {
-        FastBlurChannels::Plane => {
-            box_blur_impl::<u8, 1>(
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-                width,
-                height,
-                radius,
-                &pool,
-                thread_count,
-            );
-        }
-        FastBlurChannels::Channels3 => {
-            box_blur_impl::<u8, 3>(
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-                width,
-                height,
-                radius,
-                &pool,
-                thread_count,
-            );
-        }
-        FastBlurChannels::Channels4 => {
-            box_blur_impl::<u8, 4>(
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-                width,
-                height,
-                radius,
-                &pool,
-                thread_count,
-            );
-        }
-    }
+    let _dispatcher = match channels {
+        FastBlurChannels::Plane => box_blur_impl::<u8, 1>,
+        FastBlurChannels::Channels3 => box_blur_impl::<u8, 3>,
+        FastBlurChannels::Channels4 => box_blur_impl::<u8, 4>,
+    };
+    let pool = if thread_count == 1 {
+        None
+    } else {
+        Some(
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(thread_count as usize)
+                .build()
+                .unwrap(),
+        )
+    };
+    _dispatcher(
+        src,
+        src_stride,
+        dst,
+        dst_stride,
+        width,
+        height,
+        radius,
+        &pool,
+        thread_count,
+    );
 }
 
 /// Performs box blur on the image.
@@ -588,51 +591,32 @@ pub fn box_blur_u16(
 ) {
     let stride = width * channels.get_channels() as u32;
     let thread_count = threading_policy.get_threads_count(width, height) as u32;
-    let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(thread_count as usize)
-        .build()
-        .unwrap();
-    match channels {
-        FastBlurChannels::Plane => {
-            box_blur_impl::<u16, 1>(
-                src,
-                stride,
-                dst,
-                stride,
-                width,
-                height,
-                radius,
-                &pool,
-                thread_count,
-            );
-        }
-        FastBlurChannels::Channels3 => {
-            box_blur_impl::<u16, 3>(
-                src,
-                stride,
-                dst,
-                stride,
-                width,
-                height,
-                radius,
-                &pool,
-                thread_count,
-            );
-        }
-        FastBlurChannels::Channels4 => {
-            box_blur_impl::<u16, 4>(
-                src,
-                stride,
-                dst,
-                stride,
-                width,
-                height,
-                radius,
-                &pool,
-                thread_count,
-            );
-        }
-    }
+    let pool = if thread_count == 1 {
+        None
+    } else {
+        Some(
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(thread_count as usize)
+                .build()
+                .unwrap(),
+        )
+    };
+    let _dispatcher = match channels {
+        FastBlurChannels::Plane => box_blur_impl::<u16, 1>,
+        FastBlurChannels::Channels3 => box_blur_impl::<u16, 3>,
+        FastBlurChannels::Channels4 => box_blur_impl::<u16, 4>,
+    };
+    _dispatcher(
+        src,
+        stride,
+        dst,
+        stride,
+        width,
+        height,
+        radius,
+        &pool,
+        thread_count,
+    );
 }
 
 /// Performs box blur on the image.
@@ -661,51 +645,32 @@ pub fn box_blur_f32(
 ) {
     let stride = width * channels.get_channels() as u32;
     let thread_count = threading_policy.get_threads_count(width, height) as u32;
-    let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(thread_count as usize)
-        .build()
-        .unwrap();
-    match channels {
-        FastBlurChannels::Plane => {
-            box_blur_impl::<f32, 1>(
-                src,
-                stride,
-                dst,
-                stride,
-                width,
-                height,
-                radius,
-                &pool,
-                thread_count,
-            );
-        }
-        FastBlurChannels::Channels3 => {
-            box_blur_impl::<f32, 3>(
-                src,
-                stride,
-                dst,
-                stride,
-                width,
-                height,
-                radius,
-                &pool,
-                thread_count,
-            );
-        }
-        FastBlurChannels::Channels4 => {
-            box_blur_impl::<f32, 4>(
-                src,
-                stride,
-                dst,
-                stride,
-                width,
-                height,
-                radius,
-                &pool,
-                thread_count,
-            );
-        }
-    }
+    let pool = if thread_count == 1 {
+        None
+    } else {
+        Some(
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(thread_count as usize)
+                .build()
+                .unwrap(),
+        )
+    };
+    let _dispatcher = match channels {
+        FastBlurChannels::Plane => box_blur_impl::<f32, 1>,
+        FastBlurChannels::Channels3 => box_blur_impl::<f32, 3>,
+        FastBlurChannels::Channels4 => box_blur_impl::<f32, 4>,
+    };
+    _dispatcher(
+        src,
+        stride,
+        dst,
+        stride,
+        width,
+        height,
+        radius,
+        &pool,
+        thread_count,
+    );
 }
 
 /// Performs box blur on the image in linear colorspace
@@ -809,10 +774,16 @@ fn tent_blur_impl<
     f32: ToStorage<T>,
 {
     let thread_count = threading_policy.get_threads_count(width, height) as u32;
-    let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(thread_count as usize)
-        .build()
-        .unwrap();
+    let pool = if thread_count == 1 {
+        None
+    } else {
+        Some(
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(thread_count as usize)
+                .build()
+                .unwrap(),
+        )
+    };
     let mut transient: Vec<T> =
         vec![T::from_u32(0).unwrap_or_default(); dst_stride as usize * height as usize];
     box_blur_impl::<T, CHANNEL_CONFIGURATION>(
@@ -869,44 +840,21 @@ pub fn tent_blur(
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) {
-    match channels {
-        FastBlurChannels::Plane => {
-            tent_blur_impl::<u8, 1>(
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-                width,
-                height,
-                radius,
-                threading_policy,
-            );
-        }
-        FastBlurChannels::Channels3 => {
-            tent_blur_impl::<u8, 3>(
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-                width,
-                height,
-                radius,
-                threading_policy,
-            );
-        }
-        FastBlurChannels::Channels4 => {
-            tent_blur_impl::<u8, 4>(
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-                width,
-                height,
-                radius,
-                threading_policy,
-            );
-        }
-    }
+    let _dispatcher = match channels {
+        FastBlurChannels::Plane => tent_blur_impl::<u8, 1>,
+        FastBlurChannels::Channels3 => tent_blur_impl::<u8, 3>,
+        FastBlurChannels::Channels4 => tent_blur_impl::<u8, 4>,
+    };
+    _dispatcher(
+        src,
+        src_stride,
+        dst,
+        dst_stride,
+        width,
+        height,
+        radius,
+        threading_policy,
+    );
 }
 
 /// Performs tent blur on the image.
@@ -938,44 +886,21 @@ pub fn tent_blur_u16(
     threading_policy: ThreadingPolicy,
 ) {
     let stride = width * channels.get_channels() as u32;
-    match channels {
-        FastBlurChannels::Plane => {
-            tent_blur_impl::<u16, 1>(
-                src,
-                stride,
-                dst,
-                stride,
-                width,
-                height,
-                radius,
-                threading_policy,
-            );
-        }
-        FastBlurChannels::Channels3 => {
-            tent_blur_impl::<u16, 3>(
-                src,
-                stride,
-                dst,
-                stride,
-                width,
-                height,
-                radius,
-                threading_policy,
-            );
-        }
-        FastBlurChannels::Channels4 => {
-            tent_blur_impl::<u16, 4>(
-                src,
-                stride,
-                dst,
-                stride,
-                width,
-                height,
-                radius,
-                threading_policy,
-            );
-        }
-    }
+    let _dispatcher = match channels {
+        FastBlurChannels::Plane => tent_blur_impl::<u16, 1>,
+        FastBlurChannels::Channels3 => tent_blur_impl::<u16, 3>,
+        FastBlurChannels::Channels4 => tent_blur_impl::<u16, 4>,
+    };
+    _dispatcher(
+        src,
+        stride,
+        dst,
+        stride,
+        width,
+        height,
+        radius,
+        threading_policy,
+    );
 }
 
 /// Performs tent blur on the image.
@@ -1004,44 +929,21 @@ pub fn tent_blur_f32(
     threading_policy: ThreadingPolicy,
 ) {
     let stride = width * channels.get_channels() as u32;
-    match channels {
-        FastBlurChannels::Plane => {
-            tent_blur_impl::<f32, 1>(
-                src,
-                stride,
-                dst,
-                stride,
-                width,
-                height,
-                radius,
-                threading_policy,
-            );
-        }
-        FastBlurChannels::Channels3 => {
-            tent_blur_impl::<f32, 3>(
-                src,
-                stride,
-                dst,
-                stride,
-                width,
-                height,
-                radius,
-                threading_policy,
-            );
-        }
-        FastBlurChannels::Channels4 => {
-            tent_blur_impl::<f32, 4>(
-                src,
-                stride,
-                dst,
-                stride,
-                width,
-                height,
-                radius,
-                threading_policy,
-            );
-        }
-    }
+    let _dispatcher = match channels {
+        FastBlurChannels::Plane => tent_blur_impl::<f32, 1>,
+        FastBlurChannels::Channels3 => tent_blur_impl::<f32, 3>,
+        FastBlurChannels::Channels4 => tent_blur_impl::<f32, 4>,
+    };
+    _dispatcher(
+        src,
+        stride,
+        dst,
+        stride,
+        width,
+        height,
+        radius,
+        threading_policy,
+    );
 }
 
 /// Performs tent blur on the image in linear colorspace
@@ -1148,10 +1050,16 @@ fn gaussian_box_blur_impl<
     f32: ToStorage<T>,
 {
     let thread_count = threading_policy.get_threads_count(width, height) as u32;
-    let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(thread_count as usize)
-        .build()
-        .unwrap();
+    let pool = if thread_count == 1 {
+        None
+    } else {
+        Some(
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(thread_count as usize)
+                .build()
+                .unwrap(),
+        )
+    };
     let mut transient: Vec<T> =
         vec![T::from_u32(0).unwrap_or_default(); dst_stride as usize * height as usize];
     let mut transient2: Vec<T> =
@@ -1222,44 +1130,21 @@ pub fn gaussian_box_blur(
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) {
-    match channels {
-        FastBlurChannels::Plane => {
-            gaussian_box_blur_impl::<u8, 1>(
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-                width,
-                height,
-                radius,
-                threading_policy,
-            );
-        }
-        FastBlurChannels::Channels3 => {
-            gaussian_box_blur_impl::<u8, 3>(
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-                width,
-                height,
-                radius,
-                threading_policy,
-            );
-        }
-        FastBlurChannels::Channels4 => {
-            gaussian_box_blur_impl::<u8, 4>(
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-                width,
-                height,
-                radius,
-                threading_policy,
-            );
-        }
-    }
+    let _dispatcher = match channels {
+        FastBlurChannels::Plane => gaussian_box_blur_impl::<u8, 1>,
+        FastBlurChannels::Channels3 => gaussian_box_blur_impl::<u8, 3>,
+        FastBlurChannels::Channels4 => gaussian_box_blur_impl::<u8, 4>,
+    };
+    _dispatcher(
+        src,
+        src_stride,
+        dst,
+        dst_stride,
+        width,
+        height,
+        radius,
+        threading_policy,
+    );
 }
 
 /// Performs gaussian box blur approximation on the image.
@@ -1292,44 +1177,21 @@ pub fn gaussian_box_blur_u16(
     threading_policy: ThreadingPolicy,
 ) {
     let stride = width * channels.get_channels() as u32;
-    match channels {
-        FastBlurChannels::Plane => {
-            gaussian_box_blur_impl::<u16, 1>(
-                src,
-                stride,
-                dst,
-                stride,
-                width,
-                height,
-                radius,
-                threading_policy,
-            );
-        }
-        FastBlurChannels::Channels3 => {
-            gaussian_box_blur_impl::<u16, 3>(
-                src,
-                stride,
-                dst,
-                stride,
-                width,
-                height,
-                radius,
-                threading_policy,
-            );
-        }
-        FastBlurChannels::Channels4 => {
-            gaussian_box_blur_impl::<u16, 4>(
-                src,
-                stride,
-                dst,
-                stride,
-                width,
-                height,
-                radius,
-                threading_policy,
-            );
-        }
-    }
+    let _dispatcher = match channels {
+        FastBlurChannels::Plane => gaussian_box_blur_impl::<u16, 1>,
+        FastBlurChannels::Channels3 => gaussian_box_blur_impl::<u16, 3>,
+        FastBlurChannels::Channels4 => gaussian_box_blur_impl::<u16, 4>,
+    };
+    _dispatcher(
+        src,
+        stride,
+        dst,
+        stride,
+        width,
+        height,
+        radius,
+        threading_policy,
+    );
 }
 
 /// Performs gaussian box blur approximation on the image.
@@ -1361,44 +1223,21 @@ pub fn gaussian_box_blur_f32(
     threading_policy: ThreadingPolicy,
 ) {
     let stride = width * channels.get_channels() as u32;
-    match channels {
-        FastBlurChannels::Plane => {
-            gaussian_box_blur_impl::<f32, 1>(
-                src,
-                stride,
-                dst,
-                stride,
-                width,
-                height,
-                radius,
-                threading_policy,
-            );
-        }
-        FastBlurChannels::Channels3 => {
-            gaussian_box_blur_impl::<f32, 3>(
-                src,
-                stride,
-                dst,
-                stride,
-                width,
-                height,
-                radius,
-                threading_policy,
-            );
-        }
-        FastBlurChannels::Channels4 => {
-            gaussian_box_blur_impl::<f32, 4>(
-                src,
-                stride,
-                dst,
-                stride,
-                width,
-                height,
-                radius,
-                threading_policy,
-            );
-        }
-    }
+    let _dispatcher = match channels {
+        FastBlurChannels::Plane => gaussian_box_blur_impl::<f32, 1>,
+        FastBlurChannels::Channels3 => gaussian_box_blur_impl::<f32, 3>,
+        FastBlurChannels::Channels4 => gaussian_box_blur_impl::<f32, 4>,
+    };
+    _dispatcher(
+        src,
+        stride,
+        dst,
+        stride,
+        width,
+        height,
+        radius,
+        threading_policy,
+    );
 }
 
 /// Performs gaussian box blur approximation on the image.

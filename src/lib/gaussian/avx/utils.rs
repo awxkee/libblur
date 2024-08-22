@@ -30,6 +30,22 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
+#[inline]
+#[target_feature(enable = "avx2")]
+pub unsafe fn _mm256_opt_fma_ps<const FMA: bool>(a: __m256, b: __m256, c: __m256) -> __m256 {
+    if FMA {
+        _mm256_fma_psx(a, b, c)
+    } else {
+        _mm256_add_ps(_mm256_mul_ps(b, c), a)
+    }
+}
+
+#[inline]
+#[target_feature(enable = "avx2,fma")]
+unsafe fn _mm256_fma_psx(a: __m256, b: __m256, c: __m256) -> __m256 {
+    _mm256_fmadd_ps(b, c, a)
+}
+
 #[inline(always)]
 pub const fn _mm256_shuffle(z: u32, y: u32, x: u32, w: u32) -> i32 {
     ((z << 6) | (y << 4) | (x << 2) | w) as i32
@@ -38,21 +54,21 @@ pub const fn _mm256_shuffle(z: u32, y: u32, x: u32, w: u32) -> i32 {
 #[inline(always)]
 pub(crate) unsafe fn load_u8_u32_one(ptr: *const u8) -> __m256i {
     let u_first = u32::from_le_bytes([ptr.read_unaligned(), 0, 0, 0]);
-    return _mm256_setr_epi32(u_first as i32, 0, 0, 0, 0, 0, 0, 0);
+    _mm256_setr_epi32(u_first as i32, 0, 0, 0, 0, 0, 0, 0)
 }
 
 #[inline(always)]
 pub unsafe fn avx2_pack_u32(s_1: __m256i, s_2: __m256i) -> __m256i {
     let packed = _mm256_packus_epi32(s_1, s_2);
     const MASK: i32 = _mm256_shuffle(3, 1, 2, 0);
-    return _mm256_permute4x64_epi64::<MASK>(packed);
+    _mm256_permute4x64_epi64::<MASK>(packed)
 }
 
 #[inline(always)]
 pub unsafe fn avx2_pack_u16(s_1: __m256i, s_2: __m256i) -> __m256i {
     let packed = _mm256_packus_epi16(s_1, s_2);
     const MASK: i32 = _mm256_shuffle(3, 1, 2, 0);
-    return _mm256_permute4x64_epi64::<MASK>(packed);
+    _mm256_permute4x64_epi64::<MASK>(packed)
 }
 
 #[inline(always)]
@@ -74,5 +90,5 @@ pub(crate) unsafe fn load_u8_f32_fast<const CHANNELS_COUNT: usize>(ptr: *const u
         0,
         0,
     );
-    return _mm256_cvtepi32_ps(v_int);
+    _mm256_cvtepi32_ps(v_int)
 }

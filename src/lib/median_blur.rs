@@ -312,60 +312,51 @@ pub fn median_blur(
     threading_policy: ThreadingPolicy,
 ) {
     let unsafe_dst = UnsafeSlice::new(dst);
+    let _dispatcher = match channels {
+        FastBlurChannels::Plane => median_blur_impl::<1>,
+        FastBlurChannels::Channels3 => median_blur_impl::<3>,
+        FastBlurChannels::Channels4 => median_blur_impl::<4>,
+    };
     let thread_count = threading_policy.get_threads_count(width, height) as u32;
-    let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(thread_count as usize)
-        .build()
-        .unwrap();
-    pool.scope(|scope| {
-        let segment_size = height / thread_count;
-        for i in 0..thread_count {
-            let start_y = i * segment_size;
-            let mut end_y = (i + 1) * segment_size;
-            if i == thread_count - 1 {
-                end_y = height;
+    if thread_count == 1 {
+        _dispatcher(
+            src,
+            src_stride,
+            &unsafe_dst,
+            dst_stride,
+            width,
+            height,
+            radius,
+            0,
+            height,
+        );
+    } else {
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(thread_count as usize)
+            .build()
+            .unwrap();
+        pool.scope(|scope| {
+            let segment_size = height / thread_count;
+            for i in 0..thread_count {
+                let start_y = i * segment_size;
+                let mut end_y = (i + 1) * segment_size;
+                if i == thread_count - 1 {
+                    end_y = height;
+                }
+                scope.spawn(move |_| {
+                    _dispatcher(
+                        src,
+                        src_stride,
+                        &unsafe_dst,
+                        dst_stride,
+                        width,
+                        height,
+                        radius,
+                        start_y,
+                        end_y,
+                    );
+                });
             }
-            scope.spawn(move |_| match channels {
-                FastBlurChannels::Plane => {
-                    median_blur_impl::<1>(
-                        src,
-                        src_stride,
-                        &unsafe_dst,
-                        dst_stride,
-                        width,
-                        height,
-                        radius,
-                        start_y,
-                        end_y,
-                    );
-                }
-                FastBlurChannels::Channels3 => {
-                    median_blur_impl::<3>(
-                        src,
-                        src_stride,
-                        &unsafe_dst,
-                        dst_stride,
-                        width,
-                        height,
-                        radius,
-                        start_y,
-                        end_y,
-                    );
-                }
-                FastBlurChannels::Channels4 => {
-                    median_blur_impl::<4>(
-                        src,
-                        src_stride,
-                        &unsafe_dst,
-                        dst_stride,
-                        width,
-                        height,
-                        radius,
-                        start_y,
-                        end_y,
-                    );
-                }
-            });
-        }
-    });
+        });
+    }
 }

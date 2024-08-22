@@ -32,6 +32,7 @@ mod horiz_four_channel_f32;
 mod horiz_one_channel_f32;
 mod horiz_one_channel_u8;
 mod vertical_f32;
+mod gauss_utils;
 
 pub use base::gaussian_blur_horizontal_pass_impl_sse;
 pub use base::gaussian_blur_vertical_pass_impl_sse;
@@ -43,3 +44,4 @@ pub use horiz_one_channel_f32::gaussian_horiz_one_chan_f32;
 pub use horiz_one_channel_f32::gaussian_horiz_one_chan_filter_f32;
 pub use horiz_one_channel_u8::*;
 pub use vertical_f32::gaussian_blur_vertical_pass_impl_f32_sse;
+pub use gauss_utils::_mm_opt_fma_ps;

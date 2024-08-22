@@ -49,6 +49,34 @@ pub fn fast_gaussian_next_vertical_pass_sse_f32<
     start: u32,
     end: u32,
 ) {
+    unsafe {
+        fast_gaussian_next_vertical_pass_sse_f32_impl::<T, CHANNELS_COUNT, EDGE_MODE>(
+            undefined_slice,
+            stride,
+            width,
+            height,
+            radius,
+            start,
+            end,
+        );
+    }
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+unsafe fn fast_gaussian_next_vertical_pass_sse_f32_impl<
+    T,
+    const CHANNELS_COUNT: usize,
+    const EDGE_MODE: usize,
+>(
+    undefined_slice: &UnsafeSlice<T>,
+    stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    start: u32,
+    end: u32,
+) {
     let edge_mode: EdgeMode = EDGE_MODE.into();
     let bytes: &UnsafeSlice<'_, f32> = unsafe { std::mem::transmute(undefined_slice) };
     let mut buffer: [[f32; 4]; 1024] = [[0.; 4]; 1024];
@@ -150,6 +178,34 @@ pub fn fast_gaussian_next_horizontal_pass_sse_f32<
     start: u32,
     end: u32,
 ) {
+    unsafe {
+        fast_gaussian_next_horizontal_pass_sse_f32_impl::<T, CHANNELS_COUNT, EDGE_MODE>(
+            undefined_slice,
+            stride,
+            width,
+            height,
+            radius,
+            start,
+            end,
+        );
+    }
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+unsafe fn fast_gaussian_next_horizontal_pass_sse_f32_impl<
+    T,
+    const CHANNELS_COUNT: usize,
+    const EDGE_MODE: usize,
+>(
+    undefined_slice: &UnsafeSlice<T>,
+    stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    start: u32,
+    end: u32,
+) {
     let edge_mode: EdgeMode = EDGE_MODE.into();
     let bytes: &UnsafeSlice<'_, f32> = unsafe { std::mem::transmute(undefined_slice) };
     let mut buffer: [[f32; 4]; 1024] = [[0.; 4]; 1024];
@@ -203,16 +259,16 @@ pub fn fast_gaussian_next_horizontal_pass_sse_f32<
                 let buf_ptr = unsafe { buffer.as_mut_ptr().add(arr_index) as *mut f32 };
                 let stored = unsafe { _mm_loadu_ps(buf_ptr) };
 
-                let buf_ptr_1 = buffer[arr_index_1].as_mut_ptr();
-                let stored_1 = unsafe { _mm_loadu_ps(buf_ptr_1) };
+                let buf_ptr_1 = unsafe { buffer.as_mut_ptr().add(arr_index_1) };
+                let stored_1 = unsafe { _mm_loadu_ps(buf_ptr_1 as *const f32) };
 
                 let new_diff = unsafe { _mm_mul_ps(_mm_sub_ps(stored, stored_1), threes) };
 
                 diffs = unsafe { _mm_add_ps(diffs, new_diff) };
             } else if x + 2 * radius_64 >= 0 {
                 let arr_index = ((x + radius_64) & 1023) as usize;
-                let buf_ptr = buffer[arr_index].as_mut_ptr();
-                let stored = unsafe { _mm_loadu_ps(buf_ptr) };
+                let buf_ptr = unsafe { buffer.as_mut_ptr().add(arr_index) };
+                let stored = unsafe { _mm_loadu_ps(buf_ptr as *const f32) };
                 diffs = unsafe { _mm_sub_ps(diffs, _mm_mul_ps(stored, threes)) };
             }
 

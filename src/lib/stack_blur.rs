@@ -28,10 +28,7 @@
 use crate::mul_table::{MUL_TABLE_STACK_BLUR, SHR_TABLE_STACK_BLUR};
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::{stack_blur_pass_neon_i32, stack_blur_pass_neon_i64};
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "sse4.1"
-))]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse::{stack_blur_pass_sse, stack_blur_pass_sse_i64};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{FastBlurChannels, ThreadingPolicy};
@@ -685,6 +682,12 @@ fn stack_blur_worker_horizontal(
     thread: usize,
     thread_count: usize,
 ) {
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    let _is_avx512dq_available = std::arch::is_x86_feature_detected!("avx512dq");
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    let _is_avx512vl_available = std::arch::is_x86_feature_detected!("avx512vl");
     match channels {
         FastBlurChannels::Plane => {
             let mut _dispatcher: fn(
@@ -732,24 +735,30 @@ fn stack_blur_worker_horizontal(
                 {
                     _dispatcher = stack_blur_pass_neon_i32::<3>;
                 }
-                #[cfg(all(
-                    any(target_arch = "x86_64", target_arch = "x86"),
-                    target_feature = "sse4.1"
-                ))]
+                #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
                 {
-                    _dispatcher = stack_blur_pass_sse::<3>;
+                    if _is_sse_available {
+                       if _is_avx512dq_available && _is_avx512vl_available {
+                           _dispatcher = stack_blur_pass_sse::<3, true>;
+                       } else {
+                           _dispatcher = stack_blur_pass_sse::<3, false>;
+                       }
+                    }
                 }
             } else {
                 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
                 {
                     _dispatcher = stack_blur_pass_neon_i64::<3>;
                 }
-                #[cfg(all(
-                    any(target_arch = "x86_64", target_arch = "x86"),
-                    target_feature = "sse4.1"
-                ))]
+                #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
                 {
-                    _dispatcher = stack_blur_pass_sse_i64::<3>;
+                    if _is_sse_available {
+                        if _is_avx512dq_available && _is_avx512vl_available {
+                            _dispatcher = stack_blur_pass_sse_i64::<3, true>;
+                        } else {
+                            _dispatcher = stack_blur_pass_sse_i64::<3, false>;
+                        }
+                    }
                 }
             }
             _dispatcher(
@@ -783,24 +792,30 @@ fn stack_blur_worker_horizontal(
                 {
                     _dispatcher = stack_blur_pass_neon_i32::<4>;
                 }
-                #[cfg(all(
-                    any(target_arch = "x86_64", target_arch = "x86"),
-                    target_feature = "sse4.1"
-                ))]
+                #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
                 {
-                    _dispatcher = stack_blur_pass_sse::<4>;
+                    if _is_sse_available {
+                        if _is_avx512dq_available && _is_avx512vl_available {
+                            _dispatcher = stack_blur_pass_sse::<4, true>;
+                        } else {
+                            _dispatcher = stack_blur_pass_sse::<4, false>;
+                        }
+                    }
                 }
             } else {
                 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
                 {
                     _dispatcher = stack_blur_pass_neon_i64::<4>;
                 }
-                #[cfg(all(
-                    any(target_arch = "x86_64", target_arch = "x86"),
-                    target_feature = "sse4.1"
-                ))]
+                #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
                 {
-                    _dispatcher = stack_blur_pass_sse_i64::<4>;
+                    if _is_sse_available {
+                        if _is_avx512dq_available && _is_avx512vl_available {
+                            _dispatcher = stack_blur_pass_sse_i64::<4, true>;
+                        } else {
+                            _dispatcher = stack_blur_pass_sse_i64::<4, false>;
+                        }
+                    }
                 }
             }
             _dispatcher(
@@ -827,6 +842,12 @@ fn stack_blur_worker_vertical(
     thread: usize,
     thread_count: usize,
 ) {
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    let _is_avx512dq_available = std::arch::is_x86_feature_detected!("avx512dq");
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    let _is_avx512vl_available = std::arch::is_x86_feature_detected!("avx512vl");
     match channels {
         FastBlurChannels::Plane => {
             let mut _dispatcher: fn(
@@ -874,24 +895,30 @@ fn stack_blur_worker_vertical(
                 {
                     _dispatcher = stack_blur_pass_neon_i32::<3>;
                 }
-                #[cfg(all(
-                    any(target_arch = "x86_64", target_arch = "x86"),
-                    target_feature = "sse4.1"
-                ))]
+                #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
                 {
-                    _dispatcher = stack_blur_pass_sse::<3>;
+                    if _is_sse_available {
+                        if _is_avx512dq_available && _is_avx512vl_available {
+                            _dispatcher = stack_blur_pass_sse::<3, true>;
+                        } else {
+                            _dispatcher = stack_blur_pass_sse::<3, false>;
+                        }
+                    }
                 }
             } else {
                 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
                 {
                     _dispatcher = stack_blur_pass_neon_i64::<3>;
                 }
-                #[cfg(all(
-                    any(target_arch = "x86_64", target_arch = "x86"),
-                    target_feature = "sse4.1"
-                ))]
+                #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
                 {
-                    _dispatcher = stack_blur_pass_sse_i64::<3>;
+                    if _is_sse_available {
+                        if _is_avx512dq_available && _is_avx512vl_available {
+                            _dispatcher = stack_blur_pass_sse_i64::<3, true>;
+                        } else {
+                            _dispatcher = stack_blur_pass_sse_i64::<3, false>;
+                        }
+                    }
                 }
             }
             _dispatcher(
@@ -925,24 +952,30 @@ fn stack_blur_worker_vertical(
                 {
                     _dispatcher = stack_blur_pass_neon_i32::<4>;
                 }
-                #[cfg(all(
-                    any(target_arch = "x86_64", target_arch = "x86"),
-                    target_feature = "sse4.1"
-                ))]
+                #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
                 {
-                    _dispatcher = stack_blur_pass_sse::<4>;
+                    if _is_sse_available {
+                        if _is_avx512dq_available && _is_avx512vl_available {
+                            _dispatcher = stack_blur_pass_sse::<4, true>;
+                        } else {
+                            _dispatcher = stack_blur_pass_sse::<4, false>;
+                        }
+                    }
                 }
             } else {
                 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
                 {
                     _dispatcher = stack_blur_pass_neon_i64::<4>;
                 }
-                #[cfg(all(
-                    any(target_arch = "x86_64", target_arch = "x86"),
-                    target_feature = "sse4.1"
-                ))]
+                #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
                 {
-                    _dispatcher = stack_blur_pass_sse_i64::<4>;
+                    if _is_sse_available {
+                        if _is_avx512dq_available && _is_avx512vl_available {
+                            _dispatcher = stack_blur_pass_sse_i64::<4, true>;
+                        } else {
+                            _dispatcher = stack_blur_pass_sse_i64::<4, false>;
+                        }
+                    }
                 }
             }
             _dispatcher(

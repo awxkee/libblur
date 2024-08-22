@@ -49,7 +49,7 @@ pub enum EdgeMode {
 
 impl From<usize> for EdgeMode {
     fn from(value: usize) -> Self {
-        return match value {
+        match value {
             0 => EdgeMode::Clamp,
             1 => EdgeMode::KernelClip,
             2 => EdgeMode::Wrap,
@@ -58,7 +58,7 @@ impl From<usize> for EdgeMode {
             _ => {
                 panic!("Unknown edge mode for value: {}", value);
             }
-        };
+        }
     }
 }
 
@@ -83,7 +83,7 @@ where
 {
     let i = (i - n).rem_euclid(&(2i64.as_() * n));
     let i = (i - n).abs();
-    return i.as_();
+    i.as_()
 }
 
 #[inline(always)]
@@ -119,7 +119,7 @@ where
             .max(T::from_i32(0i32).unwrap())
             .as_();
     }
-    return i.as_();
+    i.as_()
 }
 
 #[macro_export]

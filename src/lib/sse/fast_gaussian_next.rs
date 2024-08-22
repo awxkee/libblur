@@ -49,6 +49,34 @@ pub fn fast_gaussian_next_vertical_pass_sse_u8<
     start: u32,
     end: u32,
 ) {
+    unsafe {
+        fast_gaussian_next_vertical_pass_sse_u8_impl::<T, CHANNELS_COUNT, EDGE_MODE>(
+            undefined_slice,
+            stride,
+            width,
+            height,
+            radius,
+            start,
+            end,
+        );
+    }
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+unsafe fn fast_gaussian_next_vertical_pass_sse_u8_impl<
+    T,
+    const CHANNELS_COUNT: usize,
+    const EDGE_MODE: usize,
+>(
+    undefined_slice: &UnsafeSlice<T>,
+    stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    start: u32,
+    end: u32,
+) {
     let edge_mode: EdgeMode = EDGE_MODE.into();
     let bytes: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(undefined_slice) };
     let mut buffer: [[i32; 4]; 1024] = [[0; 4]; 1024];
@@ -146,7 +174,35 @@ pub fn fast_gaussian_next_vertical_pass_sse_u8<
     }
 }
 
-pub(crate) fn fast_gaussian_next_horizontal_pass_sse_u8<
+pub fn fast_gaussian_next_horizontal_pass_sse_u8<
+    T,
+    const CHANNELS_COUNT: usize,
+    const EDGE_MODE: usize,
+>(
+    undefined_slice: &UnsafeSlice<T>,
+    stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    start: u32,
+    end: u32,
+) {
+    unsafe {
+        fast_gaussian_next_horizontal_pass_sse_u8_impl::<T, CHANNELS_COUNT, EDGE_MODE>(
+            undefined_slice,
+            stride,
+            width,
+            height,
+            radius,
+            start,
+            end,
+        );
+    }
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+unsafe fn fast_gaussian_next_horizontal_pass_sse_u8_impl<
     T,
     const CHANNELS_COUNT: usize,
     const EDGE_MODE: usize,
@@ -230,7 +286,7 @@ pub(crate) fn fast_gaussian_next_horizontal_pass_sse_u8<
                 diffs = unsafe { _mm_add_epi32(diffs, new_diff) };
             } else if x + 2 * radius_64 >= 0 {
                 let arr_index = ((x + radius_64) & 1023) as usize;
-                let buf_ptr = buffer[arr_index].as_mut_ptr();
+                let buf_ptr = unsafe { buffer.as_mut_ptr().add(arr_index) };
                 let stored = unsafe { _mm_loadu_si128(buf_ptr as *const __m128i) };
                 diffs = unsafe { _mm_sub_epi32(diffs, _mm_mullo_epi32(stored, threes)) };
             }

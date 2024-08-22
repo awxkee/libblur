@@ -29,13 +29,39 @@ use crate::mul_table::{MUL_TABLE_STACK_BLUR, SHR_TABLE_STACK_BLUR};
 use crate::sse::utils::{_mm_packus_epi64, load_u8_s32_fast, store_u8_s32};
 use crate::stack_blur::StackBlurPass;
 use crate::unsafe_slice::UnsafeSlice;
-use erydanos::_mm_mul_epi64;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
+use crate::sse::_mm_mul_epi64x;
 
-pub fn stack_blur_pass_sse<const COMPONENTS: usize>(
+pub fn stack_blur_pass_sse<const COMPONENTS: usize, const AVX512_DQVL: bool>(
+    pixels: &UnsafeSlice<u8>,
+    stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    pass: StackBlurPass,
+    thread: usize,
+    total_threads: usize,
+) {
+    unsafe {
+        stack_blur_pass_sse_impl::<COMPONENTS, AVX512_DQVL>(
+            pixels,
+            stride,
+            width,
+            height,
+            radius,
+            pass,
+            thread,
+            total_threads,
+        );
+    }
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+unsafe fn stack_blur_pass_sse_impl<const COMPONENTS: usize, const AVX512_DQVL: bool>(
     pixels: &UnsafeSlice<u8>,
     stride: u32,
     width: u32,
@@ -117,8 +143,10 @@ pub fn stack_blur_pass_sse<const COMPONENTS: usize>(
                     let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
                     let hi_a = _mm_unpackhi_epi32(sums, _mm_setzero_si128());
                     let lo_b = _mm_unpacklo_epi32(sums, _mm_setzero_si128());
-                    let blurred_hi = _mm_srl_epi64(_mm_mul_epi64(hi_a, mul_sum), shr_sum);
-                    let blurred_lo = _mm_srl_epi64(_mm_mul_epi64(lo_b, mul_sum), shr_sum);
+                    let blurred_hi =
+                        _mm_srl_epi64(_mm_mul_epi64x::<AVX512_DQVL>(hi_a, mul_sum), shr_sum);
+                    let blurred_lo =
+                        _mm_srl_epi64(_mm_mul_epi64x::<AVX512_DQVL>(lo_b, mul_sum), shr_sum);
                     let blurred = _mm_packus_epi64(blurred_lo, blurred_hi);
                     store_u8_s32::<COMPONENTS>(store_ld, blurred);
                     dst_ptr += COMPONENTS;
@@ -211,8 +239,10 @@ pub fn stack_blur_pass_sse<const COMPONENTS: usize>(
                     let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
                     let hi_a = _mm_unpackhi_epi32(sums, _mm_setzero_si128());
                     let lo_b = _mm_unpacklo_epi32(sums, _mm_setzero_si128());
-                    let blurred_hi = _mm_srl_epi64(_mm_mul_epi64(hi_a, mul_sum), shr_sum);
-                    let blurred_lo = _mm_srl_epi64(_mm_mul_epi64(lo_b, mul_sum), shr_sum);
+                    let blurred_hi =
+                        _mm_srl_epi64(_mm_mul_epi64x::<AVX512_DQVL>(hi_a, mul_sum), shr_sum);
+                    let blurred_lo =
+                        _mm_srl_epi64(_mm_mul_epi64x::<AVX512_DQVL>(lo_b, mul_sum), shr_sum);
                     let blurred = _mm_packus_epi64(blurred_lo, blurred_hi);
                     store_u8_s32::<COMPONENTS>(store_ld, blurred);
 

@@ -30,14 +30,119 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-use erydanos::_mm256_prefer_fma_ps;
-
 use crate::gaussian::avx::utils::{
-    avx2_pack_u16, avx2_pack_u32, load_u8_f32_fast, load_u8_u32_one,
+    _mm256_opt_fma_ps, avx2_pack_u16, avx2_pack_u32, load_u8_f32_fast, load_u8_u32_one,
 };
 use crate::unsafe_slice::UnsafeSlice;
 
-pub fn gaussian_blur_vertical_pass_impl_avx<T, const CHANNEL_CONFIGURATION: usize>(
+pub fn gaussian_blur_vertical_pass_impl_avx<
+    T,
+    const CHANNEL_CONFIGURATION: usize,
+    const FMA: bool,
+>(
+    undef_src: &[T],
+    src_stride: u32,
+    undef_unsafe_dst: &UnsafeSlice<T>,
+    dst_stride: u32,
+    width: u32,
+    height: u32,
+    kernel_size: usize,
+    kernel: &[f32],
+    start_y: u32,
+    end_y: u32,
+) {
+    unsafe {
+        if FMA {
+            gaussian_blur_vertical_pass_impl_fma::<T, CHANNEL_CONFIGURATION>(
+                undef_src,
+                src_stride,
+                undef_unsafe_dst,
+                dst_stride,
+                width,
+                height,
+                kernel_size,
+                kernel,
+                start_y,
+                end_y,
+            );
+        } else {
+            gaussian_blur_vertical_pass_impl_gen::<T, CHANNEL_CONFIGURATION>(
+                undef_src,
+                src_stride,
+                undef_unsafe_dst,
+                dst_stride,
+                width,
+                height,
+                kernel_size,
+                kernel,
+                start_y,
+                end_y,
+            );
+        }
+    }
+}
+
+#[inline]
+#[target_feature(enable = "avx2")]
+unsafe fn gaussian_blur_vertical_pass_impl_gen<T, const CHANNEL_CONFIGURATION: usize>(
+    undef_src: &[T],
+    src_stride: u32,
+    undef_unsafe_dst: &UnsafeSlice<T>,
+    dst_stride: u32,
+    width: u32,
+    height: u32,
+    kernel_size: usize,
+    kernel: &[f32],
+    start_y: u32,
+    end_y: u32,
+) {
+    gaussian_blur_vertical_pass_impl_avx_impl::<T, CHANNEL_CONFIGURATION, false>(
+        undef_src,
+        src_stride,
+        undef_unsafe_dst,
+        dst_stride,
+        width,
+        height,
+        kernel_size,
+        kernel,
+        start_y,
+        end_y,
+    );
+}
+
+#[inline]
+#[target_feature(enable = "avx2,fma")]
+unsafe fn gaussian_blur_vertical_pass_impl_fma<T, const CHANNEL_CONFIGURATION: usize>(
+    undef_src: &[T],
+    src_stride: u32,
+    undef_unsafe_dst: &UnsafeSlice<T>,
+    dst_stride: u32,
+    width: u32,
+    height: u32,
+    kernel_size: usize,
+    kernel: &[f32],
+    start_y: u32,
+    end_y: u32,
+) {
+    gaussian_blur_vertical_pass_impl_avx_impl::<T, CHANNEL_CONFIGURATION, true>(
+        undef_src,
+        src_stride,
+        undef_unsafe_dst,
+        dst_stride,
+        width,
+        height,
+        kernel_size,
+        kernel,
+        start_y,
+        end_y,
+    );
+}
+
+unsafe fn gaussian_blur_vertical_pass_impl_avx_impl<
+    T,
+    const CHANNEL_CONFIGURATION: usize,
+    const FMA: bool,
+>(
     undef_src: &[T],
     src_stride: u32,
     undef_unsafe_dst: &UnsafeSlice<T>,
@@ -94,8 +199,8 @@ pub fn gaussian_blur_vertical_pass_impl_avx<T, const CHANNEL_CONFIGURATION: usiz
                     let lo_f = _mm256_cvtepi32_ps(lo_32);
                     let hi_f = _mm256_cvtepi32_ps(hi_32);
 
-                    store0 = _mm256_prefer_fma_ps(store0, lo_f, f_weight);
-                    store1 = _mm256_prefer_fma_ps(store1, hi_f, f_weight);
+                    store0 = _mm256_opt_fma_ps::<FMA>(store0, lo_f, f_weight);
+                    store1 = _mm256_opt_fma_ps::<FMA>(store1, hi_f, f_weight);
 
                     let high_part = _mm256_extracti128_si256::<1>(row_0);
 
@@ -108,8 +213,8 @@ pub fn gaussian_blur_vertical_pass_impl_avx<T, const CHANNEL_CONFIGURATION: usiz
                     let lo_f = _mm256_cvtepi32_ps(lo_32);
                     let hi_f = _mm256_cvtepi32_ps(hi_32);
 
-                    store2 = _mm256_prefer_fma_ps(store2, lo_f, f_weight);
-                    store3 = _mm256_prefer_fma_ps(store3, hi_f, f_weight);
+                    store2 = _mm256_opt_fma_ps::<FMA>(store2, lo_f, f_weight);
+                    store3 = _mm256_opt_fma_ps::<FMA>(store3, hi_f, f_weight);
 
                     let low_part = _mm256_castsi256_si128(row_1);
 
@@ -122,8 +227,8 @@ pub fn gaussian_blur_vertical_pass_impl_avx<T, const CHANNEL_CONFIGURATION: usiz
                     let lo_f = _mm256_cvtepi32_ps(lo_32);
                     let hi_f = _mm256_cvtepi32_ps(hi_32);
 
-                    store4 = _mm256_prefer_fma_ps(store4, lo_f, f_weight);
-                    store5 = _mm256_prefer_fma_ps(store5, hi_f, f_weight);
+                    store4 = _mm256_opt_fma_ps::<FMA>(store4, lo_f, f_weight);
+                    store5 = _mm256_opt_fma_ps::<FMA>(store5, hi_f, f_weight);
 
                     let high_part = _mm256_extracti128_si256::<1>(row_1);
 
@@ -136,8 +241,8 @@ pub fn gaussian_blur_vertical_pass_impl_avx<T, const CHANNEL_CONFIGURATION: usiz
                     let lo_f = _mm256_cvtepi32_ps(lo_32);
                     let hi_f = _mm256_cvtepi32_ps(hi_32);
 
-                    store6 = _mm256_prefer_fma_ps(store6, lo_f, f_weight);
-                    store7 = _mm256_prefer_fma_ps(store7, hi_f, f_weight);
+                    store6 = _mm256_opt_fma_ps::<FMA>(store6, lo_f, f_weight);
+                    store7 = _mm256_opt_fma_ps::<FMA>(store7, hi_f, f_weight);
 
                     r += 1;
                 }
@@ -204,8 +309,8 @@ pub fn gaussian_blur_vertical_pass_impl_avx<T, const CHANNEL_CONFIGURATION: usiz
                     let lo_f = _mm256_cvtepi32_ps(lo_32);
                     let hi_f = _mm256_cvtepi32_ps(hi_32);
 
-                    store0 = _mm256_prefer_fma_ps(store0, lo_f, f_weight);
-                    store1 = _mm256_prefer_fma_ps(store1, hi_f, f_weight);
+                    store0 = _mm256_opt_fma_ps::<FMA>(store0, lo_f, f_weight);
+                    store1 = _mm256_opt_fma_ps::<FMA>(store1, hi_f, f_weight);
 
                     let high_part = _mm256_extracti128_si256::<1>(row);
 
@@ -218,8 +323,8 @@ pub fn gaussian_blur_vertical_pass_impl_avx<T, const CHANNEL_CONFIGURATION: usiz
                     let lo_f = _mm256_cvtepi32_ps(lo_32);
                     let hi_f = _mm256_cvtepi32_ps(hi_32);
 
-                    store2 = _mm256_prefer_fma_ps(store2, lo_f, f_weight);
-                    store3 = _mm256_prefer_fma_ps(store3, hi_f, f_weight);
+                    store2 = _mm256_opt_fma_ps::<FMA>(store2, lo_f, f_weight);
+                    store3 = _mm256_opt_fma_ps::<FMA>(store3, hi_f, f_weight);
 
                     r += 1;
                 }
@@ -269,8 +374,8 @@ pub fn gaussian_blur_vertical_pass_impl_avx<T, const CHANNEL_CONFIGURATION: usiz
                     let lo_f = _mm256_cvtepi32_ps(lo_32);
                     let hi_f = _mm256_cvtepi32_ps(hi_32);
 
-                    store0 = _mm256_prefer_fma_ps(store0, lo_f, f_weight);
-                    store1 = _mm256_prefer_fma_ps(store1, hi_f, f_weight);
+                    store0 = _mm256_opt_fma_ps::<FMA>(store0, lo_f, f_weight);
+                    store1 = _mm256_opt_fma_ps::<FMA>(store1, hi_f, f_weight);
 
                     r += 1;
                 }
@@ -313,7 +418,7 @@ pub fn gaussian_blur_vertical_pass_impl_avx<T, const CHANNEL_CONFIGURATION: usiz
                     let pixels_u16 = _mm_unpacklo_epi8(pixels_u8, _mm_setzero_si128());
                     let epi32 = _mm256_cvtepu16_epi32(pixels_u16);
                     let pixel_pair = _mm256_cvtepi32_ps(epi32);
-                    store = _mm256_prefer_fma_ps(store, pixel_pair, f_weight);
+                    store = _mm256_opt_fma_ps::<FMA>(store, pixel_pair, f_weight);
 
                     r += 1;
                 }
@@ -348,7 +453,7 @@ pub fn gaussian_blur_vertical_pass_impl_avx<T, const CHANNEL_CONFIGURATION: usiz
                     let y_src_shift = py as usize * src_stride as usize;
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let lo_lo = load_u8_f32_fast::<4>(s_ptr);
-                    store0 = _mm256_prefer_fma_ps(store0, lo_lo, f_weight);
+                    store0 = _mm256_opt_fma_ps::<FMA>(store0, lo_lo, f_weight);
 
                     r += 1;
                 }
@@ -382,7 +487,7 @@ pub fn gaussian_blur_vertical_pass_impl_avx<T, const CHANNEL_CONFIGURATION: usiz
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let pixels_u32 = load_u8_u32_one(s_ptr);
                     let lo_lo = _mm256_cvtepi32_ps(pixels_u32);
-                    store0 = _mm256_prefer_fma_ps(store0, lo_lo, f_weight);
+                    store0 = _mm256_opt_fma_ps::<FMA>(store0, lo_lo, f_weight);
 
                     r += 1;
                 }

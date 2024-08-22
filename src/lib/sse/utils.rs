@@ -25,18 +25,32 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use std::arch::asm;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
 use erydanos::{_mm_extract_epi64x, _mm_mul_epi64};
-#[cfg(target_feature = "f16c")]
 use half::f16;
 
 #[allow(non_camel_case_types)]
 #[derive(Clone, Copy)]
 pub struct __mm128ix2(pub(crate) __m128i, pub(crate) __m128i);
+
+#[inline]
+pub unsafe fn _mm_mul_epi64x<const AVX512_DQVL: bool>(ab: __m128i, cd: __m128i) -> __m128i {
+    if AVX512_DQVL {
+        let mut result: __m128i;
+        asm!("\
+            vpmullq {0}, {1}, {2}
+        \
+        ", out(xmm_reg) result, in(xmm_reg) ab, in(xmm_reg) cd);
+        result
+    } else {
+        _mm_mul_epi64(ab, cd)
+    }
+}
 
 #[inline(always)]
 pub(crate) unsafe fn _mm_sub_epi64x2(a: __mm128ix2, b: __mm128ix2) -> __mm128ix2 {
@@ -48,11 +62,11 @@ pub(crate) unsafe fn _mm_add_epi64x2(a: __mm128ix2, b: __mm128ix2) -> __mm128ix2
     __mm128ix2(_mm_add_epi64(a.0, b.0), _mm_add_epi64(a.1, b.1))
 }
 
-#[inline(always)]
-pub(crate) unsafe fn _mm_mul_n_epi64x2(x: __mm128ix2, v: i64) -> __mm128ix2 {
+#[inline]
+pub(crate) unsafe fn _mm_mul_n_epi64x2<const AVX512_DQVL: bool>(x: __mm128ix2, v: i64) -> __mm128ix2 {
     let v = _mm_set1_epi64x(v);
-    let c0 = _mm_mul_epi64(x.0, v);
-    let c1 = _mm_mul_epi64(x.1, v);
+    let c0 = _mm_mul_epi64x::<AVX512_DQVL>(x.0, v);
+    let c1 = _mm_mul_epi64x::<AVX512_DQVL>(x.1, v);
     __mm128ix2(c0, c1)
 }
 
@@ -108,20 +122,56 @@ pub(crate) unsafe fn load_f32<const CHANNELS_COUNT: usize>(ptr: *const f32) -> _
             0f32,
         );
     }
-    return _mm_setr_ps(ptr.read_unaligned(), 0f32, 0f32, 0f32);
+    _mm_setr_ps(ptr.read_unaligned(), 0f32, 0f32, 0f32)
 }
 
 #[inline]
 pub(crate) unsafe fn load_u8_s32_fast<const CHANNELS_COUNT: usize>(ptr: *const u8) -> __m128i {
-    let u_first = u32::from_le_bytes([ptr.read_unaligned(), 0, 0, 0]);
-    let u_second = u32::from_le_bytes([ptr.add(1).read_unaligned(), 0, 0, 0]);
-    let u_third = u32::from_le_bytes([ptr.add(2).read_unaligned(), 0, 0, 0]);
-    let u_fourth = match CHANNELS_COUNT {
-        4 => u32::from_le_bytes([ptr.add(3).read_unaligned(), 0, 0, 0]),
-        _ => 0,
-    };
-    let store: [u32; 4] = [u_first, u_second, u_third, u_fourth];
-    return _mm_loadu_si128(store.as_ptr() as *const __m128i);
+    // LLVM generates a little trash code until opt-level is 3 so better here is to use assembly
+    if CHANNELS_COUNT == 4 {
+        let mut regi: __m128i;
+        // It is preferred to allow LLVM re-use zeroed register
+        let zeros = _mm_setzero_si128();
+        asm!("\
+           movd {1}, dword ptr [{0}]
+           punpcklbw {1}, {2}
+           punpcklwd {1}, {2}
+    \
+    ",
+        in(reg) ptr,
+        out(xmm_reg) regi,
+        in(xmm_reg) zeros);
+        regi
+    } else if CHANNELS_COUNT == 3 {
+        let mut regi: __m128i;
+        // It is preferred to allow LLVM re-use zeroed register
+        let zeros = _mm_setzero_si128();
+        asm!("\
+            movzx   {t1}, byte ptr [{0}]
+            movzx   {t2}, word ptr [{0} + 1]
+            shl {t2}, 8
+            or {t1}, {t2}
+            movd    {1}, {t1}
+            punpcklbw {1}, {2}
+            punpcklwd {1}, {2}
+    \
+    ",
+        in(reg) ptr,
+        out(xmm_reg) regi,
+        in(xmm_reg) zeros,
+        t1 = out(reg) _, t2 = out(reg) _);
+        regi
+    } else  {
+        let u_first = u32::from_le_bytes([ptr.read_unaligned(), 0, 0, 0]);
+        let u_second = u32::from_le_bytes([ptr.add(1).read_unaligned(), 0, 0, 0]);
+        let u_third = u32::from_le_bytes([ptr.add(2).read_unaligned(), 0, 0, 0]);
+        let u_fourth = match CHANNELS_COUNT {
+            4 => u32::from_le_bytes([ptr.add(3).read_unaligned(), 0, 0, 0]),
+            _ => 0,
+        };
+        let store: [u32; 4] = [u_first, u_second, u_third, u_fourth];
+        _mm_loadu_si128(store.as_ptr() as *const __m128i)
+    }
 }
 
 #[inline(always)]
@@ -158,13 +208,13 @@ pub(crate) unsafe fn _mm_packus_epi64(a: __m128i, b: __m128i) -> __m128i {
 #[inline(always)]
 pub(crate) unsafe fn load_u8_f32_fast<const CHANNELS_COUNT: usize>(ptr: *const u8) -> __m128 {
     let vl = load_u8_s32_fast::<CHANNELS_COUNT>(ptr);
-    return _mm_cvtepi32_ps(vl);
+    _mm_cvtepi32_ps(vl)
 }
 
 #[inline(always)]
 pub(crate) unsafe fn load_u8_u32_one(ptr: *const u8) -> __m128i {
     let u_first = u32::from_le_bytes([ptr.read_unaligned(), 0, 0, 0]);
-    return _mm_set1_epi32(u_first as i32);
+    _mm_set1_epi32(u_first as i32)
 }
 
 #[inline(always)]
@@ -318,7 +368,6 @@ pub unsafe fn _mm_broadcast_fourth(item: __m128) -> __m128 {
     _mm_shuffle_ps::<FLAG>(item, item)
 }
 
-#[cfg(target_feature = "f16c")]
 #[inline]
 pub(crate) unsafe fn load_f32_f16<const CHANNELS_COUNT: usize>(ptr: *const f16) -> __m128 {
     if CHANNELS_COUNT == 4 {
@@ -353,11 +402,10 @@ pub(crate) unsafe fn load_f32_f16<const CHANNELS_COUNT: usize>(ptr: *const f16) 
     }
     let casted_ptr = ptr as *const i16;
     let in_regi = _mm_setr_epi16(casted_ptr.read_unaligned(), 0, 0, 0, 0, 0, 0, 0);
-    return _mm_cvtph_ps(in_regi);
+    _mm_cvtph_ps(in_regi)
 }
 
-#[cfg(target_feature = "f16c")]
-#[inline(always)]
+#[inline]
 pub(crate) unsafe fn store_f32_f16<const CHANNELS_COUNT: usize>(
     dst_ptr: *mut f16,
     in_regi: __m128,
@@ -367,18 +415,14 @@ pub(crate) unsafe fn store_f32_f16<const CHANNELS_COUNT: usize>(
         std::ptr::copy_nonoverlapping(&out_regi as *const _ as *mut u8, dst_ptr as *mut u8, 8);
     } else if CHANNELS_COUNT == 3 {
         let casted_ptr = dst_ptr as *mut i16;
-        let item0 = _mm_extract_epi32::<0>(out_regi) as i16;
-        let item1 = _mm_extract_epi16::<1>(out_regi) as i16;
-        let item2 = _mm_extract_epi16::<2>(out_regi) as i16;
-        casted_ptr.write_unaligned(item0);
-        casted_ptr.add(1).write_unaligned(item1);
-        casted_ptr.add(2).write_unaligned(item2);
+        let item0 = _mm_extract_epi32::<0>(out_regi);
+        let item1 = _mm_extract_epi16::<2>(out_regi) as i16;
+        (casted_ptr as *mut i32).write_unaligned(item0);
+        casted_ptr.add(2).write_unaligned(item1);
     } else if CHANNELS_COUNT == 2 {
         let casted_ptr = dst_ptr as *mut i16;
-        let item0 = _mm_extract_epi32::<0>(out_regi) as i16;
-        let item1 = _mm_extract_epi16::<1>(out_regi) as i16;
-        casted_ptr.write_unaligned(item0);
-        casted_ptr.add(1).write_unaligned(item1);
+        let item0 = _mm_extract_epi32::<0>(out_regi);
+        (casted_ptr as *mut i32).write_unaligned(item0);
     } else {
         let casted_ptr = dst_ptr as *mut i16;
         let item0 = _mm_extract_epi32::<0>(out_regi) as i16;

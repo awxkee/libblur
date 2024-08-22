@@ -32,7 +32,114 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-pub fn gaussian_blur_vertical_pass_impl_f32_sse<T, const CHANNEL_CONFIGURATION: usize>(
+pub fn gaussian_blur_vertical_pass_impl_f32_sse<
+    T,
+    const CHANNEL_CONFIGURATION: usize,
+    const FMA: bool,
+>(
+    undef_src: &[T],
+    src_stride: u32,
+    undef_unsafe_dst: &UnsafeSlice<T>,
+    dst_stride: u32,
+    width: u32,
+    height: u32,
+    kernel_size: usize,
+    kernel: &[f32],
+    start_y: u32,
+    end_y: u32,
+) {
+    unsafe {
+        if FMA {
+            gaussian_blur_vertical_pass_impl_f32_sse_fma::<T, CHANNEL_CONFIGURATION>(
+                undef_src,
+                src_stride,
+                undef_unsafe_dst,
+                dst_stride,
+                width,
+                height,
+                kernel_size,
+                kernel,
+                start_y,
+                end_y,
+            );
+        } else {
+            gaussian_blur_vertical_pass_impl_f32_sse_gen::<T, CHANNEL_CONFIGURATION>(
+                undef_src,
+                src_stride,
+                undef_unsafe_dst,
+                dst_stride,
+                width,
+                height,
+                kernel_size,
+                kernel,
+                start_y,
+                end_y,
+            );
+        }
+    }
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+unsafe fn gaussian_blur_vertical_pass_impl_f32_sse_gen<T, const CHANNEL_CONFIGURATION: usize>(
+    undef_src: &[T],
+    src_stride: u32,
+    undef_unsafe_dst: &UnsafeSlice<T>,
+    dst_stride: u32,
+    width: u32,
+    height: u32,
+    kernel_size: usize,
+    kernel: &[f32],
+    start_y: u32,
+    end_y: u32,
+) {
+    gaussian_blur_vertical_pass_impl_f32_sse_impl::<T, CHANNEL_CONFIGURATION, false>(
+        undef_src,
+        src_stride,
+        undef_unsafe_dst,
+        dst_stride,
+        width,
+        height,
+        kernel_size,
+        kernel,
+        start_y,
+        end_y,
+    );
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1,fma")]
+unsafe fn gaussian_blur_vertical_pass_impl_f32_sse_fma<T, const CHANNEL_CONFIGURATION: usize>(
+    undef_src: &[T],
+    src_stride: u32,
+    undef_unsafe_dst: &UnsafeSlice<T>,
+    dst_stride: u32,
+    width: u32,
+    height: u32,
+    kernel_size: usize,
+    kernel: &[f32],
+    start_y: u32,
+    end_y: u32,
+) {
+    gaussian_blur_vertical_pass_impl_f32_sse_impl::<T, CHANNEL_CONFIGURATION, true>(
+        undef_src,
+        src_stride,
+        undef_unsafe_dst,
+        dst_stride,
+        width,
+        height,
+        kernel_size,
+        kernel,
+        start_y,
+        end_y,
+    );
+}
+
+unsafe fn gaussian_blur_vertical_pass_impl_f32_sse_impl<
+    T,
+    const CHANNEL_CONFIGURATION: usize,
+    const FMA: bool,
+>(
     undef_src: &[T],
     src_stride: u32,
     undef_unsafe_dst: &UnsafeSlice<T>,
@@ -55,163 +162,156 @@ pub fn gaussian_blur_vertical_pass_impl_f32_sse<T, const CHANNEL_CONFIGURATION: 
 
         let mut cx = 0usize;
 
-        unsafe {
-            while cx + 24 < total_length {
-                let mut store0 = zeros;
-                let mut store1 = zeros;
-                let mut store2 = zeros;
-                let mut store3 = zeros;
-                let mut store4 = zeros;
-                let mut store5 = zeros;
+        while cx + 24 < total_length {
+            let mut store0 = zeros;
+            let mut store1 = zeros;
+            let mut store2 = zeros;
+            let mut store3 = zeros;
+            let mut store4 = zeros;
+            let mut store5 = zeros;
 
-                let mut r = -half_kernel;
-                while r <= half_kernel {
-                    let weight = kernel.as_ptr().add((r + half_kernel) as usize);
-                    let f_weight = _mm_load1_ps(weight);
+            let mut r = -half_kernel;
+            while r <= half_kernel {
+                let weight = kernel.as_ptr().add((r + half_kernel) as usize);
+                let f_weight = _mm_load1_ps(weight);
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
-                    let y_src_shift = py as usize * src_stride as usize;
-                    let s_ptr = src.as_ptr().add(y_src_shift + cx);
-                    let px_0 = _mm_loadu_ps(s_ptr);
-                    let px_1 = _mm_loadu_ps(s_ptr.add(4));
-                    let px_2 = _mm_loadu_ps(s_ptr.add(8));
-                    let px_3 = _mm_loadu_ps(s_ptr.add(12));
-                    let px_4 = _mm_loadu_ps(s_ptr.add(16));
-                    let px_5 = _mm_loadu_ps(s_ptr.add(20));
-                    store0 = _mm_prefer_fma_ps(store0, px_0, f_weight);
-                    store1 = _mm_prefer_fma_ps(store1, px_1, f_weight);
-                    store2 = _mm_prefer_fma_ps(store2, px_2, f_weight);
-                    store3 = _mm_prefer_fma_ps(store3, px_3, f_weight);
-                    store4 = _mm_prefer_fma_ps(store4, px_4, f_weight);
-                    store5 = _mm_prefer_fma_ps(store5, px_5, f_weight);
+                let py = std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
+                let y_src_shift = py as usize * src_stride as usize;
+                let s_ptr = src.as_ptr().add(y_src_shift + cx);
+                let px_0 = _mm_loadu_ps(s_ptr);
+                let px_1 = _mm_loadu_ps(s_ptr.add(4));
+                let px_2 = _mm_loadu_ps(s_ptr.add(8));
+                let px_3 = _mm_loadu_ps(s_ptr.add(12));
+                let px_4 = _mm_loadu_ps(s_ptr.add(16));
+                let px_5 = _mm_loadu_ps(s_ptr.add(20));
+                store0 = _mm_prefer_fma_ps(store0, px_0, f_weight);
+                store1 = _mm_prefer_fma_ps(store1, px_1, f_weight);
+                store2 = _mm_prefer_fma_ps(store2, px_2, f_weight);
+                store3 = _mm_prefer_fma_ps(store3, px_3, f_weight);
+                store4 = _mm_prefer_fma_ps(store4, px_4, f_weight);
+                store5 = _mm_prefer_fma_ps(store5, px_5, f_weight);
 
-                    r += 1;
-                }
-
-                let dst_ptr = (unsafe_dst.slice.as_ptr() as *mut f32).add(y_dst_shift + cx);
-                _mm_storeu_ps(dst_ptr, store0);
-                _mm_storeu_ps(dst_ptr.add(4), store1);
-                _mm_storeu_ps(dst_ptr.add(8), store2);
-                _mm_storeu_ps(dst_ptr.add(12), store3);
-                _mm_storeu_ps(dst_ptr.add(16), store4);
-                _mm_storeu_ps(dst_ptr.add(20), store5);
-
-                cx += 24;
+                r += 1;
             }
 
-            while cx + 16 < total_length {
-                let mut store0 = zeros;
-                let mut store1 = zeros;
-                let mut store2 = zeros;
-                let mut store3 = zeros;
+            let dst_ptr = (unsafe_dst.slice.as_ptr() as *mut f32).add(y_dst_shift + cx);
+            _mm_storeu_ps(dst_ptr, store0);
+            _mm_storeu_ps(dst_ptr.add(4), store1);
+            _mm_storeu_ps(dst_ptr.add(8), store2);
+            _mm_storeu_ps(dst_ptr.add(12), store3);
+            _mm_storeu_ps(dst_ptr.add(16), store4);
+            _mm_storeu_ps(dst_ptr.add(20), store5);
 
-                let mut r = -half_kernel;
-                while r <= half_kernel {
-                    let weight = kernel.as_ptr().add((r + half_kernel) as usize);
-                    let f_weight = _mm_load1_ps(weight);
+            cx += 24;
+        }
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
-                    let y_src_shift = py as usize * src_stride as usize;
-                    let s_ptr = src.as_ptr().add(y_src_shift + cx);
-                    let px_0 = _mm_loadu_ps(s_ptr);
-                    let px_1 = _mm_loadu_ps(s_ptr.add(4));
-                    let px_2 = _mm_loadu_ps(s_ptr.add(8));
-                    let px_3 = _mm_loadu_ps(s_ptr.add(12));
-                    store0 = _mm_prefer_fma_ps(store0, px_0, f_weight);
-                    store1 = _mm_prefer_fma_ps(store1, px_1, f_weight);
-                    store2 = _mm_prefer_fma_ps(store2, px_2, f_weight);
-                    store3 = _mm_prefer_fma_ps(store3, px_3, f_weight);
+        while cx + 16 < total_length {
+            let mut store0 = zeros;
+            let mut store1 = zeros;
+            let mut store2 = zeros;
+            let mut store3 = zeros;
 
-                    r += 1;
-                }
+            let mut r = -half_kernel;
+            while r <= half_kernel {
+                let weight = kernel.as_ptr().add((r + half_kernel) as usize);
+                let f_weight = _mm_load1_ps(weight);
 
-                let dst_ptr = (unsafe_dst.slice.as_ptr() as *mut f32).add(y_dst_shift + cx);
-                _mm_storeu_ps(dst_ptr, store0);
-                _mm_storeu_ps(dst_ptr.add(4), store1);
-                _mm_storeu_ps(dst_ptr.add(8), store2);
-                _mm_storeu_ps(dst_ptr.add(12), store3);
+                let py = std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
+                let y_src_shift = py as usize * src_stride as usize;
+                let s_ptr = src.as_ptr().add(y_src_shift + cx);
+                let px_0 = _mm_loadu_ps(s_ptr);
+                let px_1 = _mm_loadu_ps(s_ptr.add(4));
+                let px_2 = _mm_loadu_ps(s_ptr.add(8));
+                let px_3 = _mm_loadu_ps(s_ptr.add(12));
+                store0 = _mm_prefer_fma_ps(store0, px_0, f_weight);
+                store1 = _mm_prefer_fma_ps(store1, px_1, f_weight);
+                store2 = _mm_prefer_fma_ps(store2, px_2, f_weight);
+                store3 = _mm_prefer_fma_ps(store3, px_3, f_weight);
 
-                cx += 16;
+                r += 1;
             }
 
-            while cx + 8 < total_length {
-                let mut store0 = zeros;
-                let mut store1 = zeros;
+            let dst_ptr = (unsafe_dst.slice.as_ptr() as *mut f32).add(y_dst_shift + cx);
+            _mm_storeu_ps(dst_ptr, store0);
+            _mm_storeu_ps(dst_ptr.add(4), store1);
+            _mm_storeu_ps(dst_ptr.add(8), store2);
+            _mm_storeu_ps(dst_ptr.add(12), store3);
 
-                let mut r = -half_kernel;
-                while r <= half_kernel {
-                    let weight = kernel.as_ptr().add((r + half_kernel) as usize);
-                    let f_weight = _mm_load1_ps(weight);
+            cx += 16;
+        }
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
-                    let y_src_shift = py as usize * src_stride as usize;
-                    let s_ptr = src.as_ptr().add(y_src_shift + cx);
-                    let px_0 = _mm_loadu_ps(s_ptr);
-                    let px_1 = _mm_loadu_ps(s_ptr.add(4));
-                    store0 = _mm_prefer_fma_ps(store0, px_0, f_weight);
-                    store1 = _mm_prefer_fma_ps(store1, px_1, f_weight);
-                    r += 1;
-                }
+        while cx + 8 < total_length {
+            let mut store0 = zeros;
+            let mut store1 = zeros;
 
-                let dst_ptr = (unsafe_dst.slice.as_ptr() as *mut f32).add(y_dst_shift + cx);
-                _mm_storeu_ps(dst_ptr, store0);
-                _mm_storeu_ps(dst_ptr.add(4), store1);
+            let mut r = -half_kernel;
+            while r <= half_kernel {
+                let weight = kernel.as_ptr().add((r + half_kernel) as usize);
+                let f_weight = _mm_load1_ps(weight);
 
-                cx += 8;
+                let py = std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
+                let y_src_shift = py as usize * src_stride as usize;
+                let s_ptr = src.as_ptr().add(y_src_shift + cx);
+                let px_0 = _mm_loadu_ps(s_ptr);
+                let px_1 = _mm_loadu_ps(s_ptr.add(4));
+                store0 = _mm_prefer_fma_ps(store0, px_0, f_weight);
+                store1 = _mm_prefer_fma_ps(store1, px_1, f_weight);
+                r += 1;
             }
 
-            while cx + 4 < total_length {
-                let mut store0 = zeros;
+            let dst_ptr = (unsafe_dst.slice.as_ptr() as *mut f32).add(y_dst_shift + cx);
+            _mm_storeu_ps(dst_ptr, store0);
+            _mm_storeu_ps(dst_ptr.add(4), store1);
 
-                let mut r = -half_kernel;
-                while r <= half_kernel {
-                    let weight = kernel.as_ptr().add((r + half_kernel) as usize);
-                    let f_weight = _mm_load1_ps(weight);
+            cx += 8;
+        }
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
-                    let y_src_shift = py as usize * src_stride as usize;
-                    let s_ptr = src.as_ptr().add(y_src_shift + cx);
-                    let lo_lo = _mm_loadu_ps(s_ptr);
-                    store0 = _mm_prefer_fma_ps(store0, lo_lo, f_weight);
+        while cx + 4 < total_length {
+            let mut store0 = zeros;
 
-                    r += 1;
-                }
+            let mut r = -half_kernel;
+            while r <= half_kernel {
+                let weight = kernel.as_ptr().add((r + half_kernel) as usize);
+                let f_weight = _mm_load1_ps(weight);
 
-                let dst_ptr = (unsafe_dst.slice.as_ptr() as *mut f32).add(y_dst_shift + cx);
-                _mm_storeu_ps(dst_ptr, store0);
+                let py = std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
+                let y_src_shift = py as usize * src_stride as usize;
+                let s_ptr = src.as_ptr().add(y_src_shift + cx);
+                let lo_lo = _mm_loadu_ps(s_ptr);
+                store0 = _mm_prefer_fma_ps(store0, lo_lo, f_weight);
 
-                cx += 4;
+                r += 1;
             }
 
-            while cx < total_length {
-                let mut store0 = zeros;
+            let dst_ptr = (unsafe_dst.slice.as_ptr() as *mut f32).add(y_dst_shift + cx);
+            _mm_storeu_ps(dst_ptr, store0);
 
-                let mut r = -half_kernel;
-                while r <= half_kernel {
-                    let weight = kernel.as_ptr().add((r + half_kernel) as usize);
-                    let f_weight = _mm_load1_ps(weight);
+            cx += 4;
+        }
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
-                    let y_src_shift = py as usize * src_stride as usize;
-                    let s_ptr = src.as_ptr().add(y_src_shift + cx);
-                    let f_pixel = _mm_setr_ps(s_ptr.read_unaligned(), 0., 0., 0.);
-                    store0 = _mm_prefer_fma_ps(store0, f_pixel, f_weight);
+        while cx < total_length {
+            let mut store0 = zeros;
 
-                    r += 1;
-                }
+            let mut r = -half_kernel;
+            while r <= half_kernel {
+                let weight = kernel.as_ptr().add((r + half_kernel) as usize);
+                let f_weight = _mm_load1_ps(weight);
 
-                let dst_ptr = (unsafe_dst.slice.as_ptr() as *mut f32).add(y_dst_shift + cx);
+                let py = std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
+                let y_src_shift = py as usize * src_stride as usize;
+                let s_ptr = src.as_ptr().add(y_src_shift + cx);
+                let f_pixel = _mm_setr_ps(s_ptr.read_unaligned(), 0., 0., 0.);
+                store0 = _mm_prefer_fma_ps(store0, f_pixel, f_weight);
 
-                let pixel = _mm_extract_ps::<0>(store0);
-                (dst_ptr as *mut i32).write_unaligned(pixel);
-
-                cx += 1;
+                r += 1;
             }
+
+            let dst_ptr = (unsafe_dst.slice.as_ptr() as *mut f32).add(y_dst_shift + cx);
+
+            let pixel = _mm_extract_ps::<0>(store0);
+            (dst_ptr as *mut i32).write_unaligned(pixel);
+
+            cx += 1;
         }
     }
 }

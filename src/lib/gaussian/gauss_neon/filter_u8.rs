@@ -45,8 +45,9 @@ macro_rules! write_u8_by_channels {
             dst_ptr.write_unaligned(pixel);
         } else {
             let bits = pixel.to_le_bytes();
-            $unsafe_dst.write(offset, bits[0]);
-            $unsafe_dst.write(offset + 1, bits[1]);
+            let lowest = u16::from_le_bytes([bits[0], bits[1]]);
+            let dst_ptr = $unsafe_dst.slice.as_ptr().add(offset) as *mut u16;
+            dst_ptr.write_unaligned(lowest);
             $unsafe_dst.write(offset + 2, bits[2]);
         }
     }};
@@ -195,8 +196,8 @@ pub fn gaussian_blur_horizontal_pass_filter_neon<T, const CHANNEL_CONFIGURATION:
                     let pixel_colors_f32_1 = vcvtq_f32_u32(pixel_colors_u32_1);
                     let pixel_colors_f32_2 = vcvtq_f32_u32(pixel_colors_u32_2);
                     let pixel_colors_f32_3 = vcvtq_f32_u32(pixel_colors_u32_3);
-                    let weight = *filter_weights.get_unchecked(j);
-                    let f_weight: float32x4_t = vdupq_n_f32(weight);
+                    let weight = filter_weights.as_ptr().add(j);
+                    let f_weight: float32x4_t = vld1q_dup_f32(weight);
                     store_0 = prefer_vfmaq_f32(store_0, pixel_colors_f32_0, f_weight);
                     store_1 = prefer_vfmaq_f32(store_1, pixel_colors_f32_1, f_weight);
                     store_2 = prefer_vfmaq_f32(store_2, pixel_colors_f32_2, f_weight);
@@ -309,8 +310,8 @@ pub fn gaussian_blur_horizontal_pass_filter_neon<T, const CHANNEL_CONFIGURATION:
                         load_u8_u32_fast::<CHANNEL_CONFIGURATION>(s_ptr.add(src_stride as usize));
                     let pixel_colors_f32_0 = vcvtq_f32_u32(pixel_colors_u32_0);
                     let pixel_colors_f32_1 = vcvtq_f32_u32(pixel_colors_u32_1);
-                    let weight = *filter_weights.get_unchecked(j);
-                    let f_weight: float32x4_t = vdupq_n_f32(weight);
+                    let weight = filter_weights.as_ptr().add(j);
+                    let f_weight: float32x4_t = vld1q_dup_f32(weight);
                     store_0 = prefer_vfmaq_f32(store_0, pixel_colors_f32_0, f_weight);
                     store_1 = prefer_vfmaq_f32(store_1, pixel_colors_f32_1, f_weight);
 

@@ -137,7 +137,7 @@ fn main() {
     //     vst1q_s64(t.as_mut_ptr(), mul);
     //     println!("{:?}", t);
     // }
-    let img = ImageReader::open("assets/test_image_1.jpg")
+    let img = ImageReader::open("assets/test_image_1_small.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -220,40 +220,49 @@ fn main() {
     //     TransferFunction::Srgb,
     // );
 
-    // let mut f16_bytes: Vec<f16> = dst_bytes
-    //     .iter()
-    //     .map(|&x| f16::from_f32(x as f32 * (1. / 255.)))
-    //     .collect();
+    let mut f16_bytes: Vec<f16> = dst_bytes
+        .iter()
+        .map(|&x| f16::from_f32(x as f32 * (1. / 255.)))
+        .collect();
 
-    libblur::gaussian_blur_in_linear(
-        &bytes,
-        stride as u32,
-        &mut dst_bytes,
-        stride as u32,
+    // libblur::gaussian_blur_in_linear(
+    //     &bytes,
+    //     stride as u32,
+    //     &mut dst_bytes,
+    //     stride as u32,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     67 * 2 + 1,
+    //     67. * 2f32 / 6f32,
+    //     FastBlurChannels::Channels3,
+    //     EdgeMode::KernelClip,
+    //     ThreadingPolicy::Single,
+    //     TransferFunction::Srgb,
+    // );
+
+    stack_blur_f16(
+        &mut f16_bytes,
         dimensions.0,
         dimensions.1,
-        67 * 2 + 1,
-        67. * 2f32 / 6f32,
+        50,
         FastBlurChannels::Channels3,
-        EdgeMode::Clamp,
         ThreadingPolicy::Single,
-        TransferFunction::Srgb,
     );
 
     // stack_blur(
     //     &mut dst_bytes,
-    //     dimensions.0 * 3,
+    //     dimensions.0 * components as u32,
     //     dimensions.0,
     //     dimensions.1,
-    //     75,
+    //     50,
     //     FastBlurChannels::Channels3,
     //     ThreadingPolicy::Single,
     // );
 
-    // dst_bytes = f16_bytes
-    //     .iter()
-    //     .map(|&x| (x.to_f32() * 255f32) as u8)
-    //     .collect();
+    dst_bytes = f16_bytes
+        .iter()
+        .map(|&x| (x.to_f32() * 255f32) as u8)
+        .collect();
 
     // dst_bytes = perform_planar_pass_3(&bytes, dimensions.0 as usize, dimensions.1 as usize);
 

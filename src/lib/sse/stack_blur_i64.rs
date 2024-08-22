@@ -39,7 +39,33 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-pub fn stack_blur_pass_sse_i64<const COMPONENTS: usize>(
+pub fn stack_blur_pass_sse_i64<const COMPONENTS: usize, const AVX512_DQVL: bool>(
+    pixels: &UnsafeSlice<u8>,
+    stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    pass: StackBlurPass,
+    thread: usize,
+    total_threads: usize,
+) {
+    unsafe {
+        stack_blur_pass_sse_i64_impl::<COMPONENTS, AVX512_DQVL>(
+            pixels,
+            stride,
+            width,
+            height,
+            radius,
+            pass,
+            thread,
+            total_threads,
+        );
+    }
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+unsafe fn stack_blur_pass_sse_i64_impl<const COMPONENTS: usize, const AVX512_DQVL: bool>(
     pixels: &UnsafeSlice<u8>,
     stride: u32,
     width: u32,
@@ -86,7 +112,10 @@ pub fn stack_blur_pass_sse_i64<const COMPONENTS: usize>(
                 for i in 0..=radius {
                     let stack_value = stacks.as_mut_ptr().add(i as usize * 4);
                     _mm_store_epi64x2(stack_value, src_pixel);
-                    sums = _mm_add_epi64x2(sums, _mm_mul_n_epi64x2(src_pixel, i as i64 + 1i64));
+                    sums = _mm_add_epi64x2(
+                        sums,
+                        _mm_mul_n_epi64x2::<AVX512_DQVL>(src_pixel, i as i64 + 1i64),
+                    );
                     sum_out = _mm_add_epi64x2(sum_out, src_pixel);
                 }
 
@@ -100,7 +129,10 @@ pub fn stack_blur_pass_sse_i64<const COMPONENTS: usize>(
                     _mm_store_epi64x2(stack_ptr, src_pixel);
                     sums = _mm_add_epi64x2(
                         sums,
-                        _mm_mul_n_epi64x2(src_pixel, radius as i64 + 1i64 - i as i64),
+                        _mm_mul_n_epi64x2::<AVX512_DQVL>(
+                            src_pixel,
+                            radius as i64 + 1i64 - i as i64,
+                        ),
                     );
 
                     sum_in = _mm_add_epi64x2(sum_in, src_pixel);
@@ -175,7 +207,10 @@ pub fn stack_blur_pass_sse_i64<const COMPONENTS: usize>(
                 for i in 0..=radius {
                     let stack_ptr = stacks.as_mut_ptr().add(i as usize * 4);
                     _mm_store_epi64x2(stack_ptr, src_pixel);
-                    sums = _mm_add_epi64x2(sums, _mm_mul_n_epi64x2(src_pixel, i as i64 + 1i64));
+                    sums = _mm_add_epi64x2(
+                        sums,
+                        _mm_mul_n_epi64x2::<AVX512_DQVL>(src_pixel, i as i64 + 1i64),
+                    );
                     sum_out = _mm_add_epi64x2(sum_out, src_pixel);
                 }
 
@@ -190,7 +225,10 @@ pub fn stack_blur_pass_sse_i64<const COMPONENTS: usize>(
                     _mm_store_epi64x2(stack_ptr, src_pixel);
                     sums = _mm_add_epi64x2(
                         sums,
-                        _mm_mul_n_epi64x2(src_pixel, radius as i64 + 1i64 - i as i64),
+                        _mm_mul_n_epi64x2::<AVX512_DQVL>(
+                            src_pixel,
+                            radius as i64 + 1i64 - i as i64,
+                        ),
                     );
 
                     sum_in = _mm_add_epi64x2(sum_in, src_pixel);

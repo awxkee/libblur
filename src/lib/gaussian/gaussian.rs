@@ -31,37 +31,17 @@ use rayon::ThreadPool;
 
 use crate::channels_configuration::FastBlurChannels;
 use crate::edge_mode::EdgeMode;
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "avx2"
-))]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::gaussian::avx::{
     gaussian_blur_vertical_pass_impl_avx, gaussian_blur_vertical_pass_impl_f32_avx,
 };
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::gaussian::gauss_neon::*;
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "sse4.1"
-))]
-use crate::gaussian::gauss_sse::gaussian_horiz_one_chan_f32;
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "sse4.1"
-))]
-use crate::gaussian::gauss_sse::gaussian_horiz_sse_t_f_chan_f32;
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "sse4.1"
-))]
-use crate::gaussian::gauss_sse::gaussian_sse_horiz_one_chan_u8;
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "sse4.1"
-))]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::gaussian::gauss_sse::{
     gaussian_blur_horizontal_pass_impl_sse, gaussian_blur_vertical_pass_impl_f32_sse,
-    gaussian_blur_vertical_pass_impl_sse,
+    gaussian_blur_vertical_pass_impl_sse, gaussian_horiz_one_chan_f32,
+    gaussian_horiz_sse_t_f_chan_f32, gaussian_sse_horiz_one_chan_u8,
 };
 use crate::gaussian::gaussian_filter::create_filter;
 use crate::gaussian::gaussian_horizontal::gaussian_blur_horizontal_pass_impl;
@@ -88,7 +68,7 @@ fn gaussian_blur_horizontal_pass<
     height: u32,
     kernel_size: usize,
     kernel: &Vec<f32>,
-    thread_pool: &ThreadPool,
+    thread_pool: &Option<ThreadPool>,
     thread_count: u32,
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static + AsPrimitive<f32>,
@@ -106,14 +86,29 @@ fn gaussian_blur_horizontal_pass<
         end_y: u32,
     ) = gaussian_blur_horizontal_pass_impl::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
     let edge_mode: EdgeMode = EDGE_MODE.into();
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    let _is_fma_available = std::arch::is_x86_feature_detected!("fma");
     if CHANNEL_CONFIGURATION >= 3 {
         if std::any::type_name::<T>() == "u8" && edge_mode == EdgeMode::Clamp {
-            #[cfg(all(
-                any(target_arch = "x86_64", target_arch = "x86"),
-                target_feature = "sse4.1"
-            ))]
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
-                _dispatcher = gaussian_blur_horizontal_pass_impl_sse::<T, CHANNEL_CONFIGURATION>;
+                if _is_sse_available {
+                    if !_is_fma_available {
+                        _dispatcher = gaussian_blur_horizontal_pass_impl_sse::<
+                            T,
+                            CHANNEL_CONFIGURATION,
+                            true,
+                        >;
+                    } else {
+                        _dispatcher = gaussian_blur_horizontal_pass_impl_sse::<
+                            T,
+                            CHANNEL_CONFIGURATION,
+                            false,
+                        >;
+                    }
+                }
             }
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             {
@@ -127,24 +122,28 @@ fn gaussian_blur_horizontal_pass<
             {
                 _dispatcher = gaussian_horiz_one_chan_f32::<T>;
             }
-            #[cfg(all(
-                any(target_arch = "x86_64", target_arch = "x86"),
-                target_feature = "sse4.1"
-            ))]
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
-                _dispatcher = gaussian_horiz_one_chan_f32::<T>;
+                if _is_sse_available {
+                    _dispatcher = gaussian_horiz_one_chan_f32::<T>;
+                }
             }
         } else if edge_mode == EdgeMode::Clamp && CHANNEL_CONFIGURATION >= 3 {
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             {
                 _dispatcher = gaussian_horiz_t_f_chan_f32::<T, CHANNEL_CONFIGURATION>;
             }
-            #[cfg(all(
-                any(target_arch = "x86_64", target_arch = "x86"),
-                target_feature = "sse4.1"
-            ))]
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
-                _dispatcher = gaussian_horiz_sse_t_f_chan_f32::<T, CHANNEL_CONFIGURATION>;
+                if _is_sse_available {
+                    if _is_fma_available {
+                        _dispatcher =
+                            gaussian_horiz_sse_t_f_chan_f32::<T, CHANNEL_CONFIGURATION, true>;
+                    } else {
+                        _dispatcher =
+                            gaussian_horiz_sse_t_f_chan_f32::<T, CHANNEL_CONFIGURATION, false>;
+                    }
+                }
             }
         }
     }
@@ -153,39 +152,52 @@ fn gaussian_blur_horizontal_pass<
         if std::any::type_name::<T>() == "u8" {
             _dispatcher = gaussian_horiz_one_chan_u8::<T>;
         }
-        #[cfg(all(
-            any(target_arch = "x86_64", target_arch = "x86"),
-            target_feature = "sse4.1"
-        ))]
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         if std::any::type_name::<T>() == "u8" {
-            _dispatcher = gaussian_sse_horiz_one_chan_u8::<T>;
+            if _is_sse_available {
+                _dispatcher = gaussian_sse_horiz_one_chan_u8::<T>;
+            }
         }
     }
     let unsafe_dst = UnsafeSlice::new(dst);
-    thread_pool.scope(|scope| {
-        let segment_size = height / thread_count;
-        for i in 0..thread_count {
-            let start_y = i * segment_size;
-            let mut end_y = (i + 1) * segment_size;
-            if i == thread_count - 1 {
-                end_y = height;
-            }
+    if let Some(thread_pool) = thread_pool {
+        thread_pool.scope(|scope| {
+            let segment_size = height / thread_count;
+            for i in 0..thread_count {
+                let start_y = i * segment_size;
+                let mut end_y = (i + 1) * segment_size;
+                if i == thread_count - 1 {
+                    end_y = height;
+                }
 
-            scope.spawn(move |_| {
-                _dispatcher(
-                    src,
-                    src_stride,
-                    &unsafe_dst,
-                    dst_stride,
-                    width,
-                    kernel_size,
-                    kernel,
-                    start_y,
-                    end_y,
-                );
-            });
-        }
-    });
+                scope.spawn(move |_| {
+                    _dispatcher(
+                        src,
+                        src_stride,
+                        &unsafe_dst,
+                        dst_stride,
+                        width,
+                        kernel_size,
+                        kernel,
+                        start_y,
+                        end_y,
+                    );
+                });
+            }
+        });
+    } else {
+        _dispatcher(
+            src,
+            src_stride,
+            &unsafe_dst,
+            dst_stride,
+            width,
+            kernel_size,
+            kernel,
+            0,
+            height,
+        );
+    }
 }
 
 fn gaussian_blur_vertical_pass_impl<
@@ -234,12 +246,19 @@ fn gaussian_blur_vertical_pass<
     height: u32,
     kernel_size: usize,
     kernel: &Vec<f32>,
-    thread_pool: &ThreadPool,
+    thread_pool: &Option<ThreadPool>,
     thread_count: u32,
 ) where
     T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static + AsPrimitive<f32>,
     f32: AsPrimitive<T> + ToStorage<T>,
 {
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    let _is_fma_available = std::arch::is_x86_feature_detected!("fma");
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    let _is_avx_available = std::arch::is_x86_feature_detected!("avx2");
+
     let mut _dispatcher: fn(
         src: &[T],
         src_stride: u32,
@@ -260,14 +279,27 @@ fn gaussian_blur_vertical_pass<
         ))]
         {
             // Generally vertical pass do not depends on any specific channel configuration so it is allowed to make a vectorized calls for any channel
-            _dispatcher = gaussian_blur_vertical_pass_impl_sse::<T, CHANNEL_CONFIGURATION>;
+            if _is_sse_available {
+                if _is_fma_available {
+                    _dispatcher =
+                        gaussian_blur_vertical_pass_impl_sse::<T, CHANNEL_CONFIGURATION, true>;
+                } else {
+                    _dispatcher =
+                        gaussian_blur_vertical_pass_impl_sse::<T, CHANNEL_CONFIGURATION, false>;
+                }
+            }
         }
-        #[cfg(all(
-            any(target_arch = "x86_64", target_arch = "x86"),
-            target_feature = "avx2"
-        ))]
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
-            _dispatcher = gaussian_blur_vertical_pass_impl_avx::<T, CHANNEL_CONFIGURATION>;
+            if _is_avx_available {
+                if _is_fma_available {
+                    _dispatcher =
+                        gaussian_blur_vertical_pass_impl_avx::<T, CHANNEL_CONFIGURATION, true>;
+                } else {
+                    _dispatcher =
+                        gaussian_blur_vertical_pass_impl_avx::<T, CHANNEL_CONFIGURATION, false>;
+                }
+            }
         }
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
@@ -276,21 +308,31 @@ fn gaussian_blur_vertical_pass<
         }
     }
     if std::any::type_name::<T>() == "f32" && edge_mode == EdgeMode::Clamp {
-        #[cfg(all(
-            any(target_arch = "x86_64", target_arch = "x86"),
-            target_feature = "sse4.1"
-        ))]
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
             // Generally vertical pass do not depends on any specific channel configuration so it is allowed to make a vectorized calls for any channel
-            _dispatcher = gaussian_blur_vertical_pass_impl_f32_sse::<T, CHANNEL_CONFIGURATION>;
+            if _is_sse_available {
+                if _is_fma_available {
+                    _dispatcher =
+                        gaussian_blur_vertical_pass_impl_f32_sse::<T, CHANNEL_CONFIGURATION, true>;
+                } else {
+                    _dispatcher =
+                        gaussian_blur_vertical_pass_impl_f32_sse::<T, CHANNEL_CONFIGURATION, false>;
+                }
+            }
         }
-        #[cfg(all(
-            any(target_arch = "x86_64", target_arch = "x86"),
-            target_feature = "avx2"
-        ))]
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
             // Generally vertical pass do not depends on any specific channel configuration so it is allowed to make a vectorized calls for any channel
-            _dispatcher = gaussian_blur_vertical_pass_impl_f32_avx::<T, CHANNEL_CONFIGURATION>;
+            if _is_avx_available {
+                if _is_fma_available {
+                    _dispatcher =
+                        gaussian_blur_vertical_pass_impl_f32_avx::<T, CHANNEL_CONFIGURATION, true>;
+                } else {
+                    _dispatcher =
+                        gaussian_blur_vertical_pass_impl_f32_avx::<T, CHANNEL_CONFIGURATION, false>;
+                }
+            }
         }
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
@@ -299,32 +341,47 @@ fn gaussian_blur_vertical_pass<
         }
     }
     let unsafe_dst = UnsafeSlice::new(dst);
-    thread_pool.scope(|scope| {
-        let segment_size = height / thread_count;
+    if let Some(thread_pool) = thread_pool {
+        thread_pool.scope(|scope| {
+            let segment_size = height / thread_count;
 
-        for i in 0..thread_count {
-            let start_y = i * segment_size;
-            let mut end_y = (i + 1) * segment_size;
-            if i == thread_count - 1 {
-                end_y = height;
+            for i in 0..thread_count {
+                let start_y = i * segment_size;
+                let mut end_y = (i + 1) * segment_size;
+                if i == thread_count - 1 {
+                    end_y = height;
+                }
+
+                scope.spawn(move |_| {
+                    _dispatcher(
+                        src,
+                        src_stride,
+                        &unsafe_dst,
+                        dst_stride,
+                        width,
+                        height,
+                        kernel_size,
+                        kernel,
+                        start_y,
+                        end_y,
+                    );
+                });
             }
-
-            scope.spawn(move |_| {
-                _dispatcher(
-                    src,
-                    src_stride,
-                    &unsafe_dst,
-                    dst_stride,
-                    width,
-                    height,
-                    kernel_size,
-                    kernel,
-                    start_y,
-                    end_y,
-                );
-            });
-        }
-    });
+        });
+    } else {
+        _dispatcher(
+            src,
+            src_stride,
+            &unsafe_dst,
+            dst_stride,
+            width,
+            height,
+            kernel_size,
+            kernel,
+            0,
+            height,
+        );
+    }
 }
 
 fn gaussian_blur_impl<
@@ -352,10 +409,15 @@ fn gaussian_blur_impl<
         vec![T::from_u32(0).unwrap_or_default(); dst_stride as usize * height as usize];
 
     let thread_count = threading_policy.get_threads_count(width, height) as u32;
-    let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(thread_count as usize)
-        .build()
-        .unwrap();
+    let pool = if thread_count == 1 {
+        None
+    } else {
+        let hold = rayon::ThreadPoolBuilder::new()
+            .num_threads(thread_count as usize)
+            .build()
+            .unwrap();
+        Some(hold)
+    };
 
     match edge_mode {
         EdgeMode::Reflect => {
@@ -535,50 +597,23 @@ pub fn gaussian_blur(
     edge_mode: EdgeMode,
     threading_policy: ThreadingPolicy,
 ) {
-    match channels {
-        FastBlurChannels::Plane => {
-            gaussian_blur_impl::<u8, 1>(
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-                width,
-                height,
-                kernel_size,
-                sigma,
-                threading_policy,
-                edge_mode,
-            );
-        }
-        FastBlurChannels::Channels3 => {
-            gaussian_blur_impl::<u8, 3>(
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-                width,
-                height,
-                kernel_size,
-                sigma,
-                threading_policy,
-                edge_mode,
-            );
-        }
-        FastBlurChannels::Channels4 => {
-            gaussian_blur_impl::<u8, 4>(
-                src,
-                src_stride,
-                dst,
-                dst_stride,
-                width,
-                height,
-                kernel_size,
-                sigma,
-                threading_policy,
-                edge_mode,
-            );
-        }
-    }
+    let _dispatcher = match channels {
+        FastBlurChannels::Plane => gaussian_blur_impl::<u8, 1>,
+        FastBlurChannels::Channels3 => gaussian_blur_impl::<u8, 3>,
+        FastBlurChannels::Channels4 => gaussian_blur_impl::<u8, 4>,
+    };
+    _dispatcher(
+        src,
+        src_stride,
+        dst,
+        dst_stride,
+        width,
+        height,
+        kernel_size,
+        sigma,
+        threading_policy,
+        edge_mode,
+    );
 }
 
 /// Performs gaussian blur on the image.
@@ -610,50 +645,23 @@ pub fn gaussian_blur_u16(
     edge_mode: EdgeMode,
     threading_policy: ThreadingPolicy,
 ) {
-    match channels {
-        FastBlurChannels::Plane => {
-            gaussian_blur_impl::<u16, 1>(
-                src,
-                width * channels.get_channels() as u32,
-                dst,
-                width * channels.get_channels() as u32,
-                width,
-                height,
-                kernel_size,
-                sigma,
-                threading_policy,
-                edge_mode,
-            );
-        }
-        FastBlurChannels::Channels3 => {
-            gaussian_blur_impl::<u16, 3>(
-                src,
-                width * channels.get_channels() as u32,
-                dst,
-                width * channels.get_channels() as u32,
-                width,
-                height,
-                kernel_size,
-                sigma,
-                threading_policy,
-                edge_mode,
-            );
-        }
-        FastBlurChannels::Channels4 => {
-            gaussian_blur_impl::<u16, 4>(
-                src,
-                width * channels.get_channels() as u32,
-                dst,
-                width * channels.get_channels() as u32,
-                width,
-                height,
-                kernel_size,
-                sigma,
-                threading_policy,
-                edge_mode,
-            );
-        }
-    }
+    let _dispatcher = match channels {
+        FastBlurChannels::Plane => gaussian_blur_impl::<u16, 1>,
+        FastBlurChannels::Channels3 => gaussian_blur_impl::<u16, 3>,
+        FastBlurChannels::Channels4 => gaussian_blur_impl::<u16, 4>,
+    };
+    _dispatcher(
+        src,
+        width * channels.get_channels() as u32,
+        dst,
+        width * channels.get_channels() as u32,
+        width,
+        height,
+        kernel_size,
+        sigma,
+        threading_policy,
+        edge_mode,
+    );
 }
 
 /// Performs gaussian blur on the image.
@@ -685,50 +693,23 @@ pub fn gaussian_blur_f32(
     edge_mode: EdgeMode,
     threading_policy: ThreadingPolicy,
 ) {
-    match channels {
-        FastBlurChannels::Plane => {
-            gaussian_blur_impl::<f32, 1>(
-                src,
-                width * channels.get_channels() as u32,
-                dst,
-                width * channels.get_channels() as u32,
-                width,
-                height,
-                kernel_size,
-                sigma,
-                threading_policy,
-                edge_mode,
-            );
-        }
-        FastBlurChannels::Channels3 => {
-            gaussian_blur_impl::<f32, 3>(
-                src,
-                width * channels.get_channels() as u32,
-                dst,
-                width * channels.get_channels() as u32,
-                width,
-                height,
-                kernel_size,
-                sigma,
-                threading_policy,
-                edge_mode,
-            );
-        }
-        FastBlurChannels::Channels4 => {
-            gaussian_blur_impl::<f32, 4>(
-                src,
-                width * channels.get_channels() as u32,
-                dst,
-                width * channels.get_channels() as u32,
-                width,
-                height,
-                kernel_size,
-                sigma,
-                threading_policy,
-                edge_mode,
-            );
-        }
-    }
+    let _dispatcher = match channels {
+        FastBlurChannels::Plane => gaussian_blur_impl::<f32, 1>,
+        FastBlurChannels::Channels3 => gaussian_blur_impl::<f32, 3>,
+        FastBlurChannels::Channels4 => gaussian_blur_impl::<f32, 4>,
+    };
+    _dispatcher(
+        src,
+        width * channels.get_channels() as u32,
+        dst,
+        width * channels.get_channels() as u32,
+        width,
+        height,
+        kernel_size,
+        sigma,
+        threading_policy,
+        edge_mode,
+    );
 }
 
 /// Performs gaussian blur on the image.
@@ -760,48 +741,22 @@ pub fn gaussian_blur_f16(
     edge_mode: EdgeMode,
     threading_policy: ThreadingPolicy,
 ) {
-    match channels {
-        FastBlurChannels::Plane => {
-            gaussian_blur_impl::<half::f16, 1>(
-                unsafe { std::mem::transmute(src) },
-                width * channels.get_channels() as u32,
-                unsafe { std::mem::transmute(dst) },
-                width * channels.get_channels() as u32,
-                width,
-                height,
-                kernel_size,
-                sigma,
-                threading_policy,
-                edge_mode,
-            );
-        }
-        FastBlurChannels::Channels3 => {
-            gaussian_blur_impl::<half::f16, 3>(
-                unsafe { std::mem::transmute(src) },
-                width * channels.get_channels() as u32,
-                unsafe { std::mem::transmute(dst) },
-                width * channels.get_channels() as u32,
-                width,
-                height,
-                kernel_size,
-                sigma,
-                threading_policy,
-                edge_mode,
-            );
-        }
-        FastBlurChannels::Channels4 => {
-            gaussian_blur_impl::<half::f16, 4>(
-                unsafe { std::mem::transmute(src) },
-                width * channels.get_channels() as u32,
-                unsafe { std::mem::transmute(dst) },
-                width * channels.get_channels() as u32,
-                width,
-                height,
-                kernel_size,
-                sigma,
-                threading_policy,
-                edge_mode,
-            );
-        }
-    }
+    let _dispatcher = match channels {
+        FastBlurChannels::Plane => gaussian_blur_impl::<half::f16, 1>,
+        FastBlurChannels::Channels3 => gaussian_blur_impl::<half::f16, 3>,
+        FastBlurChannels::Channels4 => gaussian_blur_impl::<half::f16, 4>,
+    };
+
+    _dispatcher(
+        unsafe { std::mem::transmute(src) },
+        width * channels.get_channels() as u32,
+        unsafe { std::mem::transmute(dst) },
+        width * channels.get_channels() as u32,
+        width,
+        height,
+        kernel_size,
+        sigma,
+        threading_policy,
+        edge_mode,
+    );
 }

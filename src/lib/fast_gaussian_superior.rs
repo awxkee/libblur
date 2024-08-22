@@ -464,54 +464,75 @@ mod fast_gaussian_superior {
     {
         let unsafe_image = UnsafeSlice::new(bytes);
         let thread_count = threading_policy.get_threads_count(width, height) as u32;
-        let pool = rayon::ThreadPoolBuilder::new()
-            .num_threads(thread_count as usize)
-            .build()
-            .unwrap();
-        pool.scope(|scope| {
-            let segment_size = width / thread_count;
+        if thread_count == 1 {
+            fast_gaussian_vertical_pass::<T, CHANNELS_COUNT>(
+                &unsafe_image,
+                stride,
+                width,
+                height,
+                radius,
+                0,
+                width,
+            );
+            fast_gaussian_horizontal_pass::<T, CHANNELS_COUNT>(
+                &unsafe_image,
+                stride,
+                width,
+                height,
+                radius,
+                0,
+                height,
+            );
+        } else {
+            let pool = rayon::ThreadPoolBuilder::new()
+                .num_threads(thread_count as usize)
+                .build()
+                .unwrap();
+            pool.scope(|scope| {
+                let segment_size = width / thread_count;
 
-            for i in 0..thread_count {
-                let start_x = i * segment_size;
-                let mut end_x = (i + 1) * segment_size;
-                if i == thread_count - 1 {
-                    end_x = width;
+                for i in 0..thread_count {
+                    let start_x = i * segment_size;
+                    let mut end_x = (i + 1) * segment_size;
+                    if i == thread_count - 1 {
+                        end_x = width;
+                    }
+                    scope.spawn(move |_| {
+                        fast_gaussian_vertical_pass::<T, CHANNELS_COUNT>(
+                            &unsafe_image,
+                            stride,
+                            width,
+                            height,
+                            radius,
+                            start_x,
+                            end_x,
+                        );
+                    });
                 }
-                scope.spawn(move |_| {
-                    fast_gaussian_vertical_pass::<T, CHANNELS_COUNT>(
-                        &unsafe_image,
-                        stride,
-                        width,
-                        height,
-                        radius,
-                        start_x,
-                        end_x,
-                    );
-                });
-            }
-        });
-        pool.scope(|scope| {
-            let segment_size = height / thread_count;
+            });
+            pool.scope(|scope| {
+                let segment_size = height / thread_count;
 
-            for i in 0..thread_count {
-                let start_y = i * segment_size;
-                let mut end_y = (i + 1) * segment_size;
-                if i == thread_count - 1 {
-                    end_y = height;
+                for i in 0..thread_count {
+                    let start_y = i * segment_size;
+                    let mut end_y = (i + 1) * segment_size;
+                    if i == thread_count - 1 {
+                        end_y = height;
+                    }
+                    scope.spawn(move |_| {
+                        fast_gaussian_horizontal_pass::<T, CHANNELS_COUNT>(
+                            &unsafe_image,
+                            stride,
+                            width,
+                            height,
+                            radius,
+                            start_y,
+                            end_y,
+                        );
+                    });
                 }
-                scope.spawn(move |_| {
-                    fast_gaussian_horizontal_pass::<T, CHANNELS_COUNT>(
-                        &unsafe_image,
-                        stride,
-                        width,
-                        height,
-                        radius,
-                        start_y,
-                        end_y,
-                    );
-                });
-            }
-        });
+            });
+        }
     }
 }
 
@@ -531,36 +552,10 @@ pub fn fast_gaussian_superior(
     threading_policy: ThreadingPolicy,
 ) {
     let acq_radius = std::cmp::min(radius, 256);
-    match channels {
-        FastBlurChannels::Plane => {
-            fast_gaussian_superior::fast_gaussian_impl::<u8, 1>(
-                bytes,
-                stride,
-                width,
-                height,
-                acq_radius,
-                threading_policy,
-            );
-        }
-        FastBlurChannels::Channels3 => {
-            fast_gaussian_superior::fast_gaussian_impl::<u8, 3>(
-                bytes,
-                stride,
-                width,
-                height,
-                acq_radius,
-                threading_policy,
-            );
-        }
-        FastBlurChannels::Channels4 => {
-            fast_gaussian_superior::fast_gaussian_impl::<u8, 4>(
-                bytes,
-                stride,
-                width,
-                height,
-                acq_radius,
-                threading_policy,
-            );
-        }
-    }
+    let _dispatcher = match channels {
+        FastBlurChannels::Plane => fast_gaussian_superior::fast_gaussian_impl::<u8, 1>,
+        FastBlurChannels::Channels3 => fast_gaussian_superior::fast_gaussian_impl::<u8, 3>,
+        FastBlurChannels::Channels4 => fast_gaussian_superior::fast_gaussian_impl::<u8, 4>,
+    };
+    _dispatcher(bytes, stride, width, height, acq_radius, threading_policy);
 }

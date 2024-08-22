@@ -32,7 +32,114 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-pub fn gaussian_blur_vertical_pass_impl_f32_avx<T, const CHANNEL_CONFIGURATION: usize>(
+pub fn gaussian_blur_vertical_pass_impl_f32_avx<
+    T,
+    const CHANNEL_CONFIGURATION: usize,
+    const FMA: bool,
+>(
+    undef_src: &[T],
+    src_stride: u32,
+    undef_unsafe_dst: &UnsafeSlice<T>,
+    dst_stride: u32,
+    width: u32,
+    height: u32,
+    kernel_size: usize,
+    kernel: &[f32],
+    start_y: u32,
+    end_y: u32,
+) {
+    unsafe {
+        if FMA {
+            gaussian_blur_vertical_pass_fma::<T, CHANNEL_CONFIGURATION>(
+                undef_src,
+                src_stride,
+                undef_unsafe_dst,
+                dst_stride,
+                width,
+                height,
+                kernel_size,
+                kernel,
+                start_y,
+                end_y,
+            );
+        } else {
+            gaussian_blur_vertical_pass_gen::<T, CHANNEL_CONFIGURATION>(
+                undef_src,
+                src_stride,
+                undef_unsafe_dst,
+                dst_stride,
+                width,
+                height,
+                kernel_size,
+                kernel,
+                start_y,
+                end_y,
+            );
+        }
+    }
+}
+
+#[inline]
+#[target_feature(enable = "avx2")]
+unsafe fn gaussian_blur_vertical_pass_gen<T, const CHANNEL_CONFIGURATION: usize>(
+    undef_src: &[T],
+    src_stride: u32,
+    undef_unsafe_dst: &UnsafeSlice<T>,
+    dst_stride: u32,
+    width: u32,
+    height: u32,
+    kernel_size: usize,
+    kernel: &[f32],
+    start_y: u32,
+    end_y: u32,
+) {
+    gaussian_blur_vertical_pass_impl::<T, CHANNEL_CONFIGURATION, false>(
+        undef_src,
+        src_stride,
+        undef_unsafe_dst,
+        dst_stride,
+        width,
+        height,
+        kernel_size,
+        kernel,
+        start_y,
+        end_y,
+    );
+}
+
+#[inline]
+#[target_feature(enable = "avx2,fma")]
+unsafe fn gaussian_blur_vertical_pass_fma<T, const CHANNEL_CONFIGURATION: usize>(
+    undef_src: &[T],
+    src_stride: u32,
+    undef_unsafe_dst: &UnsafeSlice<T>,
+    dst_stride: u32,
+    width: u32,
+    height: u32,
+    kernel_size: usize,
+    kernel: &[f32],
+    start_y: u32,
+    end_y: u32,
+) {
+    gaussian_blur_vertical_pass_impl::<T, CHANNEL_CONFIGURATION, true>(
+        undef_src,
+        src_stride,
+        undef_unsafe_dst,
+        dst_stride,
+        width,
+        height,
+        kernel_size,
+        kernel,
+        start_y,
+        end_y,
+    );
+}
+
+unsafe fn gaussian_blur_vertical_pass_impl<
+    T,
+    const CHANNEL_CONFIGURATION: usize,
+    const FMA: bool,
+>(
     undef_src: &[T],
     src_stride: u32,
     undef_unsafe_dst: &UnsafeSlice<T>,

@@ -29,10 +29,7 @@ const BASE_RADIUS_F64_CUTOFF: u32 = 327;
 
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::stack_blur_pass_neon_f32;
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "sse4.1"
-))]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse::stack_blur_pass_sse_f;
 use crate::stack_blur::{BlurStack, StackBlurPass};
 use crate::unsafe_slice::UnsafeSlice;
@@ -635,6 +632,8 @@ fn stack_blur_worker_horizontal(
     thread: usize,
     thread_count: usize,
 ) {
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
     match channels {
         FastBlurChannels::Plane => {
             let mut _dispatcher: fn(
@@ -683,13 +682,12 @@ fn stack_blur_worker_horizontal(
                     _dispatcher = stack_blur_pass_neon_f32::<3>;
                 }
             }
-            #[cfg(all(
-                any(target_arch = "x86_64", target_arch = "x86"),
-                target_feature = "sse4.1"
-            ))]
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
-                if radius < BASE_RADIUS_F64_CUTOFF {
-                    _dispatcher = stack_blur_pass_sse_f::<3>;
+                if _is_sse_available {
+                    if radius < BASE_RADIUS_F64_CUTOFF {
+                        _dispatcher = stack_blur_pass_sse_f::<3>;
+                    }
                 }
             }
             _dispatcher(
@@ -724,13 +722,12 @@ fn stack_blur_worker_horizontal(
                     _dispatcher = stack_blur_pass_neon_f32::<4>;
                 }
             }
-            #[cfg(all(
-                any(target_arch = "x86_64", target_arch = "x86"),
-                target_feature = "sse4.1"
-            ))]
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
-                if radius < BASE_RADIUS_F64_CUTOFF {
-                    _dispatcher = stack_blur_pass_sse_f::<4>;
+                if _is_sse_available {
+                    if radius < BASE_RADIUS_F64_CUTOFF {
+                        _dispatcher = stack_blur_pass_sse_f::<4>;
+                    }
                 }
             }
             _dispatcher(
@@ -757,6 +754,8 @@ fn stack_blur_worker_vertical(
     thread: usize,
     thread_count: usize,
 ) {
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
     match channels {
         FastBlurChannels::Plane => {
             let mut _dispatcher: fn(
@@ -805,13 +804,12 @@ fn stack_blur_worker_vertical(
                     _dispatcher = stack_blur_pass_neon_f32::<3>;
                 }
             }
-            #[cfg(all(
-                any(target_arch = "x86_64", target_arch = "x86"),
-                target_feature = "sse4.1"
-            ))]
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
-                if radius < BASE_RADIUS_F64_CUTOFF {
-                    _dispatcher = stack_blur_pass_sse_f::<3>;
+                if _is_sse_available {
+                    if radius < BASE_RADIUS_F64_CUTOFF {
+                        _dispatcher = stack_blur_pass_sse_f::<3>;
+                    }
                 }
             }
             _dispatcher(
@@ -846,13 +844,12 @@ fn stack_blur_worker_vertical(
                     _dispatcher = stack_blur_pass_neon_f32::<4>;
                 }
             }
-            #[cfg(all(
-                any(target_arch = "x86_64", target_arch = "x86"),
-                target_feature = "sse4.1"
-            ))]
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
-                if radius < BASE_RADIUS_F64_CUTOFF {
-                    _dispatcher = stack_blur_pass_sse_f::<4>;
+                if _is_sse_available {
+                    if radius < BASE_RADIUS_F64_CUTOFF {
+                        _dispatcher = stack_blur_pass_sse_f::<4>;
+                    }
                 }
             }
             _dispatcher(

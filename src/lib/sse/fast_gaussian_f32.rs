@@ -49,6 +49,34 @@ pub fn fast_gaussian_horizontal_pass_sse_f32<
     start: u32,
     end: u32,
 ) {
+    unsafe {
+        fast_gaussian_horizontal_pass_sse_f32_impl::<T, CHANNELS_COUNT, EDGE_MODE>(
+            undefined_slice,
+            stride,
+            width,
+            height,
+            radius,
+            start,
+            end,
+        );
+    }
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+unsafe fn fast_gaussian_horizontal_pass_sse_f32_impl<
+    T,
+    const CHANNELS_COUNT: usize,
+    const EDGE_MODE: usize,
+>(
+    undefined_slice: &UnsafeSlice<T>,
+    stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    start: u32,
+    end: u32,
+) {
     let edge_mode: EdgeMode = EDGE_MODE.into();
     let bytes: &UnsafeSlice<'_, f32> = unsafe { std::mem::transmute(undefined_slice) };
     let mut buffer: [[f32; 4]; 1024] = [[0.; 4]; 1024];
@@ -118,6 +146,34 @@ pub fn fast_gaussian_horizontal_pass_sse_f32<
 }
 
 pub fn fast_gaussian_vertical_pass_sse_f32<
+    T,
+    const CHANNELS_COUNT: usize,
+    const EDGE_MODE: usize,
+>(
+    undefined_slice: &UnsafeSlice<T>,
+    stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    start: u32,
+    end: u32,
+) {
+    unsafe {
+        fast_gaussian_vertical_pass_sse_f32_impl::<T, CHANNELS_COUNT, EDGE_MODE>(
+            undefined_slice,
+            stride,
+            width,
+            height,
+            radius,
+            start,
+            end,
+        );
+    }
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+unsafe fn fast_gaussian_vertical_pass_sse_f32_impl<
     T,
     const CHANNELS_COUNT: usize,
     const EDGE_MODE: usize,

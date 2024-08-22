@@ -26,14 +26,11 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 mod fast_gaussian;
-#[cfg(target_feature = "f16c")]
 mod fast_gaussian_f16;
 mod fast_gaussian_f32;
 mod fast_gaussian_next;
-#[cfg(target_feature = "f16c")]
 mod fast_gaussian_next_f16;
 mod fast_gaussian_next_f32;
-#[cfg(target_feature = "f16c")]
 mod stack_blur_f16;
 mod stack_blur_f32;
 mod stack_blur_i32;
@@ -41,7 +38,6 @@ mod stack_blur_i64;
 mod utils;
 
 pub use fast_gaussian::*;
-#[cfg(target_feature = "f16c")]
 pub use fast_gaussian_f16::{
     fast_gaussian_horizontal_pass_sse_f16, fast_gaussian_vertical_pass_sse_f16,
 };
@@ -49,14 +45,12 @@ pub use fast_gaussian_f32::{
     fast_gaussian_horizontal_pass_sse_f32, fast_gaussian_vertical_pass_sse_f32,
 };
 pub use fast_gaussian_next::*;
-#[cfg(target_feature = "f16c")]
 pub use fast_gaussian_next_f16::{
     fast_gaussian_next_horizontal_pass_sse_f16, fast_gaussian_next_vertical_pass_sse_f16,
 };
 pub use fast_gaussian_next_f32::{
     fast_gaussian_next_horizontal_pass_sse_f32, fast_gaussian_next_vertical_pass_sse_f32,
 };
-#[cfg(target_feature = "f16c")]
 pub use stack_blur_f16::stack_blur_pass_sse_f16;
 pub use stack_blur_f32::stack_blur_pass_sse_f;
 pub use stack_blur_i32::stack_blur_pass_sse;

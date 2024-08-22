@@ -54,6 +54,33 @@ pub fn gaussian_horiz_one_chan_f32<T>(
     start_y: u32,
     end_y: u32,
 ) {
+    unsafe {
+        gaussian_horiz_one_chan_f32_impl::<T>(
+            undef_src,
+            src_stride,
+            undef_unsafe_dst,
+            dst_stride,
+            width,
+            kernel_size,
+            kernel,
+            start_y,
+            end_y,
+        );
+    }
+}
+
+#[target_feature(enable = "sse4.1")]
+unsafe fn gaussian_horiz_one_chan_f32_impl<T>(
+    undef_src: &[T],
+    src_stride: u32,
+    undef_unsafe_dst: &UnsafeSlice<T>,
+    dst_stride: u32,
+    width: u32,
+    kernel_size: usize,
+    kernel: &[f32],
+    start_y: u32,
+    end_y: u32,
+) {
     let src: &[f32] = unsafe { std::mem::transmute(undef_src) };
     let unsafe_dst: &UnsafeSlice<'_, f32> = unsafe { std::mem::transmute(undef_unsafe_dst) };
     let half_kernel = (kernel_size / 2) as i32;
@@ -277,6 +304,31 @@ pub fn gaussian_horiz_one_chan_f32<T>(
 }
 
 pub fn gaussian_horiz_one_chan_filter_f32<T>(
+    undef_src: &[T],
+    src_stride: u32,
+    undef_unsafe_dst: &UnsafeSlice<T>,
+    dst_stride: u32,
+    width: u32,
+    filter: &Vec<GaussianFilter>,
+    start_y: u32,
+    end_y: u32,
+) {
+    unsafe {
+        gaussian_horiz_one_chan_filter_f32_impl::<T>(
+            undef_src,
+            src_stride,
+            undef_unsafe_dst,
+            dst_stride,
+            width,
+            filter,
+            start_y,
+            end_y,
+        );
+    }
+}
+
+#[target_feature(enable = "sse4.1")]
+unsafe fn gaussian_horiz_one_chan_filter_f32_impl<T>(
     undef_src: &[T],
     src_stride: u32,
     undef_unsafe_dst: &UnsafeSlice<T>,

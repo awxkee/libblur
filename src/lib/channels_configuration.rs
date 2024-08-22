@@ -52,13 +52,13 @@ impl FastBlurChannels {
 
 impl From<usize> for FastBlurChannels {
     fn from(value: usize) -> Self {
-        return match value {
+        match value {
             1 => FastBlurChannels::Plane,
             3 => FastBlurChannels::Channels3,
             4 => FastBlurChannels::Channels4,
             _ => {
                 panic!("Unknown value");
             }
-        };
+        }
     }
 }

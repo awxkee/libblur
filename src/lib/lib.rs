@@ -1,4 +1,6 @@
+
 // Copyright (c) Radzivon Bartoshyk. All rights reserved.
+
 //
 // Redistribution and use in source and binary forms, with or without modification,
 // are permitted provided that the following conditions are met:
@@ -36,10 +38,7 @@ mod median_blur;
 mod mul_table;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 mod neon;
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    target_feature = "sse4.1"
-))]
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 mod sse;
 mod stack_blur;
 mod stack_blur_f16;
@@ -48,6 +47,7 @@ mod stack_blur_linear;
 mod threading_policy;
 mod to_storage;
 mod unsafe_slice;
+mod cpu_features;
 
 pub use channels_configuration::FastBlurChannels;
 pub use colorutils_rs::TransferFunction;

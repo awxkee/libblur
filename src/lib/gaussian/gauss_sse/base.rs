@@ -25,6 +25,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use crate::gaussian::gauss_sse::gauss_utils::_mm_opt_fma_ps;
 use crate::sse::{
     _mm_broadcast_first, _mm_broadcast_fourth, _mm_broadcast_second, _mm_broadcast_third,
 };
@@ -53,14 +54,115 @@ macro_rules! write_u8_by_channels_sse {
             dst_ptr.write_unaligned(pixel);
         } else {
             let pixel_bytes = pixel.to_le_bytes();
-            $unsafe_dst.write(unsafe_offset, pixel_bytes[0]);
-            $unsafe_dst.write(unsafe_offset + 1, pixel_bytes[1]);
+            let dst_ptr = $unsafe_dst.slice.as_ptr().add(unsafe_offset) as *mut u16;
+            let lowest = u16::from_le_bytes([pixel_bytes[0], pixel_bytes[1]]);
+            dst_ptr.write_unaligned(lowest);
             $unsafe_dst.write(unsafe_offset + 2, pixel_bytes[2]);
         }
     }};
 }
 
-pub fn gaussian_blur_horizontal_pass_impl_sse<T, const CHANNEL_CONFIGURATION: usize>(
+pub fn gaussian_blur_horizontal_pass_impl_sse<
+    T,
+    const CHANNEL_CONFIGURATION: usize,
+    const FMA: bool,
+>(
+    undef_src: &[T],
+    src_stride: u32,
+    undef_unsafe_dst: &UnsafeSlice<T>,
+    dst_stride: u32,
+    width: u32,
+    kernel_size: usize,
+    kernel: &[f32],
+    start_y: u32,
+    end_y: u32,
+) {
+    unsafe {
+        if FMA {
+            gaussian_blur_horizontal_pass_impl_sse_fma::<T, CHANNEL_CONFIGURATION>(
+                undef_src,
+                src_stride,
+                undef_unsafe_dst,
+                dst_stride,
+                width,
+                kernel_size,
+                kernel,
+                start_y,
+                end_y,
+            );
+        } else {
+            gaussian_blur_horizontal_pass_impl_sse_gen::<T, CHANNEL_CONFIGURATION>(
+                undef_src,
+                src_stride,
+                undef_unsafe_dst,
+                dst_stride,
+                width,
+                kernel_size,
+                kernel,
+                start_y,
+                end_y,
+            );
+        }
+    }
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+unsafe fn gaussian_blur_horizontal_pass_impl_sse_gen<T, const CHANNEL_CONFIGURATION: usize>(
+    undef_src: &[T],
+    src_stride: u32,
+    undef_unsafe_dst: &UnsafeSlice<T>,
+    dst_stride: u32,
+    width: u32,
+    kernel_size: usize,
+    kernel: &[f32],
+    start_y: u32,
+    end_y: u32,
+) {
+    gaussian_blur_horizontal_pass_impl_sse_impl::<T, CHANNEL_CONFIGURATION, false>(
+        undef_src,
+        src_stride,
+        undef_unsafe_dst,
+        dst_stride,
+        width,
+        kernel_size,
+        kernel,
+        start_y,
+        end_y,
+    );
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1,fma")]
+unsafe fn gaussian_blur_horizontal_pass_impl_sse_fma<T, const CHANNEL_CONFIGURATION: usize>(
+    undef_src: &[T],
+    src_stride: u32,
+    undef_unsafe_dst: &UnsafeSlice<T>,
+    dst_stride: u32,
+    width: u32,
+    kernel_size: usize,
+    kernel: &[f32],
+    start_y: u32,
+    end_y: u32,
+) {
+    gaussian_blur_horizontal_pass_impl_sse_impl::<T, CHANNEL_CONFIGURATION, true>(
+        undef_src,
+        src_stride,
+        undef_unsafe_dst,
+        dst_stride,
+        width,
+        kernel_size,
+        kernel,
+        start_y,
+        end_y,
+    );
+}
+
+unsafe fn gaussian_blur_horizontal_pass_impl_sse_impl<
+    T,
+    const CHANNEL_CONFIGURATION: usize,
+    const FMA: bool,
+>(
     undef_src: &[T],
     src_stride: u32,
     undef_unsafe_dst: &UnsafeSlice<T>,
@@ -142,10 +244,10 @@ pub fn gaussian_blur_horizontal_pass_impl_sse<T, const CHANNEL_CONFIGURATION: us
                         pixel_colors_3 = _mm_shuffle_epi8(pixel_colors_3, shuffle_rgb);
                     }
 
-                    accumulate_4_forward_sse_u8!(store_0, pixel_colors_0, weights);
-                    accumulate_4_forward_sse_u8!(store_1, pixel_colors_1, weights);
-                    accumulate_4_forward_sse_u8!(store_2, pixel_colors_2, weights);
-                    accumulate_4_forward_sse_u8!(store_3, pixel_colors_3, weights);
+                    accumulate_4_forward_sse_u8!(store_0, pixel_colors_0, weights, FMA);
+                    accumulate_4_forward_sse_u8!(store_1, pixel_colors_1, weights, FMA);
+                    accumulate_4_forward_sse_u8!(store_2, pixel_colors_2, weights, FMA);
+                    accumulate_4_forward_sse_u8!(store_3, pixel_colors_3, weights, FMA);
 
                     r += 4;
                 }
@@ -180,10 +282,10 @@ pub fn gaussian_blur_horizontal_pass_impl_sse<T, const CHANNEL_CONFIGURATION: us
                         pixel_colors_3 = _mm_shuffle_epi8(pixel_colors_3, shuffle_rgb);
                     }
 
-                    accumulate_2_forward_sse_u8!(store_0, pixel_colors_0, weights);
-                    accumulate_2_forward_sse_u8!(store_1, pixel_colors_1, weights);
-                    accumulate_2_forward_sse_u8!(store_2, pixel_colors_2, weights);
-                    accumulate_2_forward_sse_u8!(store_3, pixel_colors_3, weights);
+                    accumulate_2_forward_sse_u8!(store_0, pixel_colors_0, weights, FMA);
+                    accumulate_2_forward_sse_u8!(store_1, pixel_colors_1, weights, FMA);
+                    accumulate_2_forward_sse_u8!(store_2, pixel_colors_2, weights, FMA);
+                    accumulate_2_forward_sse_u8!(store_3, pixel_colors_3, weights, FMA);
 
                     r += 2;
                 }
@@ -275,8 +377,8 @@ pub fn gaussian_blur_horizontal_pass_impl_sse<T, const CHANNEL_CONFIGURATION: us
                         pixel_colors_1 = _mm_shuffle_epi8(pixel_colors_1, shuffle_rgb);
                     }
 
-                    accumulate_4_forward_sse_u8!(store_0, pixel_colors_0, weights);
-                    accumulate_4_forward_sse_u8!(store_1, pixel_colors_1, weights);
+                    accumulate_4_forward_sse_u8!(store_0, pixel_colors_0, weights, FMA);
+                    accumulate_4_forward_sse_u8!(store_1, pixel_colors_1, weights, FMA);
 
                     r += 4;
                 }
@@ -305,8 +407,8 @@ pub fn gaussian_blur_horizontal_pass_impl_sse<T, const CHANNEL_CONFIGURATION: us
                         pixel_colors_1 = _mm_shuffle_epi8(pixel_colors_1, shuffle_rgb);
                     }
 
-                    accumulate_2_forward_sse_u8!(store_0, pixel_colors_0, weights);
-                    accumulate_2_forward_sse_u8!(store_1, pixel_colors_1, weights);
+                    accumulate_2_forward_sse_u8!(store_0, pixel_colors_0, weights, FMA);
+                    accumulate_2_forward_sse_u8!(store_1, pixel_colors_1, weights, FMA);
 
                     r += 2;
                 }
@@ -377,7 +479,7 @@ pub fn gaussian_blur_horizontal_pass_impl_sse<T, const CHANNEL_CONFIGURATION: us
                         pixel_colors = _mm_shuffle_epi8(pixel_colors, shuffle_rgb);
                     }
 
-                    accumulate_4_forward_sse_u8!(store, pixel_colors, weights);
+                    accumulate_4_forward_sse_u8!(store, pixel_colors, weights, FMA);
 
                     r += 4;
                 }
@@ -402,7 +504,114 @@ pub fn gaussian_blur_horizontal_pass_impl_sse<T, const CHANNEL_CONFIGURATION: us
     }
 }
 
-pub fn gaussian_blur_vertical_pass_impl_sse<T, const CHANNEL_CONFIGURATION: usize>(
+pub fn gaussian_blur_vertical_pass_impl_sse<
+    T,
+    const CHANNEL_CONFIGURATION: usize,
+    const FMA: bool,
+>(
+    undef_src: &[T],
+    src_stride: u32,
+    undef_unsafe_dst: &UnsafeSlice<T>,
+    dst_stride: u32,
+    width: u32,
+    height: u32,
+    kernel_size: usize,
+    kernel: &[f32],
+    start_y: u32,
+    end_y: u32,
+) {
+    unsafe {
+        if FMA {
+            gaussian_blur_vertical_pass_impl_sse_fma::<T, CHANNEL_CONFIGURATION>(
+                undef_src,
+                src_stride,
+                undef_unsafe_dst,
+                dst_stride,
+                width,
+                height,
+                kernel_size,
+                kernel,
+                start_y,
+                end_y,
+            );
+        } else {
+            gaussian_blur_vertical_pass_impl_sse_gen::<T, CHANNEL_CONFIGURATION>(
+                undef_src,
+                src_stride,
+                undef_unsafe_dst,
+                dst_stride,
+                width,
+                height,
+                kernel_size,
+                kernel,
+                start_y,
+                end_y,
+            );
+        }
+    }
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+unsafe fn gaussian_blur_vertical_pass_impl_sse_gen<T, const CHANNEL_CONFIGURATION: usize>(
+    undef_src: &[T],
+    src_stride: u32,
+    undef_unsafe_dst: &UnsafeSlice<T>,
+    dst_stride: u32,
+    width: u32,
+    height: u32,
+    kernel_size: usize,
+    kernel: &[f32],
+    start_y: u32,
+    end_y: u32,
+) {
+    gaussian_blur_vertical_pass_impl_sse_impl::<T, CHANNEL_CONFIGURATION, false>(
+        undef_src,
+        src_stride,
+        undef_unsafe_dst,
+        dst_stride,
+        width,
+        height,
+        kernel_size,
+        kernel,
+        start_y,
+        end_y,
+    );
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1,fma")]
+unsafe fn gaussian_blur_vertical_pass_impl_sse_fma<T, const CHANNEL_CONFIGURATION: usize>(
+    undef_src: &[T],
+    src_stride: u32,
+    undef_unsafe_dst: &UnsafeSlice<T>,
+    dst_stride: u32,
+    width: u32,
+    height: u32,
+    kernel_size: usize,
+    kernel: &[f32],
+    start_y: u32,
+    end_y: u32,
+) {
+    gaussian_blur_vertical_pass_impl_sse_impl::<T, CHANNEL_CONFIGURATION, true>(
+        undef_src,
+        src_stride,
+        undef_unsafe_dst,
+        dst_stride,
+        width,
+        height,
+        kernel_size,
+        kernel,
+        start_y,
+        end_y,
+    );
+}
+
+unsafe fn gaussian_blur_vertical_pass_impl_sse_impl<
+    T,
+    const CHANNEL_CONFIGURATION: usize,
+    const FMA: bool,
+>(
     undef_src: &[T],
     src_stride: u32,
     undef_unsafe_dst: &UnsafeSlice<T>,

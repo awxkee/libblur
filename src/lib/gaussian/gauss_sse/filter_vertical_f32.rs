@@ -25,15 +25,115 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use crate::gaussian::gauss_sse::gauss_utils::_mm_opt_fma_ps;
 use crate::gaussian::gaussian_filter::GaussianFilter;
 use crate::unsafe_slice::UnsafeSlice;
-use erydanos::_mm_prefer_fma_ps;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-pub fn gaussian_blur_vertical_pass_filter_f32_sse<T, const CHANNEL_CONFIGURATION: usize>(
+pub fn gaussian_blur_vertical_pass_filter_f32_sse<
+    T,
+    const CHANNEL_CONFIGURATION: usize,
+    const FMA: bool,
+>(
+    undef_src: &[T],
+    src_stride: u32,
+    undef_unsafe_dst: &UnsafeSlice<T>,
+    dst_stride: u32,
+    width: u32,
+    height: u32,
+    filter: &Vec<GaussianFilter>,
+    start_y: u32,
+    end_y: u32,
+) {
+    unsafe {
+        if FMA {
+            gaussian_blur_vertical_pass_filter_f32_sse_fma::<T, CHANNEL_CONFIGURATION>(
+                undef_src,
+                src_stride,
+                undef_unsafe_dst,
+                dst_stride,
+                width,
+                height,
+                filter,
+                start_y,
+                end_y,
+            );
+        } else {
+            gaussian_blur_vertical_pass_filter_f32_sse_gen::<T, CHANNEL_CONFIGURATION>(
+                undef_src,
+                src_stride,
+                undef_unsafe_dst,
+                dst_stride,
+                width,
+                height,
+                filter,
+                start_y,
+                end_y,
+            );
+        }
+    }
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+unsafe fn gaussian_blur_vertical_pass_filter_f32_sse_gen<T, const CHANNEL_CONFIGURATION: usize>(
+    undef_src: &[T],
+    src_stride: u32,
+    undef_unsafe_dst: &UnsafeSlice<T>,
+    dst_stride: u32,
+    width: u32,
+    height: u32,
+    filter: &Vec<GaussianFilter>,
+    start_y: u32,
+    end_y: u32,
+) {
+    gaussian_blur_vertical_pass_filter_f32_sse_impl::<T, CHANNEL_CONFIGURATION, false>(
+        undef_src,
+        src_stride,
+        undef_unsafe_dst,
+        dst_stride,
+        width,
+        height,
+        filter,
+        start_y,
+        end_y,
+    );
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1,fma")]
+unsafe fn gaussian_blur_vertical_pass_filter_f32_sse_fma<T, const CHANNEL_CONFIGURATION: usize>(
+    undef_src: &[T],
+    src_stride: u32,
+    undef_unsafe_dst: &UnsafeSlice<T>,
+    dst_stride: u32,
+    width: u32,
+    height: u32,
+    filter: &Vec<GaussianFilter>,
+    start_y: u32,
+    end_y: u32,
+) {
+    gaussian_blur_vertical_pass_filter_f32_sse_impl::<T, CHANNEL_CONFIGURATION, true>(
+        undef_src,
+        src_stride,
+        undef_unsafe_dst,
+        dst_stride,
+        width,
+        height,
+        filter,
+        start_y,
+        end_y,
+    );
+}
+
+unsafe fn gaussian_blur_vertical_pass_filter_f32_sse_impl<
+    T,
+    const CHANNEL_CONFIGURATION: usize,
+    const FMA: bool,
+>(
     undef_src: &[T],
     src_stride: u32,
     undef_unsafe_dst: &UnsafeSlice<T>,
@@ -81,12 +181,12 @@ pub fn gaussian_blur_vertical_pass_filter_f32_sse<T, const CHANNEL_CONFIGURATION
                     let px_3 = _mm_loadu_ps(s_ptr.add(12));
                     let px_4 = _mm_loadu_ps(s_ptr.add(16));
                     let px_5 = _mm_loadu_ps(s_ptr.add(20));
-                    store0 = _mm_prefer_fma_ps(store0, px_0, f_weight);
-                    store1 = _mm_prefer_fma_ps(store1, px_1, f_weight);
-                    store2 = _mm_prefer_fma_ps(store2, px_2, f_weight);
-                    store3 = _mm_prefer_fma_ps(store3, px_3, f_weight);
-                    store4 = _mm_prefer_fma_ps(store4, px_4, f_weight);
-                    store5 = _mm_prefer_fma_ps(store5, px_5, f_weight);
+                    store0 = _mm_opt_fma_ps::<FMA>(store0, px_0, f_weight);
+                    store1 = _mm_opt_fma_ps::<FMA>(store1, px_1, f_weight);
+                    store2 = _mm_opt_fma_ps::<FMA>(store2, px_2, f_weight);
+                    store3 = _mm_opt_fma_ps::<FMA>(store3, px_3, f_weight);
+                    store4 = _mm_opt_fma_ps::<FMA>(store4, px_4, f_weight);
+                    store5 = _mm_opt_fma_ps::<FMA>(store5, px_5, f_weight);
 
                     j += 1;
                 }
@@ -120,10 +220,10 @@ pub fn gaussian_blur_vertical_pass_filter_f32_sse<T, const CHANNEL_CONFIGURATION
                     let px_1 = _mm_loadu_ps(s_ptr.add(4));
                     let px_2 = _mm_loadu_ps(s_ptr.add(8));
                     let px_3 = _mm_loadu_ps(s_ptr.add(12));
-                    store0 = _mm_prefer_fma_ps(store0, px_0, f_weight);
-                    store1 = _mm_prefer_fma_ps(store1, px_1, f_weight);
-                    store2 = _mm_prefer_fma_ps(store2, px_2, f_weight);
-                    store3 = _mm_prefer_fma_ps(store3, px_3, f_weight);
+                    store0 = _mm_opt_fma_ps::<FMA>(store0, px_0, f_weight);
+                    store1 = _mm_opt_fma_ps::<FMA>(store1, px_1, f_weight);
+                    store2 = _mm_opt_fma_ps::<FMA>(store2, px_2, f_weight);
+                    store3 = _mm_opt_fma_ps::<FMA>(store3, px_3, f_weight);
 
                     j += 1;
                 }
@@ -151,8 +251,8 @@ pub fn gaussian_blur_vertical_pass_filter_f32_sse<T, const CHANNEL_CONFIGURATION
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let px_0 = _mm_loadu_ps(s_ptr);
                     let px_1 = _mm_loadu_ps(s_ptr.add(4));
-                    store0 = _mm_prefer_fma_ps(store0, px_0, f_weight);
-                    store1 = _mm_prefer_fma_ps(store1, px_1, f_weight);
+                    store0 = _mm_opt_fma_ps::<FMA>(store0, px_0, f_weight);
+                    store1 = _mm_opt_fma_ps::<FMA>(store1, px_1, f_weight);
 
                     j += 1;
                 }
@@ -176,7 +276,7 @@ pub fn gaussian_blur_vertical_pass_filter_f32_sse<T, const CHANNEL_CONFIGURATION
                     let y_src_shift = py * src_stride as usize;
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let lo_lo = _mm_loadu_ps(s_ptr);
-                    store0 = _mm_prefer_fma_ps(store0, lo_lo, f_weight);
+                    store0 = _mm_opt_fma_ps::<FMA>(store0, lo_lo, f_weight);
 
                     j += 1;
                 }
@@ -199,7 +299,7 @@ pub fn gaussian_blur_vertical_pass_filter_f32_sse<T, const CHANNEL_CONFIGURATION
                     let y_src_shift = py * src_stride as usize;
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let f_pixel = _mm_setr_ps(s_ptr.read_unaligned(), 0., 0., 0.);
-                    store0 = _mm_prefer_fma_ps(store0, f_pixel, f_weight);
+                    store0 = _mm_opt_fma_ps::<FMA>(store0, f_pixel, f_weight);
 
                     j += 1;
                 }

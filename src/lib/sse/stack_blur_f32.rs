@@ -44,6 +44,32 @@ pub fn stack_blur_pass_sse_f<const COMPONENTS: usize>(
     total_threads: usize,
 ) {
     unsafe {
+        stack_blur_pass_sse_f_impl::<COMPONENTS>(
+            pixels,
+            stride,
+            width,
+            height,
+            radius,
+            pass,
+            thread,
+            total_threads,
+        );
+    }
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+unsafe  fn stack_blur_pass_sse_f_impl<const COMPONENTS: usize>(
+    pixels: &UnsafeSlice<f32>,
+    stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    pass: StackBlurPass,
+    thread: usize,
+    total_threads: usize,
+) {
+    unsafe {
         let div = ((radius * 2) + 1) as usize;
         let radius_scale: f32 = (1f64 / (radius * (radius + 2) - 1) as f64) as f32;
         let (mut xp, mut yp);
@@ -68,9 +94,9 @@ pub fn stack_blur_pass_sse_f<const COMPONENTS: usize>(
             let max_y = (thread + 1) * height as usize / total_threads;
 
             for y in min_y..max_y {
-                sums = _mm_set1_ps(0.);
-                sum_in = _mm_set1_ps(0.);
-                sum_out = _mm_set1_ps(0.);
+                sums = _mm_setzero_ps();
+                sum_in = _mm_setzero_ps();
+                sum_out = _mm_setzero_ps();
 
                 src_ptr = stride as usize * y;
 
@@ -154,9 +180,9 @@ pub fn stack_blur_pass_sse_f<const COMPONENTS: usize>(
             let max_x = (thread + 1) * width as usize / total_threads;
 
             for x in min_x..max_x {
-                sums = _mm_set1_ps(0.);
-                sum_in = _mm_set1_ps(0.);
-                sum_out = _mm_set1_ps(0.);
+                sums = _mm_setzero_ps();
+                sum_in = _mm_setzero_ps();
+                sum_out = _mm_setzero_ps();
 
                 src_ptr = COMPONENTS * x;
 
