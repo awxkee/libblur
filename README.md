@@ -1,7 +1,7 @@
 # Fast blur algorithms library for Rust
 
 There are some very good and blazing fast algorithms that do blurring images.
-Best optimized for NEON and SSE.
+Best optimized for NEON and SSE, partially AVX, partially done WASM.
 
 You may receive gaussian blur in 100 FPS for 4K photo.
 

@@ -78,18 +78,18 @@ unsafe fn fast_gaussian_horizontal_pass_sse_f32_impl<
     end: u32,
 ) {
     let edge_mode: EdgeMode = EDGE_MODE.into();
-    let bytes: &UnsafeSlice<'_, f32> = unsafe { std::mem::transmute(undefined_slice) };
+    let bytes: &UnsafeSlice<'_, f32> = std::mem::transmute(undefined_slice);
     let mut buffer: [[f32; 4]; 1024] = [[0.; 4]; 1024];
 
     let radius_64 = radius as i64;
     let width_wide = width as i64;
 
-    let v_half = unsafe { _mm_set1_ps(2.) };
-    let v_weight = unsafe { _mm_set1_ps(1f32 / (radius as f32 * radius as f32)) };
+    let v_half = _mm_set1_ps(2.);
+    let v_weight = _mm_set1_ps(1f32 / (radius as f32 * radius as f32));
 
     for y in start..std::cmp::min(height, end) {
-        let mut diffs = unsafe { _mm_setzero_ps() };
-        let mut summs = unsafe { _mm_setzero_ps() };
+        let mut diffs = _mm_setzero_ps();
+        let mut summs = _mm_setzero_ps();
 
         let current_y = ((y as i64) * (stride as i64)) as usize;
 
@@ -98,49 +98,45 @@ unsafe fn fast_gaussian_horizontal_pass_sse_f32_impl<
             if x >= 0 {
                 let current_px = ((std::cmp::max(x, 0) as u32) * CHANNELS_COUNT as u32) as usize;
 
-                let pixel = unsafe { _mm_mul_ps(summs, v_weight) };
+                let pixel = _mm_mul_ps(summs, v_weight);
 
                 let bytes_offset = current_y + current_px;
 
-                unsafe {
-                    let dst_ptr = bytes.slice.as_ptr().add(bytes_offset) as *mut f32;
-                    store_f32::<CHANNELS_COUNT>(dst_ptr, pixel);
-                }
+                let dst_ptr = bytes.slice.as_ptr().add(bytes_offset) as *mut f32;
+                store_f32::<CHANNELS_COUNT>(dst_ptr, pixel);
 
                 let arr_index = ((x - radius_64) & 1023) as usize;
                 let d_arr_index = (x & 1023) as usize;
 
-                let d_buf_ptr = unsafe { buffer.get_unchecked_mut(d_arr_index).as_mut_ptr() };
-                let mut d_stored = unsafe { _mm_loadu_ps(d_buf_ptr) };
-                d_stored = unsafe { _mm_mul_ps(d_stored, v_half) };
+                let d_buf_ptr = buffer.get_unchecked_mut(d_arr_index).as_mut_ptr();
+                let mut d_stored = _mm_loadu_ps(d_buf_ptr);
+                d_stored = _mm_mul_ps(d_stored, v_half);
 
-                let buf_ptr = unsafe { buffer.as_mut_ptr().add(arr_index) as *mut f32 };
-                let a_stored = unsafe { _mm_loadu_ps(buf_ptr) };
+                let buf_ptr = buffer.as_mut_ptr().add(arr_index) as *mut f32;
+                let a_stored = _mm_loadu_ps(buf_ptr);
 
-                diffs = unsafe { _mm_add_ps(diffs, _mm_sub_ps(a_stored, d_stored)) };
+                diffs = _mm_add_ps(diffs, _mm_sub_ps(a_stored, d_stored));
             } else if x + radius_64 >= 0 {
                 let arr_index = (x & 1023) as usize;
-                let buf_ptr = unsafe { buffer.get_unchecked_mut(arr_index).as_mut_ptr() };
-                let mut stored = unsafe { _mm_loadu_ps(buf_ptr) };
-                stored = unsafe { _mm_mul_ps(stored, v_half) };
-                diffs = unsafe { _mm_sub_ps(diffs, stored) };
+                let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr();
+                let mut stored = _mm_loadu_ps(buf_ptr);
+                stored = _mm_mul_ps(stored, v_half);
+                diffs = _mm_sub_ps(diffs, stored);
             }
 
             let next_row_y = (y as usize) * (stride as usize);
             let next_row_x = clamp_edge!(edge_mode, x + radius_64, 0, width_wide - 1);
             let next_row_px = next_row_x * CHANNELS_COUNT;
 
-            let s_ptr = unsafe { bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut f32 };
-            let pixel_color = unsafe { load_f32::<CHANNELS_COUNT>(s_ptr) };
+            let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut f32;
+            let pixel_color = load_f32::<CHANNELS_COUNT>(s_ptr);
 
             let arr_index = ((x + radius_64) & 1023) as usize;
-            let buf_ptr = unsafe { buffer.get_unchecked_mut(arr_index).as_mut_ptr() };
+            let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr();
 
-            diffs = unsafe { _mm_add_ps(diffs, pixel_color) };
-            summs = unsafe { _mm_add_ps(summs, diffs) };
-            unsafe {
-                _mm_storeu_ps(buf_ptr, pixel_color);
-            }
+            diffs = _mm_add_ps(diffs, pixel_color);
+            summs = _mm_add_ps(summs, diffs);
+            _mm_storeu_ps(buf_ptr, pixel_color);
         }
     }
 }
@@ -187,18 +183,18 @@ unsafe fn fast_gaussian_vertical_pass_sse_f32_impl<
     end: u32,
 ) {
     let edge_mode: EdgeMode = EDGE_MODE.into();
-    let bytes: &UnsafeSlice<'_, f32> = unsafe { std::mem::transmute(undefined_slice) };
+    let bytes: &UnsafeSlice<'_, f32> = std::mem::transmute(undefined_slice);
     let mut buffer: [[f32; 4]; 1024] = [[0.; 4]; 1024];
 
-    let v_half = unsafe { _mm_set1_ps(2.) };
-    let v_weight = unsafe { _mm_set1_ps(1f32 / (radius as f32 * radius as f32)) };
+    let v_half = _mm_set1_ps(2.);
+    let v_weight = _mm_set1_ps(1f32 / (radius as f32 * radius as f32));
 
     let height_wide = height as i64;
 
     let radius_64 = radius as i64;
     for x in start..std::cmp::min(width, end) {
-        let mut diffs = unsafe { _mm_setzero_ps() };
-        let mut summs = unsafe { _mm_setzero_ps() };
+        let mut diffs = _mm_setzero_ps();
+        let mut summs = _mm_setzero_ps();
 
         let start_y = 0 - 2 * radius as i64;
         for y in start_y..height_wide {
@@ -207,49 +203,45 @@ unsafe fn fast_gaussian_vertical_pass_sse_f32_impl<
             if y >= 0 {
                 let current_px = ((std::cmp::max(x, 0)) * CHANNELS_COUNT as u32) as usize;
 
-                let pixel = unsafe { _mm_mul_ps(summs, v_weight) };
+                let pixel = _mm_mul_ps(summs, v_weight);
 
                 let bytes_offset = current_y + current_px;
 
-                unsafe {
-                    let dst_ptr = bytes.slice.as_ptr().add(bytes_offset) as *mut f32;
-                    store_f32::<CHANNELS_COUNT>(dst_ptr, pixel);
-                }
+                let dst_ptr = bytes.slice.as_ptr().add(bytes_offset) as *mut f32;
+                store_f32::<CHANNELS_COUNT>(dst_ptr, pixel);
 
                 let arr_index = ((y - radius_64) & 1023) as usize;
                 let d_arr_index = (y & 1023) as usize;
 
-                let d_buf_ptr = unsafe { buffer.get_unchecked_mut(d_arr_index).as_mut_ptr() };
-                let mut d_stored = unsafe { _mm_loadu_ps(d_buf_ptr) };
-                d_stored = unsafe { _mm_mul_ps(d_stored, v_half) };
+                let d_buf_ptr = buffer.get_unchecked_mut(d_arr_index).as_mut_ptr();
+                let mut d_stored = _mm_loadu_ps(d_buf_ptr);
+                d_stored = _mm_mul_ps(d_stored, v_half);
 
-                let buf_ptr = unsafe { buffer.as_mut_ptr().add(arr_index) as *mut f32 };
-                let a_stored = unsafe { _mm_loadu_ps(buf_ptr) };
+                let buf_ptr = buffer.as_mut_ptr().add(arr_index) as *mut f32;
+                let a_stored = _mm_loadu_ps(buf_ptr);
 
-                diffs = unsafe { _mm_add_ps(diffs, _mm_sub_ps(a_stored, d_stored)) };
+                diffs = _mm_add_ps(diffs, _mm_sub_ps(a_stored, d_stored));
             } else if y + radius_64 >= 0 {
                 let arr_index = (y & 1023) as usize;
-                let buf_ptr = unsafe { buffer.get_unchecked_mut(arr_index).as_mut_ptr() };
-                let mut stored = unsafe { _mm_loadu_ps(buf_ptr) };
-                stored = unsafe { _mm_mul_ps(stored, v_half) };
-                diffs = unsafe { _mm_sub_ps(diffs, stored) };
+                let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr();
+                let mut stored = _mm_loadu_ps(buf_ptr);
+                stored = _mm_mul_ps(stored, v_half);
+                diffs = _mm_sub_ps(diffs, stored);
             }
 
             let next_row_y =
                 clamp_edge!(edge_mode, y + radius_64, 0, height_wide - 1) * (stride as usize);
             let next_row_x = (x * CHANNELS_COUNT as u32) as usize;
 
-            let s_ptr = unsafe { bytes.slice.as_ptr().add(next_row_y + next_row_x) as *mut f32 };
-            let pixel_color = unsafe { load_f32::<CHANNELS_COUNT>(s_ptr) };
+            let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_x) as *mut f32;
+            let pixel_color = load_f32::<CHANNELS_COUNT>(s_ptr);
 
             let arr_index = ((y + radius_64) & 1023) as usize;
-            let buf_ptr = unsafe { buffer.get_unchecked_mut(arr_index).as_mut_ptr() };
+            let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr();
 
-            diffs = unsafe { _mm_add_ps(diffs, pixel_color) };
-            summs = unsafe { _mm_add_ps(summs, diffs) };
-            unsafe {
-                _mm_storeu_ps(buf_ptr, pixel_color);
-            }
+            diffs = _mm_add_ps(diffs, pixel_color);
+            summs = _mm_add_ps(summs, diffs);
+            _mm_storeu_ps(buf_ptr, pixel_color);
         }
     }
 }

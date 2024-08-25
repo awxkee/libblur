@@ -314,13 +314,7 @@ pub(crate) unsafe fn vsplit_rgb_5(px: float32x4x4_t) -> Float32x5T {
     let second_pixel = vextq_f32::<3>(px.0, px.1);
     let third_pixel = vextq_f32::<2>(px.1, px.2);
     let four_pixel = vextq_f32::<1>(px.2, px.3);
-    Float32x5T(
-        first_pixel,
-        second_pixel,
-        third_pixel,
-        four_pixel,
-        px.3,
-    )
+    Float32x5T(first_pixel, second_pixel, third_pixel, four_pixel, px.3)
 }
 
 pub(crate) struct Float32x5T(
@@ -418,4 +412,9 @@ pub(crate) unsafe fn store_u8x8_m4<const CHANNELS_COUNT: usize>(
         let bits = pixel.to_le_bytes();
         dst_ptr.write_unaligned(bits[0]);
     }
+}
+
+#[inline]
+pub(crate) unsafe fn vmulq_by_3_s32(k: int32x4_t) -> int32x4_t {
+    vaddq_s32(vshlq_n_s32::<1>(k), k)
 }

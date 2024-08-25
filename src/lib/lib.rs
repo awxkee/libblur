@@ -48,6 +48,8 @@ mod threading_policy;
 mod to_storage;
 mod unsafe_slice;
 mod cpu_features;
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+mod wasm32;
 
 pub use channels_configuration::FastBlurChannels;
 pub use colorutils_rs::TransferFunction;

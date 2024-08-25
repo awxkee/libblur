@@ -7,11 +7,7 @@ use colorutils_rs::TransferFunction;
 use half::f16;
 use image::io::Reader as ImageReader;
 use image::{EncodableLayout, GenericImageView};
-use libblur::{
-    fast_gaussian, fast_gaussian_f16, fast_gaussian_f32, fast_gaussian_next,
-    fast_gaussian_next_f16, fast_gaussian_next_f32, stack_blur, stack_blur_f16, stack_blur_f32,
-    stack_blur_in_linear, EdgeMode, FastBlurChannels, ThreadingPolicy,
-};
+use libblur::{fast_gaussian, fast_gaussian_f16, fast_gaussian_f32, fast_gaussian_in_linear, fast_gaussian_next, fast_gaussian_next_f16, fast_gaussian_next_f32, stack_blur, stack_blur_f16, stack_blur_f32, stack_blur_in_linear, EdgeMode, FastBlurChannels, ThreadingPolicy};
 use std::time::Instant;
 
 #[allow(dead_code)]
@@ -220,10 +216,10 @@ fn main() {
     //     TransferFunction::Srgb,
     // );
 
-    let mut f16_bytes: Vec<f16> = dst_bytes
-        .iter()
-        .map(|&x| f16::from_f32(x as f32 * (1. / 255.)))
-        .collect();
+    // let mut f16_bytes: Vec<f16> = dst_bytes
+    //     .iter()
+    //     .map(|&x| f16::from_f32(x as f32 * (1. / 255.)))
+    //     .collect();
 
     // libblur::gaussian_blur_in_linear(
     //     &bytes,
@@ -240,18 +236,8 @@ fn main() {
     //     TransferFunction::Srgb,
     // );
 
-    stack_blur_f16(
-        &mut f16_bytes,
-        dimensions.0,
-        dimensions.1,
-        50,
-        FastBlurChannels::Channels3,
-        ThreadingPolicy::Single,
-    );
-
-    // stack_blur(
-    //     &mut dst_bytes,
-    //     dimensions.0 * components as u32,
+    // stack_blur_f16(
+    //     &mut f16_bytes,
     //     dimensions.0,
     //     dimensions.1,
     //     50,
@@ -259,10 +245,22 @@ fn main() {
     //     ThreadingPolicy::Single,
     // );
 
-    dst_bytes = f16_bytes
-        .iter()
-        .map(|&x| (x.to_f32() * 255f32) as u8)
-        .collect();
+    fast_gaussian_in_linear(
+        &mut dst_bytes,
+        dimensions.0 * components as u32,
+        dimensions.0,
+        dimensions.1,
+        125,
+        FastBlurChannels::Channels3,
+        ThreadingPolicy::Single,
+        TransferFunction::Rec709,
+        EdgeMode::Clamp,
+    );
+    //
+    // dst_bytes = f16_bytes
+    //     .iter()
+    //     .map(|&x| (x.to_f32() * 255f32) as u8)
+    //     .collect();
 
     // dst_bytes = perform_planar_pass_3(&bytes, dimensions.0 as usize, dimensions.1 as usize);
 

@@ -4,5 +4,8 @@ rustflags = ["-Ctarget-cpu=native"]
 [target.x86_64-apple-darwin]
 rustflags = ["-Ctarget-feature=+sse4.1"]
 
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "target-feature=+simd128"]
+
 [env]
 DYLD_FALLBACK_LIBRARY_PATH="/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/"

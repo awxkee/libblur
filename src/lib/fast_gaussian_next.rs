@@ -42,6 +42,10 @@ use crate::sse::{
 };
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+use crate::wasm32::{
+    fast_gaussian_next_horizontal_pass_wasm_u8, fast_gaussian_next_vertical_pass_wasm_u8,
+};
 use crate::{clamp_edge, reflect_101, EdgeMode, FastBlurChannels, ThreadingPolicy};
 use colorutils_rs::linear_to_planar::linear_to_plane;
 use colorutils_rs::planar_to_linear::plane_to_linear;
@@ -635,6 +639,15 @@ fn fast_gaussian_next_impl<
                     >;
                 }
             }
+        }
+    }
+    #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+    {
+        if std::any::type_name::<T>() == "u8" && BASE_RADIUS_I64_CUTOFF > radius {
+            _dispatcher_vertical =
+                fast_gaussian_next_vertical_pass_wasm_u8::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
+            _dispatcher_horizontal =
+                fast_gaussian_next_horizontal_pass_wasm_u8::<T, CHANNEL_CONFIGURATION, EDGE_MODE>;
         }
     }
 

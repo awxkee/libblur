@@ -429,3 +429,9 @@ pub(crate) unsafe fn store_f32_f16<const CHANNELS_COUNT: usize>(
         casted_ptr.write_unaligned(item0);
     }
 }
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+pub(crate) unsafe fn _mm_mul_by_3_epi32(v: __m128i) -> __m128i {
+    _mm_add_epi32(_mm_slli_epi32::<1>(v), v)
+}
