@@ -36,13 +36,14 @@ use crate::gaussian::avx::{
     gaussian_blur_vertical_pass_impl_avx, gaussian_blur_vertical_pass_impl_f32_avx,
 };
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use crate::gaussian::gauss_neon::*;
+use crate::gaussian::neon::*;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::gaussian::gauss_sse::{
     gaussian_blur_horizontal_pass_impl_sse, gaussian_blur_vertical_pass_impl_f32_sse,
     gaussian_blur_vertical_pass_impl_sse, gaussian_horiz_one_chan_f32,
     gaussian_horiz_sse_t_f_chan_f32, gaussian_sse_horiz_one_chan_u8,
 };
+use crate::gaussian::gaussian_approx_dispatch::gaussian_blur_impl_approx;
 use crate::gaussian::gaussian_filter::create_filter;
 use crate::gaussian::gaussian_horizontal::gaussian_blur_horizontal_pass_impl;
 use crate::gaussian::gaussian_kernel::get_gaussian_kernel_1d;
@@ -50,10 +51,11 @@ use crate::gaussian::gaussian_kernel_filter_dispatch::{
     gaussian_blur_horizontal_pass_edge_clip_dispatch,
     gaussian_blur_vertical_pass_edge_clip_dispatch,
 };
+use crate::gaussian::gaussian_precise_level::GaussianPreciseLevel;
 use crate::gaussian::gaussian_vertical::gaussian_blur_vertical_pass_c_impl;
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
-use crate::ThreadingPolicy;
+use crate::{get_sigma_size, ThreadingPolicy};
 
 fn gaussian_blur_horizontal_pass<
     T: FromPrimitive + Default + Send + Sync,
@@ -574,7 +576,7 @@ fn gaussian_blur_impl<
 /// * `width` - Width of the image
 /// * `height` - Height of the image
 /// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted.
-/// * `sigma` - Sigma for a gaussian kernel, corresponds to kernel flattening level. Default - kernel_size / 6
+/// * `sigma` - Sigma for a gaussian kernel, corresponds to kernel flattening level. If zero of negative then *get_sigma_size* will be used
 /// * `channels` - Count of channels in the image
 /// * `edge_mode` - Rule to handle edge mode
 /// * `threading_policy` - Threading policy according to *ThreadingPolicy*
@@ -593,24 +595,53 @@ pub fn gaussian_blur(
     channels: FastBlurChannels,
     edge_mode: EdgeMode,
     threading_policy: ThreadingPolicy,
+    precise_level: GaussianPreciseLevel,
 ) {
-    let _dispatcher = match channels {
-        FastBlurChannels::Plane => gaussian_blur_impl::<u8, 1>,
-        FastBlurChannels::Channels3 => gaussian_blur_impl::<u8, 3>,
-        FastBlurChannels::Channels4 => gaussian_blur_impl::<u8, 4>,
+    let sigma = if sigma <= 0. {
+        get_sigma_size(kernel_size as usize)
+    } else {
+        sigma
     };
-    _dispatcher(
-        src,
-        src_stride,
-        dst,
-        dst_stride,
-        width,
-        height,
-        kernel_size,
-        sigma,
-        threading_policy,
-        edge_mode,
-    );
+    match precise_level {
+        GaussianPreciseLevel::EXACT => {
+            let _dispatcher = match channels {
+                FastBlurChannels::Plane => gaussian_blur_impl::<u8, 1>,
+                FastBlurChannels::Channels3 => gaussian_blur_impl::<u8, 3>,
+                FastBlurChannels::Channels4 => gaussian_blur_impl::<u8, 4>,
+            };
+            _dispatcher(
+                src,
+                src_stride,
+                dst,
+                dst_stride,
+                width,
+                height,
+                kernel_size,
+                sigma,
+                threading_policy,
+                edge_mode,
+            );
+        }
+        GaussianPreciseLevel::INTEGRAL => {
+            let _dispatcher = match channels {
+                FastBlurChannels::Plane => gaussian_blur_impl_approx::<1>,
+                FastBlurChannels::Channels3 => gaussian_blur_impl_approx::<3>,
+                FastBlurChannels::Channels4 => gaussian_blur_impl_approx::<4>,
+            };
+            _dispatcher(
+                src,
+                src_stride,
+                dst,
+                dst_stride,
+                width,
+                height,
+                kernel_size,
+                sigma,
+                threading_policy,
+                edge_mode,
+            );
+        }
+    }
 }
 
 /// Performs gaussian blur on the image.
@@ -624,7 +655,7 @@ pub fn gaussian_blur(
 /// * `width` - Width of the image
 /// * `height` - Height of the image
 /// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted.
-/// * `sigma` - Sigma for a gaussian kernel, corresponds to kernel flattening level. Default - kernel_size / 6
+/// * `sigma` - Sigma for a gaussian kernel, corresponds to kernel flattening level. If zero of negative then *get_sigma_size* will be used
 /// * `channels` - Count of channels in the image
 /// * `edge_mode` - Rule to handle edge mode
 /// * `threading_policy` - Threading policy according to *ThreadingPolicy*
@@ -647,6 +678,11 @@ pub fn gaussian_blur_u16(
         FastBlurChannels::Channels3 => gaussian_blur_impl::<u16, 3>,
         FastBlurChannels::Channels4 => gaussian_blur_impl::<u16, 4>,
     };
+    let sigma = if sigma <= 0. {
+        get_sigma_size(kernel_size as usize)
+    } else {
+        sigma
+    };
     _dispatcher(
         src,
         width * channels.get_channels() as u32,
@@ -672,7 +708,7 @@ pub fn gaussian_blur_u16(
 /// * `width` - Width of the image
 /// * `height` - Height of the image
 /// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted.
-/// * `sigma` - Sigma for a gaussian kernel, corresponds to kernel flattening level. Default - kernel_size / 6
+/// * `sigma` - Sigma for a gaussian kernel, corresponds to kernel flattening level. If zero of negative then *get_sigma_size* will be used
 /// * `channels` - Count of channels in the image
 /// * `edge_mode` - Rule to handle edge mode
 /// * `threading_policy` - Threading policy according to *ThreadingPolicy*
@@ -695,6 +731,11 @@ pub fn gaussian_blur_f32(
         FastBlurChannels::Channels3 => gaussian_blur_impl::<f32, 3>,
         FastBlurChannels::Channels4 => gaussian_blur_impl::<f32, 4>,
     };
+    let sigma = if sigma <= 0. {
+        get_sigma_size(kernel_size as usize)
+    } else {
+        sigma
+    };
     _dispatcher(
         src,
         width * channels.get_channels() as u32,
@@ -720,7 +761,7 @@ pub fn gaussian_blur_f32(
 /// * `width` - Width of the image
 /// * `height` - Height of the image
 /// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted.
-/// * `sigma` - Sigma for a gaussian kernel, corresponds to kernel flattening level. Default - kernel_size / 6
+/// * `sigma` - Sigma for a gaussian kernel, corresponds to kernel flattening level. If zero of negative then *get_sigma_size* will be used
 /// * `channels` - Count of channels in the image
 /// * `edge_mode` - Rule to handle edge mode
 /// * `threading_policy` - Threading policy according to *ThreadingPolicy*
@@ -743,7 +784,11 @@ pub fn gaussian_blur_f16(
         FastBlurChannels::Channels3 => gaussian_blur_impl::<half::f16, 3>,
         FastBlurChannels::Channels4 => gaussian_blur_impl::<half::f16, 4>,
     };
-
+    let sigma = if sigma <= 0. {
+        get_sigma_size(kernel_size as usize)
+    } else {
+        sigma
+    };
     _dispatcher(
         unsafe { std::mem::transmute(src) },
         width * channels.get_channels() as u32,

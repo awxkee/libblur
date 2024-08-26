@@ -30,7 +30,6 @@ use std::arch::aarch64::*;
 use crate::neon::{load_u8_u16, load_u8_u32_fast, store_u8_u32, vmulq_u32_f32};
 use crate::unsafe_slice::UnsafeSlice;
 
-#[allow(dead_code)]
 pub(crate) fn box_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usize>(
     undefined_src: &[T],
     src_stride: u32,

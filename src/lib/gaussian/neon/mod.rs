@@ -33,6 +33,8 @@ mod horiz_one_channel_f32;
 mod horiz_one_channel_u8;
 mod vert_four_channel;
 mod vertical_f32;
+mod vertical_approx_u8;
+mod horiz_rgba;
 
 pub use filter_u8::gaussian_blur_horizontal_pass_filter_neon;
 pub use filter_u8::gaussian_blur_vertical_pass_filter_neon;
@@ -44,3 +46,5 @@ pub use horiz_one_channel_f32::*;
 pub use horiz_one_channel_u8::*;
 pub use vert_four_channel::*;
 pub use vertical_f32::gaussian_blur_vertical_pass_f32_neon;
+pub use vertical_approx_u8::gaussian_blur_vertical_approx_neon;
+pub use horiz_rgba::gaussian_blur_horizontal_pass_approx_neon;

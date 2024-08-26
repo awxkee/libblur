@@ -146,12 +146,12 @@ unsafe fn fast_gaussian_next_vertical_pass_impl<
                 * (stride as usize);
             let next_row_x = (x * CHANNELS_COUNT as u32) as usize;
 
-            let s_ptr = unsafe { bytes.slice.as_ptr().add(next_row_y + next_row_x) as *mut u8 };
+            let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_x) as *mut u8;
 
-            let pixel_color = unsafe { load_u8_s32_fast::<CHANNELS_COUNT>(s_ptr) };
+            let pixel_color = load_u8_s32_fast::<CHANNELS_COUNT>(s_ptr);
 
             let arr_index = ((y + 2 * radius_64) & 1023) as usize;
-            let buf_ptr = unsafe { buffer.get_unchecked_mut(arr_index).as_mut_ptr() };
+            let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr();
 
             diffs = i32x4_add(diffs, pixel_color);
             ders = i32x4_add(ders, diffs);
@@ -231,10 +231,8 @@ unsafe fn fast_gaussian_next_horizontal_pass_impl<
 
                 let bytes_offset = current_y + current_px;
 
-                unsafe {
-                    let dst_ptr = (bytes.slice.as_ptr() as *mut u8).add(bytes_offset);
-                    w_store_u8x8_m4::<CHANNELS_COUNT>(dst_ptr, prepared_u8);
-                }
+                let dst_ptr = (bytes.slice.as_ptr() as *mut u8).add(bytes_offset);
+                w_store_u8x8_m4::<CHANNELS_COUNT>(dst_ptr, prepared_u8);
 
                 let d_arr_index_1 = ((x + radius_64) & 1023) as usize;
                 let d_arr_index_2 = ((x - radius_64) & 1023) as usize;

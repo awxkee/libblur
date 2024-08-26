@@ -1,4 +1,3 @@
-
 // Copyright (c) Radzivon Bartoshyk. All rights reserved.
 
 //
@@ -29,6 +28,7 @@
 
 mod r#box;
 mod channels_configuration;
+mod cpu_features;
 mod edge_mode;
 mod fast_gaussian;
 mod fast_gaussian_next;
@@ -47,7 +47,6 @@ mod stack_blur_linear;
 mod threading_policy;
 mod to_storage;
 mod unsafe_slice;
-mod cpu_features;
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 mod wasm32;
 
@@ -72,6 +71,8 @@ pub use gaussian::gaussian_blur_f16;
 pub use gaussian::gaussian_blur_f32;
 pub use gaussian::gaussian_blur_in_linear;
 pub use gaussian::gaussian_blur_u16;
+pub use gaussian::get_sigma_size;
+pub use gaussian::GaussianPreciseLevel;
 pub use median_blur::median_blur;
 pub use r#box::box_blur;
 pub use r#box::box_blur_f32;

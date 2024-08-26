@@ -28,7 +28,7 @@
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 mod avx;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-mod gauss_neon;
+mod neon;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 mod gauss_sse;
 mod gaussian;
@@ -38,6 +38,14 @@ mod gaussian_kernel;
 mod gaussian_kernel_filter_dispatch;
 mod gaussian_linear;
 mod gaussian_vertical;
+mod gaussian_util;
+mod gaussian_approx_vertical;
+mod gaussian_approx;
+mod gaussian_precise_level;
+mod gaussian_approx_dispatch;
+mod gaussian_approx_horizontal;
 
 pub use gaussian::*;
 pub use gaussian_linear::gaussian_blur_in_linear;
+pub use gaussian_util::get_sigma_size;
+pub use gaussian_precise_level::GaussianPreciseLevel;

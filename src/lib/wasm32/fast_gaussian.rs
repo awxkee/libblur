@@ -74,7 +74,7 @@ unsafe fn fast_gaussian_horizontal_pass_impl<
     end: u32,
 ) {
     let edge_mode: EdgeMode = EDGE_MODE.into();
-    let bytes: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(undefined_slice) };
+    let bytes: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_slice);
     let mut buffer: [[i32; 4]; 1024] = [[0; 4]; 1024];
     let initial_sum = ((radius * radius) >> 1) as i32;
 
@@ -181,7 +181,7 @@ unsafe fn fast_gaussian_vertical_pass_wasm<
     end: u32,
 ) {
     let edge_mode: EdgeMode = EDGE_MODE.into();
-    let bytes: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(undefined_slice) };
+    let bytes: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_slice);
     let mut buffer: [[i32; 4]; 1024] = [[0; 4]; 1024];
     let initial_sum = ((radius * radius) >> 1) as i32;
 

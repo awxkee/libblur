@@ -25,36 +25,32 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use crate::gaussian::gaussian_approx::{PRECISION, ROUNDING_APPROX};
 use crate::gaussian::gaussian_filter::GaussianFilter;
-use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, reflect_101, reflect_index, EdgeMode};
-use num_traits::{AsPrimitive, FromPrimitive};
 
-pub fn gaussian_blur_vertical_pass_c_impl<
-    T: FromPrimitive + Default + Send + Sync + Copy + 'static + AsPrimitive<f32>,
+pub(crate) fn gaussian_blur_vertical_pass_c_approx<
     const CHANNEL_CONFIGURATION: usize,
     const EDGE_MODE: usize,
 >(
-    src: &[T],
+    src: &[u8],
     src_stride: u32,
-    unsafe_dst: &UnsafeSlice<T>,
+    unsafe_dst: &UnsafeSlice<u8>,
     dst_stride: u32,
     width: u32,
     height: u32,
     kernel_size: usize,
-    kernel: &[f32],
+    kernel: &[i16],
     start_y: u32,
     end_y: u32,
-) where
-    f32: AsPrimitive<T> + ToStorage<T>,
-{
+) {
     let total_length = width as usize * CHANNEL_CONFIGURATION;
     for y in start_y..end_y {
         let mut _cx = 0usize;
 
         while _cx + 32 < total_length {
-            gaussian_vertical_row::<T, 32, EDGE_MODE>(
+            gaussian_vertical_row_ap::<32, EDGE_MODE>(
                 src,
                 src_stride,
                 unsafe_dst,
@@ -70,7 +66,7 @@ pub fn gaussian_blur_vertical_pass_c_impl<
         }
 
         while _cx + 16 < total_length {
-            gaussian_vertical_row::<T, 16, EDGE_MODE>(
+            gaussian_vertical_row_ap::<16, EDGE_MODE>(
                 src,
                 src_stride,
                 unsafe_dst,
@@ -86,7 +82,7 @@ pub fn gaussian_blur_vertical_pass_c_impl<
         }
 
         while _cx + 8 < total_length {
-            gaussian_vertical_row::<T, 8, EDGE_MODE>(
+            gaussian_vertical_row_ap::<8, EDGE_MODE>(
                 src,
                 src_stride,
                 unsafe_dst,
@@ -102,7 +98,7 @@ pub fn gaussian_blur_vertical_pass_c_impl<
         }
 
         while _cx + 4 < total_length {
-            gaussian_vertical_row::<T, 4, EDGE_MODE>(
+            gaussian_vertical_row_ap::<4, EDGE_MODE>(
                 src,
                 src_stride,
                 unsafe_dst,
@@ -118,7 +114,7 @@ pub fn gaussian_blur_vertical_pass_c_impl<
         }
 
         while _cx < total_length {
-            gaussian_vertical_row::<T, 1, EDGE_MODE>(
+            gaussian_vertical_row_ap::<1, EDGE_MODE>(
                 src,
                 src_stride,
                 unsafe_dst,
@@ -136,27 +132,21 @@ pub fn gaussian_blur_vertical_pass_c_impl<
 }
 
 #[inline]
-pub fn gaussian_vertical_row<
-    T: FromPrimitive + Default + Send + Sync + Copy + 'static + AsPrimitive<f32>,
-    const ROW_SIZE: usize,
-    const EDGE_MODE: usize,
->(
-    src: &[T],
+fn gaussian_vertical_row_ap<const ROW_SIZE: usize, const EDGE_MODE: usize>(
+    src: &[u8],
     src_stride: u32,
-    unsafe_dst: &UnsafeSlice<T>,
+    unsafe_dst: &UnsafeSlice<u8>,
     dst_stride: u32,
     _: u32,
     height: u32,
     kernel_size: usize,
-    kernel: &[f32],
+    kernel: &[i16],
     x: u32,
     y: u32,
-) where
-    f32: AsPrimitive<T> + ToStorage<T>,
-{
+) {
     let edge_mode: EdgeMode = EDGE_MODE.into();
     let half_kernel = (kernel_size / 2) as i32;
-    let mut weights: [f32; ROW_SIZE] = [0f32; ROW_SIZE];
+    let mut weights: [i32; ROW_SIZE] = [ROUNDING_APPROX; ROW_SIZE];
     for r in -half_kernel..=half_kernel {
         let py = clamp_edge!(edge_mode, y as i64 + r as i64, 0, (height - 1) as i64);
         let y_src_shift = py * src_stride as usize;
@@ -166,7 +156,7 @@ pub fn gaussian_vertical_row<
             unsafe {
                 let v = *src.get_unchecked(y_src_shift + px);
                 let w0 = weights.get_unchecked_mut(i);
-                *w0 = *w0 + v.as_() * weight;
+                *w0 = *w0 + v as i32 * weight as i32;
             }
         }
     }
@@ -174,61 +164,59 @@ pub fn gaussian_vertical_row<
     unsafe {
         for i in 0..ROW_SIZE {
             let px = x as usize + i;
-            unsafe_dst.write(y_dst_shift + px, (*weights.get_unchecked(i)).as_());
+            unsafe_dst.write(
+                y_dst_shift + px,
+                ((*weights.get_unchecked(i)) >> PRECISION).min(255) as u8,
+            );
         }
     }
 }
 
-pub fn gaussian_blur_vertical_pass_clip_edge_impl<
-    T: FromPrimitive + Default + Send + Sync + Copy + 'static + AsPrimitive<f32>,
-    const CHANNEL_CONFIGURATION: usize,
->(
-    src: &[T],
+pub(crate) fn gaussian_blur_vertical_pass_clip_edge_approx<const CHANNEL_CONFIGURATION: usize>(
+    src: &[u8],
     src_stride: u32,
-    unsafe_dst: &UnsafeSlice<T>,
+    unsafe_dst: &UnsafeSlice<u8>,
     dst_stride: u32,
     width: u32,
     height: u32,
-    filter: &Vec<GaussianFilter<f32>>,
+    filter: &Vec<GaussianFilter<i16>>,
     start_y: u32,
     end_y: u32,
-) where
-    f32: ToStorage<T>,
-{
+) {
     let total_length = width as usize * CHANNEL_CONFIGURATION;
     for y in start_y..end_y {
         let mut _cx = 0usize;
 
         while _cx + 32 < total_length {
-            gaussian_vertical_row_clip_edge::<T, 32>(
+            gaussian_vertical_row_clip_edge::<32>(
                 src, src_stride, unsafe_dst, dst_stride, width, height, filter, _cx as u32, y,
             );
             _cx += 32;
         }
 
         while _cx + 16 < total_length {
-            gaussian_vertical_row_clip_edge::<T, 16>(
+            gaussian_vertical_row_clip_edge::<16>(
                 src, src_stride, unsafe_dst, dst_stride, width, height, filter, _cx as u32, y,
             );
             _cx += 16;
         }
 
         while _cx + 8 < total_length {
-            gaussian_vertical_row_clip_edge::<T, 8>(
+            gaussian_vertical_row_clip_edge::<8>(
                 src, src_stride, unsafe_dst, dst_stride, width, height, filter, _cx as u32, y,
             );
             _cx += 8;
         }
 
         while _cx + 4 < total_length {
-            gaussian_vertical_row_clip_edge::<T, 4>(
+            gaussian_vertical_row_clip_edge::<4>(
                 src, src_stride, unsafe_dst, dst_stride, width, height, filter, _cx as u32, y,
             );
             _cx += 4;
         }
 
         while _cx < total_length {
-            gaussian_vertical_row_clip_edge::<T, 1>(
+            gaussian_vertical_row_clip_edge::<1>(
                 src, src_stride, unsafe_dst, dst_stride, width, height, filter, _cx as u32, y,
             );
             _cx += 1;
@@ -237,23 +225,18 @@ pub fn gaussian_blur_vertical_pass_clip_edge_impl<
 }
 
 #[inline]
-pub fn gaussian_vertical_row_clip_edge<
-    T: FromPrimitive + Default + Send + Sync + Copy + 'static + AsPrimitive<f32>,
-    const ROW_SIZE: usize,
->(
-    src: &[T],
+fn gaussian_vertical_row_clip_edge<const ROW_SIZE: usize>(
+    src: &[u8],
     src_stride: u32,
-    unsafe_dst: &UnsafeSlice<T>,
+    unsafe_dst: &UnsafeSlice<u8>,
     dst_stride: u32,
     _: u32,
     _: u32,
-    filter: &Vec<GaussianFilter<f32>>,
+    filter: &Vec<GaussianFilter<i16>>,
     x: u32,
     y: u32,
-) where
-    f32: ToStorage<T>,
-{
-    let mut weights: [f32; ROW_SIZE] = [0f32; ROW_SIZE];
+) {
+    let mut weights: [i32; ROW_SIZE] = [ROUNDING_APPROX; ROW_SIZE];
     let current_filter = unsafe { filter.get_unchecked(y as usize) };
     let filter_start = current_filter.start;
     let filter_weights = &current_filter.filter;
@@ -266,7 +249,7 @@ pub fn gaussian_vertical_row_clip_edge<
             unsafe {
                 let v = *src.get_unchecked(y_src_shift + px);
                 let w0 = weights.get_unchecked_mut(i);
-                *w0 = *w0 + v.as_() * weight;
+                *w0 = *w0 + v as i32 * weight as i32;
             }
         }
     }
@@ -274,7 +257,10 @@ pub fn gaussian_vertical_row_clip_edge<
     unsafe {
         for i in 0..ROW_SIZE {
             let px = x as usize + i;
-            unsafe_dst.write(y_dst_shift + px, (*weights.get_unchecked(i)).to_());
+            unsafe_dst.write(
+                y_dst_shift + px,
+                ((*weights.get_unchecked(i)) >> PRECISION).min(255) as u8,
+            );
         }
     }
 }

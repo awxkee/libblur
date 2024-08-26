@@ -7,7 +7,7 @@ use colorutils_rs::TransferFunction;
 use half::f16;
 use image::io::Reader as ImageReader;
 use image::{EncodableLayout, GenericImageView};
-use libblur::{fast_gaussian, fast_gaussian_f16, fast_gaussian_f32, fast_gaussian_in_linear, fast_gaussian_next, fast_gaussian_next_f16, fast_gaussian_next_f32, stack_blur, stack_blur_f16, stack_blur_f32, stack_blur_in_linear, EdgeMode, FastBlurChannels, ThreadingPolicy};
+use libblur::{fast_gaussian, fast_gaussian_f16, fast_gaussian_f32, fast_gaussian_in_linear, fast_gaussian_next, fast_gaussian_next_f16, fast_gaussian_next_f32, stack_blur, stack_blur_f16, stack_blur_f32, stack_blur_in_linear, EdgeMode, FastBlurChannels, GaussianPreciseLevel, ThreadingPolicy};
 use std::time::Instant;
 
 #[allow(dead_code)]
@@ -221,20 +221,20 @@ fn main() {
     //     .map(|&x| f16::from_f32(x as f32 * (1. / 255.)))
     //     .collect();
 
-    // libblur::gaussian_blur_in_linear(
-    //     &bytes,
-    //     stride as u32,
-    //     &mut dst_bytes,
-    //     stride as u32,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     67 * 2 + 1,
-    //     67. * 2f32 / 6f32,
-    //     FastBlurChannels::Channels3,
-    //     EdgeMode::KernelClip,
-    //     ThreadingPolicy::Single,
-    //     TransferFunction::Srgb,
-    // );
+    libblur::gaussian_blur(
+        &bytes,
+        stride as u32,
+        &mut dst_bytes,
+        stride as u32,
+        dimensions.0,
+        dimensions.1,
+        37,
+        0.,
+        FastBlurChannels::Channels3,
+        EdgeMode::Clamp,
+        ThreadingPolicy::Single,
+        GaussianPreciseLevel::INTEGRAL,
+    );
 
     // stack_blur_f16(
     //     &mut f16_bytes,
@@ -245,17 +245,17 @@ fn main() {
     //     ThreadingPolicy::Single,
     // );
 
-    fast_gaussian_in_linear(
-        &mut dst_bytes,
-        dimensions.0 * components as u32,
-        dimensions.0,
-        dimensions.1,
-        125,
-        FastBlurChannels::Channels3,
-        ThreadingPolicy::Single,
-        TransferFunction::Rec709,
-        EdgeMode::Clamp,
-    );
+    // fast_gaussian_in_linear(
+    //     &mut dst_bytes,
+    //     dimensions.0 * components as u32,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     125,
+    //     FastBlurChannels::Channels3,
+    //     ThreadingPolicy::Single,
+    //     TransferFunction::Rec709,
+    //     EdgeMode::Clamp,
+    // );
     //
     // dst_bytes = f16_bytes
     //     .iter()

@@ -608,7 +608,7 @@ pub fn gaussian_horiz_one_chan_filter_u8<T>(
     undef_unsafe_dst: &UnsafeSlice<T>,
     dst_stride: u32,
     width: u32,
-    filter: &Vec<GaussianFilter>,
+    filter: &Vec<GaussianFilter<f32>>,
     start_y: u32,
     end_y: u32,
 ) {

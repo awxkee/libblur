@@ -25,6 +25,8 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use crate::gaussian::gaussian_approx::PRECISION;
+
 pub(crate) fn get_gaussian_kernel_1d(width: u32, sigma: f32) -> Vec<f32> {
     let mut sum_norm: f32 = 0f32;
     let mut kernel: Vec<f32> = Vec::with_capacity(width as usize);
@@ -46,5 +48,34 @@ pub(crate) fn get_gaussian_kernel_1d(width: u32, sigma: f32) -> Vec<f32> {
         }
     }
 
-    return kernel;
+    kernel
+}
+
+pub(crate) fn get_gaussian_kernel_1d_integral(width: u32, sigma: f32) -> Vec<i16> {
+    let mut sum_norm: f32 = 0f32;
+    let mut kernel: Vec<f32> = Vec::with_capacity(width as usize);
+    let scale = 1f32 / (f32::sqrt(2f32 * std::f32::consts::PI) * sigma);
+    let mean = (width / 2) as f32;
+
+    for x in 0..width {
+        let new_weight = f32::exp(-0.5f32 * f32::powf((x as f32 - mean) / sigma, 2.0f32)) * scale;
+        kernel.push(new_weight);
+        sum_norm += new_weight;
+    }
+
+    if sum_norm != 0f32 {
+        let sum_scale = 1f32 / sum_norm;
+        for x in 0..width as usize {
+            unsafe {
+                *kernel.get_unchecked_mut(x) = (*kernel.get_unchecked(x)) * sum_scale;
+            }
+        }
+    }
+
+    let precision_scale = (1 << PRECISION) as f32;
+
+    kernel
+        .iter()
+        .map(|&x| (x * precision_scale) as i16)
+        .collect()
 }

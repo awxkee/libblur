@@ -39,7 +39,7 @@ pub fn gaussian_blur_vertical_pass_filter_f32_neon<T, const CHANNEL_CONFIGURATIO
     dst_stride: u32,
     width: u32,
     _: u32,
-    filter: &Vec<GaussianFilter>,
+    filter: &Vec<GaussianFilter<f32>>,
     start_y: u32,
     end_y: u32,
 ) {

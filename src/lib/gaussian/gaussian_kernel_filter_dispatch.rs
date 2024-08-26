@@ -28,9 +28,9 @@
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::gaussian::avx::gaussian_blur_vertical_pass_filter_f32_avx;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use crate::gaussian::gauss_neon::*;
+use crate::gaussian::neon::*;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use crate::gaussian::gauss_neon::{
+use crate::gaussian::neon::{
     gaussian_blur_horizontal_pass_filter_neon, gaussian_blur_vertical_pass_filter_neon,
 };
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
@@ -53,7 +53,7 @@ pub(crate) fn gaussian_blur_vertical_pass_edge_clip_dispatch<
     dst_stride: u32,
     width: u32,
     height: u32,
-    filter: &Vec<GaussianFilter>,
+    filter: &Vec<GaussianFilter<f32>>,
     thread_pool: &Option<ThreadPool>,
     thread_count: u32,
 ) where
@@ -73,7 +73,7 @@ pub(crate) fn gaussian_blur_vertical_pass_edge_clip_dispatch<
         dst_stride: u32,
         width: u32,
         height: u32,
-        filter: &Vec<GaussianFilter>,
+        filter: &Vec<GaussianFilter<f32>>,
         start_y: u32,
         end_y: u32,
     ) = gaussian_blur_vertical_pass_clip_edge_impl::<T, CHANNEL_CONFIGURATION>;
@@ -194,7 +194,7 @@ pub(crate) fn gaussian_blur_horizontal_pass_edge_clip_dispatch<
     dst_stride: u32,
     width: u32,
     height: u32,
-    filter: &Vec<GaussianFilter>,
+    filter: &Vec<GaussianFilter<f32>>,
     thread_pool: &Option<ThreadPool>,
     thread_count: u32,
 ) where
@@ -212,7 +212,7 @@ pub(crate) fn gaussian_blur_horizontal_pass_edge_clip_dispatch<
         unsafe_dst: &UnsafeSlice<T>,
         dst_stride: u32,
         width: u32,
-        filter: &Vec<GaussianFilter>,
+        filter: &Vec<GaussianFilter<f32>>,
         start_y: u32,
         end_y: u32,
     ) = gaussian_blur_horizontal_pass_impl_clip_edge::<T, CHANNEL_CONFIGURATION>;

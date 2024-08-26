@@ -44,7 +44,7 @@ pub fn gaussian_blur_vertical_pass_filter_f32_sse<
     dst_stride: u32,
     width: u32,
     height: u32,
-    filter: &Vec<GaussianFilter>,
+    filter: &Vec<GaussianFilter<f32>>,
     start_y: u32,
     end_y: u32,
 ) {
@@ -86,7 +86,7 @@ unsafe fn gaussian_blur_vertical_pass_filter_f32_sse_gen<T, const CHANNEL_CONFIG
     dst_stride: u32,
     width: u32,
     height: u32,
-    filter: &Vec<GaussianFilter>,
+    filter: &Vec<GaussianFilter<f32>>,
     start_y: u32,
     end_y: u32,
 ) {
@@ -112,7 +112,7 @@ unsafe fn gaussian_blur_vertical_pass_filter_f32_sse_fma<T, const CHANNEL_CONFIG
     dst_stride: u32,
     width: u32,
     height: u32,
-    filter: &Vec<GaussianFilter>,
+    filter: &Vec<GaussianFilter<f32>>,
     start_y: u32,
     end_y: u32,
 ) {
@@ -140,7 +140,7 @@ unsafe fn gaussian_blur_vertical_pass_filter_f32_sse_impl<
     dst_stride: u32,
     width: u32,
     _: u32,
-    filter: &Vec<GaussianFilter>,
+    filter: &Vec<GaussianFilter<f32>>,
     start_y: u32,
     end_y: u32,
 ) {

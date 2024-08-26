@@ -62,7 +62,7 @@ impl From<usize> for EdgeMode {
     }
 }
 
-#[inline(always)]
+#[inline]
 pub(crate) fn reflect_index<
     T: Copy
         + 'static

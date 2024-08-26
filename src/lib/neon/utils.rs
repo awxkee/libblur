@@ -45,6 +45,12 @@ pub(crate) unsafe fn load_u8_u32_one(ptr: *const u8) -> uint32x2_t {
 }
 
 #[inline(always)]
+pub(crate) unsafe fn load_u8_u16_one(ptr: *const u8) -> uint16x4_t {
+    let u_first = u16::from_le_bytes([ptr.read_unaligned(), 0]);
+    vdup_n_u16(u_first)
+}
+
+#[inline(always)]
 pub(crate) unsafe fn store_f32<const CHANNELS_COUNT: usize>(dst_ptr: *mut f32, regi: float32x4_t) {
     if CHANNELS_COUNT == 4 {
         vst1q_f32(dst_ptr, regi);
@@ -139,6 +145,57 @@ pub(crate) unsafe fn load_f32_fast<const CHANNELS_COUNT: usize>(ptr: *const f32)
 #[inline(always)]
 pub(crate) unsafe fn load_u8_f32_fast<const CHANNELS_COUNT: usize>(ptr: *const u8) -> float32x4_t {
     vcvtq_f32_u32(load_u8_u32_fast::<CHANNELS_COUNT>(ptr))
+}
+
+#[inline(always)]
+pub(crate) unsafe fn load_u8_u16_fast<const CHANNELS_COUNT: usize>(ptr: *const u8) -> uint16x4_t {
+    // LLVM generates a little trash code so better here is to use assembly
+    let mut out_reg: uint16x4_t;
+    if CHANNELS_COUNT == 4 {
+        asm!("\
+             ldr  {tmp1:w}, [{0}]           // Load the first byte into w1
+             mov  {1:v}.s[0], {tmp1:w}      // Move w1 to the first lane of v0
+             uxtl {1:v}.8h, {1:v}.8b
+        \
+        ", in(reg) ptr, out(vreg) out_reg,
+        tmp1 = out(reg) _);
+        out_reg
+    } else if CHANNELS_COUNT == 3 {
+        asm!("\
+             ldrb    {tmp1:w}, [{0}]           // Load the first byte into w1
+             ldrb    {tmp2:w}, [{0}, #1]       // Load the second byte into w2
+             ldrb    {tmp3:w}, [{0}, #2]       // Load the third byte into w3
+
+             mov     {1:v}.h[0], {tmp1:w}      // Move w1 to the first lane of v0
+             mov     {1:v}.h[1], {tmp2:w}      // Move w2 to the second lane of v0
+             mov     {1:v}.h[2], {tmp3:w}      // Move w3 to the third lane of v0
+        \
+        ", in(reg) ptr, out(vreg) out_reg,
+        tmp1 = out(reg) _,
+        tmp2 = out(reg) _,
+        tmp3 = out(reg) _);
+        out_reg
+    } else if CHANNELS_COUNT == 2 {
+        asm!("\
+             ldrb    {tmp1:w}, [{0}]           // Load the first byte into w1
+             ldrb    {tmp2:w}, [{0}, #1]       // Load the second byte into w2
+
+             mov     {1:v}.h[0], {tmp1:w}      // Move w1 to the first lane of v0
+             mov     {1:v}.h[1], {tmp2:w}      // Move w2 to the second lane of v0
+        \
+        ", in(reg) ptr, out(vreg) out_reg,
+        tmp1 = out(reg) _,
+        tmp2 = out(reg) _);
+        out_reg
+    } else {
+        asm!("\
+             ldrb    {tmp1:w}, [{0}]           // Load the first byte into w1
+             mov     {1:v}.h[0], {tmp1:w}      // Move w1 to the first lane of v0
+        \
+        ", in(reg) ptr, out(vreg) out_reg,
+        tmp1 = out(reg) _);
+        out_reg
+    }
 }
 
 #[inline(always)]
@@ -267,7 +324,7 @@ pub(crate) unsafe fn load_u8_u16<const CHANNELS_COUNT: usize>(ptr: *const u8) ->
     };
     let store: [u16; 4] = [u_first, u_second, u_third, u_fourth];
     let pixel_color = unsafe { vld1_u16(store.as_ptr()) };
-    return pixel_color;
+    pixel_color
 }
 
 #[inline(always)]
