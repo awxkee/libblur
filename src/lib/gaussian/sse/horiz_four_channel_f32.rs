@@ -25,7 +25,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::gaussian::gauss_sse::gauss_utils::_mm_opt_fma_ps;
+use crate::gaussian::sse::gauss_utils::_mm_opt_fma_ps;
 use crate::sse::{
     _mm_broadcast_first, _mm_broadcast_fourth, _mm_broadcast_second, _mm_broadcast_third,
     _mm_loadu_ps_x4, _mm_split_rgb_5_ps, load_f32, store_f32,

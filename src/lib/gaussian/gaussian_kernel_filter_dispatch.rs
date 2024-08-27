@@ -34,7 +34,7 @@ use crate::gaussian::neon::{
     gaussian_blur_horizontal_pass_filter_neon, gaussian_blur_vertical_pass_filter_neon,
 };
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-use crate::gaussian::gauss_sse::*;
+use crate::gaussian::sse::*;
 use crate::gaussian::gaussian_filter::GaussianFilter;
 use crate::gaussian::gaussian_horizontal::gaussian_blur_horizontal_pass_impl_clip_edge;
 use crate::gaussian::gaussian_vertical::gaussian_blur_vertical_pass_clip_edge_impl;

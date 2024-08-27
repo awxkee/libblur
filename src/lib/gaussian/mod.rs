@@ -30,7 +30,7 @@ mod avx;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 mod neon;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-mod gauss_sse;
+mod sse;
 mod gaussian;
 mod gaussian_filter;
 mod gaussian_horizontal;

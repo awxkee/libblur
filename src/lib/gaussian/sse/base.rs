@@ -25,7 +25,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::gaussian::gauss_sse::gauss_utils::_mm_opt_fma_ps;
+use crate::gaussian::sse::gauss_utils::_mm_opt_fma_ps;
 use crate::sse::{
     _mm_broadcast_first, _mm_broadcast_fourth, _mm_broadcast_second, _mm_broadcast_third,
 };
@@ -262,12 +262,12 @@ unsafe fn gaussian_blur_horizontal_pass_impl_sse_impl<
                             * CHANNEL_CONFIGURATION;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let s_ptr_1 = s_ptr.add(src_stride as usize);
-                    let mut pixel_colors_0 = _mm_loadu_si128(s_ptr as *const __m128i);
-                    let mut pixel_colors_1 = _mm_loadu_si128(s_ptr_1 as *const __m128i);
+                    let mut pixel_colors_0 = _mm_loadu_si64(s_ptr);
+                    let mut pixel_colors_1 = _mm_loadu_si64(s_ptr_1);
                     let mut pixel_colors_2 =
-                        _mm_loadu_si128(s_ptr_1.add(src_stride as usize) as *const __m128i);
+                        _mm_loadu_si64(s_ptr_1.add(src_stride as usize));
                     let mut pixel_colors_3 =
-                        _mm_loadu_si128(s_ptr_1.add(src_stride as usize * 2) as *const __m128i);
+                        _mm_loadu_si64(s_ptr_1.add(src_stride as usize * 2));
                     let weights_ptr = kernel.as_ptr().add((r + half_kernel) as usize);
                     let weights = _mm_setr_ps(
                         weights_ptr.read_unaligned(),
@@ -393,8 +393,8 @@ unsafe fn gaussian_blur_horizontal_pass_impl_sse_impl<
                             * CHANNEL_CONFIGURATION;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let s_ptr_1 = s_ptr.add(src_stride as usize);
-                    let mut pixel_colors_0 = _mm_loadu_si128(s_ptr as *const __m128i);
-                    let mut pixel_colors_1 = _mm_loadu_si128(s_ptr_1 as *const __m128i);
+                    let mut pixel_colors_0 = _mm_loadu_si64(s_ptr);
+                    let mut pixel_colors_1 = _mm_loadu_si64(s_ptr_1);
                     let weights_ptr = kernel.as_ptr().add((r + half_kernel) as usize);
                     let weights = _mm_setr_ps(
                         weights_ptr.read_unaligned(),

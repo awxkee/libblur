@@ -63,7 +63,10 @@ pub(crate) unsafe fn _mm_add_epi64x2(a: __mm128ix2, b: __mm128ix2) -> __mm128ix2
 }
 
 #[inline]
-pub(crate) unsafe fn _mm_mul_n_epi64x2<const AVX512_DQVL: bool>(x: __mm128ix2, v: i64) -> __mm128ix2 {
+pub(crate) unsafe fn _mm_mul_n_epi64x2<const AVX512_DQVL: bool>(
+    x: __mm128ix2,
+    v: i64,
+) -> __mm128ix2 {
     let v = _mm_set1_epi64x(v);
     let c0 = _mm_mul_epi64x::<AVX512_DQVL>(x.0, v);
     let c1 = _mm_mul_epi64x::<AVX512_DQVL>(x.1, v);
@@ -161,7 +164,7 @@ pub(crate) unsafe fn load_u8_s32_fast<const CHANNELS_COUNT: usize>(ptr: *const u
         in(xmm_reg) zeros,
         t1 = out(reg) _, t2 = out(reg) _);
         regi
-    } else  {
+    } else {
         let u_first = u32::from_le_bytes([ptr.read_unaligned(), 0, 0, 0]);
         let u_second = u32::from_le_bytes([ptr.add(1).read_unaligned(), 0, 0, 0]);
         let u_third = u32::from_le_bytes([ptr.add(2).read_unaligned(), 0, 0, 0]);
@@ -171,6 +174,52 @@ pub(crate) unsafe fn load_u8_s32_fast<const CHANNELS_COUNT: usize>(ptr: *const u
         };
         let store: [u32; 4] = [u_first, u_second, u_third, u_fourth];
         _mm_loadu_si128(store.as_ptr() as *const __m128i)
+    }
+}
+
+#[inline]
+pub(crate) unsafe fn load_u8_s16_fast<const CHANNELS_COUNT: usize>(ptr: *const u8) -> __m128i {
+    // LLVM generates a little trash code until opt-level is 3 so better here is to use assembly
+    if CHANNELS_COUNT == 4 {
+        let mut regi: __m128i;
+        // It is preferred to allow LLVM re-use zeroed register
+        let zeros = _mm_setzero_si128();
+        asm!("\
+           movd {1}, dword ptr [{0}]
+           punpcklbw {1}, {2}
+    \
+    ",
+        in(reg) ptr,
+        out(xmm_reg) regi,
+        in(xmm_reg) zeros);
+        regi
+    } else if CHANNELS_COUNT == 3 {
+        let mut regi: __m128i;
+        // It is preferred to allow LLVM re-use zeroed register
+        let zeros = _mm_setzero_si128();
+        asm!("\
+            movzx   {t1}, byte ptr [{0}]
+            movzx   {t2}, word ptr [{0} + 1]
+            shl {t2}, 8
+            or {t1}, {t2}
+            movd    {1}, {t1}
+            punpcklbw {1}, {2}
+    \
+    ",
+        in(reg) ptr,
+        out(xmm_reg) regi,
+        in(xmm_reg) zeros,
+        t1 = out(reg) _, t2 = out(reg) _);
+        regi
+    } else {
+        let u_first = i16::from_le_bytes([ptr.read_unaligned(), 0]);
+        let u_second = i16::from_le_bytes([ptr.add(1).read_unaligned(), 0]);
+        let u_third = i16::from_le_bytes([ptr.add(2).read_unaligned(), 0]);
+        let u_fourth = match CHANNELS_COUNT {
+            4 => i16::from_le_bytes([ptr.add(3).read_unaligned(), 0]),
+            _ => 0,
+        };
+        _mm_setr_epi16(u_first, u_second, u_third, u_fourth, 0, 0, 0, 0)
     }
 }
 
@@ -205,16 +254,24 @@ pub(crate) unsafe fn _mm_packus_epi64(a: __m128i, b: __m128i) -> __m128i {
     moved
 }
 
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "sse4.1")]
 pub(crate) unsafe fn load_u8_f32_fast<const CHANNELS_COUNT: usize>(ptr: *const u8) -> __m128 {
     let vl = load_u8_s32_fast::<CHANNELS_COUNT>(ptr);
     _mm_cvtepi32_ps(vl)
 }
 
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "sse4.1")]
 pub(crate) unsafe fn load_u8_u32_one(ptr: *const u8) -> __m128i {
     let u_first = u32::from_le_bytes([ptr.read_unaligned(), 0, 0, 0]);
     _mm_set1_epi32(u_first as i32)
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+pub(crate) unsafe fn load_u8_u16_one(ptr: *const u8) -> __m128i {
+    _mm_setr_epi16(ptr.read_unaligned() as i16, 0, 0, 0, 0, 0, 0, 0)
 }
 
 #[inline(always)]

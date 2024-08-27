@@ -32,7 +32,7 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 use crate::gaussian::avx::utils::_mm256_opt_fma_ps;
-use crate::gaussian::gauss_sse::_mm_opt_fma_ps;
+use crate::gaussian::sse::_mm_opt_fma_ps;
 
 pub fn gaussian_blur_vertical_pass_filter_f32_avx<
     T,

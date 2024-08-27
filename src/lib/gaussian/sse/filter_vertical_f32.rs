@@ -25,7 +25,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::gaussian::gauss_sse::gauss_utils::_mm_opt_fma_ps;
+use crate::gaussian::sse::gauss_utils::_mm_opt_fma_ps;
 use crate::gaussian::gaussian_filter::GaussianFilter;
 use crate::unsafe_slice::UnsafeSlice;
 #[cfg(target_arch = "x86")]

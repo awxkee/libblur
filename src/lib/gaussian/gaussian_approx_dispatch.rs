@@ -39,6 +39,17 @@ use crate::gaussian::gaussian_kernel::get_gaussian_kernel_1d_integral;
 use crate::gaussian::neon::{
     gaussian_blur_horizontal_pass_approx_neon, gaussian_blur_vertical_approx_neon,
 };
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+use crate::gaussian::neon::{
+    gaussian_blur_horizontal_pass_filter_approx_neon,
+    gaussian_blur_vertical_pass_filter_approx_neon, gaussian_horiz_one_approx_u8,
+    gaussian_horiz_one_chan_filter_approx,
+};
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+use crate::gaussian::sse::{
+    gaussian_blur_horizontal_pass_approx_sse, gaussian_blur_horizontal_pass_filter_approx_sse,
+    gaussian_blur_vertical_pass_approx_sse, gaussian_blur_vertical_pass_filter_approx_sse,
+};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{EdgeMode, ThreadingPolicy};
 use rayon::ThreadPool;
@@ -66,10 +77,29 @@ fn gaussian_blur_horizontal_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_
         start_y: u32,
         end_y: u32,
     ) = gaussian_blur_horizontal_pass_impl_approx::<CHANNEL_CONFIGURATION, EDGE_MODE>;
-    let edge_mode: EdgeMode = EDGE_MODE.into();
+    let _edge_mode: EdgeMode = EDGE_MODE.into();
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-    if (CHANNEL_CONFIGURATION == 3 || CHANNEL_CONFIGURATION == 4) && edge_mode == EdgeMode::Clamp {
-        _dispatcher = gaussian_blur_horizontal_pass_approx_neon::<CHANNEL_CONFIGURATION>;
+    {
+        if (CHANNEL_CONFIGURATION == 3 || CHANNEL_CONFIGURATION == 4)
+            && _edge_mode == EdgeMode::Clamp
+        {
+            _dispatcher = gaussian_blur_horizontal_pass_approx_neon::<CHANNEL_CONFIGURATION>;
+        } else if CHANNEL_CONFIGURATION == 1 && _edge_mode == EdgeMode::Clamp {
+            _dispatcher = gaussian_horiz_one_approx_u8;
+        }
+    }
+
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    {
+        if _is_sse_available
+            && _edge_mode == EdgeMode::Clamp
+            && (CHANNEL_CONFIGURATION == 3 || CHANNEL_CONFIGURATION == 4)
+        {
+            _dispatcher = gaussian_blur_horizontal_pass_approx_sse::<CHANNEL_CONFIGURATION>;
+        }
     }
     let unsafe_dst = UnsafeSlice::new(dst);
     if let Some(thread_pool) = thread_pool {
@@ -136,11 +166,21 @@ fn gaussian_blur_vertical_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_MO
         start_y: u32,
         end_y: u32,
     ) = gaussian_blur_vertical_pass_c_approx::<CHANNEL_CONFIGURATION, EDGE_MODE>;
-    let edge_mode: EdgeMode = EDGE_MODE.into();
+    let _edge_mode: EdgeMode = EDGE_MODE.into();
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     {
-        if edge_mode == EdgeMode::Clamp {
+        if _edge_mode == EdgeMode::Clamp {
             _dispatcher = gaussian_blur_vertical_approx_neon::<CHANNEL_CONFIGURATION>;
+        }
+    }
+
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    {
+        if _is_sse_available && _edge_mode == EdgeMode::Clamp {
+            _dispatcher = gaussian_blur_vertical_pass_approx_sse::<CHANNEL_CONFIGURATION>;
         }
     }
     let unsafe_dst = UnsafeSlice::new(dst);
@@ -211,6 +251,21 @@ pub(crate) fn gaussian_blur_vertical_pass_approx_clip_dispatch<
         start_y: u32,
         end_y: u32,
     ) = gaussian_blur_vertical_pass_clip_edge_approx::<CHANNEL_CONFIGURATION>;
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    {
+        _dispatcher = gaussian_blur_vertical_pass_filter_approx_neon::<CHANNEL_CONFIGURATION>;
+    }
+
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    {
+        if _is_sse_available {
+            _dispatcher = gaussian_blur_vertical_pass_filter_approx_sse::<CHANNEL_CONFIGURATION>;
+        }
+    }
+
     let unsafe_dst = UnsafeSlice::new(dst);
     if let Some(thread_pool) = thread_pool {
         thread_pool.scope(|scope| {
@@ -274,6 +329,25 @@ fn gaussian_blur_horizontal_pass_clip_approx_dispatch<const CHANNEL_CONFIGURATIO
         start_y: u32,
         end_y: u32,
     ) = gaussian_blur_horizontal_pass_impl_clip_edge_approx::<CHANNEL_CONFIGURATION>;
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    {
+        if CHANNEL_CONFIGURATION == 3 || CHANNEL_CONFIGURATION == 4 {
+            _dispatcher = gaussian_blur_horizontal_pass_filter_approx_neon::<CHANNEL_CONFIGURATION>;
+        } else if CHANNEL_CONFIGURATION == 1 {
+            _dispatcher = gaussian_horiz_one_chan_filter_approx;
+        }
+    }
+
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    {
+        if _is_sse_available && (CHANNEL_CONFIGURATION == 3 || CHANNEL_CONFIGURATION == 4) {
+            _dispatcher = gaussian_blur_horizontal_pass_filter_approx_sse::<CHANNEL_CONFIGURATION>;
+        }
+    }
+
     let unsafe_dst = UnsafeSlice::new(dst);
     if let Some(thread_pool) = thread_pool {
         thread_pool.scope(|scope| {

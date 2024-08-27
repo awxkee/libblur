@@ -38,7 +38,7 @@ use crate::gaussian::avx::{
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::gaussian::neon::*;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-use crate::gaussian::gauss_sse::{
+use crate::gaussian::sse::{
     gaussian_blur_horizontal_pass_impl_sse, gaussian_blur_vertical_pass_impl_f32_sse,
     gaussian_blur_vertical_pass_impl_sse, gaussian_horiz_one_chan_f32,
     gaussian_horiz_sse_t_f_chan_f32, gaussian_sse_horiz_one_chan_u8,

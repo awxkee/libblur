@@ -3,27 +3,25 @@ mod split;
 
 use crate::merge::merge_channels_3;
 use crate::split::split_channels_3;
-use colorutils_rs::TransferFunction;
-use half::f16;
 use image::io::Reader as ImageReader;
 use image::{EncodableLayout, GenericImageView};
-use libblur::{fast_gaussian, fast_gaussian_f16, fast_gaussian_f32, fast_gaussian_in_linear, fast_gaussian_next, fast_gaussian_next_f16, fast_gaussian_next_f32, stack_blur, stack_blur_f16, stack_blur_f32, stack_blur_in_linear, EdgeMode, FastBlurChannels, GaussianPreciseLevel, ThreadingPolicy};
+use libblur::{EdgeMode, FastBlurChannels, GaussianPreciseLevel, ThreadingPolicy};
 use std::time::Instant;
 
 #[allow(dead_code)]
 fn f32_to_f16(bytes: Vec<f32>) -> Vec<u16> {
-    return bytes
+    bytes
         .iter()
         .map(|&x| half::f16::from_f32(x).to_bits())
-        .collect();
+        .collect()
 }
 
 #[allow(dead_code)]
 fn f16_to_f32(bytes: Vec<u16>) -> Vec<f32> {
-    return bytes
+    bytes
         .iter()
         .map(|&x| half::f16::from_bits(x).to_f32())
-        .collect();
+        .collect()
 }
 
 fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
@@ -34,84 +32,87 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
 
     split_channels_3(img, width, height, &mut plane_1, &mut plane_2, &mut plane_3);
 
-    let mut dst_plane_1 = Vec::from(plane_1);
-    let mut dst_plane_2 = Vec::from(plane_2);
-    let mut dst_plane_3 = Vec::from(plane_3);
+    let mut dst_plane_1 = vec![0u8; width * height];
+    let mut dst_plane_2 = vec![0u8; width * height];
+    let mut dst_plane_3 = vec![0u8; width * height];
 
-    libblur::fast_gaussian_next(
-        &mut dst_plane_1,
-        width as u32,
-        width as u32,
-        height as u32,
-        35,
-        FastBlurChannels::Plane,
-        ThreadingPolicy::Single,
-        EdgeMode::Clamp,
-    );
-
-    libblur::fast_gaussian_next(
-        &mut dst_plane_2,
-        width as u32,
-        width as u32,
-        height as u32,
-        35,
-        FastBlurChannels::Plane,
-        ThreadingPolicy::Single,
-        EdgeMode::Clamp,
-    );
-
-    libblur::fast_gaussian_next(
-        &mut dst_plane_3,
-        width as u32,
-        width as u32,
-        height as u32,
-        35,
-        FastBlurChannels::Plane,
-        ThreadingPolicy::Single,
-        EdgeMode::Clamp,
-    );
-
-    // libblur::gaussian_blur(
-    //     &plane_1,
-    //     width as u32,
+    // libblur::fast_gaussian_next(
     //     &mut dst_plane_1,
     //     width as u32,
     //     width as u32,
     //     height as u32,
-    //     25 * 2 + 1,
-    //     25f32 * 2f32 / 6f32,
+    //     35,
     //     FastBlurChannels::Plane,
-    //     EdgeMode::KernelClip,
     //     ThreadingPolicy::Single,
+    //     EdgeMode::Clamp,
     // );
     //
-    // libblur::gaussian_blur(
-    //     &plane_2,
-    //     width as u32,
+    // libblur::fast_gaussian_next(
     //     &mut dst_plane_2,
     //     width as u32,
     //     width as u32,
     //     height as u32,
-    //     25 * 2 + 1,
-    //     25f32 * 2f32 / 6f32,
+    //     35,
     //     FastBlurChannels::Plane,
-    //     EdgeMode::Clamp,
     //     ThreadingPolicy::Single,
+    //     EdgeMode::Clamp,
     // );
     //
-    // libblur::gaussian_blur(
-    //     &plane_3,
-    //     width as u32,
+    // libblur::fast_gaussian_next(
     //     &mut dst_plane_3,
     //     width as u32,
     //     width as u32,
     //     height as u32,
-    //     25 * 2 + 1,
-    //     25f32 * 2f32 / 6f32,
+    //     35,
     //     FastBlurChannels::Plane,
-    //     EdgeMode::Clamp,
     //     ThreadingPolicy::Single,
+    //     EdgeMode::Clamp,
     // );
+
+    libblur::gaussian_blur(
+        &plane_1,
+        width as u32,
+        &mut dst_plane_1,
+        width as u32,
+        width as u32,
+        height as u32,
+        25 * 2 + 1,
+        0.,
+        FastBlurChannels::Plane,
+        EdgeMode::Clamp,
+        ThreadingPolicy::Single,
+        GaussianPreciseLevel::INTEGRAL,
+    );
+
+    libblur::gaussian_blur(
+        &plane_2,
+        width as u32,
+        &mut dst_plane_2,
+        width as u32,
+        width as u32,
+        height as u32,
+        25 * 2 + 1,
+        0.,
+        FastBlurChannels::Plane,
+        EdgeMode::Clamp,
+        ThreadingPolicy::Single,
+        GaussianPreciseLevel::INTEGRAL,
+    );
+
+    libblur::gaussian_blur(
+        &plane_3,
+        width as u32,
+        &mut dst_plane_3,
+        width as u32,
+        width as u32,
+        height as u32,
+        25 * 2 + 1,
+        0.,
+        FastBlurChannels::Plane,
+        EdgeMode::Clamp,
+        ThreadingPolicy::Single,
+        GaussianPreciseLevel::INTEGRAL,
+    );
 
     merge_channels_3(
         &mut merged_planes,
@@ -231,7 +232,7 @@ fn main() {
         37,
         0.,
         FastBlurChannels::Channels3,
-        EdgeMode::Clamp,
+        EdgeMode::KernelClip,
         ThreadingPolicy::Single,
         GaussianPreciseLevel::INTEGRAL,
     );
