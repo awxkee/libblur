@@ -36,8 +36,7 @@ use std::arch::x86_64::*;
 
 #[inline]
 #[target_feature(enable = "sse4.1")]
-#[cfg(target_arch = "x86")]
-pub unsafe fn _mm_loadu_si16(mem_addr: *const u8) -> __m128i {
+pub unsafe fn _mm_loadu_si16x(mem_addr: *const u8) -> __m128i {
     let item = (mem_addr as *const i16).read_unaligned();
     _mm_set1_epi16(item)
 }
@@ -136,7 +135,7 @@ unsafe fn gaussian_sse_horiz_one_chan_impl(
                 let pixel_colors_3 = _mm_setr_epi32(value3, 0, 0, 0);
                 for i in 0..diff as usize {
                     let weights = kernel.as_ptr().add(i);
-                    let f_weight = _mm_loadu_si16(weights as *const u8);
+                    let f_weight = _mm_loadu_si16x(weights as *const u8);
                     store0 = _mm_add_epi32(store0, _mm_madd_epi16(pixel_colors_0, f_weight));
                     store1 = _mm_add_epi32(store1, _mm_madd_epi16(pixel_colors_1, f_weight));
                     store2 = _mm_add_epi32(store2, _mm_madd_epi16(pixel_colors_2, f_weight));
@@ -281,7 +280,7 @@ unsafe fn gaussian_sse_horiz_one_chan_impl(
                     0,
                 );
                 let weight = kernel.as_ptr().add((r + half_kernel) as usize);
-                let f_weight = _mm_loadu_si16(weight as *const u8);
+                let f_weight = _mm_loadu_si16x(weight as *const u8);
                 store0 = _mm_add_epi32(store0, _mm_madd_epi16(pixel_colors_0, f_weight));
                 store1 = _mm_add_epi32(store1, _mm_madd_epi16(pixel_colors_1, f_weight));
                 store2 = _mm_add_epi32(store2, _mm_madd_epi16(pixel_colors_2, f_weight));
@@ -338,7 +337,7 @@ unsafe fn gaussian_sse_horiz_one_chan_impl(
                     let pixel_colors_1 = _mm_setr_epi32(value1, 0, 0, 0);
                     for i in 0..diff as usize {
                         let weights = kernel.as_ptr().add(i);
-                        let f_weight = _mm_loadu_si16(weights as *const u8);
+                        let f_weight = _mm_loadu_si16x(weights as *const u8);
                         store0 = _mm_add_epi32(store0, _mm_madd_epi16(pixel_colors_0, f_weight));
                         store1 = _mm_add_epi32(store1, _mm_madd_epi16(pixel_colors_1, f_weight));
                     }
@@ -432,7 +431,7 @@ unsafe fn gaussian_sse_horiz_one_chan_impl(
                     let pixel_colors_1 =
                         _mm_setr_epi32(s_ptr_next.read_unaligned() as i32, 0, 0, 0);
                     let weight = kernel.as_ptr().add((r + half_kernel) as usize);
-                    let f_weight = _mm_loadu_si16(weight as *const u8);
+                    let f_weight = _mm_loadu_si16x(weight as *const u8);
                     store0 = _mm_add_epi32(store0, _mm_madd_epi16(pixel_colors_0, f_weight));
                     store1 = _mm_add_epi32(store1, _mm_madd_epi16(pixel_colors_1, f_weight));
 
@@ -471,7 +470,7 @@ unsafe fn gaussian_sse_horiz_one_chan_impl(
                 let pixel_colors = _mm_setr_epi32(value, 0, 0, 0);
                 for i in 0..diff as usize {
                     let weights = kernel.as_ptr().add(i);
-                    let f_weight = _mm_loadu_si16(weights as *const u8);
+                    let f_weight = _mm_loadu_si16x(weights as *const u8);
                     store = _mm_add_epi32(store, _mm_madd_epi16(pixel_colors, f_weight));
                 }
                 r += diff as i32;
@@ -541,7 +540,7 @@ unsafe fn gaussian_sse_horiz_one_chan_impl(
                 let value = s_ptr.read_unaligned() as i32;
                 let pixel_colors = _mm_setr_epi32(value, 0, 0, 0);
                 let weight = kernel.as_ptr().add((r + half_kernel) as usize);
-                let f_weight = _mm_loadu_si16(weight as *const u8);
+                let f_weight = _mm_loadu_si16x(weight as *const u8);
                 store = _mm_add_epi32(store, _mm_madd_epi16(pixel_colors, f_weight));
 
                 r += 1;
@@ -706,7 +705,7 @@ unsafe fn gaussian_sse_horiz_one_chan_filter_impl(
                 let pixel_colors_0 = _mm_setr_epi32(s_ptr.read_unaligned() as i32, 0, 0, 0);
                 let pixel_colors_1 = _mm_setr_epi32(s_ptr_next.read_unaligned() as i32, 0, 0, 0);
                 let weight = filter_weights.as_ptr().add(r);
-                let f_weight = _mm_loadu_si16(weight as *const u8);
+                let f_weight = _mm_loadu_si16x(weight as *const u8);
                 store0 = _mm_add_epi32(store0, _mm_madd_epi16(pixel_colors_0, f_weight));
                 store1 = _mm_add_epi32(store1, _mm_madd_epi16(pixel_colors_1, f_weight));
 
@@ -814,7 +813,7 @@ unsafe fn gaussian_sse_horiz_one_chan_filter_impl(
                 let value = s_ptr.read_unaligned() as i32;
                 let pixel_colors = _mm_setr_epi32(value, 0, 0, 0);
                 let weight = filter_weights.as_ptr().add(r).read_unaligned();
-                let f_weight = _mm_loadu_si16(weight as *const u8);
+                let f_weight = _mm_loadu_si16x(weight as *const u8);
                 store = _mm_add_epi32(store, _mm_madd_epi16(pixel_colors, f_weight));
 
                 r += 1;
