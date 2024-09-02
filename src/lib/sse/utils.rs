@@ -350,16 +350,16 @@ pub unsafe fn _mm_hsum_ps(v: __m128) -> f32 {
     _mm_cvtss_f32(sums)
 }
 
-#[inline]
-#[target_feature(enable = "sse4.1")]
-pub unsafe fn _mm_hsum_epi32(v: __m128i) -> i32 {
-    const SHUFFLE_1: i32 = shuffle(1, 0, 3, 2);
-    let hi64 = _mm_shuffle_epi32::<SHUFFLE_1>(v);
-    let sum64 = _mm_add_epi32(hi64, v);
-    let hi32 = _mm_shufflelo_epi16::<SHUFFLE_1>(sum64); // Swap the low two elements
-    let sum32 = _mm_add_epi32(sum64, hi32);
-    _mm_cvtsi128_si32(sum32)
-}
+// #[inline]
+// #[target_feature(enable = "sse4.1")]
+// pub unsafe fn _mm_hsum_epi32(v: __m128i) -> i32 {
+//     const SHUFFLE_1: i32 = shuffle(1, 0, 3, 2);
+//     let hi64 = _mm_shuffle_epi32::<SHUFFLE_1>(v);
+//     let sum64 = _mm_add_epi32(hi64, v);
+//     let hi32 = _mm_shufflelo_epi16::<SHUFFLE_1>(sum64); // Swap the low two elements
+//     let sum32 = _mm_add_epi32(sum64, hi32);
+//     _mm_cvtsi128_si32(sum32)
+// }
 
 #[inline]
 #[target_feature(enable = "sse4.1")]

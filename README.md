@@ -174,13 +174,15 @@ Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded
 Excellent results. Have improvements, however, much slower than any approximations slow. Use when use need gaussian
 methods - smoothing, anti-alias,
 FFT, advanced analysis etc.
+There are two methods of convolution, integral approximation and exact,
+approximation in integral form is still gaussian with 1-3% of error however about 2x faster.
 
 Kernel size must be odd. Will panic if kernel size is not odd.
 
 O(R) complexity.
 
 ```rust
-libblur::gaussian_blur( & bytes, src_stride, & mut dst_bytes, dst_stride, width, height, kernel_size, sigma, FastBlurChannels::Channels3);
+libblur::gaussian_blur(&bytes, src_stride, & mut dst_bytes, dst_stride, width, height, kernel_size, sigma, FastBlurChannels::Channels3, GaussianPreciseLevel::EXACT);
 ```
 
 Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded mode with 151 kernel size.

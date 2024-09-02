@@ -26,7 +26,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::gaussian::gaussian_filter::GaussianFilter;
-use crate::sse::{_mm_hsum_ps, _mm_loadu_ps_x2, _mm_loadu_ps_x4, _mm_loadu_si128_x2};
+use crate::sse::{_mm_hsum_ps, _mm_loadu_ps_x2, _mm_loadu_ps_x4, _mm_loadu_si128_x2, load_u8_s32_fast};
 use crate::unsafe_slice::UnsafeSlice;
 use erydanos::_mm_prefer_fma_ps;
 #[cfg(target_arch = "x86")]
@@ -856,12 +856,7 @@ unsafe fn gaussian_sse_horiz_one_chan_filter_impl<T>(
                     ) as usize;
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
-                    let pixel_colors_i32 = _mm_setr_epi32(
-                        s_ptr.read_unaligned() as i32,
-                        s_ptr.add(1).read_unaligned() as i32,
-                        s_ptr.add(2).read_unaligned() as i32,
-                        s_ptr.add(3).read_unaligned() as i32,
-                    );
+                    let pixel_colors_i32 = load_u8_s32_fast::<4>(s_ptr);
                     let pixel_colors_f32 = _mm_cvtepi32_ps(pixel_colors_i32);
                     let weight = filter_weights.as_ptr().add(r);
                     let f_weight = _mm_loadu_ps(weight);
