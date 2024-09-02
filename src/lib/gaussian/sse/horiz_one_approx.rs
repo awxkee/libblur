@@ -36,6 +36,14 @@ use std::arch::x86_64::*;
 
 #[inline]
 #[target_feature(enable = "sse4.1")]
+#[cfg(target_arch = "x86")]
+pub unsafe fn _mm_loadu_si16(mem_addr: *const u8) -> __m128i {
+    let item = (mem_addr as *const i16).read_unaligned();
+    _mm_set1_epi16(item)
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_sum_clamp(v: __m128i) -> i32 {
     const SHUFFLE_1: i32 = shuffle(1, 0, 3, 2);
     let hi64 = _mm_shuffle_epi32::<SHUFFLE_1>(v);
