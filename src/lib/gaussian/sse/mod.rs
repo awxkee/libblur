@@ -30,6 +30,7 @@ mod filter_u8;
 mod filter_vertical_f32;
 mod gauss_utils;
 mod horiz_four_channel_f32;
+mod horiz_one_approx;
 mod horiz_one_channel_f32;
 mod horiz_one_channel_u8;
 mod horiz_rgba_approx;
@@ -45,6 +46,9 @@ pub use filter_u8::gaussian_blur_vertical_pass_filter_sse;
 pub use filter_vertical_f32::gaussian_blur_vertical_pass_filter_f32_sse;
 pub use gauss_utils::_mm_opt_fma_ps;
 pub use horiz_four_channel_f32::gaussian_horiz_sse_t_f_chan_f32;
+pub use horiz_one_approx::{
+    gaussian_sse_horiz_one_chan_filter_approx_u8, gaussian_sse_horiz_one_chan_u8_approx,
+};
 pub use horiz_one_channel_f32::gaussian_horiz_one_chan_f32;
 pub use horiz_one_channel_f32::gaussian_horiz_one_chan_filter_f32;
 pub use horiz_one_channel_u8::*;

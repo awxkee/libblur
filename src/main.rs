@@ -221,21 +221,21 @@ fn main() {
     //     .iter()
     //     .map(|&x| f16::from_f32(x as f32 * (1. / 255.)))
     //     .collect();
-
-    libblur::gaussian_blur(
-        &bytes,
-        stride as u32,
-        &mut dst_bytes,
-        stride as u32,
-        dimensions.0,
-        dimensions.1,
-        37,
-        0.,
-        FastBlurChannels::Channels3,
-        EdgeMode::KernelClip,
-        ThreadingPolicy::Single,
-        GaussianPreciseLevel::INTEGRAL,
-    );
+    //
+    // libblur::gaussian_blur(
+    //     &bytes,
+    //     stride as u32,
+    //     &mut dst_bytes,
+    //     stride as u32,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     37,
+    //     0.,
+    //     FastBlurChannels::Channels3,
+    //     EdgeMode::KernelClip,
+    //     ThreadingPolicy::Single,
+    //     GaussianPreciseLevel::INTEGRAL,
+    // );
 
     // stack_blur_f16(
     //     &mut f16_bytes,
@@ -263,7 +263,7 @@ fn main() {
     //     .map(|&x| (x.to_f32() * 255f32) as u8)
     //     .collect();
 
-    // dst_bytes = perform_planar_pass_3(&bytes, dimensions.0 as usize, dimensions.1 as usize);
+    dst_bytes = perform_planar_pass_3(&bytes, dimensions.0 as usize, dimensions.1 as usize);
 
     let elapsed_time = start_time.elapsed();
     // Print the elapsed time in milliseconds

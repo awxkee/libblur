@@ -766,12 +766,12 @@ unsafe fn gaussian_sse_horiz_one_chan_filter_impl<T>(
                 let agg0 = _mm_hsum_ps(store0);
                 let offset0 = y_dst_shift + x as usize;
                 let dst_ptr0 = unsafe_dst.slice.as_ptr().add(offset0) as *mut u8;
-                dst_ptr0.write_unaligned(agg0.min(255f32).max(0f32) as u8);
+                dst_ptr0.write_unaligned(agg0.round().min(255f32).max(0f32) as u8);
 
                 let agg1 = _mm_hsum_ps(store1);
                 let offset1 = offset0 + dst_stride as usize;
                 let dst_ptr1 = unsafe_dst.slice.as_ptr().add(offset1) as *mut u8;
-                dst_ptr1.write_unaligned(agg1.min(255f32).max(0f32) as u8);
+                dst_ptr1.write_unaligned(agg1.round().min(255f32).max(0f32) as u8);
             }
         }
         _cy = y;

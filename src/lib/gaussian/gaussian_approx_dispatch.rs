@@ -49,6 +49,7 @@ use crate::gaussian::neon::{
 use crate::gaussian::sse::{
     gaussian_blur_horizontal_pass_approx_sse, gaussian_blur_horizontal_pass_filter_approx_sse,
     gaussian_blur_vertical_pass_approx_sse, gaussian_blur_vertical_pass_filter_approx_sse,
+    gaussian_sse_horiz_one_chan_filter_approx_u8, gaussian_sse_horiz_one_chan_u8_approx,
 };
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{EdgeMode, ThreadingPolicy};
@@ -99,6 +100,8 @@ fn gaussian_blur_horizontal_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_
             && (CHANNEL_CONFIGURATION == 3 || CHANNEL_CONFIGURATION == 4)
         {
             _dispatcher = gaussian_blur_horizontal_pass_approx_sse::<CHANNEL_CONFIGURATION>;
+        } else if _is_sse_available && _edge_mode == EdgeMode::Clamp && CHANNEL_CONFIGURATION == 1 {
+            _dispatcher = gaussian_sse_horiz_one_chan_u8_approx;
         }
     }
     let unsafe_dst = UnsafeSlice::new(dst);
@@ -345,6 +348,8 @@ fn gaussian_blur_horizontal_pass_clip_approx_dispatch<const CHANNEL_CONFIGURATIO
     {
         if _is_sse_available && (CHANNEL_CONFIGURATION == 3 || CHANNEL_CONFIGURATION == 4) {
             _dispatcher = gaussian_blur_horizontal_pass_filter_approx_sse::<CHANNEL_CONFIGURATION>;
+        } else if _is_sse_available && CHANNEL_CONFIGURATION == 1 {
+            _dispatcher = gaussian_sse_horiz_one_chan_filter_approx_u8;
         }
     }
 
