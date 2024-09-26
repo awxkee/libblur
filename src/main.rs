@@ -249,23 +249,23 @@ fn main() {
     //     ThreadingPolicy::Single,
     // );
 
-    // fast_gaussian(
-    //     &mut dst_bytes,
-    //     dimensions.0 * components as u32,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     125,
-    //     FastBlurChannels::Channels3,
-    //     ThreadingPolicy::Single,
-    //     EdgeMode::Clamp,
-    // );
+    fast_gaussian(
+        &mut dst_bytes,
+        dimensions.0 * components as u32,
+        dimensions.0,
+        dimensions.1,
+        125,
+        FastBlurChannels::Channels3,
+        ThreadingPolicy::Single,
+        EdgeMode::Clamp,
+    );
 
     // dst_bytes = f16_bytes
     //     .iter()
     //     .map(|&x| (x.to_f32() * 255f32) as u8)
     //     .collect();
 
-    dst_bytes = perform_planar_pass_3(&bytes, dimensions.0 as usize, dimensions.1 as usize);
+    // dst_bytes = perform_planar_pass_3(&bytes, dimensions.0 as usize, dimensions.1 as usize);
 
     let elapsed_time = start_time.elapsed();
     // Print the elapsed time in milliseconds
