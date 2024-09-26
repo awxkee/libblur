@@ -52,6 +52,7 @@ use std::mem::size_of;
 ///
 /// # Complexity
 /// O(1) complexity.
+#[allow(clippy::too_many_arguments)]
 pub fn stack_blur_in_linear(
     in_place: &mut [u8],
     stride: u32,
@@ -78,7 +79,7 @@ pub fn stack_blur_in_linear(
     };
 
     forward_transformer(
-        &in_place,
+        in_place,
         stride,
         &mut linear_data,
         width * size_of::<f32>() as u32 * channels.get_channels() as u32,

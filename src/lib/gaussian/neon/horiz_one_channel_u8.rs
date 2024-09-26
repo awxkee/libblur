@@ -297,21 +297,25 @@ pub fn gaussian_horiz_one_chan_u8<T>(
                 let agg0 = vhsumq_f32(store0);
                 let offset0 = y_dst_shift + x as usize;
                 let dst_ptr0 = unsafe_dst.slice.as_ptr().add(offset0) as *mut u8;
+                #[allow(clippy::manual_clamp)]
                 dst_ptr0.write_unaligned(agg0.round().min(255f32).max(0f32) as u8);
 
                 let agg1 = vhsumq_f32(store1);
                 let offset1 = offset0 + dst_stride as usize;
                 let dst_ptr1 = unsafe_dst.slice.as_ptr().add(offset1) as *mut u8;
+                #[allow(clippy::manual_clamp)]
                 dst_ptr1.write_unaligned(agg1.round().min(255f32).max(0f32) as u8);
 
                 let agg2 = vhsumq_f32(store2);
                 let offset2 = offset0 + dst_stride as usize * 2;
                 let dst_ptr2 = unsafe_dst.slice.as_ptr().add(offset2) as *mut u8;
+                #[allow(clippy::manual_clamp)]
                 dst_ptr2.write_unaligned(agg2.round().min(255f32).max(0f32) as u8);
 
                 let agg3 = vhsumq_f32(store3);
                 let offset3 = offset0 + dst_stride as usize * 3;
                 let dst_ptr3 = unsafe_dst.slice.as_ptr().add(offset3) as *mut u8;
+                #[allow(clippy::manual_clamp)]
                 dst_ptr3.write_unaligned(agg3.round().min(255f32).max(0f32) as u8);
             }
         }
@@ -470,11 +474,13 @@ pub fn gaussian_horiz_one_chan_u8<T>(
                 let agg0 = vhsumq_f32(store0);
                 let offset0 = y_dst_shift + x as usize;
                 let dst_ptr0 = unsafe_dst.slice.as_ptr().add(offset0) as *mut u8;
+                #[allow(clippy::manual_clamp)]
                 dst_ptr0.write_unaligned(agg0.round().min(255f32).max(0f32) as u8);
 
                 let agg1 = vhsumq_f32(store1);
                 let offset1 = offset0 + dst_stride as usize;
                 let dst_ptr1 = unsafe_dst.slice.as_ptr().add(offset1) as *mut u8;
+                #[allow(clippy::manual_clamp)]
                 dst_ptr1.write_unaligned(agg1.round().min(255f32).max(0f32) as u8);
             }
         }
@@ -595,6 +601,7 @@ pub fn gaussian_horiz_one_chan_u8<T>(
                 let agg = vhsumq_f32(store);
                 let offset = y_dst_shift + x as usize;
                 let dst_ptr = unsafe_dst.slice.as_ptr().add(offset) as *mut u8;
+                #[allow(clippy::manual_clamp)]
                 let vl = agg.round().min(255f32).max(0f32) as u8;
                 dst_ptr.write_unaligned(vl);
             }
@@ -608,7 +615,7 @@ pub fn gaussian_horiz_one_chan_filter_u8<T>(
     undef_unsafe_dst: &UnsafeSlice<T>,
     dst_stride: u32,
     width: u32,
-    filter: &Vec<GaussianFilter<f32>>,
+    filter: &[GaussianFilter<f32>],
     start_y: u32,
     end_y: u32,
 ) {
@@ -766,11 +773,13 @@ pub fn gaussian_horiz_one_chan_filter_u8<T>(
                 let agg0 = vhsumq_f32(store0);
                 let offset0 = y_dst_shift + x as usize;
                 let dst_ptr0 = unsafe_dst.slice.as_ptr().add(offset0) as *mut u8;
+                #[allow(clippy::manual_clamp)]
                 dst_ptr0.write_unaligned(agg0.round().min(255f32).max(0f32) as u8);
 
                 let agg1 = vhsumq_f32(store1);
                 let offset1 = offset0 + dst_stride as usize;
                 let dst_ptr1 = unsafe_dst.slice.as_ptr().add(offset1) as *mut u8;
+                #[allow(clippy::manual_clamp)]
                 dst_ptr1.write_unaligned(agg1.round().min(255f32).max(0f32) as u8);
             }
         }
@@ -892,6 +901,7 @@ pub fn gaussian_horiz_one_chan_filter_u8<T>(
                 let agg = vhsumq_f32(store);
                 let offset = y_dst_shift + x as usize;
                 let dst_ptr = unsafe_dst.slice.as_ptr().add(offset) as *mut u8;
+                #[allow(clippy::manual_clamp)]
                 dst_ptr.write_unaligned(agg.round().min(255f32).max(0f32) as u8);
             }
         }

@@ -26,7 +26,9 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::gaussian::gaussian_filter::GaussianFilter;
-use crate::sse::{_mm_hsum_ps, _mm_loadu_ps_x2, _mm_loadu_ps_x4, _mm_loadu_si128_x2, load_u8_s32_fast};
+use crate::sse::{
+    _mm_hsum_ps, _mm_loadu_ps_x2, _mm_loadu_ps_x4, _mm_loadu_si128_x2, load_u8_s32_fast,
+};
 use crate::unsafe_slice::UnsafeSlice;
 use erydanos::_mm_prefer_fma_ps;
 #[cfg(target_arch = "x86")]
@@ -307,21 +309,25 @@ unsafe fn gaussian_sse_horiz_one_chan_impl<T>(
                 let agg0 = _mm_hsum_ps(store0);
                 let offset0 = y_dst_shift + x as usize;
                 let dst_ptr0 = unsafe_dst.slice.as_ptr().add(offset0) as *mut u8;
+                #[allow(clippy::manual_clamp)]
                 dst_ptr0.write_unaligned(agg0.round().min(255f32).max(0f32) as u8);
 
                 let agg1 = _mm_hsum_ps(store1);
                 let offset1 = offset0 + dst_stride as usize;
                 let dst_ptr1 = unsafe_dst.slice.as_ptr().add(offset1) as *mut u8;
+                #[allow(clippy::manual_clamp)]
                 dst_ptr1.write_unaligned(agg1.round().min(255f32).max(0f32) as u8);
 
                 let agg2 = _mm_hsum_ps(store2);
                 let offset2 = offset1 + dst_stride as usize;
                 let dst_ptr2 = unsafe_dst.slice.as_ptr().add(offset2) as *mut u8;
+                #[allow(clippy::manual_clamp)]
                 dst_ptr2.write_unaligned(agg2.round().min(255f32).max(0f32) as u8);
 
                 let agg3 = _mm_hsum_ps(store3);
                 let offset3 = offset2 + dst_stride as usize;
                 let dst_ptr3 = unsafe_dst.slice.as_ptr().add(offset3) as *mut u8;
+                #[allow(clippy::manual_clamp)]
                 dst_ptr3.write_unaligned(agg3.round().min(255f32).max(0f32) as u8);
             }
         }
@@ -462,11 +468,13 @@ unsafe fn gaussian_sse_horiz_one_chan_impl<T>(
                 let agg0 = _mm_hsum_ps(store0);
                 let offset0 = y_dst_shift + x as usize;
                 let dst_ptr0 = unsafe_dst.slice.as_ptr().add(offset0) as *mut u8;
+                #[allow(clippy::manual_clamp)]
                 dst_ptr0.write_unaligned(agg0.round().min(255f32).max(0f32) as u8);
 
                 let agg1 = _mm_hsum_ps(store1);
                 let offset1 = offset0 + dst_stride as usize;
                 let dst_ptr1 = unsafe_dst.slice.as_ptr().add(offset1) as *mut u8;
+                #[allow(clippy::manual_clamp)]
                 dst_ptr1.write_unaligned(agg1.round().min(255f32).max(0f32) as u8);
             }
         }
@@ -577,6 +585,7 @@ unsafe fn gaussian_sse_horiz_one_chan_impl<T>(
                 let agg = _mm_hsum_ps(store);
                 let offset = y_dst_shift + x as usize;
                 let dst_ptr = unsafe_dst.slice.as_ptr().add(offset) as *mut u8;
+                #[allow(clippy::manual_clamp)]
                 dst_ptr.write_unaligned(agg.round().min(255f32).max(0f32) as u8);
             }
         }
@@ -589,7 +598,7 @@ pub fn gaussian_sse_horiz_one_chan_filter_u8<T>(
     undef_unsafe_dst: &UnsafeSlice<T>,
     dst_stride: u32,
     width: u32,
-    filter: &Vec<GaussianFilter<f32>>,
+    filter: &[GaussianFilter<f32>],
     start_y: u32,
     end_y: u32,
 ) {
@@ -614,7 +623,7 @@ unsafe fn gaussian_sse_horiz_one_chan_filter_impl<T>(
     undef_unsafe_dst: &UnsafeSlice<T>,
     dst_stride: u32,
     width: u32,
-    filter: &Vec<GaussianFilter<f32>>,
+    filter: &[GaussianFilter<f32>],
     start_y: u32,
     end_y: u32,
 ) {
@@ -766,11 +775,13 @@ unsafe fn gaussian_sse_horiz_one_chan_filter_impl<T>(
                 let agg0 = _mm_hsum_ps(store0);
                 let offset0 = y_dst_shift + x as usize;
                 let dst_ptr0 = unsafe_dst.slice.as_ptr().add(offset0) as *mut u8;
+                #[allow(clippy::manual_clamp)]
                 dst_ptr0.write_unaligned(agg0.round().min(255f32).max(0f32) as u8);
 
                 let agg1 = _mm_hsum_ps(store1);
                 let offset1 = offset0 + dst_stride as usize;
                 let dst_ptr1 = unsafe_dst.slice.as_ptr().add(offset1) as *mut u8;
+                #[allow(clippy::manual_clamp)]
                 dst_ptr1.write_unaligned(agg1.round().min(255f32).max(0f32) as u8);
             }
         }
@@ -884,6 +895,7 @@ unsafe fn gaussian_sse_horiz_one_chan_filter_impl<T>(
                 let agg = _mm_hsum_ps(store);
                 let offset = y_dst_shift + x as usize;
                 let dst_ptr = unsafe_dst.slice.as_ptr().add(offset) as *mut u8;
+                #[allow(clippy::manual_clamp)]
                 dst_ptr.write_unaligned(agg.round().min(255f32).max(0f32) as u8);
             }
         }

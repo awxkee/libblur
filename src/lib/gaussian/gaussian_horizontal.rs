@@ -32,7 +32,15 @@ use crate::{clamp_edge, reflect_101, reflect_index, EdgeMode};
 use num_traits::{AsPrimitive, FromPrimitive};
 
 pub(crate) fn gaussian_blur_horizontal_pass_impl<
-    T: FromPrimitive + Default + Send + Sync,
+    T: FromPrimitive
+        + Default
+        + Send
+        + Sync
+        + std::ops::AddAssign
+        + std::ops::SubAssign
+        + Copy
+        + 'static
+        + AsPrimitive<f32>,
     const CHANNEL_CONFIGURATION: usize,
     const EDGE_MODE: usize,
 >(
@@ -46,7 +54,6 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl<
     start_y: u32,
     end_y: u32,
 ) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static + AsPrimitive<f32>,
     f32: AsPrimitive<T> + ToStorage<T>,
 {
     gaussian_blur_horizontal_pass_impl_c::<T, CHANNEL_CONFIGURATION, EDGE_MODE>(
@@ -94,8 +101,17 @@ macro_rules! save_4_weights {
     }};
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn gaussian_blur_horizontal_pass_impl_c<
-    T: FromPrimitive + Default + Send + Sync,
+    T: FromPrimitive
+        + Default
+        + Send
+        + Sync
+        + std::ops::AddAssign
+        + std::ops::SubAssign
+        + Copy
+        + 'static
+        + AsPrimitive<f32>,
     const CHANNEL_CONFIGURATION: usize,
     const EDGE_MODE: usize,
 >(
@@ -109,7 +125,6 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_c<
     start_y: u32,
     end_y: u32,
 ) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static + AsPrimitive<f32>,
     f32: AsPrimitive<T> + ToStorage<T>,
 {
     let edge_mode: EdgeMode = EDGE_MODE.into();
@@ -293,8 +308,17 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_c<
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn gaussian_blur_horizontal_pass_impl_clip_edge<
-    T: FromPrimitive + Default + Send + Sync,
+    T: FromPrimitive
+        + Default
+        + Send
+        + Sync
+        + std::ops::AddAssign
+        + std::ops::SubAssign
+        + Copy
+        + 'static
+        + AsPrimitive<f32>,
     const CHANNEL_CONFIGURATION: usize,
 >(
     src: &[T],
@@ -302,11 +326,10 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_clip_edge<
     unsafe_dst: &UnsafeSlice<T>,
     dst_stride: u32,
     width: u32,
-    filter: &Vec<GaussianFilter<f32>>,
+    filter: &[GaussianFilter<f32>],
     start_y: u32,
     end_y: u32,
 ) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static + AsPrimitive<f32>,
     f32: AsPrimitive<T> + ToStorage<T>,
 {
     let mut _cy = start_y;

@@ -30,6 +30,7 @@ use crate::gaussian::gaussian_filter::GaussianFilter;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, reflect_101, reflect_index, EdgeMode};
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn gaussian_blur_vertical_pass_c_approx<
     const CHANNEL_CONFIGURATION: usize,
     const EDGE_MODE: usize,
@@ -132,6 +133,7 @@ pub(crate) fn gaussian_blur_vertical_pass_c_approx<
 }
 
 #[inline]
+#[allow(clippy::too_many_arguments)]
 fn gaussian_vertical_row_ap<const ROW_SIZE: usize, const EDGE_MODE: usize>(
     src: &[u8],
     src_stride: u32,
@@ -156,7 +158,7 @@ fn gaussian_vertical_row_ap<const ROW_SIZE: usize, const EDGE_MODE: usize>(
             unsafe {
                 let v = *src.get_unchecked(y_src_shift + px);
                 let w0 = weights.get_unchecked_mut(i);
-                *w0 = *w0 + v as i32 * weight as i32;
+                *w0 += v as i32 * weight as i32;
             }
         }
     }
@@ -172,6 +174,7 @@ fn gaussian_vertical_row_ap<const ROW_SIZE: usize, const EDGE_MODE: usize>(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn gaussian_blur_vertical_pass_clip_edge_approx<const CHANNEL_CONFIGURATION: usize>(
     src: &[u8],
     src_stride: u32,
@@ -179,7 +182,7 @@ pub(crate) fn gaussian_blur_vertical_pass_clip_edge_approx<const CHANNEL_CONFIGU
     dst_stride: u32,
     width: u32,
     height: u32,
-    filter: &Vec<GaussianFilter<i16>>,
+    filter: &[GaussianFilter<i16>],
     start_y: u32,
     end_y: u32,
 ) {
@@ -225,6 +228,7 @@ pub(crate) fn gaussian_blur_vertical_pass_clip_edge_approx<const CHANNEL_CONFIGU
 }
 
 #[inline]
+#[allow(clippy::too_many_arguments)]
 fn gaussian_vertical_row_clip_edge<const ROW_SIZE: usize>(
     src: &[u8],
     src_stride: u32,
@@ -232,7 +236,7 @@ fn gaussian_vertical_row_clip_edge<const ROW_SIZE: usize>(
     dst_stride: u32,
     _: u32,
     _: u32,
-    filter: &Vec<GaussianFilter<i16>>,
+    filter: &[GaussianFilter<i16>],
     x: u32,
     y: u32,
 ) {
@@ -249,7 +253,7 @@ fn gaussian_vertical_row_clip_edge<const ROW_SIZE: usize>(
             unsafe {
                 let v = *src.get_unchecked(y_src_shift + px);
                 let w0 = weights.get_unchecked_mut(i);
-                *w0 = *w0 + v as i32 * weight as i32;
+                *w0 += v as i32 * weight as i32;
             }
         }
     }

@@ -65,8 +65,8 @@ where
 
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub(crate) enum StackBlurPass {
-    HORIZONTAL,
-    VERTICAL,
+    Horizontal,
+    Vertical,
 }
 
 ///
@@ -75,6 +75,7 @@ pub(crate) enum StackBlurPass {
 /// `T` - buffer type u8, u16 etc, this method expected only integral types
 /// `J` - accumulator type, i32, i64
 /// `I` - intermediate multiplication type, when sum will be adopting into higher it may overflow, use this parameter to control overflowing
+#[allow(clippy::too_many_arguments)]
 fn stack_blur_pass<T, J, I, const COMPONENTS: usize>(
     pixels: &UnsafeSlice<T>,
     stride: u32,
@@ -134,7 +135,7 @@ fn stack_blur_pass<T, J, I, const COMPONENTS: usize>(
     let mut src_ptr;
     let mut dst_ptr;
 
-    if pass == StackBlurPass::HORIZONTAL {
+    if pass == StackBlurPass::Horizontal {
         let min_y = thread * height as usize / total_threads;
         let max_y = (thread + 1) * height as usize / total_threads;
 
@@ -404,7 +405,7 @@ fn stack_blur_pass<T, J, I, const COMPONENTS: usize>(
                 }
             }
         }
-    } else if pass == StackBlurPass::VERTICAL {
+    } else if pass == StackBlurPass::Vertical {
         let min_x = thread * width as usize / total_threads;
         let max_x = (thread + 1) * width as usize / total_threads;
 
@@ -709,12 +710,12 @@ fn stack_blur_worker_horizontal(
                 stack_blur_pass::<u8, i32, i64, 1>
             };
             _dispatcher(
-                &slice,
+                slice,
                 stride,
                 width,
                 height,
                 radius,
-                StackBlurPass::HORIZONTAL,
+                StackBlurPass::Horizontal,
                 thread,
                 thread_count,
             );
@@ -770,12 +771,12 @@ fn stack_blur_worker_horizontal(
                 }
             }
             _dispatcher(
-                &slice,
+                slice,
                 stride,
                 width,
                 height,
                 radius,
-                StackBlurPass::HORIZONTAL,
+                StackBlurPass::Horizontal,
                 thread,
                 thread_count,
             );
@@ -831,12 +832,12 @@ fn stack_blur_worker_horizontal(
                 }
             }
             _dispatcher(
-                &slice,
+                slice,
                 stride,
                 width,
                 height,
                 radius,
-                StackBlurPass::HORIZONTAL,
+                StackBlurPass::Horizontal,
                 thread,
                 thread_count,
             );
@@ -844,6 +845,7 @@ fn stack_blur_worker_horizontal(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn stack_blur_worker_vertical(
     slice: &UnsafeSlice<u8>,
     stride: u32,
@@ -877,12 +879,12 @@ fn stack_blur_worker_vertical(
                 stack_blur_pass::<u8, i32, i64, 1>
             };
             _dispatcher(
-                &slice,
+                slice,
                 stride,
                 width,
                 height,
                 radius,
-                StackBlurPass::VERTICAL,
+                StackBlurPass::Vertical,
                 thread,
                 thread_count,
             );
@@ -938,12 +940,12 @@ fn stack_blur_worker_vertical(
                 }
             }
             _dispatcher(
-                &slice,
+                slice,
                 stride,
                 width,
                 height,
                 radius,
-                StackBlurPass::VERTICAL,
+                StackBlurPass::Vertical,
                 thread,
                 thread_count,
             );
@@ -999,12 +1001,12 @@ fn stack_blur_worker_vertical(
                 }
             }
             _dispatcher(
-                &slice,
+                slice,
                 stride,
                 width,
                 height,
                 radius,
-                StackBlurPass::VERTICAL,
+                StackBlurPass::Vertical,
                 thread,
                 thread_count,
             );
@@ -1038,7 +1040,7 @@ pub fn stack_blur(
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) {
-    let radius = std::cmp::max(std::cmp::min(254, radius), 2);
+    let radius = radius.clamp(2, 254);
     let thread_count = threading_policy.get_threads_count(width, height) as u32;
     if thread_count == 1 {
         let slice = UnsafeSlice::new(in_place);

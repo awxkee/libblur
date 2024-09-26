@@ -138,7 +138,7 @@ fn box_blur_horizontal_pass_impl<T, J, const CHANNELS_CONFIGURATION: usize>(
 
             let write_offset = y_dst_shift + px;
             unsafe {
-                unsafe_dst.write(write_offset + 0, (weight0.as_() * weight).to_());
+                unsafe_dst.write(write_offset, (weight0.as_() * weight).to_());
                 if CHANNELS_CONFIGURATION > 1 {
                     unsafe_dst.write(write_offset + 1, (weight1.as_() * weight).to_());
                 }
@@ -153,8 +153,19 @@ fn box_blur_horizontal_pass_impl<T, J, const CHANNELS_CONFIGURATION: usize>(
     }
 }
 
+#[allow(clippy::type_complexity)]
 fn box_blur_horizontal_pass<
-    T: FromPrimitive + Default + Send + Sync,
+    T: FromPrimitive
+        + Default
+        + Send
+        + Sync
+        + std::ops::AddAssign
+        + std::ops::SubAssign
+        + Copy
+        + AsPrimitive<u32>
+        + AsPrimitive<u64>
+        + AsPrimitive<f32>
+        + AsPrimitive<f64>,
     const CHANNEL_CONFIGURATION: usize,
 >(
     src: &[T],
@@ -167,13 +178,6 @@ fn box_blur_horizontal_pass<
     pool: &Option<ThreadPool>,
     thread_count: u32,
 ) where
-    T: std::ops::AddAssign
-        + std::ops::SubAssign
-        + Copy
-        + AsPrimitive<u32>
-        + AsPrimitive<u64>
-        + AsPrimitive<f32>
-        + AsPrimitive<f64>,
     f32: ToStorage<T>,
 {
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
@@ -345,7 +349,7 @@ fn box_blur_vertical_pass_impl<T, J, const CHANNELS_CONFIGURATION: usize>(
 
             let write_offset = y_dst_shift + px;
             unsafe {
-                unsafe_dst.write(write_offset + 0, (weight0.as_() * weight).to_());
+                unsafe_dst.write(write_offset, (weight0.as_() * weight).to_());
                 if CHANNELS_CONFIGURATION > 1 {
                     unsafe_dst.write(write_offset + 1, (weight1.as_() * weight).to_());
                 }
@@ -360,8 +364,20 @@ fn box_blur_vertical_pass_impl<T, J, const CHANNELS_CONFIGURATION: usize>(
     }
 }
 
+#[allow(clippy::type_complexity)]
 fn box_blur_vertical_pass<
-    T: FromPrimitive + Default + Sync + Send + Copy,
+    T: FromPrimitive
+        + Default
+        + Sync
+        + Send
+        + Copy
+        + std::ops::AddAssign
+        + std::ops::SubAssign
+        + Copy
+        + AsPrimitive<u32>
+        + AsPrimitive<u64>
+        + AsPrimitive<f32>
+        + AsPrimitive<f64>,
     const CHANNEL_CONFIGURATION: usize,
 >(
     src: &[T],
@@ -374,13 +390,6 @@ fn box_blur_vertical_pass<
     pool: &Option<ThreadPool>,
     thread_count: u32,
 ) where
-    T: std::ops::AddAssign
-        + std::ops::SubAssign
-        + Copy
-        + AsPrimitive<u32>
-        + AsPrimitive<u64>
-        + AsPrimitive<f32>
-        + AsPrimitive<f64>,
     f32: ToStorage<T>,
 {
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
@@ -460,7 +469,18 @@ fn box_blur_vertical_pass<
 }
 
 fn box_blur_impl<
-    T: FromPrimitive + Default + Sync + Send + Copy,
+    T: FromPrimitive
+        + Default
+        + Sync
+        + Send
+        + Copy
+        + std::ops::AddAssign
+        + std::ops::SubAssign
+        + Copy
+        + AsPrimitive<u32>
+        + AsPrimitive<u64>
+        + AsPrimitive<f32>
+        + AsPrimitive<f64>,
     const CHANNEL_CONFIGURATION: usize,
 >(
     src: &[T],
@@ -473,13 +493,6 @@ fn box_blur_impl<
     pool: &Option<ThreadPool>,
     thread_count: u32,
 ) where
-    T: std::ops::AddAssign
-        + std::ops::SubAssign
-        + Copy
-        + AsPrimitive<u32>
-        + AsPrimitive<u64>
-        + AsPrimitive<f32>
-        + AsPrimitive<f64>,
     f32: ToStorage<T>,
 {
     let mut transient: Vec<T> =
@@ -721,7 +734,7 @@ pub fn box_blur_in_linear(
     };
 
     forward_transformer(
-        &src,
+        src,
         src_stride,
         &mut linear_data,
         width * std::mem::size_of::<f32>() as u32 * channels.get_channels() as u32,
@@ -752,7 +765,18 @@ pub fn box_blur_in_linear(
 }
 
 fn tent_blur_impl<
-    T: FromPrimitive + Default + Sync + Send + Copy,
+    T: FromPrimitive
+        + Default
+        + Sync
+        + Send
+        + Copy
+        + std::ops::AddAssign
+        + std::ops::SubAssign
+        + Copy
+        + AsPrimitive<u32>
+        + AsPrimitive<u64>
+        + AsPrimitive<f32>
+        + AsPrimitive<f64>,
     const CHANNEL_CONFIGURATION: usize,
 >(
     src: &[T],
@@ -764,13 +788,6 @@ fn tent_blur_impl<
     radius: u32,
     threading_policy: ThreadingPolicy,
 ) where
-    T: std::ops::AddAssign
-        + std::ops::SubAssign
-        + Copy
-        + AsPrimitive<u32>
-        + AsPrimitive<u64>
-        + AsPrimitive<f32>
-        + AsPrimitive<f64>,
     f32: ToStorage<T>,
 {
     let thread_count = threading_policy.get_threads_count(width, height) as u32;
@@ -997,7 +1014,7 @@ pub fn tent_blur_in_linear(
     };
 
     forward_transformer(
-        &src,
+        src,
         src_stride,
         &mut linear_data,
         width * std::mem::size_of::<f32>() as u32 * channels.get_channels() as u32,
@@ -1028,7 +1045,18 @@ pub fn tent_blur_in_linear(
 }
 
 fn gaussian_box_blur_impl<
-    T: FromPrimitive + Default + Sync + Send + Copy,
+    T: FromPrimitive
+        + Default
+        + Sync
+        + Send
+        + Copy
+        + std::ops::AddAssign
+        + std::ops::SubAssign
+        + Copy
+        + AsPrimitive<u32>
+        + AsPrimitive<u64>
+        + AsPrimitive<f32>
+        + AsPrimitive<f64>,
     const CHANNEL_CONFIGURATION: usize,
 >(
     src: &[T],
@@ -1040,13 +1068,6 @@ fn gaussian_box_blur_impl<
     radius: u32,
     threading_policy: ThreadingPolicy,
 ) where
-    T: std::ops::AddAssign
-        + std::ops::SubAssign
-        + Copy
-        + AsPrimitive<u32>
-        + AsPrimitive<u64>
-        + AsPrimitive<f32>
-        + AsPrimitive<f64>,
     f32: ToStorage<T>,
 {
     let thread_count = threading_policy.get_threads_count(width, height) as u32;
@@ -1065,7 +1086,7 @@ fn gaussian_box_blur_impl<
     let mut transient2: Vec<T> =
         vec![T::from_u32(0).unwrap_or_default(); dst_stride as usize * height as usize];
     box_blur_impl::<T, CHANNEL_CONFIGURATION>(
-        &src,
+        src,
         src_stride,
         &mut transient,
         dst_stride,
@@ -1291,7 +1312,7 @@ pub fn gaussian_box_blur_in_linear(
     };
 
     forward_transformer(
-        &src,
+        src,
         src_stride,
         &mut linear_data,
         width * std::mem::size_of::<f32>() as u32 * channels.get_channels() as u32,

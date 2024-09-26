@@ -42,8 +42,7 @@ impl ThreadingPolicy {
         match self {
             ThreadingPolicy::Single => 1,
             ThreadingPolicy::Adaptive => {
-                let thread_count =
-                    std::cmp::max(std::cmp::min(width * height / (256 * 256), 12), 1);
+                let thread_count = (width * height / (256 * 256)).clamp(1, 12);
                 thread_count as usize
             }
             ThreadingPolicy::Fixed(fixed) => *fixed,

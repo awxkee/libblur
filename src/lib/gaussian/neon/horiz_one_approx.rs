@@ -536,7 +536,7 @@ pub fn gaussian_horiz_one_chan_filter_approx(
     unsafe_dst: &UnsafeSlice<u8>,
     dst_stride: u32,
     width: u32,
-    filter: &Vec<GaussianFilter<i16>>,
+    filter: &[GaussianFilter<i16>],
     start_y: u32,
     end_y: u32,
 ) {

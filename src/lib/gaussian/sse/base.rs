@@ -264,10 +264,8 @@ unsafe fn gaussian_blur_horizontal_pass_impl_sse_impl<
                     let s_ptr_1 = s_ptr.add(src_stride as usize);
                     let mut pixel_colors_0 = _mm_loadu_si64(s_ptr);
                     let mut pixel_colors_1 = _mm_loadu_si64(s_ptr_1);
-                    let mut pixel_colors_2 =
-                        _mm_loadu_si64(s_ptr_1.add(src_stride as usize));
-                    let mut pixel_colors_3 =
-                        _mm_loadu_si64(s_ptr_1.add(src_stride as usize * 2));
+                    let mut pixel_colors_2 = _mm_loadu_si64(s_ptr_1.add(src_stride as usize));
+                    let mut pixel_colors_3 = _mm_loadu_si64(s_ptr_1.add(src_stride as usize * 2));
                     let weights_ptr = kernel.as_ptr().add((r + half_kernel) as usize);
                     let weights = _mm_setr_ps(
                         weights_ptr.read_unaligned(),

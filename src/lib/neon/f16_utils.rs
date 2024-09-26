@@ -43,7 +43,7 @@ pub struct x_float16x8_t(pub(crate) uint16x8_t);
 
 #[inline]
 pub unsafe fn xvld_f16(ptr: *const half::f16) -> x_float16x4_t {
-    let store: uint16x4_t = vld1_u16(std::mem::transmute(ptr));
+    let store: uint16x4_t = vld1_u16(std::mem::transmute::<*const half::f16, *const u16>(ptr));
     std::mem::transmute(store)
 }
 
@@ -86,6 +86,9 @@ pub(super) unsafe fn xvcvt_f16_f32(v: float32x4_t) -> x_float16x4_t {
 }
 
 #[inline]
-pub unsafe fn xvst_f16(ptr: *const half::f16, x: x_float16x4_t) {
-    vst1_u16(std::mem::transmute(ptr), xreinterpret_u16_f16(x))
+pub unsafe fn xvst_f16(ptr: *mut half::f16, x: x_float16x4_t) {
+    vst1_u16(
+        std::mem::transmute::<*mut half::f16, *mut u16>(ptr),
+        xreinterpret_u16_f16(x),
+    )
 }

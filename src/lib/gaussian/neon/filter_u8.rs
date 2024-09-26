@@ -59,7 +59,7 @@ pub fn gaussian_blur_horizontal_pass_filter_neon<T, const CHANNEL_CONFIGURATION:
     undef_unsafe_dst: &UnsafeSlice<T>,
     dst_stride: u32,
     width: u32,
-    filter: &Vec<GaussianFilter<f32>>,
+    filter: &[GaussianFilter<f32>],
     start_y: u32,
     end_y: u32,
 ) {
@@ -411,7 +411,7 @@ pub fn gaussian_blur_vertical_pass_filter_neon<T, const CHANNEL_CONFIGURATION: u
     dst_stride: u32,
     width: u32,
     _: u32,
-    filter: &Vec<GaussianFilter<f32>>,
+    filter: &[GaussianFilter<f32>],
     start_y: u32,
     end_y: u32,
 ) {

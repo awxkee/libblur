@@ -54,6 +54,7 @@ use std::mem::size_of;
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
+#[allow(clippy::too_many_arguments)]
 pub fn gaussian_blur_in_linear(
     src: &[u8],
     src_stride: u32,
@@ -86,7 +87,7 @@ pub fn gaussian_blur_in_linear(
     };
 
     forward_transformer(
-        &src,
+        src,
         src_stride,
         &mut linear_data,
         width * size_of::<f32>() as u32 * channels.get_channels() as u32,

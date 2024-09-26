@@ -25,8 +25,8 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::gaussian::sse::gauss_utils::_mm_opt_fma_ps;
 use crate::gaussian::gaussian_filter::GaussianFilter;
+use crate::gaussian::sse::gauss_utils::_mm_opt_fma_ps;
 use crate::sse::{
     _mm_broadcast_first, _mm_broadcast_fourth, _mm_broadcast_second, _mm_broadcast_third,
     load_u8_f32_fast, load_u8_u32_one,
@@ -93,7 +93,7 @@ pub fn gaussian_blur_horizontal_pass_filter_sse<
     undef_unsafe_dst: &UnsafeSlice<T>,
     dst_stride: u32,
     width: u32,
-    filter: &Vec<GaussianFilter<f32>>,
+    filter: &[GaussianFilter<f32>],
     start_y: u32,
     end_y: u32,
 ) {
@@ -132,7 +132,7 @@ unsafe fn gaussian_blur_horizontal_pass_filter_sse_gen<T, const CHANNEL_CONFIGUR
     undef_unsafe_dst: &UnsafeSlice<T>,
     dst_stride: u32,
     width: u32,
-    filter: &Vec<GaussianFilter<f32>>,
+    filter: &[GaussianFilter<f32>],
     start_y: u32,
     end_y: u32,
 ) {
@@ -159,7 +159,7 @@ unsafe fn gaussian_blur_horizontal_pass_filter_sse_gen_fma<
     undef_unsafe_dst: &UnsafeSlice<T>,
     dst_stride: u32,
     width: u32,
-    filter: &Vec<GaussianFilter<f32>>,
+    filter: &[GaussianFilter<f32>],
     start_y: u32,
     end_y: u32,
 ) {
@@ -185,7 +185,7 @@ unsafe fn gaussian_blur_horizontal_pass_filter_sse_impl<
     undef_unsafe_dst: &UnsafeSlice<T>,
     dst_stride: u32,
     width: u32,
-    filter: &Vec<GaussianFilter<f32>>,
+    filter: &[GaussianFilter<f32>],
     start_y: u32,
     end_y: u32,
 ) {
@@ -236,7 +236,7 @@ unsafe fn gaussian_blur_horizontal_pass_filter_sse_impl<
             }
 
             while j + 2 < current_filter.size
-                && filter_start as i64 + j as i64 + (if CHANNEL_CONFIGURATION == 4 { 3 } else { 3 })
+                && filter_start as i64 + j as i64 + (if CHANNEL_CONFIGURATION == 4 { 2 } else { 3 })
                     < width as i64
             {
                 let px = (filter_start + j) * CHANNEL_CONFIGURATION;
@@ -360,7 +360,7 @@ pub fn gaussian_blur_vertical_pass_filter_sse<
     dst_stride: u32,
     width: u32,
     height: u32,
-    filter: &Vec<GaussianFilter<f32>>,
+    filter: &[GaussianFilter<f32>],
     start_y: u32,
     end_y: u32,
 ) {
@@ -402,7 +402,7 @@ unsafe fn gaussian_blur_vertical_pass_filter_sse_fma<T, const CHANNEL_CONFIGURAT
     dst_stride: u32,
     width: u32,
     height: u32,
-    filter: &Vec<GaussianFilter<f32>>,
+    filter: &[GaussianFilter<f32>],
     start_y: u32,
     end_y: u32,
 ) {
@@ -428,7 +428,7 @@ unsafe fn gaussian_blur_vertical_pass_filter_sse_gen<T, const CHANNEL_CONFIGURAT
     dst_stride: u32,
     width: u32,
     height: u32,
-    filter: &Vec<GaussianFilter<f32>>,
+    filter: &[GaussianFilter<f32>],
     start_y: u32,
     end_y: u32,
 ) {
@@ -456,7 +456,7 @@ unsafe fn gaussian_blur_vertical_pass_filter_sse_impl<
     dst_stride: u32,
     width: u32,
     _: u32,
-    filter: &Vec<GaussianFilter<f32>>,
+    filter: &[GaussianFilter<f32>],
     start_y: u32,
     end_y: u32,
 ) {

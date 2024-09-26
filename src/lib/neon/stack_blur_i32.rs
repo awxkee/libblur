@@ -31,6 +31,7 @@ use crate::stack_blur::StackBlurPass;
 use crate::unsafe_slice::UnsafeSlice;
 use std::arch::aarch64::*;
 
+#[allow(clippy::too_many_arguments)]
 pub fn stack_blur_pass_neon_i32<const COMPONENTS: usize>(
     pixels: &UnsafeSlice<u8>,
     stride: u32,
@@ -61,7 +62,7 @@ pub fn stack_blur_pass_neon_i32<const COMPONENTS: usize>(
         let mut src_ptr;
         let mut dst_ptr;
 
-        if pass == StackBlurPass::HORIZONTAL {
+        if pass == StackBlurPass::Horizontal {
             let min_y = thread * height as usize / total_threads;
             let max_y = (thread + 1) * height as usize / total_threads;
 
@@ -149,7 +150,7 @@ pub fn stack_blur_pass_neon_i32<const COMPONENTS: usize>(
                     sum_in = vsubq_s32(sum_in, stack_val);
                 }
             }
-        } else if pass == StackBlurPass::VERTICAL {
+        } else if pass == StackBlurPass::Vertical {
             let min_x = thread * width as usize / total_threads;
             let max_x = (thread + 1) * width as usize / total_threads;
 

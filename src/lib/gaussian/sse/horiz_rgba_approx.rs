@@ -173,7 +173,8 @@ unsafe fn gaussian_blur_horizontal_pass_approx_impl<const CHANNEL_CONFIGURATION:
                         _mm_loadu_si128(s_ptr_1.add(src_stride as usize * 2) as *const __m128i);
                     let weights_ptr = kernel.as_ptr().add((r + half_kernel) as usize);
                     let weights0 = _mm_set1_epi32((weights_ptr as *const i32).read_unaligned());
-                    let weights1 = _mm_set1_epi32((weights_ptr.add(2) as *const i32).read_unaligned());
+                    let weights1 =
+                        _mm_set1_epi32((weights_ptr.add(2) as *const i32).read_unaligned());
 
                     let lo_0 = _mm_shuffle_epi8(pixel_colors_0, shuffle_lo);
                     let hi_0 = _mm_shuffle_epi8(pixel_colors_0, shuffle_hi);
@@ -338,7 +339,8 @@ unsafe fn gaussian_blur_horizontal_pass_approx_impl<const CHANNEL_CONFIGURATION:
                     let pixel_colors_1 = _mm_loadu_si128(s_ptr_1 as *const __m128i);
                     let weights_ptr = kernel.as_ptr().add((r + half_kernel) as usize);
                     let weights0 = _mm_set1_epi32((weights_ptr as *const i32).read_unaligned());
-                    let weights1 = _mm_set1_epi32((weights_ptr.add(2) as *const i32).read_unaligned());
+                    let weights1 =
+                        _mm_set1_epi32((weights_ptr.add(2) as *const i32).read_unaligned());
 
                     let lo_0 = _mm_shuffle_epi8(pixel_colors_0, shuffle_lo);
                     let hi_0 = _mm_shuffle_epi8(pixel_colors_0, shuffle_hi);
@@ -425,7 +427,8 @@ unsafe fn gaussian_blur_horizontal_pass_approx_impl<const CHANNEL_CONFIGURATION:
                     let pixel_colors = _mm_loadu_si128(s_ptr as *const __m128i);
                     let weights_ptr = kernel.as_ptr().add((r + half_kernel) as usize);
                     let weights0 = _mm_set1_epi32((weights_ptr as *const i32).read_unaligned());
-                    let weights1 = _mm_set1_epi32((weights_ptr.add(2) as *const i32).read_unaligned());
+                    let weights1 =
+                        _mm_set1_epi32((weights_ptr.add(2) as *const i32).read_unaligned());
 
                     let lo = _mm_shuffle_epi8(pixel_colors, shuffle_lo);
                     let hi = _mm_shuffle_epi8(pixel_colors, shuffle_hi);

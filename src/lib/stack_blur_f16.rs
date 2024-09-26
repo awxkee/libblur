@@ -65,12 +65,12 @@ fn stack_blur_worker_horizontal(
                 usize,
             ) = stack_blur_pass_f::<f16, f32, 1>;
             _dispatcher(
-                &slice,
+                slice,
                 stride,
                 width,
                 height,
                 radius,
-                StackBlurPass::HORIZONTAL,
+                StackBlurPass::Horizontal,
                 thread,
                 thread_count,
             );
@@ -99,12 +99,12 @@ fn stack_blur_worker_horizontal(
                 }
             }
             _dispatcher(
-                &slice,
+                slice,
                 stride,
                 width,
                 height,
                 radius,
-                StackBlurPass::HORIZONTAL,
+                StackBlurPass::Horizontal,
                 thread,
                 thread_count,
             );
@@ -133,12 +133,12 @@ fn stack_blur_worker_horizontal(
                 }
             }
             _dispatcher(
-                &slice,
+                slice,
                 stride,
                 width,
                 height,
                 radius,
-                StackBlurPass::HORIZONTAL,
+                StackBlurPass::Horizontal,
                 thread,
                 thread_count,
             );
@@ -173,12 +173,12 @@ fn stack_blur_worker_vertical(
                 usize,
             ) = stack_blur_pass_f::<f16, f32, 1>;
             _dispatcher(
-                &slice,
+                slice,
                 stride,
                 width,
                 height,
                 radius,
-                StackBlurPass::VERTICAL,
+                StackBlurPass::Vertical,
                 thread,
                 thread_count,
             );
@@ -207,12 +207,12 @@ fn stack_blur_worker_vertical(
                 }
             }
             _dispatcher(
-                &slice,
+                slice,
                 stride,
                 width,
                 height,
                 radius,
-                StackBlurPass::VERTICAL,
+                StackBlurPass::Vertical,
                 thread,
                 thread_count,
             );
@@ -241,12 +241,12 @@ fn stack_blur_worker_vertical(
                 }
             }
             _dispatcher(
-                &slice,
+                slice,
                 stride,
                 width,
                 height,
                 radius,
-                StackBlurPass::VERTICAL,
+                StackBlurPass::Vertical,
                 thread,
                 thread_count,
             );

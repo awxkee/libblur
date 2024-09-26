@@ -463,7 +463,7 @@ pub fn gaussian_horiz_t_f_chan_filter_f32<T, const CHANNEL_CONFIGURATION: usize>
     undef_unsafe_dst: &UnsafeSlice<T>,
     dst_stride: u32,
     width: u32,
-    filter: &Vec<GaussianFilter<f32>>,
+    filter: &[GaussianFilter<f32>],
     start_y: u32,
     end_y: u32,
 ) {

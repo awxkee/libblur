@@ -25,14 +25,14 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use crate::gaussian::avx::utils::_mm256_opt_fma_ps;
 use crate::gaussian::gaussian_filter::GaussianFilter;
+use crate::gaussian::sse::_mm_opt_fma_ps;
 use crate::unsafe_slice::UnsafeSlice;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
-use crate::gaussian::avx::utils::_mm256_opt_fma_ps;
-use crate::gaussian::sse::_mm_opt_fma_ps;
 
 pub fn gaussian_blur_vertical_pass_filter_f32_avx<
     T,
@@ -45,7 +45,7 @@ pub fn gaussian_blur_vertical_pass_filter_f32_avx<
     dst_stride: u32,
     width: u32,
     height: u32,
-    filter: &Vec<GaussianFilter<f32>>,
+    filter: &[GaussianFilter<f32>],
     start_y: u32,
     end_y: u32,
 ) {
@@ -87,7 +87,7 @@ unsafe fn gaussian_blur_vertical_pass_filter_gen<T, const CHANNEL_CONFIGURATION:
     dst_stride: u32,
     width: u32,
     height: u32,
-    filter: &Vec<GaussianFilter<f32>>,
+    filter: &[GaussianFilter<f32>],
     start_y: u32,
     end_y: u32,
 ) {
@@ -112,7 +112,7 @@ unsafe fn gaussian_blur_vertical_pass_filter_fma<T, const CHANNEL_CONFIGURATION:
     dst_stride: u32,
     width: u32,
     height: u32,
-    filter: &Vec<GaussianFilter<f32>>,
+    filter: &[GaussianFilter<f32>],
     start_y: u32,
     end_y: u32,
 ) {
@@ -140,7 +140,7 @@ unsafe fn gaussian_blur_vertical_pass_filter_impl<
     dst_stride: u32,
     width: u32,
     _: u32,
-    filter: &Vec<GaussianFilter<f32>>,
+    filter: &[GaussianFilter<f32>],
     start_y: u32,
     end_y: u32,
 ) {

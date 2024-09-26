@@ -27,6 +27,9 @@
 
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::gaussian::avx::gaussian_blur_vertical_pass_filter_f32_avx;
+use crate::gaussian::gaussian_filter::GaussianFilter;
+use crate::gaussian::gaussian_horizontal::gaussian_blur_horizontal_pass_impl_clip_edge;
+use crate::gaussian::gaussian_vertical::gaussian_blur_vertical_pass_clip_edge_impl;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::gaussian::neon::*;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
@@ -35,16 +38,22 @@ use crate::gaussian::neon::{
 };
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::gaussian::sse::*;
-use crate::gaussian::gaussian_filter::GaussianFilter;
-use crate::gaussian::gaussian_horizontal::gaussian_blur_horizontal_pass_impl_clip_edge;
-use crate::gaussian::gaussian_vertical::gaussian_blur_vertical_pass_clip_edge_impl;
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
 use num_traits::{AsPrimitive, FromPrimitive};
 use rayon::ThreadPool;
 
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub(crate) fn gaussian_blur_vertical_pass_edge_clip_dispatch<
-    T: FromPrimitive + Default + Send + Sync,
+    T: FromPrimitive
+        + Default
+        + Send
+        + Sync
+        + std::ops::AddAssign
+        + std::ops::SubAssign
+        + Copy
+        + 'static
+        + AsPrimitive<f32>,
     const CHANNEL_CONFIGURATION: usize,
 >(
     src: &[T],
@@ -53,11 +62,10 @@ pub(crate) fn gaussian_blur_vertical_pass_edge_clip_dispatch<
     dst_stride: u32,
     width: u32,
     height: u32,
-    filter: &Vec<GaussianFilter<f32>>,
+    filter: &[GaussianFilter<f32>],
     thread_pool: &Option<ThreadPool>,
     thread_count: u32,
 ) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static + AsPrimitive<f32>,
     f32: ToStorage<T>,
 {
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
@@ -73,7 +81,7 @@ pub(crate) fn gaussian_blur_vertical_pass_edge_clip_dispatch<
         dst_stride: u32,
         width: u32,
         height: u32,
-        filter: &Vec<GaussianFilter<f32>>,
+        filter: &[GaussianFilter<f32>],
         start_y: u32,
         end_y: u32,
     ) = gaussian_blur_vertical_pass_clip_edge_impl::<T, CHANNEL_CONFIGURATION>;
@@ -184,8 +192,17 @@ pub(crate) fn gaussian_blur_vertical_pass_edge_clip_dispatch<
     }
 }
 
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub(crate) fn gaussian_blur_horizontal_pass_edge_clip_dispatch<
-    T: FromPrimitive + Default + Send + Sync,
+    T: FromPrimitive
+        + Default
+        + Send
+        + Sync
+        + std::ops::AddAssign
+        + std::ops::SubAssign
+        + Copy
+        + 'static
+        + AsPrimitive<f32>,
     const CHANNEL_CONFIGURATION: usize,
 >(
     src: &[T],
@@ -194,11 +211,10 @@ pub(crate) fn gaussian_blur_horizontal_pass_edge_clip_dispatch<
     dst_stride: u32,
     width: u32,
     height: u32,
-    filter: &Vec<GaussianFilter<f32>>,
+    filter: &[GaussianFilter<f32>],
     thread_pool: &Option<ThreadPool>,
     thread_count: u32,
 ) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static + AsPrimitive<f32>,
     f32: AsPrimitive<T> + ToStorage<T>,
 {
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
@@ -212,34 +228,26 @@ pub(crate) fn gaussian_blur_horizontal_pass_edge_clip_dispatch<
         unsafe_dst: &UnsafeSlice<T>,
         dst_stride: u32,
         width: u32,
-        filter: &Vec<GaussianFilter<f32>>,
+        filter: &[GaussianFilter<f32>],
         start_y: u32,
         end_y: u32,
     ) = gaussian_blur_horizontal_pass_impl_clip_edge::<T, CHANNEL_CONFIGURATION>;
-    if CHANNEL_CONFIGURATION >= 3 {
-        if std::any::type_name::<T>() == "u8" {
-            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-            {
-                if _is_sse_available {
-                    if _is_fma_available {
-                        _dispatcher = gaussian_blur_horizontal_pass_filter_sse::<
-                            T,
-                            CHANNEL_CONFIGURATION,
-                            true,
-                        >;
-                    } else {
-                        _dispatcher = gaussian_blur_horizontal_pass_filter_sse::<
-                            T,
-                            CHANNEL_CONFIGURATION,
-                            false,
-                        >;
-                    }
+    if CHANNEL_CONFIGURATION >= 3 && std::any::type_name::<T>() == "u8" {
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        {
+            if _is_sse_available {
+                if _is_fma_available {
+                    _dispatcher =
+                        gaussian_blur_horizontal_pass_filter_sse::<T, CHANNEL_CONFIGURATION, true>;
+                } else {
+                    _dispatcher =
+                        gaussian_blur_horizontal_pass_filter_sse::<T, CHANNEL_CONFIGURATION, false>;
                 }
             }
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-            {
-                _dispatcher = gaussian_blur_horizontal_pass_filter_neon::<T, CHANNEL_CONFIGURATION>;
-            }
+        }
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            _dispatcher = gaussian_blur_horizontal_pass_filter_neon::<T, CHANNEL_CONFIGURATION>;
         }
     }
     if std::any::type_name::<T>() == "f32" {
@@ -260,18 +268,15 @@ pub(crate) fn gaussian_blur_horizontal_pass_edge_clip_dispatch<
                 _dispatcher = gaussian_horiz_t_f_chan_filter_f32::<T, CHANNEL_CONFIGURATION>;
             }
         }
-    }
-    if std::any::type_name::<T>() == "u8" {
-        if CHANNEL_CONFIGURATION == 1 {
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-            {
-                _dispatcher = gaussian_horiz_one_chan_filter_u8::<T>;
-            }
-            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-            {
-                if _is_sse_available {
-                    _dispatcher = gaussian_sse_horiz_one_chan_filter_u8::<T>;
-                }
+    } else if std::any::type_name::<T>() == "u8" && CHANNEL_CONFIGURATION == 1 {
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            _dispatcher = gaussian_horiz_one_chan_filter_u8::<T>;
+        }
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        {
+            if _is_sse_available {
+                _dispatcher = gaussian_sse_horiz_one_chan_filter_u8::<T>;
             }
         }
     }

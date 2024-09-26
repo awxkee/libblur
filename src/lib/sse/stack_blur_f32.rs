@@ -59,7 +59,7 @@ pub fn stack_blur_pass_sse_f<const COMPONENTS: usize>(
 
 #[inline]
 #[target_feature(enable = "sse4.1")]
-unsafe  fn stack_blur_pass_sse_f_impl<const COMPONENTS: usize>(
+unsafe fn stack_blur_pass_sse_f_impl<const COMPONENTS: usize>(
     pixels: &UnsafeSlice<f32>,
     stride: u32,
     width: u32,
@@ -89,7 +89,7 @@ unsafe  fn stack_blur_pass_sse_f_impl<const COMPONENTS: usize>(
         let mut src_ptr;
         let mut dst_ptr;
 
-        if pass == StackBlurPass::HORIZONTAL {
+        if pass == StackBlurPass::Horizontal {
             let min_y = thread * height as usize / total_threads;
             let max_y = (thread + 1) * height as usize / total_threads;
 
@@ -175,7 +175,7 @@ unsafe  fn stack_blur_pass_sse_f_impl<const COMPONENTS: usize>(
                     sum_in = _mm_sub_ps(sum_in, stack_val);
                 }
             }
-        } else if pass == StackBlurPass::VERTICAL {
+        } else if pass == StackBlurPass::Vertical {
             let min_x = thread * width as usize / total_threads;
             let max_x = (thread + 1) * width as usize / total_threads;
 

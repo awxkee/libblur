@@ -89,7 +89,7 @@ unsafe fn stack_blur_pass_impl<const COMPONENTS: usize>(
     let mut src_ptr;
     let mut dst_ptr;
 
-    if pass == StackBlurPass::HORIZONTAL {
+    if pass == StackBlurPass::Horizontal {
         let min_y = thread * height as usize / total_threads;
         let max_y = (thread + 1) * height as usize / total_threads;
 
@@ -182,7 +182,7 @@ unsafe fn stack_blur_pass_impl<const COMPONENTS: usize>(
                 sum_in = i32x4_add(sum_in, stack_val);
             }
         }
-    } else if pass == StackBlurPass::VERTICAL {
+    } else if pass == StackBlurPass::Vertical {
         let min_x = thread * width as usize / total_threads;
         let max_x = (thread + 1) * width as usize / total_threads;
 

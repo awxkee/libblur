@@ -136,6 +136,7 @@ pub fn gaussian_blur_vertical_pass_c_impl<
 }
 
 #[inline]
+#[allow(clippy::too_many_arguments)]
 pub fn gaussian_vertical_row<
     T: FromPrimitive + Default + Send + Sync + Copy + 'static + AsPrimitive<f32>,
     const ROW_SIZE: usize,
@@ -166,7 +167,7 @@ pub fn gaussian_vertical_row<
             unsafe {
                 let v = *src.get_unchecked(y_src_shift + px);
                 let w0 = weights.get_unchecked_mut(i);
-                *w0 = *w0 + v.as_() * weight;
+                *w0 += v.as_() * weight;
             }
         }
     }
@@ -179,6 +180,7 @@ pub fn gaussian_vertical_row<
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn gaussian_blur_vertical_pass_clip_edge_impl<
     T: FromPrimitive + Default + Send + Sync + Copy + 'static + AsPrimitive<f32>,
     const CHANNEL_CONFIGURATION: usize,
@@ -189,7 +191,7 @@ pub fn gaussian_blur_vertical_pass_clip_edge_impl<
     dst_stride: u32,
     width: u32,
     height: u32,
-    filter: &Vec<GaussianFilter<f32>>,
+    filter: &[GaussianFilter<f32>],
     start_y: u32,
     end_y: u32,
 ) where
@@ -247,7 +249,7 @@ pub fn gaussian_vertical_row_clip_edge<
     dst_stride: u32,
     _: u32,
     _: u32,
-    filter: &Vec<GaussianFilter<f32>>,
+    filter: &[GaussianFilter<f32>],
     x: u32,
     y: u32,
 ) where
@@ -266,7 +268,7 @@ pub fn gaussian_vertical_row_clip_edge<
             unsafe {
                 let v = *src.get_unchecked(y_src_shift + px);
                 let w0 = weights.get_unchecked_mut(i);
-                *w0 = *w0 + v.as_() * weight;
+                *w0 += v.as_() * weight;
             }
         }
     }

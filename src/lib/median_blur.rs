@@ -37,6 +37,7 @@ struct MedianHistogram {
     n: i32,
 }
 
+#[allow(clippy::too_many_arguments)]
 fn add_rgb_pixels<const CHANNEL_CONFIGURATION: usize>(
     src: &[u8],
     src_stride: u32,
@@ -172,6 +173,7 @@ fn init_histogram<const CHANNELS_CONFIGURATION: usize>(
 fn median_filter(x: [i32; 256], n: i32) -> i32 {
     let mut n = n / 2;
     let mut i = 0i64;
+    #[allow(clippy::manual_range_contains)]
     while i < 256 && i >= 0 {
         unsafe {
             n -= *x.get_unchecked(i as usize);
@@ -300,6 +302,7 @@ fn median_blur_impl<const CHANNELS_CONFIGURATION: usize>(
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
+#[allow(clippy::too_many_arguments)]
 pub fn median_blur(
     src: &[u8],
     src_stride: u32,

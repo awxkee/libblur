@@ -42,7 +42,7 @@ pub fn gaussian_blur_vertical_pass_filter_approx_sse<const CHANNEL_CONFIGURATION
     dst_stride: u32,
     width: u32,
     height: u32,
-    filter: &Vec<GaussianFilter<i16>>,
+    filter: &[GaussianFilter<i16>],
     start_y: u32,
     end_y: u32,
 ) {
@@ -69,7 +69,7 @@ unsafe fn gaussian_blur_vertical_pass_filter_sse_impl<const CHANNEL_CONFIGURATIO
     dst_stride: u32,
     width: u32,
     _: u32,
-    filter: &Vec<GaussianFilter<i16>>,
+    filter: &[GaussianFilter<i16>],
     start_y: u32,
     end_y: u32,
 ) {

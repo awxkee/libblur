@@ -71,12 +71,6 @@ unsafe fn box_blur_horizontal_pass_impl<T, const CHANNELS: usize>(
 ) {
     let src: &[u8] = unsafe { std::mem::transmute(undefined_src) };
     let unsafe_dst: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(undefined_unsafe_dst) };
-    let eraser_store: [i32; 4] = if CHANNELS == 3 {
-        [1i32, 1i32, 1i32, 0i32]
-    } else {
-        [1i32, 1i32, 1i32, 1i32]
-    };
-    let eraser = unsafe { _mm_loadu_si128(eraser_store.as_ptr() as *const __m128i) };
 
     let kernel_size = radius * 2 + 1;
     let edge_count = (kernel_size / 2) + 1;
@@ -130,7 +124,7 @@ unsafe fn box_blur_horizontal_pass_impl<T, const CHANNELS: usize>(
             let px = x as usize * CHANNELS;
 
             if CHANNELS == 3 {
-                store = unsafe { _mm_mullo_epi32(store, eraser) };
+                store = _mm_insert_epi32::<3>(store, 0);
             }
 
             let scale_store = unsafe { _mm_mul_ps_epi32(store, v_weight) };
@@ -157,12 +151,6 @@ pub(crate) fn box_blur_vertical_pass_sse<T, const CHANNELS: usize>(
 ) {
     let src: &[u8] = unsafe { std::mem::transmute(undefined_src) };
     let unsafe_dst: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(undefined_unsafe_dst) };
-    let eraser_store: [i32; 4] = if CHANNELS == 3 {
-        [1i32, 1i32, 1i32, 0i32]
-    } else {
-        [1i32, 1i32, 1i32, 1i32]
-    };
-    let eraser = unsafe { _mm_loadu_si128(eraser_store.as_ptr() as *const __m128i) };
 
     let kernel_size = radius * 2 + 1;
     let edge_count = (kernel_size / 2) + 1;
@@ -225,8 +213,8 @@ pub(crate) fn box_blur_vertical_pass_sse<T, const CHANNELS: usize>(
             let px = x as usize * CHANNELS;
 
             if CHANNELS == 3 {
-                store_0 = unsafe { _mm_mullo_epi32(store_0, eraser) };
-                store_1 = unsafe { _mm_mullo_epi32(store_1, eraser) };
+                store_0 = unsafe { _mm_insert_epi32::<3>(store_0, 0) };
+                store_1 = unsafe { _mm_insert_epi32::<3>(store_1, 0) };
             }
 
             let scale_store_0 = unsafe { _mm_mul_ps_epi32(store_0, v_weight) };
@@ -299,7 +287,7 @@ pub(crate) fn box_blur_vertical_pass_sse<T, const CHANNELS: usize>(
             let px = x as usize * CHANNELS;
 
             if CHANNELS == 3 {
-                store = unsafe { _mm_mullo_epi32(store, eraser) };
+                store = unsafe { _mm_insert_epi32::<3>(store, 0) };
             }
 
             let scale_store = unsafe { _mm_mul_ps_epi32(store, v_weight) };

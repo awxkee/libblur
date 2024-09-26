@@ -35,14 +35,6 @@ use crate::edge_mode::EdgeMode;
 use crate::gaussian::avx::{
     gaussian_blur_vertical_pass_impl_avx, gaussian_blur_vertical_pass_impl_f32_avx,
 };
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use crate::gaussian::neon::*;
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-use crate::gaussian::sse::{
-    gaussian_blur_horizontal_pass_impl_sse, gaussian_blur_vertical_pass_impl_f32_sse,
-    gaussian_blur_vertical_pass_impl_sse, gaussian_horiz_one_chan_f32,
-    gaussian_horiz_sse_t_f_chan_f32, gaussian_sse_horiz_one_chan_u8,
-};
 use crate::gaussian::gaussian_approx_dispatch::gaussian_blur_impl_approx;
 use crate::gaussian::gaussian_filter::create_filter;
 use crate::gaussian::gaussian_horizontal::gaussian_blur_horizontal_pass_impl;
@@ -53,12 +45,29 @@ use crate::gaussian::gaussian_kernel_filter_dispatch::{
 };
 use crate::gaussian::gaussian_precise_level::GaussianPreciseLevel;
 use crate::gaussian::gaussian_vertical::gaussian_blur_vertical_pass_c_impl;
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+use crate::gaussian::neon::*;
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+use crate::gaussian::sse::{
+    gaussian_blur_horizontal_pass_impl_sse, gaussian_blur_vertical_pass_impl_f32_sse,
+    gaussian_blur_vertical_pass_impl_sse, gaussian_horiz_one_chan_f32,
+    gaussian_horiz_sse_t_f_chan_f32, gaussian_sse_horiz_one_chan_u8,
+};
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{get_sigma_size, ThreadingPolicy};
 
+#[allow(clippy::type_complexity)]
 fn gaussian_blur_horizontal_pass<
-    T: FromPrimitive + Default + Send + Sync,
+    T: FromPrimitive
+        + Default
+        + Send
+        + Sync
+        + std::ops::AddAssign
+        + std::ops::SubAssign
+        + Copy
+        + 'static
+        + AsPrimitive<f32>,
     const CHANNEL_CONFIGURATION: usize,
     const EDGE_MODE: usize,
 >(
@@ -69,11 +78,10 @@ fn gaussian_blur_horizontal_pass<
     width: u32,
     height: u32,
     kernel_size: usize,
-    kernel: &Vec<f32>,
+    kernel: &[f32],
     thread_pool: &Option<ThreadPool>,
     thread_count: u32,
 ) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static + AsPrimitive<f32>,
     f32: AsPrimitive<T> + ToStorage<T>,
 {
     let mut _dispatcher: fn(
@@ -92,30 +100,25 @@ fn gaussian_blur_horizontal_pass<
     let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     let _is_fma_available = std::arch::is_x86_feature_detected!("fma");
-    if CHANNEL_CONFIGURATION >= 3 {
-        if std::any::type_name::<T>() == "u8" && edge_mode == EdgeMode::Clamp {
-            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-            {
-                if _is_sse_available {
-                    if !_is_fma_available {
-                        _dispatcher = gaussian_blur_horizontal_pass_impl_sse::<
-                            T,
-                            CHANNEL_CONFIGURATION,
-                            true,
-                        >;
-                    } else {
-                        _dispatcher = gaussian_blur_horizontal_pass_impl_sse::<
-                            T,
-                            CHANNEL_CONFIGURATION,
-                            false,
-                        >;
-                    }
+    if CHANNEL_CONFIGURATION >= 3
+        && std::any::type_name::<T>() == "u8"
+        && edge_mode == EdgeMode::Clamp
+    {
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        {
+            if _is_sse_available {
+                if !_is_fma_available {
+                    _dispatcher =
+                        gaussian_blur_horizontal_pass_impl_sse::<T, CHANNEL_CONFIGURATION, true>;
+                } else {
+                    _dispatcher =
+                        gaussian_blur_horizontal_pass_impl_sse::<T, CHANNEL_CONFIGURATION, false>;
                 }
             }
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-            {
-                _dispatcher = gaussian_blur_horizontal_pass_neon::<T, CHANNEL_CONFIGURATION>;
-            }
+        }
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            _dispatcher = gaussian_blur_horizontal_pass_neon::<T, CHANNEL_CONFIGURATION>;
         }
     }
     if std::any::type_name::<T>() == "f32" {
@@ -155,10 +158,8 @@ fn gaussian_blur_horizontal_pass<
             _dispatcher = gaussian_horiz_one_chan_u8::<T>;
         }
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-        if std::any::type_name::<T>() == "u8" {
-            if _is_sse_available {
-                _dispatcher = gaussian_sse_horiz_one_chan_u8::<T>;
-            }
+        if std::any::type_name::<T>() == "u8" && _is_sse_available {
+            _dispatcher = gaussian_sse_horiz_one_chan_u8::<T>;
         }
     }
     let unsafe_dst = UnsafeSlice::new(dst);
@@ -203,7 +204,15 @@ fn gaussian_blur_horizontal_pass<
 }
 
 fn gaussian_blur_vertical_pass_impl<
-    T: FromPrimitive + Default + Send + Sync,
+    T: FromPrimitive
+        + Default
+        + Send
+        + Sync
+        + std::ops::AddAssign
+        + std::ops::SubAssign
+        + Copy
+        + 'static
+        + AsPrimitive<f32>,
     const CHANNEL_CONFIGURATION: usize,
     const EDGE_MODE: usize,
 >(
@@ -218,7 +227,6 @@ fn gaussian_blur_vertical_pass_impl<
     start_y: u32,
     end_y: u32,
 ) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static + AsPrimitive<f32>,
     f32: AsPrimitive<T> + ToStorage<T>,
 {
     gaussian_blur_vertical_pass_c_impl::<T, CHANNEL_CONFIGURATION, EDGE_MODE>(
@@ -235,8 +243,17 @@ fn gaussian_blur_vertical_pass_impl<
     );
 }
 
+#[allow(clippy::type_complexity)]
 fn gaussian_blur_vertical_pass<
-    T: FromPrimitive + Default + Send + Sync,
+    T: FromPrimitive
+        + Default
+        + Send
+        + Sync
+        + std::ops::AddAssign
+        + std::ops::SubAssign
+        + Copy
+        + 'static
+        + AsPrimitive<f32>,
     const CHANNEL_CONFIGURATION: usize,
     const EDGE_MODE: usize,
 >(
@@ -247,11 +264,10 @@ fn gaussian_blur_vertical_pass<
     width: u32,
     height: u32,
     kernel_size: usize,
-    kernel: &Vec<f32>,
+    kernel: &[f32],
     thread_pool: &Option<ThreadPool>,
     thread_count: u32,
 ) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static + AsPrimitive<f32>,
     f32: AsPrimitive<T> + ToStorage<T>,
 {
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
@@ -384,7 +400,15 @@ fn gaussian_blur_vertical_pass<
 }
 
 fn gaussian_blur_impl<
-    T: FromPrimitive + Default + Send + Sync,
+    T: FromPrimitive
+        + Default
+        + Send
+        + Sync
+        + std::ops::AddAssign
+        + std::ops::SubAssign
+        + Copy
+        + 'static
+        + AsPrimitive<f32>,
     const CHANNEL_CONFIGURATION: usize,
 >(
     src: &[T],
@@ -398,7 +422,6 @@ fn gaussian_blur_impl<
     threading_policy: ThreadingPolicy,
     edge_mode: EdgeMode,
 ) where
-    T: std::ops::AddAssign + std::ops::SubAssign + Copy + 'static + AsPrimitive<f32>,
     f32: AsPrimitive<T> + ToStorage<T>,
 {
     if kernel_size % 2 == 0 {
@@ -422,7 +445,7 @@ fn gaussian_blur_impl<
         EdgeMode::Reflect => {
             let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
             gaussian_blur_horizontal_pass::<T, CHANNEL_CONFIGURATION, { EdgeMode::Reflect as usize }>(
-                &src,
+                src,
                 src_stride,
                 &mut transient,
                 dst_stride,
@@ -449,7 +472,7 @@ fn gaussian_blur_impl<
         EdgeMode::Wrap => {
             let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
             gaussian_blur_horizontal_pass::<T, CHANNEL_CONFIGURATION, { EdgeMode::Wrap as usize }>(
-                &src,
+                src,
                 src_stride,
                 &mut transient,
                 dst_stride,
@@ -476,7 +499,7 @@ fn gaussian_blur_impl<
         EdgeMode::Clamp => {
             let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
             gaussian_blur_horizontal_pass::<T, CHANNEL_CONFIGURATION, { EdgeMode::Clamp as usize }>(
-                &src,
+                src,
                 src_stride,
                 &mut transient,
                 dst_stride,
@@ -507,7 +530,7 @@ fn gaussian_blur_impl<
                 CHANNEL_CONFIGURATION,
                 { EdgeMode::Reflect101 as usize },
             >(
-                &src,
+                src,
                 src_stride,
                 &mut transient,
                 dst_stride,
@@ -539,7 +562,7 @@ fn gaussian_blur_impl<
             let horizontal_filter = create_filter(width as usize, kernel_size, sigma);
             let vertical_filter = create_filter(height as usize, kernel_size, sigma);
             gaussian_blur_horizontal_pass_edge_clip_dispatch::<T, CHANNEL_CONFIGURATION>(
-                &src,
+                src,
                 dst_stride,
                 &mut transient,
                 dst_stride,
@@ -583,6 +606,7 @@ fn gaussian_blur_impl<
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
+#[allow(clippy::too_many_arguments)]
 pub fn gaussian_blur(
     src: &[u8],
     src_stride: u32,
@@ -715,6 +739,7 @@ pub fn gaussian_blur_u16(
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
+#[allow(clippy::too_many_arguments)]
 pub fn gaussian_blur_f32(
     src: &[f32],
     dst: &mut [f32],
@@ -790,9 +815,9 @@ pub fn gaussian_blur_f16(
         sigma
     };
     _dispatcher(
-        unsafe { std::mem::transmute(src) },
+        unsafe { std::mem::transmute::<&[u16], &[half::f16]>(src) },
         width * channels.get_channels() as u32,
-        unsafe { std::mem::transmute(dst) },
+        unsafe { std::mem::transmute::<&mut [u16], &mut [half::f16]>(dst) },
         width * channels.get_channels() as u32,
         width,
         height,

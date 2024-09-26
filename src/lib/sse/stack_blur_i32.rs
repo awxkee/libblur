@@ -26,6 +26,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::mul_table::{MUL_TABLE_STACK_BLUR, SHR_TABLE_STACK_BLUR};
+use crate::sse::_mm_mul_epi64x;
 use crate::sse::utils::{_mm_packus_epi64, load_u8_s32_fast, store_u8_s32};
 use crate::stack_blur::StackBlurPass;
 use crate::unsafe_slice::UnsafeSlice;
@@ -33,7 +34,6 @@ use crate::unsafe_slice::UnsafeSlice;
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
-use crate::sse::_mm_mul_epi64x;
 
 pub fn stack_blur_pass_sse<const COMPONENTS: usize, const AVX512_DQVL: bool>(
     pixels: &UnsafeSlice<u8>,
@@ -91,7 +91,7 @@ unsafe fn stack_blur_pass_sse_impl<const COMPONENTS: usize, const AVX512_DQVL: b
         let mut src_ptr;
         let mut dst_ptr;
 
-        if pass == StackBlurPass::HORIZONTAL {
+        if pass == StackBlurPass::Horizontal {
             let min_y = thread * height as usize / total_threads;
             let max_y = (thread + 1) * height as usize / total_threads;
 
@@ -186,7 +186,7 @@ unsafe fn stack_blur_pass_sse_impl<const COMPONENTS: usize, const AVX512_DQVL: b
                     sum_in = _mm_sub_epi32(sum_in, stack_val);
                 }
             }
-        } else if pass == StackBlurPass::VERTICAL {
+        } else if pass == StackBlurPass::Vertical {
             let min_x = thread * width as usize / total_threads;
             let max_x = (thread + 1) * width as usize / total_threads;
 

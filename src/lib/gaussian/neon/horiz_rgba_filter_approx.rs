@@ -31,8 +31,8 @@ use crate::gaussian::gaussian_filter::GaussianFilter;
 use crate::neon::load_u8_u16_fast;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{
-    accumulate_2_forward_approx, accumulate_4_by_4_forward_approx, accumulate_4_forward_approx
-    , write_u8_by_channels_approx,
+    accumulate_2_forward_approx, accumulate_4_by_4_forward_approx, accumulate_4_forward_approx,
+    write_u8_by_channels_approx,
 };
 use std::arch::aarch64::*;
 
@@ -42,7 +42,7 @@ pub fn gaussian_blur_horizontal_pass_filter_approx_neon<const CHANNEL_CONFIGURAT
     unsafe_dst: &UnsafeSlice<u8>,
     dst_stride: u32,
     width: u32,
-    filter: &Vec<GaussianFilter<i16>>,
+    filter: &[GaussianFilter<i16>],
     start_y: u32,
     end_y: u32,
 ) {

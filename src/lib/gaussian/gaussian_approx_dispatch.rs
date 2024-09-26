@@ -55,6 +55,7 @@ use crate::unsafe_slice::UnsafeSlice;
 use crate::{EdgeMode, ThreadingPolicy};
 use rayon::ThreadPool;
 
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 fn gaussian_blur_horizontal_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>(
     src: &[u8],
     src_stride: u32,
@@ -63,7 +64,7 @@ fn gaussian_blur_horizontal_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_
     width: u32,
     height: u32,
     kernel_size: usize,
-    kernel: &Vec<i16>,
+    kernel: &[i16],
     thread_pool: &Option<ThreadPool>,
     thread_count: u32,
 ) {
@@ -145,6 +146,7 @@ fn gaussian_blur_horizontal_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_
     }
 }
 
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 fn gaussian_blur_vertical_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>(
     src: &[u8],
     src_stride: u32,
@@ -153,7 +155,7 @@ fn gaussian_blur_vertical_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_MO
     width: u32,
     height: u32,
     kernel_size: usize,
-    kernel: &Vec<i16>,
+    kernel: &[i16],
     thread_pool: &Option<ThreadPool>,
     thread_count: u32,
 ) {
@@ -230,6 +232,7 @@ fn gaussian_blur_vertical_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_MO
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub(crate) fn gaussian_blur_vertical_pass_approx_clip_dispatch<
     const CHANNEL_CONFIGURATION: usize,
 >(
@@ -239,7 +242,7 @@ pub(crate) fn gaussian_blur_vertical_pass_approx_clip_dispatch<
     dst_stride: u32,
     width: u32,
     height: u32,
-    filter: &Vec<GaussianFilter<i16>>,
+    filter: &[GaussianFilter<i16>],
     thread_pool: &Option<ThreadPool>,
     thread_count: u32,
 ) {
@@ -250,7 +253,7 @@ pub(crate) fn gaussian_blur_vertical_pass_approx_clip_dispatch<
         dst_stride: u32,
         width: u32,
         height: u32,
-        filter: &Vec<GaussianFilter<i16>>,
+        filter: &[GaussianFilter<i16>],
         start_y: u32,
         end_y: u32,
     ) = gaussian_blur_vertical_pass_clip_edge_approx::<CHANNEL_CONFIGURATION>;
@@ -311,6 +314,7 @@ pub(crate) fn gaussian_blur_vertical_pass_approx_clip_dispatch<
     }
 }
 
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 fn gaussian_blur_horizontal_pass_clip_approx_dispatch<const CHANNEL_CONFIGURATION: usize>(
     src: &[u8],
     src_stride: u32,
@@ -318,7 +322,7 @@ fn gaussian_blur_horizontal_pass_clip_approx_dispatch<const CHANNEL_CONFIGURATIO
     dst_stride: u32,
     width: u32,
     height: u32,
-    filter: &Vec<GaussianFilter<i16>>,
+    filter: &[GaussianFilter<i16>],
     thread_pool: &Option<ThreadPool>,
     thread_count: u32,
 ) {
@@ -328,7 +332,7 @@ fn gaussian_blur_horizontal_pass_clip_approx_dispatch<const CHANNEL_CONFIGURATIO
         unsafe_dst: &UnsafeSlice<u8>,
         dst_stride: u32,
         width: u32,
-        filter: &Vec<GaussianFilter<i16>>,
+        filter: &[GaussianFilter<i16>],
         start_y: u32,
         end_y: u32,
     ) = gaussian_blur_horizontal_pass_impl_clip_edge_approx::<CHANNEL_CONFIGURATION>;
@@ -392,6 +396,7 @@ fn gaussian_blur_horizontal_pass_clip_approx_dispatch<const CHANNEL_CONFIGURATIO
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn gaussian_blur_impl_approx<const CHANNEL_CONFIGURATION: usize>(
     src: &[u8],
     src_stride: u32,
@@ -424,7 +429,7 @@ pub(crate) fn gaussian_blur_impl_approx<const CHANNEL_CONFIGURATION: usize>(
         EdgeMode::Reflect => {
             let kernel = get_gaussian_kernel_1d_integral(kernel_size, sigma);
             gaussian_blur_horizontal_pass::<CHANNEL_CONFIGURATION, { EdgeMode::Reflect as usize }>(
-                &src,
+                src,
                 src_stride,
                 &mut transient,
                 dst_stride,
@@ -451,7 +456,7 @@ pub(crate) fn gaussian_blur_impl_approx<const CHANNEL_CONFIGURATION: usize>(
         EdgeMode::Wrap => {
             let kernel = get_gaussian_kernel_1d_integral(kernel_size, sigma);
             gaussian_blur_horizontal_pass::<CHANNEL_CONFIGURATION, { EdgeMode::Wrap as usize }>(
-                &src,
+                src,
                 src_stride,
                 &mut transient,
                 dst_stride,
@@ -478,7 +483,7 @@ pub(crate) fn gaussian_blur_impl_approx<const CHANNEL_CONFIGURATION: usize>(
         EdgeMode::Clamp => {
             let kernel = get_gaussian_kernel_1d_integral(kernel_size, sigma);
             gaussian_blur_horizontal_pass::<CHANNEL_CONFIGURATION, { EdgeMode::Clamp as usize }>(
-                &src,
+                src,
                 src_stride,
                 &mut transient,
                 dst_stride,
@@ -505,7 +510,7 @@ pub(crate) fn gaussian_blur_impl_approx<const CHANNEL_CONFIGURATION: usize>(
         EdgeMode::Reflect101 => {
             let kernel = get_gaussian_kernel_1d_integral(kernel_size, sigma);
             gaussian_blur_horizontal_pass::<CHANNEL_CONFIGURATION, { EdgeMode::Reflect101 as usize }>(
-                &src,
+                src,
                 src_stride,
                 &mut transient,
                 dst_stride,
@@ -535,7 +540,7 @@ pub(crate) fn gaussian_blur_impl_approx<const CHANNEL_CONFIGURATION: usize>(
             let vertical_filter =
                 create_integral_filter::<PRECISION>(height as usize, kernel_size, sigma);
             gaussian_blur_horizontal_pass_clip_approx_dispatch::<CHANNEL_CONFIGURATION>(
-                &src,
+                src,
                 dst_stride,
                 &mut transient,
                 dst_stride,

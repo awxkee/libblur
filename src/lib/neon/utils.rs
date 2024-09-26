@@ -323,8 +323,7 @@ pub(crate) unsafe fn load_u8_u16<const CHANNELS_COUNT: usize>(ptr: *const u8) ->
         _ => 0,
     };
     let store: [u16; 4] = [u_first, u_second, u_third, u_fourth];
-    let pixel_color = unsafe { vld1_u16(store.as_ptr()) };
-    pixel_color
+    unsafe { vld1_u16(store.as_ptr()) }
 }
 
 #[inline(always)]
@@ -335,11 +334,11 @@ pub(crate) unsafe fn prefer_vfmaq_f32(
 ) -> float32x4_t {
     #[cfg(target_arch = "aarch64")]
     {
-        return vfmaq_f32(a, b, c);
+        vfmaq_f32(a, b, c)
     }
     #[cfg(target_arch = "arm")]
     {
-        return vmlaq_f32(a, b, c);
+        vmlaq_f32(a, b, c)
     }
 }
 
@@ -351,11 +350,11 @@ pub(crate) unsafe fn prefer_vfma_f32(
 ) -> float32x2_t {
     #[cfg(target_arch = "aarch64")]
     {
-        return vfma_f32(a, b, c);
+        vfma_f32(a, b, c)
     }
     #[cfg(target_arch = "arm")]
     {
-        return vmla_f32(a, b, c);
+        vmla_f32(a, b, c)
     }
 }
 
@@ -414,7 +413,7 @@ pub(crate) unsafe fn load_f32_f16<const CHANNELS_COUNT: usize>(ptr: *const f16) 
     }
     let recast = ptr as *const u16;
     let cvt = xreinterpret_f16_u16(vld1_u16([recast.read_unaligned(), 0, 0, 0].as_ptr()));
-    return xvcvt_f32_f16(cvt);
+    xvcvt_f32_f16(cvt)
 }
 
 #[inline(always)]

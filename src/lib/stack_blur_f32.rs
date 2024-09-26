@@ -89,7 +89,7 @@ pub(crate) fn stack_blur_pass_f<T, J, const COMPONENTS: usize>(
     let mut src_ptr;
     let mut dst_ptr;
 
-    if pass == StackBlurPass::HORIZONTAL {
+    if pass == StackBlurPass::Horizontal {
         let min_y = thread * height as usize / total_threads;
         let max_y = (thread + 1) * height as usize / total_threads;
 
@@ -354,7 +354,7 @@ pub(crate) fn stack_blur_pass_f<T, J, const COMPONENTS: usize>(
                 }
             }
         }
-    } else if pass == StackBlurPass::VERTICAL {
+    } else if pass == StackBlurPass::Vertical {
         let min_x = thread * width as usize / total_threads;
         let max_x = (thread + 1) * width as usize / total_threads;
 
@@ -651,12 +651,12 @@ fn stack_blur_worker_horizontal(
                 stack_blur_pass_f::<f32, f64, 1>
             };
             _dispatcher(
-                &slice,
+                slice,
                 stride,
                 width,
                 height,
                 radius,
-                StackBlurPass::HORIZONTAL,
+                StackBlurPass::Horizontal,
                 thread,
                 thread_count,
             );
@@ -684,19 +684,17 @@ fn stack_blur_worker_horizontal(
             }
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
-                if _is_sse_available {
-                    if radius < BASE_RADIUS_F64_CUTOFF {
-                        _dispatcher = stack_blur_pass_sse_f::<3>;
-                    }
+                if _is_sse_available && radius < BASE_RADIUS_F64_CUTOFF {
+                    _dispatcher = stack_blur_pass_sse_f::<3>;
                 }
             }
             _dispatcher(
-                &slice,
+                slice,
                 stride,
                 width,
                 height,
                 radius,
-                StackBlurPass::HORIZONTAL,
+                StackBlurPass::Horizontal,
                 thread,
                 thread_count,
             );
@@ -724,19 +722,17 @@ fn stack_blur_worker_horizontal(
             }
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
-                if _is_sse_available {
-                    if radius < BASE_RADIUS_F64_CUTOFF {
-                        _dispatcher = stack_blur_pass_sse_f::<4>;
-                    }
+                if _is_sse_available && radius < BASE_RADIUS_F64_CUTOFF {
+                    _dispatcher = stack_blur_pass_sse_f::<4>;
                 }
             }
             _dispatcher(
-                &slice,
+                slice,
                 stride,
                 width,
                 height,
                 radius,
-                StackBlurPass::HORIZONTAL,
+                StackBlurPass::Horizontal,
                 thread,
                 thread_count,
             );
@@ -744,6 +740,7 @@ fn stack_blur_worker_horizontal(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn stack_blur_worker_vertical(
     slice: &UnsafeSlice<f32>,
     stride: u32,
@@ -773,12 +770,12 @@ fn stack_blur_worker_vertical(
                 stack_blur_pass_f::<f32, f64, 1>
             };
             _dispatcher(
-                &slice,
+                slice,
                 stride,
                 width,
                 height,
                 radius,
-                StackBlurPass::VERTICAL,
+                StackBlurPass::Vertical,
                 thread,
                 thread_count,
             );
@@ -806,19 +803,17 @@ fn stack_blur_worker_vertical(
             }
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
-                if _is_sse_available {
-                    if radius < BASE_RADIUS_F64_CUTOFF {
-                        _dispatcher = stack_blur_pass_sse_f::<3>;
-                    }
+                if _is_sse_available && radius < BASE_RADIUS_F64_CUTOFF {
+                    _dispatcher = stack_blur_pass_sse_f::<3>;
                 }
             }
             _dispatcher(
-                &slice,
+                slice,
                 stride,
                 width,
                 height,
                 radius,
-                StackBlurPass::VERTICAL,
+                StackBlurPass::Vertical,
                 thread,
                 thread_count,
             );
@@ -846,19 +841,17 @@ fn stack_blur_worker_vertical(
             }
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
-                if _is_sse_available {
-                    if radius < BASE_RADIUS_F64_CUTOFF {
-                        _dispatcher = stack_blur_pass_sse_f::<4>;
-                    }
+                if _is_sse_available && radius < BASE_RADIUS_F64_CUTOFF {
+                    _dispatcher = stack_blur_pass_sse_f::<4>;
                 }
             }
             _dispatcher(
-                &slice,
+                slice,
                 stride,
                 width,
                 height,
                 radius,
-                StackBlurPass::VERTICAL,
+                StackBlurPass::Vertical,
                 thread,
                 thread_count,
             );

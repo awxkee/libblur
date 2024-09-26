@@ -256,3 +256,10 @@ Example comparison time for blurring image 2828x4242 RGBA 8-bit in single-thread
 |---------|:--------:|
 | libblur | 51.90ms  |
 | OpenCV  | 134.28ms |
+
+This project is licensed under either of
+
+- BSD-3-Clause License (see [LICENSE](LICENSE-APACHE))
+- Apache License, Version 2.0 (see [LICENSE](LICENSE-APACHE.md))
+
+at your option.

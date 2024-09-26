@@ -26,7 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::gaussian::gaussian_approx::{ROUNDING_APPROX, PRECISION};
+use crate::gaussian::gaussian_approx::{PRECISION, ROUNDING_APPROX};
 use crate::gaussian::gaussian_filter::GaussianFilter;
 use crate::sse::load_u8_s16_fast;
 use crate::unsafe_slice::UnsafeSlice;
@@ -42,7 +42,7 @@ pub fn gaussian_blur_horizontal_pass_filter_approx_sse<const CHANNEL_CONFIGURATI
     undef_unsafe_dst: &UnsafeSlice<u8>,
     dst_stride: u32,
     width: u32,
-    filter: &Vec<GaussianFilter<i16>>,
+    filter: &[GaussianFilter<i16>],
     start_y: u32,
     end_y: u32,
 ) {
@@ -67,7 +67,7 @@ unsafe fn gaussian_blur_horizontal_pass_filter_sse_impl<const CHANNEL_CONFIGURAT
     unsafe_dst: &UnsafeSlice<u8>,
     dst_stride: u32,
     width: u32,
-    filter: &Vec<GaussianFilter<i16>>,
+    filter: &[GaussianFilter<i16>],
     start_y: u32,
     end_y: u32,
 ) {
@@ -102,7 +102,7 @@ unsafe fn gaussian_blur_horizontal_pass_filter_sse_impl<const CHANNEL_CONFIGURAT
 
             while j + 4 < current_filter.size
                 && filter_start as i64 + j as i64 + (if CHANNEL_CONFIGURATION == 4 { 4 } else { 6 })
-                < width as i64
+                    < width as i64
             {
                 let px = (filter_start + j) * CHANNEL_CONFIGURATION;
                 let s_ptr = src.as_ptr().add(y_src_shift + px);
@@ -144,8 +144,8 @@ unsafe fn gaussian_blur_horizontal_pass_filter_sse_impl<const CHANNEL_CONFIGURAT
             }
 
             while j + 2 < current_filter.size
-                && filter_start as i64 + j as i64 + (if CHANNEL_CONFIGURATION == 4 { 3 } else { 3 })
-                < width as i64
+                && filter_start as i64 + j as i64 + (if CHANNEL_CONFIGURATION == 4 { 2 } else { 3 })
+                    < width as i64
             {
                 let px = (filter_start + j) * CHANNEL_CONFIGURATION;
                 let s_ptr = src.as_ptr().add(y_src_shift + px);
@@ -183,12 +183,10 @@ unsafe fn gaussian_blur_horizontal_pass_filter_sse_impl<const CHANNEL_CONFIGURAT
                 let mut pixel_colors_0 = load_u8_s16_fast::<CHANNEL_CONFIGURATION>(s_ptr);
                 let mut pixel_colors_1 =
                     load_u8_s16_fast::<CHANNEL_CONFIGURATION>(s_ptr.add(src_stride as usize));
-                let mut pixel_colors_2 = load_u8_s16_fast::<CHANNEL_CONFIGURATION>(
-                    s_ptr.add(src_stride as usize * 2),
-                );
-                let mut pixel_colors_3 = load_u8_s16_fast::<CHANNEL_CONFIGURATION>(
-                    s_ptr.add(src_stride as usize * 3),
-                );
+                let mut pixel_colors_2 =
+                    load_u8_s16_fast::<CHANNEL_CONFIGURATION>(s_ptr.add(src_stride as usize * 2));
+                let mut pixel_colors_3 =
+                    load_u8_s16_fast::<CHANNEL_CONFIGURATION>(s_ptr.add(src_stride as usize * 3));
 
                 pixel_colors_0 = _mm_unpacklo_epi16(pixel_colors_0, zeros_si);
                 pixel_colors_1 = _mm_unpacklo_epi16(pixel_colors_1, zeros_si);
@@ -212,9 +210,9 @@ unsafe fn gaussian_blur_horizontal_pass_filter_sse_impl<const CHANNEL_CONFIGURAT
             );
             let off1 = y_dst_shift + dst_stride as usize;
             write_u8_by_channels_sse_approx!(store_1, CHANNEL_CONFIGURATION, unsafe_dst, off1, x);
-            let off2 =  y_dst_shift + dst_stride as usize * 2;
+            let off2 = y_dst_shift + dst_stride as usize * 2;
             write_u8_by_channels_sse_approx!(store_2, CHANNEL_CONFIGURATION, unsafe_dst, off2, x);
-            let off3 =  y_dst_shift + dst_stride as usize * 3;
+            let off3 = y_dst_shift + dst_stride as usize * 3;
             write_u8_by_channels_sse_approx!(store_3, CHANNEL_CONFIGURATION, unsafe_dst, off3, x);
         }
 
@@ -264,7 +262,7 @@ unsafe fn gaussian_blur_horizontal_pass_filter_sse_impl<const CHANNEL_CONFIGURAT
             }
 
             while j + 2 < current_filter.size
-                && filter_start as i64 + j as i64 + (if CHANNEL_CONFIGURATION == 4 { 3 } else { 3 })
+                && filter_start as i64 + j as i64 + (if CHANNEL_CONFIGURATION == 4 { 2 } else { 3 })
                     < width as i64
             {
                 let px = (filter_start + j) * CHANNEL_CONFIGURATION;

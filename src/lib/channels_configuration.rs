@@ -27,7 +27,9 @@
 
 #[repr(C)]
 #[derive(Clone, Copy, Ord, PartialOrd, Eq, PartialEq)]
-/// Declares channels count, generally channels order do not matter for blurring,
+/// Declares channels count
+///
+/// In common channels order do not matter for blurring
 /// except cases when transformation into linear colorspace is performed
 /// in case of linear transformation alpha plane expected to be last so if colorspace has 4 channels then it should be
 /// RGBA, BGRA etc

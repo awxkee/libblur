@@ -62,6 +62,7 @@ macro_rules! save_4_weights {
     }};
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn gaussian_blur_horizontal_pass_impl_approx<
     const CHANNEL_CONFIGURATION: usize,
     const EDGE_MODE: usize,
@@ -300,7 +301,7 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_clip_edge_approx<
     unsafe_dst: &UnsafeSlice<u8>,
     dst_stride: u32,
     width: u32,
-    filter: &Vec<GaussianFilter<i16>>,
+    filter: &[GaussianFilter<i16>],
     start_y: u32,
     end_y: u32,
 ) {
@@ -495,7 +496,12 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_clip_edge_approx<
         let y_src_shift = y as usize * src_stride as usize;
         let y_dst_shift = y as usize * dst_stride as usize;
         for x in 0..width {
-            let (mut w0, mut w1, mut w2, mut w3) = (ROUNDING_APPROX, ROUNDING_APPROX, ROUNDING_APPROX, ROUNDING_APPROX);
+            let (mut w0, mut w1, mut w2, mut w3) = (
+                ROUNDING_APPROX,
+                ROUNDING_APPROX,
+                ROUNDING_APPROX,
+                ROUNDING_APPROX,
+            );
 
             let current_filter = unsafe { filter.get_unchecked(x as usize) };
             let filter_start = current_filter.start;
