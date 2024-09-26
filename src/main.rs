@@ -5,7 +5,10 @@ use crate::merge::merge_channels_3;
 use crate::split::split_channels_3;
 use image::io::Reader as ImageReader;
 use image::{EncodableLayout, GenericImageView};
-use libblur::{fast_gaussian, fast_gaussian_next, fast_gaussian_next_f32, EdgeMode, FastBlurChannels, GaussianPreciseLevel, ThreadingPolicy};
+use libblur::{
+    fast_gaussian, fast_gaussian_next, fast_gaussian_next_f32, EdgeMode, FastBlurChannels,
+    GaussianPreciseLevel, ThreadingPolicy,
+};
 use std::time::Instant;
 
 #[allow(dead_code)]
@@ -81,7 +84,7 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
         FastBlurChannels::Plane,
         EdgeMode::Clamp,
         ThreadingPolicy::Single,
-        GaussianPreciseLevel::INTEGRAL,
+        GaussianPreciseLevel::EXACT,
     );
 
     libblur::gaussian_blur(
@@ -96,7 +99,7 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
         FastBlurChannels::Plane,
         EdgeMode::Clamp,
         ThreadingPolicy::Single,
-        GaussianPreciseLevel::INTEGRAL,
+        GaussianPreciseLevel::EXACT,
     );
 
     libblur::gaussian_blur(
@@ -111,7 +114,7 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
         FastBlurChannels::Plane,
         EdgeMode::Clamp,
         ThreadingPolicy::Single,
-        GaussianPreciseLevel::INTEGRAL,
+        GaussianPreciseLevel::EXACT,
     );
 
     merge_channels_3(
@@ -221,7 +224,7 @@ fn main() {
     //     .iter()
     //     .map(|&x| f16::from_f32(x as f32 * (1. / 255.)))
     //     .collect();
-    //
+    // //
     // libblur::gaussian_blur(
     //     &bytes,
     //     stride as u32,
@@ -234,7 +237,7 @@ fn main() {
     //     FastBlurChannels::Channels3,
     //     EdgeMode::KernelClip,
     //     ThreadingPolicy::Single,
-    //     GaussianPreciseLevel::INTEGRAL,
+    //     GaussianPreciseLevel::EXACT,
     // );
 
     // stack_blur_f16(
@@ -246,23 +249,23 @@ fn main() {
     //     ThreadingPolicy::Single,
     // );
 
-    fast_gaussian(
-        &mut dst_bytes,
-        dimensions.0 * components as u32,
-        dimensions.0,
-        dimensions.1,
-        125,
-        FastBlurChannels::Channels3,
-        ThreadingPolicy::Single,
-        EdgeMode::Clamp,
-    );
+    // fast_gaussian(
+    //     &mut dst_bytes,
+    //     dimensions.0 * components as u32,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     125,
+    //     FastBlurChannels::Channels3,
+    //     ThreadingPolicy::Single,
+    //     EdgeMode::Clamp,
+    // );
 
     // dst_bytes = f16_bytes
     //     .iter()
     //     .map(|&x| (x.to_f32() * 255f32) as u8)
     //     .collect();
 
-    // dst_bytes = perform_planar_pass_3(&bytes, dimensions.0 as usize, dimensions.1 as usize);
+    dst_bytes = perform_planar_pass_3(&bytes, dimensions.0 as usize, dimensions.1 as usize);
 
     let elapsed_time = start_time.elapsed();
     // Print the elapsed time in milliseconds

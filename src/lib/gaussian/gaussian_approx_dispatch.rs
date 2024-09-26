@@ -92,10 +92,8 @@ fn gaussian_blur_horizontal_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_
     }
 
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-    let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
-
-    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     {
+        let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
         if _is_sse_available
             && _edge_mode == EdgeMode::Clamp
             && (CHANNEL_CONFIGURATION == 3 || CHANNEL_CONFIGURATION == 4)

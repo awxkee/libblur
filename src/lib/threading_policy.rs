@@ -26,12 +26,13 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Default, Hash)]
 /// Declares thread policy usage
 pub enum ThreadingPolicy {
     /// Will use only one thread, current is preferred
     Single,
     /// Computes adaptive thread count between 1...12 for given image bounds
+    #[default]
     Adaptive,
     /// Spawn provided threads count
     Fixed(usize),
