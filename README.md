@@ -274,6 +274,23 @@ Example comparison time for blurring image 2828x4242 RGBA 8-bit in single-thread
 | libblur | 51.90ms  |
 | OpenCV  | 134.28ms |
 
+### Fast bilateral blur
+
+This is fast bilateral approximation, note this behaviour significantly differs from OpenCV.
+This method has high convergence and will completely blur an image very fast with increasing spatial sigma
+
+```rust
+fast_bilateral_filter(
+    src_bytes,
+    &mut dst_bytes,
+    dimensions.0,
+    dimensions.1,
+    spatial_sigma,
+    range_sigma,
+    FastBlurChannels::Channels3,
+);
+```
+
 This project is licensed under either of
 
 - BSD-3-Clause License (see [LICENSE](LICENSE-APACHE))
