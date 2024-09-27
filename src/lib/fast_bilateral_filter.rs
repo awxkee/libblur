@@ -601,6 +601,7 @@ fn fast_bilateral_filter_plane_impl<V: Copy + Default + 'static + BilinearWorkin
     }
 }
 
+#[cfg(feature = "image")]
 pub(crate) fn fast_bilateral_filter_gray_alpha_impl<
     V: Copy + Default + 'static + BilinearWorkingItem<V> + Send + Sync,
 >(
