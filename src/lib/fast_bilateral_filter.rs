@@ -345,8 +345,18 @@ fn fast_bilateral_filter_impl<
     let padding_xy = 2.;
     let padding_z = 2.;
 
-    let spatial_sigma_scale = 1. / spatial_sigma * (if spatial_sigma > 1.3 { 1.3 } else { 1. });
-    let range_sigma_scale = 1. / range_sigma;
+    let spatial_sigma_scale = if spatial_sigma > 1. {
+        (1. / spatial_sigma * (if spatial_sigma > 1.3 { 1.3 } else { 1. }))
+            .min(1. / 1.2f32)
+            .max(1. / 15f32)
+    } else {
+        1.
+    };
+    let range_sigma_scale = if range_sigma > 1. {
+        (1. / range_sigma).min(1. / 1.1f32).max(1. / 15f32)
+    } else {
+        1.
+    };
 
     let small_width = (((width - 1) as f32 * spatial_sigma_scale) + 1. + 2. * padding_xy) as usize;
     let small_height =
@@ -822,6 +832,7 @@ fn fast_bilateral_filter_rgba_impl<
 ///
 /// This is fast bilateral approximation, note this behaviour significantly differs from OpenCV.
 /// This method has high convergence and will completely blur an image very fast with increasing spatial sigma
+/// By the nature of this filter the more spatial sigma are the faster method is.
 ///
 /// # Arguments
 ///
@@ -859,6 +870,7 @@ pub fn fast_bilateral_filter(
 ///
 /// This is fast bilateral approximation, note this behaviour significantly differs from OpenCV.
 /// This method has high convergence and will completely blur an image very fast with increasing spatial sigma
+/// By the nature of this filter the more spatial sigma are the faster method is.
 ///
 /// # Arguments
 ///
@@ -896,6 +908,7 @@ pub fn fast_bilateral_filter_u16(
 ///
 /// This is fast bilateral approximation, note this behaviour significantly differs from OpenCV.
 /// This method has high convergence and will completely blur an image very fast with increasing spatial sigma
+/// By the nature of this filter the more spatial sigma are the faster method is.
 ///
 /// # Arguments
 ///

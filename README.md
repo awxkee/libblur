@@ -277,7 +277,8 @@ Example comparison time for blurring image 2828x4242 RGBA 8-bit in single-thread
 ### Fast bilateral blur
 
 This is fast bilateral approximation, note this behaviour significantly differs from OpenCV.
-This method has high convergence and will completely blur an image very fast with increasing spatial sigma
+This method has high convergence and will completely blur an image very fast with increasing spatial sigma.
+By the nature of this filter the more spatial sigma are the faster method is.
 
 ```rust
 fast_bilateral_filter(

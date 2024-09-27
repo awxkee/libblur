@@ -38,7 +38,8 @@ use image::{
 /// Performs fast bilateral filter on the image
 ///
 /// This is fast bilateral approximation, note this behaviour significantly differs from OpenCV.
-/// This method has high convergence and will completely blur an image very fast with increasing spatial sigma
+/// This method has high convergence and will completely blur an image very fast with increasing spatial sigma.
+/// By the nature of this filter the more spatial sigma are the faster method is.
 ///
 /// # Arguments
 ///

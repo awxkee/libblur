@@ -3,7 +3,7 @@ mod split;
 
 use crate::merge::merge_channels_3;
 use crate::split::split_channels_3;
-use image::{EncodableLayout, GenericImageView, ImageFormat, ImageReader};
+use image::{DynamicImage, EncodableLayout, GenericImageView, ImageFormat, ImageReader};
 use libblur::{fast_bilateral_filter, fast_bilateral_filter_image, fast_gaussian, fast_gaussian_next, fast_gaussian_next_f32, gaussian_blur_image, stack_blur_image, EdgeMode, FastBlurChannels, GaussianPreciseLevel, ThreadingPolicy};
 use std::time::Instant;
 
@@ -261,13 +261,10 @@ fn main() {
         &mut dst_bytes,
         dimensions.0,
         dimensions.1,
-        2.3f32,
-        1f32,
+        7f32,
+        0.5f32,
         FastBlurChannels::Channels3,
     );
-
-    let new_img = fast_bilateral_filter_image(img, 15f32, 1f32).unwrap();
-    new_img.save_with_format("output.jpg", ImageFormat::Jpeg).unwrap();
 
     // dst_bytes = f16_bytes
     //     .iter()
@@ -279,6 +276,9 @@ fn main() {
     let elapsed_time = start_time.elapsed();
     // Print the elapsed time in milliseconds
     println!("Elapsed time: {:.2?}", elapsed_time);
+
+    let new_img = fast_bilateral_filter_image(img, 20f32, 1f32).unwrap();
+    new_img.save_with_format("output.jpg", ImageFormat::Jpeg).unwrap();
 
     // libblur::gaussian_blur(
     //     &bytes,
