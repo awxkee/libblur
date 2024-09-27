@@ -761,6 +761,7 @@ fn gaussian_blur_impl<
 /// * `channels` - Count of channels in the image
 /// * `edge_mode` - Rule to handle edge mode
 /// * `threading_policy` - Threading policy according to *ThreadingPolicy*
+/// * `precise_level` - Gaussian precise level
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided

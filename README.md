@@ -23,6 +23,23 @@ For measurement was used M3 Pro with NEON feature. On x86_84 OpenCV might be bet
 cargo add libblur
 ```
 
+#### Usage with image feature
+
+```rust
+let blurred = gaussian_blur_image(
+     img,
+     61,
+     0.,
+     EdgeMode::Clamp,
+     GaussianPreciseLevel::INTEGRAL,
+     ThreadingPolicy::Adaptive,
+ )
+ .unwrap();
+ blurred
+     .save_with_format("blurred.jpg", ImageFormat::Jpeg)
+     .unwrap();
+```
+
 ### Stack blur
 
 The fastest with acceptable results. Result are quite close to gaussian and look good. Sometimes noticeable changes

@@ -938,7 +938,6 @@ pub fn fast_gaussian_next(
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn fast_gaussian_next_u16(
     bytes: &mut [u16],
-    stride: u32,
     width: u32,
     height: u32,
     radius: u32,
@@ -952,7 +951,7 @@ pub fn fast_gaussian_next_u16(
         channels,
         edge_mode,
         bytes,
-        stride,
+        width * channels.get_channels() as u32,
         width,
         height,
         acq_radius,

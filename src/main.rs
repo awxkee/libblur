@@ -3,11 +3,10 @@ mod split;
 
 use crate::merge::merge_channels_3;
 use crate::split::split_channels_3;
-use image::io::Reader as ImageReader;
-use image::{EncodableLayout, GenericImageView};
+use image::{EncodableLayout, GenericImageView, ImageFormat, ImageReader};
 use libblur::{
-    fast_gaussian, fast_gaussian_next, fast_gaussian_next_f32, EdgeMode, FastBlurChannels,
-    GaussianPreciseLevel, ThreadingPolicy,
+    fast_gaussian, fast_gaussian_next, fast_gaussian_next_f32, gaussian_blur_image,
+    stack_blur_image, EdgeMode, FastBlurChannels, GaussianPreciseLevel, ThreadingPolicy,
 };
 use std::time::Instant;
 
@@ -259,6 +258,19 @@ fn main() {
         ThreadingPolicy::Single,
         EdgeMode::Clamp,
     );
+
+    let blurred = gaussian_blur_image(
+        img,
+        61,
+        0.,
+        EdgeMode::Clamp,
+        GaussianPreciseLevel::INTEGRAL,
+        ThreadingPolicy::Adaptive,
+    )
+    .unwrap();
+    blurred
+        .save_with_format("blurred.jpg", ImageFormat::Jpeg)
+        .unwrap();
 
     // dst_bytes = f16_bytes
     //     .iter()
