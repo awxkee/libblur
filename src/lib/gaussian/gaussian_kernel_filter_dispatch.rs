@@ -45,6 +45,7 @@ use num_traits::{AsPrimitive, FromPrimitive};
 use rayon::ThreadPool;
 
 pub trait GaussianClipVerticalPass<T> {
+    #[allow(clippy::type_complexity)]
     fn get_clip_vert_pass<const CHANNEL_CONFIGURATION: usize>() -> fn(
         src: &[T],
         src_stride: u32,
@@ -59,6 +60,7 @@ pub trait GaussianClipVerticalPass<T> {
 }
 
 impl GaussianClipVerticalPass<f16> for f16 {
+    #[allow(clippy::type_complexity)]
     fn get_clip_vert_pass<const CHANNEL_CONFIGURATION: usize>() -> fn(
         src: &[f16],
         src_stride: u32,
@@ -75,6 +77,7 @@ impl GaussianClipVerticalPass<f16> for f16 {
 }
 
 impl GaussianClipVerticalPass<u16> for u16 {
+    #[allow(clippy::type_complexity)]
     fn get_clip_vert_pass<const CHANNEL_CONFIGURATION: usize>(
     ) -> fn(&[u16], u32, &UnsafeSlice<u16>, u32, u32, u32, &[GaussianFilter<f32>], u32, u32) {
         gaussian_blur_vertical_pass_clip_edge_impl::<u16, CHANNEL_CONFIGURATION>
@@ -82,6 +85,7 @@ impl GaussianClipVerticalPass<u16> for u16 {
 }
 
 impl GaussianClipVerticalPass<u8> for u8 {
+    #[allow(clippy::type_complexity)]
     fn get_clip_vert_pass<const CHANNEL_CONFIGURATION: usize>(
     ) -> fn(&[u8], u32, &UnsafeSlice<u8>, u32, u32, u32, &[GaussianFilter<f32>], u32, u32) {
         let mut _dispatcher: fn(
@@ -120,6 +124,7 @@ impl GaussianClipVerticalPass<u8> for u8 {
 }
 
 impl GaussianClipVerticalPass<f32> for f32 {
+    #[allow(clippy::type_complexity)]
     fn get_clip_vert_pass<const CHANNEL_CONFIGURATION: usize>(
     ) -> fn(&[f32], u32, &UnsafeSlice<f32>, u32, u32, u32, &[GaussianFilter<f32>], u32, u32) {
         let mut _dispatcher: fn(
@@ -260,6 +265,7 @@ pub(crate) fn gaussian_blur_vertical_pass_edge_clip_dispatch<
 }
 
 pub trait GaussianClipHorizontalPass<T> {
+    #[allow(clippy::type_complexity)]
     fn get_clip_horiz_pass<const CHANNEL_CONFIGURATION: usize>() -> fn(
         src: &[T],
         src_stride: u32,
@@ -287,6 +293,7 @@ impl GaussianClipHorizontalPass<f16> for f16 {
 }
 
 impl GaussianClipHorizontalPass<u8> for u8 {
+    #[allow(clippy::type_complexity)]
     fn get_clip_horiz_pass<const CHANNEL_CONFIGURATION: usize>(
     ) -> fn(&[u8], u32, &UnsafeSlice<u8>, u32, u32, &[GaussianFilter<f32>], u32, u32) {
         let mut _dispatcher: fn(
@@ -343,6 +350,7 @@ impl GaussianClipHorizontalPass<u8> for u8 {
 }
 
 impl GaussianClipHorizontalPass<f32> for f32 {
+    #[allow(clippy::type_complexity)]
     fn get_clip_horiz_pass<const CHANNEL_CONFIGURATION: usize>(
     ) -> fn(&[f32], u32, &UnsafeSlice<f32>, u32, u32, &[GaussianFilter<f32>], u32, u32) {
         let mut _dispatcher: fn(

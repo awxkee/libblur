@@ -58,7 +58,7 @@ pub fn gaussian_blur_image(
 ) -> Option<DynamicImage> {
     match image {
         DynamicImage::ImageLuma8(gray) => {
-            let mut new_image = gray.as_raw().iter().copied().collect::<Vec<_>>();
+            let mut new_image = gray.as_raw().to_vec();
             gaussian_blur(
                 gray.as_raw(),
                 gray.width(),
@@ -150,7 +150,7 @@ pub fn gaussian_blur_image(
             Some(DynamicImage::ImageLumaA8(new_gray_image))
         }
         DynamicImage::ImageRgb8(rgb_image) => {
-            let mut new_image = rgb_image.as_raw().iter().copied().collect::<Vec<_>>();
+            let mut new_image = rgb_image.as_raw().to_vec();
 
             gaussian_blur(
                 rgb_image.as_raw(),
@@ -172,7 +172,7 @@ pub fn gaussian_blur_image(
             Some(DynamicImage::ImageRgb8(new_rgb_image))
         }
         DynamicImage::ImageRgba8(rgba_image) => {
-            let mut new_image = rgba_image.as_raw().iter().copied().collect::<Vec<_>>();
+            let mut new_image = rgba_image.as_raw().to_vec();
             gaussian_blur(
                 rgba_image.as_raw(),
                 rgba_image.width() * 4,
@@ -192,7 +192,7 @@ pub fn gaussian_blur_image(
             Some(DynamicImage::ImageRgba8(new_rgba_image))
         }
         DynamicImage::ImageLuma16(luma_16) => {
-            let mut new_image = luma_16.as_raw().iter().copied().collect::<Vec<_>>();
+            let mut new_image = luma_16.as_raw().to_vec();
 
             gaussian_blur_u16(
                 luma_16.as_raw(),
@@ -278,7 +278,7 @@ pub fn gaussian_blur_image(
             Some(DynamicImage::ImageLumaA16(new_gray_image))
         }
         DynamicImage::ImageRgb16(rgb_16_image) => {
-            let mut new_image = rgb_16_image.as_raw().iter().copied().collect::<Vec<_>>();
+            let mut new_image = rgb_16_image.as_raw().to_vec();
 
             gaussian_blur_u16(
                 rgb_16_image.as_raw(),
@@ -300,7 +300,7 @@ pub fn gaussian_blur_image(
             Some(DynamicImage::ImageRgb16(new_rgb_image))
         }
         DynamicImage::ImageRgba16(rgba_16_image) => {
-            let mut new_image = rgba_16_image.as_raw().iter().copied().collect::<Vec<_>>();
+            let mut new_image = rgba_16_image.as_raw().to_vec();
 
             gaussian_blur_u16(
                 rgba_16_image.as_raw(),
@@ -322,7 +322,7 @@ pub fn gaussian_blur_image(
             Some(DynamicImage::ImageRgba16(new_rgb_image))
         }
         DynamicImage::ImageRgb32F(rgb_image_f32) => {
-            let mut new_image = rgb_image_f32.as_raw().iter().copied().collect::<Vec<_>>();
+            let mut new_image = rgb_image_f32.as_raw().to_vec();
             gaussian_blur_f32(
                 rgb_image_f32.as_raw(),
                 &mut new_image,
@@ -339,7 +339,7 @@ pub fn gaussian_blur_image(
             Some(DynamicImage::ImageRgb32F(new_rgb_image))
         }
         DynamicImage::ImageRgba32F(rgba_image_f32) => {
-            let mut new_image = rgba_image_f32.as_raw().iter().copied().collect::<Vec<_>>();
+            let mut new_image = rgba_image_f32.as_raw().to_vec();
             gaussian_blur_f32(
                 rgba_image_f32.as_raw(),
                 &mut new_image,

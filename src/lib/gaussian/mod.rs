@@ -46,6 +46,7 @@ mod neon;
 mod sse;
 
 pub use declaration::*;
+pub use gaussian_kernel::get_gaussian_kernel_1d;
 pub use gaussian_linear::gaussian_blur_in_linear;
 pub use gaussian_precise_level::GaussianPreciseLevel;
 pub use gaussian_util::get_sigma_size;

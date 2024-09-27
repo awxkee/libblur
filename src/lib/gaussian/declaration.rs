@@ -60,6 +60,7 @@ use crate::unsafe_slice::UnsafeSlice;
 use crate::{get_sigma_size, ThreadingPolicy};
 
 trait GaussianHorizontalDispatch<T> {
+    #[allow(clippy::type_complexity)]
     fn get_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>() -> fn(
         src: &[T],
         src_stride: u32,
@@ -74,6 +75,7 @@ trait GaussianHorizontalDispatch<T> {
 }
 
 impl GaussianHorizontalDispatch<u16> for u16 {
+    #[allow(clippy::type_complexity)]
     fn get_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>(
     ) -> fn(&[u16], u32, &UnsafeSlice<u16>, u32, u32, usize, &[f32], u32, u32) {
         gaussian_blur_horizontal_pass_impl::<u16, CHANNEL_CONFIGURATION, EDGE_MODE>
@@ -81,6 +83,7 @@ impl GaussianHorizontalDispatch<u16> for u16 {
 }
 
 impl GaussianHorizontalDispatch<f16> for f16 {
+    #[allow(clippy::type_complexity)]
     fn get_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>(
     ) -> fn(&[f16], u32, &UnsafeSlice<f16>, u32, u32, usize, &[f32], u32, u32) {
         gaussian_blur_horizontal_pass_impl::<f16, CHANNEL_CONFIGURATION, EDGE_MODE>
@@ -88,6 +91,7 @@ impl GaussianHorizontalDispatch<f16> for f16 {
 }
 
 impl GaussianHorizontalDispatch<u8> for u8 {
+    #[allow(clippy::type_complexity)]
     fn get_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>(
     ) -> fn(&[u8], u32, &UnsafeSlice<u8>, u32, u32, usize, &[f32], u32, u32) {
         let mut _dispatcher: fn(
@@ -146,6 +150,7 @@ impl GaussianHorizontalDispatch<u8> for u8 {
 }
 
 impl GaussianHorizontalDispatch<f32> for f32 {
+    #[allow(clippy::type_complexity)]
     fn get_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>(
     ) -> fn(&[f32], u32, &UnsafeSlice<f32>, u32, u32, usize, &[f32], u32, u32) {
         let mut _dispatcher: fn(
@@ -318,6 +323,7 @@ fn gaussian_blur_vertical_pass_impl<
 }
 
 trait GaussianVerticalPassDispatch<T> {
+    #[allow(clippy::type_complexity)]
     fn get_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>() -> fn(
         src: &[T],
         src_stride: u32,
@@ -333,6 +339,7 @@ trait GaussianVerticalPassDispatch<T> {
 }
 
 impl GaussianVerticalPassDispatch<f16> for f16 {
+    #[allow(clippy::type_complexity)]
     fn get_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>(
     ) -> fn(&[f16], u32, &UnsafeSlice<f16>, u32, u32, u32, usize, &[f32], u32, u32) {
         gaussian_blur_vertical_pass_impl::<f16, CHANNEL_CONFIGURATION, EDGE_MODE>
@@ -347,6 +354,7 @@ impl GaussianVerticalPassDispatch<u16> for u16 {
 }
 
 impl GaussianVerticalPassDispatch<u8> for u8 {
+    #[allow(clippy::type_complexity)]
     fn get_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>(
     ) -> fn(&[u8], u32, &UnsafeSlice<u8>, u32, u32, u32, usize, &[f32], u32, u32) {
         let mut _dispatcher: fn(
@@ -405,6 +413,7 @@ impl GaussianVerticalPassDispatch<u8> for u8 {
 }
 
 impl GaussianVerticalPassDispatch<f32> for f32 {
+    #[allow(clippy::type_complexity)]
     fn get_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>(
     ) -> fn(&[f32], u32, &UnsafeSlice<f32>, u32, u32, u32, usize, &[f32], u32, u32) {
         let mut _dispatcher: fn(

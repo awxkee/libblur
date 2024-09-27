@@ -4,10 +4,7 @@ mod split;
 use crate::merge::merge_channels_3;
 use crate::split::split_channels_3;
 use image::{EncodableLayout, GenericImageView, ImageFormat, ImageReader};
-use libblur::{
-    fast_gaussian, fast_gaussian_next, fast_gaussian_next_f32, gaussian_blur_image,
-    stack_blur_image, EdgeMode, FastBlurChannels, GaussianPreciseLevel, ThreadingPolicy,
-};
+use libblur::{fast_bilateral_filter, fast_bilateral_filter_image, fast_gaussian, fast_gaussian_next, fast_gaussian_next_f32, gaussian_blur_image, stack_blur_image, EdgeMode, FastBlurChannels, GaussianPreciseLevel, ThreadingPolicy};
 use std::time::Instant;
 
 #[allow(dead_code)]
@@ -136,7 +133,7 @@ fn main() {
     //     vst1q_s64(t.as_mut_ptr(), mul);
     //     println!("{:?}", t);
     // }
-    let img = ImageReader::open("assets/test_image_1_small.jpg")
+    let img = ImageReader::open("assets/test_image_1.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -248,29 +245,29 @@ fn main() {
     //     ThreadingPolicy::Single,
     // );
 
-    fast_gaussian(
+    // fast_gaussian(
+    //     &mut dst_bytes,
+    //     dimensions.0 * components as u32,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     125,
+    //     FastBlurChannels::Channels3,
+    //     ThreadingPolicy::Single,
+    //     EdgeMode::Clamp,
+    // );
+
+    fast_bilateral_filter(
+        src_bytes,
         &mut dst_bytes,
-        dimensions.0 * components as u32,
         dimensions.0,
         dimensions.1,
-        125,
+        2.3f32,
+        1f32,
         FastBlurChannels::Channels3,
-        ThreadingPolicy::Single,
-        EdgeMode::Clamp,
     );
 
-    let blurred = gaussian_blur_image(
-        img,
-        61,
-        0.,
-        EdgeMode::Clamp,
-        GaussianPreciseLevel::INTEGRAL,
-        ThreadingPolicy::Adaptive,
-    )
-    .unwrap();
-    blurred
-        .save_with_format("blurred.jpg", ImageFormat::Jpeg)
-        .unwrap();
+    let new_img = fast_bilateral_filter_image(img, 15f32, 1f32).unwrap();
+    new_img.save_with_format("output.jpg", ImageFormat::Jpeg).unwrap();
 
     // dst_bytes = f16_bytes
     //     .iter()

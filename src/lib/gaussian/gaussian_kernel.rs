@@ -27,7 +27,7 @@
 
 use crate::gaussian::gaussian_approx::PRECISION;
 
-pub(crate) fn get_gaussian_kernel_1d(width: u32, sigma: f32) -> Vec<f32> {
+pub fn get_gaussian_kernel_1d(width: u32, sigma: f32) -> Vec<f32> {
     let mut sum_norm: f32 = 0f32;
     let mut kernel: Vec<f32> = Vec::with_capacity(width as usize);
     let scale = 1f32 / (f32::sqrt(2f32 * std::f32::consts::PI) * sigma);

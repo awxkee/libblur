@@ -30,6 +30,9 @@ mod r#box;
 mod channels_configuration;
 mod cpu_features;
 mod edge_mode;
+mod fast_bilateral_filter;
+#[cfg(feature = "image")]
+mod fast_bilateral_image;
 mod fast_gaussian;
 #[cfg(feature = "image")]
 mod fast_gaussian_image;
@@ -61,6 +64,11 @@ mod wasm32;
 pub use channels_configuration::FastBlurChannels;
 pub use colorutils_rs::TransferFunction;
 pub use edge_mode::*;
+pub use fast_bilateral_filter::{
+    fast_bilateral_filter, fast_bilateral_filter_f32, fast_bilateral_filter_u16,
+};
+#[cfg(feature = "image")]
+pub use fast_bilateral_image::fast_bilateral_filter_image;
 pub use fast_gaussian::fast_gaussian;
 pub use fast_gaussian::fast_gaussian_f16;
 pub use fast_gaussian::fast_gaussian_f32;

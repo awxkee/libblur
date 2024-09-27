@@ -879,7 +879,7 @@ fn fast_gaussian_next_impl<
 /// Performs gaussian approximation on the image.
 ///
 /// Fast gaussian approximation for u8 image.
-/// This is also a VERY fast approximation, however producing more pleasant results than stack blur, or first level of approximation.
+/// This is also a VERY fast approximation, however producing more pleasant results than stack blu.
 /// Radius is limited to 280.
 /// Approximation based on binomial filter.
 /// O(1) complexity.
@@ -921,7 +921,7 @@ pub fn fast_gaussian_next(
 /// Performs gaussian approximation on the image.
 ///
 /// Fast gaussian approximation for u16 image.
-/// This is also a VERY fast approximation, however producing more pleasant results than stack blur, or first level of approximation.
+/// This is also a VERY fast approximation, however producing more pleasant results than stack blur.
 /// Radius is limited to 152.
 /// Approximation based on binomial filter.
 /// O(1) complexity.
@@ -962,7 +962,7 @@ pub fn fast_gaussian_next_u16(
 /// Performs gaussian approximation on the image.
 ///
 /// Fast gaussian approximation for u16 image.
-/// This is also a VERY fast approximation, however producing more pleasant results than stack blur, or first level of approximation.
+/// This is also a VERY fast approximation, however producing more pleasant results than stack blur.
 /// Approximation based on binomial filter.
 /// O(1) complexity.
 ///
@@ -1001,7 +1001,7 @@ pub fn fast_gaussian_next_f32(
 /// Performs gaussian approximation on the image.
 ///
 /// Fast gaussian approximation for f16 image.
-/// This is also a VERY fast approximation, however producing more pleasant results than stack blur, or first level of approximation.
+/// This is also a VERY fast approximation, however producing more pleasant results than stack blur.
 /// Approximation based on binomial filter.
 /// O(1) complexity.
 ///
