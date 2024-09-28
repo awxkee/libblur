@@ -1,7 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use libblur::{FastBlurChannels, ThreadingPolicy};
-use opencv::core::{find_file, Mat, Size};
+use opencv::core::{find_file, Mat};
 use opencv::imgcodecs::{imread, IMREAD_COLOR};
 
 pub fn criterion_benchmark(c: &mut Criterion) {
@@ -53,7 +53,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| {
             let mut dst_bytes: Vec<u8> = rgb_image.to_vec();
             libblur::median_blur(
-                src_bytes,
+                rgb_image,
                 rgb_img.dimensions().0 * 3,
                 &mut dst_bytes,
                 rgb_img.dimensions().0 * 3,

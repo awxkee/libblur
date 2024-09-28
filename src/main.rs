@@ -160,15 +160,15 @@ fn main() {
         );
     }
 
-    // libblur::stack_blur(
-    //     &mut dst_bytes,
-    //     stride as u32,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     255,
-    //     FastBlurChannels::Channels4,
-    //     ThreadingPolicy::Single,
-    // );
+    libblur::stack_blur(
+        &mut dst_bytes,
+        stride as u32,
+        dimensions.0,
+        dimensions.1,
+        75,
+        FastBlurChannels::Channels3,
+        ThreadingPolicy::Single,
+    );
 
     //
     // libblur::tent_blur(
@@ -260,15 +260,15 @@ fn main() {
     //     EdgeMode::Clamp,
     // );
 
-    fast_bilateral_filter(
-        src_bytes,
-        &mut dst_bytes,
-        dimensions.0,
-        dimensions.1,
-        7f32,
-        0.5f32,
-        FastBlurChannels::Channels3,
-    );
+    // fast_bilateral_filter(
+    //     src_bytes,
+    //     &mut dst_bytes,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     7f32,
+    //     0.5f32,
+    //     FastBlurChannels::Channels3,
+    // );
 
     // dst_bytes = f16_bytes
     //     .iter()
@@ -280,11 +280,6 @@ fn main() {
     let elapsed_time = start_time.elapsed();
     // Print the elapsed time in milliseconds
     println!("Elapsed time: {:.2?}", elapsed_time);
-
-    let new_img = fast_bilateral_filter_image(img, 3.5f32, 1f32).unwrap();
-    new_img
-        .save_with_format("output.jpg", ImageFormat::Jpeg)
-        .unwrap();
 
     // libblur::gaussian_blur(
     //     &bytes,
