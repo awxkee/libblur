@@ -139,14 +139,6 @@ macro_rules! reflect_101 {
     }};
 }
 
-/**
-    RRRRRR  OOOOO  U     U TTTTTTT IIIII NN   N EEEEEEE SSSSS
-    R     R O     O U     U   T     I   I N N  N E       S
-   RRRRRR  O     O U     U   T     I   I N  N N EEEEE    SSS
-   R   R   O     O U     U   T     I   I N   NN E            S
-   R    R   OOOOO   UUUUU    T    IIIII N    N EEEEEEE  SSSSS
-**/
-
 #[macro_export]
 macro_rules! clamp_edge {
     ($edge_mode:expr, $value:expr, $min:expr, $max:expr) => {{

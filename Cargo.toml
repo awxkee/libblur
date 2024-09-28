@@ -19,10 +19,18 @@ rayon = "1.10.0"
 
 [dev-dependencies]
 criterion = "0.5.1"
-#opencv = { version = "0.92.0", default-features = false, features = ["imgcodecs", "imgproc"] }
+opencv = { version = "0.93.1", default-features = false, features = ["imgcodecs", "imgproc", "clang-runtime"] }
 
 [[bench]]
-name = "gauss_bench"
+name = "gauss"
+harness = false
+
+[[bench]]
+name = "median"
+harness = false
+
+[[bench]]
+name = "box"
 harness = false
 
 [[bench]]

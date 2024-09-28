@@ -58,14 +58,6 @@ use std::mem::size_of;
 
 const BASE_RADIUS_I64_CUTOFF: u32 = 125;
 
-/**
- RRRRRR  OOOOO  U     U TTTTTTT IIIII NN   N EEEEEEE SSSSS
- R     R O     O U     U   T     I   I N N  N E       S
-RRRRRR  O     O U     U   T     I   I N  N N EEEEE    SSS
-R   R   O     O U     U   T     I   I N   NN E            S
-R    R   OOOOO   UUUUU    T    IIIII N    N EEEEEEE  SSSSS
- **/
-
 macro_rules! impl_generic_call {
     ($store_type:ty, $channels_type:expr, $edge_mode:expr, $bytes:expr, $stride:expr, $width:expr, $height:expr, $radius:expr, $threading_policy:expr) => {
         let _dispatcher = match $channels_type {

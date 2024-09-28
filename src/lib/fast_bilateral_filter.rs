@@ -308,6 +308,7 @@ fn get_gaussian_kernel_size(sigma: f32) -> usize {
     2 * (3.0 * sigma).ceil() as usize + 1
 }
 
+#[allow(clippy::manual_clamp)]
 fn fast_bilateral_filter_impl<
     T: Copy
         + Default
@@ -546,6 +547,7 @@ pub trait BilinearWorkingItem<T> {
 
 impl BilinearWorkingItem<u8> for u8 {
     #[inline]
+    #[allow(clippy::manual_clamp)]
     fn from_bi_linear_f32(value: f32) -> u8 {
         (value * 255.).min(255.).max(0.).round() as u8
     }

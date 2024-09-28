@@ -1,6 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use image::io::Reader as ImageReader;
-use image::GenericImageView;
+use image::{GenericImageView, ImageReader};
 
 use libblur::{EdgeMode, FastBlurChannels, ThreadingPolicy};
 
@@ -15,14 +14,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let src_bytes = img.as_bytes();
     c.bench_function("RGBA fast gaussian", |b| {
         b.iter(|| {
-            let mut dst_bytes: Vec<u8> = vec![0u8; dimensions.1 as usize * stride];
-            unsafe {
-                std::ptr::copy_nonoverlapping(
-                    src_bytes.as_ptr(),
-                    dst_bytes.as_mut_ptr(),
-                    dimensions.1 as usize * stride,
-                );
-            }
+            let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
             libblur::fast_gaussian(
                 &mut dst_bytes,
                 stride as u32,
@@ -30,7 +22,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 dimensions.1,
                 77,
                 FastBlurChannels::Channels4,
-                ThreadingPolicy::Single,
+                ThreadingPolicy::Adaptive,
                 EdgeMode::Clamp,
             );
         })

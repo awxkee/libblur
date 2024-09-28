@@ -59,14 +59,6 @@ use crate::{clamp_edge, reflect_101, EdgeMode};
 
 const BASE_RADIUS_I64_CUTOFF: u32 = 180;
 
-/**
- RRRRRR  OOOOO  U     U TTTTTTT IIIII NN   N EEEEEEE SSSSS
- R     R O     O U     U   T     I   I N N  N E       S
-RRRRRR  O     O U     U   T     I   I N  N N EEEEE    SSS
-R   R   O     O U     U   T     I   I N   NN E            S
-R    R   OOOOO   UUUUU    T    IIIII N    N EEEEEEE  SSSSS
-**/
-
 macro_rules! update_differences_inside {
     ($dif_r:expr, $buffer_r:expr, $arr_index:expr, $d_arr_index:expr) => {{
         let twos = J::from_i32(2i32).unwrap();

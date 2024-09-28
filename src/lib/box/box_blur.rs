@@ -30,6 +30,7 @@ use colorutils_rs::planar_to_linear::plane_to_linear;
 use colorutils_rs::{
     linear_to_rgb, linear_to_rgba, rgb_to_linear, rgba_to_linear, TransferFunction,
 };
+use half::f16;
 use num_traits::cast::FromPrimitive;
 use num_traits::AsPrimitive;
 use rayon::ThreadPool;
@@ -153,6 +154,76 @@ fn box_blur_horizontal_pass_impl<T, J, const CHANNELS_CONFIGURATION: usize>(
     }
 }
 
+trait BoxBlurHorizontalPass<T> {
+    #[allow(clippy::type_complexity)]
+    fn get_horizontal_pass<const CHANNEL_CONFIGURATION: usize>() -> fn(
+        src: &[T],
+        src_stride: u32,
+        unsafe_dst: &UnsafeSlice<T>,
+        dst_stride: u32,
+        width: u32,
+        radius: u32,
+        start_y: u32,
+        end_y: u32,
+    );
+}
+
+impl BoxBlurHorizontalPass<f32> for f32 {
+    #[allow(clippy::type_complexity)]
+    fn get_horizontal_pass<const CHANNEL_CONFIGURATION: usize>(
+    ) -> fn(&[f32], u32, &UnsafeSlice<f32>, u32, u32, u32, u32, u32) {
+        box_blur_horizontal_pass_impl::<f32, f32, CHANNEL_CONFIGURATION>
+    }
+}
+
+impl BoxBlurHorizontalPass<f16> for f16 {
+    #[allow(clippy::type_complexity)]
+    fn get_horizontal_pass<const CHANNEL_CONFIGURATION: usize>(
+    ) -> fn(&[f16], u32, &UnsafeSlice<f16>, u32, u32, u32, u32, u32) {
+        box_blur_horizontal_pass_impl::<f16, f32, CHANNEL_CONFIGURATION>
+    }
+}
+
+impl BoxBlurHorizontalPass<u16> for u16 {
+    #[allow(clippy::type_complexity)]
+    fn get_horizontal_pass<const CHANNEL_CONFIGURATION: usize>(
+    ) -> fn(&[u16], u32, &UnsafeSlice<u16>, u32, u32, u32, u32, u32) {
+        box_blur_horizontal_pass_impl::<u16, u32, CHANNEL_CONFIGURATION>
+    }
+}
+
+impl BoxBlurHorizontalPass<u8> for u8 {
+    #[allow(clippy::type_complexity)]
+    fn get_horizontal_pass<const CHANNEL_CONFIGURATION: usize>(
+    ) -> fn(&[u8], u32, &UnsafeSlice<u8>, u32, u32, u32, u32, u32) {
+        let mut _dispatcher_horizontal: fn(
+            src: &[u8],
+            src_stride: u32,
+            unsafe_dst: &UnsafeSlice<u8>,
+            dst_stride: u32,
+            width: u32,
+            radius: u32,
+            start_y: u32,
+            end_y: u32,
+        ) = box_blur_horizontal_pass_impl::<u8, u32, CHANNEL_CONFIGURATION>;
+        if CHANNEL_CONFIGURATION >= 3 {
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            {
+                _dispatcher_horizontal = box_blur_horizontal_pass_neon::<u8, CHANNEL_CONFIGURATION>;
+            }
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+            {
+                let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+                if _is_sse_available {
+                    _dispatcher_horizontal =
+                        box_blur_horizontal_pass_sse::<u8, { CHANNEL_CONFIGURATION }>;
+                }
+            }
+        }
+        _dispatcher_horizontal
+    }
+}
+
 #[allow(clippy::type_complexity)]
 fn box_blur_horizontal_pass<
     T: FromPrimitive
@@ -165,7 +236,8 @@ fn box_blur_horizontal_pass<
         + AsPrimitive<u32>
         + AsPrimitive<u64>
         + AsPrimitive<f32>
-        + AsPrimitive<f64>,
+        + AsPrimitive<f64>
+        + BoxBlurHorizontalPass<T>,
     const CHANNEL_CONFIGURATION: usize,
 >(
     src: &[T],
@@ -180,40 +252,7 @@ fn box_blur_horizontal_pass<
 ) where
     f32: ToStorage<T>,
 {
-    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-    let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
-    let mut _dispatcher_horizontal: fn(
-        src: &[T],
-        src_stride: u32,
-        unsafe_dst: &UnsafeSlice<T>,
-        dst_stride: u32,
-        width: u32,
-        radius: u32,
-        start_y: u32,
-        end_y: u32,
-    ) = box_blur_horizontal_pass_impl::<T, u32, CHANNEL_CONFIGURATION>;
-    if std::any::type_name::<T>() == "f32"
-        || std::any::type_name::<T>() == "f16"
-        || std::any::type_name::<T>() == "half::f16"
-        || std::any::type_name::<T>() == "half::binary16::f16"
-    {
-        _dispatcher_horizontal = box_blur_horizontal_pass_impl::<T, f32, CHANNEL_CONFIGURATION>;
-    }
-    if CHANNEL_CONFIGURATION >= 3 {
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-        {
-            if std::any::type_name::<T>() == "u8" {
-                _dispatcher_horizontal = box_blur_horizontal_pass_neon::<T, CHANNEL_CONFIGURATION>;
-            }
-        }
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-        {
-            if std::any::type_name::<T>() == "u8" && _is_sse_available {
-                _dispatcher_horizontal =
-                    box_blur_horizontal_pass_sse::<T, { CHANNEL_CONFIGURATION }>;
-            }
-        }
-    }
+    let _dispatcher_horizontal = T::get_horizontal_pass::<CHANNEL_CONFIGURATION>();
     let unsafe_dst = UnsafeSlice::new(dst);
     if let Some(pool) = pool {
         pool.scope(|scope| {
@@ -364,6 +403,75 @@ fn box_blur_vertical_pass_impl<T, J, const CHANNELS_CONFIGURATION: usize>(
     }
 }
 
+trait BoxBlurVerticalPass<T> {
+    #[allow(clippy::type_complexity)]
+    fn get_box_vertical_pass<const CHANNELS_CONFIGURATION: usize>() -> fn(
+        src: &[T],
+        src_stride: u32,
+        unsafe_dst: &UnsafeSlice<T>,
+        dst_stride: u32,
+        width: u32,
+        height: u32,
+        radius: u32,
+        start_x: u32,
+        end_x: u32,
+    );
+}
+
+impl BoxBlurVerticalPass<f16> for f16 {
+    #[allow(clippy::type_complexity)]
+    fn get_box_vertical_pass<const CHANNELS_CONFIGURATION: usize>(
+    ) -> fn(&[f16], u32, &UnsafeSlice<f16>, u32, u32, u32, u32, u32, u32) {
+        box_blur_vertical_pass_impl::<f16, f32, CHANNELS_CONFIGURATION>
+    }
+}
+
+impl BoxBlurVerticalPass<f32> for f32 {
+    #[allow(clippy::type_complexity)]
+    fn get_box_vertical_pass<const CHANNELS_CONFIGURATION: usize>(
+    ) -> fn(&[f32], u32, &UnsafeSlice<f32>, u32, u32, u32, u32, u32, u32) {
+        box_blur_vertical_pass_impl::<f32, f32, CHANNELS_CONFIGURATION>
+    }
+}
+
+impl BoxBlurVerticalPass<u16> for u16 {
+    #[allow(clippy::type_complexity)]
+    fn get_box_vertical_pass<const CHANNELS_CONFIGURATION: usize>(
+    ) -> fn(&[u16], u32, &UnsafeSlice<u16>, u32, u32, u32, u32, u32, u32) {
+        box_blur_vertical_pass_impl::<u16, u32, CHANNELS_CONFIGURATION>
+    }
+}
+
+impl BoxBlurVerticalPass<u8> for u8 {
+    #[allow(clippy::type_complexity)]
+    fn get_box_vertical_pass<const CHANNELS_CONFIGURATION: usize>(
+    ) -> fn(&[u8], u32, &UnsafeSlice<u8>, u32, u32, u32, u32, u32, u32) {
+        let mut _dispatcher_vertical: fn(
+            src: &[u8],
+            src_stride: u32,
+            unsafe_dst: &UnsafeSlice<u8>,
+            dst_stride: u32,
+            width: u32,
+            height: u32,
+            radius: u32,
+            start_x: u32,
+            end_x: u32,
+        ) = box_blur_vertical_pass_impl::<u8, u32, CHANNELS_CONFIGURATION>;
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        {
+            let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+            if _is_sse_available {
+                _dispatcher_vertical = box_blur_vertical_pass_sse::<u8, CHANNELS_CONFIGURATION>;
+            }
+        }
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            _dispatcher_vertical = box_blur_vertical_pass_neon::<u8, CHANNELS_CONFIGURATION>;
+        }
+        _dispatcher_vertical
+    }
+}
+
 #[allow(clippy::type_complexity)]
 fn box_blur_vertical_pass<
     T: FromPrimitive
@@ -377,7 +485,8 @@ fn box_blur_vertical_pass<
         + AsPrimitive<u32>
         + AsPrimitive<u64>
         + AsPrimitive<f32>
-        + AsPrimitive<f64>,
+        + AsPrimitive<f64>
+        + BoxBlurVerticalPass<T>,
     const CHANNEL_CONFIGURATION: usize,
 >(
     src: &[T],
@@ -392,40 +501,7 @@ fn box_blur_vertical_pass<
 ) where
     f32: ToStorage<T>,
 {
-    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-    let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
-    let mut _dispatcher_vertical: fn(
-        src: &[T],
-        src_stride: u32,
-        unsafe_dst: &UnsafeSlice<T>,
-        dst_stride: u32,
-        width: u32,
-        height: u32,
-        radius: u32,
-        start_x: u32,
-        end_x: u32,
-    ) = box_blur_vertical_pass_impl::<T, u32, CHANNEL_CONFIGURATION>;
-    if std::any::type_name::<T>() == "f32"
-        || std::any::type_name::<T>() == "f16"
-        || std::any::type_name::<T>() == "half::f16"
-        || std::any::type_name::<T>() == "half::binary16::f16"
-    {
-        _dispatcher_vertical = box_blur_vertical_pass_impl::<T, f32, CHANNEL_CONFIGURATION>;
-    }
-    if CHANNEL_CONFIGURATION >= 3 {
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-        {
-            if std::any::type_name::<T>() == "u8" && _is_sse_available {
-                _dispatcher_vertical = box_blur_vertical_pass_sse::<T, CHANNEL_CONFIGURATION>;
-            }
-        }
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-        {
-            if std::any::type_name::<T>() == "u8" {
-                _dispatcher_vertical = box_blur_vertical_pass_neon::<T, CHANNEL_CONFIGURATION>;
-            }
-        }
-    }
+    let _dispatcher_vertical = T::get_box_vertical_pass::<CHANNEL_CONFIGURATION>();
     let unsafe_dst = UnsafeSlice::new(dst);
 
     if let Some(pool) = pool {
@@ -480,7 +556,9 @@ fn box_blur_impl<
         + AsPrimitive<u32>
         + AsPrimitive<u64>
         + AsPrimitive<f32>
-        + AsPrimitive<f64>,
+        + AsPrimitive<f64>
+        + BoxBlurHorizontalPass<T>
+        + BoxBlurVerticalPass<T>,
     const CHANNEL_CONFIGURATION: usize,
 >(
     src: &[T],
@@ -776,7 +854,9 @@ fn tent_blur_impl<
         + AsPrimitive<u32>
         + AsPrimitive<u64>
         + AsPrimitive<f32>
-        + AsPrimitive<f64>,
+        + AsPrimitive<f64>
+        + BoxBlurHorizontalPass<T>
+        + BoxBlurVerticalPass<T>,
     const CHANNEL_CONFIGURATION: usize,
 >(
     src: &[T],
@@ -1056,7 +1136,9 @@ fn gaussian_box_blur_impl<
         + AsPrimitive<u32>
         + AsPrimitive<u64>
         + AsPrimitive<f32>
-        + AsPrimitive<f64>,
+        + AsPrimitive<f64>
+        + BoxBlurHorizontalPass<T>
+        + BoxBlurVerticalPass<T>,
     const CHANNEL_CONFIGURATION: usize,
 >(
     src: &[T],
