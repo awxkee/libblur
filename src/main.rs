@@ -160,6 +160,8 @@ fn main() {
         );
     }
 
+    let start = Instant::now();
+
     libblur::stack_blur(
         &mut dst_bytes,
         stride as u32,
@@ -167,8 +169,10 @@ fn main() {
         dimensions.1,
         75,
         FastBlurChannels::Channels3,
-        ThreadingPolicy::Single,
+        ThreadingPolicy::Adaptive,
     );
+
+    println!("stack_blur {:?}" ,start.elapsed());
 
     //
     // libblur::tent_blur(

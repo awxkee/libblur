@@ -54,7 +54,7 @@ pub(crate) fn stack_blur_pass_f<T, J, const COMPONENTS: usize>(
         + std::ops::Mul<Output = J>
         + std::ops::Div<Output = J>
         + AsPrimitive<T>
-        + std::ops::SubAssign,
+        + std::ops::SubAssign + Default,
     f32: AsPrimitive<J>,
     i32: AsPrimitive<J>,
     u32: AsPrimitive<J>,

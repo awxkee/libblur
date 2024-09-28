@@ -37,7 +37,7 @@ use crate::unsafe_slice::UnsafeSlice;
 use crate::wasm32::stack_blur_pass_wasm_i32;
 use crate::{FastBlurChannels, ThreadingPolicy};
 use num_traits::{AsPrimitive, FromPrimitive};
-use std::ops::AddAssign;
+use std::ops::{AddAssign, Mul, Shr, SubAssign};
 
 const BASE_RADIUS_I64_CUTOFF: u32 = 150;
 
@@ -51,15 +51,204 @@ pub(crate) struct BlurStack<J: Copy + FromPrimitive> {
 
 impl<J> BlurStack<J>
 where
-    J: Copy + FromPrimitive,
+    J: Copy + FromPrimitive + Default,
 {
+    #[inline]
     pub fn new() -> BlurStack<J> {
         BlurStack {
-            r: J::from_i32(0i32).unwrap(),
-            g: J::from_i32(0i32).unwrap(),
-            b: J::from_i32(0i32).unwrap(),
-            a: J::from_i32(0i32).unwrap(),
+            r: J::default(),
+            g: J::default(),
+            b: J::default(),
+            a: J::default(),
         }
+    }
+
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Copy)]
+pub(crate) struct SlidingWindow<const COMPS: usize, J: Copy> {
+    pub r: J,
+    pub g: J,
+    pub b: J,
+    pub a: J,
+}
+
+impl<const COMPS: usize, J> SlidingWindow<COMPS, J>
+where
+    J: Copy + Default,
+{
+    #[inline]
+    pub fn new() -> SlidingWindow<COMPS, J> {
+        SlidingWindow {
+            r: J::default(),
+            g: J::default(),
+            b: J::default(),
+            a: J::default(),
+        }
+    }
+
+    #[inline]
+    pub fn from_components(r: J, g: J, b: J, a: J) -> SlidingWindow<COMPS, J> {
+        SlidingWindow { r, g, b, a }
+    }
+
+    #[inline]
+    pub fn cast<T>(&self) -> SlidingWindow<COMPS, T> where J: AsPrimitive<T>, T: Default + Copy + 'static {
+        if COMPS == 1 {
+            SlidingWindow::from_components(self.r.as_(), T::default(), T::default(), T::default())
+        } else if COMPS == 2 {
+            SlidingWindow::from_components(self.r.as_(), self.g.as_(), T::default(), T::default())
+        } else if COMPS == 3 {
+            SlidingWindow::from_components(self.r.as_(), self.g.as_(), self.b.as_(), T::default())
+        } else if COMPS == 4 {
+            SlidingWindow::from_components(self.r.as_(), self.g.as_(), self.b.as_(), self.a.as_())
+        } else {
+            panic!("Not implemented.");
+        }
+    }
+}
+
+impl<const COMPS: usize, J> SlidingWindow<COMPS, J>
+where
+    J: Copy + FromPrimitive + Default + 'static,
+{
+    #[inline]
+    pub fn from_store<T>(store: &UnsafeSlice<T>, offset: usize) -> SlidingWindow<COMPS, J> where T: AsPrimitive<J> {
+        if COMPS == 1 {
+            SlidingWindow {
+                r: (*store.get(offset)).as_(),
+                g: J::default(),
+                b: J::default(),
+                a: J::default(),
+            }
+        } else if COMPS == 2 {
+            SlidingWindow {
+                r: (*store.get(offset)).as_(),
+                g: (*store.get(offset + 1)).as_(),
+                b: J::default(),
+                a: J::default(),
+            }
+        } else if COMPS == 3 {
+            SlidingWindow {
+                r: (*store.get(offset)).as_(),
+                g: (*store.get(offset + 1)).as_(),
+                b: (*store.get(offset + 2)).as_(),
+                a: J::default(),
+            }
+        } else if COMPS == 4 {
+            SlidingWindow {
+                r: (*store.get(offset)).as_(),
+                g: (*store.get(offset + 1)).as_(),
+                b: (*store.get(offset + 2)).as_(),
+                a: (*store.get(offset + 3)).as_(),
+            }
+        } else {
+            panic!("Not implemented.")
+        }
+    }
+}
+
+impl<const COMPS: usize, J> Mul<J> for SlidingWindow<COMPS, J>
+where
+    J: Copy + Mul<Output = J> + Default + 'static,
+{
+    type Output = Self;
+
+    #[inline]
+    fn mul(self, rhs: J) -> Self::Output {
+        if COMPS == 1 {
+            SlidingWindow::from_components(self.r * rhs, self.g, self.b, self.a)
+        } else if COMPS == 2 {
+            SlidingWindow::from_components(self.r * rhs, self.g * rhs, self.b, self.a)
+        } else if COMPS == 3 {
+            SlidingWindow::from_components(self.r * rhs, self.g * rhs, self.b * rhs, self.a)
+        } else if COMPS == 4 {
+            SlidingWindow::from_components(self.r * rhs, self.g * rhs, self.b * rhs, self.a * rhs)
+        } else {
+            panic!("Not implemented.");
+        }
+    }
+}
+
+impl<const COMPS: usize, J> Shr<J> for SlidingWindow<COMPS, J>
+where
+    J: Copy + Shr<J, Output = J> + Default + 'static,
+{
+    type Output = Self;
+
+    #[inline]
+    fn shr(self, rhs: J) -> Self::Output {
+        if COMPS == 1 {
+            SlidingWindow::from_components(self.r >> rhs, self.g, self.b, self.a)
+        } else if COMPS == 2 {
+            SlidingWindow::from_components(self.r >> rhs, self.g >> rhs, self.b, self.a)
+        } else if COMPS == 3 {
+            SlidingWindow::from_components(self.r >> rhs, self.g >> rhs, self.b >> rhs, self.a)
+        } else if COMPS == 4 {
+            SlidingWindow::from_components(self.r >> rhs, self.g >> rhs, self.b >> rhs, self.a >> rhs)
+        } else {
+            panic!("Not implemented.");
+        }
+    }
+}
+
+
+impl<const COMPS: usize, J> AddAssign<SlidingWindow<COMPS, J>> for SlidingWindow<COMPS, J>
+where
+    J: Copy + AddAssign,
+{
+    #[inline]
+    fn add_assign(&mut self, rhs: SlidingWindow<COMPS, J>) {
+        if COMPS == 1 {
+            self.r += rhs.r;
+        } else if COMPS == 2 {
+            self.r += rhs.r;
+            self.g += rhs.g;
+        } else if COMPS == 3 {
+            self.r += rhs.r;
+            self.g += rhs.g;
+            self.b += rhs.b;
+        } else if COMPS == 4 {
+            self.r += rhs.r;
+            self.g += rhs.g;
+            self.b += rhs.b;
+            self.a += rhs.a;
+        }
+    }
+}
+
+impl<const COMPS: usize, J> SubAssign<SlidingWindow<COMPS, J>> for SlidingWindow<COMPS, J>
+where
+    J: Copy + SubAssign,
+{
+    #[inline]
+    fn sub_assign(&mut self, rhs: SlidingWindow<COMPS, J>) {
+        if COMPS == 1 {
+            self.r -= rhs.r;
+        } else if COMPS == 2 {
+            self.r -= rhs.r;
+            self.g -= rhs.g;
+        } else if COMPS == 3 {
+            self.r -= rhs.r;
+            self.g -= rhs.g;
+            self.b -= rhs.b;
+        } else if COMPS == 4 {
+            self.r -= rhs.r;
+            self.g -= rhs.g;
+            self.b -= rhs.b;
+            self.a -= rhs.a;
+        }
+    }
+}
+
+impl<const COMPS: usize, J> Default for SlidingWindow<COMPS, J>
+where
+    J: Copy + FromPrimitive + Default,
+{
+    #[inline]
+    fn default() -> Self {
+        SlidingWindow::new()
     }
 }
 
@@ -94,13 +283,14 @@ fn stack_blur_pass<T, J, I, const COMPONENTS: usize>(
         + std::ops::Shr<Output = J>
         + std::ops::SubAssign
         + AsPrimitive<T>
-        + AsPrimitive<I>,
+        + AsPrimitive<I>
+        + Default,
     T: Copy + AsPrimitive<J> + FromPrimitive,
     I: Copy
         + AsPrimitive<T>
         + FromPrimitive
         + std::ops::Mul<Output = I>
-        + std::ops::Shr<Output = I>,
+        + std::ops::Shr<Output = I> + Default,
     i32: AsPrimitive<J>,
     u32: AsPrimitive<J>,
 {
@@ -110,21 +300,12 @@ fn stack_blur_pass<T, J, I, const COMPONENTS: usize>(
     let mut stack_start;
     let mut stacks = vec![];
     for _ in 0..div {
-        stacks.push(Box::new(BlurStack::new()));
+        stacks.push(SlidingWindow::<COMPONENTS, J>::new());
     }
 
-    let mut sum_r: J;
-    let mut sum_g: J;
-    let mut sum_b: J;
-    let mut sum_a: J;
-    let mut sum_in_r: J;
-    let mut sum_in_g: J;
-    let mut sum_in_b: J;
-    let mut sum_in_a: J;
-    let mut sum_out_r: J;
-    let mut sum_out_g: J;
-    let mut sum_out_b: J;
-    let mut sum_out_a: J;
+    let mut sum: SlidingWindow<COMPONENTS, J>;
+    let mut sum_in: SlidingWindow<COMPONENTS, J>;
+    let mut sum_out: SlidingWindow<COMPONENTS, J>;
 
     let wm = width - 1;
     let hm = height - 1;
@@ -140,131 +321,33 @@ fn stack_blur_pass<T, J, I, const COMPONENTS: usize>(
         let max_y = (thread + 1) * height as usize / total_threads;
 
         for y in min_y..max_y {
-            sum_r = 0i32.as_();
-            sum_g = 0i32.as_();
-            sum_b = 0i32.as_();
-            sum_a = 0i32.as_();
-            sum_in_r = 0i32.as_();
-            sum_in_g = 0i32.as_();
-            sum_in_b = 0i32.as_();
-            sum_in_a = 0i32.as_();
-            sum_out_r = 0i32.as_();
-            sum_out_g = 0i32.as_();
-            sum_out_b = 0i32.as_();
-            sum_out_a = 0i32.as_();
+            sum = SlidingWindow::default();
+            sum_in = SlidingWindow::default();
+            sum_out = SlidingWindow::default();
 
             src_ptr = stride as usize * y; // start of line (0,y)
 
-            let src_r = pixels[src_ptr].as_();
-            let src_g = if COMPONENTS > 1 {
-                pixels[src_ptr + 1].as_()
-            } else {
-                0i32.as_()
-            };
-            let src_b = if COMPONENTS > 2 {
-                pixels[src_ptr + 2].as_()
-            } else {
-                0i32.as_()
-            };
-            let src_a = if COMPONENTS == 4 {
-                pixels[src_ptr + 3].as_()
-            } else {
-                0i32.as_()
-            };
+            let src = SlidingWindow::from_store(pixels, src_ptr);
 
             for i in 0..=radius {
-                let stack_value = unsafe { &mut *stacks.get_unchecked_mut(i as usize) };
-                stack_value.r = src_r;
-                if COMPONENTS > 1 {
-                    stack_value.g = src_g;
-                }
-                if COMPONENTS > 2 {
-                    stack_value.b = src_b;
-                }
-                if COMPONENTS == 4 {
-                    stack_value.a = src_a;
-                }
-
+                unsafe { *stacks.get_unchecked_mut(i as usize) = src.clone() };
                 let fi = (i + 1).as_();
-                sum_r += src_r * fi;
-                if COMPONENTS > 1 {
-                    sum_g += src_g * fi;
-                }
-                if COMPONENTS > 2 {
-                    sum_b += src_b * fi;
-                }
-                if COMPONENTS == 4 {
-                    sum_a += src_a * fi;
-                }
-
-                sum_out_r += src_r;
-                if COMPONENTS > 1 {
-                    sum_out_g += src_g;
-                }
-                if COMPONENTS > 2 {
-                    sum_out_b += src_b;
-                }
-                if COMPONENTS == 4 {
-                    sum_out_a += src_a;
-                }
+                sum += src * fi;
+                sum_out += src;
             }
 
             for i in 1..=radius {
                 if i <= wm {
                     src_ptr += COMPONENTS;
                 }
-                let stack_ptr = unsafe { &mut *stacks.get_unchecked_mut((i + radius) as usize) };
 
-                let src_r = pixels[src_ptr].as_();
-                let src_g = if COMPONENTS > 1 {
-                    pixels[src_ptr + 1].as_()
-                } else {
-                    0i32.as_()
-                };
-                let src_b = if COMPONENTS > 2 {
-                    pixels[src_ptr + 2].as_()
-                } else {
-                    0i32.as_()
-                };
-                let src_a = if COMPONENTS == 4 {
-                    pixels[src_ptr + 3].as_()
-                } else {
-                    0i32.as_()
-                };
+                let src = SlidingWindow::from_store(pixels, src_ptr);
 
-                stack_ptr.r = src_r;
-                if COMPONENTS > 1 {
-                    stack_ptr.g = src_g;
-                }
-                if COMPONENTS > 2 {
-                    stack_ptr.b = src_b;
-                }
-                if COMPONENTS == 4 {
-                    stack_ptr.a = src_a;
-                }
+                unsafe { *stacks.get_unchecked_mut((i + radius) as usize) = src };
 
                 let re = (radius + 1 - i).as_();
-                sum_r += src_r * re;
-                if COMPONENTS > 1 {
-                    sum_g += src_g * re;
-                }
-                if COMPONENTS > 2 {
-                    sum_b += src_b * re;
-                }
-                if COMPONENTS == 4 {
-                    sum_a += src_a * re;
-                }
-
-                sum_in_r += src_r;
-                if COMPONENTS > 1 {
-                    sum_in_g += src_g;
-                }
-                if COMPONENTS > 2 {
-                    sum_in_b += src_b;
-                }
-                if COMPONENTS == 4 {
-                    sum_in_a += src_a;
-                }
+                sum += src * re;
+                sum_in += src;
             }
 
             sp = radius;
@@ -277,33 +360,22 @@ fn stack_blur_pass<T, J, I, const COMPONENTS: usize>(
             dst_ptr = y * stride as usize;
             for _ in 0..width {
                 unsafe {
-                    let sum_r_i64: I = sum_r.as_();
-                    pixels.write(dst_ptr, ((sum_r_i64 * mul_sum) >> shr_sum).as_());
+                    let sum_intermediate: SlidingWindow<COMPONENTS, I> = sum.cast();
+                    let finalized = (sum_intermediate * mul_sum) >> shr_sum;
+                    pixels.write(dst_ptr, finalized.r.as_());
                     if COMPONENTS > 1 {
-                        let sum_g_i64: I = sum_g.as_();
-                        pixels.write(dst_ptr + 1, ((sum_g_i64 * mul_sum) >> shr_sum).as_());
+                        pixels.write(dst_ptr + 1, finalized.g.as_());
                     }
                     if COMPONENTS > 2 {
-                        let sum_b_i64: I = sum_b.as_();
-                        pixels.write(dst_ptr + 2, ((sum_b_i64 * mul_sum) >> shr_sum).as_());
+                        pixels.write(dst_ptr + 2, finalized.b.as_());
                     }
                     if COMPONENTS == 4 {
-                        let sum_a_i64: I = sum_a.as_();
-                        pixels.write(dst_ptr + 3, ((sum_a_i64 * mul_sum) >> shr_sum).as_());
+                        pixels.write(dst_ptr + 3, finalized.a.as_());
                     }
                 }
                 dst_ptr += COMPONENTS;
 
-                sum_r -= sum_out_r;
-                if COMPONENTS > 1 {
-                    sum_g -= sum_out_g;
-                }
-                if COMPONENTS > 2 {
-                    sum_b -= sum_out_b;
-                }
-                if COMPONENTS == 4 {
-                    sum_a -= sum_out_a;
-                }
+                sum -= sum_out;
 
                 stack_start = sp + div - radius;
                 if stack_start >= div {
@@ -311,71 +383,17 @@ fn stack_blur_pass<T, J, I, const COMPONENTS: usize>(
                 }
                 let stack = unsafe { &mut *stacks.get_unchecked_mut(stack_start as usize) };
 
-                sum_out_r -= stack.r;
-                if COMPONENTS > 1 {
-                    sum_out_g -= stack.g;
-                }
-                if COMPONENTS > 2 {
-                    sum_out_b -= stack.b;
-                }
-                if COMPONENTS == 4 {
-                    sum_out_a -= stack.a;
-                }
+                sum_out -= *stack;
 
                 if xp < wm {
                     src_ptr += COMPONENTS;
                     xp += 1;
                 }
 
-                let src_r = pixels[src_ptr].as_();
-                let src_g = if COMPONENTS > 1 {
-                    pixels[src_ptr + 1].as_()
-                } else {
-                    0i32.as_()
-                };
-                let src_b = if COMPONENTS > 2 {
-                    pixels[src_ptr + 2].as_()
-                } else {
-                    0i32.as_()
-                };
-                let src_a = if COMPONENTS == 4 {
-                    pixels[src_ptr + 3].as_()
-                } else {
-                    0i32.as_()
-                };
-
-                stack.r = src_r;
-                if COMPONENTS > 1 {
-                    stack.g = src_g;
-                }
-                if COMPONENTS > 2 {
-                    stack.b = src_b;
-                }
-                if COMPONENTS == 4 {
-                    stack.a = src_a;
-                }
-
-                sum_in_r += src_r;
-                if COMPONENTS > 1 {
-                    sum_in_g += src_g;
-                }
-                if COMPONENTS > 2 {
-                    sum_in_b += src_b;
-                }
-                if COMPONENTS == 4 {
-                    sum_in_a += src_a;
-                }
-
-                sum_r += sum_in_r;
-                if COMPONENTS > 1 {
-                    sum_g += sum_in_g;
-                }
-                if COMPONENTS > 2 {
-                    sum_b += sum_in_b;
-                }
-                if COMPONENTS == 4 {
-                    sum_a += sum_in_a;
-                }
+                let src = SlidingWindow::from_store(pixels, src_ptr);
+                *stack = src;
+                sum_in += src;
+                sum += sum_in;
 
                 sp += 1;
                 if sp >= div {
@@ -383,26 +401,8 @@ fn stack_blur_pass<T, J, I, const COMPONENTS: usize>(
                 }
                 let stack = unsafe { &mut *stacks.get_unchecked_mut(sp as usize) };
 
-                sum_out_r += stack.r;
-                if COMPONENTS > 1 {
-                    sum_out_g += stack.g;
-                }
-                if COMPONENTS > 2 {
-                    sum_out_b += stack.b;
-                }
-                if COMPONENTS == 4 {
-                    sum_out_a += stack.a;
-                }
-                sum_in_r -= stack.r;
-                if COMPONENTS > 1 {
-                    sum_in_g -= stack.g;
-                }
-                if COMPONENTS > 2 {
-                    sum_in_b -= stack.b;
-                }
-                if COMPONENTS == 4 {
-                    sum_in_a -= stack.a;
-                }
+                sum_out += *stack;
+                sum_in -= *stack;
             }
         }
     } else if pass == StackBlurPass::Vertical {
@@ -410,73 +410,20 @@ fn stack_blur_pass<T, J, I, const COMPONENTS: usize>(
         let max_x = (thread + 1) * width as usize / total_threads;
 
         for x in min_x..max_x {
-            sum_r = 0i32.as_();
-            sum_g = 0i32.as_();
-            sum_b = 0i32.as_();
-            sum_a = 0i32.as_();
-            sum_in_r = 0i32.as_();
-            sum_in_g = 0i32.as_();
-            sum_in_b = 0i32.as_();
-            sum_in_a = 0i32.as_();
-            sum_out_r = 0i32.as_();
-            sum_out_g = 0i32.as_();
-            sum_out_b = 0i32.as_();
-            sum_out_a = 0i32.as_();
+            sum = SlidingWindow::default();
+            sum_in = SlidingWindow::default();
+            sum_out = SlidingWindow::default();
 
             src_ptr = COMPONENTS * x; // x,0
 
-            let src_r = pixels[src_ptr].as_();
-            let src_g = if COMPONENTS > 1 {
-                pixels[src_ptr + 1].as_()
-            } else {
-                0i32.as_()
-            };
-            let src_b = if COMPONENTS > 2 {
-                pixels[src_ptr + 2].as_()
-            } else {
-                0i32.as_()
-            };
-            let src_a = if COMPONENTS == 4 {
-                pixels[src_ptr + 3].as_()
-            } else {
-                0i32.as_()
-            };
+            let src = SlidingWindow::from_store(pixels, src_ptr);
 
             for i in 0..=radius {
-                let stack_value = unsafe { &mut *stacks.get_unchecked_mut(i as usize) };
-                stack_value.r = src_r;
-                if COMPONENTS > 1 {
-                    stack_value.g = src_g;
-                }
-                if COMPONENTS > 2 {
-                    stack_value.b = src_b;
-                }
-                if COMPONENTS == 4 {
-                    stack_value.a = src_a;
-                }
+                unsafe { *stacks.get_unchecked_mut(i as usize) = src }
 
                 let ji = (i + 1).as_();
-                sum_r += src_r * ji;
-                if COMPONENTS > 1 {
-                    sum_g += src_g * ji;
-                }
-                if COMPONENTS > 2 {
-                    sum_b += src_b * ji;
-                }
-                if COMPONENTS == 4 {
-                    sum_a += src_a * ji;
-                }
-
-                sum_out_r += src_r;
-                if COMPONENTS > 1 {
-                    sum_out_g += src_g;
-                }
-                if COMPONENTS > 2 {
-                    sum_out_b += src_b;
-                }
-                if COMPONENTS == 4 {
-                    sum_out_a += src_a;
-                }
+                sum += src * ji;
+                sum_out += src;
             }
 
             for i in 1..=radius {
@@ -484,57 +431,13 @@ fn stack_blur_pass<T, J, I, const COMPONENTS: usize>(
                     src_ptr += stride as usize;
                 }
 
-                let stack_ptr = unsafe { &mut *stacks.get_unchecked_mut((i + radius) as usize) };
+                let src = SlidingWindow::from_store(pixels, src_ptr);
 
-                let src_r = pixels[src_ptr].as_();
-                let src_g = if COMPONENTS > 1 {
-                    pixels[src_ptr + 1].as_()
-                } else {
-                    0i32.as_()
-                };
-                let src_b = if COMPONENTS > 2 {
-                    pixels[src_ptr + 2].as_()
-                } else {
-                    0i32.as_()
-                };
-                let src_a = if COMPONENTS == 4 {
-                    pixels[src_ptr + 3].as_()
-                } else {
-                    0i32.as_()
-                };
-
-                stack_ptr.r = src_r;
-                if COMPONENTS > 1 {
-                    stack_ptr.g = src_g;
-                }
-                if COMPONENTS > 2 {
-                    stack_ptr.b = src_b;
-                }
-                if COMPONENTS == 4 {
-                    stack_ptr.a = src_a;
-                }
+                unsafe { *stacks.get_unchecked_mut((i + radius) as usize) = src };
 
                 let rji = (radius + 1 - i).as_();
-                sum_r += src_r * rji;
-                if COMPONENTS > 1 {
-                    sum_g += src_g * rji;
-                }
-                if COMPONENTS > 2 {
-                    sum_b += src_b * rji;
-                }
-                if COMPONENTS == 4 {
-                    sum_a += src_a * rji;
-                }
-                sum_in_r += src_r;
-                if COMPONENTS > 1 {
-                    sum_in_g += src_g;
-                }
-                if COMPONENTS > 2 {
-                    sum_in_b += src_b;
-                }
-                if COMPONENTS == 4 {
-                    sum_in_a += src_a;
-                }
+                sum += src * rji;
+                sum_in += src;
             }
 
             sp = radius;
@@ -546,33 +449,22 @@ fn stack_blur_pass<T, J, I, const COMPONENTS: usize>(
             dst_ptr = COMPONENTS * x;
             for _ in 0..height {
                 unsafe {
-                    let sum_r_i64: I = sum_r.as_();
-                    pixels.write(dst_ptr, ((sum_r_i64 * mul_sum) >> shr_sum).as_());
+                    let sum_intermediate: SlidingWindow<COMPONENTS, I> = sum.cast();
+                    let finalized = (sum_intermediate * mul_sum) >> shr_sum;
+                    pixels.write(dst_ptr, finalized.r.as_());
                     if COMPONENTS > 1 {
-                        let sum_g_i64: I = sum_g.as_();
-                        pixels.write(dst_ptr + 1, ((sum_g_i64 * mul_sum) >> shr_sum).as_());
+                        pixels.write(dst_ptr + 1, finalized.g.as_());
                     }
                     if COMPONENTS > 2 {
-                        let sum_b_i64: I = sum_b.as_();
-                        pixels.write(dst_ptr + 2, ((sum_b_i64 * mul_sum) >> shr_sum).as_());
+                        pixels.write(dst_ptr + 2, finalized.b.as_());
                     }
                     if COMPONENTS == 4 {
-                        let sum_a_i64: I = sum_a.as_();
-                        pixels.write(dst_ptr + 3, ((sum_a_i64 * mul_sum) >> shr_sum).as_());
+                        pixels.write(dst_ptr + 3, finalized.a.as_());
                     }
                 }
                 dst_ptr += stride as usize;
 
-                sum_r -= sum_out_r;
-                if COMPONENTS > 1 {
-                    sum_g -= sum_out_g;
-                }
-                if COMPONENTS > 2 {
-                    sum_b -= sum_out_b;
-                }
-                if COMPONENTS == 4 {
-                    sum_a -= sum_out_a;
-                }
+                sum -= sum_out;
 
                 stack_start = sp + div - radius;
                 if stack_start >= div {
@@ -580,71 +472,20 @@ fn stack_blur_pass<T, J, I, const COMPONENTS: usize>(
                 }
                 let stack_ptr = unsafe { &mut *stacks.get_unchecked_mut(stack_start as usize) };
 
-                sum_out_r -= stack_ptr.r;
-                if COMPONENTS > 1 {
-                    sum_out_g -= stack_ptr.g;
-                }
-                if COMPONENTS > 2 {
-                    sum_out_b -= stack_ptr.b;
-                }
-                if COMPONENTS == 4 {
-                    sum_out_a -= stack_ptr.a;
-                }
+                sum_out -= *stack_ptr;
 
                 if yp < hm {
                     src_ptr += stride as usize; // stride
                     yp += 1;
                 }
 
-                let src_r = pixels[src_ptr].as_();
-                let src_g = if COMPONENTS > 1 {
-                    pixels[src_ptr + 1].as_()
-                } else {
-                    0i32.as_()
-                };
-                let src_b = if COMPONENTS > 2 {
-                    pixels[src_ptr + 2].as_()
-                } else {
-                    0i32.as_()
-                };
-                let src_a = if COMPONENTS == 4 {
-                    pixels[src_ptr + 3].as_()
-                } else {
-                    0i32.as_()
-                };
+                let src = SlidingWindow::from_store(pixels, src_ptr);
 
-                stack_ptr.r = src_r;
-                if COMPONENTS > 1 {
-                    stack_ptr.g = src_g;
-                }
-                if COMPONENTS > 2 {
-                    stack_ptr.b = src_b;
-                }
-                if COMPONENTS == 4 {
-                    stack_ptr.a = src_a;
-                }
+                *stack_ptr = src;
 
-                sum_in_r += src_r;
-                if COMPONENTS > 1 {
-                    sum_in_g += src_g;
-                }
-                if COMPONENTS > 2 {
-                    sum_in_b += src_b;
-                }
-                if COMPONENTS == 4 {
-                    sum_in_a += src_a;
-                }
+                sum_in += src;
+                sum += sum_in;
 
-                sum_r += sum_in_r;
-                if COMPONENTS > 1 {
-                    sum_g += sum_in_g;
-                }
-                if COMPONENTS > 2 {
-                    sum_b += sum_in_b;
-                }
-                if COMPONENTS == 4 {
-                    sum_a += sum_in_a;
-                }
                 sp += 1;
 
                 if sp >= div {
@@ -652,26 +493,8 @@ fn stack_blur_pass<T, J, I, const COMPONENTS: usize>(
                 }
                 let stack_ptr = unsafe { &mut *stacks.get_unchecked_mut(sp as usize) };
 
-                sum_out_r += stack_ptr.r;
-                if COMPONENTS > 1 {
-                    sum_out_g += stack_ptr.g;
-                }
-                if COMPONENTS > 2 {
-                    sum_out_b += stack_ptr.b;
-                }
-                if COMPONENTS == 4 {
-                    sum_out_a += stack_ptr.a;
-                }
-                sum_in_r -= stack_ptr.r;
-                if COMPONENTS > 1 {
-                    sum_in_g -= stack_ptr.g;
-                }
-                if COMPONENTS > 2 {
-                    sum_in_b -= stack_ptr.b;
-                }
-                if COMPONENTS == 4 {
-                    sum_in_a -= stack_ptr.a;
-                }
+                sum_out += *stack_ptr;
+                sum_in -= *stack_ptr;
             }
         }
     }
@@ -735,41 +558,41 @@ fn stack_blur_worker_horizontal(
             } else {
                 stack_blur_pass::<u8, i32, i64, 3>
             };
-            if radius < BASE_RADIUS_I64_CUTOFF {
-                #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-                {
-                    _dispatcher = stack_blur_pass_neon_i32::<3>;
-                }
-                #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-                {
-                    if _is_sse_available {
-                        if _is_avx512dq_available && _is_avx512vl_available {
-                            _dispatcher = stack_blur_pass_sse::<3, true>;
-                        } else {
-                            _dispatcher = stack_blur_pass_sse::<3, false>;
-                        }
-                    }
-                }
-                #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
-                {
-                    _dispatcher = stack_blur_pass_wasm_i32::<3>;
-                }
-            } else {
-                #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-                {
-                    _dispatcher = stack_blur_pass_neon_i64::<3>;
-                }
-                #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-                {
-                    if _is_sse_available {
-                        if _is_avx512dq_available && _is_avx512vl_available {
-                            _dispatcher = stack_blur_pass_sse_i64::<3, true>;
-                        } else {
-                            _dispatcher = stack_blur_pass_sse_i64::<3, false>;
-                        }
-                    }
-                }
-            }
+            // if radius < BASE_RADIUS_I64_CUTOFF {
+            //     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            //     {
+            //         _dispatcher = stack_blur_pass_neon_i32::<3>;
+            //     }
+            //     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+            //     {
+            //         if _is_sse_available {
+            //             if _is_avx512dq_available && _is_avx512vl_available {
+            //                 _dispatcher = stack_blur_pass_sse::<3, true>;
+            //             } else {
+            //                 _dispatcher = stack_blur_pass_sse::<3, false>;
+            //             }
+            //         }
+            //     }
+            //     #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+            //     {
+            //         _dispatcher = stack_blur_pass_wasm_i32::<3>;
+            //     }
+            // } else {
+            //     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            //     {
+            //         _dispatcher = stack_blur_pass_neon_i64::<3>;
+            //     }
+            //     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+            //     {
+            //         if _is_sse_available {
+            //             if _is_avx512dq_available && _is_avx512vl_available {
+            //                 _dispatcher = stack_blur_pass_sse_i64::<3, true>;
+            //             } else {
+            //                 _dispatcher = stack_blur_pass_sse_i64::<3, false>;
+            //             }
+            //         }
+            //     }
+            // }
             _dispatcher(
                 slice,
                 stride,
@@ -796,41 +619,41 @@ fn stack_blur_worker_horizontal(
             } else {
                 stack_blur_pass::<u8, i32, i64, 4>
             };
-            if radius < BASE_RADIUS_I64_CUTOFF {
-                #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-                {
-                    _dispatcher = stack_blur_pass_neon_i32::<4>;
-                }
-                #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-                {
-                    if _is_sse_available {
-                        if _is_avx512dq_available && _is_avx512vl_available {
-                            _dispatcher = stack_blur_pass_sse::<4, true>;
-                        } else {
-                            _dispatcher = stack_blur_pass_sse::<4, false>;
-                        }
-                    }
-                }
-                #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
-                {
-                    _dispatcher = stack_blur_pass_wasm_i32::<4>;
-                }
-            } else {
-                #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-                {
-                    _dispatcher = stack_blur_pass_neon_i64::<4>;
-                }
-                #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-                {
-                    if _is_sse_available {
-                        if _is_avx512dq_available && _is_avx512vl_available {
-                            _dispatcher = stack_blur_pass_sse_i64::<4, true>;
-                        } else {
-                            _dispatcher = stack_blur_pass_sse_i64::<4, false>;
-                        }
-                    }
-                }
-            }
+            // if radius < BASE_RADIUS_I64_CUTOFF {
+            //     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            //     {
+            //         _dispatcher = stack_blur_pass_neon_i32::<4>;
+            //     }
+            //     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+            //     {
+            //         if _is_sse_available {
+            //             if _is_avx512dq_available && _is_avx512vl_available {
+            //                 _dispatcher = stack_blur_pass_sse::<4, true>;
+            //             } else {
+            //                 _dispatcher = stack_blur_pass_sse::<4, false>;
+            //             }
+            //         }
+            //     }
+            //     #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+            //     {
+            //         _dispatcher = stack_blur_pass_wasm_i32::<4>;
+            //     }
+            // } else {
+            //     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            //     {
+            //         _dispatcher = stack_blur_pass_neon_i64::<4>;
+            //     }
+            //     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+            //     {
+            //         if _is_sse_available {
+            //             if _is_avx512dq_available && _is_avx512vl_available {
+            //                 _dispatcher = stack_blur_pass_sse_i64::<4, true>;
+            //             } else {
+            //                 _dispatcher = stack_blur_pass_sse_i64::<4, false>;
+            //             }
+            //         }
+            //     }
+            // }
             _dispatcher(
                 slice,
                 stride,
@@ -904,41 +727,41 @@ fn stack_blur_worker_vertical(
             } else {
                 stack_blur_pass::<u8, i32, i64, 3>
             };
-            if radius < BASE_RADIUS_I64_CUTOFF {
-                #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-                {
-                    _dispatcher = stack_blur_pass_neon_i32::<3>;
-                }
-                #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-                {
-                    if _is_sse_available {
-                        if _is_avx512dq_available && _is_avx512vl_available {
-                            _dispatcher = stack_blur_pass_sse::<3, true>;
-                        } else {
-                            _dispatcher = stack_blur_pass_sse::<3, false>;
-                        }
-                    }
-                }
-                #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
-                {
-                    _dispatcher = stack_blur_pass_wasm_i32::<3>;
-                }
-            } else {
-                #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-                {
-                    _dispatcher = stack_blur_pass_neon_i64::<3>;
-                }
-                #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-                {
-                    if _is_sse_available {
-                        if _is_avx512dq_available && _is_avx512vl_available {
-                            _dispatcher = stack_blur_pass_sse_i64::<3, true>;
-                        } else {
-                            _dispatcher = stack_blur_pass_sse_i64::<3, false>;
-                        }
-                    }
-                }
-            }
+            // if radius < BASE_RADIUS_I64_CUTOFF {
+            //     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            //     {
+            //         _dispatcher = stack_blur_pass_neon_i32::<3>;
+            //     }
+            //     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+            //     {
+            //         if _is_sse_available {
+            //             if _is_avx512dq_available && _is_avx512vl_available {
+            //                 _dispatcher = stack_blur_pass_sse::<3, true>;
+            //             } else {
+            //                 _dispatcher = stack_blur_pass_sse::<3, false>;
+            //             }
+            //         }
+            //     }
+            //     #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+            //     {
+            //         _dispatcher = stack_blur_pass_wasm_i32::<3>;
+            //     }
+            // } else {
+            //     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            //     {
+            //         _dispatcher = stack_blur_pass_neon_i64::<3>;
+            //     }
+            //     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+            //     {
+            //         if _is_sse_available {
+            //             if _is_avx512dq_available && _is_avx512vl_available {
+            //                 _dispatcher = stack_blur_pass_sse_i64::<3, true>;
+            //             } else {
+            //                 _dispatcher = stack_blur_pass_sse_i64::<3, false>;
+            //             }
+            //         }
+            //     }
+            // }
             _dispatcher(
                 slice,
                 stride,
@@ -965,41 +788,41 @@ fn stack_blur_worker_vertical(
             } else {
                 stack_blur_pass::<u8, i32, i64, 4>
             };
-            if radius < BASE_RADIUS_I64_CUTOFF {
-                #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-                {
-                    _dispatcher = stack_blur_pass_neon_i32::<4>;
-                }
-                #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-                {
-                    if _is_sse_available {
-                        if _is_avx512dq_available && _is_avx512vl_available {
-                            _dispatcher = stack_blur_pass_sse::<4, true>;
-                        } else {
-                            _dispatcher = stack_blur_pass_sse::<4, false>;
-                        }
-                    }
-                }
-                #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
-                {
-                    _dispatcher = stack_blur_pass_wasm_i32::<3>;
-                }
-            } else {
-                #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-                {
-                    _dispatcher = stack_blur_pass_neon_i64::<4>;
-                }
-                #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-                {
-                    if _is_sse_available {
-                        if _is_avx512dq_available && _is_avx512vl_available {
-                            _dispatcher = stack_blur_pass_sse_i64::<4, true>;
-                        } else {
-                            _dispatcher = stack_blur_pass_sse_i64::<4, false>;
-                        }
-                    }
-                }
-            }
+            // if radius < BASE_RADIUS_I64_CUTOFF {
+            //     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            //     {
+            //         _dispatcher = stack_blur_pass_neon_i32::<4>;
+            //     }
+            //     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+            //     {
+            //         if _is_sse_available {
+            //             if _is_avx512dq_available && _is_avx512vl_available {
+            //                 _dispatcher = stack_blur_pass_sse::<4, true>;
+            //             } else {
+            //                 _dispatcher = stack_blur_pass_sse::<4, false>;
+            //             }
+            //         }
+            //     }
+            //     #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+            //     {
+            //         _dispatcher = stack_blur_pass_wasm_i32::<3>;
+            //     }
+            // } else {
+            //     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            //     {
+            //         _dispatcher = stack_blur_pass_neon_i64::<4>;
+            //     }
+            //     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+            //     {
+            //         if _is_sse_available {
+            //             if _is_avx512dq_available && _is_avx512vl_available {
+            //                 _dispatcher = stack_blur_pass_sse_i64::<4, true>;
+            //             } else {
+            //                 _dispatcher = stack_blur_pass_sse_i64::<4, false>;
+            //             }
+            //         }
+            //     }
+            // }
             _dispatcher(
                 slice,
                 stride,
