@@ -25,13 +25,13 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::stackblur::{HorizontalStackBlurPass, StackBlurWorkingPass, VerticalStackBlurPass};
-use crate::unsafe_slice::UnsafeSlice;
-use crate::{FastBlurChannels, ThreadingPolicy};
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::stackblur::neon::{HorizontalNeonStackBlurPass, VerticalNeonStackBlurPass};
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::stackblur::sse::{HorizontalSseStackBlurPass, VerticalSseStackBlurPass};
+use crate::stackblur::{HorizontalStackBlurPass, StackBlurWorkingPass, VerticalStackBlurPass};
+use crate::unsafe_slice::UnsafeSlice;
+use crate::{FastBlurChannels, ThreadingPolicy};
 
 fn stack_blur_worker_horizontal(
     slice: &UnsafeSlice<u8>,
@@ -49,93 +49,10 @@ fn stack_blur_worker_horizontal(
         FastBlurChannels::Plane => {
             let executor = Box::new(HorizontalStackBlurPass::<u8, i32, 1>::default());
             executor.pass(slice, stride, width, height, radius, thread, thread_count);
-            // let mut _dispatcher: fn(
-            //     &UnsafeSlice<u8>,
-            //     u32,
-            //     u32,
-            //     u32,
-            //     u32,
-            //     StackBlurPass,
-            //     usize,
-            //     usize,
-            // ) = if radius < BASE_RADIUS_I64_CUTOFF {
-            //     stack_blur_pass::<u8, i64, i64, 1>
-            // } else {
-            //     stack_blur_pass::<u8, i32, i64, 1>
-            // };
-            // _dispatcher(
-            //     slice,
-            //     stride,
-            //     width,
-            //     height,
-            //     radius,
-            //     StackBlurPass::Horizontal,
-            //     thread,
-            //     thread_count,
-            // );
         }
         FastBlurChannels::Channels3 => {
-            // let mut _dispatcher: fn(
-            //     &UnsafeSlice<u8>,
-            //     u32,
-            //     u32,
-            //     u32,
-            //     u32,
-            //     StackBlurPass,
-            //     usize,
-            //     usize,
-            // ) = if radius < BASE_RADIUS_I64_CUTOFF {
-            //     stack_blur_pass::<u8, i32, i64, 3>
-            // } else {
-            //     stack_blur_pass::<u8, i32, i64, 3>
-            // };
-
-            // if radius < BASE_RADIUS_I64_CUTOFF {
-            //     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-            //     {
-            //         _dispatcher = stack_blur_pass_neon_i32::<3>;
-            //     }
-            //     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-            //     {
-            //         if _is_sse_available {
-            //             if _is_avx512dq_available && _is_avx512vl_available {
-            //                 _dispatcher = stack_blur_pass_sse::<3, true>;
-            //             } else {
-            //                 _dispatcher = stack_blur_pass_sse::<3, false>;
-            //             }
-            //         }
-            //     }
-            //     #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
-            //     {
-            //         _dispatcher = stack_blur_pass_wasm_i32::<3>;
-            //     }
-            // } else {
-            //     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-            //     {
-            //         _dispatcher = stack_blur_pass_neon_i64::<3>;
-            //     }
-            //     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-            //     {
-            //         if _is_sse_available {
-            //             if _is_avx512dq_available && _is_avx512vl_available {
-            //                 _dispatcher = stack_blur_pass_sse_i64::<3, true>;
-            //             } else {
-            //                 _dispatcher = stack_blur_pass_sse_i64::<3, false>;
-            //             }
-            //         }
-            //     }
-            // }
-            // _dispatcher(
-            //     slice,
-            //     stride,
-            //     width,
-            //     height,
-            //     radius,
-            //     StackBlurPass::Horizontal,
-            //     thread,
-            //     thread_count,
-            // );
-            let mut _executor: Box<dyn StackBlurWorkingPass<u8, i32, 3>> = Box::new(HorizontalStackBlurPass::<u8, i32, 3>::default());
+            let mut _executor: Box<dyn StackBlurWorkingPass<u8, i32, 3>> =
+                Box::new(HorizontalStackBlurPass::<u8, i32, 3>::default());
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             {
                 _executor = Box::new(HorizontalNeonStackBlurPass::<u8, i32, 3>::default());
@@ -150,66 +67,8 @@ fn stack_blur_worker_horizontal(
             _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }
         FastBlurChannels::Channels4 => {
-            // let mut _dispatcher: fn(
-            //     &UnsafeSlice<u8>,
-            //     u32,
-            //     u32,
-            //     u32,
-            //     u32,
-            //     StackBlurPass,
-            //     usize,
-            //     usize,
-            // ) = if radius < BASE_RADIUS_I64_CUTOFF {
-            //     stack_blur_pass::<u8, i64, i64, 4>
-            // } else {
-            //     stack_blur_pass::<u8, i32, i64, 4>
-            // };
-            // if radius < BASE_RADIUS_I64_CUTOFF {
-            //     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-            //     {
-            //         _dispatcher = stack_blur_pass_neon_i32::<4>;
-            //     }
-            //     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-            //     {
-            //         if _is_sse_available {
-            //             if _is_avx512dq_available && _is_avx512vl_available {
-            //                 _dispatcher = stack_blur_pass_sse::<4, true>;
-            //             } else {
-            //                 _dispatcher = stack_blur_pass_sse::<4, false>;
-            //             }
-            //         }
-            //     }
-            //     #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
-            //     {
-            //         _dispatcher = stack_blur_pass_wasm_i32::<4>;
-            //     }
-            // } else {
-            //     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-            //     {
-            //         _dispatcher = stack_blur_pass_neon_i64::<4>;
-            //     }
-            //     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-            //     {
-            //         if _is_sse_available {
-            //             if _is_avx512dq_available && _is_avx512vl_available {
-            //                 _dispatcher = stack_blur_pass_sse_i64::<4, true>;
-            //             } else {
-            //                 _dispatcher = stack_blur_pass_sse_i64::<4, false>;
-            //             }
-            //         }
-            //     }
-            // }
-            // _dispatcher(
-            //     slice,
-            //     stride,
-            //     width,
-            //     height,
-            //     radius,
-            //     StackBlurPass::Horizontal,
-            //     thread,
-            //     thread_count,
-            // );
-            let mut _executor: Box<dyn StackBlurWorkingPass<u8, i32, 4>> = Box::new(HorizontalStackBlurPass::<u8, i32, 4>::default());
+            let mut _executor: Box<dyn StackBlurWorkingPass<u8, i32, 4>> =
+                Box::new(HorizontalStackBlurPass::<u8, i32, 4>::default());
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             {
                 _executor = Box::new(HorizontalNeonStackBlurPass::<u8, i32, 4>::default());
@@ -241,7 +100,8 @@ fn stack_blur_worker_vertical(
     let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
     match channels {
         FastBlurChannels::Plane => {
-            let mut _executor: Box<dyn StackBlurWorkingPass<u8, i32, 1>> = Box::new(VerticalStackBlurPass::<u8, i32, 1>::default());
+            let mut _executor: Box<dyn StackBlurWorkingPass<u8, i32, 1>> =
+                Box::new(VerticalStackBlurPass::<u8, i32, 1>::default());
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             {
                 _executor = Box::new(VerticalNeonStackBlurPass::<u8, i32, 1>::default());
@@ -256,66 +116,8 @@ fn stack_blur_worker_vertical(
             _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }
         FastBlurChannels::Channels3 => {
-            // let mut _dispatcher: fn(
-            //     &UnsafeSlice<u8>,
-            //     u32,
-            //     u32,
-            //     u32,
-            //     u32,
-            //     StackBlurPass,
-            //     usize,
-            //     usize,
-            // ) = if radius < BASE_RADIUS_I64_CUTOFF {
-            //     stack_blur_pass::<u8, i64, i64, 3>
-            // } else {
-            //     stack_blur_pass::<u8, i32, i64, 3>
-            // };
-            // if radius < BASE_RADIUS_I64_CUTOFF {
-            //     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-            //     {
-            //         _dispatcher = stack_blur_pass_neon_i32::<3>;
-            //     }
-            //     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-            //     {
-            //         if _is_sse_available {
-            //             if _is_avx512dq_available && _is_avx512vl_available {
-            //                 _dispatcher = stack_blur_pass_sse::<3, true>;
-            //             } else {
-            //                 _dispatcher = stack_blur_pass_sse::<3, false>;
-            //             }
-            //         }
-            //     }
-            //     #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
-            //     {
-            //         _dispatcher = stack_blur_pass_wasm_i32::<3>;
-            //     }
-            // } else {
-            //     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-            //     {
-            //         _dispatcher = stack_blur_pass_neon_i64::<3>;
-            //     }
-            //     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-            //     {
-            //         if _is_sse_available {
-            //             if _is_avx512dq_available && _is_avx512vl_available {
-            //                 _dispatcher = stack_blur_pass_sse_i64::<3, true>;
-            //             } else {
-            //                 _dispatcher = stack_blur_pass_sse_i64::<3, false>;
-            //             }
-            //         }
-            //     }
-            // }
-            // _dispatcher(
-            //     slice,
-            //     stride,
-            //     width,
-            //     height,
-            //     radius,
-            //     StackBlurPass::Vertical,
-            //     thread,
-            //     thread_count,
-            // );
-            let mut _executor: Box<dyn StackBlurWorkingPass<u8, i32, 3>> = Box::new(VerticalStackBlurPass::<u8, i32, 3>::default());
+            let mut _executor: Box<dyn StackBlurWorkingPass<u8, i32, 3>> =
+                Box::new(VerticalStackBlurPass::<u8, i32, 3>::default());
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             {
                 _executor = Box::new(VerticalNeonStackBlurPass::<u8, i32, 3>::default());
@@ -330,66 +132,8 @@ fn stack_blur_worker_vertical(
             _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }
         FastBlurChannels::Channels4 => {
-            // let mut _dispatcher: fn(
-            //     &UnsafeSlice<u8>,
-            //     u32,
-            //     u32,
-            //     u32,
-            //     u32,
-            //     StackBlurPass,
-            //     usize,
-            //     usize,
-            // ) = if radius < BASE_RADIUS_I64_CUTOFF {
-            //     stack_blur_pass::<u8, i64, i64, 4>
-            // } else {
-            //     stack_blur_pass::<u8, i32, i64, 4>
-            // };
-            // if radius < BASE_RADIUS_I64_CUTOFF {
-            //     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-            //     {
-            //         _dispatcher = stack_blur_pass_neon_i32::<4>;
-            //     }
-            //     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-            //     {
-            //         if _is_sse_available {
-            //             if _is_avx512dq_available && _is_avx512vl_available {
-            //                 _dispatcher = stack_blur_pass_sse::<4, true>;
-            //             } else {
-            //                 _dispatcher = stack_blur_pass_sse::<4, false>;
-            //             }
-            //         }
-            //     }
-            //     #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
-            //     {
-            //         _dispatcher = stack_blur_pass_wasm_i32::<3>;
-            //     }
-            // } else {
-            //     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-            //     {
-            //         _dispatcher = stack_blur_pass_neon_i64::<4>;
-            //     }
-            //     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-            //     {
-            //         if _is_sse_available {
-            //             if _is_avx512dq_available && _is_avx512vl_available {
-            //                 _dispatcher = stack_blur_pass_sse_i64::<4, true>;
-            //             } else {
-            //                 _dispatcher = stack_blur_pass_sse_i64::<4, false>;
-            //             }
-            //         }
-            //     }
-            // }
-            // _dispatcher(
-            //     slice,
-            //     stride,
-            //     width,
-            //     height,
-            //     radius,
-            //     StackBlurPass::Vertical,
-            //     thread,
-            //     thread_count,
-            // );
-            let mut _executor: Box<dyn StackBlurWorkingPass<u8, i32, 4>> = Box::new(VerticalStackBlurPass::<u8, i32, 4>::default());
+            let mut _executor: Box<dyn StackBlurWorkingPass<u8, i32, 4>> =
+                Box::new(VerticalStackBlurPass::<u8, i32, 4>::default());
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             {
                 _executor = Box::new(VerticalNeonStackBlurPass::<u8, i32, 4>::default());

@@ -28,30 +28,29 @@
 use crate::neon::f16_utils::{
     xreinterpret_f16_u16, xreinterpret_u16_f16, xvcvt_f16_f32, xvcvt_f32_f16, xvld_f16, xvst_f16,
 };
-use erydanos::vmulq_s64;
 use half::f16;
 use std::arch::aarch64::*;
 use std::arch::asm;
 
 #[inline(always)]
-pub(crate) unsafe fn load_u8_s32_fast<const CHANNELS_COUNT: usize>(ptr: *const u8) -> int32x4_t {
+pub unsafe fn load_u8_s32_fast<const CHANNELS_COUNT: usize>(ptr: *const u8) -> int32x4_t {
     vreinterpretq_s32_u32(load_u8_u32_fast::<CHANNELS_COUNT>(ptr))
 }
 
 #[inline(always)]
-pub(crate) unsafe fn load_u8_u32_one(ptr: *const u8) -> uint32x2_t {
+pub unsafe fn load_u8_u32_one(ptr: *const u8) -> uint32x2_t {
     let u_first = u32::from_le_bytes([ptr.read_unaligned(), 0, 0, 0]);
     vdup_n_u32(u_first)
 }
 
 #[inline(always)]
-pub(crate) unsafe fn load_u8_u16_one(ptr: *const u8) -> uint16x4_t {
+pub unsafe fn load_u8_u16_one(ptr: *const u8) -> uint16x4_t {
     let u_first = u16::from_le_bytes([ptr.read_unaligned(), 0]);
     vdup_n_u16(u_first)
 }
 
 #[inline(always)]
-pub(crate) unsafe fn store_f32<const CHANNELS_COUNT: usize>(dst_ptr: *mut f32, regi: float32x4_t) {
+pub unsafe fn store_f32<const CHANNELS_COUNT: usize>(dst_ptr: *mut f32, regi: float32x4_t) {
     if CHANNELS_COUNT == 4 {
         vst1q_f32(dst_ptr, regi);
     } else if CHANNELS_COUNT == 3 {
@@ -67,7 +66,7 @@ pub(crate) unsafe fn store_f32<const CHANNELS_COUNT: usize>(dst_ptr: *mut f32, r
 }
 
 #[inline(always)]
-pub(crate) unsafe fn store_u8_s32<const CHANNELS_COUNT: usize>(dst_ptr: *mut u8, regi: int32x4_t) {
+pub unsafe fn store_u8_s32<const CHANNELS_COUNT: usize>(dst_ptr: *mut u8, regi: int32x4_t) {
     let s16 = vreinterpret_u16_s16(vqmovn_s32(regi));
     let u16_f = vcombine_u16(s16, s16);
     let v8 = vqmovn_u16(u16_f);
@@ -91,7 +90,7 @@ pub(crate) unsafe fn store_u8_s32<const CHANNELS_COUNT: usize>(dst_ptr: *mut u8,
 }
 
 #[inline(always)]
-pub(crate) unsafe fn store_u8_u32<const CHANNELS_COUNT: usize>(dst_ptr: *mut u8, regi: uint32x4_t) {
+pub unsafe fn store_u8_u32<const CHANNELS_COUNT: usize>(dst_ptr: *mut u8, regi: uint32x4_t) {
     let s16 = vqmovn_u32(regi);
     let u16_f = vcombine_u16(s16, s16);
     let v8 = vqmovn_u16(u16_f);
@@ -115,7 +114,7 @@ pub(crate) unsafe fn store_u8_u32<const CHANNELS_COUNT: usize>(dst_ptr: *mut u8,
 }
 
 #[inline(always)]
-pub(crate) unsafe fn load_f32_fast<const CHANNELS_COUNT: usize>(ptr: *const f32) -> float32x4_t {
+pub unsafe fn load_f32_fast<const CHANNELS_COUNT: usize>(ptr: *const f32) -> float32x4_t {
     if CHANNELS_COUNT == 4 {
         return vld1q_f32(ptr);
     } else if CHANNELS_COUNT == 3 {
@@ -143,12 +142,12 @@ pub(crate) unsafe fn load_f32_fast<const CHANNELS_COUNT: usize>(ptr: *const f32)
 }
 
 #[inline(always)]
-pub(crate) unsafe fn load_u8_f32_fast<const CHANNELS_COUNT: usize>(ptr: *const u8) -> float32x4_t {
+pub unsafe fn load_u8_f32_fast<const CHANNELS_COUNT: usize>(ptr: *const u8) -> float32x4_t {
     vcvtq_f32_u32(load_u8_u32_fast::<CHANNELS_COUNT>(ptr))
 }
 
 #[inline(always)]
-pub(crate) unsafe fn load_u8_u16_fast<const CHANNELS_COUNT: usize>(ptr: *const u8) -> uint16x4_t {
+pub unsafe fn load_u8_u16_fast<const CHANNELS_COUNT: usize>(ptr: *const u8) -> uint16x4_t {
     // LLVM generates a little trash code so better here is to use assembly
     let mut out_reg: uint16x4_t;
     if CHANNELS_COUNT == 4 {
@@ -199,74 +198,55 @@ pub(crate) unsafe fn load_u8_u16_fast<const CHANNELS_COUNT: usize>(ptr: *const u
 }
 
 #[inline(always)]
-pub(crate) unsafe fn load_u8_u32_fast<const CHANNELS_COUNT: usize>(ptr: *const u8) -> uint32x4_t {
+pub unsafe fn load_u8_u32_fast<const CHANNELS_COUNT: usize>(ptr: *const u8) -> uint32x4_t {
     // LLVM generates a little trash code so better here is to use assembly
+    let mut out_reg: uint32x4_t;
     if CHANNELS_COUNT == 4 {
-        vld1q_u32(
-            [
-                ptr.read_unaligned() as u32,
-                ptr.add(1).read_unaligned() as u32,
-                ptr.add(2).read_unaligned() as u32,
-                ptr.add(3).read_unaligned() as u32,
-            ]
-            .as_ptr(),
-        )
+        asm!("\
+             ldr  {tmp1:w}, [{0}]           // Load the first byte into w1
+             mov  {1:v}.s[0], {tmp1:w}      // Move w1 to the first lane of v0
+             uxtl {1:v}.8h, {1:v}.8b
+             uxtl {1:v}.4s, {1:v}.4h
+        \
+        ", in(reg) ptr, out(vreg) out_reg,
+        tmp1 = out(reg) _);
+        out_reg
     } else if CHANNELS_COUNT == 3 {
-        vld1q_u32(
-            [
-                ptr.read_unaligned() as u32,
-                ptr.add(1).read_unaligned() as u32,
-                ptr.add(2).read_unaligned() as u32,
-                0,
-            ]
-            .as_ptr(),
-        )
+        asm!("\
+             ldrb    {tmp1:w}, [{0}]           // Load the first byte into w1
+             ldrb    {tmp2:w}, [{0}, #1]       // Load the second byte into w2
+             ldrb    {tmp3:w}, [{0}, #2]       // Load the third byte into w3
+
+             mov     {1:v}.s[0], {tmp1:w}      // Move w1 to the first lane of v0
+             mov     {1:v}.s[1], {tmp2:w}      // Move w2 to the second lane of v0
+             mov     {1:v}.s[2], {tmp3:w}      // Move w3 to the third lane of v0
+        \
+        ", in(reg) ptr, out(vreg) out_reg,
+        tmp1 = out(reg) _,
+        tmp2 = out(reg) _,
+        tmp3 = out(reg) _);
+        out_reg
     } else if CHANNELS_COUNT == 2 {
-        vld1q_u32(
-            [
-                ptr.read_unaligned() as u32,
-                ptr.add(1).read_unaligned() as u32,
-                0,
-                0,
-            ]
-            .as_ptr(),
-        )
+        asm!("\
+             ldrb    {tmp1:w}, [{0}]           // Load the first byte into w1
+             ldrb    {tmp2:w}, [{0}, #1]       // Load the second byte into w2
+
+             mov     {1:v}.s[0], {tmp1:w}      // Move w1 to the first lane of v0
+             mov     {1:v}.s[1], {tmp2:w}      // Move w2 to the second lane of v0
+        \
+        ", in(reg) ptr, out(vreg) out_reg,
+        tmp1 = out(reg) _,
+        tmp2 = out(reg) _);
+        out_reg
     } else {
-        vld1q_u32([ptr.read_unaligned() as u32, 0, 0, 0].as_ptr())
+        asm!("\
+             ldrb    {tmp1:w}, [{0}]           // Load the first byte into w1
+             mov     {1:v}.s[0], {tmp1:w}      // Move w1 to the first lane of v0
+        \
+        ", in(reg) ptr, out(vreg) out_reg,
+        tmp1 = out(reg) _);
+        out_reg
     }
-}
-
-#[inline(always)]
-pub(crate) unsafe fn load_u8_u64_fast<const CHANNELS_COUNT: usize>(ptr: *const u8) -> uint64x2x2_t {
-    let u_first = u64::from_le_bytes([ptr.read_unaligned(), 0, 0, 0, 0, 0, 0, 0]);
-    let u_second = u64::from_le_bytes([ptr.add(1).read_unaligned(), 0, 0, 0, 0, 0, 0, 0]);
-    let u_third = u64::from_le_bytes([ptr.add(2).read_unaligned(), 0, 0, 0, 0, 0, 0, 0]);
-    let u_fourth = match CHANNELS_COUNT {
-        4 => u64::from_le_bytes([ptr.add(3).read_unaligned(), 0, 0, 0, 0, 0, 0, 0]),
-        _ => 0,
-    };
-    let store: [u64; 4] = [u_first, u_second, u_third, u_fourth];
-    vld1q_u64_x2(store.as_ptr())
-}
-
-#[inline(always)]
-pub unsafe fn vaddq_s64x2(ab: int64x2x2_t, cd: int64x2x2_t) -> int64x2x2_t {
-    let ux_0 = vaddq_s64(ab.0, cd.0);
-    let ux_1 = vaddq_s64(ab.1, cd.1);
-    int64x2x2_t(ux_0, ux_1)
-}
-
-#[inline(always)]
-pub unsafe fn vsubq_s64x2(ab: int64x2x2_t, cd: int64x2x2_t) -> int64x2x2_t {
-    let ux_0 = vsubq_s64(ab.0, cd.0);
-    let ux_1 = vsubq_s64(ab.1, cd.1);
-    int64x2x2_t(ux_0, ux_1)
-}
-
-#[inline(always)]
-pub(crate) unsafe fn vdupq_n_s64x2(v: i64) -> int64x2x2_t {
-    let vl = vdupq_n_s64(v);
-    int64x2x2_t(vl, vl)
 }
 
 #[inline(always)]
@@ -282,42 +262,37 @@ pub(crate) unsafe fn vmulq_s32_f32(a: int32x4_t, b: float32x4_t) -> int32x4_t {
 }
 
 #[inline(always)]
-pub(crate) unsafe fn vmulq_n_s64x2(x: int64x2x2_t, v: i64) -> int64x2x2_t {
-    let vl = vdupq_n_s64(v);
-    let lo = vmulq_s64(x.0, vl);
-    let hi = vmulq_s64(x.1, vl);
-    int64x2x2_t(lo, hi)
+pub unsafe fn load_u8_u16<const CHANNELS_COUNT: usize>(ptr: *const u8) -> uint16x4_t {
+    if CHANNELS_COUNT == 4 {
+        let u_first = u16::from_le_bytes([ptr.read(), 0]);
+        let u_second = u16::from_le_bytes([ptr.add(1).read_unaligned(), 0]);
+        let u_third = u16::from_le_bytes([ptr.add(2).read_unaligned(), 0]);
+        let u_fourth = u16::from_le_bytes([ptr.add(3).read_unaligned(), 0]);
+        let store: [u16; 4] = [u_first, u_second, u_third, u_fourth];
+        unsafe { vld1_u16(store.as_ptr()) }
+    } else if CHANNELS_COUNT == 3 {
+        let u_first = u16::from_le_bytes([ptr.read(), 0]);
+        let u_second = u16::from_le_bytes([ptr.add(1).read_unaligned(), 0]);
+        let u_third = u16::from_le_bytes([ptr.add(2).read_unaligned(), 0]);
+        let u_fourth = 0;
+        let store: [u16; 4] = [u_first, u_second, u_third, u_fourth];
+        unsafe { vld1_u16(store.as_ptr()) }
+    } else if CHANNELS_COUNT == 2 {
+        let u_first = u16::from_le_bytes([ptr.read(), 0]);
+        let u_second = u16::from_le_bytes([ptr.add(1).read_unaligned(), 0]);
+        let u_third = 0;
+        let u_fourth = 0;
+        let store: [u16; 4] = [u_first, u_second, u_third, u_fourth];
+        unsafe { vld1_u16(store.as_ptr()) }
+    } else {
+        let u_first = u16::from_le_bytes([ptr.read(), 0]);
+        let store: [u16; 4] = [u_first, 0, 0, 0];
+        unsafe { vld1_u16(store.as_ptr()) }
+    }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn load_u8_s64x2_fast<const CHANNELS_COUNT: usize>(
-    ptr: *const u8,
-) -> int64x2x2_t {
-    let ux = load_u8_u64_fast::<CHANNELS_COUNT>(ptr);
-    let sx_0 = vreinterpretq_s64_u64(ux.0);
-    let sx_1 = vreinterpretq_s64_u64(ux.1);
-    int64x2x2_t(sx_0, sx_1)
-}
-
-#[inline(always)]
-pub(crate) unsafe fn load_u8_u16<const CHANNELS_COUNT: usize>(ptr: *const u8) -> uint16x4_t {
-    let u_first = u16::from_le_bytes([ptr.read(), 0]);
-    let u_second = u16::from_le_bytes([ptr.add(1).read_unaligned(), 0]);
-    let u_third = u16::from_le_bytes([ptr.add(2).read_unaligned(), 0]);
-    let u_fourth = match CHANNELS_COUNT {
-        4 => u16::from_le_bytes([ptr.add(3).read_unaligned(), 0]),
-        _ => 0,
-    };
-    let store: [u16; 4] = [u_first, u_second, u_third, u_fourth];
-    unsafe { vld1_u16(store.as_ptr()) }
-}
-
-#[inline(always)]
-pub(crate) unsafe fn prefer_vfmaq_f32(
-    a: float32x4_t,
-    b: float32x4_t,
-    c: float32x4_t,
-) -> float32x4_t {
+pub unsafe fn prefer_vfmaq_f32(a: float32x4_t, b: float32x4_t, c: float32x4_t) -> float32x4_t {
     #[cfg(target_arch = "aarch64")]
     {
         vfmaq_f32(a, b, c)
@@ -329,11 +304,7 @@ pub(crate) unsafe fn prefer_vfmaq_f32(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn prefer_vfma_f32(
-    a: float32x2_t,
-    b: float32x2_t,
-    c: float32x2_t,
-) -> float32x2_t {
+pub unsafe fn prefer_vfma_f32(a: float32x2_t, b: float32x2_t, c: float32x2_t) -> float32x2_t {
     #[cfg(target_arch = "aarch64")]
     {
         vfma_f32(a, b, c)
@@ -345,13 +316,13 @@ pub(crate) unsafe fn prefer_vfma_f32(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn vhsumq_f32(a: float32x4_t) -> f32 {
+pub unsafe fn vhsumq_f32(a: float32x4_t) -> f32 {
     let va = vadd_f32(vget_low_f32(a), vget_high_f32(a));
     vpadds_f32(va)
 }
 
 #[inline(always)]
-pub(crate) unsafe fn vsplit_rgb_5(px: float32x4x4_t) -> Float32x5T {
+pub unsafe fn vsplit_rgb_5(px: float32x4x4_t) -> Float32x5T {
     let first_pixel = px.0;
     let second_pixel = vextq_f32::<3>(px.0, px.1);
     let third_pixel = vextq_f32::<2>(px.1, px.2);
@@ -368,7 +339,7 @@ pub(crate) struct Float32x5T(
 );
 
 #[inline(always)]
-pub(crate) unsafe fn load_f32_f16<const CHANNELS_COUNT: usize>(ptr: *const f16) -> float32x4_t {
+pub unsafe fn load_f32_f16<const CHANNELS_COUNT: usize>(ptr: *const f16) -> float32x4_t {
     if CHANNELS_COUNT == 4 {
         let cvt = xvld_f16(ptr);
         return xvcvt_f32_f16(cvt);
@@ -403,10 +374,7 @@ pub(crate) unsafe fn load_f32_f16<const CHANNELS_COUNT: usize>(ptr: *const f16) 
 }
 
 #[inline(always)]
-pub(crate) unsafe fn store_f32_f16<const CHANNELS_COUNT: usize>(
-    dst_ptr: *mut f16,
-    in_regi: float32x4_t,
-) {
+pub unsafe fn store_f32_f16<const CHANNELS_COUNT: usize>(dst_ptr: *mut f16, in_regi: float32x4_t) {
     let out_regi = xvcvt_f16_f32(in_regi);
     if CHANNELS_COUNT == 4 {
         xvst_f16(dst_ptr, out_regi);

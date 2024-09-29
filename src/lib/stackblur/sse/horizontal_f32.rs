@@ -42,7 +42,9 @@ pub struct HorizontalSseStackBlurPassFloat32<T, J, const COMPONENTS: usize> {
     _phantom_j: PhantomData<J>,
 }
 
-impl<T, J, const COMPONENTS: usize> Default for HorizontalSseStackBlurPassFloat32<T, J, COMPONENTS> {
+impl<T, J, const COMPONENTS: usize> Default
+    for HorizontalSseStackBlurPassFloat32<T, J, COMPONENTS>
+{
     fn default() -> Self {
         HorizontalSseStackBlurPassFloat32::<T, J, COMPONENTS> {
             _phantom_t: Default::default(),
@@ -54,15 +56,15 @@ impl<T, J, const COMPONENTS: usize> Default for HorizontalSseStackBlurPassFloat3
 impl<T, J, const COMPONENTS: usize> HorizontalSseStackBlurPassFloat32<T, J, COMPONENTS>
 where
     J: Copy
-    + 'static
-    + FromPrimitive
-    + AddAssign<J>
-    + Mul<Output = J>
-    + Sub<Output = J>
-    + AsPrimitive<f32>
-    + SubAssign
-    + AsPrimitive<T>
-    + Default,
+        + 'static
+        + FromPrimitive
+        + AddAssign<J>
+        + Mul<Output = J>
+        + Sub<Output = J>
+        + AsPrimitive<f32>
+        + SubAssign
+        + AsPrimitive<T>
+        + Default,
     T: Copy + AsPrimitive<J> + FromPrimitive,
     i32: AsPrimitive<J>,
     u32: AsPrimitive<J>,
@@ -94,7 +96,7 @@ where
 
             let mut src_ptr;
             let mut dst_ptr;
-            
+
             let min_y = thread * height as usize / total_threads;
             let max_y = (thread + 1) * height as usize / total_threads;
 
@@ -184,20 +186,19 @@ where
     }
 }
 
-
 impl<T, J, const COMPONENTS: usize> StackBlurWorkingPass<T, J, COMPONENTS>
-for HorizontalSseStackBlurPassFloat32<T, J, COMPONENTS>
+    for HorizontalSseStackBlurPassFloat32<T, J, COMPONENTS>
 where
     J: Copy
-    + 'static
-    + FromPrimitive
-    + AddAssign<J>
-    + Mul<Output = J>
-    + Sub<Output = J>
-    + AsPrimitive<f32>
-    + SubAssign
-    + AsPrimitive<T>
-    + Default,
+        + 'static
+        + FromPrimitive
+        + AddAssign<J>
+        + Mul<Output = J>
+        + Sub<Output = J>
+        + AsPrimitive<f32>
+        + SubAssign
+        + AsPrimitive<T>
+        + Default,
     T: Copy + AsPrimitive<J> + FromPrimitive,
     i32: AsPrimitive<J>,
     u32: AsPrimitive<J>,

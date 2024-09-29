@@ -55,15 +55,15 @@ impl<T, J, const COMPONENTS: usize> Default for VerticalSseStackBlurPassFloat16<
 impl<T, J, const COMPONENTS: usize> VerticalSseStackBlurPassFloat16<T, J, COMPONENTS>
 where
     J: Copy
-    + 'static
-    + FromPrimitive
-    + AddAssign<J>
-    + Mul<Output = J>
-    + Sub<Output = J>
-    + AsPrimitive<f32>
-    + SubAssign
-    + AsPrimitive<T>
-    + Default,
+        + 'static
+        + FromPrimitive
+        + AddAssign<J>
+        + Mul<Output = J>
+        + Sub<Output = J>
+        + AsPrimitive<f32>
+        + SubAssign
+        + AsPrimitive<T>
+        + Default,
     T: Copy + AsPrimitive<J> + FromPrimitive,
     i32: AsPrimitive<J>,
     u32: AsPrimitive<J>,
@@ -103,7 +103,7 @@ where
             for x in min_x..max_x {
                 let mut sums = _mm_setzero_ps();
                 let mut sum_in = _mm_setzero_ps();
-                let mut  sum_out = _mm_setzero_ps();
+                let mut sum_out = _mm_setzero_ps();
 
                 src_ptr = COMPONENTS * x; // x,0
 
@@ -188,18 +188,18 @@ where
 }
 
 impl<T, J, const COMPONENTS: usize> StackBlurWorkingPass<T, J, COMPONENTS>
-for VerticalSseStackBlurPassFloat16<T, J, COMPONENTS>
+    for VerticalSseStackBlurPassFloat16<T, J, COMPONENTS>
 where
     J: Copy
-    + 'static
-    + FromPrimitive
-    + AddAssign<J>
-    + Mul<Output = J>
-    + Sub<Output = J>
-    + AsPrimitive<f32>
-    + SubAssign
-    + AsPrimitive<T>
-    + Default,
+        + 'static
+        + FromPrimitive
+        + AddAssign<J>
+        + Mul<Output = J>
+        + Sub<Output = J>
+        + AsPrimitive<f32>
+        + SubAssign
+        + AsPrimitive<T>
+        + Default,
     T: Copy + AsPrimitive<J> + FromPrimitive,
     i32: AsPrimitive<J>,
     u32: AsPrimitive<J>,

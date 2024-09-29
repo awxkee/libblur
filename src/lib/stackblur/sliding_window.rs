@@ -123,7 +123,8 @@ where
     #[inline]
     pub fn to_store<T>(self, store: &UnsafeSlice<T>, offset: usize)
     where
-        J: AsPrimitive<T>, T: Copy + 'static
+        J: AsPrimitive<T>,
+        T: Copy + 'static,
     {
         unsafe {
             store.write(offset, self.r.as_());
@@ -137,7 +138,6 @@ where
                 store.write(offset + 3, self.a.as_());
             }
         }
-
     }
 }
 

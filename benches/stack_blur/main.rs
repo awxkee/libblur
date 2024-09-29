@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use libblur::{FastBlurChannels, ThreadingPolicy};
 use opencv::core::{find_file, Mat, Size};

@@ -44,7 +44,6 @@ mod gaussian;
 #[cfg(feature = "image")]
 mod gaussian_blur_image;
 mod median_blur;
-mod mul_table;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 mod neon;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
@@ -106,10 +105,10 @@ pub use r#box::tent_blur;
 pub use r#box::tent_blur_f32;
 pub use r#box::tent_blur_in_linear;
 pub use r#box::tent_blur_u16;
-pub use stackblur::stack_blur::stack_blur;
-pub use stackblur::stack_blur_f16::stack_blur_f16;
-pub use stackblur::stack_blur_f32::stack_blur_f32;
 #[cfg(feature = "image")]
 pub use stack_blur_image::stack_blur_image;
 pub use stack_blur_linear::stack_blur_in_linear;
+pub use stackblur::stack_blur::stack_blur;
+pub use stackblur::stack_blur_f16::stack_blur_f16;
+pub use stackblur::stack_blur_f32::stack_blur_f32;
 pub use threading_policy::ThreadingPolicy;

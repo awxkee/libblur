@@ -84,7 +84,7 @@ where
             let max_y = (thread + 1) * height as usize / total_threads;
 
             let div = ((radius * 2) + 1) as usize;
-            let (mut _xp);
+            let mut _xp;
             let mut sp;
             let mut stack_start;
             let mut stacks0 = vec![0i32; 4 * div];
@@ -134,6 +134,7 @@ where
                 }
 
                 src_ptr = COMPONENTS * _xp as usize + y * stride as usize;
+
                 let mut dst_ptr = y * stride as usize;
                 for _ in 0..width {
                     let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;

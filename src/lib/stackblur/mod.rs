@@ -27,15 +27,16 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 mod horizontal;
-mod sliding_window;
-mod stack_blur_pass;
-mod vertical;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 mod neon;
-pub mod stack_blur;
+mod sliding_window;
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 pub(crate) mod sse;
+pub mod stack_blur;
 pub mod stack_blur_f16;
 pub mod stack_blur_f32;
+mod stack_blur_pass;
+mod vertical;
 
 pub use horizontal::HorizontalStackBlurPass;
 pub use stack_blur_pass::StackBlurWorkingPass;

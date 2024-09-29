@@ -25,13 +25,13 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use erydanos::_mm_extract_epi64x;
+use half::f16;
 use std::arch::asm;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
-use erydanos::_mm_extract_epi64x;
-use half::f16;
 
 #[inline]
 pub(crate) unsafe fn load_f32<const CHANNELS_COUNT: usize>(ptr: *const f32) -> __m128 {
@@ -92,9 +92,14 @@ pub(crate) unsafe fn load_u8_s32_fast<const CHANNELS_COUNT: usize>(ptr: *const u
         t1 = out(reg) _, t2 = out(reg) _);
         regi
     } else if CHANNELS_COUNT == 2 {
-        _mm_setr_epi32(ptr.read_unaligned() as i32, ptr.add(1).read_unaligned() as i32, 0,0)
+        _mm_setr_epi32(
+            ptr.read_unaligned() as i32,
+            ptr.add(1).read_unaligned() as i32,
+            0,
+            0,
+        )
     } else {
-        _mm_setr_epi32(ptr.read_unaligned() as i32, 0, 0,0)
+        _mm_setr_epi32(ptr.read_unaligned() as i32, 0, 0, 0)
     }
 }
 
@@ -133,9 +138,18 @@ pub(crate) unsafe fn load_u8_s16_fast<const CHANNELS_COUNT: usize>(ptr: *const u
         t1 = out(reg) _, t2 = out(reg) _);
         regi
     } else if CHANNELS_COUNT == 2 {
-        _mm_setr_epi16(ptr.read_unaligned() as i16, ptr.add(1).read_unaligned() as i16, 0,0, 0,0,0,0)
+        _mm_setr_epi16(
+            ptr.read_unaligned() as i16,
+            ptr.add(1).read_unaligned() as i16,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+        )
     } else {
-        _mm_setr_epi16(ptr.read_unaligned() as i16, 0, 0,0, 0,0,0,0)
+        _mm_setr_epi16(ptr.read_unaligned() as i16, 0, 0, 0, 0, 0, 0, 0)
     }
 }
 

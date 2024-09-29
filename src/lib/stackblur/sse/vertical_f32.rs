@@ -54,15 +54,15 @@ impl<T, J, const COMPONENTS: usize> Default for VerticalSseStackBlurPassFloat32<
 impl<T, J, const COMPONENTS: usize> VerticalSseStackBlurPassFloat32<T, J, COMPONENTS>
 where
     J: Copy
-    + 'static
-    + FromPrimitive
-    + AddAssign<J>
-    + Mul<Output = J>
-    + Sub<Output = J>
-    + AsPrimitive<f32>
-    + SubAssign
-    + AsPrimitive<T>
-    + Default,
+        + 'static
+        + FromPrimitive
+        + AddAssign<J>
+        + Mul<Output = J>
+        + Sub<Output = J>
+        + AsPrimitive<f32>
+        + SubAssign
+        + AsPrimitive<T>
+        + Default,
     T: Copy + AsPrimitive<J> + FromPrimitive,
     i32: AsPrimitive<J>,
     u32: AsPrimitive<J>,
@@ -188,18 +188,18 @@ where
 }
 
 impl<T, J, const COMPONENTS: usize> StackBlurWorkingPass<T, J, COMPONENTS>
-for VerticalSseStackBlurPassFloat32<T, J, COMPONENTS>
+    for VerticalSseStackBlurPassFloat32<T, J, COMPONENTS>
 where
     J: Copy
-    + 'static
-    + FromPrimitive
-    + AddAssign<J>
-    + Mul<Output = J>
-    + Sub<Output = J>
-    + AsPrimitive<f32>
-    + SubAssign
-    + AsPrimitive<T>
-    + Default,
+        + 'static
+        + FromPrimitive
+        + AddAssign<J>
+        + Mul<Output = J>
+        + Sub<Output = J>
+        + AsPrimitive<f32>
+        + SubAssign
+        + AsPrimitive<T>
+        + Default,
     T: Copy + AsPrimitive<J> + FromPrimitive,
     i32: AsPrimitive<J>,
     u32: AsPrimitive<J>,

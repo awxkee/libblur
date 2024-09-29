@@ -28,7 +28,6 @@
  */
 mod fast_gaussian;
 mod fast_gaussian_next;
-mod stack_blur_i32;
 mod utils;
 
 pub use fast_gaussian::{
@@ -37,4 +36,3 @@ pub use fast_gaussian::{
 pub use fast_gaussian_next::{
     fast_gaussian_next_horizontal_pass_wasm_u8, fast_gaussian_next_vertical_pass_wasm_u8,
 };
-pub use stack_blur_i32::stack_blur_pass_wasm_i32;

@@ -50,15 +50,15 @@ impl<T, J, const COMPONENTS: usize> Default for HorizontalStackBlurPass<T, J, CO
 impl<T, J, const COMPONENTS: usize> HorizontalStackBlurPass<T, J, COMPONENTS>
 where
     J: Copy
-    + 'static
-    + FromPrimitive
-    + AddAssign<J>
-    + Mul<Output = J>
-    + Sub<Output = J>
-    + AsPrimitive<f32>
-    + SubAssign
-    + AsPrimitive<T>
-    + Default,
+        + 'static
+        + FromPrimitive
+        + AddAssign<J>
+        + Mul<Output = J>
+        + Sub<Output = J>
+        + AsPrimitive<f32>
+        + SubAssign
+        + AsPrimitive<T>
+        + Default,
     T: Copy + AsPrimitive<J> + FromPrimitive,
     i32: AsPrimitive<J>,
     u32: AsPrimitive<J>,
@@ -97,7 +97,7 @@ where
             let mut sum_in = SlidingWindow::default();
             let mut sum_out = SlidingWindow::default();
 
-            let mut src_ptr = stride as usize * y; // start of line (0,y)
+            let mut src_ptr = stride as usize * y;
 
             let src = SlidingWindow::from_store(pixels, src_ptr);
 

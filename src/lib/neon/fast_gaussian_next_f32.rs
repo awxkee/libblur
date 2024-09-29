@@ -27,7 +27,7 @@
 
 use std::arch::aarch64::*;
 
-use crate::neon::{load_f32_fast, store_f32};
+use crate::neon::utils::{load_f32_fast, store_f32};
 use crate::reflect_index;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, reflect_101, EdgeMode};

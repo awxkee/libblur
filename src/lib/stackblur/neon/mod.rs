@@ -27,7 +27,15 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 mod horizontal;
+mod horizontal_f16;
+mod horizontal_f32;
 mod vertical;
+mod vertical_f16;
+mod vertical_f32;
 
 pub use horizontal::HorizontalNeonStackBlurPass;
+pub use horizontal_f16::HorizontalNeonStackBlurPassFloat16;
+pub use horizontal_f32::HorizontalNeonStackBlurPassFloat32;
 pub use vertical::VerticalNeonStackBlurPass;
+pub use vertical_f16::VerticalNeonStackBlurPassFloat16;
+pub use vertical_f32::VerticalNeonStackBlurPassFloat32;

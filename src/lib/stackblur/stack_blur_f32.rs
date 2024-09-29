@@ -25,6 +25,10 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+use crate::stackblur::neon::{
+    HorizontalNeonStackBlurPassFloat32, VerticalNeonStackBlurPassFloat32,
+};
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::stackblur::sse::{HorizontalSseStackBlurPassFloat32, VerticalSseStackBlurPassFloat32};
 use crate::stackblur::{HorizontalStackBlurPass, StackBlurWorkingPass, VerticalStackBlurPass};
@@ -54,6 +58,10 @@ fn stack_blur_worker_horizontal(
                         Box::new(HorizontalSseStackBlurPassFloat32::<f32, f32, 1>::default());
                 }
             }
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            {
+                _executor = Box::new(HorizontalNeonStackBlurPassFloat32::<f32, f32, 1>::default());
+            }
             _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }
         FastBlurChannels::Channels3 => {
@@ -66,6 +74,10 @@ fn stack_blur_worker_horizontal(
                         Box::new(HorizontalSseStackBlurPassFloat32::<f32, f32, 3>::default());
                 }
             }
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            {
+                _executor = Box::new(HorizontalNeonStackBlurPassFloat32::<f32, f32, 3>::default());
+            }
             _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }
         FastBlurChannels::Channels4 => {
@@ -77,6 +89,10 @@ fn stack_blur_worker_horizontal(
                     _executor =
                         Box::new(HorizontalSseStackBlurPassFloat32::<f32, f32, 4>::default());
                 }
+            }
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            {
+                _executor = Box::new(HorizontalNeonStackBlurPassFloat32::<f32, f32, 4>::default());
             }
             _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }
@@ -106,6 +122,10 @@ fn stack_blur_worker_vertical(
                     _executor = Box::new(VerticalSseStackBlurPassFloat32::<f32, f32, 1>::default());
                 }
             }
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            {
+                _executor = Box::new(VerticalNeonStackBlurPassFloat32::<f32, f32, 1>::default());
+            }
             _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }
         FastBlurChannels::Channels3 => {
@@ -117,6 +137,10 @@ fn stack_blur_worker_vertical(
                     _executor = Box::new(VerticalSseStackBlurPassFloat32::<f32, f32, 3>::default());
                 }
             }
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            {
+                _executor = Box::new(VerticalNeonStackBlurPassFloat32::<f32, f32, 3>::default());
+            }
             _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }
         FastBlurChannels::Channels4 => {
@@ -127,6 +151,10 @@ fn stack_blur_worker_vertical(
                 if _is_sse_available {
                     _executor = Box::new(VerticalSseStackBlurPassFloat32::<f32, f32, 4>::default());
                 }
+            }
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            {
+                _executor = Box::new(VerticalNeonStackBlurPassFloat32::<f32, f32, 4>::default());
             }
             _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }

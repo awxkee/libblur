@@ -97,7 +97,7 @@ Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded 
 
 |         | time(NEON) | time(SSE) |
 |---------|:----------:|:---------:|
-| libblur |   8.68ms   |  13.60ms  |
+| libblur |   7.90ms   |  13.60ms  |
 | OpenCV  |   8.43ms   |  9.80ms   |
 
 Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded mode with 77 radius.
@@ -127,14 +127,14 @@ Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded 
 
 |         | time(NEON) | time(SSE) | 
 |---------|:----------:|:---------:| 
-| libblur |   9.95ms   |  14.91ms  | 
+| libblur |   8.51ms   |  14.91ms  | 
 | OpenCV  |     -      |     -     | 
 
 Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded mode with 77 radius.
 
 |         | time(NEON) | time(SSE) |
 |---------|:----------:|:---------:|
-| libblur |   9.74ms   |  13.39ms  |
+| libblur |   8.44ms   |  13.39ms  |
 | OpenCV  |     --     |    --     |
 
 ### Fast gaussian next
@@ -149,19 +149,19 @@ O(log R) complexity.
 libblur::fast_gaussian_next( & mut bytes, stride, width, height, radius, FastBlurChannels::Channels3);
 ```
 
-Example comparison time for blurring image 3000x4000 RGB 8-bit in single-threaded mode with 77 radius.
+Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded mode with 35 radius.
 
-|         |  Time   |
-|---------|:-------:|
-| libblur | 53.99ms |
-| OpenCV  |    -    |
+|         | time(NEON) |
+|---------|:----------:|
+| libblur |   9.41ms   |
+| OpenCV  |     -      |
 
 Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded mode with 77 radius.
 
-|         |  Time   |
-|---------|:-------:|
-| libblur | 10.26ms |
-| OpenCV  |    -    |
+|         | time(NEON) |
+|---------|:----------:|
+| libblur |   9.28ms   |
+| OpenCV  |     -      |
 
 ### Tent blur
 
