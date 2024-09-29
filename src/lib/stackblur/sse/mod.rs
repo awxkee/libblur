@@ -26,42 +26,16 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::unsafe_slice::UnsafeSlice;
-use num_traits::{AsPrimitive, FromPrimitive};
-use std::ops::{AddAssign, Mul, Sub, SubAssign};
+mod horizontal;
+mod horizontal_f16;
+mod horizontal_f32;
+mod vertical;
+mod vertical_f16;
+mod vertical_f32;
 
-pub trait StackBlurWorkingPass<T, J, const COMPONENTS: usize>
-where
-    J: Copy
-        + 'static
-        + FromPrimitive
-        + AddAssign<J>
-        + Mul<Output = J>
-        + Sub<Output = J>
-        + AsPrimitive<f32>
-        + SubAssign
-        + AsPrimitive<T>
-        + Default,
-    T: Copy + AsPrimitive<J> + FromPrimitive,
-    i32: AsPrimitive<J>,
-    u32: AsPrimitive<J>,
-    f32: AsPrimitive<T>,
-    usize: AsPrimitive<J>,
-{
-    ///
-    ///
-    /// # Generics
-    /// `T` - buffer type u8, u16 etc, this method expected only integral types
-    /// `J` - accumulator type, i32, i64
-    /// `I` - intermediate multiplication type, when sum will be adopting into higher it may overflow, use this parameter to control overflowing
-    fn pass(
-        &self,
-        pixels: &UnsafeSlice<T>,
-        stride: u32,
-        width: u32,
-        height: u32,
-        radius: u32,
-        thread: usize,
-        total_threads: usize,
-    );
-}
+pub use horizontal::HorizontalSseStackBlurPass;
+pub use horizontal_f16::HorizontalSseStackBlurPassFloat16;
+pub use horizontal_f32::HorizontalSseStackBlurPassFloat32;
+pub use vertical::VerticalSseStackBlurPass;
+pub use vertical_f16::VerticalSseStackBlurPassFloat16;
+pub use vertical_f32::VerticalSseStackBlurPassFloat32;

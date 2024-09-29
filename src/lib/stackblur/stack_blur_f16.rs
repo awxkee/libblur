@@ -26,17 +26,10 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use half::f16;
-
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use crate::cpu_features::is_aarch_f16c_supported;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use crate::neon::stack_blur_pass_neon_f16;
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-use crate::sse::stack_blur_pass_sse_f16;
-use crate::stackblur::stack_blur::StackBlurPass;
-use crate::stack_blur_f32::stack_blur_pass_f;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{FastBlurChannels, ThreadingPolicy};
+use crate::stackblur::{HorizontalStackBlurPass, StackBlurWorkingPass, VerticalStackBlurPass};
+use crate::stackblur::sse::{HorizontalSseStackBlurPassFloat16, VerticalSseStackBlurPassFloat16};
 
 fn stack_blur_worker_horizontal(
     slice: &UnsafeSlice<f16>,
@@ -54,94 +47,40 @@ fn stack_blur_worker_horizontal(
     let _is_f16c_available = std::arch::is_x86_feature_detected!("f16c");
     match channels {
         FastBlurChannels::Plane => {
-            let mut _dispatcher: fn(
-                &UnsafeSlice<f16>,
-                u32,
-                u32,
-                u32,
-                u32,
-                StackBlurPass,
-                usize,
-                usize,
-            ) = stack_blur_pass_f::<f16, f32, 1>;
-            _dispatcher(
-                slice,
-                stride,
-                width,
-                height,
-                radius,
-                StackBlurPass::Horizontal,
-                thread,
-                thread_count,
-            );
+            let mut _executor: Box<dyn StackBlurWorkingPass<f16, f32, 1>> =
+                Box::new(HorizontalStackBlurPass::<f16, f32, 1>::default());
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+            {
+                if _is_sse_available {
+                    _executor =
+                        Box::new(HorizontalSseStackBlurPassFloat16::<f16, f32, 1>::default());
+                }
+            }
+            _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }
         FastBlurChannels::Channels3 => {
-            let mut _dispatcher: fn(
-                &UnsafeSlice<f16>,
-                u32,
-                u32,
-                u32,
-                u32,
-                StackBlurPass,
-                usize,
-                usize,
-            ) = stack_blur_pass_f::<f16, f32, 3>;
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-            {
-                if is_aarch_f16c_supported() {
-                    _dispatcher = stack_blur_pass_neon_f16::<3>;
-                }
-            }
+            let mut _executor: Box<dyn StackBlurWorkingPass<f16, f32, 3>> =
+                Box::new(HorizontalStackBlurPass::<f16, f32, 3>::default());
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
-                if _is_sse_available && _is_f16c_available {
-                    _dispatcher = stack_blur_pass_sse_f16::<3>;
+                if _is_sse_available {
+                    _executor =
+                        Box::new(HorizontalSseStackBlurPassFloat16::<f16, f32, 3>::default());
                 }
             }
-            _dispatcher(
-                slice,
-                stride,
-                width,
-                height,
-                radius,
-                StackBlurPass::Horizontal,
-                thread,
-                thread_count,
-            );
+            _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }
         FastBlurChannels::Channels4 => {
-            let mut _dispatcher: fn(
-                &UnsafeSlice<f16>,
-                u32,
-                u32,
-                u32,
-                u32,
-                StackBlurPass,
-                usize,
-                usize,
-            ) = stack_blur_pass_f::<f16, f32, 4>;
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-            {
-                if is_aarch_f16c_supported() {
-                    _dispatcher = stack_blur_pass_neon_f16::<4>;
-                }
-            }
+            let mut _executor: Box<dyn StackBlurWorkingPass<f16, f32, 4>> =
+                Box::new(HorizontalStackBlurPass::<f16, f32, 4>::default());
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
-                if _is_sse_available && _is_f16c_available {
-                    _dispatcher = stack_blur_pass_sse_f16::<4>;
+                if _is_sse_available {
+                    _executor =
+                        Box::new(HorizontalSseStackBlurPassFloat16::<f16, f32, 4>::default());
                 }
             }
-            _dispatcher(
-                slice,
-                stride,
-                width,
-                height,
-                radius,
-                StackBlurPass::Horizontal,
-                thread,
-                thread_count,
-            );
+            _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }
     }
 }
@@ -162,108 +101,50 @@ fn stack_blur_worker_vertical(
     let _is_f16c_available = std::arch::is_x86_feature_detected!("f16c");
     match channels {
         FastBlurChannels::Plane => {
-            let mut _dispatcher: fn(
-                &UnsafeSlice<f16>,
-                u32,
-                u32,
-                u32,
-                u32,
-                StackBlurPass,
-                usize,
-                usize,
-            ) = stack_blur_pass_f::<f16, f32, 1>;
-            _dispatcher(
-                slice,
-                stride,
-                width,
-                height,
-                radius,
-                StackBlurPass::Vertical,
-                thread,
-                thread_count,
-            );
+            let mut _executor: Box<dyn StackBlurWorkingPass<f16, f32, 1>> =
+                Box::new(VerticalStackBlurPass::<f16, f32, 1>::default());
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+            {
+                if _is_sse_available {
+                    _executor = Box::new(VerticalSseStackBlurPassFloat16::<f16, f32, 1>::default());
+                }
+            }
+            _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }
         FastBlurChannels::Channels3 => {
-            let mut _dispatcher: fn(
-                &UnsafeSlice<f16>,
-                u32,
-                u32,
-                u32,
-                u32,
-                StackBlurPass,
-                usize,
-                usize,
-            ) = stack_blur_pass_f::<f16, f32, 3>;
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-            {
-                if is_aarch_f16c_supported() {
-                    _dispatcher = stack_blur_pass_neon_f16::<3>;
-                }
-            }
+            let mut _executor: Box<dyn StackBlurWorkingPass<f16, f32, 3>> =
+                Box::new(VerticalStackBlurPass::<f16, f32, 3>::default());
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
-                if _is_sse_available && _is_f16c_available {
-                    _dispatcher = stack_blur_pass_sse_f16::<3>;
+                if _is_sse_available {
+                    _executor = Box::new(VerticalSseStackBlurPassFloat16::<f16, f32, 3>::default());
                 }
             }
-            _dispatcher(
-                slice,
-                stride,
-                width,
-                height,
-                radius,
-                StackBlurPass::Vertical,
-                thread,
-                thread_count,
-            );
+            _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }
         FastBlurChannels::Channels4 => {
-            let mut _dispatcher: fn(
-                &UnsafeSlice<f16>,
-                u32,
-                u32,
-                u32,
-                u32,
-                StackBlurPass,
-                usize,
-                usize,
-            ) = stack_blur_pass_f::<f16, f32, 4>;
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-            {
-                if is_aarch_f16c_supported() {
-                    _dispatcher = stack_blur_pass_neon_f16::<4>;
-                }
-            }
+            let mut _executor: Box<dyn StackBlurWorkingPass<f16, f32, 4>> =
+                Box::new(VerticalStackBlurPass::<f16, f32, 4>::default());
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
-                if _is_sse_available && _is_f16c_available {
-                    _dispatcher = stack_blur_pass_sse_f16::<4>;
+                if _is_sse_available {
+                    _executor = Box::new(VerticalSseStackBlurPassFloat16::<f16, f32, 4>::default());
                 }
             }
-            _dispatcher(
-                slice,
-                stride,
-                width,
-                height,
-                radius,
-                StackBlurPass::Vertical,
-                thread,
-                thread_count,
-            );
+            _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }
     }
 }
 
 /// Fastest available blur option in f16, values may be denormalized, or normalized
 ///
-/// Fast gaussian approximation using stack blur
-/// This is a very fast approximation using f32 accumulator size
+/// Fast gaussian approximation using stack blur.
 ///
 /// # Arguments
 /// * `in_place` - mutable buffer contains image data that will be used as a source and destination
 /// * `width` - image width
 /// * `height` - image height
-/// * `radius` - radius almost is not limited for f16 implementation
+/// * `radius` - radius almost is not limited, minimum is one
 /// * `channels` - Count of channels of the image, only 3 and 4 is supported, alpha position, and channels order does not matter
 /// * `threading_policy` - Threads usage policy
 ///
@@ -277,8 +158,8 @@ pub fn stack_blur_f16(
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) {
+    let radius = radius.max(1);
     let stride = width * channels.get_channels() as u32;
-    let radius = std::cmp::max(radius, 2);
     let thread_count = threading_policy.get_threads_count(width, height) as u32;
     if thread_count == 1 {
         let slice = UnsafeSlice::new(in_place);

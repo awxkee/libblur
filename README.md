@@ -97,14 +97,14 @@ Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded 
 
 |         | time(NEON) | time(SSE) |
 |---------|:----------:|:---------:|
-| libblur |   8.68ms   |  24.62ms  |
+| libblur |   8.68ms   |  13.60ms  |
 | OpenCV  |   8.43ms   |  9.80ms   |
 
 Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded mode with 77 radius.
 
 |         | time(NEON) | time(SSE) |
 |---------|:----------:|:---------:|
-| libblur |   6.73ms   |  23.72ms  |
+| libblur |   6.73ms   |  11.91ms  |
 | OpenCV  |   8.00ms   |  9.62ms   |
 
 ### Fast gaussian
@@ -125,17 +125,17 @@ libblur::fast_gaussian( & mut bytes, stride, width0, height, radius, FastBlurCha
 
 Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded mode with 77 radius.
 
-|         |  Time  |
-|---------|:------:|
-| libblur | 9.95ms |
-| OpenCV  |   -    |
+|         | time(NEON) | time(SSE) | 
+|---------|:----------:|:---------:| 
+| libblur |   9.95ms   |  14.91ms  | 
+| OpenCV  |     -      |     -     | 
 
 Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded mode with 77 radius.
 
-|         |  Time  |
-|---------|:------:|
-| libblur | 9.74ms |
-| OpenCV  |   --   |
+|         | time(NEON) | time(SSE) |
+|---------|:----------:|:---------:|
+| libblur |   9.74ms   |  13.39ms  |
+| OpenCV  |     --     |    --     |
 
 ### Fast gaussian next
 

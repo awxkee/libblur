@@ -30,8 +30,12 @@ mod horizontal;
 mod sliding_window;
 mod stack_blur_pass;
 mod vertical;
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 mod neon;
 pub mod stack_blur;
+pub(crate) mod sse;
+pub mod stack_blur_f16;
+pub mod stack_blur_f32;
 
 pub use horizontal::HorizontalStackBlurPass;
 pub use stack_blur_pass::StackBlurWorkingPass;

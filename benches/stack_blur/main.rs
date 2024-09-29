@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use libblur::{FastBlurChannels, ThreadingPolicy};
 use opencv::core::{find_file, Mat, Size};
@@ -14,8 +14,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let stride = dimensions.0 as usize * components;
     let src_bytes = img.as_bytes();
     c.bench_function("libblur: RGBA stack blur", |b| {
+        let mut dst_bytes: Vec<u8> = src_bytes.iter().copied().collect::<Vec<_>>();
         b.iter(|| {
-            let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
             libblur::stack_blur(
                 &mut dst_bytes,
                 stride as u32,
@@ -48,10 +48,10 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let rgb_image = rgb_img.as_bytes();
 
     c.bench_function("libblur: RGB stack blur", |b| {
+        let mut dst = rgb_image.iter().copied().collect::<Vec<_>>();
         b.iter(|| {
-            let mut dst_bytes: Vec<u8> = rgb_image.to_vec();
             libblur::stack_blur(
-                &mut dst_bytes,
+                &mut dst,
                 rgb_img.dimensions().0 * 3,
                 rgb_img.dimensions().0,
                 rgb_img.dimensions().1,
@@ -59,7 +59,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 FastBlurChannels::Channels3,
                 ThreadingPolicy::Adaptive,
             );
-        })
+        });
     });
 
     let src_rgb = imread(

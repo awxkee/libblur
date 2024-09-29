@@ -31,7 +31,7 @@ use crate::stackblur::stack_blur_pass::StackBlurWorkingPass;
 use crate::unsafe_slice::UnsafeSlice;
 use num_traits::{AsPrimitive, FromPrimitive};
 use std::marker::PhantomData;
-use std::ops::{AddAssign, Mul, Shr, Sub, SubAssign};
+use std::ops::{AddAssign, Mul, Sub, SubAssign};
 
 pub struct HorizontalStackBlurPass<T, J, const COMPONENTS: usize> {
     _phantom_t: PhantomData<T>,
@@ -47,27 +47,26 @@ impl<T, J, const COMPONENTS: usize> Default for HorizontalStackBlurPass<T, J, CO
     }
 }
 
-impl<T, J, const COMPONENTS: usize> StackBlurWorkingPass<T, J, COMPONENTS>
-    for HorizontalStackBlurPass<T, J, COMPONENTS>
+impl<T, J, const COMPONENTS: usize> HorizontalStackBlurPass<T, J, COMPONENTS>
 where
     J: Copy
-        + 'static
-        + FromPrimitive
-        + AddAssign<J>
-        + Mul<Output = J>
-        + Shr<Output = J>
-        + Sub<Output = J>
-        + AsPrimitive<f32>
-        + SubAssign
-        + AsPrimitive<T>
-        + Default,
+    + 'static
+    + FromPrimitive
+    + AddAssign<J>
+    + Mul<Output = J>
+    + Sub<Output = J>
+    + AsPrimitive<f32>
+    + SubAssign
+    + AsPrimitive<T>
+    + Default,
     T: Copy + AsPrimitive<J> + FromPrimitive,
     i32: AsPrimitive<J>,
     u32: AsPrimitive<J>,
     f32: AsPrimitive<T> + AsPrimitive<J>,
     usize: AsPrimitive<J>,
 {
-    fn pass(
+    #[inline]
+    unsafe fn pass_impl(
         &self,
         pixels: &UnsafeSlice<T>,
         stride: u32,
@@ -91,7 +90,7 @@ where
         let min_y = thread * height as usize / total_threads;
         let max_y = (thread + 1) * height as usize / total_threads;
 
-        let mut start_y = min_y;
+        let start_y = min_y;
 
         for y in start_y..max_y {
             let mut sum = SlidingWindow::default();
@@ -167,6 +166,41 @@ where
                 sum_out += *stack;
                 sum_in -= *stack;
             }
+        }
+    }
+}
+
+impl<T, J, const COMPONENTS: usize> StackBlurWorkingPass<T, J, COMPONENTS>
+    for HorizontalStackBlurPass<T, J, COMPONENTS>
+where
+    J: Copy
+        + 'static
+        + FromPrimitive
+        + AddAssign<J>
+        + Mul<Output = J>
+        + Sub<Output = J>
+        + AsPrimitive<f32>
+        + SubAssign
+        + AsPrimitive<T>
+        + Default,
+    T: Copy + AsPrimitive<J> + FromPrimitive,
+    i32: AsPrimitive<J>,
+    u32: AsPrimitive<J>,
+    f32: AsPrimitive<T> + AsPrimitive<J>,
+    usize: AsPrimitive<J>,
+{
+    fn pass(
+        &self,
+        pixels: &UnsafeSlice<T>,
+        stride: u32,
+        width: u32,
+        height: u32,
+        radius: u32,
+        thread: usize,
+        total_threads: usize,
+    ) {
+        unsafe {
+            self.pass_impl(pixels, stride, width, height, radius, thread, total_threads);
         }
     }
 }

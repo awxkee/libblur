@@ -31,7 +31,7 @@ use crate::stackblur::stack_blur_pass::StackBlurWorkingPass;
 use crate::unsafe_slice::UnsafeSlice;
 use num_traits::{AsPrimitive, FromPrimitive};
 use std::marker::PhantomData;
-use std::ops::{AddAssign, Mul, Shr, Sub, SubAssign};
+use std::ops::{AddAssign, Mul, Sub, SubAssign};
 
 pub struct VerticalStackBlurPass<T, J, const COMPONENTS: usize> {
     _phantom_t: PhantomData<T>,
@@ -47,15 +47,13 @@ impl<T, J, const COMPONENTS: usize> Default for VerticalStackBlurPass<T, J, COMP
     }
 }
 
-impl<T, J, const COMPONENTS: usize> StackBlurWorkingPass<T, J, COMPONENTS>
-    for VerticalStackBlurPass<T, J, COMPONENTS>
+impl<T, J, const COMPONENTS: usize> VerticalStackBlurPass<T, J, COMPONENTS>
 where
     J: Copy
     + 'static
     + FromPrimitive
     + AddAssign<J>
     + Mul<Output = J>
-    + Shr<Output = J>
     + Sub<Output = J>
     + AsPrimitive<f32>
     + SubAssign
@@ -67,7 +65,8 @@ where
     f32: AsPrimitive<T> + AsPrimitive<J>,
     usize: AsPrimitive<J>,
 {
-    fn pass(
+    #[inline]
+    unsafe fn pass_impl(
         &self,
         pixels: &UnsafeSlice<T>,
         stride: u32,
@@ -78,7 +77,7 @@ where
         total_threads: usize,
     ) {
         let div = ((radius * 2) + 1) as usize;
-        let (mut _yp);
+        let mut _yp;
         let mut sp;
         let mut stack_start;
         let mut stacks = vec![SlidingWindow::<COMPONENTS, J>::new(); div];
@@ -175,6 +174,41 @@ where
                 sum_out += *stack_ptr;
                 sum_in -= *stack_ptr;
             }
+        }
+    }
+}
+
+impl<T, J, const COMPONENTS: usize> StackBlurWorkingPass<T, J, COMPONENTS>
+    for VerticalStackBlurPass<T, J, COMPONENTS>
+where
+    J: Copy
+    + 'static
+    + FromPrimitive
+    + AddAssign<J>
+    + Mul<Output = J>
+    + Sub<Output = J>
+    + AsPrimitive<f32>
+    + SubAssign
+    + AsPrimitive<T>
+    + Default,
+    T: Copy + AsPrimitive<J> + FromPrimitive,
+    i32: AsPrimitive<J>,
+    u32: AsPrimitive<J>,
+    f32: AsPrimitive<T> + AsPrimitive<J>,
+    usize: AsPrimitive<J>,
+{
+    fn pass(
+        &self,
+        pixels: &UnsafeSlice<T>,
+        stride: u32,
+        width: u32,
+        height: u32,
+        radius: u32,
+        thread: usize,
+        total_threads: usize,
+    ) {
+        unsafe {
+            self.pass_impl(pixels, stride, width, height, radius, thread, total_threads);
         }
     }
 }

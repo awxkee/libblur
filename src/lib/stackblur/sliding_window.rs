@@ -121,7 +121,7 @@ where
     }
 
     #[inline]
-    pub fn to_store<T>(&self, store: &UnsafeSlice<T>, offset: usize)
+    pub fn to_store<T>(self, store: &UnsafeSlice<T>, offset: usize)
     where
         J: AsPrimitive<T>, T: Copy + 'static
     {

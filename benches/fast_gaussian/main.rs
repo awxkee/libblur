@@ -13,8 +13,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let stride = dimensions.0 as usize * components;
     let src_bytes = img.as_bytes();
     c.bench_function("RGBA fast gaussian", |b| {
+        let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
         b.iter(|| {
-            let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
             libblur::fast_gaussian(
                 &mut dst_bytes,
                 stride as u32,
@@ -37,8 +37,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let rgb_src_bytes = rgb_image.as_bytes();
 
     c.bench_function("RGB fast gaussian", |b| {
+        let mut dst_bytes: Vec<u8> = rgb_src_bytes.to_vec();
         b.iter(|| {
-            let mut dst_bytes: Vec<u8> = rgb_src_bytes.to_vec();
             libblur::fast_gaussian(
                 &mut dst_bytes,
                 img.dimensions().0 * 3,
