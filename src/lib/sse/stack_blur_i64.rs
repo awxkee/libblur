@@ -31,7 +31,7 @@ use crate::sse::{
     __mm128ix2, _mm_add_epi64x2, _mm_load_epi64x2, _mm_mul_n_epi64x2, _mm_set1_epi64x2,
     _mm_store_epi64x2, _mm_sub_epi64x2, load_u8_s64x2_fast,
 };
-use crate::stack_blur::StackBlurPass;
+use crate::stackblur::stack_blur::StackBlurPass;
 use crate::unsafe_slice::UnsafeSlice;
 use erydanos::_mm_mul_epi64;
 #[cfg(target_arch = "x86")]

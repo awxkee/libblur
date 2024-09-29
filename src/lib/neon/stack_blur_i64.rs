@@ -29,7 +29,7 @@ use crate::mul_table::{MUL_TABLE_STACK_BLUR, SHR_TABLE_STACK_BLUR};
 use crate::neon::{
     load_u8_s64x2_fast, store_u8_s32, vaddq_s64x2, vdupq_n_s64x2, vmulq_n_s64x2, vsubq_s64x2,
 };
-use crate::stack_blur::StackBlurPass;
+use crate::stackblur::stack_blur::StackBlurPass;
 use crate::unsafe_slice::UnsafeSlice;
 use erydanos::vmulq_s64;
 use std::arch::aarch64::*;

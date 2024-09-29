@@ -33,7 +33,7 @@ use crate::cpu_features::is_aarch_f16c_supported;
 use crate::neon::stack_blur_pass_neon_f16;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse::stack_blur_pass_sse_f16;
-use crate::stack_blur::StackBlurPass;
+use crate::stackblur::stack_blur::StackBlurPass;
 use crate::stack_blur_f32::stack_blur_pass_f;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{FastBlurChannels, ThreadingPolicy};

@@ -27,7 +27,7 @@
 
 use crate::mul_table::{MUL_TABLE_STACK_BLUR, SHR_TABLE_STACK_BLUR};
 use crate::neon::{load_u8_s32_fast, store_u8_s32};
-use crate::stack_blur::StackBlurPass;
+use crate::stackblur::stack_blur::StackBlurPass;
 use crate::unsafe_slice::UnsafeSlice;
 use std::arch::aarch64::*;
 

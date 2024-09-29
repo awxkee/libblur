@@ -31,7 +31,7 @@ const BASE_RADIUS_F64_CUTOFF: u32 = 327;
 use crate::neon::stack_blur_pass_neon_f32;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse::stack_blur_pass_sse_f;
-use crate::stack_blur::{BlurStack, StackBlurPass};
+use crate::stackblur::stack_blur::{BlurStack, StackBlurPass};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{FastBlurChannels, ThreadingPolicy};
 use num_traits::{AsPrimitive, FromPrimitive};
@@ -54,7 +54,8 @@ pub(crate) fn stack_blur_pass_f<T, J, const COMPONENTS: usize>(
         + std::ops::Mul<Output = J>
         + std::ops::Div<Output = J>
         + AsPrimitive<T>
-        + std::ops::SubAssign + Default,
+        + std::ops::SubAssign
+        + Default,
     f32: AsPrimitive<J>,
     i32: AsPrimitive<J>,
     u32: AsPrimitive<J>,

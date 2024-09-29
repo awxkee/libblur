@@ -167,12 +167,12 @@ fn main() {
         stride as u32,
         dimensions.0,
         dimensions.1,
-        75,
+        125,
         FastBlurChannels::Channels3,
         ThreadingPolicy::Adaptive,
     );
 
-    println!("stack_blur {:?}" ,start.elapsed());
+    println!("stackblur {:?}", start.elapsed());
 
     //
     // libblur::tent_blur(

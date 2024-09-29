@@ -33,7 +33,7 @@ use std::arch::x86_64::*;
 use half::f16;
 
 use crate::sse::{load_f32_f16, store_f32_f16};
-use crate::stack_blur::StackBlurPass;
+use crate::stackblur::stack_blur::StackBlurPass;
 use crate::unsafe_slice::UnsafeSlice;
 
 pub fn stack_blur_pass_sse_f16<const COMPONENTS: usize>(

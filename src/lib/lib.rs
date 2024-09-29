@@ -49,12 +49,12 @@ mod mul_table;
 mod neon;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 mod sse;
-mod stack_blur;
 mod stack_blur_f16;
 mod stack_blur_f32;
 #[cfg(feature = "image")]
 mod stack_blur_image;
 mod stack_blur_linear;
+mod stackblur;
 mod threading_policy;
 mod to_storage;
 mod unsafe_slice;
@@ -108,7 +108,7 @@ pub use r#box::tent_blur;
 pub use r#box::tent_blur_f32;
 pub use r#box::tent_blur_in_linear;
 pub use r#box::tent_blur_u16;
-pub use stack_blur::stack_blur;
+pub use stackblur::stack_blur::stack_blur;
 pub use stack_blur_f16::stack_blur_f16;
 pub use stack_blur_f32::stack_blur_f32;
 #[cfg(feature = "image")]

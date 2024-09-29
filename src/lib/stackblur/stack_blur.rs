@@ -27,17 +27,17 @@
 
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::cpu_features::{is_x86_avx512dq_supported, is_x86_avx512vl_supported};
-use crate::mul_table::{MUL_TABLE_STACK_BLUR, SHR_TABLE_STACK_BLUR};
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use crate::neon::{stack_blur_pass_neon_i32, stack_blur_pass_neon_i64};
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse::{stack_blur_pass_sse, stack_blur_pass_sse_i64};
+use crate::stackblur::{HorizontalStackBlurPass, StackBlurWorkingPass, VerticalStackBlurPass};
 use crate::unsafe_slice::UnsafeSlice;
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 use crate::wasm32::stack_blur_pass_wasm_i32;
 use crate::{FastBlurChannels, ThreadingPolicy};
 use num_traits::{AsPrimitive, FromPrimitive};
-use std::ops::{AddAssign, Mul, Shr, SubAssign};
+use std::ops::{AddAssign, Mul, Shr, Sub, SubAssign};
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+use crate::stackblur::neon::{HorizontalNeonStackBlurPass, VerticalNeonStackBlurPass};
 
 const BASE_RADIUS_I64_CUTOFF: u32 = 150;
 
@@ -62,7 +62,6 @@ where
             a: J::default(),
         }
     }
-
 }
 
 #[repr(C)]
@@ -94,7 +93,11 @@ where
     }
 
     #[inline]
-    pub fn cast<T>(&self) -> SlidingWindow<COMPS, T> where J: AsPrimitive<T>, T: Default + Copy + 'static {
+    pub fn cast<T>(&self) -> SlidingWindow<COMPS, T>
+    where
+        J: AsPrimitive<T>,
+        T: Default + Copy + 'static,
+    {
         if COMPS == 1 {
             SlidingWindow::from_components(self.r.as_(), T::default(), T::default(), T::default())
         } else if COMPS == 2 {
@@ -114,7 +117,10 @@ where
     J: Copy + FromPrimitive + Default + 'static,
 {
     #[inline]
-    pub fn from_store<T>(store: &UnsafeSlice<T>, offset: usize) -> SlidingWindow<COMPS, J> where T: AsPrimitive<J> {
+    pub fn from_store<T>(store: &UnsafeSlice<T>, offset: usize) -> SlidingWindow<COMPS, J>
+    where
+        T: AsPrimitive<J>,
+    {
         if COMPS == 1 {
             SlidingWindow {
                 r: (*store.get(offset)).as_(),
@@ -171,6 +177,55 @@ where
     }
 }
 
+impl<const COMPS: usize, J> Sub<J> for SlidingWindow<COMPS, J>
+where
+    J: Copy + Sub<Output = J> + Default + 'static,
+{
+    type Output = Self;
+
+    #[inline]
+    fn sub(self, rhs: J) -> Self::Output {
+        if COMPS == 1 {
+            SlidingWindow::from_components(self.r - rhs, self.g, self.b, self.a)
+        } else if COMPS == 2 {
+            SlidingWindow::from_components(self.r - rhs, self.g - rhs, self.b, self.a)
+        } else if COMPS == 3 {
+            SlidingWindow::from_components(self.r - rhs, self.g - rhs, self.b - rhs, self.a)
+        } else if COMPS == 4 {
+            SlidingWindow::from_components(self.r - rhs, self.g - rhs, self.b - rhs, self.a - rhs)
+        } else {
+            panic!("Not implemented.");
+        }
+    }
+}
+
+impl<const COMPS: usize, J> Sub<SlidingWindow<COMPS, J>> for SlidingWindow<COMPS, J>
+where
+    J: Copy + Sub<Output = J> + Default + 'static,
+{
+    type Output = Self;
+
+    #[inline]
+    fn sub(self, rhs: SlidingWindow<COMPS, J>) -> Self::Output {
+        if COMPS == 1 {
+            SlidingWindow::from_components(self.r - rhs.r, self.g, self.b, self.a)
+        } else if COMPS == 2 {
+            SlidingWindow::from_components(self.r - rhs.r, self.g - rhs.g, self.b, self.a)
+        } else if COMPS == 3 {
+            SlidingWindow::from_components(self.r - rhs.r, self.g - rhs.g, self.b - rhs.b, self.a)
+        } else if COMPS == 4 {
+            SlidingWindow::from_components(
+                self.r - rhs.r,
+                self.g - rhs.g,
+                self.b - rhs.b,
+                self.a - rhs.a,
+            )
+        } else {
+            panic!("Not implemented.");
+        }
+    }
+}
+
 impl<const COMPS: usize, J> Shr<J> for SlidingWindow<COMPS, J>
 where
     J: Copy + Shr<J, Output = J> + Default + 'static,
@@ -186,13 +241,17 @@ where
         } else if COMPS == 3 {
             SlidingWindow::from_components(self.r >> rhs, self.g >> rhs, self.b >> rhs, self.a)
         } else if COMPS == 4 {
-            SlidingWindow::from_components(self.r >> rhs, self.g >> rhs, self.b >> rhs, self.a >> rhs)
+            SlidingWindow::from_components(
+                self.r >> rhs,
+                self.g >> rhs,
+                self.b >> rhs,
+                self.a >> rhs,
+            )
         } else {
             panic!("Not implemented.");
         }
     }
 }
-
 
 impl<const COMPS: usize, J> AddAssign<SlidingWindow<COMPS, J>> for SlidingWindow<COMPS, J>
 where
@@ -279,222 +338,215 @@ fn stack_blur_pass<T, J, I, const COMPONENTS: usize>(
         + 'static
         + FromPrimitive
         + AddAssign<J>
-        + std::ops::Mul<Output = J>
-        + std::ops::Shr<Output = J>
-        + std::ops::SubAssign
+        + Mul<Output = J>
+        + Shr<Output = J>
+        + Sub<Output = J>
+        + AsPrimitive<f32>
+        + SubAssign
         + AsPrimitive<T>
         + AsPrimitive<I>
         + Default,
     T: Copy + AsPrimitive<J> + FromPrimitive,
-    I: Copy
-        + AsPrimitive<T>
-        + FromPrimitive
-        + std::ops::Mul<Output = I>
-        + std::ops::Shr<Output = I> + Default,
+    I: Copy + AsPrimitive<T> + FromPrimitive + Mul<Output = I> + Shr<Output = I> + Default,
     i32: AsPrimitive<J>,
     u32: AsPrimitive<J>,
+    f32: AsPrimitive<T>,
+    usize: AsPrimitive<J>,
 {
     let div = ((radius * 2) + 1) as usize;
-    let (mut xp, mut yp);
-    let mut sp;
-    let mut stack_start;
+    let kernel_size = 2 * radius as usize + 1;
     let mut stacks = vec![];
     for _ in 0..div {
         stacks.push(SlidingWindow::<COMPONENTS, J>::new());
     }
 
     let mut sum: SlidingWindow<COMPONENTS, J>;
-    let mut sum_in: SlidingWindow<COMPONENTS, J>;
-    let mut sum_out: SlidingWindow<COMPONENTS, J>;
 
     let wm = width - 1;
     let hm = height - 1;
-    let div = (radius * 2) + 1;
-    let mul_sum = I::from_i32(MUL_TABLE_STACK_BLUR[radius as usize]).unwrap();
-    let shr_sum = I::from_i32(SHR_TABLE_STACK_BLUR[radius as usize]).unwrap();
 
-    let mut src_ptr;
-    let mut dst_ptr;
+    let mul_value = 1. / ((radius as f32 + 1.) * (radius as f32 + 1.));
 
     if pass == StackBlurPass::Horizontal {
         let min_y = thread * height as usize / total_threads;
         let max_y = (thread + 1) * height as usize / total_threads;
 
+        let mut diff =
+            vec![SlidingWindow::<COMPONENTS, J>::default(); width as usize + kernel_size];
+
         for y in min_y..max_y {
-            sum = SlidingWindow::default();
-            sum_in = SlidingWindow::default();
-            sum_out = SlidingWindow::default();
+            let y_offset = y * stride as usize;
 
-            src_ptr = stride as usize * y; // start of line (0,y)
+            let mut diff_val = SlidingWindow::<COMPONENTS, J>::default();
+            let radius_mul = (radius + 2) * (radius + 1) / 2;
+            let zero_pos_value = SlidingWindow::<COMPONENTS, J>::from_store(pixels, y_offset);
+            sum = zero_pos_value * radius_mul.as_();
 
-            let src = SlidingWindow::from_store(pixels, src_ptr);
+            let mut loading_pos = y_offset;
 
-            for i in 0..=radius {
-                unsafe { *stacks.get_unchecked_mut(i as usize) = src.clone() };
-                let fi = (i + 1).as_();
-                sum += src * fi;
-                sum_out += src;
-            }
+            let mut differences_iter = 0usize;
 
-            for i in 1..=radius {
-                if i <= wm {
-                    src_ptr += COMPONENTS;
+            for i in 0..radius as usize {
+                if i < wm as usize {
+                    loading_pos += COMPONENTS;
                 }
-
-                let src = SlidingWindow::from_store(pixels, src_ptr);
-
-                unsafe { *stacks.get_unchecked_mut((i + radius) as usize) = src };
-
-                let re = (radius + 1 - i).as_();
-                sum += src * re;
-                sum_in += src;
-            }
-
-            sp = radius;
-            xp = radius;
-            if xp > wm {
-                xp = wm;
-            }
-
-            src_ptr = COMPONENTS * xp as usize + y * stride as usize;
-            dst_ptr = y * stride as usize;
-            for _ in 0..width {
+                let c_val = SlidingWindow::<COMPONENTS, J>::from_store(pixels, loading_pos);
+                let new_diff = c_val - zero_pos_value;
                 unsafe {
-                    let sum_intermediate: SlidingWindow<COMPONENTS, I> = sum.cast();
-                    let finalized = (sum_intermediate * mul_sum) >> shr_sum;
-                    pixels.write(dst_ptr, finalized.r.as_());
+                    *diff.get_unchecked_mut(differences_iter) = new_diff;
+                }
+                diff_val += new_diff;
+                sum += c_val * (radius as usize - i).as_();
+                differences_iter += 1;
+            }
+
+            let full_offset = (radius + 1) as usize;
+
+            let mut max_to_the_right = (width as usize).saturating_sub(full_offset);
+
+            for i in 0..max_to_the_right {
+                let v_offset_0 = y_offset + i * COMPONENTS;
+                let v_offset_1 = y_offset + (i + full_offset) * COMPONENTS;
+                let new_diff = SlidingWindow::<COMPONENTS, J>::from_store(pixels, v_offset_1)
+                    - SlidingWindow::<COMPONENTS, J>::from_store(pixels, v_offset_0);
+                unsafe {
+                    *diff.get_unchecked_mut(differences_iter) = new_diff;
+                }
+                differences_iter += 1;
+            }
+
+            let v_last_offset = y_offset + (width as usize - 1) * COMPONENTS;
+            let last = SlidingWindow::<COMPONENTS, J>::from_store(pixels, v_last_offset);
+
+            for i in max_to_the_right..width as usize {
+                let v_offset = y_offset + i * COMPONENTS;
+                unsafe {
+                    *diff.get_unchecked_mut(differences_iter) =
+                        last - SlidingWindow::<COMPONENTS, J>::from_store(pixels, v_offset);
+                }
+                differences_iter += 1;
+            }
+
+            diff_val += unsafe { *diff.get_unchecked(radius as usize) };
+
+            let mut diff_start_end = radius as usize + 1;
+            let mut diff_start = 0usize;
+
+            for i in 0..width as usize {
+                unsafe {
+                    let sum_intermediate: SlidingWindow<COMPONENTS, f32> = sum.cast();
+                    let dst_ptr = y_offset + i * COMPONENTS;
+                    pixels.write(dst_ptr, (sum_intermediate.r * mul_value).as_());
                     if COMPONENTS > 1 {
-                        pixels.write(dst_ptr + 1, finalized.g.as_());
+                        pixels.write(dst_ptr + 1, (sum_intermediate.g * mul_value).as_());
                     }
                     if COMPONENTS > 2 {
-                        pixels.write(dst_ptr + 2, finalized.b.as_());
+                        pixels.write(dst_ptr + 2, (sum_intermediate.b * mul_value).as_());
                     }
                     if COMPONENTS == 4 {
-                        pixels.write(dst_ptr + 3, finalized.a.as_());
+                        pixels.write(dst_ptr + 3, (sum_intermediate.a * mul_value).as_());
                     }
                 }
-                dst_ptr += COMPONENTS;
 
-                sum -= sum_out;
+                sum += diff_val;
 
-                stack_start = sp + div - radius;
-                if stack_start >= div {
-                    stack_start -= div;
-                }
-                let stack = unsafe { &mut *stacks.get_unchecked_mut(stack_start as usize) };
-
-                sum_out -= *stack;
-
-                if xp < wm {
-                    src_ptr += COMPONENTS;
-                    xp += 1;
+                unsafe {
+                    diff_val +=
+                        *diff.get_unchecked(diff_start_end) - *diff.get_unchecked(diff_start);
                 }
 
-                let src = SlidingWindow::from_store(pixels, src_ptr);
-                *stack = src;
-                sum_in += src;
-                sum += sum_in;
-
-                sp += 1;
-                if sp >= div {
-                    sp = 0;
-                }
-                let stack = unsafe { &mut *stacks.get_unchecked_mut(sp as usize) };
-
-                sum_out += *stack;
-                sum_in -= *stack;
+                diff_start_end += 1;
+                diff_start += 1;
             }
         }
     } else if pass == StackBlurPass::Vertical {
         let min_x = thread * width as usize / total_threads;
         let max_x = (thread + 1) * width as usize / total_threads;
 
+        let mut diff =
+            vec![SlidingWindow::<COMPONENTS, J>::default(); height as usize + kernel_size];
+
         for x in min_x..max_x {
-            sum = SlidingWindow::default();
-            sum_in = SlidingWindow::default();
-            sum_out = SlidingWindow::default();
+            let mut diff_val = SlidingWindow::<COMPONENTS, J>::default();
+            let radius_mul = (radius + 2) * (radius + 1) / 2;
+            let zero_pos_value = SlidingWindow::<COMPONENTS, J>::from_store(pixels, x * COMPONENTS);
+            sum = zero_pos_value * radius_mul.as_();
 
-            src_ptr = COMPONENTS * x; // x,0
+            let mut loading_pos = 0usize + x * COMPONENTS;
 
-            let src = SlidingWindow::from_store(pixels, src_ptr);
+            let mut differences_iter = 0usize;
 
-            for i in 0..=radius {
-                unsafe { *stacks.get_unchecked_mut(i as usize) = src }
-
-                let ji = (i + 1).as_();
-                sum += src * ji;
-                sum_out += src;
-            }
-
-            for i in 1..=radius {
-                if i <= hm {
-                    src_ptr += stride as usize;
+            for i in 0..radius as usize {
+                if i < hm as usize {
+                    loading_pos += stride as usize;
                 }
-
-                let src = SlidingWindow::from_store(pixels, src_ptr);
-
-                unsafe { *stacks.get_unchecked_mut((i + radius) as usize) = src };
-
-                let rji = (radius + 1 - i).as_();
-                sum += src * rji;
-                sum_in += src;
-            }
-
-            sp = radius;
-            yp = radius;
-            if yp > hm {
-                yp = hm;
-            }
-            src_ptr = COMPONENTS * x + yp as usize * stride as usize;
-            dst_ptr = COMPONENTS * x;
-            for _ in 0..height {
+                let c_val = SlidingWindow::<COMPONENTS, J>::from_store(pixels, loading_pos);
+                let new_diff = c_val - zero_pos_value;
                 unsafe {
-                    let sum_intermediate: SlidingWindow<COMPONENTS, I> = sum.cast();
-                    let finalized = (sum_intermediate * mul_sum) >> shr_sum;
-                    pixels.write(dst_ptr, finalized.r.as_());
+                    *diff.get_unchecked_mut(differences_iter) = new_diff;
+                }
+                diff_val += new_diff;
+                sum += c_val * (radius as usize - i).as_();
+                differences_iter += 1;
+            }
+
+            let full_offset = (radius + 1) as usize;
+
+            let mut max_to_the_bottom = (height as usize).saturating_sub(full_offset);
+
+            for i in 0..max_to_the_bottom {
+                let v_offset_0 = i * stride as usize + x * COMPONENTS;
+                let v_offset_1 = (i + full_offset) * stride as usize + x * COMPONENTS;
+                let new_diff = SlidingWindow::<COMPONENTS, J>::from_store(pixels, v_offset_1)
+                    - SlidingWindow::<COMPONENTS, J>::from_store(pixels, v_offset_0);
+                unsafe {
+                    *diff.get_unchecked_mut(differences_iter) = new_diff;
+                }
+                differences_iter += 1;
+            }
+
+            let v_last_offset = (height as usize - 1) * stride as usize + x * COMPONENTS;
+            let last = SlidingWindow::<COMPONENTS, J>::from_store(pixels, v_last_offset);
+
+            for i in max_to_the_bottom..height as usize {
+                let v_offset = i * stride as usize + x * COMPONENTS;
+                unsafe {
+                    *diff.get_unchecked_mut(differences_iter) =
+                        last - SlidingWindow::<COMPONENTS, J>::from_store(pixels, v_offset);
+                }
+                differences_iter += 1;
+            }
+
+            diff_val += unsafe { *diff.get_unchecked(radius as usize) };
+
+            let mut diff_start_end = radius as usize + 1;
+            let mut diff_start = 0usize;
+
+            for i in 0..height as usize {
+                unsafe {
+                    let sum_intermediate: SlidingWindow<COMPONENTS, f32> = sum.cast();
+                    let dst_ptr = i * stride as usize + x * COMPONENTS;
+                    pixels.write(dst_ptr, (sum_intermediate.r * mul_value).as_());
                     if COMPONENTS > 1 {
-                        pixels.write(dst_ptr + 1, finalized.g.as_());
+                        pixels.write(dst_ptr + 1, (sum_intermediate.g * mul_value).as_());
                     }
                     if COMPONENTS > 2 {
-                        pixels.write(dst_ptr + 2, finalized.b.as_());
+                        pixels.write(dst_ptr + 2, (sum_intermediate.b * mul_value).as_());
                     }
                     if COMPONENTS == 4 {
-                        pixels.write(dst_ptr + 3, finalized.a.as_());
+                        pixels.write(dst_ptr + 3, (sum_intermediate.a * mul_value).as_());
                     }
                 }
-                dst_ptr += stride as usize;
 
-                sum -= sum_out;
+                sum += diff_val;
 
-                stack_start = sp + div - radius;
-                if stack_start >= div {
-                    stack_start -= div;
-                }
-                let stack_ptr = unsafe { &mut *stacks.get_unchecked_mut(stack_start as usize) };
-
-                sum_out -= *stack_ptr;
-
-                if yp < hm {
-                    src_ptr += stride as usize; // stride
-                    yp += 1;
+                unsafe {
+                    diff_val +=
+                        *diff.get_unchecked(diff_start_end) - *diff.get_unchecked(diff_start);
                 }
 
-                let src = SlidingWindow::from_store(pixels, src_ptr);
-
-                *stack_ptr = src;
-
-                sum_in += src;
-                sum += sum_in;
-
-                sp += 1;
-
-                if sp >= div {
-                    sp = 0;
-                }
-                let stack_ptr = unsafe { &mut *stacks.get_unchecked_mut(sp as usize) };
-
-                sum_out += *stack_ptr;
-                sum_in -= *stack_ptr;
+                diff_start_end += 1;
+                diff_start += 1;
             }
         }
     }
@@ -518,46 +570,49 @@ fn stack_blur_worker_horizontal(
     let _is_avx512vl_available = is_x86_avx512vl_supported();
     match channels {
         FastBlurChannels::Plane => {
-            let mut _dispatcher: fn(
-                &UnsafeSlice<u8>,
-                u32,
-                u32,
-                u32,
-                u32,
-                StackBlurPass,
-                usize,
-                usize,
-            ) = if radius < BASE_RADIUS_I64_CUTOFF {
-                stack_blur_pass::<u8, i64, i64, 1>
-            } else {
-                stack_blur_pass::<u8, i32, i64, 1>
-            };
-            _dispatcher(
-                slice,
-                stride,
-                width,
-                height,
-                radius,
-                StackBlurPass::Horizontal,
-                thread,
-                thread_count,
-            );
+            let executor = Box::new(HorizontalStackBlurPass::<u8, i32, 1>::default());
+            executor.pass(slice, stride, width, height, radius, thread, thread_count);
+            // let mut _dispatcher: fn(
+            //     &UnsafeSlice<u8>,
+            //     u32,
+            //     u32,
+            //     u32,
+            //     u32,
+            //     StackBlurPass,
+            //     usize,
+            //     usize,
+            // ) = if radius < BASE_RADIUS_I64_CUTOFF {
+            //     stack_blur_pass::<u8, i64, i64, 1>
+            // } else {
+            //     stack_blur_pass::<u8, i32, i64, 1>
+            // };
+            // _dispatcher(
+            //     slice,
+            //     stride,
+            //     width,
+            //     height,
+            //     radius,
+            //     StackBlurPass::Horizontal,
+            //     thread,
+            //     thread_count,
+            // );
         }
         FastBlurChannels::Channels3 => {
-            let mut _dispatcher: fn(
-                &UnsafeSlice<u8>,
-                u32,
-                u32,
-                u32,
-                u32,
-                StackBlurPass,
-                usize,
-                usize,
-            ) = if radius < BASE_RADIUS_I64_CUTOFF {
-                stack_blur_pass::<u8, i64, i64, 3>
-            } else {
-                stack_blur_pass::<u8, i32, i64, 3>
-            };
+            // let mut _dispatcher: fn(
+            //     &UnsafeSlice<u8>,
+            //     u32,
+            //     u32,
+            //     u32,
+            //     u32,
+            //     StackBlurPass,
+            //     usize,
+            //     usize,
+            // ) = if radius < BASE_RADIUS_I64_CUTOFF {
+            //     stack_blur_pass::<u8, i32, i64, 3>
+            // } else {
+            //     stack_blur_pass::<u8, i32, i64, 3>
+            // };
+
             // if radius < BASE_RADIUS_I64_CUTOFF {
             //     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             //     {
@@ -593,32 +648,38 @@ fn stack_blur_worker_horizontal(
             //         }
             //     }
             // }
-            _dispatcher(
-                slice,
-                stride,
-                width,
-                height,
-                radius,
-                StackBlurPass::Horizontal,
-                thread,
-                thread_count,
-            );
+            // _dispatcher(
+            //     slice,
+            //     stride,
+            //     width,
+            //     height,
+            //     radius,
+            //     StackBlurPass::Horizontal,
+            //     thread,
+            //     thread_count,
+            // );
+            let mut _executor: Box<dyn StackBlurWorkingPass<u8, i32, 3>> = Box::new(HorizontalStackBlurPass::<u8, i32, 3>::default());
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            {
+                _executor = Box::new(HorizontalNeonStackBlurPass::<u8, i32, 3>::default());
+            }
+            _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }
         FastBlurChannels::Channels4 => {
-            let mut _dispatcher: fn(
-                &UnsafeSlice<u8>,
-                u32,
-                u32,
-                u32,
-                u32,
-                StackBlurPass,
-                usize,
-                usize,
-            ) = if radius < BASE_RADIUS_I64_CUTOFF {
-                stack_blur_pass::<u8, i64, i64, 4>
-            } else {
-                stack_blur_pass::<u8, i32, i64, 4>
-            };
+            // let mut _dispatcher: fn(
+            //     &UnsafeSlice<u8>,
+            //     u32,
+            //     u32,
+            //     u32,
+            //     u32,
+            //     StackBlurPass,
+            //     usize,
+            //     usize,
+            // ) = if radius < BASE_RADIUS_I64_CUTOFF {
+            //     stack_blur_pass::<u8, i64, i64, 4>
+            // } else {
+            //     stack_blur_pass::<u8, i32, i64, 4>
+            // };
             // if radius < BASE_RADIUS_I64_CUTOFF {
             //     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             //     {
@@ -654,16 +715,22 @@ fn stack_blur_worker_horizontal(
             //         }
             //     }
             // }
-            _dispatcher(
-                slice,
-                stride,
-                width,
-                height,
-                radius,
-                StackBlurPass::Horizontal,
-                thread,
-                thread_count,
-            );
+            // _dispatcher(
+            //     slice,
+            //     stride,
+            //     width,
+            //     height,
+            //     radius,
+            //     StackBlurPass::Horizontal,
+            //     thread,
+            //     thread_count,
+            // );
+            let mut _executor: Box<dyn StackBlurWorkingPass<u8, i32, 4>> = Box::new(HorizontalStackBlurPass::<u8, i32, 4>::default());
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            {
+                _executor = Box::new(HorizontalNeonStackBlurPass::<u8, i32, 4>::default());
+            }
+            _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }
     }
 }
@@ -713,20 +780,20 @@ fn stack_blur_worker_vertical(
             );
         }
         FastBlurChannels::Channels3 => {
-            let mut _dispatcher: fn(
-                &UnsafeSlice<u8>,
-                u32,
-                u32,
-                u32,
-                u32,
-                StackBlurPass,
-                usize,
-                usize,
-            ) = if radius < BASE_RADIUS_I64_CUTOFF {
-                stack_blur_pass::<u8, i64, i64, 3>
-            } else {
-                stack_blur_pass::<u8, i32, i64, 3>
-            };
+            // let mut _dispatcher: fn(
+            //     &UnsafeSlice<u8>,
+            //     u32,
+            //     u32,
+            //     u32,
+            //     u32,
+            //     StackBlurPass,
+            //     usize,
+            //     usize,
+            // ) = if radius < BASE_RADIUS_I64_CUTOFF {
+            //     stack_blur_pass::<u8, i64, i64, 3>
+            // } else {
+            //     stack_blur_pass::<u8, i32, i64, 3>
+            // };
             // if radius < BASE_RADIUS_I64_CUTOFF {
             //     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             //     {
@@ -762,32 +829,38 @@ fn stack_blur_worker_vertical(
             //         }
             //     }
             // }
-            _dispatcher(
-                slice,
-                stride,
-                width,
-                height,
-                radius,
-                StackBlurPass::Vertical,
-                thread,
-                thread_count,
-            );
+            // _dispatcher(
+            //     slice,
+            //     stride,
+            //     width,
+            //     height,
+            //     radius,
+            //     StackBlurPass::Vertical,
+            //     thread,
+            //     thread_count,
+            // );
+            let mut _executor: Box<dyn StackBlurWorkingPass<u8, i32, 3>> = Box::new(VerticalStackBlurPass::<u8, i32, 3>::default());
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            {
+                _executor = Box::new(VerticalNeonStackBlurPass::<u8, i32, 3>::default());
+            }
+            _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }
         FastBlurChannels::Channels4 => {
-            let mut _dispatcher: fn(
-                &UnsafeSlice<u8>,
-                u32,
-                u32,
-                u32,
-                u32,
-                StackBlurPass,
-                usize,
-                usize,
-            ) = if radius < BASE_RADIUS_I64_CUTOFF {
-                stack_blur_pass::<u8, i64, i64, 4>
-            } else {
-                stack_blur_pass::<u8, i32, i64, 4>
-            };
+            // let mut _dispatcher: fn(
+            //     &UnsafeSlice<u8>,
+            //     u32,
+            //     u32,
+            //     u32,
+            //     u32,
+            //     StackBlurPass,
+            //     usize,
+            //     usize,
+            // ) = if radius < BASE_RADIUS_I64_CUTOFF {
+            //     stack_blur_pass::<u8, i64, i64, 4>
+            // } else {
+            //     stack_blur_pass::<u8, i32, i64, 4>
+            // };
             // if radius < BASE_RADIUS_I64_CUTOFF {
             //     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             //     {
@@ -823,16 +896,22 @@ fn stack_blur_worker_vertical(
             //         }
             //     }
             // }
-            _dispatcher(
-                slice,
-                stride,
-                width,
-                height,
-                radius,
-                StackBlurPass::Vertical,
-                thread,
-                thread_count,
-            );
+            // _dispatcher(
+            //     slice,
+            //     stride,
+            //     width,
+            //     height,
+            //     radius,
+            //     StackBlurPass::Vertical,
+            //     thread,
+            //     thread_count,
+            // );
+            let mut _executor: Box<dyn StackBlurWorkingPass<u8, i32, 4>> = Box::new(VerticalStackBlurPass::<u8, i32, 4>::default());
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            {
+                _executor = Box::new(VerticalNeonStackBlurPass::<u8, i32, 4>::default());
+            }
+            _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }
     }
 }
@@ -863,7 +942,7 @@ pub fn stack_blur(
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) {
-    let radius = radius.clamp(2, 254);
+    // let radius = radius.clamp(2, 254);
     let thread_count = threading_policy.get_threads_count(width, height) as u32;
     if thread_count == 1 {
         let slice = UnsafeSlice::new(in_place);

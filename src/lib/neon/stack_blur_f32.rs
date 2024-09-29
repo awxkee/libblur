@@ -28,7 +28,7 @@
 use std::arch::aarch64::*;
 
 use crate::neon::{load_f32_fast, store_f32};
-use crate::stack_blur::StackBlurPass;
+use crate::stackblur::stack_blur::StackBlurPass;
 use crate::unsafe_slice::UnsafeSlice;
 
 pub fn stack_blur_pass_neon_f32<const COMPONENTS: usize>(

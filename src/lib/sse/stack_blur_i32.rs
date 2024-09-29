@@ -28,7 +28,7 @@
 use crate::mul_table::{MUL_TABLE_STACK_BLUR, SHR_TABLE_STACK_BLUR};
 use crate::sse::_mm_mul_epi64x;
 use crate::sse::utils::{_mm_packus_epi64, load_u8_s32_fast, store_u8_s32};
-use crate::stack_blur::StackBlurPass;
+use crate::stackblur::stack_blur::StackBlurPass;
 use crate::unsafe_slice::UnsafeSlice;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
