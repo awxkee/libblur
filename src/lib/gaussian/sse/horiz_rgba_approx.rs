@@ -29,6 +29,7 @@
 use crate::gaussian::gaussian_approx::{PRECISION, ROUNDING_APPROX};
 use crate::sse::load_u8_s16_fast;
 use crate::unsafe_slice::UnsafeSlice;
+use crate::{clamp_edge, reflect_101, reflect_index, EdgeMode};
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -67,6 +68,7 @@ pub fn gaussian_blur_horizontal_pass_approx_sse<const CHANNEL_CONFIGURATION: usi
     kernel: &[i16],
     start_y: u32,
     end_y: u32,
+    edge_mode: EdgeMode,
 ) {
     unsafe {
         gaussian_blur_horizontal_pass_approx_impl::<CHANNEL_CONFIGURATION>(
@@ -79,6 +81,7 @@ pub fn gaussian_blur_horizontal_pass_approx_sse<const CHANNEL_CONFIGURATION: usi
             kernel,
             start_y,
             end_y,
+            edge_mode,
         );
     }
 }
@@ -94,6 +97,7 @@ unsafe fn gaussian_blur_horizontal_pass_approx_impl<const CHANNEL_CONFIGURATION:
     kernel: &[i16],
     start_y: u32,
     end_y: u32,
+    edge_mode: EdgeMode,
 ) {
     unsafe {
         let zeros_si = _mm_setzero_si128();
@@ -127,24 +131,35 @@ unsafe fn gaussian_blur_horizontal_pass_approx_impl<const CHANNEL_CONFIGURATION:
                 let edge_value_check = x as i64 + r as i64;
                 if edge_value_check < 0 {
                     let diff = edge_value_check.abs();
-                    let s_ptr = src.as_ptr().add(y_src_shift); // Here we're always at zero
-                    let mut pixel_colors_0 = load_u8_s16_fast::<CHANNEL_CONFIGURATION>(s_ptr);
-                    let s_ptr_next_1 = src.as_ptr().add(y_src_shift + src_stride as usize); // Here we're always at zero
-                    let mut pixel_colors_1 =
-                        load_u8_s16_fast::<CHANNEL_CONFIGURATION>(s_ptr_next_1);
-                    let s_ptr_next_2 = s_ptr_next_1.add(src_stride as usize); // Here we're always at zero
-                    let mut pixel_colors_2 =
-                        load_u8_s16_fast::<CHANNEL_CONFIGURATION>(s_ptr_next_2);
-                    let s_ptr_next_3 = s_ptr_next_2.add(src_stride as usize); // Here we're always at zero
-                    let mut pixel_colors_3 =
-                        load_u8_s16_fast::<CHANNEL_CONFIGURATION>(s_ptr_next_3);
 
-                    pixel_colors_0 = _mm_unpacklo_epi16(pixel_colors_0, zeros_si);
-                    pixel_colors_1 = _mm_unpacklo_epi16(pixel_colors_1, zeros_si);
-                    pixel_colors_2 = _mm_unpacklo_epi16(pixel_colors_2, zeros_si);
-                    pixel_colors_3 = _mm_unpacklo_epi16(pixel_colors_3, zeros_si);
+                    let start_x = edge_value_check;
 
                     for i in 0..diff as usize {
+                        let s_ptr = src.as_ptr().add(
+                            y_src_shift
+                                + clamp_edge!(
+                                    edge_mode,
+                                    start_x + i as i64,
+                                    0i64,
+                                    width as i64 - 1
+                                ) * CHANNEL_CONFIGURATION,
+                        ); // Here we're always at the edge
+                        let mut pixel_colors_0 = load_u8_s16_fast::<CHANNEL_CONFIGURATION>(s_ptr);
+                        let s_ptr_next_1 = src.as_ptr().add(y_src_shift + src_stride as usize); // Here we're always at the edge
+                        let mut pixel_colors_1 =
+                            load_u8_s16_fast::<CHANNEL_CONFIGURATION>(s_ptr_next_1);
+                        let s_ptr_next_2 = s_ptr_next_1.add(src_stride as usize); // Here we're always at the edge
+                        let mut pixel_colors_2 =
+                            load_u8_s16_fast::<CHANNEL_CONFIGURATION>(s_ptr_next_2);
+                        let s_ptr_next_3 = s_ptr_next_2.add(src_stride as usize); // Here we're always at the edge
+                        let mut pixel_colors_3 =
+                            load_u8_s16_fast::<CHANNEL_CONFIGURATION>(s_ptr_next_3);
+
+                        pixel_colors_0 = _mm_unpacklo_epi16(pixel_colors_0, zeros_si);
+                        pixel_colors_1 = _mm_unpacklo_epi16(pixel_colors_1, zeros_si);
+                        pixel_colors_2 = _mm_unpacklo_epi16(pixel_colors_2, zeros_si);
+                        pixel_colors_3 = _mm_unpacklo_epi16(pixel_colors_3, zeros_si);
+
                         let weights = kernel.as_ptr().add(i);
                         let f_weight = _mm_set1_epi16(weights.read_unaligned());
                         store_0 = _mm_add_epi32(store_0, _mm_madd_epi16(pixel_colors_0, f_weight));
@@ -159,10 +174,7 @@ unsafe fn gaussian_blur_horizontal_pass_approx_impl<const CHANNEL_CONFIGURATION:
                     && x as i64 + r as i64 + (if CHANNEL_CONFIGURATION == 4 { 4 } else { 6 })
                         < width as i64
                 {
-                    let px =
-                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize
-                            * CHANNEL_CONFIGURATION;
+                    let px = (x as i64 + r as i64) as usize * CHANNEL_CONFIGURATION;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let s_ptr_1 = s_ptr.add(src_stride as usize);
                     let pixel_colors_0 = _mm_loadu_si128(s_ptr as *const __m128i);
@@ -204,10 +216,7 @@ unsafe fn gaussian_blur_horizontal_pass_approx_impl<const CHANNEL_CONFIGURATION:
                     && x as i64 + r as i64 + (if CHANNEL_CONFIGURATION == 4 { 4 } else { 6 })
                         < width as i64
                 {
-                    let px =
-                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize
-                            * CHANNEL_CONFIGURATION;
+                    let px = (x as i64 + r as i64) as usize * CHANNEL_CONFIGURATION;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let s_ptr_1 = s_ptr.add(src_stride as usize);
                     let pixel_colors_0 = _mm_loadu_si64(s_ptr);
@@ -232,8 +241,7 @@ unsafe fn gaussian_blur_horizontal_pass_approx_impl<const CHANNEL_CONFIGURATION:
 
                 while r <= half_kernel {
                     let current_x =
-                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize;
+                        clamp_edge!(edge_mode, x as i64 + r as i64, 0i64, width as i64 - 1);
                     let px = current_x * CHANNEL_CONFIGURATION;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let weight = *kernel.get_unchecked((r + half_kernel) as usize);
@@ -310,13 +318,26 @@ unsafe fn gaussian_blur_horizontal_pass_approx_impl<const CHANNEL_CONFIGURATION:
                 let edge_value_check = x as i64 + r as i64;
                 if edge_value_check < 0 {
                     let diff = edge_value_check.abs();
-                    let s_ptr = src.as_ptr().add(y_src_shift); // Here we're always at zero
-                    let mut pixel_colors_0 = load_u8_s16_fast::<CHANNEL_CONFIGURATION>(s_ptr);
-                    let s_ptr_next = src.as_ptr().add(y_src_shift + src_stride as usize); // Here we're always at zero
-                    let mut pixel_colors_1 = load_u8_s16_fast::<CHANNEL_CONFIGURATION>(s_ptr_next);
-                    pixel_colors_0 = _mm_unpacklo_epi16(pixel_colors_0, zeros_si);
-                    pixel_colors_1 = _mm_unpacklo_epi16(pixel_colors_1, zeros_si);
+
+                    let start_x = x as i64 + r as i64;
+
                     for i in 0..diff as usize {
+                        let s_ptr = src.as_ptr().add(
+                            y_src_shift
+                                + clamp_edge!(
+                                    edge_mode,
+                                    start_x + i as i64,
+                                    0i64,
+                                    width as i64 - 1
+                                ) * CHANNEL_CONFIGURATION,
+                        ); // Here we're always at the edge
+                        let mut pixel_colors_0 = load_u8_s16_fast::<CHANNEL_CONFIGURATION>(s_ptr);
+                        let s_ptr_next = src.as_ptr().add(y_src_shift + src_stride as usize); // Here we're always at the edge
+                        let mut pixel_colors_1 =
+                            load_u8_s16_fast::<CHANNEL_CONFIGURATION>(s_ptr_next);
+                        pixel_colors_0 = _mm_unpacklo_epi16(pixel_colors_0, zeros_si);
+                        pixel_colors_1 = _mm_unpacklo_epi16(pixel_colors_1, zeros_si);
+
                         let weights = kernel.as_ptr().add(i);
                         let f_weight = _mm_set1_epi16(weights.read_unaligned());
                         store_0 = _mm_add_epi32(store_0, _mm_madd_epi16(pixel_colors_0, f_weight));
@@ -329,10 +350,7 @@ unsafe fn gaussian_blur_horizontal_pass_approx_impl<const CHANNEL_CONFIGURATION:
                     && x as i64 + r as i64 + (if CHANNEL_CONFIGURATION == 4 { 4 } else { 6 })
                         < width as i64
                 {
-                    let px =
-                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize
-                            * CHANNEL_CONFIGURATION;
+                    let px = (x as i64 + r as i64) as usize * CHANNEL_CONFIGURATION;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let s_ptr_1 = s_ptr.add(src_stride as usize);
                     let pixel_colors_0 = _mm_loadu_si128(s_ptr as *const __m128i);
@@ -357,10 +375,8 @@ unsafe fn gaussian_blur_horizontal_pass_approx_impl<const CHANNEL_CONFIGURATION:
                 }
 
                 while r <= half_kernel {
-                    let current_x =
-                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize;
-                    let px = current_x * CHANNEL_CONFIGURATION;
+                    let px = clamp_edge!(edge_mode, x as i64 + r as i64, 0i64, width as i64 - 1)
+                        * CHANNEL_CONFIGURATION;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let mut pixel_colors_0 = load_u8_s16_fast::<CHANNEL_CONFIGURATION>(s_ptr);
                     let mut pixel_colors_1 =
@@ -408,9 +424,19 @@ unsafe fn gaussian_blur_horizontal_pass_approx_impl<const CHANNEL_CONFIGURATION:
                 let edge_value_check = x as i64 + r as i64;
                 if edge_value_check < 0 {
                     let diff = edge_value_check.abs();
-                    let s_ptr = src.as_ptr().add(y_src_shift); // Here we're always at zero
-                    let pixel_colors_0 = load_u8_s16_fast::<CHANNEL_CONFIGURATION>(s_ptr);
+                    let start_x = x as i64 + r as i64;
                     for i in 0..diff as usize {
+                        let s_ptr = src.as_ptr().add(
+                            y_src_shift
+                                + clamp_edge!(
+                                    edge_mode,
+                                    start_x + i as i64,
+                                    0i64,
+                                    width as i64 - 1
+                                ) * CHANNEL_CONFIGURATION,
+                        ); // Here we're always at the edge
+                        let pixel_colors_0 = load_u8_s16_fast::<CHANNEL_CONFIGURATION>(s_ptr);
+
                         let weights = kernel.as_ptr().add(i);
                         let f_weight = _mm_set1_epi16(weights.read_unaligned());
                         store = _mm_add_epi32(store, _mm_madd_epi16(pixel_colors_0, f_weight));
@@ -419,10 +445,7 @@ unsafe fn gaussian_blur_horizontal_pass_approx_impl<const CHANNEL_CONFIGURATION:
                 }
 
                 while r + 4 <= half_kernel && x as i64 + r as i64 + 6 < width as i64 {
-                    let px =
-                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize
-                            * CHANNEL_CONFIGURATION;
+                    let px = (x as i64 + r as i64) as usize * CHANNEL_CONFIGURATION;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors = _mm_loadu_si128(s_ptr as *const __m128i);
                     let weights_ptr = kernel.as_ptr().add((r + half_kernel) as usize);
@@ -441,8 +464,7 @@ unsafe fn gaussian_blur_horizontal_pass_approx_impl<const CHANNEL_CONFIGURATION:
 
                 while r <= half_kernel {
                     let current_x =
-                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize;
+                        clamp_edge!(edge_mode, x as i64 + r as i64, 0i64, width as i64 - 1);
                     let px = current_x * CHANNEL_CONFIGURATION;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let mut pixel_colors = load_u8_s16_fast::<CHANNEL_CONFIGURATION>(s_ptr);

@@ -36,11 +36,7 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-pub fn fast_gaussian_next_vertical_pass_sse_u8<
-    T,
-    const CHANNELS_COUNT: usize,
-    const EDGE_MODE: usize,
->(
+pub fn fast_gaussian_next_vertical_pass_sse_u8<T, const CHANNELS_COUNT: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -48,9 +44,10 @@ pub fn fast_gaussian_next_vertical_pass_sse_u8<
     radius: u32,
     start: u32,
     end: u32,
+    edge_mode: EdgeMode,
 ) {
     unsafe {
-        fast_gaussian_next_vertical_pass_sse_u8_impl::<T, CHANNELS_COUNT, EDGE_MODE>(
+        fast_gaussian_next_vertical_pass_sse_u8_impl::<T, CHANNELS_COUNT>(
             undefined_slice,
             stride,
             width,
@@ -58,17 +55,14 @@ pub fn fast_gaussian_next_vertical_pass_sse_u8<
             radius,
             start,
             end,
+            edge_mode,
         );
     }
 }
 
 #[inline]
 #[target_feature(enable = "sse4.1")]
-unsafe fn fast_gaussian_next_vertical_pass_sse_u8_impl<
-    T,
-    const CHANNELS_COUNT: usize,
-    const EDGE_MODE: usize,
->(
+unsafe fn fast_gaussian_next_vertical_pass_sse_u8_impl<T, const CHANNELS_COUNT: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -76,8 +70,8 @@ unsafe fn fast_gaussian_next_vertical_pass_sse_u8_impl<
     radius: u32,
     start: u32,
     end: u32,
+    edge_mode: EdgeMode,
 ) {
-    let edge_mode: EdgeMode = EDGE_MODE.into();
     let bytes: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_slice);
     let mut buffer: [[i32; 4]; 1024] = [[0; 4]; 1024];
 
@@ -164,11 +158,7 @@ unsafe fn fast_gaussian_next_vertical_pass_sse_u8_impl<
     }
 }
 
-pub fn fast_gaussian_next_horizontal_pass_sse_u8<
-    T,
-    const CHANNELS_COUNT: usize,
-    const EDGE_MODE: usize,
->(
+pub fn fast_gaussian_next_horizontal_pass_sse_u8<T, const CHANNELS_COUNT: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -176,9 +166,10 @@ pub fn fast_gaussian_next_horizontal_pass_sse_u8<
     radius: u32,
     start: u32,
     end: u32,
+    edge_mode: EdgeMode,
 ) {
     unsafe {
-        fast_gaussian_next_horizontal_pass_sse_u8_impl::<T, CHANNELS_COUNT, EDGE_MODE>(
+        fast_gaussian_next_horizontal_pass_sse_u8_impl::<T, CHANNELS_COUNT>(
             undefined_slice,
             stride,
             width,
@@ -186,17 +177,14 @@ pub fn fast_gaussian_next_horizontal_pass_sse_u8<
             radius,
             start,
             end,
+            edge_mode,
         );
     }
 }
 
 #[inline]
 #[target_feature(enable = "sse4.1")]
-unsafe fn fast_gaussian_next_horizontal_pass_sse_u8_impl<
-    T,
-    const CHANNELS_COUNT: usize,
-    const EDGE_MODE: usize,
->(
+unsafe fn fast_gaussian_next_horizontal_pass_sse_u8_impl<T, const CHANNELS_COUNT: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -204,8 +192,8 @@ unsafe fn fast_gaussian_next_horizontal_pass_sse_u8_impl<
     radius: u32,
     start: u32,
     end: u32,
+    edge_mode: EdgeMode,
 ) {
-    let edge_mode: EdgeMode = EDGE_MODE.into();
     let bytes: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_slice);
     let mut buffer: [[i32; 4]; 1024] = [[0; 4]; 1024];
 

@@ -42,7 +42,6 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl<
         + 'static
         + AsPrimitive<f32>,
     const CHANNEL_CONFIGURATION: usize,
-    const EDGE_MODE: usize,
 >(
     src: &[T],
     src_stride: u32,
@@ -53,10 +52,11 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl<
     kernel: &[f32],
     start_y: u32,
     end_y: u32,
+    edge_mode: EdgeMode,
 ) where
     f32: AsPrimitive<T> + ToStorage<T>,
 {
-    gaussian_blur_horizontal_pass_impl_c::<T, CHANNEL_CONFIGURATION, EDGE_MODE>(
+    gaussian_blur_horizontal_pass_impl_c::<T, CHANNEL_CONFIGURATION>(
         src,
         src_stride,
         unsafe_dst,
@@ -66,6 +66,7 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl<
         kernel,
         start_y,
         end_y,
+        edge_mode,
     );
 }
 
@@ -113,7 +114,6 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_c<
         + 'static
         + AsPrimitive<f32>,
     const CHANNEL_CONFIGURATION: usize,
-    const EDGE_MODE: usize,
 >(
     src: &[T],
     src_stride: u32,
@@ -124,10 +124,10 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_c<
     kernel: &[f32],
     start_y: u32,
     end_y: u32,
+    edge_mode: EdgeMode,
 ) where
     f32: AsPrimitive<T> + ToStorage<T>,
 {
-    let edge_mode: EdgeMode = EDGE_MODE.into();
     let half_kernel = (kernel_size / 2) as i32;
     let mut _cy = start_y;
 

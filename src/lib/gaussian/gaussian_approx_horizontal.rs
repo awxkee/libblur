@@ -63,10 +63,7 @@ macro_rules! save_4_weights {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn gaussian_blur_horizontal_pass_impl_approx<
-    const CHANNEL_CONFIGURATION: usize,
-    const EDGE_MODE: usize,
->(
+pub(crate) fn gaussian_blur_horizontal_pass_impl_approx<const CHANNEL_CONFIGURATION: usize>(
     src: &[u8],
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<u8>,
@@ -76,14 +73,15 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_approx<
     kernel: &[i16],
     start_y: u32,
     end_y: u32,
+    edge_mode: EdgeMode,
 ) {
-    let edge_mode: EdgeMode = EDGE_MODE.into();
     let half_kernel = (kernel_size / 2) as i32;
     let mut _cy = start_y;
 
     for y in (_cy..end_y.saturating_sub(4)).step_by(4) {
         let y_src_shift = y as usize * src_stride as usize;
         let y_dst_shift = y as usize * dst_stride as usize;
+
         for x in 0..width {
             let (mut w0, mut w1, mut w2, mut w3) = (
                 ROUNDING_APPROX,
@@ -200,6 +198,7 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_approx<
     for y in (_cy..end_y.saturating_sub(2)).step_by(2) {
         let y_src_shift = y as usize * src_stride as usize;
         let y_dst_shift = y as usize * dst_stride as usize;
+
         for x in 0..width {
             let (mut w0, mut w1, mut w2, mut w3) = (
                 ROUNDING_APPROX,
@@ -262,6 +261,7 @@ pub(crate) fn gaussian_blur_horizontal_pass_impl_approx<
     for y in _cy..end_y {
         let y_src_shift = y as usize * src_stride as usize;
         let y_dst_shift = y as usize * dst_stride as usize;
+
         for x in 0..width {
             let (mut w0, mut w1, mut w2, mut w3) = (
                 ROUNDING_APPROX,

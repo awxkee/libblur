@@ -37,6 +37,8 @@ pub mod stack_blur_f16;
 pub mod stack_blur_f32;
 mod stack_blur_pass;
 mod vertical;
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+mod wasm;
 
 pub use horizontal::HorizontalStackBlurPass;
 pub use stack_blur_pass::StackBlurWorkingPass;

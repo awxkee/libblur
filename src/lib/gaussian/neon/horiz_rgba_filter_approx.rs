@@ -73,11 +73,7 @@ pub fn gaussian_blur_horizontal_pass_filter_approx_neon<const CHANNEL_CONFIGURAT
                 if CHANNEL_CONFIGURATION == 4 {
                     while j + 16 < current_filter.size && x as i64 + j as i64 + 16i64 < width as i64
                     {
-                        let px = std::cmp::min(
-                            std::cmp::max(filter_start as i64 + j as i64, 0),
-                            (width - 1) as i64,
-                        ) as usize
-                            * CHANNEL_CONFIGURATION;
+                        let px = (filter_start as i64 + j as i64) as usize * CHANNEL_CONFIGURATION;
                         let s_ptr = src.as_ptr().add(y_src_shift + px);
                         let pixel_colors_0 = vld1q_u8_x4(s_ptr);
                         let pixel_colors_1 = vld1q_u8_x4(s_ptr.add(src_stride as usize));
@@ -219,11 +215,7 @@ pub fn gaussian_blur_horizontal_pass_filter_approx_neon<const CHANNEL_CONFIGURAT
                 if CHANNEL_CONFIGURATION == 4 {
                     while j + 16 < current_filter.size && x as i64 + j as i64 + 16i64 < width as i64
                     {
-                        let px = std::cmp::min(
-                            std::cmp::max(filter_start as i64 + j as i64, 0),
-                            (width - 1) as i64,
-                        ) as usize
-                            * CHANNEL_CONFIGURATION;
+                        let px = (filter_start as i64 + j as i64) as usize * CHANNEL_CONFIGURATION;
                         let s_ptr = src.as_ptr().add(y_src_shift + px);
                         let pixel_colors_0 = vld1q_u8_x4(s_ptr);
                         let pixel_colors_1 = vld1q_u8_x4(s_ptr.add(src_stride as usize));

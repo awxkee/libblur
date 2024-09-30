@@ -31,6 +31,7 @@ use crate::sse::{
     _mm_loadu_ps_x4, _mm_split_rgb_5_ps, load_f32, store_f32,
 };
 use crate::unsafe_slice::UnsafeSlice;
+use crate::{clamp_edge, reflect_101, reflect_index, EdgeMode};
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -73,6 +74,7 @@ pub fn gaussian_horiz_sse_t_f_chan_f32<T, const CHANNEL_CONFIGURATION: usize, co
     kernel: &[f32],
     start_y: u32,
     end_y: u32,
+    edge_mode: EdgeMode,
 ) {
     unsafe {
         if FMA {
@@ -86,6 +88,7 @@ pub fn gaussian_horiz_sse_t_f_chan_f32<T, const CHANNEL_CONFIGURATION: usize, co
                 kernel,
                 start_y,
                 end_y,
+                edge_mode,
             );
         } else {
             gaussian_horiz_sse_t_f_chan_gen::<T, CHANNEL_CONFIGURATION>(
@@ -98,6 +101,7 @@ pub fn gaussian_horiz_sse_t_f_chan_f32<T, const CHANNEL_CONFIGURATION: usize, co
                 kernel,
                 start_y,
                 end_y,
+                edge_mode,
             );
         }
     }
@@ -115,6 +119,7 @@ unsafe fn gaussian_horiz_sse_t_f_chan_gen<T, const CHANNEL_CONFIGURATION: usize>
     kernel: &[f32],
     start_y: u32,
     end_y: u32,
+    edge_mode: EdgeMode,
 ) {
     gaussian_horiz_sse_t_f_chan_f32_impl::<T, CHANNEL_CONFIGURATION, false>(
         undef_src,
@@ -126,6 +131,7 @@ unsafe fn gaussian_horiz_sse_t_f_chan_gen<T, const CHANNEL_CONFIGURATION: usize>
         kernel,
         start_y,
         end_y,
+        edge_mode,
     );
 }
 
@@ -141,6 +147,7 @@ unsafe fn gaussian_horiz_sse_t_f_chan_fma<T, const CHANNEL_CONFIGURATION: usize>
     kernel: &[f32],
     start_y: u32,
     end_y: u32,
+    edge_mode: EdgeMode,
 ) {
     gaussian_horiz_sse_t_f_chan_f32_impl::<T, CHANNEL_CONFIGURATION, true>(
         undef_src,
@@ -152,6 +159,7 @@ unsafe fn gaussian_horiz_sse_t_f_chan_fma<T, const CHANNEL_CONFIGURATION: usize>
         kernel,
         start_y,
         end_y,
+        edge_mode,
     );
 }
 
@@ -169,6 +177,7 @@ unsafe fn gaussian_horiz_sse_t_f_chan_f32_impl<
     kernel: &[f32],
     start_y: u32,
     end_y: u32,
+    edge_mode: EdgeMode,
 ) {
     let src: &[f32] = std::mem::transmute(undef_src);
     let unsafe_dst: &UnsafeSlice<'_, f32> = std::mem::transmute(undef_unsafe_dst);
@@ -189,11 +198,19 @@ unsafe fn gaussian_horiz_sse_t_f_chan_f32_impl<
             let edge_value_check = x as i64 + r as i64;
             if edge_value_check < 0 {
                 let diff = edge_value_check.abs();
-                let s_ptr = src.as_ptr().add(y_src_shift); // Here we're always at zero
-                let pixel_colors_0 = load_f32::<CHANNEL_CONFIGURATION>(s_ptr);
-                let s_ptr_next = src.as_ptr().add(y_src_shift + src_stride as usize); // Here we're always at zero
-                let pixel_colors_1 = load_f32::<CHANNEL_CONFIGURATION>(s_ptr_next);
+
+                let start_x = edge_value_check;
+
                 for i in 0..diff as usize {
+                    let s_ptr = src.as_ptr().add(
+                        y_src_shift
+                            + clamp_edge!(edge_mode, start_x + i as i64, 0i64, width as i64 - 1)
+                                * CHANNEL_CONFIGURATION,
+                    ); // Here we're always at the edge
+                    let pixel_colors_0 = load_f32::<CHANNEL_CONFIGURATION>(s_ptr);
+                    let s_ptr_next = src.as_ptr().add(y_src_shift + src_stride as usize); // Here we're always at the edge
+                    let pixel_colors_1 = load_f32::<CHANNEL_CONFIGURATION>(s_ptr_next);
+
                     let weights = kernel.as_ptr().add(i);
                     let f_weight = _mm_load1_ps(weights);
                     store0 = _mm_opt_fma_ps::<FMA>(store0, pixel_colors_0, f_weight);
@@ -204,9 +221,7 @@ unsafe fn gaussian_horiz_sse_t_f_chan_f32_impl<
 
             if CHANNEL_CONFIGURATION == 4 {
                 while r + 8 <= half_kernel && ((x as i64 + r as i64 + 8i64) < width as i64) {
-                    let current_x =
-                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize;
+                    let current_x = (x as i64 + r as i64) as usize;
                     let px = current_x * CHANNEL_CONFIGURATION;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors_0 = _mm_loadu_ps_x4(s_ptr);
@@ -228,9 +243,7 @@ unsafe fn gaussian_horiz_sse_t_f_chan_f32_impl<
                 }
 
                 while r + 4 <= half_kernel && ((x as i64 + r as i64 + 4i64) < width as i64) {
-                    let current_x =
-                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize;
+                    let current_x = (x as i64 + r as i64) as usize;
                     let px = current_x * CHANNEL_CONFIGURATION;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors_0 = _mm_loadu_ps_x4(s_ptr);
@@ -246,9 +259,7 @@ unsafe fn gaussian_horiz_sse_t_f_chan_f32_impl<
                 }
             } else if CHANNEL_CONFIGURATION == 3 {
                 while r + 5 <= half_kernel && ((x as i64 + r as i64 + 6i64) < width as i64) {
-                    let current_x =
-                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize;
+                    let current_x = (x as i64 + r as i64) as usize;
                     let px = current_x * CHANNEL_CONFIGURATION;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     // (r0 g0 b0 r1) (g1 b1 r2 g2) (b2 r3 g3 b3) (r4 g4 b5 undef)
@@ -269,9 +280,7 @@ unsafe fn gaussian_horiz_sse_t_f_chan_f32_impl<
             }
 
             while r <= half_kernel {
-                let current_x =
-                    std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                        as usize;
+                let current_x = clamp_edge!(edge_mode, x as i64 + r as i64, 0i64, width as i64 - 1);
                 let px = current_x * CHANNEL_CONFIGURATION;
                 let s_ptr = src.as_ptr().add(y_src_shift + px);
                 let pixel_colors_0 = load_f32::<CHANNEL_CONFIGURATION>(s_ptr);
@@ -308,9 +317,17 @@ unsafe fn gaussian_horiz_sse_t_f_chan_f32_impl<
             let edge_value_check = x as i64 + r as i64;
             if edge_value_check < 0 {
                 let diff = edge_value_check.abs();
-                let s_ptr = src.as_ptr().add(y_src_shift); // Here we're always at zero
-                let pixel_colors_f32 = load_f32::<CHANNEL_CONFIGURATION>(s_ptr);
+
+                let start_x = edge_value_check;
+
                 for i in 0..diff as usize {
+                    let s_ptr = src.as_ptr().add(
+                        y_src_shift
+                            + clamp_edge!(edge_mode, start_x + i as i64, 0i64, width as i64 - 1)
+                                * CHANNEL_CONFIGURATION,
+                    ); // Here we're always at the edge
+                    let pixel_colors_f32 = load_f32::<CHANNEL_CONFIGURATION>(s_ptr);
+
                     let weights = kernel.as_ptr().add(i);
                     let f_weight = _mm_load1_ps(weights);
                     store = _mm_opt_fma_ps::<FMA>(store, pixel_colors_f32, f_weight);
@@ -320,9 +337,7 @@ unsafe fn gaussian_horiz_sse_t_f_chan_f32_impl<
 
             if CHANNEL_CONFIGURATION == 4 {
                 while r + 4 <= half_kernel && ((x as i64 + r as i64 + 4i64) < width as i64) {
-                    let current_x =
-                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize;
+                    let current_x = (x as i64 + r as i64) as usize;
                     let px = current_x * CHANNEL_CONFIGURATION;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let px = _mm_loadu_ps_x4(s_ptr);
@@ -336,9 +351,7 @@ unsafe fn gaussian_horiz_sse_t_f_chan_f32_impl<
                 }
             } else if CHANNEL_CONFIGURATION == 3 {
                 while r + 5 <= half_kernel && ((x as i64 + r as i64 + 6i64) < width as i64) {
-                    let current_x =
-                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize;
+                    let current_x = (x as i64 + r as i64) as usize;
                     let px = current_x * CHANNEL_CONFIGURATION;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     // (r0 g0 b0 r1) (g1 b1 r2 g2) (b2 r3 g3 b3) (r4 g4 b5 undef)
@@ -356,9 +369,7 @@ unsafe fn gaussian_horiz_sse_t_f_chan_f32_impl<
             }
 
             while r <= half_kernel {
-                let current_x =
-                    std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                        as usize;
+                let current_x = clamp_edge!(edge_mode, x as i64 + r as i64, 0i64, width as i64 - 1);
                 let px = current_x * CHANNEL_CONFIGURATION;
                 let s_ptr = src.as_ptr().add(y_src_shift + px);
                 let pixel_colors_f32 = load_f32::<CHANNEL_CONFIGURATION>(s_ptr);

@@ -29,6 +29,7 @@
 use crate::gaussian::gaussian_approx::{PRECISION, ROUNDING_APPROX};
 use crate::sse::load_u8_u16_one;
 use crate::unsafe_slice::UnsafeSlice;
+use crate::{clamp_edge, reflect_101, reflect_index, EdgeMode};
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -45,6 +46,7 @@ pub fn gaussian_blur_vertical_pass_approx_sse<const CHANNEL_CONFIGURATION: usize
     kernel: &[i16],
     start_y: u32,
     end_y: u32,
+    edge_mode: EdgeMode,
 ) {
     unsafe {
         gaussian_blur_vertical_pass_impl_sse_impl::<CHANNEL_CONFIGURATION>(
@@ -58,6 +60,7 @@ pub fn gaussian_blur_vertical_pass_approx_sse<const CHANNEL_CONFIGURATION: usize
             kernel,
             start_y,
             end_y,
+            edge_mode,
         );
     }
 }
@@ -74,6 +77,7 @@ unsafe fn gaussian_blur_vertical_pass_impl_sse_impl<const CHANNEL_CONFIGURATION:
     kernel: &[i16],
     start_y: u32,
     end_y: u32,
+    edge_mode: EdgeMode,
 ) {
     let half_kernel = (kernel_size / 2) as i32;
 
@@ -100,8 +104,7 @@ unsafe fn gaussian_blur_vertical_pass_impl_sse_impl<const CHANNEL_CONFIGURATION:
                     let weight = *kernel.get_unchecked((r + half_kernel) as usize);
                     let f_weight = _mm_set1_epi16(weight);
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
+                    let py = clamp_edge!(edge_mode, y as i64 + r as i64, 0i64, height as i64 - 1);
                     let y_src_shift = py as usize * src_stride as usize;
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let pixels_u8_lo = _mm_loadu_si128(s_ptr as *const __m128i);
@@ -167,8 +170,7 @@ unsafe fn gaussian_blur_vertical_pass_impl_sse_impl<const CHANNEL_CONFIGURATION:
                     let weight = *kernel.get_unchecked((r + half_kernel) as usize);
                     let f_weight = _mm_set1_epi16(weight);
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
+                    let py = clamp_edge!(edge_mode, y as i64 + r as i64, 0i64, height as i64 - 1);
                     let y_src_shift = py as usize * src_stride as usize;
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let pixels_u8 = _mm_loadu_si128(s_ptr as *const __m128i);
@@ -211,8 +213,7 @@ unsafe fn gaussian_blur_vertical_pass_impl_sse_impl<const CHANNEL_CONFIGURATION:
                     let weight = *kernel.get_unchecked((r + half_kernel) as usize);
                     let f_weight = _mm_set1_epi16(weight);
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
+                    let py = clamp_edge!(edge_mode, y as i64 + r as i64, 0i64, height as i64 - 1);
                     let y_src_shift = py as usize * src_stride as usize;
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let pixels_u8 = _mm_unpacklo_epi8(_mm_loadu_si64(s_ptr), zeros_si);
@@ -245,8 +246,7 @@ unsafe fn gaussian_blur_vertical_pass_impl_sse_impl<const CHANNEL_CONFIGURATION:
                     let weight = *kernel.get_unchecked((r + half_kernel) as usize);
                     let f_weight = _mm_set1_epi16(weight);
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
+                    let py = clamp_edge!(edge_mode, y as i64 + r as i64, 0i64, height as i64 - 1);
                     let y_src_shift = py as usize * src_stride as usize;
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let read_element = (s_ptr as *const i32).read_unaligned();
@@ -280,8 +280,7 @@ unsafe fn gaussian_blur_vertical_pass_impl_sse_impl<const CHANNEL_CONFIGURATION:
                     let weight = *kernel.get_unchecked((r + half_kernel) as usize);
                     let f_weight = _mm_set1_epi16(weight);
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
+                    let py = clamp_edge!(edge_mode, y as i64 + r as i64, 0i64, height as i64 - 1);
                     let y_src_shift = py as usize * src_stride as usize;
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let pixels_u16 = load_u8_u16_one(s_ptr);

@@ -28,6 +28,7 @@
 use crate::gaussian::gaussian_filter::GaussianFilter;
 use crate::neon::{prefer_vfmaq_f32, vhsumq_f32};
 use crate::unsafe_slice::UnsafeSlice;
+use crate::{clamp_edge, reflect_101, reflect_index, EdgeMode};
 use std::arch::aarch64::*;
 
 macro_rules! accumulate_4_items {
@@ -49,6 +50,7 @@ pub fn gaussian_horiz_one_chan_f32<T>(
     kernel: &[f32],
     start_y: u32,
     end_y: u32,
+    edge_mode: EdgeMode,
 ) {
     let src: &[f32] = unsafe { std::mem::transmute(undef_src) };
     let unsafe_dst: &UnsafeSlice<'_, f32> = unsafe { std::mem::transmute(undef_unsafe_dst) };
@@ -75,11 +77,23 @@ pub fn gaussian_horiz_one_chan_f32<T>(
                 let edge_value_check = x as i64 + r as i64;
                 if edge_value_check < 0 {
                     let diff = edge_value_check.abs();
-                    let s_ptr = src.as_ptr().add(y_src_shift); // Here we're always at zero
-                    let pixel_colors_f32_0 = vld1q_lane_f32::<0>(s_ptr, zeros);
-                    let s_ptr_next = src.as_ptr().add(y_src_shift_next); // Here we're always at zero
-                    let pixel_colors_f32_1 = vld1q_lane_f32::<0>(s_ptr_next, zeros);
+
+                    let start_x = edge_value_check;
+
                     for i in 0..diff as usize {
+                        let s_ptr = src.as_ptr().add(
+                            y_src_shift
+                                + clamp_edge!(
+                                    edge_mode,
+                                    start_x + i as i64,
+                                    0i64,
+                                    width as i64 - 1
+                                ),
+                        );
+                        let pixel_colors_f32_0 = vld1q_lane_f32::<0>(s_ptr, zeros);
+                        let s_ptr_next = src.as_ptr().add(y_src_shift_next); // Here we're always at zero
+                        let pixel_colors_f32_1 = vld1q_lane_f32::<0>(s_ptr_next, zeros);
+
                         let weight = kernel.as_ptr().add(i);
                         let f_weight = vld1q_lane_f32::<0>(weight, zeros);
                         store0 = prefer_vfmaq_f32(store0, pixel_colors_f32_0, f_weight);
@@ -89,9 +103,7 @@ pub fn gaussian_horiz_one_chan_f32<T>(
                 }
 
                 while r + 32 <= half_kernel && ((x as i64 + r as i64 + 32i64) < width as i64) {
-                    let current_x =
-                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize;
+                    let current_x = (x as i64 + r as i64) as usize;
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors_f32_set0_0 = vld1q_f32_x4(s_ptr);
@@ -116,9 +128,7 @@ pub fn gaussian_horiz_one_chan_f32<T>(
                 }
 
                 while r + 16 <= half_kernel && ((x as i64 + r as i64 + 16i64) < width as i64) {
-                    let current_x =
-                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize;
+                    let current_x = (x as i64 + r as i64) as usize;
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors_f32_set_0 = vld1q_f32_x4(s_ptr);
@@ -134,9 +144,7 @@ pub fn gaussian_horiz_one_chan_f32<T>(
                 }
 
                 while r + 4 <= half_kernel && ((x as i64 + r as i64 + 4i64) < width as i64) {
-                    let current_x =
-                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize;
+                    let current_x = (x as i64 + r as i64) as usize;
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors_f32_0 = vld1q_f32(s_ptr);
@@ -152,8 +160,7 @@ pub fn gaussian_horiz_one_chan_f32<T>(
 
                 while r <= half_kernel {
                     let current_x =
-                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize;
+                        clamp_edge!(edge_mode, x as i64 + r as i64, 0i64, width as i64 - 1);
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors_f32_0 = vld1q_lane_f32::<0>(s_ptr, zeros);
@@ -196,9 +203,20 @@ pub fn gaussian_horiz_one_chan_f32<T>(
                 let edge_value_check = x as i64 + r as i64;
                 if edge_value_check < 0 {
                     let diff = edge_value_check.abs();
-                    let s_ptr = src.as_ptr().add(y_src_shift); // Here we're always at zero
-                    let pixel_colors_f32 = vld1q_lane_f32::<0>(s_ptr, zeros);
+
+                    let start_x = edge_value_check;
+
                     for i in 0..diff as usize {
+                        let s_ptr = src.as_ptr().add(
+                            y_src_shift
+                                + clamp_edge!(
+                                    edge_mode,
+                                    start_x + i as i64,
+                                    0i64,
+                                    width as i64 - 1
+                                ),
+                        );
+                        let pixel_colors_f32 = vld1q_lane_f32::<0>(s_ptr, zeros);
                         let weights = kernel.as_ptr().add(i);
                         let f_weight = vld1q_lane_f32::<0>(weights, zeros);
                         store = prefer_vfmaq_f32(store, pixel_colors_f32, f_weight);
@@ -207,9 +225,7 @@ pub fn gaussian_horiz_one_chan_f32<T>(
                 }
 
                 while r + 32 <= half_kernel && ((x as i64 + r as i64 + 32i64) < width as i64) {
-                    let current_x =
-                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize;
+                    let current_x = (x as i64 + r as i64) as usize;
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors_f32_set_0 = vld1q_f32_x4(s_ptr);
@@ -225,9 +241,7 @@ pub fn gaussian_horiz_one_chan_f32<T>(
                 }
 
                 while r + 16 <= half_kernel && ((x as i64 + r as i64 + 16i64) < width as i64) {
-                    let current_x =
-                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize;
+                    let current_x = (x as i64 + r as i64) as usize;
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors_f32_set = vld1q_f32_x4(s_ptr);
@@ -240,9 +254,7 @@ pub fn gaussian_horiz_one_chan_f32<T>(
                 }
 
                 while r + 4 <= half_kernel && ((x as i64 + r as i64 + 4i64) < width as i64) {
-                    let current_x =
-                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize;
+                    let current_x = (x as i64 + r as i64) as usize;
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors_f32 = vld1q_f32(s_ptr);
@@ -255,8 +267,7 @@ pub fn gaussian_horiz_one_chan_f32<T>(
 
                 while r <= half_kernel {
                     let current_x =
-                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize;
+                        clamp_edge!(edge_mode, x as i64 + r as i64, 0i64, width as i64 - 1);
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors_f32 = vld1q_lane_f32::<0>(s_ptr, zeros);
@@ -314,10 +325,7 @@ pub fn gaussian_horiz_one_chan_filter_f32<T>(
                 while r + 32 < current_filter.size
                     && ((filter_start as i64 + r as i64 + 32i64) < width as i64)
                 {
-                    let current_x = std::cmp::min(
-                        std::cmp::max(filter_start as i64 + r as i64, 0),
-                        (width - 1) as i64,
-                    ) as usize;
+                    let current_x = (x as i64 + r as i64) as usize;
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors_f32_set0_0 = vld1q_f32_x4(s_ptr);
@@ -344,10 +352,7 @@ pub fn gaussian_horiz_one_chan_filter_f32<T>(
                 while r + 16 < current_filter.size
                     && ((filter_start as i64 + r as i64 + 16i64) < width as i64)
                 {
-                    let current_x = std::cmp::min(
-                        std::cmp::max(filter_start as i64 + r as i64, 0),
-                        (width - 1) as i64,
-                    ) as usize;
+                    let current_x = (x as i64 + r as i64) as usize;
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors_f32_set_0 = vld1q_f32_x4(s_ptr);
@@ -365,10 +370,7 @@ pub fn gaussian_horiz_one_chan_filter_f32<T>(
                 while r + 4 < current_filter.size
                     && ((filter_start as i64 + r as i64 + 4i64) < width as i64)
                 {
-                    let current_x = std::cmp::min(
-                        std::cmp::max(filter_start as i64 + r as i64, 0),
-                        (width - 1) as i64,
-                    ) as usize;
+                    let current_x = (x as i64 + r as i64) as usize;
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors_f32_0 = vld1q_f32(s_ptr);
@@ -383,10 +385,7 @@ pub fn gaussian_horiz_one_chan_filter_f32<T>(
                 }
 
                 while r < current_filter.size {
-                    let current_x = std::cmp::min(
-                        std::cmp::max(filter_start as i64 + r as i64, 0),
-                        (width - 1) as i64,
-                    ) as usize;
+                    let current_x = (x as i64 + r as i64) as usize;
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors_f32_0 = vld1q_lane_f32::<0>(s_ptr, zeros);
@@ -433,10 +432,7 @@ pub fn gaussian_horiz_one_chan_filter_f32<T>(
                 while r + 32 < current_filter.size
                     && ((filter_start as i64 + r as i64 + 32i64) < width as i64)
                 {
-                    let current_x = std::cmp::min(
-                        std::cmp::max(filter_start as i64 + r as i64, 0),
-                        (width - 1) as i64,
-                    ) as usize;
+                    let current_x = (x as i64 + r as i64) as usize;
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors_f32_set_0 = vld1q_f32_x4(s_ptr);
@@ -454,10 +450,7 @@ pub fn gaussian_horiz_one_chan_filter_f32<T>(
                 while r + 16 < current_filter.size
                     && ((filter_start as i64 + r as i64 + 16i64) < width as i64)
                 {
-                    let current_x = std::cmp::min(
-                        std::cmp::max(filter_start as i64 + r as i64, 0),
-                        (width - 1) as i64,
-                    ) as usize;
+                    let current_x = (x as i64 + r as i64) as usize;
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors_f32_set = vld1q_f32_x4(s_ptr);
@@ -472,10 +465,7 @@ pub fn gaussian_horiz_one_chan_filter_f32<T>(
                 while r + 4 < current_filter.size
                     && ((filter_start as i64 + r as i64 + 4i64) < width as i64)
                 {
-                    let current_x = std::cmp::min(
-                        std::cmp::max(filter_start as i64 + r as i64, 0),
-                        (width - 1) as i64,
-                    ) as usize;
+                    let current_x = (x as i64 + r as i64) as usize;
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors_f32 = vld1q_f32(s_ptr);
@@ -487,10 +477,7 @@ pub fn gaussian_horiz_one_chan_filter_f32<T>(
                 }
 
                 while r < current_filter.size {
-                    let current_x = std::cmp::min(
-                        std::cmp::max(filter_start as i64 + r as i64, 0),
-                        (width - 1) as i64,
-                    ) as usize;
+                    let current_x = (x as i64 + r as i64) as usize;
                     let px = current_x;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors_f32 = vld1q_lane_f32::<0>(s_ptr, zeros);

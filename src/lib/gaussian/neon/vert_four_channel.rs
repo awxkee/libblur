@@ -27,6 +27,7 @@
 
 use crate::neon::{load_u8_u32_fast, load_u8_u32_one, prefer_vfma_f32, prefer_vfmaq_f32};
 use crate::unsafe_slice::UnsafeSlice;
+use crate::{clamp_edge, reflect_101, reflect_index, EdgeMode};
 use std::arch::aarch64::*;
 
 pub fn gaussian_blur_vertical_pass_neon<T, const CHANNEL_CONFIGURATION: usize>(
@@ -40,6 +41,7 @@ pub fn gaussian_blur_vertical_pass_neon<T, const CHANNEL_CONFIGURATION: usize>(
     kernel: &[f32],
     start_y: u32,
     end_y: u32,
+    edge_mode: EdgeMode,
 ) {
     let src: &[u8] = unsafe { std::mem::transmute(undef_src) };
     let unsafe_dst: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(undef_unsafe_dst) };
@@ -70,9 +72,8 @@ pub fn gaussian_blur_vertical_pass_neon<T, const CHANNEL_CONFIGURATION: usize>(
                     let weight = kernel.as_ptr().add((r + half_kernel) as usize);
                     let f_weight: float32x4_t = vld1q_dup_f32(weight);
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
-                    let y_src_shift = py as usize * src_stride as usize;
+                    let py = clamp_edge!(edge_mode, y as i64 + r as i64, 0, (height - 1) as i64);
+                    let y_src_shift = py * src_stride as usize;
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let pixels_u8x2 = vld1q_u8_x2(s_ptr);
                     let hi_16 = vmovl_high_u8(pixels_u8x2.0);
@@ -136,9 +137,8 @@ pub fn gaussian_blur_vertical_pass_neon<T, const CHANNEL_CONFIGURATION: usize>(
                     let weight = kernel.as_ptr().add((r + half_kernel) as usize);
                     let f_weight: float32x4_t = vld1q_dup_f32(weight);
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
-                    let y_src_shift = py as usize * src_stride as usize;
+                    let py = clamp_edge!(edge_mode, y as i64 + r as i64, 0, (height - 1) as i64);
+                    let y_src_shift = py * src_stride as usize;
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let pixels_u8 = vld1q_u8(s_ptr);
                     let hi_16 = vmovl_high_u8(pixels_u8);
@@ -180,9 +180,8 @@ pub fn gaussian_blur_vertical_pass_neon<T, const CHANNEL_CONFIGURATION: usize>(
                     let weight = kernel.as_ptr().add((r + half_kernel) as usize);
                     let f_weight: float32x4_t = vld1q_dup_f32(weight);
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
-                    let y_src_shift = py as usize * src_stride as usize;
+                    let py = clamp_edge!(edge_mode, y as i64 + r as i64, 0, (height - 1) as i64);
+                    let y_src_shift = py * src_stride as usize;
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let pixels_u8 = vld1_u8(s_ptr);
                     let pixels_u16 = vmovl_u8(pixels_u8);
@@ -215,9 +214,8 @@ pub fn gaussian_blur_vertical_pass_neon<T, const CHANNEL_CONFIGURATION: usize>(
                     let weight = kernel.as_ptr().add((r + half_kernel) as usize);
                     let f_weight: float32x4_t = vld1q_dup_f32(weight);
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
-                    let y_src_shift = py as usize * src_stride as usize;
+                    let py = clamp_edge!(edge_mode, y as i64 + r as i64, 0, (height - 1) as i64);
+                    let y_src_shift = py * src_stride as usize;
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let pixels_u32 = load_u8_u32_fast::<4>(s_ptr);
                     let lo_lo = vcvtq_f32_u32(pixels_u32);
@@ -248,9 +246,8 @@ pub fn gaussian_blur_vertical_pass_neon<T, const CHANNEL_CONFIGURATION: usize>(
                     let weight = kernel.as_ptr().add((r + half_kernel) as usize);
                     let f_weight = vld1_dup_f32(weight);
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
-                    let y_src_shift = py as usize * src_stride as usize;
+                    let py = clamp_edge!(edge_mode, y as i64 + r as i64, 0, (height - 1) as i64);
+                    let y_src_shift = py * src_stride as usize;
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let pixels_u32 = load_u8_u32_one(s_ptr);
                     let lo_lo = vcvt_f32_u32(pixels_u32);

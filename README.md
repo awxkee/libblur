@@ -60,7 +60,7 @@ Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded 
 
 |                   | Time(NEON) | Time(SSE) | 
 |-------------------|:----------:|:---------:| 
-| libblur(Exact)    |  122.02ms  | 180.14ms  | 
+| libblur(Exact)    |  119.21ms  | 180.14ms  | 
 | libblur(Integral) |  86.81ms   | 129.67ms  | 
 | OpenCV            |  201.48ms  | 188.82ms  | 
 
@@ -69,15 +69,15 @@ Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded
 |                   | time(NEON) | Time(SSE/AVX) |
 |-------------------|:----------:|:-------------:|
 | libblur(Exact)    |  128.67ms  |   192.68ms    |
-| libblur(Integral) |  85.35ms   |   160.29ms    |
+| libblur(Integral) |  81.60ms   |   160.29ms    |
 | OpenCV            |  187.51ms  |   191.31ms    |
 
 Example comparison time for blurring image 3000x4000 single plane 8-bit in multithreaded mode with 151 kernel size.
 
 |                   | time(NEON) | Time(SSE/AVX) |
 |-------------------|:----------:|:-------------:|
-| libblur(Exact)    |  41.65ms   |    47.09ms    |
-| libblur(Integral) |  25.43ms   |    36.36ms    |
+| libblur(Exact)    |  40.15ms   |    47.09ms    |
+| libblur(Integral) |  22.63ms   |    36.36ms    |
 | OpenCV            |  75.94ms   |    64.81ms    |
 
 ### Stack blur
@@ -97,14 +97,14 @@ Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded 
 
 |         | time(NEON) | time(SSE) |
 |---------|:----------:|:---------:|
-| libblur |   7.90ms   |  13.60ms  |
+| libblur |   7.71ms   |  13.60ms  |
 | OpenCV  |   8.43ms   |  9.80ms   |
 
 Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded mode with 77 radius.
 
 |         | time(NEON) | time(SSE) |
 |---------|:----------:|:---------:|
-| libblur |   6.73ms   |  11.91ms  |
+| libblur |   7.41ms   |  11.91ms  |
 | OpenCV  |   8.00ms   |  9.62ms   |
 
 ### Fast gaussian
@@ -247,6 +247,7 @@ fast_bilateral_filter(
     &mut dst_bytes,
     dimensions.0,
     dimensions.1,
+    kernel_size,
     spatial_sigma,
     range_sigma,
     FastBlurChannels::Channels3,

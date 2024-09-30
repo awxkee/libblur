@@ -26,14 +26,8 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-mod fast_gaussian;
-mod fast_gaussian_next;
-mod utils;
+mod horizontal;
+mod vertical;
 
-pub use fast_gaussian::{
-    fast_gaussian_horizontal_pass_wasm_u8, fast_gaussian_vertical_pass_wasm_u8,
-};
-pub use fast_gaussian_next::{
-    fast_gaussian_next_horizontal_pass_wasm_u8, fast_gaussian_next_vertical_pass_wasm_u8,
-};
-pub use utils::*;
+pub use horizontal::HorizontalWasmStackBlurPass;
+pub use vertical::VerticalWasmStackBlurPass;

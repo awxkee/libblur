@@ -25,15 +25,15 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#[cfg(target_arch = "x86")]
-use std::arch::x86::*;
-#[cfg(target_arch = "x86_64")]
-use std::arch::x86_64::*;
-
 use crate::gaussian::avx::utils::{
     _mm256_opt_fma_ps, avx2_pack_u16, avx2_pack_u32, load_u8_f32_fast, load_u8_u32_one,
 };
 use crate::unsafe_slice::UnsafeSlice;
+use crate::{clamp_edge, reflect_101, reflect_index, EdgeMode};
+#[cfg(target_arch = "x86")]
+use std::arch::x86::*;
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::*;
 
 pub fn gaussian_blur_vertical_pass_impl_avx<
     T,
@@ -50,6 +50,7 @@ pub fn gaussian_blur_vertical_pass_impl_avx<
     kernel: &[f32],
     start_y: u32,
     end_y: u32,
+    edge_mode: EdgeMode,
 ) {
     unsafe {
         if FMA {
@@ -64,6 +65,7 @@ pub fn gaussian_blur_vertical_pass_impl_avx<
                 kernel,
                 start_y,
                 end_y,
+                edge_mode,
             );
         } else {
             gaussian_blur_vertical_pass_impl_gen::<T, CHANNEL_CONFIGURATION>(
@@ -77,6 +79,7 @@ pub fn gaussian_blur_vertical_pass_impl_avx<
                 kernel,
                 start_y,
                 end_y,
+                edge_mode,
             );
         }
     }
@@ -95,6 +98,7 @@ unsafe fn gaussian_blur_vertical_pass_impl_gen<T, const CHANNEL_CONFIGURATION: u
     kernel: &[f32],
     start_y: u32,
     end_y: u32,
+    edge_mode: EdgeMode,
 ) {
     gaussian_blur_vertical_pass_impl_avx_impl::<T, CHANNEL_CONFIGURATION, false>(
         undef_src,
@@ -107,6 +111,7 @@ unsafe fn gaussian_blur_vertical_pass_impl_gen<T, const CHANNEL_CONFIGURATION: u
         kernel,
         start_y,
         end_y,
+        edge_mode,
     );
 }
 
@@ -123,6 +128,7 @@ unsafe fn gaussian_blur_vertical_pass_impl_fma<T, const CHANNEL_CONFIGURATION: u
     kernel: &[f32],
     start_y: u32,
     end_y: u32,
+    edge_mode: EdgeMode,
 ) {
     gaussian_blur_vertical_pass_impl_avx_impl::<T, CHANNEL_CONFIGURATION, true>(
         undef_src,
@@ -135,6 +141,7 @@ unsafe fn gaussian_blur_vertical_pass_impl_fma<T, const CHANNEL_CONFIGURATION: u
         kernel,
         start_y,
         end_y,
+        edge_mode,
     );
 }
 
@@ -153,6 +160,7 @@ unsafe fn gaussian_blur_vertical_pass_impl_avx_impl<
     kernel: &[f32],
     start_y: u32,
     end_y: u32,
+    edge_mode: EdgeMode,
 ) {
     let src: &[u8] = unsafe { std::mem::transmute(undef_src) };
     let unsafe_dst: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(undef_unsafe_dst) };
@@ -181,9 +189,8 @@ unsafe fn gaussian_blur_vertical_pass_impl_avx_impl<
                     let weight = *kernel.get_unchecked((r + half_kernel) as usize);
                     let f_weight = _mm256_set1_ps(weight);
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
-                    let y_src_shift = py as usize * src_stride as usize;
+                    let py = clamp_edge!(edge_mode, y as i64 + r as i64, 0i64, height as i64 - 1);
+                    let y_src_shift = py * src_stride as usize;
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let row_0 = _mm256_loadu_si256(s_ptr as *const __m256i);
                     let row_1 = _mm256_loadu_si256(s_ptr.add(32) as *const __m256i);
@@ -292,9 +299,8 @@ unsafe fn gaussian_blur_vertical_pass_impl_avx_impl<
                     let weight = *kernel.get_unchecked((r + half_kernel) as usize);
                     let f_weight = _mm256_set1_ps(weight);
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
-                    let y_src_shift = py as usize * src_stride as usize;
+                    let py = clamp_edge!(edge_mode, y as i64 + r as i64, 0i64, height as i64 - 1);
+                    let y_src_shift = py * src_stride as usize;
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let row = _mm256_loadu_si256(s_ptr as *const __m256i);
 
@@ -360,9 +366,8 @@ unsafe fn gaussian_blur_vertical_pass_impl_avx_impl<
                     let weight = *kernel.get_unchecked((r + half_kernel) as usize);
                     let f_weight = _mm256_set1_ps(weight);
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
-                    let y_src_shift = py as usize * src_stride as usize;
+                    let py = clamp_edge!(edge_mode, y as i64 + r as i64, 0i64, height as i64 - 1);
+                    let y_src_shift = py * src_stride as usize;
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let pixels_u8 = _mm_loadu_si128(s_ptr as *const __m128i);
                     let hi_16 = _mm_unpackhi_epi8(pixels_u8, _mm_setzero_si128());
@@ -410,9 +415,8 @@ unsafe fn gaussian_blur_vertical_pass_impl_avx_impl<
                     let weight = *kernel.get_unchecked((r + half_kernel) as usize);
                     let f_weight = _mm256_set1_ps(weight);
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
-                    let y_src_shift = py as usize * src_stride as usize;
+                    let py = clamp_edge!(edge_mode, y as i64 + r as i64, 0i64, height as i64 - 1);
+                    let y_src_shift = py * src_stride as usize;
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let pixels_u8 = _mm_loadu_si64(s_ptr);
                     let pixels_u16 = _mm_unpacklo_epi8(pixels_u8, _mm_setzero_si128());
@@ -448,9 +452,8 @@ unsafe fn gaussian_blur_vertical_pass_impl_avx_impl<
                     let weight = *kernel.get_unchecked((r + half_kernel) as usize);
                     let f_weight = _mm256_set1_ps(weight);
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
-                    let y_src_shift = py as usize * src_stride as usize;
+                    let py = clamp_edge!(edge_mode, y as i64 + r as i64, 0i64, height as i64 - 1);
+                    let y_src_shift = py * src_stride as usize;
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let lo_lo = load_u8_f32_fast::<4>(s_ptr);
                     store0 = _mm256_opt_fma_ps::<FMA>(store0, lo_lo, f_weight);
@@ -481,9 +484,8 @@ unsafe fn gaussian_blur_vertical_pass_impl_avx_impl<
                     let weight = *kernel.get_unchecked((r + half_kernel) as usize);
                     let f_weight = _mm256_setr_ps(weight, 0., 0., 0., 0., 0., 0., 0.);
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
-                    let y_src_shift = py as usize * src_stride as usize;
+                    let py = clamp_edge!(edge_mode, y as i64 + r as i64, 0i64, height as i64 - 1);
+                    let y_src_shift = py * src_stride as usize;
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let pixels_u32 = load_u8_u32_one(s_ptr);
                     let lo_lo = _mm256_cvtepi32_ps(pixels_u32);

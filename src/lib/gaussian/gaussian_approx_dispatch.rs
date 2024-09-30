@@ -56,7 +56,7 @@ use crate::{EdgeMode, ThreadingPolicy};
 use rayon::ThreadPool;
 
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
-fn gaussian_blur_horizontal_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>(
+fn gaussian_blur_horizontal_pass<const CHANNEL_CONFIGURATION: usize>(
     src: &[u8],
     src_stride: u32,
     dst: &mut [u8],
@@ -67,6 +67,7 @@ fn gaussian_blur_horizontal_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_
     kernel: &[i16],
     thread_pool: &Option<ThreadPool>,
     thread_count: u32,
+    edge_mode: EdgeMode,
 ) {
     let mut _dispatcher: fn(
         src: &[u8],
@@ -78,15 +79,13 @@ fn gaussian_blur_horizontal_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_
         kernel: &[i16],
         start_y: u32,
         end_y: u32,
-    ) = gaussian_blur_horizontal_pass_impl_approx::<CHANNEL_CONFIGURATION, EDGE_MODE>;
-    let _edge_mode: EdgeMode = EDGE_MODE.into();
+        edge_mode: EdgeMode,
+    ) = gaussian_blur_horizontal_pass_impl_approx::<CHANNEL_CONFIGURATION>;
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     {
-        if (CHANNEL_CONFIGURATION == 3 || CHANNEL_CONFIGURATION == 4)
-            && _edge_mode == EdgeMode::Clamp
-        {
+        if CHANNEL_CONFIGURATION == 3 || CHANNEL_CONFIGURATION == 4 {
             _dispatcher = gaussian_blur_horizontal_pass_approx_neon::<CHANNEL_CONFIGURATION>;
-        } else if CHANNEL_CONFIGURATION == 1 && _edge_mode == EdgeMode::Clamp {
+        } else if CHANNEL_CONFIGURATION == 1 {
             _dispatcher = gaussian_horiz_one_approx_u8;
         }
     }
@@ -94,12 +93,9 @@ fn gaussian_blur_horizontal_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     {
         let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
-        if _is_sse_available
-            && _edge_mode == EdgeMode::Clamp
-            && (CHANNEL_CONFIGURATION == 3 || CHANNEL_CONFIGURATION == 4)
-        {
+        if _is_sse_available && (CHANNEL_CONFIGURATION == 3 || CHANNEL_CONFIGURATION == 4) {
             _dispatcher = gaussian_blur_horizontal_pass_approx_sse::<CHANNEL_CONFIGURATION>;
-        } else if _is_sse_available && _edge_mode == EdgeMode::Clamp && CHANNEL_CONFIGURATION == 1 {
+        } else if _is_sse_available && CHANNEL_CONFIGURATION == 1 {
             _dispatcher = gaussian_sse_horiz_one_chan_u8_approx;
         }
     }
@@ -125,6 +121,7 @@ fn gaussian_blur_horizontal_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_
                         kernel,
                         start_y,
                         end_y,
+                        edge_mode,
                     );
                 });
             }
@@ -140,12 +137,13 @@ fn gaussian_blur_horizontal_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_
             kernel,
             0,
             height,
+            edge_mode,
         );
     }
 }
 
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
-fn gaussian_blur_vertical_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>(
+fn gaussian_blur_vertical_pass<const CHANNEL_CONFIGURATION: usize>(
     src: &[u8],
     src_stride: u32,
     dst: &mut [u8],
@@ -156,6 +154,7 @@ fn gaussian_blur_vertical_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_MO
     kernel: &[i16],
     thread_pool: &Option<ThreadPool>,
     thread_count: u32,
+    edge_mode: EdgeMode,
 ) {
     let mut _dispatcher: fn(
         src: &[u8],
@@ -168,13 +167,11 @@ fn gaussian_blur_vertical_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_MO
         kernel: &[i16],
         start_y: u32,
         end_y: u32,
-    ) = gaussian_blur_vertical_pass_c_approx::<CHANNEL_CONFIGURATION, EDGE_MODE>;
-    let _edge_mode: EdgeMode = EDGE_MODE.into();
+        edge_mode: EdgeMode,
+    ) = gaussian_blur_vertical_pass_c_approx::<CHANNEL_CONFIGURATION>;
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     {
-        if _edge_mode == EdgeMode::Clamp {
-            _dispatcher = gaussian_blur_vertical_approx_neon::<CHANNEL_CONFIGURATION>;
-        }
+        _dispatcher = gaussian_blur_vertical_approx_neon::<CHANNEL_CONFIGURATION>;
     }
 
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
@@ -182,7 +179,7 @@ fn gaussian_blur_vertical_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_MO
 
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     {
-        if _is_sse_available && _edge_mode == EdgeMode::Clamp {
+        if _is_sse_available {
             _dispatcher = gaussian_blur_vertical_pass_approx_sse::<CHANNEL_CONFIGURATION>;
         }
     }
@@ -210,6 +207,7 @@ fn gaussian_blur_vertical_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_MO
                         kernel,
                         start_y,
                         end_y,
+                        edge_mode,
                     );
                 });
             }
@@ -226,6 +224,7 @@ fn gaussian_blur_vertical_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_MO
             kernel,
             0,
             height,
+            edge_mode,
         );
     }
 }
@@ -424,9 +423,9 @@ pub(crate) fn gaussian_blur_impl_approx<const CHANNEL_CONFIGURATION: usize>(
     };
 
     match edge_mode {
-        EdgeMode::Reflect => {
+        EdgeMode::Reflect | EdgeMode::Clamp | EdgeMode::Reflect101 | EdgeMode::Wrap => {
             let kernel = get_gaussian_kernel_1d_integral(kernel_size, sigma);
-            gaussian_blur_horizontal_pass::<CHANNEL_CONFIGURATION, { EdgeMode::Reflect as usize }>(
+            gaussian_blur_horizontal_pass::<CHANNEL_CONFIGURATION>(
                 src,
                 src_stride,
                 &mut transient,
@@ -437,8 +436,9 @@ pub(crate) fn gaussian_blur_impl_approx<const CHANNEL_CONFIGURATION: usize>(
                 &kernel,
                 &pool,
                 thread_count,
+                edge_mode,
             );
-            gaussian_blur_vertical_pass::<CHANNEL_CONFIGURATION, { EdgeMode::Reflect as usize }>(
+            gaussian_blur_vertical_pass::<CHANNEL_CONFIGURATION>(
                 &transient,
                 dst_stride,
                 dst,
@@ -449,87 +449,7 @@ pub(crate) fn gaussian_blur_impl_approx<const CHANNEL_CONFIGURATION: usize>(
                 &kernel,
                 &pool,
                 thread_count,
-            );
-        }
-        EdgeMode::Wrap => {
-            let kernel = get_gaussian_kernel_1d_integral(kernel_size, sigma);
-            gaussian_blur_horizontal_pass::<CHANNEL_CONFIGURATION, { EdgeMode::Wrap as usize }>(
-                src,
-                src_stride,
-                &mut transient,
-                dst_stride,
-                width,
-                height,
-                kernel.len(),
-                &kernel,
-                &pool,
-                thread_count,
-            );
-            gaussian_blur_vertical_pass::<CHANNEL_CONFIGURATION, { EdgeMode::Wrap as usize }>(
-                &transient,
-                dst_stride,
-                dst,
-                dst_stride,
-                width,
-                height,
-                kernel.len(),
-                &kernel,
-                &pool,
-                thread_count,
-            );
-        }
-        EdgeMode::Clamp => {
-            let kernel = get_gaussian_kernel_1d_integral(kernel_size, sigma);
-            gaussian_blur_horizontal_pass::<CHANNEL_CONFIGURATION, { EdgeMode::Clamp as usize }>(
-                src,
-                src_stride,
-                &mut transient,
-                dst_stride,
-                width,
-                height,
-                kernel.len(),
-                &kernel,
-                &pool,
-                thread_count,
-            );
-            gaussian_blur_vertical_pass::<CHANNEL_CONFIGURATION, { EdgeMode::Clamp as usize }>(
-                &transient,
-                dst_stride,
-                dst,
-                dst_stride,
-                width,
-                height,
-                kernel.len(),
-                &kernel,
-                &pool,
-                thread_count,
-            );
-        }
-        EdgeMode::Reflect101 => {
-            let kernel = get_gaussian_kernel_1d_integral(kernel_size, sigma);
-            gaussian_blur_horizontal_pass::<CHANNEL_CONFIGURATION, { EdgeMode::Reflect101 as usize }>(
-                src,
-                src_stride,
-                &mut transient,
-                dst_stride,
-                width,
-                height,
-                kernel.len(),
-                &kernel,
-                &pool,
-                thread_count,
-            );
-            gaussian_blur_vertical_pass::<CHANNEL_CONFIGURATION, { EdgeMode::Reflect101 as usize }>(
-                &transient,
-                dst_stride,
-                dst,
-                dst_stride,
-                width,
-                height,
-                kernel.len(),
-                &kernel,
-                &pool,
-                thread_count,
+                edge_mode,
             );
         }
         EdgeMode::KernelClip => {

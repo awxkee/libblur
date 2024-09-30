@@ -29,6 +29,8 @@
 use crate::stackblur::neon::{HorizontalNeonStackBlurPass, VerticalNeonStackBlurPass};
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::stackblur::sse::{HorizontalSseStackBlurPass, VerticalSseStackBlurPass};
+#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+use crate::stackblur::wasm::{HorizontalWasmStackBlurPass, VerticalWasmStackBlurPass};
 use crate::stackblur::{HorizontalStackBlurPass, StackBlurWorkingPass, VerticalStackBlurPass};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{FastBlurChannels, ThreadingPolicy};
@@ -47,8 +49,24 @@ fn stack_blur_worker_horizontal(
     let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
     match channels {
         FastBlurChannels::Plane => {
-            let executor = Box::new(HorizontalStackBlurPass::<u8, i32, 1>::default());
-            executor.pass(slice, stride, width, height, radius, thread, thread_count);
+            let mut _executor: Box<dyn StackBlurWorkingPass<u8, i32, 1>> =
+                Box::new(HorizontalStackBlurPass::<u8, i32, 1>::default());
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            {
+                _executor = Box::new(HorizontalNeonStackBlurPass::<u8, i32, 1>::default());
+            }
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+            {
+                let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+                if _is_sse_available {
+                    _executor = Box::new(HorizontalSseStackBlurPass::<u8, i32, 1>::default());
+                }
+            }
+            #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+            {
+                _executor = Box::new(HorizontalWasmStackBlurPass::<u8, i32, 1>::default());
+            }
+            _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }
         FastBlurChannels::Channels3 => {
             let mut _executor: Box<dyn StackBlurWorkingPass<u8, i32, 3>> =
@@ -63,6 +81,10 @@ fn stack_blur_worker_horizontal(
                 if _is_sse_available {
                     _executor = Box::new(HorizontalSseStackBlurPass::<u8, i32, 3>::default());
                 }
+            }
+            #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+            {
+                _executor = Box::new(HorizontalWasmStackBlurPass::<u8, i32, 3>::default());
             }
             _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }
@@ -79,6 +101,10 @@ fn stack_blur_worker_horizontal(
                 if _is_sse_available {
                     _executor = Box::new(HorizontalSseStackBlurPass::<u8, i32, 4>::default());
                 }
+            }
+            #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+            {
+                _executor = Box::new(HorizontalWasmStackBlurPass::<u8, i32, 4>::default());
             }
             _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }
@@ -113,6 +139,10 @@ fn stack_blur_worker_vertical(
                     _executor = Box::new(VerticalSseStackBlurPass::<u8, i32, 1>::default());
                 }
             }
+            #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+            {
+                _executor = Box::new(VerticalWasmStackBlurPass::<u8, i32, 1>::default());
+            }
             _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }
         FastBlurChannels::Channels3 => {
@@ -129,6 +159,10 @@ fn stack_blur_worker_vertical(
                     _executor = Box::new(VerticalSseStackBlurPass::<u8, i32, 3>::default());
                 }
             }
+            #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+            {
+                _executor = Box::new(VerticalWasmStackBlurPass::<u8, i32, 3>::default());
+            }
             _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }
         FastBlurChannels::Channels4 => {
@@ -144,6 +178,10 @@ fn stack_blur_worker_vertical(
                 if _is_sse_available {
                     _executor = Box::new(VerticalSseStackBlurPass::<u8, i32, 4>::default());
                 }
+            }
+            #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+            {
+                _executor = Box::new(VerticalWasmStackBlurPass::<u8, i32, 4>::default());
             }
             _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }

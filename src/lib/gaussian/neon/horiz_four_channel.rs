@@ -29,7 +29,7 @@ use std::arch::aarch64::*;
 
 use crate::neon::{load_u8_f32_fast, load_u8_u32_fast, prefer_vfmaq_f32};
 use crate::unsafe_slice::UnsafeSlice;
-use crate::write_u8_by_channels;
+use crate::{clamp_edge, reflect_101, reflect_index, write_u8_by_channels, EdgeMode};
 
 #[macro_export]
 macro_rules! accumulate_4_forward_u8 {
@@ -114,6 +114,7 @@ pub fn gaussian_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
     kernel: &[f32],
     start_y: u32,
     end_y: u32,
+    edge_mode: EdgeMode,
 ) {
     unsafe {
         let src: &[u8] = std::mem::transmute(undef_src);
@@ -142,17 +143,26 @@ pub fn gaussian_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
                 let edge_value_check = x as i64 + r as i64;
                 if edge_value_check < 0 {
                     let diff = edge_value_check.abs();
-                    let s_ptr = src.as_ptr().add(y_src_shift); // Here we're always at zero
-                    let pixel_colors_f32_0 = load_u8_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr);
-                    let s_ptr_next = src.as_ptr().add(y_src_shift + src_stride as usize); // Here we're always at zero
-                    let pixel_colors_f32_1 = load_u8_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr_next);
-                    let s_ptr_next_2 = src.as_ptr().add(y_src_shift + src_stride as usize * 2); // Here we're always at zero
-                    let pixel_colors_f32_2 =
-                        load_u8_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr_next_2);
-                    let s_ptr_next_3 = src.as_ptr().add(y_src_shift + src_stride as usize * 3); // Here we're always at zero
-                    let pixel_colors_f32_3 =
-                        load_u8_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr_next_3);
+
+                    let start_x = edge_value_check;
+
                     for i in 0..diff as usize {
+                        let s_ptr = src.as_ptr().add(
+                            y_src_shift
+                                + clamp_edge!(edge_mode, start_x + i as i64, 0, width as i64 - 1)
+                                    * CHANNEL_CONFIGURATION,
+                        );
+                        let pixel_colors_f32_0 = load_u8_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr);
+                        let s_ptr_next = src.as_ptr().add(y_src_shift + src_stride as usize); // Here we're always at zero
+                        let pixel_colors_f32_1 =
+                            load_u8_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr_next);
+                        let s_ptr_next_2 = src.as_ptr().add(y_src_shift + src_stride as usize * 2); // Here we're always at zero
+                        let pixel_colors_f32_2 =
+                            load_u8_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr_next_2);
+                        let s_ptr_next_3 = src.as_ptr().add(y_src_shift + src_stride as usize * 3); // Here we're always at zero
+                        let pixel_colors_f32_3 =
+                            load_u8_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr_next_3);
+
                         let weights = kernel.as_ptr().add(i);
                         let f_weight = vld1q_dup_f32(weights);
                         store_0 = prefer_vfmaq_f32(store_0, pixel_colors_f32_0, f_weight);
@@ -165,11 +175,7 @@ pub fn gaussian_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
 
                 if CHANNEL_CONFIGURATION == 4 {
                     while r + 16 <= half_kernel && x as i64 + r as i64 + 16i64 < width as i64 {
-                        let px = std::cmp::min(
-                            std::cmp::max(x as i64 + r as i64, 0),
-                            (width - 1) as i64,
-                        ) as usize
-                            * CHANNEL_CONFIGURATION;
+                        let px = (x as i64 + r as i64) as usize * CHANNEL_CONFIGURATION;
                         let s_ptr = src.as_ptr().add(y_src_shift + px);
                         let pixel_colors_0 = vld1q_u8_x4(s_ptr);
                         let pixel_colors_1 = vld1q_u8_x4(s_ptr.add(src_stride as usize));
@@ -192,10 +198,7 @@ pub fn gaussian_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
                     && x as i64 + r as i64 + (if CHANNEL_CONFIGURATION == 4 { 4 } else { 6 })
                         < width as i64
                 {
-                    let px =
-                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize
-                            * CHANNEL_CONFIGURATION;
+                    let px = (x as i64 + r as i64) as usize * CHANNEL_CONFIGURATION;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let mut pixel_colors_0: uint8x16_t = vld1q_u8(s_ptr);
                     let mut pixel_colors_1: uint8x16_t = vld1q_u8(s_ptr.add(src_stride as usize));
@@ -226,10 +229,7 @@ pub fn gaussian_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
                     && x as i64 + r as i64 + (if CHANNEL_CONFIGURATION == 4 { 2 } else { 3 })
                         < width as i64
                 {
-                    let px =
-                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize
-                            * CHANNEL_CONFIGURATION;
+                    let px = (x as i64 + r as i64) as usize * CHANNEL_CONFIGURATION;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let mut pixel_colors_0: uint8x8_t = vld1_u8(s_ptr);
                     let mut pixel_colors_1: uint8x8_t = vld1_u8(s_ptr.add(src_stride as usize));
@@ -256,8 +256,7 @@ pub fn gaussian_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
 
                 while r <= half_kernel {
                     let current_x =
-                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize;
+                        clamp_edge!(edge_mode, x as i64 + r as i64, 0, width as i64 - 1);
                     let px = current_x * CHANNEL_CONFIGURATION;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors_u32_0 = load_u8_u32_fast::<CHANNEL_CONFIGURATION>(s_ptr);
@@ -306,11 +305,20 @@ pub fn gaussian_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
                 let edge_value_check = x as i64 + r as i64;
                 if edge_value_check < 0 {
                     let diff = edge_value_check.abs();
-                    let s_ptr = src.as_ptr().add(y_src_shift); // Here we're always at zero
-                    let pixel_colors_f32_0 = load_u8_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr);
-                    let s_ptr_next = src.as_ptr().add(y_src_shift + src_stride as usize); // Here we're always at zero
-                    let pixel_colors_f32_1 = load_u8_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr_next);
+
+                    let start_x = edge_value_check;
+
                     for i in 0..diff as usize {
+                        let s_ptr = src.as_ptr().add(
+                            y_src_shift
+                                + clamp_edge!(edge_mode, start_x + i as i64, 0, width as i64 - 1)
+                                    * CHANNEL_CONFIGURATION,
+                        );
+                        let pixel_colors_f32_0 = load_u8_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr);
+                        let s_ptr_next = src.as_ptr().add(y_src_shift + src_stride as usize); // Here we're always at zero
+                        let pixel_colors_f32_1 =
+                            load_u8_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr_next);
+
                         let weights = kernel.as_ptr().add(i);
                         let f_weight = vld1q_dup_f32(weights);
                         store_0 = prefer_vfmaq_f32(store_0, pixel_colors_f32_0, f_weight);
@@ -321,11 +329,7 @@ pub fn gaussian_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
 
                 if CHANNEL_CONFIGURATION == 4 {
                     while r + 16 <= half_kernel && x as i64 + r as i64 + 16i64 < width as i64 {
-                        let px = std::cmp::min(
-                            std::cmp::max(x as i64 + r as i64, 0),
-                            (width - 1) as i64,
-                        ) as usize
-                            * CHANNEL_CONFIGURATION;
+                        let px = (x as i64 + r as i64) as usize * CHANNEL_CONFIGURATION;
                         let s_ptr = src.as_ptr().add(y_src_shift + px);
                         let pixel_colors_0 = vld1q_u8_x4(s_ptr);
                         let pixel_colors_1 = vld1q_u8_x4(s_ptr.add(src_stride as usize));
@@ -344,10 +348,7 @@ pub fn gaussian_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
                     && x as i64 + r as i64 + (if CHANNEL_CONFIGURATION == 4 { 4 } else { 6 })
                         < width as i64
                 {
-                    let px =
-                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize
-                            * CHANNEL_CONFIGURATION;
+                    let px = (x as i64 + r as i64) as usize * CHANNEL_CONFIGURATION;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
 
                     let mut pixel_colors_0: uint8x16_t = vld1q_u8(s_ptr);
@@ -371,10 +372,7 @@ pub fn gaussian_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
                     && x as i64 + r as i64 + (if CHANNEL_CONFIGURATION == 4 { 2 } else { 3 })
                         < width as i64
                 {
-                    let px =
-                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize
-                            * CHANNEL_CONFIGURATION;
+                    let px = (x as i64 + r as i64) as usize * CHANNEL_CONFIGURATION;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let mut pixel_colors_0: uint8x8_t = vld1_u8(s_ptr);
                     let mut pixel_colors_1: uint8x8_t = vld1_u8(s_ptr.add(src_stride as usize));
@@ -395,8 +393,7 @@ pub fn gaussian_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
 
                 while r <= half_kernel {
                     let current_x =
-                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize;
+                        clamp_edge!(edge_mode, x as i64 + r as i64, 0, width as i64 - 1);
                     let px = current_x * CHANNEL_CONFIGURATION;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors_u32_0 = load_u8_u32_fast::<CHANNEL_CONFIGURATION>(s_ptr);
@@ -435,9 +432,17 @@ pub fn gaussian_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
                 let edge_value_check = x as i64 + r as i64;
                 if edge_value_check < 0 {
                     let diff = edge_value_check.abs();
-                    let s_ptr = src.as_ptr().add(y_src_shift); // Here we're always at zero
-                    let pixel_colors_f32_0 = load_u8_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr);
+
+                    let start_x = edge_value_check;
+
                     for i in 0..diff as usize {
+                        let s_ptr = src.as_ptr().add(
+                            y_src_shift
+                                + clamp_edge!(edge_mode, start_x + i as i64, 0, width as i64 - 1)
+                                    * CHANNEL_CONFIGURATION,
+                        );
+                        let pixel_colors_f32_0 = load_u8_f32_fast::<CHANNEL_CONFIGURATION>(s_ptr);
+
                         let weights = kernel.as_ptr().add(i);
                         let f_weight = vld1q_dup_f32(weights);
                         store = prefer_vfmaq_f32(store, pixel_colors_f32_0, f_weight);
@@ -446,10 +451,7 @@ pub fn gaussian_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
                 }
 
                 while r + 4 <= half_kernel && x as i64 + r as i64 + 6 < width as i64 {
-                    let px =
-                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize
-                            * CHANNEL_CONFIGURATION;
+                    let px = (x as i64 + r as i64) as usize * CHANNEL_CONFIGURATION;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let mut pixel_colors: uint8x16_t = vld1q_u8(s_ptr);
                     if CHANNEL_CONFIGURATION == 3 {
@@ -465,9 +467,7 @@ pub fn gaussian_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
                 }
 
                 while r + 2 <= half_kernel && x as i64 + r as i64 + 2 < width as i64 {
-                    let current_x =
-                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize;
+                    let current_x = (x as i64 + r as i64) as usize;
                     let px = current_x * CHANNEL_CONFIGURATION;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let weights_ptr = kernel.as_ptr().add((r + half_kernel) as usize);
@@ -484,8 +484,7 @@ pub fn gaussian_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
 
                 while r <= half_kernel {
                     let current_x =
-                        std::cmp::min(std::cmp::max(x as i64 + r as i64, 0), (width - 1) as i64)
-                            as usize;
+                        clamp_edge!(edge_mode, x as i64 + r as i64, 0, width as i64 - 1);
                     let px = current_x * CHANNEL_CONFIGURATION;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let pixel_colors_u32 = load_u8_u32_fast::<CHANNEL_CONFIGURATION>(s_ptr);

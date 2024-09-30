@@ -100,11 +100,19 @@ macro_rules! impl_generic_call {
         $bytes:expr, $stride:expr, $width:expr, $height:expr,
         $radius:expr, $threading_policy:expr) => {
         let _dispatch = match $channels_type {
-            FastBlurChannels::Plane => fast_gaussian_impl::<$store_type, 1, $edge_mode>,
-            FastBlurChannels::Channels3 => fast_gaussian_impl::<$store_type, 3, $edge_mode>,
-            FastBlurChannels::Channels4 => fast_gaussian_impl::<$store_type, 4, $edge_mode>,
+            FastBlurChannels::Plane => fast_gaussian_impl::<$store_type, 1>,
+            FastBlurChannels::Channels3 => fast_gaussian_impl::<$store_type, 3>,
+            FastBlurChannels::Channels4 => fast_gaussian_impl::<$store_type, 4>,
         };
-        _dispatch($bytes, $stride, $width, $height, $radius, $threading_policy);
+        _dispatch(
+            $bytes,
+            $stride,
+            $width,
+            $height,
+            $radius,
+            $threading_policy,
+            $edge_mode,
+        );
     };
 }
 
@@ -112,13 +120,14 @@ macro_rules! impl_generic_call_plane_count {
     ($store_type:ty, $channels_type:expr, $edge_mode:expr,
         $bytes:expr, $stride:expr, $width:expr, $height:expr,
         $radius:expr, $threading_policy:expr) => {
-        fast_gaussian_impl::<$store_type, $channels_type, $edge_mode>(
+        fast_gaussian_impl::<$store_type, $channels_type>(
             $bytes,
             $stride,
             $width,
             $height,
             $radius,
             $threading_policy,
+            $edge_mode,
         );
     };
 }
@@ -127,63 +136,17 @@ macro_rules! impl_margin_call {
     ($store_type:ty, $channels_type:expr, $edge_mode:expr,
         $bytes:expr, $stride:expr, $width:expr, $height:expr,
         $radius:expr, $threading_policy:expr) => {
-        match $edge_mode {
-            EdgeMode::Clamp => {
-                impl_generic_call!(
-                    $store_type,
-                    $channels_type,
-                    { EdgeMode::Clamp as usize },
-                    $bytes,
-                    $stride,
-                    $width,
-                    $height,
-                    $radius,
-                    $threading_policy
-                );
-            }
-            EdgeMode::KernelClip => {
-                panic!("Kernel clip is supported only in gaussian")
-            }
-            EdgeMode::Wrap => {
-                impl_generic_call!(
-                    $store_type,
-                    $channels_type,
-                    { EdgeMode::Wrap as usize },
-                    $bytes,
-                    $stride,
-                    $width,
-                    $height,
-                    $radius,
-                    $threading_policy
-                );
-            }
-            EdgeMode::Reflect => {
-                impl_generic_call!(
-                    $store_type,
-                    $channels_type,
-                    { EdgeMode::Reflect as usize },
-                    $bytes,
-                    $stride,
-                    $width,
-                    $height,
-                    $radius,
-                    $threading_policy
-                );
-            }
-            EdgeMode::Reflect101 => {
-                impl_generic_call!(
-                    $store_type,
-                    $channels_type,
-                    { EdgeMode::Reflect101 as usize },
-                    $bytes,
-                    $stride,
-                    $width,
-                    $height,
-                    $radius,
-                    $threading_policy
-                );
-            }
-        }
+        impl_generic_call!(
+            $store_type,
+            $channels_type,
+            $edge_mode,
+            $bytes,
+            $stride,
+            $width,
+            $height,
+            $radius,
+            $threading_policy
+        );
     };
 }
 
@@ -191,63 +154,17 @@ macro_rules! impl_margin_call_plane {
     ($store_type:ty, $channels_type:expr, $edge_mode:expr,
         $bytes:expr, $stride:expr, $width:expr, $height:expr,
         $radius:expr, $threading_policy:expr) => {
-        match $edge_mode {
-            EdgeMode::Clamp => {
-                impl_generic_call_plane_count!(
-                    $store_type,
-                    $channels_type,
-                    { EdgeMode::Clamp as usize },
-                    $bytes,
-                    $stride,
-                    $width,
-                    $height,
-                    $radius,
-                    $threading_policy
-                );
-            }
-            EdgeMode::KernelClip => {
-                panic!("Kernel clip is supported only in gaussian")
-            }
-            EdgeMode::Wrap => {
-                impl_generic_call_plane_count!(
-                    $store_type,
-                    $channels_type,
-                    { EdgeMode::Wrap as usize },
-                    $bytes,
-                    $stride,
-                    $width,
-                    $height,
-                    $radius,
-                    $threading_policy
-                );
-            }
-            EdgeMode::Reflect => {
-                impl_generic_call_plane_count!(
-                    $store_type,
-                    $channels_type,
-                    { EdgeMode::Reflect as usize },
-                    $bytes,
-                    $stride,
-                    $width,
-                    $height,
-                    $radius,
-                    $threading_policy
-                );
-            }
-            EdgeMode::Reflect101 => {
-                impl_generic_call_plane_count!(
-                    $store_type,
-                    $channels_type,
-                    { EdgeMode::Reflect101 as usize },
-                    $bytes,
-                    $stride,
-                    $width,
-                    $height,
-                    $radius,
-                    $threading_policy
-                );
-            }
-        }
+        impl_generic_call_plane_count!(
+            $store_type,
+            $channels_type,
+            $edge_mode,
+            $bytes,
+            $stride,
+            $width,
+            $height,
+            $radius,
+            $threading_policy
+        );
     };
 }
 
@@ -289,13 +206,7 @@ impl InitialValue for half::f16 {
 /// `T` - type of buffer
 /// `J` - accumulator type
 /// `M` - multiplication type, when weight will be applied this type will be used also
-fn fast_gaussian_vertical_pass<
-    T,
-    J,
-    M,
-    const CHANNELS_CONFIGURATION: usize,
-    const EDGE_MODE: usize,
->(
+fn fast_gaussian_vertical_pass<T, J, M, const CHANNELS_CONFIGURATION: usize>(
     bytes: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -303,6 +214,7 @@ fn fast_gaussian_vertical_pass<
     radius: u32,
     start: u32,
     end: u32,
+    edge_mode: EdgeMode,
 ) where
     T: std::ops::AddAssign
         + 'static
@@ -324,7 +236,6 @@ fn fast_gaussian_vertical_pass<
     M: Copy + FromPrimitive + std::ops::Mul<Output = M> + AsPrimitive<T> + Float + ToStorage<T>,
     i32: AsPrimitive<J>,
 {
-    let edge_mode: EdgeMode = EDGE_MODE.into();
     let mut buffer_r: [J; 1024] = [0i32.as_(); 1024];
     let mut buffer_g: [J; 1024] = [0i32.as_(); 1024];
     let mut buffer_b: [J; 1024] = [0i32.as_(); 1024];
@@ -389,7 +300,7 @@ fn fast_gaussian_vertical_pass<
             }
 
             let next_row_y =
-                clamp_edge!(edge_mode, y + radius_64, 0, height_wide - 1) * (stride as usize);
+                clamp_edge!(edge_mode, y + radius_64, 0i64, height_wide - 1) * (stride as usize);
             let next_row_x = (x * CHANNELS_CONFIGURATION as u32) as usize;
 
             let px_idx = next_row_y + next_row_x;
@@ -415,13 +326,7 @@ fn fast_gaussian_vertical_pass<
 /// `T` - type of buffer
 /// `J` - accumulator type
 /// `M` - multiplication type, when weight will be applied this type will be used also
-fn fast_gaussian_horizontal_pass<
-    T,
-    J,
-    M,
-    const CHANNELS_CONFIGURATION: usize,
-    const EDGE_MODE: usize,
->(
+fn fast_gaussian_horizontal_pass<T, J, M, const CHANNELS_CONFIGURATION: usize>(
     bytes: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -429,6 +334,7 @@ fn fast_gaussian_horizontal_pass<
     radius: u32,
     start: u32,
     end: u32,
+    edge_mode: EdgeMode,
 ) where
     T: std::ops::AddAssign
         + 'static
@@ -450,7 +356,6 @@ fn fast_gaussian_horizontal_pass<
     M: Copy + FromPrimitive + std::ops::Mul<Output = M> + AsPrimitive<T> + Float + ToStorage<T>,
     i32: AsPrimitive<J>,
 {
-    let edge_mode: EdgeMode = EDGE_MODE.into();
     let mut buffer_r: [J; 1024] = [0i32.as_(); 1024];
     let mut buffer_g: [J; 1024] = [0i32.as_(); 1024];
     let mut buffer_b: [J; 1024] = [0i32.as_(); 1024];
@@ -539,7 +444,7 @@ fn fast_gaussian_horizontal_pass<
 }
 
 trait FastGaussianDispatchProvider<T> {
-    fn get_vertical<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>(
+    fn get_vertical<const CHANNEL_CONFIGURATION: usize>(
         radius: u32,
     ) -> fn(
         bytes: &UnsafeSlice<T>,
@@ -549,56 +454,65 @@ trait FastGaussianDispatchProvider<T> {
         radius: u32,
         start: u32,
         end: u32,
+        EdgeMode,
     );
-    fn get_horizontal<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>(
+    fn get_horizontal<const CHANNEL_CONFIGURATION: usize>(
         radius: u32,
-    ) -> fn(&UnsafeSlice<T>, u32, u32, u32, u32, u32, u32);
+    ) -> fn(&UnsafeSlice<T>, u32, u32, u32, u32, u32, u32, EdgeMode);
 }
 
 impl FastGaussianDispatchProvider<u16> for u16 {
-    fn get_vertical<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>(
+    fn get_vertical<const CHANNEL_CONFIGURATION: usize>(
         radius: u32,
-    ) -> fn(&UnsafeSlice<u16>, u32, u32, u32, u32, u32, u32) {
+    ) -> fn(&UnsafeSlice<u16>, u32, u32, u32, u32, u32, u32, EdgeMode) {
         if BASE_RADIUS_I64_CUTOFF > radius {
-            fast_gaussian_vertical_pass::<u16, i32, f32, CHANNEL_CONFIGURATION, EDGE_MODE>
+            fast_gaussian_vertical_pass::<u16, i32, f32, CHANNEL_CONFIGURATION>
         } else {
-            fast_gaussian_vertical_pass::<u16, i64, f64, CHANNEL_CONFIGURATION, EDGE_MODE>
+            fast_gaussian_vertical_pass::<u16, i64, f64, CHANNEL_CONFIGURATION>
         }
     }
 
-    fn get_horizontal<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>(
+    fn get_horizontal<const CHANNEL_CONFIGURATION: usize>(
         radius: u32,
-    ) -> fn(&UnsafeSlice<u16>, u32, u32, u32, u32, u32, u32) {
+    ) -> fn(&UnsafeSlice<u16>, u32, u32, u32, u32, u32, u32, EdgeMode) {
         if BASE_RADIUS_I64_CUTOFF > radius {
-            fast_gaussian_horizontal_pass::<u16, i32, f32, CHANNEL_CONFIGURATION, EDGE_MODE>
+            fast_gaussian_horizontal_pass::<u16, i32, f32, CHANNEL_CONFIGURATION>
         } else {
-            fast_gaussian_horizontal_pass::<u16, i64, f64, CHANNEL_CONFIGURATION, EDGE_MODE>
+            fast_gaussian_horizontal_pass::<u16, i64, f64, CHANNEL_CONFIGURATION>
         }
     }
 }
 
 impl FastGaussianDispatchProvider<u8> for u8 {
-    fn get_horizontal<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>(
+    fn get_horizontal<const CHANNEL_CONFIGURATION: usize>(
         radius: u32,
-    ) -> fn(&UnsafeSlice<u8>, u32, u32, u32, u32, u32, u32) {
-        let mut _dispatcher_horizontal: fn(&UnsafeSlice<u8>, u32, u32, u32, u32, u32, u32) =
-            if BASE_RADIUS_I64_CUTOFF > radius {
-                fast_gaussian_horizontal_pass::<u8, i32, f32, CHANNEL_CONFIGURATION, EDGE_MODE>
-            } else {
-                fast_gaussian_horizontal_pass::<u8, i64, f64, CHANNEL_CONFIGURATION, EDGE_MODE>
-            };
+    ) -> fn(&UnsafeSlice<u8>, u32, u32, u32, u32, u32, u32, EdgeMode) {
+        let mut _dispatcher_horizontal: fn(
+            &UnsafeSlice<u8>,
+            u32,
+            u32,
+            u32,
+            u32,
+            u32,
+            u32,
+            EdgeMode,
+        ) = if BASE_RADIUS_I64_CUTOFF > radius {
+            fast_gaussian_horizontal_pass::<u8, i32, f32, CHANNEL_CONFIGURATION>
+        } else {
+            fast_gaussian_horizontal_pass::<u8, i64, f64, CHANNEL_CONFIGURATION>
+        };
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             if BASE_RADIUS_I64_CUTOFF > radius {
                 _dispatcher_horizontal =
-                    fast_gaussian_horizontal_pass_neon_u8::<u8, CHANNEL_CONFIGURATION, EDGE_MODE>;
+                    fast_gaussian_horizontal_pass_neon_u8::<u8, CHANNEL_CONFIGURATION>;
             }
         }
         #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
         {
             if BASE_RADIUS_I64_CUTOFF > radius {
                 _dispatcher_horizontal =
-                    fast_gaussian_horizontal_pass_wasm_u8::<u8, CHANNEL_CONFIGURATION, EDGE_MODE>;
+                    fast_gaussian_horizontal_pass_wasm_u8::<u8, CHANNEL_CONFIGURATION>;
             }
         }
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
@@ -606,15 +520,15 @@ impl FastGaussianDispatchProvider<u8> for u8 {
             let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
             if _is_sse_available && BASE_RADIUS_I64_CUTOFF > radius {
                 _dispatcher_horizontal =
-                    fast_gaussian_horizontal_pass_sse_u8::<u8, CHANNEL_CONFIGURATION, EDGE_MODE>;
+                    fast_gaussian_horizontal_pass_sse_u8::<u8, CHANNEL_CONFIGURATION>;
             }
         }
         _dispatcher_horizontal
     }
 
-    fn get_vertical<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>(
+    fn get_vertical<const CHANNEL_CONFIGURATION: usize>(
         radius: u32,
-    ) -> fn(&UnsafeSlice<u8>, u32, u32, u32, u32, u32, u32) {
+    ) -> fn(&UnsafeSlice<u8>, u32, u32, u32, u32, u32, u32, EdgeMode) {
         let mut _dispatcher_vertical: fn(
             bytes: &UnsafeSlice<u8>,
             stride: u32,
@@ -623,23 +537,24 @@ impl FastGaussianDispatchProvider<u8> for u8 {
             radius: u32,
             start: u32,
             end: u32,
+            EdgeMode,
         ) = if BASE_RADIUS_I64_CUTOFF > radius {
-            fast_gaussian_vertical_pass::<u8, i32, f32, CHANNEL_CONFIGURATION, EDGE_MODE>
+            fast_gaussian_vertical_pass::<u8, i32, f32, CHANNEL_CONFIGURATION>
         } else {
-            fast_gaussian_vertical_pass::<u8, i64, f64, CHANNEL_CONFIGURATION, EDGE_MODE>
+            fast_gaussian_vertical_pass::<u8, i64, f64, CHANNEL_CONFIGURATION>
         };
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             if BASE_RADIUS_I64_CUTOFF > radius {
                 _dispatcher_vertical =
-                    fast_gaussian_vertical_pass_neon_u8::<u8, CHANNEL_CONFIGURATION, EDGE_MODE>;
+                    fast_gaussian_vertical_pass_neon_u8::<u8, CHANNEL_CONFIGURATION>;
             }
         }
         #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
         {
             if BASE_RADIUS_I64_CUTOFF > radius {
                 _dispatcher_vertical =
-                    fast_gaussian_vertical_pass_wasm_u8::<u8, CHANNEL_CONFIGURATION, EDGE_MODE>;
+                    fast_gaussian_vertical_pass_wasm_u8::<u8, CHANNEL_CONFIGURATION>;
             }
         }
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
@@ -647,7 +562,7 @@ impl FastGaussianDispatchProvider<u8> for u8 {
             let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
             if _is_sse_available && BASE_RADIUS_I64_CUTOFF > radius {
                 _dispatcher_vertical =
-                    fast_gaussian_vertical_pass_sse_u8::<u8, CHANNEL_CONFIGURATION, EDGE_MODE>;
+                    fast_gaussian_vertical_pass_sse_u8::<u8, CHANNEL_CONFIGURATION>;
             }
         }
         _dispatcher_vertical
@@ -655,9 +570,9 @@ impl FastGaussianDispatchProvider<u8> for u8 {
 }
 
 impl FastGaussianDispatchProvider<f32> for f32 {
-    fn get_vertical<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>(
+    fn get_vertical<const CHANNEL_CONFIGURATION: usize>(
         radius: u32,
-    ) -> fn(&UnsafeSlice<f32>, u32, u32, u32, u32, u32, u32) {
+    ) -> fn(&UnsafeSlice<f32>, u32, u32, u32, u32, u32, u32, EdgeMode) {
         let mut _dispatcher_vertical: fn(
             bytes: &UnsafeSlice<f32>,
             stride: u32,
@@ -666,57 +581,66 @@ impl FastGaussianDispatchProvider<f32> for f32 {
             radius: u32,
             start: u32,
             end: u32,
+            EdgeMode,
         ) = if BASE_RADIUS_I64_CUTOFF > radius {
-            fast_gaussian_vertical_pass::<f32, f32, f32, CHANNEL_CONFIGURATION, EDGE_MODE>
+            fast_gaussian_vertical_pass::<f32, f32, f32, CHANNEL_CONFIGURATION>
         } else {
-            fast_gaussian_vertical_pass::<f32, f64, f64, CHANNEL_CONFIGURATION, EDGE_MODE>
+            fast_gaussian_vertical_pass::<f32, f64, f64, CHANNEL_CONFIGURATION>
         };
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
             let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
             if _is_sse_available {
                 _dispatcher_vertical =
-                    fast_gaussian_vertical_pass_sse_f32::<f32, CHANNEL_CONFIGURATION, EDGE_MODE>;
+                    fast_gaussian_vertical_pass_sse_f32::<f32, CHANNEL_CONFIGURATION>;
             }
         }
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             _dispatcher_vertical =
-                fast_gaussian_vertical_pass_neon_f32::<f32, CHANNEL_CONFIGURATION, EDGE_MODE>;
+                fast_gaussian_vertical_pass_neon_f32::<f32, CHANNEL_CONFIGURATION>;
         }
         _dispatcher_vertical
     }
 
-    fn get_horizontal<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>(
+    fn get_horizontal<const CHANNEL_CONFIGURATION: usize>(
         radius: u32,
-    ) -> fn(&UnsafeSlice<f32>, u32, u32, u32, u32, u32, u32) {
-        let mut _dispatcher_horizontal: fn(&UnsafeSlice<f32>, u32, u32, u32, u32, u32, u32) =
-            if BASE_RADIUS_I64_CUTOFF > radius {
-                fast_gaussian_horizontal_pass::<f32, f32, f32, CHANNEL_CONFIGURATION, EDGE_MODE>
-            } else {
-                fast_gaussian_horizontal_pass::<f32, f64, f64, CHANNEL_CONFIGURATION, EDGE_MODE>
-            };
+    ) -> fn(&UnsafeSlice<f32>, u32, u32, u32, u32, u32, u32, EdgeMode) {
+        let mut _dispatcher_horizontal: fn(
+            &UnsafeSlice<f32>,
+            u32,
+            u32,
+            u32,
+            u32,
+            u32,
+            u32,
+            EdgeMode,
+        ) = if BASE_RADIUS_I64_CUTOFF > radius {
+            fast_gaussian_horizontal_pass::<f32, f32, f32, CHANNEL_CONFIGURATION>
+        } else {
+            fast_gaussian_horizontal_pass::<f32, f64, f64, CHANNEL_CONFIGURATION>
+        };
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
             let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
             if _is_sse_available {
                 _dispatcher_horizontal =
-                    fast_gaussian_horizontal_pass_sse_f32::<f32, CHANNEL_CONFIGURATION, EDGE_MODE>;
+                    fast_gaussian_horizontal_pass_sse_f32::<f32, CHANNEL_CONFIGURATION>;
             }
         }
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             _dispatcher_horizontal =
-                fast_gaussian_horizontal_pass_neon_f32::<f32, CHANNEL_CONFIGURATION, EDGE_MODE>;
+                fast_gaussian_horizontal_pass_neon_f32::<f32, CHANNEL_CONFIGURATION>;
         }
         _dispatcher_horizontal
     }
 }
 
 impl FastGaussianDispatchProvider<f16> for f16 {
-    fn get_vertical<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>(
+    fn get_vertical<const CHANNEL_CONFIGURATION: usize>(
         radius: u32,
-    ) -> fn(&UnsafeSlice<f16>, u32, u32, u32, u32, u32, u32) {
+    ) -> fn(&UnsafeSlice<f16>, u32, u32, u32, u32, u32, u32, EdgeMode) {
         let mut _dispatcher_vertical: fn(
             bytes: &UnsafeSlice<f16>,
             stride: u32,
@@ -725,16 +649,17 @@ impl FastGaussianDispatchProvider<f16> for f16 {
             radius: u32,
             start: u32,
             end: u32,
+            EdgeMode,
         ) = if BASE_RADIUS_I64_CUTOFF > radius {
-            fast_gaussian_vertical_pass::<f16, f32, f32, CHANNEL_CONFIGURATION, EDGE_MODE>
+            fast_gaussian_vertical_pass::<f16, f32, f32, CHANNEL_CONFIGURATION>
         } else {
-            fast_gaussian_vertical_pass::<f16, f64, f64, CHANNEL_CONFIGURATION, EDGE_MODE>
+            fast_gaussian_vertical_pass::<f16, f64, f64, CHANNEL_CONFIGURATION>
         };
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             if is_aarch_f16c_supported() {
                 _dispatcher_vertical =
-                    fast_gaussian_vertical_pass_neon_f16::<f16, CHANNEL_CONFIGURATION, EDGE_MODE>;
+                    fast_gaussian_vertical_pass_neon_f16::<f16, CHANNEL_CONFIGURATION>;
             }
         }
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
@@ -743,26 +668,34 @@ impl FastGaussianDispatchProvider<f16> for f16 {
             let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
             if _is_sse_available && _is_f16c_available {
                 _dispatcher_vertical =
-                    fast_gaussian_vertical_pass_sse_f16::<f16, CHANNEL_CONFIGURATION, EDGE_MODE>;
+                    fast_gaussian_vertical_pass_sse_f16::<f16, CHANNEL_CONFIGURATION>;
             }
         }
         _dispatcher_vertical
     }
 
-    fn get_horizontal<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>(
+    fn get_horizontal<const CHANNEL_CONFIGURATION: usize>(
         radius: u32,
-    ) -> fn(&UnsafeSlice<f16>, u32, u32, u32, u32, u32, u32) {
-        let mut _dispatcher_horizontal: fn(&UnsafeSlice<f16>, u32, u32, u32, u32, u32, u32) =
-            if BASE_RADIUS_I64_CUTOFF > radius {
-                fast_gaussian_horizontal_pass::<f16, f32, f32, CHANNEL_CONFIGURATION, EDGE_MODE>
-            } else {
-                fast_gaussian_horizontal_pass::<f16, f64, f64, CHANNEL_CONFIGURATION, EDGE_MODE>
-            };
+    ) -> fn(&UnsafeSlice<f16>, u32, u32, u32, u32, u32, u32, EdgeMode) {
+        let mut _dispatcher_horizontal: fn(
+            &UnsafeSlice<f16>,
+            u32,
+            u32,
+            u32,
+            u32,
+            u32,
+            u32,
+            EdgeMode,
+        ) = if BASE_RADIUS_I64_CUTOFF > radius {
+            fast_gaussian_horizontal_pass::<f16, f32, f32, CHANNEL_CONFIGURATION>
+        } else {
+            fast_gaussian_horizontal_pass::<f16, f64, f64, CHANNEL_CONFIGURATION>
+        };
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             if is_aarch_f16c_supported() {
                 _dispatcher_horizontal =
-                    fast_gaussian_horizontal_pass_neon_f16::<f16, CHANNEL_CONFIGURATION, EDGE_MODE>;
+                    fast_gaussian_horizontal_pass_neon_f16::<f16, CHANNEL_CONFIGURATION>;
             }
         }
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
@@ -771,7 +704,7 @@ impl FastGaussianDispatchProvider<f16> for f16 {
             let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
             if _is_sse_available && _is_f16c_available {
                 _dispatcher_horizontal =
-                    fast_gaussian_horizontal_pass_sse_f16::<f16, CHANNEL_CONFIGURATION, EDGE_MODE>;
+                    fast_gaussian_horizontal_pass_sse_f16::<f16, CHANNEL_CONFIGURATION>;
             }
         }
         _dispatcher_horizontal
@@ -793,7 +726,6 @@ fn fast_gaussian_impl<
         + InitialValue
         + FastGaussianDispatchProvider<T>,
     const CHANNEL_CONFIGURATION: usize,
-    const EDGE_MODE: usize,
 >(
     bytes: &mut [T],
     stride: u32,
@@ -801,6 +733,7 @@ fn fast_gaussian_impl<
     height: u32,
     radius: u32,
     threading_policy: ThreadingPolicy,
+    edge_mode: EdgeMode,
 ) where
     f32: AsPrimitive<T> + ToStorage<T>,
     f64: AsPrimitive<T> + ToStorage<T>,
@@ -819,12 +752,31 @@ fn fast_gaussian_impl<
         radius: u32,
         start: u32,
         end: u32,
-    ) = T::get_vertical::<CHANNEL_CONFIGURATION, EDGE_MODE>(radius);
-    let mut _dispatcher_horizontal: fn(&UnsafeSlice<T>, u32, u32, u32, u32, u32, u32) =
-        T::get_horizontal::<CHANNEL_CONFIGURATION, EDGE_MODE>(radius);
+        EdgeMode,
+    ) = T::get_vertical::<CHANNEL_CONFIGURATION>(radius);
+    let mut _dispatcher_horizontal: fn(&UnsafeSlice<T>, u32, u32, u32, u32, u32, u32, EdgeMode) =
+        T::get_horizontal::<CHANNEL_CONFIGURATION>(radius);
     if thread_count == 1 {
-        _dispatcher_vertical(&unsafe_image, stride, width, height, radius, 0, width);
-        _dispatcher_horizontal(&unsafe_image, stride, width, height, radius, 0, height);
+        _dispatcher_vertical(
+            &unsafe_image,
+            stride,
+            width,
+            height,
+            radius,
+            0,
+            width,
+            edge_mode,
+        );
+        _dispatcher_horizontal(
+            &unsafe_image,
+            stride,
+            width,
+            height,
+            radius,
+            0,
+            height,
+            edge_mode,
+        );
     } else {
         pool.scope(|scope| {
             let segment_size = width / thread_count;
@@ -844,6 +796,7 @@ fn fast_gaussian_impl<
                         radius,
                         start_x,
                         end_x,
+                        edge_mode,
                     );
                 });
             }
@@ -866,6 +819,7 @@ fn fast_gaussian_impl<
                         radius,
                         start_y,
                         end_y,
+                        edge_mode,
                     );
                 });
             }

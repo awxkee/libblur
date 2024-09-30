@@ -34,11 +34,7 @@ use crate::reflect_index;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, reflect_101, EdgeMode};
 
-pub fn fast_gaussian_next_vertical_pass_neon_f16<
-    T,
-    const CHANNELS_COUNT: usize,
-    const EDGE_MODE: usize,
->(
+pub fn fast_gaussian_next_vertical_pass_neon_f16<T, const CHANNELS_COUNT: usize>(
     undef_bytes: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -46,9 +42,9 @@ pub fn fast_gaussian_next_vertical_pass_neon_f16<
     radius: u32,
     start: u32,
     end: u32,
+    edge_mode: EdgeMode,
 ) {
     unsafe {
-        let edge_mode: EdgeMode = EDGE_MODE.into();
         let bytes: &UnsafeSlice<'_, f16> = std::mem::transmute(undef_bytes);
         let mut buffer: [[f32; 4]; 1024] = [[0f32; 4]; 1024];
 
@@ -129,11 +125,7 @@ pub fn fast_gaussian_next_vertical_pass_neon_f16<
     }
 }
 
-pub fn fast_gaussian_next_horizontal_pass_neon_f16<
-    T,
-    const CHANNELS_COUNT: usize,
-    const EDGE_MODE: usize,
->(
+pub fn fast_gaussian_next_horizontal_pass_neon_f16<T, const CHANNELS_COUNT: usize>(
     undef_bytes: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -141,9 +133,9 @@ pub fn fast_gaussian_next_horizontal_pass_neon_f16<
     radius: u32,
     start: u32,
     end: u32,
+    edge_mode: EdgeMode,
 ) {
     unsafe {
-        let edge_mode: EdgeMode = EDGE_MODE.into();
         let mut buffer: [[f32; 4]; 1024] = [[0f32; 4]; 1024];
         let bytes: &UnsafeSlice<'_, f16> = std::mem::transmute(undef_bytes);
 

@@ -31,10 +31,7 @@ use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, reflect_101, reflect_index, EdgeMode};
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn gaussian_blur_vertical_pass_c_approx<
-    const CHANNEL_CONFIGURATION: usize,
-    const EDGE_MODE: usize,
->(
+pub(crate) fn gaussian_blur_vertical_pass_c_approx<const CHANNEL_CONFIGURATION: usize>(
     src: &[u8],
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<u8>,
@@ -45,13 +42,14 @@ pub(crate) fn gaussian_blur_vertical_pass_c_approx<
     kernel: &[i16],
     start_y: u32,
     end_y: u32,
+    edge_mode: EdgeMode,
 ) {
     let total_length = width as usize * CHANNEL_CONFIGURATION;
     for y in start_y..end_y {
         let mut _cx = 0usize;
 
         while _cx + 32 < total_length {
-            gaussian_vertical_row_ap::<32, EDGE_MODE>(
+            gaussian_vertical_row_ap::<32>(
                 src,
                 src_stride,
                 unsafe_dst,
@@ -62,12 +60,13 @@ pub(crate) fn gaussian_blur_vertical_pass_c_approx<
                 kernel,
                 _cx as u32,
                 y,
+                edge_mode,
             );
             _cx += 32;
         }
 
         while _cx + 16 < total_length {
-            gaussian_vertical_row_ap::<16, EDGE_MODE>(
+            gaussian_vertical_row_ap::<16>(
                 src,
                 src_stride,
                 unsafe_dst,
@@ -78,12 +77,13 @@ pub(crate) fn gaussian_blur_vertical_pass_c_approx<
                 kernel,
                 _cx as u32,
                 y,
+                edge_mode,
             );
             _cx += 16;
         }
 
         while _cx + 8 < total_length {
-            gaussian_vertical_row_ap::<8, EDGE_MODE>(
+            gaussian_vertical_row_ap::<8>(
                 src,
                 src_stride,
                 unsafe_dst,
@@ -94,12 +94,13 @@ pub(crate) fn gaussian_blur_vertical_pass_c_approx<
                 kernel,
                 _cx as u32,
                 y,
+                edge_mode,
             );
             _cx += 8;
         }
 
         while _cx + 4 < total_length {
-            gaussian_vertical_row_ap::<4, EDGE_MODE>(
+            gaussian_vertical_row_ap::<4>(
                 src,
                 src_stride,
                 unsafe_dst,
@@ -110,12 +111,13 @@ pub(crate) fn gaussian_blur_vertical_pass_c_approx<
                 kernel,
                 _cx as u32,
                 y,
+                edge_mode,
             );
             _cx += 4;
         }
 
         while _cx < total_length {
-            gaussian_vertical_row_ap::<1, EDGE_MODE>(
+            gaussian_vertical_row_ap::<1>(
                 src,
                 src_stride,
                 unsafe_dst,
@@ -126,6 +128,7 @@ pub(crate) fn gaussian_blur_vertical_pass_c_approx<
                 kernel,
                 _cx as u32,
                 y,
+                edge_mode,
             );
             _cx += 1;
         }
@@ -134,7 +137,7 @@ pub(crate) fn gaussian_blur_vertical_pass_c_approx<
 
 #[inline]
 #[allow(clippy::too_many_arguments)]
-fn gaussian_vertical_row_ap<const ROW_SIZE: usize, const EDGE_MODE: usize>(
+fn gaussian_vertical_row_ap<const ROW_SIZE: usize>(
     src: &[u8],
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<u8>,
@@ -145,8 +148,8 @@ fn gaussian_vertical_row_ap<const ROW_SIZE: usize, const EDGE_MODE: usize>(
     kernel: &[i16],
     x: u32,
     y: u32,
+    edge_mode: EdgeMode,
 ) {
-    let edge_mode: EdgeMode = EDGE_MODE.into();
     let half_kernel = (kernel_size / 2) as i32;
     let mut weights: [i32; ROW_SIZE] = [ROUNDING_APPROX; ROW_SIZE];
     for r in -half_kernel..=half_kernel {

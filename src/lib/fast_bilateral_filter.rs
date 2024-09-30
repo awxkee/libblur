@@ -304,10 +304,6 @@ where
     }
 }
 
-fn get_gaussian_kernel_size(sigma: f32) -> usize {
-    2 * (3.0 * sigma).ceil() as usize + 1
-}
-
 #[allow(clippy::manual_clamp)]
 fn fast_bilateral_filter_impl<
     T: Copy
@@ -329,6 +325,7 @@ fn fast_bilateral_filter_impl<
     dst: &mut [T],
     width: u32,
     height: u32,
+    kernel_size: u32,
     spatial_sigma: f32,
     range_sigma: f32,
 ) where
@@ -386,9 +383,7 @@ fn fast_bilateral_filter_impl<
 
     let preferred_sigma = (spatial_sigma * spatial_sigma + range_sigma * range_sigma).sqrt();
 
-    let vl = get_gaussian_kernel_size(preferred_sigma).max(3);
-
-    let gaussian_kernel = get_gaussian_kernel_1d(vl as u32, preferred_sigma);
+    let gaussian_kernel = get_gaussian_kernel_1d(kernel_size, preferred_sigma);
     let half_kernel = gaussian_kernel.len() / 2;
     let kernel_size = gaussian_kernel.len();
 
@@ -587,9 +582,13 @@ fn fast_bilateral_filter_plane_impl<V: Copy + Default + 'static + BilinearWorkin
     dst: &mut [V],
     width: u32,
     height: u32,
+    kernel_size: u32,
     spatial_sigma: f32,
     range_sigma: f32,
 ) {
+    if kernel_size & 1 == 0 {
+        panic!("kernel_size must not be odd");
+    }
     if spatial_sigma <= 0. || range_sigma <= 0.0 {
         panic!("Spatial sigma and range sigma must be more than 0");
     }
@@ -604,6 +603,7 @@ fn fast_bilateral_filter_plane_impl<V: Copy + Default + 'static + BilinearWorkin
         &mut dst_chan0,
         width,
         height,
+        kernel_size,
         spatial_sigma,
         range_sigma,
     );
@@ -621,9 +621,13 @@ pub(crate) fn fast_bilateral_filter_gray_alpha_impl<
     dst: &mut [V],
     width: u32,
     height: u32,
+    kernel_size: u32,
     spatial_sigma: f32,
     range_sigma: f32,
 ) {
+    if kernel_size & 1 == 0 {
+        panic!("kernel size must be odd");
+    }
     if spatial_sigma <= 0. || range_sigma <= 0.0 {
         panic!("Spatial sigma and range sigma must be more than 0");
     }
@@ -647,6 +651,7 @@ pub(crate) fn fast_bilateral_filter_gray_alpha_impl<
                 &mut dst_chan0,
                 width,
                 height,
+                kernel_size,
                 spatial_sigma,
                 range_sigma,
             );
@@ -657,6 +662,7 @@ pub(crate) fn fast_bilateral_filter_gray_alpha_impl<
                 &mut dst_chan1,
                 width,
                 height,
+                kernel_size,
                 spatial_sigma,
                 range_sigma,
             );
@@ -678,9 +684,13 @@ fn fast_bilateral_filter_rgb_impl<
     dst: &mut [V],
     width: u32,
     height: u32,
+    kernel_size: u32,
     spatial_sigma: f32,
     range_sigma: f32,
 ) {
+    if kernel_size & 1 == 0 {
+        panic!("kernel_size must not be odd");
+    }
     if spatial_sigma <= 0. || range_sigma <= 0.0 {
         panic!("Spatial sigma and range sigma must be more than 0");
     }
@@ -708,6 +718,7 @@ fn fast_bilateral_filter_rgb_impl<
                 &mut dst_chan0,
                 width,
                 height,
+                kernel_size,
                 spatial_sigma,
                 range_sigma,
             );
@@ -718,6 +729,7 @@ fn fast_bilateral_filter_rgb_impl<
                 &mut dst_chan1,
                 width,
                 height,
+                kernel_size,
                 spatial_sigma,
                 range_sigma,
             );
@@ -728,6 +740,7 @@ fn fast_bilateral_filter_rgb_impl<
                 &mut dst_chan2,
                 width,
                 height,
+                kernel_size,
                 spatial_sigma,
                 range_sigma,
             );
@@ -750,9 +763,13 @@ fn fast_bilateral_filter_rgba_impl<
     dst: &mut [V],
     width: u32,
     height: u32,
+    kernel_size: u32,
     spatial_sigma: f32,
     range_sigma: f32,
 ) {
+    if kernel_size & 1 == 0 {
+        panic!("kernel_size must not be odd");
+    }
     if spatial_sigma <= 0. || range_sigma <= 0.0 {
         panic!("Spatial sigma and range sigma must be more than 0");
     }
@@ -784,6 +801,7 @@ fn fast_bilateral_filter_rgba_impl<
                 &mut dst_chan0,
                 width,
                 height,
+                kernel_size,
                 spatial_sigma,
                 range_sigma,
             );
@@ -794,6 +812,7 @@ fn fast_bilateral_filter_rgba_impl<
                 &mut dst_chan1,
                 width,
                 height,
+                kernel_size,
                 spatial_sigma,
                 range_sigma,
             );
@@ -804,6 +823,7 @@ fn fast_bilateral_filter_rgba_impl<
                 &mut dst_chan2,
                 width,
                 height,
+                kernel_size,
                 spatial_sigma,
                 range_sigma,
             );
@@ -814,6 +834,7 @@ fn fast_bilateral_filter_rgba_impl<
                 &mut dst_chan3,
                 width,
                 height,
+                kernel_size,
                 spatial_sigma,
                 range_sigma,
             );
@@ -842,6 +863,7 @@ fn fast_bilateral_filter_rgba_impl<
 /// * `dst`: Destination image
 /// * `width`: Width of the image
 /// * `height`: Height of the image
+/// * `kernel_size`: Convolution kernel size, must be odd
 /// * `spatial_sigma`: Spatial sigma
 /// * `range_sigma`: Range sigma
 /// * `channels`: See [FastBlurChannels] for more info
@@ -851,19 +873,47 @@ pub fn fast_bilateral_filter(
     dst: &mut [u8],
     width: u32,
     height: u32,
+    kernel_size: u32,
     spatial_sigma: f32,
     range_sigma: f32,
     channels: FastBlurChannels,
 ) {
+    if kernel_size & 1 == 0 {
+        panic!("kernel_size must be odd");
+    }
     match channels {
         FastBlurChannels::Plane => {
-            fast_bilateral_filter_plane_impl(img, dst, width, height, spatial_sigma, range_sigma);
+            fast_bilateral_filter_plane_impl(
+                img,
+                dst,
+                width,
+                height,
+                kernel_size,
+                spatial_sigma,
+                range_sigma,
+            );
         }
         FastBlurChannels::Channels3 => {
-            fast_bilateral_filter_rgb_impl(img, dst, width, height, spatial_sigma, range_sigma);
+            fast_bilateral_filter_rgb_impl(
+                img,
+                dst,
+                width,
+                height,
+                kernel_size,
+                spatial_sigma,
+                range_sigma,
+            );
         }
         FastBlurChannels::Channels4 => {
-            fast_bilateral_filter_rgba_impl(img, dst, width, height, spatial_sigma, range_sigma);
+            fast_bilateral_filter_rgba_impl(
+                img,
+                dst,
+                width,
+                height,
+                kernel_size,
+                spatial_sigma,
+                range_sigma,
+            );
         }
     }
 }
@@ -880,6 +930,7 @@ pub fn fast_bilateral_filter(
 /// * `dst`: Destination image
 /// * `width`: Width of the image
 /// * `height`: Height of the image
+/// * `kernel_size`: Convolution kernel size, must be odd
 /// * `spatial_sigma`: Spatial sigma
 /// * `range_sigma`: Range sigma
 /// * `channels`: See [FastBlurChannels] for more info
@@ -889,19 +940,47 @@ pub fn fast_bilateral_filter_u16(
     dst: &mut [u16],
     width: u32,
     height: u32,
+    kernel_size: u32,
     spatial_sigma: f32,
     range_sigma: f32,
     channels: FastBlurChannels,
 ) {
+    if kernel_size & 1 == 0 {
+        panic!("kernel_size must be odd");
+    }
     match channels {
         FastBlurChannels::Plane => {
-            fast_bilateral_filter_plane_impl(img, dst, width, height, spatial_sigma, range_sigma);
+            fast_bilateral_filter_plane_impl(
+                img,
+                dst,
+                width,
+                height,
+                kernel_size,
+                spatial_sigma,
+                range_sigma,
+            );
         }
         FastBlurChannels::Channels3 => {
-            fast_bilateral_filter_rgb_impl(img, dst, width, height, spatial_sigma, range_sigma);
+            fast_bilateral_filter_rgb_impl(
+                img,
+                dst,
+                width,
+                height,
+                kernel_size,
+                spatial_sigma,
+                range_sigma,
+            );
         }
         FastBlurChannels::Channels4 => {
-            fast_bilateral_filter_rgba_impl(img, dst, width, height, spatial_sigma, range_sigma);
+            fast_bilateral_filter_rgba_impl(
+                img,
+                dst,
+                width,
+                height,
+                kernel_size,
+                spatial_sigma,
+                range_sigma,
+            );
         }
     }
 }
@@ -918,6 +997,7 @@ pub fn fast_bilateral_filter_u16(
 /// * `dst`: Destination image
 /// * `width`: Width of the image
 /// * `height`: Height of the image
+/// * `kernel_size`: Convolution kernel size, must be odd
 /// * `spatial_sigma`: Spatial sigma
 /// * `range_sigma`: Range sigma
 /// * `channels`: See [FastBlurChannels] for more info
@@ -927,19 +1007,47 @@ pub fn fast_bilateral_filter_f32(
     dst: &mut [f32],
     width: u32,
     height: u32,
+    kernel_size: u32,
     spatial_sigma: f32,
     range_sigma: f32,
     channels: FastBlurChannels,
 ) {
+    if kernel_size & 1 == 0 {
+        panic!("kernel_size must be odd");
+    }
     match channels {
         FastBlurChannels::Plane => {
-            fast_bilateral_filter_plane_impl(img, dst, width, height, spatial_sigma, range_sigma);
+            fast_bilateral_filter_plane_impl(
+                img,
+                dst,
+                width,
+                height,
+                kernel_size,
+                spatial_sigma,
+                range_sigma,
+            );
         }
         FastBlurChannels::Channels3 => {
-            fast_bilateral_filter_rgb_impl(img, dst, width, height, spatial_sigma, range_sigma);
+            fast_bilateral_filter_rgb_impl(
+                img,
+                dst,
+                width,
+                height,
+                kernel_size,
+                spatial_sigma,
+                range_sigma,
+            );
         }
         FastBlurChannels::Channels4 => {
-            fast_bilateral_filter_rgba_impl(img, dst, width, height, spatial_sigma, range_sigma);
+            fast_bilateral_filter_rgba_impl(
+                img,
+                dst,
+                width,
+                height,
+                kernel_size,
+                spatial_sigma,
+                range_sigma,
+            );
         }
     }
 }

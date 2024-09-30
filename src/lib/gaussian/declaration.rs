@@ -61,7 +61,7 @@ use crate::{get_sigma_size, ThreadingPolicy};
 
 trait GaussianHorizontalDispatch<T> {
     #[allow(clippy::type_complexity)]
-    fn get_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>() -> fn(
+    fn get_pass<const CHANNEL_CONFIGURATION: usize>() -> fn(
         src: &[T],
         src_stride: u32,
         unsafe_dst: &UnsafeSlice<T>,
@@ -71,29 +71,30 @@ trait GaussianHorizontalDispatch<T> {
         kernel: &[f32],
         start_y: u32,
         end_y: u32,
+        edge_mode: EdgeMode,
     );
 }
 
 impl GaussianHorizontalDispatch<u16> for u16 {
     #[allow(clippy::type_complexity)]
-    fn get_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>(
-    ) -> fn(&[u16], u32, &UnsafeSlice<u16>, u32, u32, usize, &[f32], u32, u32) {
-        gaussian_blur_horizontal_pass_impl::<u16, CHANNEL_CONFIGURATION, EDGE_MODE>
+    fn get_pass<const CHANNEL_CONFIGURATION: usize>(
+    ) -> fn(&[u16], u32, &UnsafeSlice<u16>, u32, u32, usize, &[f32], u32, u32, EdgeMode) {
+        gaussian_blur_horizontal_pass_impl::<u16, CHANNEL_CONFIGURATION>
     }
 }
 
 impl GaussianHorizontalDispatch<f16> for f16 {
     #[allow(clippy::type_complexity)]
-    fn get_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>(
-    ) -> fn(&[f16], u32, &UnsafeSlice<f16>, u32, u32, usize, &[f32], u32, u32) {
-        gaussian_blur_horizontal_pass_impl::<f16, CHANNEL_CONFIGURATION, EDGE_MODE>
+    fn get_pass<const CHANNEL_CONFIGURATION: usize>(
+    ) -> fn(&[f16], u32, &UnsafeSlice<f16>, u32, u32, usize, &[f32], u32, u32, EdgeMode) {
+        gaussian_blur_horizontal_pass_impl::<f16, CHANNEL_CONFIGURATION>
     }
 }
 
 impl GaussianHorizontalDispatch<u8> for u8 {
     #[allow(clippy::type_complexity)]
-    fn get_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>(
-    ) -> fn(&[u8], u32, &UnsafeSlice<u8>, u32, u32, usize, &[f32], u32, u32) {
+    fn get_pass<const CHANNEL_CONFIGURATION: usize>(
+    ) -> fn(&[u8], u32, &UnsafeSlice<u8>, u32, u32, usize, &[f32], u32, u32, EdgeMode) {
         let mut _dispatcher: fn(
             src: &[u8],
             src_stride: u32,
@@ -104,9 +105,9 @@ impl GaussianHorizontalDispatch<u8> for u8 {
             kernel: &[f32],
             start_y: u32,
             end_y: u32,
-        ) = gaussian_blur_horizontal_pass_impl::<u8, CHANNEL_CONFIGURATION, EDGE_MODE>;
-        let edge_mode: EdgeMode = EDGE_MODE.into();
-        if CHANNEL_CONFIGURATION >= 3 && edge_mode == EdgeMode::Clamp {
+            EdgeMode,
+        ) = gaussian_blur_horizontal_pass_impl::<u8, CHANNEL_CONFIGURATION>;
+        if CHANNEL_CONFIGURATION >= 3 {
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
                 let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
@@ -132,7 +133,7 @@ impl GaussianHorizontalDispatch<u8> for u8 {
                 _dispatcher = gaussian_blur_horizontal_pass_neon::<u8, CHANNEL_CONFIGURATION>;
             }
         }
-        if edge_mode == EdgeMode::Clamp && CHANNEL_CONFIGURATION == 1 {
+        if CHANNEL_CONFIGURATION == 1 {
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             {
                 _dispatcher = gaussian_horiz_one_chan_u8::<u8>;
@@ -151,8 +152,8 @@ impl GaussianHorizontalDispatch<u8> for u8 {
 
 impl GaussianHorizontalDispatch<f32> for f32 {
     #[allow(clippy::type_complexity)]
-    fn get_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>(
-    ) -> fn(&[f32], u32, &UnsafeSlice<f32>, u32, u32, usize, &[f32], u32, u32) {
+    fn get_pass<const CHANNEL_CONFIGURATION: usize>(
+    ) -> fn(&[f32], u32, &UnsafeSlice<f32>, u32, u32, usize, &[f32], u32, u32, EdgeMode) {
         let mut _dispatcher: fn(
             src: &[f32],
             src_stride: u32,
@@ -163,9 +164,9 @@ impl GaussianHorizontalDispatch<f32> for f32 {
             kernel: &[f32],
             start_y: u32,
             end_y: u32,
-        ) = gaussian_blur_horizontal_pass_impl::<f32, CHANNEL_CONFIGURATION, EDGE_MODE>;
-        let edge_mode: EdgeMode = EDGE_MODE.into();
-        if edge_mode == EdgeMode::Clamp && CHANNEL_CONFIGURATION == 1 {
+            edge_mode: EdgeMode,
+        ) = gaussian_blur_horizontal_pass_impl::<f32, CHANNEL_CONFIGURATION>;
+        if CHANNEL_CONFIGURATION == 1 {
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             {
                 _dispatcher = gaussian_horiz_one_chan_f32::<f32>;
@@ -178,7 +179,7 @@ impl GaussianHorizontalDispatch<f32> for f32 {
                     _dispatcher = gaussian_horiz_one_chan_f32::<f32>;
                 }
             }
-        } else if edge_mode == EdgeMode::Clamp && CHANNEL_CONFIGURATION >= 3 {
+        } else if CHANNEL_CONFIGURATION >= 3 {
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             {
                 _dispatcher = gaussian_horiz_t_f_chan_f32::<f32, CHANNEL_CONFIGURATION>;
@@ -215,7 +216,6 @@ fn gaussian_blur_horizontal_pass<
         + AsPrimitive<f32>
         + GaussianHorizontalDispatch<T>,
     const CHANNEL_CONFIGURATION: usize,
-    const EDGE_MODE: usize,
 >(
     src: &[T],
     src_stride: u32,
@@ -227,6 +227,7 @@ fn gaussian_blur_horizontal_pass<
     kernel: &[f32],
     thread_pool: &Option<ThreadPool>,
     thread_count: u32,
+    edge_mode: EdgeMode,
 ) where
     f32: AsPrimitive<T> + ToStorage<T>,
 {
@@ -240,7 +241,8 @@ fn gaussian_blur_horizontal_pass<
         kernel: &[f32],
         start_y: u32,
         end_y: u32,
-    ) = T::get_pass::<CHANNEL_CONFIGURATION, EDGE_MODE>();
+        EdgeMode,
+    ) = T::get_pass::<CHANNEL_CONFIGURATION>();
     let unsafe_dst = UnsafeSlice::new(dst);
     if let Some(thread_pool) = thread_pool {
         thread_pool.scope(|scope| {
@@ -263,6 +265,7 @@ fn gaussian_blur_horizontal_pass<
                         kernel,
                         start_y,
                         end_y,
+                        edge_mode,
                     );
                 });
             }
@@ -278,6 +281,7 @@ fn gaussian_blur_horizontal_pass<
             kernel,
             0,
             height,
+            edge_mode,
         );
     }
 }
@@ -293,7 +297,6 @@ fn gaussian_blur_vertical_pass_impl<
         + 'static
         + AsPrimitive<f32>,
     const CHANNEL_CONFIGURATION: usize,
-    const EDGE_MODE: usize,
 >(
     src: &[T],
     src_stride: u32,
@@ -305,10 +308,11 @@ fn gaussian_blur_vertical_pass_impl<
     kernel: &[f32],
     start_y: u32,
     end_y: u32,
+    edge_mode: EdgeMode,
 ) where
     f32: AsPrimitive<T> + ToStorage<T>,
 {
-    gaussian_blur_vertical_pass_c_impl::<T, CHANNEL_CONFIGURATION, EDGE_MODE>(
+    gaussian_blur_vertical_pass_c_impl::<T, CHANNEL_CONFIGURATION>(
         src,
         src_stride,
         unsafe_dst,
@@ -319,12 +323,13 @@ fn gaussian_blur_vertical_pass_impl<
         kernel,
         start_y,
         end_y,
+        edge_mode,
     );
 }
 
 trait GaussianVerticalPassDispatch<T> {
     #[allow(clippy::type_complexity)]
-    fn get_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>() -> fn(
+    fn get_pass<const CHANNEL_CONFIGURATION: usize>() -> fn(
         src: &[T],
         src_stride: u32,
         unsafe_dst: &UnsafeSlice<T>,
@@ -335,28 +340,29 @@ trait GaussianVerticalPassDispatch<T> {
         kernel: &[f32],
         start_y: u32,
         end_y: u32,
+        EdgeMode,
     );
 }
 
 impl GaussianVerticalPassDispatch<f16> for f16 {
     #[allow(clippy::type_complexity)]
-    fn get_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>(
-    ) -> fn(&[f16], u32, &UnsafeSlice<f16>, u32, u32, u32, usize, &[f32], u32, u32) {
-        gaussian_blur_vertical_pass_impl::<f16, CHANNEL_CONFIGURATION, EDGE_MODE>
+    fn get_pass<const CHANNEL_CONFIGURATION: usize>(
+    ) -> fn(&[f16], u32, &UnsafeSlice<f16>, u32, u32, u32, usize, &[f32], u32, u32, EdgeMode) {
+        gaussian_blur_vertical_pass_impl::<f16, CHANNEL_CONFIGURATION>
     }
 }
 
 impl GaussianVerticalPassDispatch<u16> for u16 {
-    fn get_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>(
-    ) -> fn(&[u16], u32, &UnsafeSlice<u16>, u32, u32, u32, usize, &[f32], u32, u32) {
-        gaussian_blur_vertical_pass_impl::<u16, CHANNEL_CONFIGURATION, EDGE_MODE>
+    fn get_pass<const CHANNEL_CONFIGURATION: usize>(
+    ) -> fn(&[u16], u32, &UnsafeSlice<u16>, u32, u32, u32, usize, &[f32], u32, u32, EdgeMode) {
+        gaussian_blur_vertical_pass_impl::<u16, CHANNEL_CONFIGURATION>
     }
 }
 
 impl GaussianVerticalPassDispatch<u8> for u8 {
     #[allow(clippy::type_complexity)]
-    fn get_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>(
-    ) -> fn(&[u8], u32, &UnsafeSlice<u8>, u32, u32, u32, usize, &[f32], u32, u32) {
+    fn get_pass<const CHANNEL_CONFIGURATION: usize>(
+    ) -> fn(&[u8], u32, &UnsafeSlice<u8>, u32, u32, u32, usize, &[f32], u32, u32, EdgeMode) {
         let mut _dispatcher: fn(
             src: &[u8],
             src_stride: u32,
@@ -368,45 +374,37 @@ impl GaussianVerticalPassDispatch<u8> for u8 {
             kernel: &[f32],
             start_y: u32,
             end_y: u32,
-        ) = gaussian_blur_vertical_pass_impl::<u8, CHANNEL_CONFIGURATION, EDGE_MODE>;
-        let edge_mode: EdgeMode = EDGE_MODE.into();
-        if edge_mode == EdgeMode::Clamp {
-            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-            {
-                let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
-                let _is_fma_available = std::arch::is_x86_feature_detected!("fma");
-                let _is_avx_available = std::arch::is_x86_feature_detected!("avx2");
-                // Generally vertical pass do not depends on any specific channel configuration so it is allowed to make a vectorized calls for any channel
-                if _is_sse_available {
-                    if _is_fma_available {
-                        _dispatcher =
-                            gaussian_blur_vertical_pass_impl_sse::<u8, CHANNEL_CONFIGURATION, true>;
-                    } else {
-                        _dispatcher = gaussian_blur_vertical_pass_impl_sse::<
-                            u8,
-                            CHANNEL_CONFIGURATION,
-                            false,
-                        >;
-                    }
-                }
-                if _is_avx_available {
-                    if _is_fma_available {
-                        _dispatcher =
-                            gaussian_blur_vertical_pass_impl_avx::<u8, CHANNEL_CONFIGURATION, true>;
-                    } else {
-                        _dispatcher = gaussian_blur_vertical_pass_impl_avx::<
-                            u8,
-                            CHANNEL_CONFIGURATION,
-                            false,
-                        >;
-                    }
+            EdgeMode,
+        ) = gaussian_blur_vertical_pass_impl::<u8, CHANNEL_CONFIGURATION>;
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        {
+            let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+            let _is_fma_available = std::arch::is_x86_feature_detected!("fma");
+            let _is_avx_available = std::arch::is_x86_feature_detected!("avx2");
+            // Generally vertical pass do not depends on any specific channel configuration so it is allowed to make a vectorized calls for any channel
+            if _is_sse_available {
+                if _is_fma_available {
+                    _dispatcher =
+                        gaussian_blur_vertical_pass_impl_sse::<u8, CHANNEL_CONFIGURATION, true>;
+                } else {
+                    _dispatcher =
+                        gaussian_blur_vertical_pass_impl_sse::<u8, CHANNEL_CONFIGURATION, false>;
                 }
             }
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-            {
-                // Generally vertical pass do not depends on any specific channel configuration so it is allowed to make a vectorized calls for any channel
-                _dispatcher = gaussian_blur_vertical_pass_neon::<u8, CHANNEL_CONFIGURATION>;
+            if _is_avx_available {
+                if _is_fma_available {
+                    _dispatcher =
+                        gaussian_blur_vertical_pass_impl_avx::<u8, CHANNEL_CONFIGURATION, true>;
+                } else {
+                    _dispatcher =
+                        gaussian_blur_vertical_pass_impl_avx::<u8, CHANNEL_CONFIGURATION, false>;
+                }
             }
+        }
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            // Generally vertical pass do not depends on any specific channel configuration so it is allowed to make a vectorized calls for any channel
+            _dispatcher = gaussian_blur_vertical_pass_neon::<u8, CHANNEL_CONFIGURATION>;
         }
         _dispatcher
     }
@@ -414,8 +412,8 @@ impl GaussianVerticalPassDispatch<u8> for u8 {
 
 impl GaussianVerticalPassDispatch<f32> for f32 {
     #[allow(clippy::type_complexity)]
-    fn get_pass<const CHANNEL_CONFIGURATION: usize, const EDGE_MODE: usize>(
-    ) -> fn(&[f32], u32, &UnsafeSlice<f32>, u32, u32, u32, usize, &[f32], u32, u32) {
+    fn get_pass<const CHANNEL_CONFIGURATION: usize>(
+    ) -> fn(&[f32], u32, &UnsafeSlice<f32>, u32, u32, u32, usize, &[f32], u32, u32, EdgeMode) {
         let mut _dispatcher: fn(
             src: &[f32],
             src_stride: u32,
@@ -427,52 +425,50 @@ impl GaussianVerticalPassDispatch<f32> for f32 {
             kernel: &[f32],
             start_y: u32,
             end_y: u32,
-        ) = gaussian_blur_vertical_pass_impl::<f32, CHANNEL_CONFIGURATION, EDGE_MODE>;
-        let edge_mode: EdgeMode = EDGE_MODE.into();
-        if edge_mode == EdgeMode::Clamp {
-            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-            {
-                let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
-                let _is_fma_available = std::arch::is_x86_feature_detected!("fma");
-                let _is_avx_available = std::arch::is_x86_feature_detected!("avx2");
-                // Generally vertical pass do not depends on any specific channel configuration so it is allowed to make a vectorized calls for any channel
-                if _is_sse_available {
-                    if _is_fma_available {
-                        _dispatcher = gaussian_blur_vertical_pass_impl_f32_sse::<
-                            f32,
-                            CHANNEL_CONFIGURATION,
-                            true,
-                        >;
-                    } else {
-                        _dispatcher = gaussian_blur_vertical_pass_impl_f32_sse::<
-                            f32,
-                            CHANNEL_CONFIGURATION,
-                            false,
-                        >;
-                    }
-                }
-                // Generally vertical pass do not depends on any specific channel configuration so it is allowed to make a vectorized calls for any channel
-                if _is_avx_available {
-                    if _is_fma_available {
-                        _dispatcher = gaussian_blur_vertical_pass_impl_f32_avx::<
-                            f32,
-                            CHANNEL_CONFIGURATION,
-                            true,
-                        >;
-                    } else {
-                        _dispatcher = gaussian_blur_vertical_pass_impl_f32_avx::<
-                            f32,
-                            CHANNEL_CONFIGURATION,
-                            false,
-                        >;
-                    }
+            EdgeMode,
+        ) = gaussian_blur_vertical_pass_impl::<f32, CHANNEL_CONFIGURATION>;
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        {
+            let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+            let _is_fma_available = std::arch::is_x86_feature_detected!("fma");
+            let _is_avx_available = std::arch::is_x86_feature_detected!("avx2");
+            // Generally vertical pass do not depends on any specific channel configuration so it is allowed to make a vectorized calls for any channel
+            if _is_sse_available {
+                if _is_fma_available {
+                    _dispatcher = gaussian_blur_vertical_pass_impl_f32_sse::<
+                        f32,
+                        CHANNEL_CONFIGURATION,
+                        true,
+                    >;
+                } else {
+                    _dispatcher = gaussian_blur_vertical_pass_impl_f32_sse::<
+                        f32,
+                        CHANNEL_CONFIGURATION,
+                        false,
+                    >;
                 }
             }
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-            {
-                // Generally vertical pass do not depends on any specific channel configuration so it is allowed to make a vectorized calls for any channel
-                _dispatcher = gaussian_blur_vertical_pass_f32_neon::<f32, CHANNEL_CONFIGURATION>;
+            // Generally vertical pass do not depends on any specific channel configuration so it is allowed to make a vectorized calls for any channel
+            if _is_avx_available {
+                if _is_fma_available {
+                    _dispatcher = gaussian_blur_vertical_pass_impl_f32_avx::<
+                        f32,
+                        CHANNEL_CONFIGURATION,
+                        true,
+                    >;
+                } else {
+                    _dispatcher = gaussian_blur_vertical_pass_impl_f32_avx::<
+                        f32,
+                        CHANNEL_CONFIGURATION,
+                        false,
+                    >;
+                }
             }
+        }
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            // Generally vertical pass do not depends on any specific channel configuration so it is allowed to make a vectorized calls for any channel
+            _dispatcher = gaussian_blur_vertical_pass_f32_neon::<f32, CHANNEL_CONFIGURATION>;
         }
         _dispatcher
     }
@@ -491,7 +487,6 @@ fn gaussian_blur_vertical_pass<
         + AsPrimitive<f32>
         + GaussianVerticalPassDispatch<T>,
     const CHANNEL_CONFIGURATION: usize,
-    const EDGE_MODE: usize,
 >(
     src: &[T],
     src_stride: u32,
@@ -503,6 +498,7 @@ fn gaussian_blur_vertical_pass<
     kernel: &[f32],
     thread_pool: &Option<ThreadPool>,
     thread_count: u32,
+    edge_mode: EdgeMode,
 ) where
     f32: AsPrimitive<T> + ToStorage<T>,
 {
@@ -517,7 +513,8 @@ fn gaussian_blur_vertical_pass<
         kernel: &[f32],
         start_y: u32,
         end_y: u32,
-    ) = T::get_pass::<CHANNEL_CONFIGURATION, EDGE_MODE>();
+        EdgeMode,
+    ) = T::get_pass::<CHANNEL_CONFIGURATION>();
     let unsafe_dst = UnsafeSlice::new(dst);
     if let Some(thread_pool) = thread_pool {
         thread_pool.scope(|scope| {
@@ -542,6 +539,7 @@ fn gaussian_blur_vertical_pass<
                         kernel,
                         start_y,
                         end_y,
+                        edge_mode,
                     );
                 });
             }
@@ -558,6 +556,7 @@ fn gaussian_blur_vertical_pass<
             kernel,
             0,
             height,
+            edge_mode,
         );
     }
 }
@@ -609,9 +608,9 @@ fn gaussian_blur_impl<
     };
 
     match edge_mode {
-        EdgeMode::Reflect => {
+        EdgeMode::Reflect | EdgeMode::Wrap | EdgeMode::Clamp | EdgeMode::Reflect101 => {
             let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
-            gaussian_blur_horizontal_pass::<T, CHANNEL_CONFIGURATION, { EdgeMode::Reflect as usize }>(
+            gaussian_blur_horizontal_pass::<T, CHANNEL_CONFIGURATION>(
                 src,
                 src_stride,
                 &mut transient,
@@ -622,8 +621,9 @@ fn gaussian_blur_impl<
                 &kernel,
                 &pool,
                 thread_count,
+                edge_mode,
             );
-            gaussian_blur_vertical_pass::<T, CHANNEL_CONFIGURATION, { EdgeMode::Reflect as usize }>(
+            gaussian_blur_vertical_pass::<T, CHANNEL_CONFIGURATION>(
                 &transient,
                 dst_stride,
                 dst,
@@ -634,95 +634,7 @@ fn gaussian_blur_impl<
                 &kernel,
                 &pool,
                 thread_count,
-            );
-        }
-        EdgeMode::Wrap => {
-            let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
-            gaussian_blur_horizontal_pass::<T, CHANNEL_CONFIGURATION, { EdgeMode::Wrap as usize }>(
-                src,
-                src_stride,
-                &mut transient,
-                dst_stride,
-                width,
-                height,
-                kernel.len(),
-                &kernel,
-                &pool,
-                thread_count,
-            );
-            gaussian_blur_vertical_pass::<T, CHANNEL_CONFIGURATION, { EdgeMode::Wrap as usize }>(
-                &transient,
-                dst_stride,
-                dst,
-                dst_stride,
-                width,
-                height,
-                kernel.len(),
-                &kernel,
-                &pool,
-                thread_count,
-            );
-        }
-        EdgeMode::Clamp => {
-            let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
-            gaussian_blur_horizontal_pass::<T, CHANNEL_CONFIGURATION, { EdgeMode::Clamp as usize }>(
-                src,
-                src_stride,
-                &mut transient,
-                dst_stride,
-                width,
-                height,
-                kernel.len(),
-                &kernel,
-                &pool,
-                thread_count,
-            );
-            gaussian_blur_vertical_pass::<T, CHANNEL_CONFIGURATION, { EdgeMode::Clamp as usize }>(
-                &transient,
-                dst_stride,
-                dst,
-                dst_stride,
-                width,
-                height,
-                kernel.len(),
-                &kernel,
-                &pool,
-                thread_count,
-            );
-        }
-        EdgeMode::Reflect101 => {
-            let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
-            gaussian_blur_horizontal_pass::<
-                T,
-                CHANNEL_CONFIGURATION,
-                { EdgeMode::Reflect101 as usize },
-            >(
-                src,
-                src_stride,
-                &mut transient,
-                dst_stride,
-                width,
-                height,
-                kernel.len(),
-                &kernel,
-                &pool,
-                thread_count,
-            );
-            gaussian_blur_vertical_pass::<
-                T,
-                CHANNEL_CONFIGURATION,
-                { EdgeMode::Reflect101 as usize },
-            >(
-                &transient,
-                dst_stride,
-                dst,
-                dst_stride,
-                width,
-                height,
-                kernel.len(),
-                &kernel,
-                &pool,
-                thread_count,
+                edge_mode,
             );
         }
         EdgeMode::KernelClip => {

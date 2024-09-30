@@ -3,6 +3,7 @@ mod split;
 
 use crate::merge::merge_channels_3;
 use crate::split::split_channels_3;
+use colorutils_rs::TransferFunction;
 use image::{DynamicImage, EncodableLayout, GenericImageView, ImageFormat, ImageReader};
 use libblur::{
     fast_bilateral_filter, fast_bilateral_filter_image, fast_gaussian, fast_gaussian_next,
@@ -82,7 +83,7 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
         25 * 2 + 1,
         0.,
         FastBlurChannels::Plane,
-        EdgeMode::Clamp,
+        EdgeMode::Reflect,
         ThreadingPolicy::Single,
         GaussianPreciseLevel::EXACT,
     );
@@ -97,7 +98,7 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
         25 * 2 + 1,
         0.,
         FastBlurChannels::Plane,
-        EdgeMode::Clamp,
+        EdgeMode::Reflect,
         ThreadingPolicy::Single,
         GaussianPreciseLevel::EXACT,
     );
@@ -112,7 +113,7 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
         25 * 2 + 1,
         0.,
         FastBlurChannels::Plane,
-        EdgeMode::Clamp,
+        EdgeMode::Reflect,
         ThreadingPolicy::Single,
         GaussianPreciseLevel::EXACT,
     );
@@ -137,7 +138,7 @@ fn main() {
     //     vst1q_s64(t.as_mut_ptr(), mul);
     //     println!("{:?}", t);
     // }
-    let img = ImageReader::open("assets/test_image_1.jpg")
+    let img = ImageReader::open("assets/test_image_1_small.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -146,31 +147,25 @@ fn main() {
     println!("type {:?}", img.color());
 
     println!("{:?}", img.color());
+    // let img = img.to_rgba8();
     let src_bytes = img.as_bytes();
     let components = 3;
     let stride = dimensions.0 as usize * components;
-    let mut bytes: Vec<u8> = Vec::from(src_bytes);
-    let mut dst_bytes: Vec<u8> = Vec::with_capacity(dimensions.1 as usize * stride);
-    dst_bytes.resize(dimensions.1 as usize * stride, 0);
-    unsafe {
-        std::ptr::copy_nonoverlapping(
-            src_bytes.as_ptr(),
-            dst_bytes.as_mut_ptr(),
-            dimensions.1 as usize * stride,
-        );
-    }
+    let mut bytes: Vec<u8> = src_bytes.to_vec();
+    let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
 
     let start = Instant::now();
 
-    libblur::stack_blur(
-        &mut dst_bytes,
-        stride as u32,
-        dimensions.0,
-        dimensions.1,
-        77,
-        FastBlurChannels::Channels3,
-        ThreadingPolicy::Adaptive,
-    );
+    // libblur::stack_blur_in_linear(
+    //     &mut dst_bytes,
+    //     stride as u32,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     49,
+    //     FastBlurChannels::Channels3,
+    //     ThreadingPolicy::Adaptive,
+    //     TransferFunction::Gamma2p8,
+    // );
 
     println!("stackblur {:?}", start.elapsed());
 
@@ -264,15 +259,16 @@ fn main() {
     //     EdgeMode::Clamp,
     // );
 
-    // fast_bilateral_filter(
-    //     src_bytes,
-    //     &mut dst_bytes,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     7f32,
-    //     0.5f32,
-    //     FastBlurChannels::Channels3,
-    // );
+    fast_bilateral_filter(
+        src_bytes,
+        &mut dst_bytes,
+        dimensions.0,
+        dimensions.1,
+        15,
+        2f32,
+        1.1f32,
+        FastBlurChannels::Channels3,
+    );
 
     // dst_bytes = f16_bytes
     //     .iter()
@@ -292,11 +288,12 @@ fn main() {
     //     stride as u32,
     //     dimensions.0,
     //     dimensions.1,
-    //     75 * 2 + 1,
-    //     75f32*2f32 / 6f32,
+    //     25,
+    //     0.,
     //     FastBlurChannels::Channels4,
-    //     EdgeMode::Wrap,
+    //     EdgeMode::Reflect101,
     //     ThreadingPolicy::Adaptive,
+    //     GaussianPreciseLevel::INTEGRAL,
     // );
     bytes = dst_bytes;
     // libblur::median_blur(
@@ -317,7 +314,7 @@ fn main() {
 
     if components == 3 {
         image::save_buffer(
-            "blurred_stack_oklab.jpg",
+            "blurred_stack_oklab_t.jpg",
             bytes.as_bytes(),
             dimensions.0,
             dimensions.1,

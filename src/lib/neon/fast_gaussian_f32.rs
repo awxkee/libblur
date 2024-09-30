@@ -31,11 +31,7 @@ use crate::neon::{load_f32_fast, store_f32};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, reflect_101, reflect_index, EdgeMode};
 
-pub fn fast_gaussian_vertical_pass_neon_f32<
-    T,
-    const CHANNELS_COUNT: usize,
-    const EDGE_MODE: usize,
->(
+pub fn fast_gaussian_vertical_pass_neon_f32<T, const CHANNELS_COUNT: usize>(
     undef_bytes: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -43,9 +39,9 @@ pub fn fast_gaussian_vertical_pass_neon_f32<
     radius: u32,
     start: u32,
     end: u32,
+    edge_mode: EdgeMode,
 ) {
     unsafe {
-        let edge_mode: EdgeMode = EDGE_MODE.into();
         let bytes: &UnsafeSlice<'_, f32> = std::mem::transmute(undef_bytes);
         let mut buffer: [[f32; 4]; 1024] = [[0f32; 4]; 1024];
 
@@ -107,11 +103,7 @@ pub fn fast_gaussian_vertical_pass_neon_f32<
     }
 }
 
-pub fn fast_gaussian_horizontal_pass_neon_f32<
-    T,
-    const CHANNELS_COUNT: usize,
-    const EDGE_MODE: usize,
->(
+pub fn fast_gaussian_horizontal_pass_neon_f32<T, const CHANNELS_COUNT: usize>(
     undef_bytes: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -119,9 +111,9 @@ pub fn fast_gaussian_horizontal_pass_neon_f32<
     radius: u32,
     start: u32,
     end: u32,
+    edge_mode: EdgeMode,
 ) {
     unsafe {
-        let edge_mode: EdgeMode = EDGE_MODE.into();
         let bytes: &UnsafeSlice<'_, f32> = std::mem::transmute(undef_bytes);
         let mut buffer: [[f32; 4]; 1024] = [[0f32; 4]; 1024];
         let radius_64 = radius as i64;

@@ -28,6 +28,7 @@
 use crate::gaussian::gaussian_approx::{PRECISION, ROUNDING_APPROX};
 use crate::neon::{load_u8_u16_fast, load_u8_u16_one};
 use crate::unsafe_slice::UnsafeSlice;
+use crate::{clamp_edge, reflect_101, reflect_index, EdgeMode};
 use std::arch::aarch64::*;
 
 pub fn gaussian_blur_vertical_approx_neon<const CHANNEL_CONFIGURATION: usize>(
@@ -41,6 +42,7 @@ pub fn gaussian_blur_vertical_approx_neon<const CHANNEL_CONFIGURATION: usize>(
     kernel: &[i16],
     start_y: u32,
     end_y: u32,
+    edge_mode: EdgeMode,
 ) {
     unsafe {
         let src: &[u8] = std::mem::transmute(undef_src);
@@ -71,9 +73,8 @@ pub fn gaussian_blur_vertical_approx_neon<const CHANNEL_CONFIGURATION: usize>(
                     let weight = kernel.as_ptr().add((r + half_kernel) as usize);
                     let f_weight = vld1q_dup_s16(weight);
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
-                    let y_src_shift = py as usize * src_stride as usize;
+                    let py = clamp_edge!(edge_mode, y as i64 + r as i64, 0, height as i64 - 1);
+                    let y_src_shift = py * src_stride as usize;
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let pixels_u8x2 = vld1q_u8_x2(s_ptr);
                     let hi_16 = vreinterpretq_s16_u16(vmovl_high_u8(pixels_u8x2.0));
@@ -134,8 +135,7 @@ pub fn gaussian_blur_vertical_approx_neon<const CHANNEL_CONFIGURATION: usize>(
                     let weight = kernel.as_ptr().add((r + half_kernel) as usize);
                     let f_weight = vld1q_dup_s16(weight);
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
+                    let py = clamp_edge!(edge_mode, y as i64 + r as i64, 0, height as i64 - 1);
                     let y_src_shift = py as usize * src_stride as usize;
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let pixels_u8 = vld1q_u8(s_ptr);
@@ -178,8 +178,7 @@ pub fn gaussian_blur_vertical_approx_neon<const CHANNEL_CONFIGURATION: usize>(
                     let weight = kernel.as_ptr().add((r + half_kernel) as usize);
                     let f_weight = vld1q_dup_s16(weight);
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
+                    let py = clamp_edge!(edge_mode, y as i64 + r as i64, 0, height as i64 - 1);
                     let y_src_shift = py as usize * src_stride as usize;
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let pixels_u8 = vld1_u8(s_ptr);
@@ -213,8 +212,7 @@ pub fn gaussian_blur_vertical_approx_neon<const CHANNEL_CONFIGURATION: usize>(
                     let weight = kernel.as_ptr().add((r + half_kernel) as usize);
                     let f_weight = vld1_dup_s16(weight);
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
+                    let py = clamp_edge!(edge_mode, y as i64 + r as i64, 0, height as i64 - 1);
                     let y_src_shift = py as usize * src_stride as usize;
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let pixels_u32 = vreinterpret_s16_u16(load_u8_u16_fast::<4>(s_ptr));
@@ -244,8 +242,7 @@ pub fn gaussian_blur_vertical_approx_neon<const CHANNEL_CONFIGURATION: usize>(
                     let weight = kernel.as_ptr().add((r + half_kernel) as usize);
                     let f_weight = vld1_dup_s16(weight);
 
-                    let py =
-                        std::cmp::min(std::cmp::max(y as i64 + r as i64, 0), (height - 1) as i64);
+                    let py = clamp_edge!(edge_mode, y as i64 + r as i64, 0, height as i64 - 1);
                     let y_src_shift = py as usize * src_stride as usize;
                     let s_ptr = src.as_ptr().add(y_src_shift + cx);
                     let pixel_s16 = load_u8_u16_one(s_ptr);

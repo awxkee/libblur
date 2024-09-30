@@ -45,15 +45,20 @@ use image::{
 ///
 /// * `img`: Source image
 /// * `dst`: Destination image
+/// * `kernel_size`: Convolution kernel size, must be odd
 /// * `spatial_sigma`: Spatial sigma
 /// * `range_sigma`: Range sigma
 ///
 #[must_use]
 pub fn fast_bilateral_filter_image(
     image: DynamicImage,
+    kernel_size: u32,
     spatial_sigma: f32,
     range_sigma: f32,
 ) -> Option<DynamicImage> {
+    if kernel_size & 1 == 0 {
+        return None;
+    }
     match image {
         DynamicImage::ImageLuma8(gray) => {
             let mut new_image = gray.as_raw().to_vec();
@@ -62,6 +67,7 @@ pub fn fast_bilateral_filter_image(
                 &mut new_image,
                 gray.width(),
                 gray.height(),
+                kernel_size,
                 spatial_sigma,
                 range_sigma,
                 FastBlurChannels::Plane,
@@ -81,6 +87,7 @@ pub fn fast_bilateral_filter_image(
                 &mut new_image,
                 luma_alpha_image.width(),
                 luma_alpha_image.height(),
+                kernel_size,
                 spatial_sigma,
                 range_sigma,
             );
@@ -100,6 +107,7 @@ pub fn fast_bilateral_filter_image(
                 &mut new_image,
                 rgb_image.width(),
                 rgb_image.height(),
+                kernel_size,
                 spatial_sigma,
                 range_sigma,
                 FastBlurChannels::Channels3,
@@ -116,6 +124,7 @@ pub fn fast_bilateral_filter_image(
                 &mut new_image,
                 rgba_image.width(),
                 rgba_image.height(),
+                kernel_size,
                 spatial_sigma,
                 range_sigma,
                 FastBlurChannels::Channels4,
@@ -132,6 +141,7 @@ pub fn fast_bilateral_filter_image(
                 &mut new_image,
                 luma_16.width(),
                 luma_16.height(),
+                kernel_size,
                 spatial_sigma,
                 range_sigma,
                 FastBlurChannels::Plane,
@@ -153,6 +163,7 @@ pub fn fast_bilateral_filter_image(
                 &mut new_raw_buffer,
                 gray_alpha_16.width(),
                 gray_alpha_16.height(),
+                kernel_size,
                 spatial_sigma,
                 range_sigma,
             );
@@ -172,6 +183,7 @@ pub fn fast_bilateral_filter_image(
                 &mut new_image,
                 rgb_16_image.width(),
                 rgb_16_image.height(),
+                kernel_size,
                 spatial_sigma,
                 range_sigma,
                 FastBlurChannels::Channels3,
@@ -192,6 +204,7 @@ pub fn fast_bilateral_filter_image(
                 &mut new_image,
                 rgba_16_image.width(),
                 rgba_16_image.height(),
+                kernel_size,
                 spatial_sigma,
                 range_sigma,
                 FastBlurChannels::Channels4,
@@ -211,6 +224,7 @@ pub fn fast_bilateral_filter_image(
                 &mut new_image,
                 rgb_image_f32.width(),
                 rgb_image_f32.height(),
+                kernel_size,
                 spatial_sigma,
                 range_sigma,
                 FastBlurChannels::Channels3,
@@ -226,6 +240,7 @@ pub fn fast_bilateral_filter_image(
                 &mut new_image,
                 rgba_image_f32.width(),
                 rgba_image_f32.height(),
+                kernel_size,
                 spatial_sigma,
                 range_sigma,
                 FastBlurChannels::Channels4,

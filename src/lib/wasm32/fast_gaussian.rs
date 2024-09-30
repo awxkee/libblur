@@ -32,11 +32,7 @@ use crate::wasm32::utils::{
 use crate::{clamp_edge, reflect_101, reflect_index, EdgeMode};
 use std::arch::wasm32::*;
 
-pub fn fast_gaussian_horizontal_pass_wasm_u8<
-    T,
-    const CHANNELS_COUNT: usize,
-    const EDGE_MODE: usize,
->(
+pub fn fast_gaussian_horizontal_pass_wasm_u8<T, const CHANNELS_COUNT: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -44,9 +40,10 @@ pub fn fast_gaussian_horizontal_pass_wasm_u8<
     radius: u32,
     start: u32,
     end: u32,
+    edge_mode: EdgeMode,
 ) {
     unsafe {
-        fast_gaussian_horizontal_pass_impl::<T, CHANNELS_COUNT, EDGE_MODE>(
+        fast_gaussian_horizontal_pass_impl::<T, CHANNELS_COUNT>(
             undefined_slice,
             stride,
             width,
@@ -54,17 +51,14 @@ pub fn fast_gaussian_horizontal_pass_wasm_u8<
             radius,
             start,
             end,
+            edge_mode,
         );
     }
 }
 
 #[inline]
 #[target_feature(enable = "simd128")]
-unsafe fn fast_gaussian_horizontal_pass_impl<
-    T,
-    const CHANNELS_COUNT: usize,
-    const EDGE_MODE: usize,
->(
+unsafe fn fast_gaussian_horizontal_pass_impl<T, const CHANNELS_COUNT: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -72,8 +66,8 @@ unsafe fn fast_gaussian_horizontal_pass_impl<
     radius: u32,
     start: u32,
     end: u32,
+    edge_mode: EdgeMode,
 ) {
-    let edge_mode: EdgeMode = EDGE_MODE.into();
     let bytes: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_slice);
     let mut buffer: [[i32; 4]; 1024] = [[0; 4]; 1024];
     let initial_sum = ((radius * radius) >> 1) as i32;
@@ -139,11 +133,7 @@ unsafe fn fast_gaussian_horizontal_pass_impl<
     }
 }
 
-pub fn fast_gaussian_vertical_pass_wasm_u8<
-    T,
-    const CHANNELS_COUNT: usize,
-    const EDGE_MODE: usize,
->(
+pub fn fast_gaussian_vertical_pass_wasm_u8<T, const CHANNELS_COUNT: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -151,9 +141,10 @@ pub fn fast_gaussian_vertical_pass_wasm_u8<
     radius: u32,
     start: u32,
     end: u32,
+    edge_mode: EdgeMode,
 ) {
     unsafe {
-        fast_gaussian_vertical_pass_wasm::<T, CHANNELS_COUNT, EDGE_MODE>(
+        fast_gaussian_vertical_pass_wasm::<T, CHANNELS_COUNT>(
             undefined_slice,
             stride,
             width,
@@ -161,17 +152,14 @@ pub fn fast_gaussian_vertical_pass_wasm_u8<
             radius,
             start,
             end,
+            edge_mode,
         );
     }
 }
 
 #[inline]
 #[target_feature(enable = "simd128")]
-unsafe fn fast_gaussian_vertical_pass_wasm<
-    T,
-    const CHANNELS_COUNT: usize,
-    const EDGE_MODE: usize,
->(
+unsafe fn fast_gaussian_vertical_pass_wasm<T, const CHANNELS_COUNT: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -179,8 +167,8 @@ unsafe fn fast_gaussian_vertical_pass_wasm<
     radius: u32,
     start: u32,
     end: u32,
+    edge_mode: EdgeMode,
 ) {
-    let edge_mode: EdgeMode = EDGE_MODE.into();
     let bytes: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_slice);
     let mut buffer: [[i32; 4]; 1024] = [[0; 4]; 1024];
     let initial_sum = ((radius * radius) >> 1) as i32;

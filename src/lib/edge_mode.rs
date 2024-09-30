@@ -37,13 +37,10 @@ pub enum EdgeMode {
     /// *Kernel clip is supported only for clear gaussian blur and not supported in any approximations!*
     KernelClip = 1,
     /// If filter goes out of bounds image will be replicated with rule `cdefgh|abcdefgh|abcdefg`
-    /// Note that for gaussian blur *Wrap* is significantly slower when NEON or SSE is available than *KernelClip* and *Clamp*
     Wrap = 2,
     /// If filter goes out of bounds image will be replicated with rule `fedcba|abcdefgh|hgfedcb`
-    /// Note that for gaussian blur *Reflect* is significantly slower when NEON or SSE is available than *KernelClip* and *Clamp*
     Reflect = 3,
     /// If filter goes out of bounds image will be replicated with rule `gfedcb|abcdefgh|gfedcba`
-    /// Note that for gaussian blur *Reflect101* is significantly slower when NEON or SSE is available than *KernelClip* and *Clamp*
     Reflect101 = 4,
 }
 
@@ -147,8 +144,11 @@ macro_rules! clamp_edge {
                 (std::cmp::min(std::cmp::max($value, $min), $max) as u32) as usize
             }
             EdgeMode::Wrap => {
-                let cx = $value.rem_euclid($max);
-                cx as usize
+                if $value < $min || $value > $max {
+                    $value.rem_euclid($max) as usize
+                } else {
+                    $value as usize
+                }
             }
             EdgeMode::Reflect => {
                 let cx = reflect_index($value, $max);
