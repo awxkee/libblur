@@ -176,9 +176,9 @@ fn main() {
     println!("type {:?}", img.color());
 
     println!("{:?}", img.color());
-    let img = img.to_rgb8();
+    // let img = img.to_rgb8();
     let src_bytes = img.as_bytes();
-    let components = 3;
+    let components = 4;
     let stride = dimensions.0 as usize * components;
     let mut bytes: Vec<u8> = src_bytes.to_vec();
     let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
@@ -319,7 +319,7 @@ fn main() {
     // )
     // .unwrap();
 
-    filter_2d_rgb_approx::<u8, f32, i32>(
+    filter_2d_rgba_approx::<u8, f32, i32>(
         &bytes,
         &mut dst_bytes,
         ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),

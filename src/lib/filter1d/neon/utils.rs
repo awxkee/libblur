@@ -169,14 +169,14 @@ pub unsafe fn vqmovnq_f32_u8(
 
 #[inline(always)]
 pub unsafe fn vqmovnq_s32_u8(store: (int32x4_t, int32x4_t, int32x4_t, int32x4_t)) -> uint8x16_t {
-    let hi_s = vcombine_u16(vqshrun_n_s32::<15>(store.2), vqshrun_n_s32::<15>(store.3));
-    let lo_s = vcombine_u16(vqshrun_n_s32::<15>(store.0), vqshrun_n_s32::<15>(store.1));
+    let hi_s = vcombine_u16(vqrshrun_n_s32::<15>(store.2), vqrshrun_n_s32::<15>(store.3));
+    let lo_s = vcombine_u16(vqrshrun_n_s32::<15>(store.0), vqrshrun_n_s32::<15>(store.1));
     vcombine_u8(vqmovn_u16(lo_s), vqmovn_u16(hi_s))
 }
 
 #[inline(always)]
 pub unsafe fn vqmovn_s32_u8(store: (int32x4_t, int32x4_t)) -> uint8x8_t {
-    let lo_s = vcombine_u16(vqshrun_n_s32::<15>(store.0), vqshrun_n_s32::<15>(store.1));
+    let lo_s = vcombine_u16(vqrshrun_n_s32::<15>(store.0), vqrshrun_n_s32::<15>(store.1));
     vqmovn_u16(lo_s)
 }
 

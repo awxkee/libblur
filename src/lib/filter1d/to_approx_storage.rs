@@ -41,7 +41,7 @@ macro_rules! impl_to_approx_storage {
         impl ToApproxStorage<$to> for $from {
             #[inline]
             fn to_approx_(self) -> $to {
-                (self >> <$from>::approx_level())
+                ((self + (1 << (<$from>::approx_level() - 1))) >> <$from>::approx_level())
                     .max(<$from>::MIN.into())
                     .max(<$to>::MIN.into()) as $to
             }

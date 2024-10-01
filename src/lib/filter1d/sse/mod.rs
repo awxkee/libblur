@@ -26,41 +26,11 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#![allow(clippy::type_complexity)]
-mod arena;
-mod arena_roi;
-mod color_group;
-mod filter;
-mod filter_1d_column_handler;
-mod filter_1d_column_handler_approx;
-mod filter_1d_rgb_row_handler;
-mod filter_1d_rgb_row_handler_approx;
-mod filter_1d_rgba_row_handler;
-mod filter_1d_rgba_row_handler_approx;
-mod filter_1d_row_handler;
-mod filter_1d_row_handler_approx;
-mod filter_2d_approx;
-mod filter_2d_rgb;
-mod filter_2d_rgb_approx;
-mod filter_2d_rgba;
-mod filter_2d_rgba_approx;
-mod filter_column;
-mod filter_column_approx;
-mod filter_element;
-mod filter_row;
-mod filter_row_cg;
-mod filter_row_cg_approx;
-mod filter_scan;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-mod neon;
-mod region;
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-mod sse;
-mod to_approx_storage;
+mod filter_rgb_row_approx;
+mod filter_rgba_row_approx;
+mod utils;
+mod filter_row_approx;
 
-pub use filter::filter_2d_exact;
-pub use filter_2d_approx::filter_2d_approx;
-pub use filter_2d_rgb::filter_2d_rgb_exact;
-pub use filter_2d_rgb_approx::filter_2d_rgb_approx;
-pub use filter_2d_rgba::filter_2d_rgba_exact;
-pub use filter_2d_rgba_approx::filter_2d_rgba_approx;
+pub use filter_rgb_row_approx::filter_rgb_row_sse_u8_i32;
+pub use filter_rgba_row_approx::filter_rgba_row_sse_u8_i32;
+pub use filter_row_approx::filter_row_sse_u8_i32;

@@ -31,7 +31,9 @@ mod fast_gaussian_f32;
 mod fast_gaussian_next;
 mod fast_gaussian_next_f16;
 mod fast_gaussian_next_f32;
+mod packing;
 pub(crate) mod utils;
+mod v_load_store;
 
 pub use fast_gaussian::*;
 pub use fast_gaussian_f16::{
@@ -47,4 +49,6 @@ pub use fast_gaussian_next_f16::{
 pub use fast_gaussian_next_f32::{
     fast_gaussian_next_horizontal_pass_sse_f32, fast_gaussian_next_vertical_pass_sse_f32,
 };
+pub use packing::*;
 pub use utils::*;
+pub use v_load_store::*;
