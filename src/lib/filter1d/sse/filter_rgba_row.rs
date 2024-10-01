@@ -58,7 +58,7 @@ pub fn filter_rgba_row_sse_u8_f32(
     unsafe {
         let has_fma = std::arch::is_x86_feature_detected!("fma");
         if has_fma {
-            filter_rgba_row_sse_u8_f32_impl::<true>(
+            filter_rgba_row_sse_u8_f32_fma(
                 arena,
                 arena_src,
                 dst,
@@ -67,7 +67,7 @@ pub fn filter_rgba_row_sse_u8_f32(
                 scanned_kernel,
             );
         } else {
-            filter_rgba_row_sse_u8_f32_impl::<false>(
+            filter_rgba_row_sse_u8_f32_def(
                 arena,
                 arena_src,
                 dst,
@@ -79,7 +79,45 @@ pub fn filter_rgba_row_sse_u8_f32(
     }
 }
 
+#[target_feature(enable = "sse4.1", enable = "fma")]
+unsafe fn filter_rgba_row_sse_u8_f32_fma(
+    arena: Arena,
+    arena_src: &[u8],
+    dst: &UnsafeSlice<u8>,
+    image_size: ImageSize,
+    filter_region: FilterRegion,
+    scanned_kernel: &[ScanPoint1d<f32>],
+) {
+    filter_rgba_row_sse_u8_f32_impl::<true>(
+        arena,
+        arena_src,
+        dst,
+        image_size,
+        filter_region,
+        scanned_kernel,
+    );
+}
+
 #[target_feature(enable = "sse4.1")]
+unsafe fn filter_rgba_row_sse_u8_f32_def(
+    arena: Arena,
+    arena_src: &[u8],
+    dst: &UnsafeSlice<u8>,
+    image_size: ImageSize,
+    filter_region: FilterRegion,
+    scanned_kernel: &[ScanPoint1d<f32>],
+) {
+    filter_rgba_row_sse_u8_f32_impl::<false>(
+        arena,
+        arena_src,
+        dst,
+        image_size,
+        filter_region,
+        scanned_kernel,
+    );
+}
+
+#[inline(always)]
 unsafe fn filter_rgba_row_sse_u8_f32_impl<const FMA: bool>(
     arena: Arena,
     arena_src: &[u8],

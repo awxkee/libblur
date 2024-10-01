@@ -59,7 +59,7 @@ pub fn filter_column_avx_u8_f32(
     let has_fma = std::arch::is_x86_feature_detected!("fma");
     unsafe {
         if has_fma {
-            filter_column_avx_u8_f32_impl::<true>(
+            filter_column_avx_u8_f32_impl_fma(
                 arena,
                 arena_src,
                 dst,
@@ -68,7 +68,7 @@ pub fn filter_column_avx_u8_f32(
                 scanned_kernel,
             );
         } else {
-            filter_column_avx_u8_f32_impl::<false>(
+            filter_column_avx_u8_f32_impl_def(
                 arena,
                 arena_src,
                 dst,
@@ -80,8 +80,45 @@ pub fn filter_column_avx_u8_f32(
     }
 }
 
-#[inline]
-#[target_feature(enable = "avx2,sse4.1")]
+#[target_feature(enable = "avx2")]
+unsafe fn filter_column_avx_u8_f32_impl_def(
+    arena: Arena,
+    arena_src: &[u8],
+    dst: &UnsafeSlice<u8>,
+    image_size: ImageSize,
+    filter_region: FilterRegion,
+    scanned_kernel: &[ScanPoint1d<f32>],
+) {
+    filter_column_avx_u8_f32_impl::<false>(
+        arena,
+        arena_src,
+        dst,
+        image_size,
+        filter_region,
+        scanned_kernel,
+    );
+}
+
+#[target_feature(enable = "avx2", enable = "fma")]
+unsafe fn filter_column_avx_u8_f32_impl_fma(
+    arena: Arena,
+    arena_src: &[u8],
+    dst: &UnsafeSlice<u8>,
+    image_size: ImageSize,
+    filter_region: FilterRegion,
+    scanned_kernel: &[ScanPoint1d<f32>],
+) {
+    filter_column_avx_u8_f32_impl::<true>(
+        arena,
+        arena_src,
+        dst,
+        image_size,
+        filter_region,
+        scanned_kernel,
+    );
+}
+
+#[inline(always)]
 unsafe fn filter_column_avx_u8_f32_impl<const FMA: bool>(
     arena: Arena,
     arena_src: &[u8],
