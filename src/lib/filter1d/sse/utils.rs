@@ -94,9 +94,18 @@ pub unsafe fn _mm_mul_epi8_by_epi16_x2(input: __m128i, weight: __m128i) -> (__m1
 
 #[inline]
 #[target_feature(enable = "sse4.1,fma")]
-/// Computes `b*c + a` using fma when available
 pub unsafe fn _mm_fmlaf_ps(a: __m128, b: __m128, c: __m128) -> __m128 {
     _mm_fmadd_ps(b, c, a)
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+pub unsafe fn _mm_opt_fmlaf_ps<const FMA: bool>(a: __m128, b: __m128, c: __m128) -> __m128 {
+    if FMA {
+        _mm_fmlaf_ps(a, b, c)
+    } else {
+        _mm_add_ps(_mm_mul_ps(b, c), a)
+    }
 }
 
 #[inline]
