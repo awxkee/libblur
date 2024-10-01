@@ -29,5 +29,7 @@
 
 mod filter_column;
 mod utils;
+mod filter_rgb_row;
 
 pub use filter_column::filter_column_avx_u8_f32;
+pub use filter_rgb_row::filter_rgb_row_avx_u8_f32;

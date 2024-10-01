@@ -46,8 +46,10 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 use std::ops::Mul;
+use crate::avx::{_mm256_load_deinterleave_rgb, _mm256_store_interleave_rgb};
+use crate::filter1d::avx::utils::{_mm256_mul_add_epi8_by_ps_x4, _mm256_mul_epi8_by_ps_x4, _mm256_pack_ps_x4_epi8};
 
-pub fn filter_rgb_row_sse_u8_f32(
+pub fn filter_rgb_row_avx_u8_f32(
     arena: Arena,
     arena_src: &[u8],
     dst: &UnsafeSlice<u8>,
@@ -58,7 +60,7 @@ pub fn filter_rgb_row_sse_u8_f32(
     unsafe {
         let has_fma = std::arch::is_x86_feature_detected!("fma");
         if has_fma {
-            filter_rgb_row_sse_u8_f32_fma(
+            filter_rgb_row_avx_u8_f32_fma(
                 arena,
                 arena_src,
                 dst,
@@ -67,7 +69,7 @@ pub fn filter_rgb_row_sse_u8_f32(
                 scanned_kernel,
             );
         } else {
-            filter_rgb_row_sse_u8_f32_def(
+            filter_rgb_row_avx_u8_f32_def(
                 arena,
                 arena_src,
                 dst,
@@ -79,8 +81,8 @@ pub fn filter_rgb_row_sse_u8_f32(
     }
 }
 
-#[target_feature(enable = "sse4.1")]
-unsafe fn filter_rgb_row_sse_u8_f32_def(
+#[target_feature(enable = "avx2")]
+unsafe fn filter_rgb_row_avx_u8_f32_def(
     arena: Arena,
     arena_src: &[u8],
     dst: &UnsafeSlice<u8>,
@@ -88,7 +90,7 @@ unsafe fn filter_rgb_row_sse_u8_f32_def(
     filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
-    filter_rgb_row_sse_u8_f32_impl::<false>(
+    filter_rgb_row_avx_u8_f32_impl::<false>(
         arena,
         arena_src,
         dst,
@@ -98,8 +100,8 @@ unsafe fn filter_rgb_row_sse_u8_f32_def(
     );
 }
 
-#[target_feature(enable = "sse4.1", enable = "fma")]
-unsafe fn filter_rgb_row_sse_u8_f32_fma(
+#[target_feature(enable = "avx2", enable = "fma")]
+unsafe fn filter_rgb_row_avx_u8_f32_fma(
     arena: Arena,
     arena_src: &[u8],
     dst: &UnsafeSlice<u8>,
@@ -107,7 +109,7 @@ unsafe fn filter_rgb_row_sse_u8_f32_fma(
     filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
-    filter_rgb_row_sse_u8_f32_impl::<true>(
+    filter_rgb_row_avx_u8_f32_impl::<true>(
         arena,
         arena_src,
         dst,
@@ -118,7 +120,7 @@ unsafe fn filter_rgb_row_sse_u8_f32_fma(
 }
 
 #[inline(always)]
-unsafe fn filter_rgb_row_sse_u8_f32_impl<const FMA: bool>(
+unsafe fn filter_rgb_row_avx_u8_f32_impl<const FMA: bool>(
     arena: Arena,
     arena_src: &[u8],
     dst: &UnsafeSlice<u8>,
@@ -142,6 +144,38 @@ unsafe fn filter_rgb_row_sse_u8_f32_impl<const FMA: bool>(
         let length = scanned_kernel.iter().len();
 
         let mut _cx = 0usize;
+
+        while _cx + 32 < width {
+            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(0).weight);
+
+            let shifted_src = local_src.get_unchecked((_cx * N)..);
+
+            let source = _mm256_load_deinterleave_rgb(shifted_src.as_ptr());
+            let mut k0 = _mm256_mul_epi8_by_ps_x4(source.0, coeff);
+            let mut k1 = _mm256_mul_epi8_by_ps_x4(source.1, coeff);
+            let mut k2 = _mm256_mul_epi8_by_ps_x4(source.2, coeff);
+
+            for i in 1..length {
+                let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(i).weight);
+                let v_source =
+                    _mm256_load_deinterleave_rgb(shifted_src.get_unchecked((i * N)..).as_ptr());
+                k0 = _mm256_mul_add_epi8_by_ps_x4::<FMA>(k0, v_source.0, coeff);
+                k1 = _mm256_mul_add_epi8_by_ps_x4::<FMA>(k1, v_source.1, coeff);
+                k2 = _mm256_mul_add_epi8_by_ps_x4::<FMA>(k2, v_source.2, coeff);
+            }
+
+            let dst_offset = y * dst_stride + _cx * N;
+            let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+            _mm256_store_interleave_rgb(
+                dst_ptr0,
+                (
+                    _mm256_pack_ps_x4_epi8(k0),
+                    _mm256_pack_ps_x4_epi8(k1),
+                    _mm256_pack_ps_x4_epi8(k2),
+                ),
+            );
+            _cx += 32;
+        }
 
         while _cx + 16 < width {
             let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(0).weight);
