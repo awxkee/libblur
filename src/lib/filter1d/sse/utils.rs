@@ -70,6 +70,21 @@ pub unsafe fn _mm_mul_epi8_by_ps_x4(
 
 #[inline]
 #[target_feature(enable = "sse4.1")]
+pub unsafe fn _mm_mul_epi8_by_ps_x2(
+    input: __m128i,
+    weight: __m128,
+) -> (__m128, __m128) {
+    let zeros = _mm_setzero_si128();
+    let lo_16 = _mm_unpacklo_epi8(input, zeros);
+
+    (
+        _mm_mul_ps(_mm_cvtepi32_ps(_mm_unpacklo_epi16(lo_16, zeros)), weight),
+        _mm_mul_ps(_mm_cvtepi32_ps(_mm_unpackhi_epi16(lo_16, zeros)), weight),
+    )
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_mul_epi8_by_epi16_x2(input: __m128i, weight: __m128i) -> (__m128i, __m128i) {
     let zeros = _mm_setzero_si128();
     let lo_16 = _mm_unpacklo_epi8(input, zeros);
@@ -142,6 +157,44 @@ pub unsafe fn _mm_mul_add_epi8_by_ps_x4<const FMA: bool>(
         )
     }
 }
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+pub unsafe fn _mm_mul_add_epi8_by_ps_x2<const FMA: bool>(
+    accumulator: (__m128, __m128),
+    input: __m128i,
+    weight: __m128,
+) -> (__m128, __m128) {
+    let zeros = _mm_setzero_si128();
+    let lo_16 = _mm_unpacklo_epi8(input, zeros);
+
+    if FMA {
+        (
+            _mm_fmlaf_ps(
+                accumulator.0,
+                _mm_cvtepi32_ps(_mm_unpacklo_epi16(lo_16, zeros)),
+                weight,
+            ),
+            _mm_fmlaf_ps(
+                accumulator.1,
+                _mm_cvtepi32_ps(_mm_unpackhi_epi16(lo_16, zeros)),
+                weight,
+            ),
+        )
+    } else {
+        (
+            _mm_add_ps(
+                _mm_mul_ps(_mm_cvtepi32_ps(_mm_unpacklo_epi16(lo_16, zeros)), weight),
+                accumulator.0,
+            ),
+            _mm_add_ps(
+                _mm_mul_ps(_mm_cvtepi32_ps(_mm_unpackhi_epi16(lo_16, zeros)), weight),
+                accumulator.1,
+            ),
+        )
+    }
+}
+
 
 #[inline]
 #[target_feature(enable = "sse4.1")]
@@ -235,4 +288,15 @@ pub unsafe fn _mm_pack_ps_x4_epi8(store: (__m128, __m128, __m128, __m128)) -> __
         _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(store.1)),
     );
     _mm_packus_epi16(lo_s, hi_s)
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+pub unsafe fn _mm_pack_ps_x2_epi8(store: (__m128, __m128)) -> __m128i {
+    const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
+    let lo_s = _mm_packs_epi32(
+        _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(store.0)),
+        _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(store.1)),
+    );
+    _mm_packus_epi16(lo_s, _mm_setzero_si128())
 }

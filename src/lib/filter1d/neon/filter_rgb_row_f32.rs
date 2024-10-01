@@ -38,7 +38,7 @@ use std::arch::aarch64::*;
 use std::ops::Mul;
 
 pub fn filter_rgb_row_neon_f32_f32(
-    arena: &Arena,
+    arena: Arena,
     arena_src: &[f32],
     dst: &UnsafeSlice<f32>,
     image_size: ImageSize,

@@ -5,7 +5,13 @@ use crate::merge::merge_channels_3;
 use crate::split::split_channels_3;
 use colorutils_rs::TransferFunction;
 use image::{DynamicImage, EncodableLayout, GenericImageView, ImageFormat, ImageReader};
-use libblur::{fast_bilateral_filter, fast_bilateral_filter_image, fast_gaussian, fast_gaussian_next, fast_gaussian_next_f32, filter_2d_approx, filter_2d_exact, filter_2d_rgb_approx, filter_2d_rgb_exact, filter_2d_rgba_approx, filter_2d_rgba_exact, gaussian_blur_image, get_gaussian_kernel_1d, get_sigma_size, stack_blur_image, EdgeMode, FastBlurChannels, GaussianPreciseLevel, ImageSize, ThreadingPolicy};
+use libblur::{
+    fast_bilateral_filter, fast_bilateral_filter_image, fast_gaussian, fast_gaussian_next,
+    fast_gaussian_next_f32, filter_2d_approx, filter_2d_exact, filter_2d_rgb_approx,
+    filter_2d_rgb_exact, filter_2d_rgba_approx, filter_2d_rgba_exact, gaussian_blur_image,
+    get_gaussian_kernel_1d, get_sigma_size, stack_blur_image, EdgeMode, FastBlurChannels,
+    GaussianPreciseLevel, ImageSize, ThreadingPolicy,
+};
 use std::time::Instant;
 
 #[allow(dead_code)]

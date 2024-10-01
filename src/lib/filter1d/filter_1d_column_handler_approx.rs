@@ -89,7 +89,6 @@ impl Filter1DColumnHandlerApprox<u8, i32> for u8 {
         }
         filter_column_approx
     }
-
 }
 
 default_1d_column_handler!(u8, i64);

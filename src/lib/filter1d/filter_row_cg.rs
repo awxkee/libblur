@@ -37,7 +37,7 @@ use num_traits::{AsPrimitive, MulAdd};
 use std::ops::Mul;
 
 pub fn filter_color_group_row<T, F, const N: usize>(
-    arena: &Arena,
+    arena: Arena,
     arena_src: &[T],
     dst: &UnsafeSlice<T>,
     image_size: ImageSize,

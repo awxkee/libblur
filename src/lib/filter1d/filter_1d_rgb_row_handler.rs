@@ -35,10 +35,12 @@ use crate::filter1d::region::FilterRegion;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::ImageSize;
 use half::f16;
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+use crate::filter1d::sse::filter_rgb_row_sse_u8_f32;
 
 pub trait Filter1DRgbRowHandler<T, F> {
     fn get_rgb_row_handler() -> fn(
-        arena: &Arena,
+        arena: Arena,
         arena_src: &[T],
         dst: &UnsafeSlice<T>,
         image_size: ImageSize,
@@ -51,7 +53,7 @@ macro_rules! default_1d_row_handler {
     ($store:ty, $intermediate:ty) => {
         impl Filter1DRgbRowHandler<$store, $intermediate> for $store {
             fn get_rgb_row_handler() -> fn(
-                &Arena,
+                Arena,
                 &[$store],
                 &UnsafeSlice<$store>,
                 ImageSize,
@@ -65,29 +67,41 @@ macro_rules! default_1d_row_handler {
 }
 
 impl Filter1DRgbRowHandler<u8, f32> for u8 {
-    #[cfg(not(all(target_arch = "aarch64", target_feature = "neon")))]
+    #[cfg(not(any(
+        all(target_arch = "aarch64", target_feature = "neon"),
+        any(target_arch = "x86_64", target_arch = "x86")
+    )))]
     fn get_rgb_row_handler(
-    ) -> fn(&Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
+    ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
         filter_color_group_row::<u8, f32, 3>
     }
 
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     fn get_rgb_row_handler(
-    ) -> fn(&Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
+    ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
         filter_rgb_row_neon_u8_f32
+    }
+
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    fn get_rgb_row_handler(
+    ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
+        if std::arch::is_x86_feature_detected!("sse4.1") {
+            return filter_rgb_row_sse_u8_f32;
+        }
+        filter_color_group_row::<u8, f32, 3>
     }
 }
 
 impl Filter1DRgbRowHandler<f32, f32> for f32 {
     #[cfg(not(all(target_arch = "aarch64", target_feature = "neon")))]
     fn get_rgb_row_handler(
-    ) -> fn(&Arena, &[f32], &UnsafeSlice<f32>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
+    ) -> fn(Arena, &[f32], &UnsafeSlice<f32>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
         filter_color_group_row::<f32, f32, 3>
     }
 
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     fn get_rgb_row_handler(
-    ) -> fn(&Arena, &[f32], &UnsafeSlice<f32>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
+    ) -> fn(Arena, &[f32], &UnsafeSlice<f32>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
         filter_rgb_row_neon_f32_f32
     }
 }
