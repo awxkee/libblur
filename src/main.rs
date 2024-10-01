@@ -304,20 +304,20 @@ fn main() {
     //     .map(|&x| (x.to_f32() * 255f32) as u8)
     //     .collect();
 
-    dst_bytes = perform_planar_pass_3(&bytes, dimensions.0 as usize, dimensions.1 as usize);
+    // dst_bytes = perform_planar_pass_3(&bytes, dimensions.0 as usize, dimensions.1 as usize);
 
-    let kernel = get_gaussian_kernel_1d(151, get_sigma_size(151));
-    // dst_bytes.fill(0);
-    // filter_2d_rgba_exact(
-    //     &bytes,
-    //     &mut dst_bytes,
-    //     ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
-    //     &kernel,
-    //     &kernel,
-    //     EdgeMode::Clamp,
-    //     ThreadingPolicy::Adaptive,
-    // )
-    // .unwrap();
+    let kernel = get_gaussian_kernel_1d(35, get_sigma_size(35));
+    dst_bytes.fill(0);
+    filter_2d_rgb_exact(
+        &bytes,
+        &mut dst_bytes,
+        ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
+        &kernel,
+        &kernel,
+        EdgeMode::Clamp,
+        ThreadingPolicy::Adaptive,
+    )
+    .unwrap();
     //
     // filter_2d_rgba_approx::<u8, f32, i32>(
     //     &bytes,

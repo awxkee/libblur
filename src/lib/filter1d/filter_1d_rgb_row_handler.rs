@@ -32,11 +32,11 @@ use crate::filter1d::filter_scan::ScanPoint1d;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::filter1d::neon::{filter_rgb_row_neon_f32_f32, filter_rgb_row_neon_u8_f32};
 use crate::filter1d::region::FilterRegion;
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+use crate::filter1d::sse::filter_rgb_row_sse_u8_f32;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::ImageSize;
 use half::f16;
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-use crate::filter1d::sse::filter_rgb_row_sse_u8_f32;
 
 pub trait Filter1DRgbRowHandler<T, F> {
     fn get_rgb_row_handler() -> fn(

@@ -58,6 +58,20 @@ where
     F: ToStorage<T> + Mul<F> + MulAdd<F, Output = F> + Send + Sync,
     i32: AsPrimitive<F>,
 {
+    if image.len() != 4 * image_size.width * image_size.height {
+        return Err(format!(
+            "Can't create arena, expected image with size {} but got {}",
+            4 * image_size.width * image_size.height,
+            image.len()
+        ));
+    }
+    if destination.len() != 4 * image_size.width * image_size.height {
+        return Err(format!(
+            "Can't create arena, expected image with size {} but got {}",
+            4 * image_size.width * image_size.height,
+            destination.len()
+        ));
+    }
     if row_kernel.len() & 1 == 0 {
         return Err(String::from("Row kernel length must be odd"));
     }

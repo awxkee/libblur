@@ -147,7 +147,7 @@ pub unsafe fn _mm_load_deinterleave_rgba(ptr: *const u8) -> (__m128i, __m128i, _
 
 #[inline]
 #[target_feature(enable = "sse4.1")]
-pub unsafe fn _mm_load_deinterleave_half_rgba(
+pub unsafe fn _mm_load_deinterleave_rgba_half(
     ptr: *const u8,
 ) -> (__m128i, __m128i, __m128i, __m128i) {
     let row0 = _mm_loadu_si128(ptr as *const __m128i);

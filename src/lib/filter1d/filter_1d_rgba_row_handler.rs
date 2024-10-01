@@ -32,6 +32,8 @@ use crate::filter1d::filter_scan::ScanPoint1d;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::filter1d::neon::filter_rgba_row_neon_u8_f32;
 use crate::filter1d::region::FilterRegion;
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+use crate::filter1d::sse::filter_rgba_row_sse_u8_f32;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::ImageSize;
 use half::f16;
@@ -65,7 +67,10 @@ macro_rules! default_1d_row_handler {
 }
 
 impl Filter1DRgbaRowHandler<u8, f32> for u8 {
-    #[cfg(not(all(target_arch = "aarch64", target_feature = "neon")))]
+    #[cfg(not(any(
+        all(target_arch = "aarch64", target_feature = "neon"),
+        any(target_arch = "x86_64", target_arch = "x86")
+    )))]
     fn get_rgba_row_handler(
     ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
         filter_color_group_row::<u8, f32, 4>
@@ -75,6 +80,15 @@ impl Filter1DRgbaRowHandler<u8, f32> for u8 {
     fn get_rgba_row_handler(
     ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
         filter_rgba_row_neon_u8_f32
+    }
+
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    fn get_rgba_row_handler(
+    ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
+        if std::arch::is_x86_feature_detected!("sse4.1") {
+            return filter_rgba_row_sse_u8_f32;
+        }
+        filter_color_group_row::<u8, f32, 4>
     }
 }
 

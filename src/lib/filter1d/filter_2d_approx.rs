@@ -73,6 +73,20 @@ where
     i32: AsPrimitive<F> + AsPrimitive<I>,
     i64: AsPrimitive<I> + AsPrimitive<F>,
 {
+    if image.len() != image_size.width * image_size.height {
+        return Err(format!(
+            "Can't create arena, expected image with size {} but got {}",
+            image_size.width * image_size.height,
+            image.len()
+        ));
+    }
+    if destination.len() != image_size.width * image_size.height {
+        return Err(format!(
+            "Can't create arena, expected image with size {} but got {}",
+            image_size.width * image_size.height,
+            destination.len()
+        ));
+    }
     if row_kernel.len() & 1 == 0 {
         return Err(String::from("Row kernel length must be odd"));
     }

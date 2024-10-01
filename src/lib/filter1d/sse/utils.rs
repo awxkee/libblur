@@ -70,10 +70,7 @@ pub unsafe fn _mm_mul_epi8_by_ps_x4(
 
 #[inline]
 #[target_feature(enable = "sse4.1")]
-pub unsafe fn _mm_mul_epi8_by_ps_x2(
-    input: __m128i,
-    weight: __m128,
-) -> (__m128, __m128) {
+pub unsafe fn _mm_mul_epi8_by_ps_x2(input: __m128i, weight: __m128) -> (__m128, __m128) {
     let zeros = _mm_setzero_si128();
     let lo_16 = _mm_unpacklo_epi8(input, zeros);
 
@@ -194,7 +191,6 @@ pub unsafe fn _mm_mul_add_epi8_by_ps_x2<const FMA: bool>(
         )
     }
 }
-
 
 #[inline]
 #[target_feature(enable = "sse4.1")]
