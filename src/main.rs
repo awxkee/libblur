@@ -306,8 +306,8 @@ fn main() {
 
     // dst_bytes = perform_planar_pass_3(&bytes, dimensions.0 as usize, dimensions.1 as usize);
 
-    let kernel = get_gaussian_kernel_1d(35, get_sigma_size(35));
-    dst_bytes.fill(0);
+    let kernel = get_gaussian_kernel_1d(151, get_sigma_size(151));
+    // dst_bytes.fill(0);
     filter_2d_rgb_exact(
         &bytes,
         &mut dst_bytes,

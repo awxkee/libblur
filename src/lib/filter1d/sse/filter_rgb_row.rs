@@ -79,6 +79,7 @@ pub fn filter_rgb_row_sse_u8_f32(
     }
 }
 
+#[inline]
 #[target_feature(enable = "sse4.1")]
 unsafe fn filter_rgb_row_sse_u8_f32_impl<const FMA: bool>(
     arena: Arena,

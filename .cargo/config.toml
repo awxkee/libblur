@@ -1,6 +1,6 @@
-[target.x86_64-pc-windows-msvc]
-rustflags = ["-Ctarget-feature=+sse4.1"]
+#[target.x86_64-pc-windows-msvc]
 #rustflags = ["-Ctarget-cpu=native"]
+#rustflags = ["-Ctarget-feature=+avx2,+sse4.1"]
 
 [target.x86_64-apple-darwin]
 rustflags = ["-Ctarget-feature=+sse4.1"]

@@ -26,23 +26,26 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-mod filter_column;
-mod filter_column_approx;
-mod filter_column_f32;
-mod filter_rgb_row;
-mod filter_rgb_row_approx;
-mod filter_rgba_row;
-mod filter_rgba_row_approx;
-mod filter_row;
-mod filter_row_approx;
-pub mod utils;
 
-pub use filter_column::filter_column_sse_u8_f32;
-pub use filter_column_approx::filter_column_sse_u8_i32;
-pub use filter_column_f32::filter_column_sse_f32_f32;
-pub use filter_rgb_row::filter_rgb_row_sse_u8_f32;
-pub use filter_rgb_row_approx::filter_rgb_row_sse_u8_i32;
-pub use filter_rgba_row::filter_rgba_row_sse_u8_f32;
-pub use filter_rgba_row_approx::filter_rgba_row_sse_u8_i32;
-pub use filter_row::filter_row_sse_u8_f32;
-pub use filter_row_approx::filter_row_sse_u8_i32;
+#[cfg(target_arch = "x86")]
+use std::arch::x86::*;
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::*;
+
+#[inline]
+#[target_feature(enable = "avx2")]
+pub unsafe fn _mm256_load_pack_x4(ptr: *const u8) -> (__m256i, __m256i, __m256i, __m256i) {
+    let row0 = _mm256_loadu_si256(ptr as *const __m256i);
+    let row1 = _mm256_loadu_si256(ptr.add(32) as *const __m256i);
+    let row2 = _mm256_loadu_si256(ptr.add(64) as *const __m256i);
+    let row3 = _mm256_loadu_si256(ptr.add(96) as *const __m256i);
+    (row0, row1, row2, row3)
+}
+
+#[inline]
+#[target_feature(enable = "avx2")]
+pub unsafe fn _mm256_load_pack_x2(ptr: *const u8) -> (__m256i, __m256i) {
+    let row0 = _mm256_loadu_si256(ptr as *const __m256i);
+    let row1 = _mm256_loadu_si256(ptr.add(32) as *const __m256i);
+    (row0, row1)
+}

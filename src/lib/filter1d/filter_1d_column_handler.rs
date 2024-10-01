@@ -37,6 +37,8 @@ use crate::filter1d::sse::{filter_column_sse_f32_f32, filter_column_sse_u8_f32};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::ImageSize;
 use half::f16;
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+use crate::filter1d::avx::filter_column_avx_u8_f32;
 
 pub trait Filter1DColumnHandler<T, F> {
     fn get_column_handler() -> fn(
@@ -68,6 +70,9 @@ impl Filter1DColumnHandler<u8, f32> for u8 {
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     fn get_column_handler(
     ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
+        if std::arch::is_x86_feature_detected!("avx2") {
+            return filter_column_avx_u8_f32;
+        }
         if std::arch::is_x86_feature_detected!("sse4.1") {
             return filter_column_sse_u8_f32;
         }

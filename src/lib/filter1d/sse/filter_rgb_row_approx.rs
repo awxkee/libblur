@@ -66,6 +66,7 @@ pub fn filter_rgb_row_sse_u8_i32(
     }
 }
 
+#[inline]
 #[target_feature(enable = "sse4.1")]
 unsafe fn filter_rgb_row_neon_u8_i32_impl(
     arena: Arena,

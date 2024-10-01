@@ -57,6 +57,8 @@ mod region;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 mod sse;
 mod to_approx_storage;
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+mod avx;
 
 pub use filter::filter_2d_exact;
 pub use filter_2d_approx::filter_2d_approx;
