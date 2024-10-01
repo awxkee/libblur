@@ -33,7 +33,7 @@ use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::neon::filter_column_neon_u8_i32;
 use crate::filter1d::region::FilterRegion;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-use crate::filter1d::sse::filter_row_sse_u8_i32;
+use crate::filter1d::sse::filter_column_sse_u8_i32;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::ImageSize;
 
@@ -85,10 +85,11 @@ impl Filter1DColumnHandlerApprox<u8, i32> for u8 {
     fn get_column_handler(
     ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<i32>]) {
         if std::arch::is_x86_feature_detected!("sse4.1") {
-            return filter_row_sse_u8_i32;
+            return filter_column_sse_u8_i32;
         }
         filter_column_approx
     }
+
 }
 
 default_1d_column_handler!(u8, i64);

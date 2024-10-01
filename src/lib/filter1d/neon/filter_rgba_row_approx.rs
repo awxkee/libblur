@@ -39,7 +39,7 @@ use std::arch::aarch64::*;
 use std::ops::{Add, Mul};
 
 pub fn filter_rgba_row_neon_u8_i32(
-    arena: &Arena,
+    arena: Arena,
     arena_src: &[u8],
     dst: &UnsafeSlice<u8>,
     image_size: ImageSize,

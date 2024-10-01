@@ -36,7 +36,7 @@ use num_traits::{AsPrimitive, MulAdd};
 use std::ops::Mul;
 
 pub fn filter_row<T, F>(
-    arena: &Arena,
+    arena: Arena,
     arena_src: &[T],
     dst: &UnsafeSlice<T>,
     image_size: ImageSize,

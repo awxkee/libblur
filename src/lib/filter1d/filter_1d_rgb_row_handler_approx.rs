@@ -39,7 +39,7 @@ use crate::ImageSize;
 
 pub trait Filter1DRgbRowHandlerApprox<T, F> {
     fn get_rgb_row_handler_apr() -> fn(
-        arena: &Arena,
+        arena: Arena,
         arena_src: &[T],
         dst: &UnsafeSlice<T>,
         image_size: ImageSize,
@@ -52,7 +52,7 @@ macro_rules! default_1d_row_handler {
     ($store:ty, $intermediate:ty) => {
         impl Filter1DRgbRowHandlerApprox<$store, $intermediate> for $store {
             fn get_rgb_row_handler_apr() -> fn(
-                &Arena,
+                Arena,
                 &[$store],
                 &UnsafeSlice<$store>,
                 ImageSize,
@@ -71,19 +71,19 @@ impl Filter1DRgbRowHandlerApprox<u8, i32> for u8 {
         any(target_arch = "x86_64", target_arch = "x86")
     )))]
     fn get_rgb_row_handler_apr(
-    ) -> fn(&Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<i32>]) {
+    ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<i32>]) {
         filter_color_group_row_approx::<u8, i32, 3>
     }
 
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     fn get_rgb_row_handler_apr(
-    ) -> fn(&Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<i32>]) {
+    ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<i32>]) {
         filter_rgb_row_neon_u8_i32
     }
 
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     fn get_rgb_row_handler_apr(
-    ) -> fn(&Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<i32>]) {
+    ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<i32>]) {
         if std::arch::is_x86_feature_detected!("sse4.1") {
             return filter_rgb_row_sse_u8_i32;
         }

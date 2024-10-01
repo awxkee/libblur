@@ -47,7 +47,7 @@ use std::arch::x86_64::*;
 use std::ops::{Add, Mul};
 
 pub fn filter_rgb_row_sse_u8_i32(
-    arena: &Arena,
+    arena: Arena,
     arena_src: &[u8],
     dst: &UnsafeSlice<u8>,
     image_size: ImageSize,
@@ -68,7 +68,7 @@ pub fn filter_rgb_row_sse_u8_i32(
 
 #[target_feature(enable = "sse4.1")]
 unsafe fn filter_rgb_row_neon_u8_i32_impl(
-    arena: &Arena,
+    arena: Arena,
     arena_src: &[u8],
     dst: &UnsafeSlice<u8>,
     image_size: ImageSize,

@@ -114,7 +114,7 @@ where
 
                 scope.spawn(move |_| {
                     row_handler(
-                        &copied_arena,
+                        copied_arena,
                         row_arena_src_slice,
                         &transient_cell,
                         image_size,
@@ -128,7 +128,7 @@ where
         let row_handler = T::get_row_handler();
         let transient_cell = UnsafeSlice::new(destination);
         row_handler(
-            &arena,
+            arena,
             row_arena_src_slice,
             &transient_cell,
             image_size,

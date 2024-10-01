@@ -103,7 +103,7 @@ where
     let scanned_column_kernel = unsafe { scan_se_1d::<I>(&scaled_column_kernel) };
     let scanned_column_kernel_slice = scanned_column_kernel.as_slice();
 
-    let (mut row_arena_src, arena) = make_arena::<T, 3>(
+    let (mut row_arena_src, arena) = make_arena::<T, 1>(
         image,
         image_size,
         KernelShape::new(row_kernel.len(), 0),
@@ -141,7 +141,7 @@ where
 
                 scope.spawn(move |_| {
                     row_handler(
-                        &copied_arena,
+                        copied_arena,
                         row_arena_src_slice,
                         &transient_cell,
                         image_size,
@@ -155,7 +155,7 @@ where
         let row_handler = T::get_row_handler_apr();
         let transient_cell = UnsafeSlice::new(destination);
         row_handler(
-            &arena,
+            arena,
             row_arena_src_slice,
             &transient_cell,
             image_size,
@@ -166,7 +166,7 @@ where
 
     row_arena_src.clear();
 
-    let (mut column_arena_src, column_arena) = make_arena::<T, 3>(
+    let (mut column_arena_src, column_arena) = make_arena::<T, 1>(
         destination,
         image_size,
         KernelShape::new(0, scanned_column_kernel_slice.len()),

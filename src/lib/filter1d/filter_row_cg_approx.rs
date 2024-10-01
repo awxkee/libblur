@@ -37,7 +37,7 @@ use num_traits::AsPrimitive;
 use std::ops::{Add, Mul, Shr};
 
 pub fn filter_color_group_row_approx<T, I, const N: usize>(
-    arena: &Arena,
+    arena: Arena,
     arena_src: &[T],
     dst: &UnsafeSlice<T>,
     image_size: ImageSize,

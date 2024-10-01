@@ -5,13 +5,7 @@ use crate::merge::merge_channels_3;
 use crate::split::split_channels_3;
 use colorutils_rs::TransferFunction;
 use image::{DynamicImage, EncodableLayout, GenericImageView, ImageFormat, ImageReader};
-use libblur::{
-    fast_bilateral_filter, fast_bilateral_filter_image, fast_gaussian, fast_gaussian_next,
-    fast_gaussian_next_f32, filter_2d_exact, filter_2d_rgb_approx, filter_2d_rgb_exact,
-    filter_2d_rgba_approx, filter_2d_rgba_exact, gaussian_blur_image, get_gaussian_kernel_1d,
-    get_sigma_size, stack_blur_image, EdgeMode, FastBlurChannels, GaussianPreciseLevel, ImageSize,
-    ThreadingPolicy,
-};
+use libblur::{fast_bilateral_filter, fast_bilateral_filter_image, fast_gaussian, fast_gaussian_next, fast_gaussian_next_f32, filter_2d_approx, filter_2d_exact, filter_2d_rgb_approx, filter_2d_rgb_exact, filter_2d_rgba_approx, filter_2d_rgba_exact, gaussian_blur_image, get_gaussian_kernel_1d, get_sigma_size, stack_blur_image, EdgeMode, FastBlurChannels, GaussianPreciseLevel, ImageSize, ThreadingPolicy};
 use std::time::Instant;
 
 #[allow(dead_code)]
@@ -100,7 +94,7 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
 
     let start = Instant::now();
 
-    filter_2d_exact(
+    filter_2d_approx::<u8, f32, i32>(
         &plane_2,
         &mut dst_plane_2,
         ImageSize::new(width, height),
@@ -176,9 +170,9 @@ fn main() {
     println!("type {:?}", img.color());
 
     println!("{:?}", img.color());
-    // let img = img.to_rgb8();
+    let img = img.to_rgb8();
     let src_bytes = img.as_bytes();
-    let components = 4;
+    let components = 3;
     let stride = dimensions.0 as usize * components;
     let mut bytes: Vec<u8> = src_bytes.to_vec();
     let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
@@ -304,7 +298,7 @@ fn main() {
     //     .map(|&x| (x.to_f32() * 255f32) as u8)
     //     .collect();
 
-    // dst_bytes = perform_planar_pass_3(&bytes, dimensions.0 as usize, dimensions.1 as usize);
+    dst_bytes = perform_planar_pass_3(&bytes, dimensions.0 as usize, dimensions.1 as usize);
 
     let kernel = get_gaussian_kernel_1d(151, get_sigma_size(151));
     // dst_bytes.fill(0);
@@ -318,17 +312,17 @@ fn main() {
     //     ThreadingPolicy::Adaptive,
     // )
     // .unwrap();
-
-    filter_2d_rgba_approx::<u8, f32, i32>(
-        &bytes,
-        &mut dst_bytes,
-        ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
-        &kernel,
-        &kernel,
-        EdgeMode::Clamp,
-        ThreadingPolicy::Adaptive,
-    )
-    .unwrap();
+    //
+    // filter_2d_rgba_approx::<u8, f32, i32>(
+    //     &bytes,
+    //     &mut dst_bytes,
+    //     ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
+    //     &kernel,
+    //     &kernel,
+    //     EdgeMode::Clamp,
+    //     ThreadingPolicy::Adaptive,
+    // )
+    // .unwrap();
 
     let elapsed_time = start_time.elapsed();
     // Print the elapsed time in milliseconds

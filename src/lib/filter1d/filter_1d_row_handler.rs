@@ -38,7 +38,7 @@ use half::f16;
 
 pub trait Filter1DRowHandler<T, F> {
     fn get_row_handler() -> fn(
-        arena: &Arena,
+        arena: Arena,
         arena_src: &[T],
         dst: &UnsafeSlice<T>,
         image_size: ImageSize,
@@ -50,13 +50,13 @@ pub trait Filter1DRowHandler<T, F> {
 impl Filter1DRowHandler<u8, f32> for u8 {
     #[cfg(not(all(target_arch = "aarch64", target_feature = "neon")))]
     fn get_row_handler(
-    ) -> fn(&Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
+    ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
         filter_row
     }
 
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     fn get_row_handler(
-    ) -> fn(&Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
+    ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
         filter_row_neon_u8_f32
     }
 }
@@ -64,13 +64,13 @@ impl Filter1DRowHandler<u8, f32> for u8 {
 impl Filter1DRowHandler<f32, f32> for f32 {
     #[cfg(not(all(target_arch = "aarch64", target_feature = "neon")))]
     fn get_row_handler(
-    ) -> fn(&Arena, &[f32], &UnsafeSlice<f32>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
+    ) -> fn(Arena, &[f32], &UnsafeSlice<f32>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
         filter_row
     }
 
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     fn get_row_handler(
-    ) -> fn(&Arena, &[f32], &UnsafeSlice<f32>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
+    ) -> fn(Arena, &[f32], &UnsafeSlice<f32>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
         filter_row_neon_f32_f32
     }
 }
@@ -79,7 +79,7 @@ macro_rules! default_1d_row_handler {
     ($store:ty, $intermediate:ty) => {
         impl Filter1DRowHandler<$store, $intermediate> for $store {
             fn get_row_handler() -> fn(
-                &Arena,
+                Arena,
                 &[$store],
                 &UnsafeSlice<$store>,
                 ImageSize,

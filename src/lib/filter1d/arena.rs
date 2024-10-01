@@ -70,6 +70,14 @@ pub fn make_arena<T, const COMPONENTS: usize>(
 where
     T: Default + Copy + Send + Sync,
 {
+    if image.len() != COMPONENTS * image_size.width * image_size.height {
+        return Err(format!(
+            "Can't create arena, expected image with size {} but got {}",
+            COMPONENTS * image_size.width * image_size.height,
+            image.len()
+        ));
+    }
+
     let (kw, kh) = (kernel_size.width, kernel_size.height);
 
     let pad_w = kw / 2;
