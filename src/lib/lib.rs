@@ -40,9 +40,11 @@ mod fast_gaussian_image;
 mod fast_gaussian_image_next;
 mod fast_gaussian_next;
 mod fast_gaussian_superior;
+mod filter1d;
 mod gaussian;
 #[cfg(feature = "image")]
 mod gaussian_blur_image;
+mod img_size;
 mod median_blur;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 mod neon;
@@ -83,15 +85,21 @@ pub use fast_gaussian_next::fast_gaussian_next_f32;
 pub use fast_gaussian_next::fast_gaussian_next_in_linear;
 pub use fast_gaussian_next::fast_gaussian_next_u16;
 pub use fast_gaussian_superior::fast_gaussian_superior;
+pub use filter1d::{
+    filter_2d_approx, filter_2d_exact, filter_2d_rgb_approx, filter_2d_rgb_exact,
+    filter_2d_rgba_approx, filter_2d_rgba_exact,
+};
 pub use gaussian::gaussian_blur;
 pub use gaussian::gaussian_blur_f16;
 pub use gaussian::gaussian_blur_f32;
 pub use gaussian::gaussian_blur_in_linear;
 pub use gaussian::gaussian_blur_u16;
+pub use gaussian::get_gaussian_kernel_1d;
 pub use gaussian::get_sigma_size;
 pub use gaussian::GaussianPreciseLevel;
 #[cfg(feature = "image")]
 pub use gaussian_blur_image::gaussian_blur_image;
+pub use img_size::ImageSize;
 pub use median_blur::median_blur;
 pub use r#box::box_blur;
 pub use r#box::box_blur_f32;

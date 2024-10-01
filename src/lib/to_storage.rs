@@ -29,7 +29,7 @@ use half::f16;
 use num_traits::Float;
 
 /// Helper trait to convert and round if we are storing in integral type
-pub(crate) trait ToStorage<T>: 'static + Copy + Float
+pub trait ToStorage<T>: 'static + Copy + Float
 where
     T: 'static + Copy,
 {
@@ -51,8 +51,12 @@ impl_to_integral_storage!(f32, u8);
 impl_to_integral_storage!(f64, u8);
 impl_to_integral_storage!(f32, u16);
 impl_to_integral_storage!(f64, u16);
+impl_to_integral_storage!(f32, i16);
+impl_to_integral_storage!(f64, i16);
 impl_to_integral_storage!(f32, u32);
 impl_to_integral_storage!(f64, u32);
+impl_to_integral_storage!(f32, i32);
+impl_to_integral_storage!(f64, i32);
 impl_to_integral_storage!(f32, usize);
 impl_to_integral_storage!(f64, usize);
 

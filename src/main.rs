@@ -7,8 +7,10 @@ use colorutils_rs::TransferFunction;
 use image::{DynamicImage, EncodableLayout, GenericImageView, ImageFormat, ImageReader};
 use libblur::{
     fast_bilateral_filter, fast_bilateral_filter_image, fast_gaussian, fast_gaussian_next,
-    fast_gaussian_next_f32, gaussian_blur_image, stack_blur_image, EdgeMode, FastBlurChannels,
-    GaussianPreciseLevel, ThreadingPolicy,
+    fast_gaussian_next_f32, filter_2d_exact, filter_2d_rgb_approx, filter_2d_rgb_exact,
+    filter_2d_rgba_approx, filter_2d_rgba_exact, gaussian_blur_image, get_gaussian_kernel_1d,
+    get_sigma_size, stack_blur_image, EdgeMode, FastBlurChannels, GaussianPreciseLevel, ImageSize,
+    ThreadingPolicy,
 };
 use std::time::Instant;
 
@@ -73,6 +75,10 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
     //     EdgeMode::Clamp,
     // );
 
+    let start = Instant::now();
+
+    let kernel_size = 75;
+
     libblur::gaussian_blur(
         &plane_1,
         width as u32,
@@ -80,28 +86,49 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
         width as u32,
         width as u32,
         height as u32,
-        25 * 2 + 1,
+        kernel_size,
         0.,
         FastBlurChannels::Plane,
         EdgeMode::Reflect,
-        ThreadingPolicy::Single,
+        ThreadingPolicy::Adaptive,
         GaussianPreciseLevel::EXACT,
     );
 
-    libblur::gaussian_blur(
+    println!("libblur::gaussian_blur: {:?}", start.elapsed());
+
+    let kernel = get_gaussian_kernel_1d(kernel_size, get_sigma_size(kernel_size as usize));
+
+    let start = Instant::now();
+
+    filter_2d_exact(
         &plane_2,
-        width as u32,
         &mut dst_plane_2,
-        width as u32,
-        width as u32,
-        height as u32,
-        25 * 2 + 1,
-        0.,
-        FastBlurChannels::Plane,
+        ImageSize::new(width, height),
+        &kernel,
+        &kernel,
         EdgeMode::Reflect,
-        ThreadingPolicy::Single,
-        GaussianPreciseLevel::EXACT,
-    );
+        ThreadingPolicy::Adaptive,
+    )
+    .unwrap();
+
+    println!("filter_1d: {:?}", start.elapsed());
+
+    // libblur::gaussian_blur(
+    //     &plane_2,
+    //     width as u32,
+    //     &mut dst_plane_2,
+    //     width as u32,
+    //     width as u32,
+    //     height as u32,
+    //     25 * 2 + 1,
+    //     0.,
+    //     FastBlurChannels::Plane,
+    //     EdgeMode::Reflect,
+    //     ThreadingPolicy::Single,
+    //     GaussianPreciseLevel::EXACT,
+    // );
+
+    let start = Instant::now();
 
     libblur::gaussian_blur(
         &plane_3,
@@ -110,13 +137,15 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
         width as u32,
         width as u32,
         height as u32,
-        25 * 2 + 1,
+        kernel_size,
         0.,
         FastBlurChannels::Plane,
         EdgeMode::Reflect,
-        ThreadingPolicy::Single,
+        ThreadingPolicy::Adaptive,
         GaussianPreciseLevel::EXACT,
     );
+
+    println!("libblur::gaussian_blur: {:?}", start.elapsed());
 
     merge_channels_3(
         &mut merged_planes,
@@ -138,7 +167,7 @@ fn main() {
     //     vst1q_s64(t.as_mut_ptr(), mul);
     //     println!("{:?}", t);
     // }
-    let img = ImageReader::open("assets/test_image_1_small.jpg")
+    let img = ImageReader::open("assets/test_image_4.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -147,7 +176,7 @@ fn main() {
     println!("type {:?}", img.color());
 
     println!("{:?}", img.color());
-    // let img = img.to_rgba8();
+    let img = img.to_rgb8();
     let src_bytes = img.as_bytes();
     let components = 3;
     let stride = dimensions.0 as usize * components;
@@ -259,16 +288,16 @@ fn main() {
     //     EdgeMode::Clamp,
     // );
 
-    fast_bilateral_filter(
-        src_bytes,
-        &mut dst_bytes,
-        dimensions.0,
-        dimensions.1,
-        15,
-        2f32,
-        1.1f32,
-        FastBlurChannels::Channels3,
-    );
+    // fast_bilateral_filter(
+    //     src_bytes,
+    //     &mut dst_bytes,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     15,
+    //     2f32,
+    //     1.1f32,
+    //     FastBlurChannels::Channels3,
+    // );
 
     // dst_bytes = f16_bytes
     //     .iter()
@@ -276,6 +305,30 @@ fn main() {
     //     .collect();
 
     // dst_bytes = perform_planar_pass_3(&bytes, dimensions.0 as usize, dimensions.1 as usize);
+
+    let kernel = get_gaussian_kernel_1d(151, get_sigma_size(151));
+    // dst_bytes.fill(0);
+    // filter_2d_rgba_exact(
+    //     &bytes,
+    //     &mut dst_bytes,
+    //     ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
+    //     &kernel,
+    //     &kernel,
+    //     EdgeMode::Clamp,
+    //     ThreadingPolicy::Adaptive,
+    // )
+    // .unwrap();
+
+    filter_2d_rgb_approx::<u8, f32, i32>(
+        &bytes,
+        &mut dst_bytes,
+        ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
+        &kernel,
+        &kernel,
+        EdgeMode::Clamp,
+        ThreadingPolicy::Adaptive,
+    )
+    .unwrap();
 
     let elapsed_time = start_time.elapsed();
     // Print the elapsed time in milliseconds
@@ -314,7 +367,7 @@ fn main() {
 
     if components == 3 {
         image::save_buffer(
-            "blurred_stack_oklab_t.jpg",
+            "blurred_stack_oklab.jpg",
             bytes.as_bytes(),
             dimensions.0,
             dimensions.1,

@@ -25,11 +25,6 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use half::f16;
-use num_traits::cast::FromPrimitive;
-use num_traits::AsPrimitive;
-use rayon::ThreadPool;
-
 use crate::channels_configuration::FastBlurChannels;
 use crate::edge_mode::EdgeMode;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
@@ -58,6 +53,10 @@ use crate::gaussian::sse::{
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{get_sigma_size, ThreadingPolicy};
+use half::f16;
+use num_traits::cast::FromPrimitive;
+use num_traits::AsPrimitive;
+use rayon::ThreadPool;
 
 trait GaussianHorizontalDispatch<T> {
     #[allow(clippy::type_complexity)]
