@@ -94,7 +94,7 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
 
     let start = Instant::now();
 
-    filter_2d_approx::<u8, f32, i32>(
+    filter_2d_exact(
         &plane_2,
         &mut dst_plane_2,
         ImageSize::new(width, height),
