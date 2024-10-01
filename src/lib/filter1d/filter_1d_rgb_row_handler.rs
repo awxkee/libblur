@@ -29,6 +29,7 @@
 use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_row_cg::filter_color_group_row;
 use crate::filter1d::filter_scan::ScanPoint1d;
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::filter1d::neon::{filter_rgb_row_neon_f32_f32, filter_rgb_row_neon_u8_f32};
 use crate::filter1d::region::FilterRegion;
 use crate::unsafe_slice::UnsafeSlice;

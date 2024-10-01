@@ -51,6 +51,7 @@ mod filter_row;
 mod filter_row_cg;
 mod filter_row_cg_approx;
 mod filter_scan;
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 mod neon;
 mod region;
 mod to_approx_storage;
