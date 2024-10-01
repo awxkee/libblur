@@ -27,11 +27,11 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+use crate::avx::{_mm256_interleave_rgb, _mm256_interleave_rgba_epi8};
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
-use crate::avx::_mm256_interleave_rgb;
 
 #[inline]
 #[target_feature(enable = "avx2")]
@@ -62,4 +62,11 @@ pub unsafe fn _mm256_store_pack_x3(ptr: *mut u8, v: (__m256i, __m256i, __m256i))
 pub unsafe fn _mm256_store_interleave_rgb(ptr: *mut u8, v: (__m256i, __m256i, __m256i)) {
     let (v0, v1, v2) = _mm256_interleave_rgb(v.0, v.1, v.2);
     _mm256_store_pack_x3(ptr, (v0, v1, v2));
+}
+
+#[inline]
+#[target_feature(enable = "avx2")]
+pub unsafe fn _mm256_store_interleave_rgba(ptr: *mut u8, v: (__m256i, __m256i, __m256i, __m256i)) {
+    let (v0, v1, v2, v3) = _mm256_interleave_rgba_epi8((v.0, v.1, v.2, v.3));
+    _mm256_store_pack_x4(ptr, (v0, v1, v2, v3));
 }

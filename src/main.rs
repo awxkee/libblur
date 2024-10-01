@@ -167,7 +167,7 @@ fn main() {
     //     vst1q_s64(t.as_mut_ptr(), mul);
     //     println!("{:?}", t);
     // }
-    let img = ImageReader::open("assets/test_image_4.png")
+    let img = ImageReader::open("assets/test_image_1_small.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -176,9 +176,9 @@ fn main() {
     println!("type {:?}", img.color());
 
     println!("{:?}", img.color());
-    let img = img.to_rgb8();
+    let img = img.to_rgba8();
     let src_bytes = img.as_bytes();
-    let components = 3;
+    let components = 4;
     let stride = dimensions.0 as usize * components;
     let mut bytes: Vec<u8> = src_bytes.to_vec();
     let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
@@ -306,9 +306,9 @@ fn main() {
 
     // dst_bytes = perform_planar_pass_3(&bytes, dimensions.0 as usize, dimensions.1 as usize);
 
-    let kernel = get_gaussian_kernel_1d(151, get_sigma_size(151));
+    let kernel = get_gaussian_kernel_1d(25, get_sigma_size(25));
     // dst_bytes.fill(0);
-    filter_2d_rgb_exact(
+    filter_2d_rgba_exact(
         &bytes,
         &mut dst_bytes,
         ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),

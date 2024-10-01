@@ -97,10 +97,9 @@ pub unsafe fn _mm256_deinterleave_rgba_epi8(
 
 #[inline]
 #[target_feature(enable = "avx2")]
-pub unsafe fn _mm256_store_interleaved_epi8(
-    ptr: *mut u8,
-    vals: (__m256i, __m256i, __m256i, __m256i)
-) {
+pub unsafe fn _mm256_interleave_rgba_epi8(
+    vals: (__m256i, __m256i, __m256i, __m256i),
+) -> (__m256i, __m256i, __m256i, __m256i) {
     let bg0 = _mm256_unpacklo_epi8(vals.0, vals.1);
     let bg1 = _mm256_unpackhi_epi8(vals.0, vals.1);
     let ra0 = _mm256_unpacklo_epi8(vals.2, vals.3);
@@ -115,11 +114,7 @@ pub unsafe fn _mm256_store_interleaved_epi8(
     let rgba2 = _mm256_permute2x128_si256::<49>(rgba0_, rgba1_);
     let rgba1 = _mm256_permute2x128_si256::<32>(rgba2_, rgba3_);
     let rgba3 = _mm256_permute2x128_si256::<49>(rgba2_, rgba3_);
-
-    _mm256_storeu_si256(ptr as *mut __m256i, rgba0);
-    _mm256_storeu_si256(ptr.add(32) as *mut __m256i, rgba1);
-    _mm256_storeu_si256(ptr.add(64) as *mut __m256i, rgba2);
-    _mm256_storeu_si256(ptr.add(96) as *mut __m256i, rgba3);
+    (rgba0, rgba1, rgba2, rgba3)
 }
 
 #[inline]

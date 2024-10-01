@@ -27,6 +27,8 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter1d::arena::Arena;
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+use crate::filter1d::avx::filter_column_avx_u8_f32;
 use crate::filter1d::filter_column::filter_column;
 use crate::filter1d::filter_scan::ScanPoint1d;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
@@ -37,8 +39,6 @@ use crate::filter1d::sse::{filter_column_sse_f32_f32, filter_column_sse_u8_f32};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::ImageSize;
 use half::f16;
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-use crate::filter1d::avx::filter_column_avx_u8_f32;
 
 pub trait Filter1DColumnHandler<T, F> {
     fn get_column_handler() -> fn(

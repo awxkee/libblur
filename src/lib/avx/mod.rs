@@ -27,10 +27,10 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+mod pack;
 mod v_load;
 mod v_store;
-mod pack;
 
+pub use pack::*;
 pub use v_load::*;
 pub use v_store::*;
-pub use pack::*;
