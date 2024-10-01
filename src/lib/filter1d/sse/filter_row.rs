@@ -37,7 +37,10 @@ use crate::sse::{_mm_load_pack_x2, _mm_load_pack_x4, _mm_store_pack_x2, _mm_stor
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
 use num_traits::MulAdd;
-use std::arch::x86_64::{__m128i, _mm_loadu_si128, _mm_set1_ps, _mm_storeu_si128};
+#[cfg(target_arch = "x86")]
+use std::arch::x86::*;
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::*;
 use std::ops::Mul;
 
 pub fn filter_row_sse_u8_f32(
