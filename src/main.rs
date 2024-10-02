@@ -5,9 +5,9 @@ use crate::merge::merge_channels_3;
 use crate::split::split_channels_3;
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use libblur::{
-    filter_2d_exact, filter_2d_rgb_approx, filter_2d_rgb_exact, filter_2d_rgba_exact,
-    get_gaussian_kernel_1d, get_sigma_size, EdgeMode, FastBlurChannels, GaussianPreciseLevel,
-    ImageSize, Scalar, ThreadingPolicy,
+    filter_2d_exact, filter_2d_rgb_approx, filter_2d_rgb_exact, filter_2d_rgba_approx,
+    filter_2d_rgba_exact, get_gaussian_kernel_1d, get_sigma_size, EdgeMode, FastBlurChannels,
+    GaussianPreciseLevel, ImageSize, Scalar, ThreadingPolicy,
 };
 use std::time::Instant;
 
@@ -174,9 +174,9 @@ fn main() {
     println!("type {:?}", img.color());
 
     println!("{:?}", img.color());
-    let img = img.to_rgb8();
+    let img = img.to_rgba8();
     let src_bytes = img.as_bytes();
-    let components = 3;
+    let components = 4;
     let stride = dimensions.0 as usize * components;
     let mut bytes: Vec<u8> = src_bytes.to_vec();
     let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
@@ -310,7 +310,7 @@ fn main() {
     let sobel_horizontal: [f32; 3] = [-1., 0., 1.];
     let sobel_vertical: [f32; 3] = [1., 2., 1.];
 
-    filter_2d_rgb_approx::<u8, f32, i32>(
+    filter_2d_rgba_approx::<u8, f32, i32>(
         &bytes,
         &mut dst_bytes,
         ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
