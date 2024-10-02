@@ -36,23 +36,20 @@ pub enum EdgeMode {
     Clamp = 0,
     /// If kernel goes out of bounds it will be clipped, this is a slightly faster than clamp, however have different visual effects at the edge.
     /// *Kernel clip is supported only for clear gaussian blur and not supported in any approximations!*
-    KernelClip = 1,
-    /// If filter goes out of bounds image will be replicated with rule `cdefgh|abcdefgh|abcdefg`
-    Wrap = 2,
+    Wrap = 1,
     /// If filter goes out of bounds image will be replicated with rule `fedcba|abcdefgh|hgfedcb`
-    Reflect = 3,
+    Reflect = 2,
     /// If filter goes out of bounds image will be replicated with rule `gfedcb|abcdefgh|gfedcba`
-    Reflect101 = 4,
+    Reflect101 = 3,
     /// If filter goes out of bounds image will be replicated with provided constant
     /// Works only for clear filter, otherwise ignored
-    Constant = 5,
+    Constant = 4,
 }
 
 impl From<usize> for EdgeMode {
     fn from(value: usize) -> Self {
         match value {
             0 => EdgeMode::Clamp,
-            1 => EdgeMode::KernelClip,
             2 => EdgeMode::Wrap,
             3 => EdgeMode::Reflect,
             4 => EdgeMode::Reflect101,
@@ -145,7 +142,7 @@ macro_rules! reflect_101 {
 macro_rules! clamp_edge {
     ($edge_mode:expr, $value:expr, $min:expr, $max:expr) => {{
         match $edge_mode {
-            EdgeMode::Clamp | EdgeMode::KernelClip | EdgeMode::Constant => {
+            EdgeMode::Clamp | EdgeMode::Constant => {
                 (std::cmp::min(std::cmp::max($value, $min), $max) as u32) as usize
             }
             EdgeMode::Wrap => {

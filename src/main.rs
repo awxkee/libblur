@@ -78,9 +78,7 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
 
     libblur::gaussian_blur(
         &plane_1,
-        width as u32,
         &mut dst_plane_1,
-        width as u32,
         width as u32,
         height as u32,
         kernel_size,
@@ -130,9 +128,7 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
 
     libblur::gaussian_blur(
         &plane_3,
-        width as u32,
         &mut dst_plane_3,
-        width as u32,
         width as u32,
         height as u32,
         kernel_size,
@@ -304,7 +300,7 @@ fn main() {
 
     // dst_bytes = perform_planar_pass_3(&bytes, dimensions.0 as usize, dimensions.1 as usize);
 
-    let kernel = get_gaussian_kernel_1d(151, get_sigma_size(151));
+    let kernel = get_gaussian_kernel_1d(13, get_sigma_size(13));
     // dst_bytes.fill(0);
 
     let sobel_horizontal: [f32; 3] = [-1., 0., 1.];

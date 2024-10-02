@@ -26,6 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::unsafe_slice::UnsafeSlice;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use std::arch::aarch64::*;
 #[cfg(target_arch = "x86")]
@@ -65,7 +66,13 @@ unsafe fn copy_row_neon(dst: &mut [u8], src: &[u8], start: usize, stride: usize)
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[target_feature(enable = "sse4.1")]
-unsafe fn copy_row_sse(dst: &mut [u8], src: &[u8], start: usize, stride: usize) -> usize {
+unsafe fn copy_row_sse(
+    dst: &UnsafeSlice<u8>,
+    offset: usize,
+    src: &[u8],
+    start: usize,
+    stride: usize,
+) -> usize {
     let mut _cx = start;
     while _cx + 64 < stride {
         let offset_ptr = src.as_ptr().add(_cx);
@@ -73,7 +80,7 @@ unsafe fn copy_row_sse(dst: &mut [u8], src: &[u8], start: usize, stride: usize) 
         let row1 = _mm_loadu_si128(offset_ptr.add(16) as *const __m128i);
         let row2 = _mm_loadu_si128(offset_ptr.add(32) as *const __m128i);
         let row3 = _mm_loadu_si128(offset_ptr.add(48) as *const __m128i);
-        let dst_offset_ptr = dst.as_mut_ptr().add(_cx);
+        let dst_offset_ptr = (dst.slice.as_ptr() as *mut u8).add(_cx + offset);
         _mm_storeu_si128(dst_offset_ptr as *mut __m128i, row0);
         _mm_storeu_si128(dst_offset_ptr.add(16) as *mut __m128i, row1);
         _mm_storeu_si128(dst_offset_ptr.add(32) as *mut __m128i, row2);
@@ -85,7 +92,7 @@ unsafe fn copy_row_sse(dst: &mut [u8], src: &[u8], start: usize, stride: usize) 
         let offset_ptr = src.as_ptr().add(_cx);
         let row0 = _mm_loadu_si128(offset_ptr as *const __m128i);
         let row1 = _mm_loadu_si128(offset_ptr.add(16) as *const __m128i);
-        let dst_offset_ptr = dst.as_mut_ptr().add(_cx);
+        let dst_offset_ptr = (dst.slice.as_ptr() as *mut u8).add(_cx + offset);
         _mm_storeu_si128(dst_offset_ptr as *mut __m128i, row0);
         _mm_storeu_si128(dst_offset_ptr.add(16) as *mut __m128i, row1);
         _cx += 32;
@@ -94,7 +101,7 @@ unsafe fn copy_row_sse(dst: &mut [u8], src: &[u8], start: usize, stride: usize) 
     while _cx + 16 < stride {
         let offset_ptr = src.as_ptr().add(_cx);
         let row0 = _mm_loadu_si128(offset_ptr as *const __m128i);
-        let dst_offset_ptr = dst.as_mut_ptr().add(_cx);
+        let dst_offset_ptr = (dst.slice.as_ptr() as *mut u8).add(_cx + offset);
         _mm_storeu_si128(dst_offset_ptr as *mut __m128i, row0);
         _cx += 16;
     }
@@ -102,7 +109,7 @@ unsafe fn copy_row_sse(dst: &mut [u8], src: &[u8], start: usize, stride: usize) 
     while _cx + 8 < stride {
         let offset_ptr = src.as_ptr().add(_cx);
         let row0 = _mm_loadu_si64(offset_ptr);
-        let dst_offset_ptr = dst.as_mut_ptr().add(_cx);
+        let dst_offset_ptr = (dst.slice.as_ptr() as *mut u8).add(_cx + offset);
         std::ptr::copy_nonoverlapping(&row0 as *const _ as *const u8, dst_offset_ptr, 8);
         _cx += 8;
     }
@@ -112,7 +119,13 @@ unsafe fn copy_row_sse(dst: &mut [u8], src: &[u8], start: usize, stride: usize) 
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[target_feature(enable = "avx2")]
-unsafe fn copy_row_avx(dst: &mut [u8], src: &[u8], start: usize, stride: usize) -> usize {
+unsafe fn copy_row_avx(
+    dst: &UnsafeSlice<u8>,
+    offset: usize,
+    src: &[u8],
+    start: usize,
+    stride: usize,
+) -> usize {
     let mut _cx = start;
 
     while _cx + 128 < stride {
@@ -121,7 +134,7 @@ unsafe fn copy_row_avx(dst: &mut [u8], src: &[u8], start: usize, stride: usize) 
         let row1 = _mm256_loadu_si256(offset_ptr.add(32) as *const __m256i);
         let row2 = _mm256_loadu_si256(offset_ptr.add(64) as *const __m256i);
         let row3 = _mm256_loadu_si256(offset_ptr.add(96) as *const __m256i);
-        let dst_offset_ptr = dst.as_mut_ptr().add(_cx);
+        let dst_offset_ptr = (dst.slice.as_ptr() as *mut u8).add(_cx + offset);
         _mm256_storeu_si256(dst_offset_ptr as *mut __m256i, row0);
         _mm256_storeu_si256(dst_offset_ptr.add(32) as *mut __m256i, row1);
         _mm256_storeu_si256(dst_offset_ptr.add(64) as *mut __m256i, row2);
@@ -133,7 +146,7 @@ unsafe fn copy_row_avx(dst: &mut [u8], src: &[u8], start: usize, stride: usize) 
         let offset_ptr = src.as_ptr().add(_cx);
         let row0 = _mm256_loadu_si256(offset_ptr as *const __m256i);
         let row1 = _mm256_loadu_si256(offset_ptr.add(32) as *const __m256i);
-        let dst_offset_ptr = dst.as_mut_ptr().add(_cx);
+        let dst_offset_ptr = (dst.slice.as_ptr() as *mut u8).add(_cx + offset);
         _mm256_storeu_si256(dst_offset_ptr as *mut __m256i, row0);
         _mm256_storeu_si256(dst_offset_ptr.add(32) as *mut __m256i, row1);
         _cx += 64;
@@ -142,7 +155,7 @@ unsafe fn copy_row_avx(dst: &mut [u8], src: &[u8], start: usize, stride: usize) 
     while _cx + 32 < stride {
         let offset_ptr = src.as_ptr().add(_cx);
         let row0 = _mm256_loadu_si256(offset_ptr as *const __m256i);
-        let dst_offset_ptr = dst.as_mut_ptr().add(_cx);
+        let dst_offset_ptr = (dst.slice.as_ptr() as *mut u8).add(_cx + offset);
         _mm256_storeu_si256(dst_offset_ptr as *mut __m256i, row0);
         _cx += 32;
     }
@@ -150,7 +163,7 @@ unsafe fn copy_row_avx(dst: &mut [u8], src: &[u8], start: usize, stride: usize) 
     while _cx + 16 < stride {
         let offset_ptr = src.as_ptr().add(_cx);
         let row0 = _mm_loadu_si128(offset_ptr as *const __m128i);
-        let dst_offset_ptr = dst.as_mut_ptr().add(_cx);
+        let dst_offset_ptr = (dst.slice.as_ptr() as *mut u8).add(_cx + offset);
         _mm_storeu_si128(dst_offset_ptr as *mut __m128i, row0);
         _cx += 16;
     }
@@ -158,7 +171,7 @@ unsafe fn copy_row_avx(dst: &mut [u8], src: &[u8], start: usize, stride: usize) 
     while _cx + 8 < stride {
         let offset_ptr = src.as_ptr().add(_cx);
         let row0 = _mm_loadu_si64(offset_ptr);
-        let dst_offset_ptr = dst.as_mut_ptr().add(_cx);
+        let dst_offset_ptr = (dst.slice.as_ptr() as *mut u8).add(_cx + offset);
         std::ptr::copy_nonoverlapping(&row0 as *const _ as *const u8, dst_offset_ptr, 8);
         _cx += 8;
     }
@@ -173,9 +186,11 @@ where
     T: Copy,
 {
     if std::any::type_name::<T>() == "u8" {
-        let mut dst: &mut [u8] = unsafe { std::mem::transmute(arena) };
-        let mut src = unsafe { std::mem::transmute::<&[T], &[u8]>(roi) };
-        let mut _row_handle: Option<unsafe fn(&mut [u8], &[u8], usize, usize) -> usize> = None;
+        let dst: &mut [u8] = unsafe { std::mem::transmute(arena) };
+        let src = unsafe { std::mem::transmute::<&[T], &[u8]>(roi) };
+        let mut _row_handle: Option<
+            unsafe fn(&UnsafeSlice<u8>, usize, &[u8], usize, usize) -> usize,
+        > = None;
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             _row_handle = Some(copy_row_neon);
@@ -190,21 +205,20 @@ where
             }
         }
         unsafe {
+            let unsafe_dst = &UnsafeSlice::new(dst);
             for y in 0..height {
                 let mut _cx = 0usize;
+                let src = src.get_unchecked((stride * y)..);
+
+                let dst_offset = arena_stride * y;
 
                 if let Some(row_handle) = _row_handle {
-                    _cx = row_handle(dst, src, _cx, stride);
+                    _cx = row_handle(&unsafe_dst, dst_offset, src, _cx, stride);
                 }
 
                 while _cx < stride {
-                    *dst.get_unchecked_mut(_cx) = *src.get_unchecked(_cx);
+                    unsafe_dst.write(_cx + dst_offset, *src.get_unchecked(_cx));
                     _cx += 1;
-                }
-
-                if y + 1 < height {
-                    dst = dst.get_unchecked_mut(arena_stride..);
-                    src = src.get_unchecked(stride..);
                 }
             }
         }

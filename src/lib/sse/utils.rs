@@ -103,56 +103,6 @@ pub(crate) unsafe fn load_u8_s32_fast<const CHANNELS_COUNT: usize>(ptr: *const u
     }
 }
 
-#[inline]
-pub(crate) unsafe fn load_u8_s16_fast<const CHANNELS_COUNT: usize>(ptr: *const u8) -> __m128i {
-    // LLVM generates a little trash code until opt-level is 3 so better here is to use assembly
-    if CHANNELS_COUNT == 4 {
-        let mut regi: __m128i;
-        // It is preferred to allow LLVM re-use zeroed register
-        let zeros = _mm_setzero_si128();
-        asm!("\
-           movd {1}, dword ptr [{0}]
-           punpcklbw {1}, {2}
-    \
-    ",
-        in(reg) ptr,
-        out(xmm_reg) regi,
-        in(xmm_reg) zeros);
-        regi
-    } else if CHANNELS_COUNT == 3 {
-        let mut regi: __m128i;
-        // It is preferred to allow LLVM re-use zeroed register
-        let zeros = _mm_setzero_si128();
-        asm!("\
-            movzx   {t1}, byte ptr [{0}]
-            movzx   {t2}, word ptr [{0} + 1]
-            shl {t2}, 8
-            or {t1}, {t2}
-            movd    {1}, {t1}
-            punpcklbw {1}, {2}
-    \
-    ",
-        in(reg) ptr,
-        out(xmm_reg) regi,
-        in(xmm_reg) zeros,
-        t1 = out(reg) _, t2 = out(reg) _);
-        regi
-    } else if CHANNELS_COUNT == 2 {
-        _mm_setr_epi16(
-            ptr.read_unaligned() as i16,
-            ptr.add(1).read_unaligned() as i16,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-        )
-    } else {
-        _mm_setr_epi16(ptr.read_unaligned() as i16, 0, 0, 0, 0, 0, 0, 0)
-    }
-}
-
 #[inline(always)]
 pub(crate) unsafe fn _mm_mul_ps_epi32(ab: __m128i, cd: __m128) -> __m128i {
     let cvt = _mm_cvtepi32_ps(ab);
@@ -181,26 +131,6 @@ pub(crate) unsafe fn _mm_packus_epi64(a: __m128i, b: __m128i) -> __m128i {
     let a = _mm_shuffle_epi32::<SHUFFLE_MASK>(a);
     let b1 = _mm_shuffle_epi32::<SHUFFLE_MASK>(b);
     _mm_castps_si128(_mm_movelh_ps(_mm_castsi128_ps(a), _mm_castsi128_ps(b1)))
-}
-
-#[inline]
-#[target_feature(enable = "sse4.1")]
-pub(crate) unsafe fn load_u8_f32_fast<const CHANNELS_COUNT: usize>(ptr: *const u8) -> __m128 {
-    let vl = load_u8_s32_fast::<CHANNELS_COUNT>(ptr);
-    _mm_cvtepi32_ps(vl)
-}
-
-#[inline]
-#[target_feature(enable = "sse4.1")]
-pub(crate) unsafe fn load_u8_u32_one(ptr: *const u8) -> __m128i {
-    let u_first = u32::from_le_bytes([ptr.read_unaligned(), 0, 0, 0]);
-    _mm_set1_epi32(u_first as i32)
-}
-
-#[inline]
-#[target_feature(enable = "sse4.1")]
-pub(crate) unsafe fn load_u8_u16_one(ptr: *const u8) -> __m128i {
-    _mm_setr_epi16(ptr.read_unaligned() as i16, 0, 0, 0, 0, 0, 0, 0)
 }
 
 #[inline(always)]

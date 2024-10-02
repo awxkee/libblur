@@ -81,11 +81,6 @@ where
     if column_kernel.len() & 1 == 0 {
         return Err(String::from("Column kernel length must be odd"));
     }
-    if border_mode == EdgeMode::KernelClip {
-        return Err(String::from(
-            "Border mode KernelClip is not supported in filter 1d",
-        ));
-    }
 
     let scanned_row_kernel = unsafe { scan_se_1d(row_kernel) };
     let scanned_row_kernel_slice = scanned_row_kernel.as_slice();

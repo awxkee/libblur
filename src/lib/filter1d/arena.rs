@@ -26,6 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use std::time::Instant;
 use crate::edge_mode::{reflect_index, reflect_index_101};
 use crate::filter1d::arena_roi::copy_roi;
 use crate::filter1d::filter_element::KernelShape;
@@ -97,6 +98,8 @@ where
     let old_stride = image_size.width * COMPONENTS;
     let new_stride = new_width * COMPONENTS;
 
+    let arent_time = Instant::now();
+
     unsafe {
         let offset = pad_h * new_stride + pad_w * COMPONENTS;
         copy_roi(
@@ -107,6 +110,8 @@ where
             height,
         );
     }
+
+    println!("transfer time {:?}", arent_time.elapsed());
 
     let filling_ranges = [
         (0..pad_h, 0..new_width),                                  // Top outer
@@ -201,9 +206,6 @@ where
                     }
                 }
             }
-        }
-        EdgeMode::KernelClip => {
-            return Err("KernelClip is not supported in Filter 1D".parse().unwrap())
         }
     }
 

@@ -95,11 +95,6 @@ where
     if column_kernel.len() & 1 == 0 {
         return Err(String::from("Column kernel length must be odd"));
     }
-    if border_mode == EdgeMode::KernelClip {
-        return Err(String::from(
-            "Border mode KernelClip is not supported in filter 1d",
-        ));
-    }
 
     let one_i: I = 1.as_();
     let base_level: I = one_i << I::approx_level().as_();

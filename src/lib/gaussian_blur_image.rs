@@ -61,9 +61,7 @@ pub fn gaussian_blur_image(
             let mut new_image = gray.as_raw().to_vec();
             gaussian_blur(
                 gray.as_raw(),
-                gray.width(),
                 &mut new_image,
-                gray.width(),
                 gray.width(),
                 gray.height(),
                 kernel_size,
@@ -99,9 +97,7 @@ pub fn gaussian_blur_image(
 
             gaussian_blur(
                 &intensity_plane,
-                luma_alpha_image.width(),
                 &mut new_intensity_plane,
-                luma_alpha_image.width(),
                 luma_alpha_image.width(),
                 luma_alpha_image.height(),
                 kernel_size,
@@ -114,9 +110,7 @@ pub fn gaussian_blur_image(
 
             gaussian_blur(
                 &alpha_plane,
-                luma_alpha_image.width(),
                 &mut new_alpha_plane,
-                luma_alpha_image.width(),
                 luma_alpha_image.width(),
                 luma_alpha_image.height(),
                 kernel_size,
@@ -154,9 +148,7 @@ pub fn gaussian_blur_image(
 
             gaussian_blur(
                 rgb_image.as_raw(),
-                rgb_image.width() * 3,
                 &mut new_image,
-                rgb_image.width() * 3,
                 rgb_image.width(),
                 rgb_image.height(),
                 kernel_size,
@@ -175,9 +167,7 @@ pub fn gaussian_blur_image(
             let mut new_image = rgba_image.as_raw().to_vec();
             gaussian_blur(
                 rgba_image.as_raw(),
-                rgba_image.width() * 4,
                 &mut new_image,
-                rgba_image.width() * 4,
                 rgba_image.width(),
                 rgba_image.height(),
                 kernel_size,
