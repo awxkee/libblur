@@ -70,3 +70,19 @@ pub unsafe fn _mm256_store_interleave_rgba(ptr: *mut u8, v: (__m256i, __m256i, _
     let (v0, v1, v2, v3) = _mm256_interleave_rgba_epi8((v.0, v.1, v.2, v.3));
     _mm256_store_pack_x4(ptr, (v0, v1, v2, v3));
 }
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+pub unsafe fn _mm256_store_pack_ps_x4(ptr: *mut f32, v: (__m256, __m256, __m256, __m256)) {
+    _mm256_storeu_ps(ptr, v.0);
+    _mm256_storeu_ps(ptr.add(8), v.1);
+    _mm256_storeu_ps(ptr.add(16), v.2);
+    _mm256_storeu_ps(ptr.add(24), v.3);
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+pub unsafe fn _mm256_store_pack_ps_x2(ptr: *mut f32, v: (__m256, __m256)) {
+    _mm256_storeu_ps(ptr, v.0);
+    _mm256_storeu_ps(ptr.add(8), v.1);
+}

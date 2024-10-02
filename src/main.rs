@@ -167,7 +167,7 @@ fn main() {
     //     vst1q_s64(t.as_mut_ptr(), mul);
     //     println!("{:?}", t);
     // }
-    let img = ImageReader::open("assets/test_image_1_small.jpg")
+    let img = ImageReader::open("assets/test_image_4.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -306,7 +306,7 @@ fn main() {
 
     // dst_bytes = perform_planar_pass_3(&bytes, dimensions.0 as usize, dimensions.1 as usize);
 
-    let kernel = get_gaussian_kernel_1d(25, get_sigma_size(25));
+    let kernel = get_gaussian_kernel_1d(151, get_sigma_size(151));
     // dst_bytes.fill(0);
     filter_2d_rgba_exact(
         &bytes,

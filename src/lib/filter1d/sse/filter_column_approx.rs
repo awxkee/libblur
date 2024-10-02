@@ -34,7 +34,10 @@ use crate::filter1d::sse::utils::{
 };
 use crate::filter1d::to_approx_storage::ToApproxStorage;
 use crate::img_size::ImageSize;
-use crate::sse::{_mm_load_pack_x2, _mm_load_pack_x4, _mm_store_pack_x2, _mm_store_pack_x4};
+use crate::sse::{
+    _mm_load_pack_x2, _mm_load_pack_x3, _mm_load_pack_x4, _mm_store_pack_x2, _mm_store_pack_x3,
+    _mm_store_pack_x4,
+};
 use crate::unsafe_slice::UnsafeSlice;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
@@ -120,6 +123,38 @@ unsafe fn filter_column_sse_u8_i32_impl(
                     ),
                 );
                 _cx += 64;
+            }
+
+            while _cx + 48 < image_width {
+                let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(0).weight as i16);
+
+                let shifted_src = local_src.get_unchecked(_cx..);
+
+                let source = _mm_load_pack_x3(shifted_src.as_ptr());
+                let mut k0 = _mm_mul_epi8_by_epi16_x4(source.0, coeff);
+                let mut k1 = _mm_mul_epi8_by_epi16_x4(source.1, coeff);
+                let mut k2 = _mm_mul_epi8_by_epi16_x4(source.2, coeff);
+
+                for i in 1..length {
+                    let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(i).weight as i16);
+                    let v_source =
+                        _mm_load_pack_x3(shifted_src.get_unchecked(i * arena_width..).as_ptr());
+                    k0 = _mm_mul_add_epi8_by_epi16_x4(k0, v_source.0, coeff);
+                    k1 = _mm_mul_add_epi8_by_epi16_x4(k1, v_source.1, coeff);
+                    k2 = _mm_mul_add_epi8_by_epi16_x4(k2, v_source.2, coeff);
+                }
+
+                let dst_offset = y * dst_stride + _cx;
+                let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+                _mm_store_pack_x3(
+                    dst_ptr0,
+                    (
+                        _mm_pack_epi32_x4_epi8(k0),
+                        _mm_pack_epi32_x4_epi8(k1),
+                        _mm_pack_epi32_x4_epi8(k2),
+                    ),
+                );
+                _cx += 48;
             }
 
             while _cx + 32 < image_width {

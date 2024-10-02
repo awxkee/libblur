@@ -69,7 +69,7 @@ pub unsafe fn _mm256_fmlaf_ps(a: __m256, b: __m256, c: __m256) -> __m256 {
 
 #[inline]
 #[target_feature(enable = "avx2")]
-pub unsafe fn _mm_opt_fmlaf_ps<const FMA: bool>(a: __m256, b: __m256, c: __m256) -> __m256 {
+pub unsafe fn _mm256_opt_fmlaf_ps<const FMA: bool>(a: __m256, b: __m256, c: __m256) -> __m256 {
     if FMA {
         _mm256_fmlaf_ps(a, b, c)
     } else {
@@ -88,22 +88,22 @@ pub unsafe fn _mm256_mul_add_epi8_by_ps_x4<const FMA: bool>(
     let hi_16 = _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(input));
 
     (
-        _mm_opt_fmlaf_ps::<FMA>(
+        _mm256_opt_fmlaf_ps::<FMA>(
             accumulator.0,
             _mm256_cvtepi32_ps(_mm256_cvtepi16_epi32(_mm256_castsi256_si128(lo_16))),
             weight,
         ),
-        _mm_opt_fmlaf_ps::<FMA>(
+        _mm256_opt_fmlaf_ps::<FMA>(
             accumulator.1,
             _mm256_cvtepi32_ps(_mm256_cvtepi16_epi32(_mm256_extracti128_si256::<1>(lo_16))),
             weight,
         ),
-        _mm_opt_fmlaf_ps::<FMA>(
+        _mm256_opt_fmlaf_ps::<FMA>(
             accumulator.2,
             _mm256_cvtepi32_ps(_mm256_cvtepi16_epi32(_mm256_castsi256_si128(hi_16))),
             weight,
         ),
-        _mm_opt_fmlaf_ps::<FMA>(
+        _mm256_opt_fmlaf_ps::<FMA>(
             accumulator.3,
             _mm256_cvtepi32_ps(_mm256_cvtepi16_epi32(_mm256_extracti128_si256::<1>(hi_16))),
             weight,

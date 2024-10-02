@@ -28,7 +28,7 @@
  */
 use crate::filter1d::arena::Arena;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-use crate::filter1d::avx::filter_column_avx_u8_f32;
+use crate::filter1d::avx::{filter_column_avx_f32_f32, filter_column_avx_u8_f32};
 use crate::filter1d::filter_column::filter_column;
 use crate::filter1d::filter_scan::ScanPoint1d;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
@@ -99,6 +99,9 @@ impl Filter1DColumnHandler<f32, f32> for f32 {
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     fn get_column_handler(
     ) -> fn(Arena, &[f32], &UnsafeSlice<f32>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
+        if std::arch::is_x86_feature_detected!("avx2") {
+            return filter_column_avx_f32_f32;
+        }
         if std::arch::is_x86_feature_detected!("sse4.1") {
             return filter_column_sse_f32_f32;
         }

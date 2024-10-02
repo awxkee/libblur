@@ -95,6 +95,34 @@ pub fn filter_column_neon_u8_i32(
                 _cx += 64;
             }
 
+            while _cx + 48 < image_width {
+                let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(0).weight as i16);
+
+                let shifted_src = local_src.get_unchecked(_cx..);
+
+                let source = vld1q_u8_x3(shifted_src.as_ptr());
+                let mut k0 = vmulq_u8_by_i16(source.0, coeff);
+                let mut k1 = vmulq_u8_by_i16(source.1, coeff);
+                let mut k2 = vmulq_u8_by_i16(source.2, coeff);
+
+                for i in 1..length {
+                    let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight as i16);
+                    let v_source =
+                        vld1q_u8_x3(shifted_src.get_unchecked(i * arena_width..).as_ptr());
+                    k0 = vfmlaq_u8_s16(k0, v_source.0, coeff);
+                    k1 = vfmlaq_u8_s16(k1, v_source.1, coeff);
+                    k2 = vfmlaq_u8_s16(k2, v_source.2, coeff);
+                }
+
+                let dst_offset = y * dst_stride + _cx;
+                let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+                vst1q_u8_x3(
+                    dst_ptr0,
+                    uint8x16x3_t(vqmovnq_s32_u8(k0), vqmovnq_s32_u8(k1), vqmovnq_s32_u8(k2)),
+                );
+                _cx += 48;
+            }
+
             while _cx + 32 < image_width {
                 let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(0).weight as i16);
 

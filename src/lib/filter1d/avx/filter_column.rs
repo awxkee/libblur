@@ -27,7 +27,8 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::avx::{
-    _mm256_load_pack_x2, _mm256_load_pack_x4, _mm256_store_pack_x2, _mm256_store_pack_x4,
+    _mm256_load_pack_x2, _mm256_load_pack_x3, _mm256_load_pack_x4, _mm256_store_pack_x2,
+    _mm256_store_pack_x3, _mm256_store_pack_x4,
 };
 use crate::filter1d::arena::Arena;
 use crate::filter1d::avx::utils::{
@@ -175,6 +176,38 @@ unsafe fn filter_column_avx_u8_f32_impl<const FMA: bool>(
                 ),
             );
             _cx += 128;
+        }
+
+        while _cx + 96 < image_width {
+            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(0).weight);
+
+            let shifted_src = local_src.get_unchecked(_cx..);
+
+            let source = _mm256_load_pack_x3(shifted_src.as_ptr());
+            let mut k0 = _mm256_mul_epi8_by_ps_x4(source.0, coeff);
+            let mut k1 = _mm256_mul_epi8_by_ps_x4(source.1, coeff);
+            let mut k2 = _mm256_mul_epi8_by_ps_x4(source.2, coeff);
+
+            for i in 1..length {
+                let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(i).weight);
+                let v_source =
+                    _mm256_load_pack_x3(shifted_src.get_unchecked(i * arena_width..).as_ptr());
+                k0 = _mm256_mul_add_epi8_by_ps_x4::<FMA>(k0, v_source.0, coeff);
+                k1 = _mm256_mul_add_epi8_by_ps_x4::<FMA>(k1, v_source.1, coeff);
+                k2 = _mm256_mul_add_epi8_by_ps_x4::<FMA>(k2, v_source.2, coeff);
+            }
+
+            let dst_offset = y * dst_stride + _cx;
+            let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+            _mm256_store_pack_x3(
+                dst_ptr0,
+                (
+                    _mm256_pack_ps_x4_epi8(k0),
+                    _mm256_pack_ps_x4_epi8(k1),
+                    _mm256_pack_ps_x4_epi8(k2),
+                ),
+            );
+            _cx += 96;
         }
 
         while _cx + 64 < image_width {

@@ -47,18 +47,18 @@ pub unsafe fn _mm_load_pack_x4(ptr: *const u8) -> (__m128i, __m128i, __m128i, __
 #[inline]
 #[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_load_pack_ps_x4(ptr: *const f32) -> (__m128, __m128, __m128, __m128) {
-    let row0 = _mm_load_ps(ptr);
-    let row1 = _mm_load_ps(ptr.add(4));
-    let row2 = _mm_load_ps(ptr.add(8));
-    let row3 = _mm_load_ps(ptr.add(12));
+    let row0 = _mm_loadu_ps(ptr);
+    let row1 = _mm_loadu_ps(ptr.add(4));
+    let row2 = _mm_loadu_ps(ptr.add(8));
+    let row3 = _mm_loadu_ps(ptr.add(12));
     (row0, row1, row2, row3)
 }
 
 #[inline]
 #[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_load_pack_ps_x2(ptr: *const f32) -> (__m128, __m128) {
-    let row0 = _mm_load_ps(ptr);
-    let row1 = _mm_load_ps(ptr.add(4));
+    let row0 = _mm_loadu_ps(ptr);
+    let row1 = _mm_loadu_ps(ptr.add(4));
     (row0, row1)
 }
 
@@ -74,17 +74,17 @@ pub unsafe fn _mm_store_pack_x4(ptr: *mut u8, v: (__m128i, __m128i, __m128i, __m
 #[inline]
 #[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_store_pack_ps_x4(ptr: *mut f32, v: (__m128, __m128, __m128, __m128)) {
-    _mm_store_ps(ptr, v.0);
-    _mm_store_ps(ptr.add(4), v.1);
-    _mm_store_ps(ptr.add(8), v.2);
-    _mm_store_ps(ptr.add(12), v.3);
+    _mm_storeu_ps(ptr, v.0);
+    _mm_storeu_ps(ptr.add(4), v.1);
+    _mm_storeu_ps(ptr.add(8), v.2);
+    _mm_storeu_ps(ptr.add(12), v.3);
 }
 
 #[inline]
 #[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_store_pack_ps_x2(ptr: *mut f32, v: (__m128, __m128)) {
-    _mm_store_ps(ptr, v.0);
-    _mm_store_ps(ptr.add(4), v.1);
+    _mm_storeu_ps(ptr, v.0);
+    _mm_storeu_ps(ptr.add(4), v.1);
 }
 
 #[inline]
