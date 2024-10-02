@@ -43,6 +43,7 @@ mod filter_row;
 mod filter_row_f32;
 mod utils;
 mod filter_rgb_row_approx;
+mod filter_rgba_row_approx;
 
 pub use filter_column::filter_column_avx_u8_f32;
 pub use filter_column_approx::filter_column_avx_u8_i32_app;
@@ -59,3 +60,4 @@ pub use filter_rgba_row_symm::filter_rgba_row_avx_symm_u8_f32;
 pub use filter_row::filter_row_avx_u8_f32;
 pub use filter_row_f32::filter_row_avx_f32_f32;
 pub use filter_rgb_row_approx::filter_rgb_row_avx_u8_i32_app;
+pub use filter_rgba_row_approx::filter_rgba_row_avx_u8_i32_app;

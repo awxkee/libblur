@@ -27,6 +27,8 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter1d::arena::Arena;
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+use crate::filter1d::avx::filter_rgba_row_avx_u8_i32_app;
 use crate::filter1d::filter_row_cg_approx::filter_color_group_row_approx;
 use crate::filter1d::filter_row_cg_approx_symmetric::filter_color_group_row_symmetric_approx;
 use crate::filter1d::filter_scan::ScanPoint1d;
@@ -104,6 +106,9 @@ impl Filter1DRgbaRowHandlerApprox<u8, i32> for u8 {
     fn get_rgba_row_handler(
         is_kernel_symmetric: bool,
     ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<i32>]) {
+        if std::arch::is_x86_feature_detected!("avx2") {
+            return filter_rgba_row_avx_u8_i32_app;
+        }
         if std::arch::is_x86_feature_detected!("sse4.1") {
             return filter_rgba_row_sse_u8_i32_app;
         }

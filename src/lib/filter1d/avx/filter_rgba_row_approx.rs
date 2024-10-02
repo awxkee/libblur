@@ -26,7 +26,11 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::avx::{_mm256_load_deinterleave_rgba, _mm256_store_interleave_rgba};
 use crate::filter1d::arena::Arena;
+use crate::filter1d::avx::utils::{
+    _mm256_mul_add_epi8_by_epi16_x4, _mm256_mul_epi8_by_epi16_x4, _mm256_pack_epi32_x4_epi8,
+};
 use crate::filter1d::color_group::ColorGroup;
 use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::region::FilterRegion;
@@ -35,10 +39,7 @@ use crate::filter1d::sse::utils::{
     _mm_mul_epi8_by_epi16_x4, _mm_pack_epi32_x2_epi8, _mm_pack_epi32_x4_epi8,
 };
 use crate::img_size::ImageSize;
-use crate::sse::{
-    _mm_load_deinterleave_rgba, _mm_load_deinterleave_rgba_half, _mm_store_interleave_rgba,
-    _mm_store_interleave_rgba_half,
-};
+use crate::sse::{_mm_load_deinterleave_rgba, _mm_load_deinterleave_rgba_half, _mm_store_interleave_rgba, _mm_store_interleave_rgba_half};
 use crate::unsafe_slice::UnsafeSlice;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
@@ -46,7 +47,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 use std::ops::{Add, Mul};
 
-pub fn filter_rgba_row_sse_u8_i32_app(
+pub fn filter_rgba_row_avx_u8_i32_app(
     arena: Arena,
     arena_src: &[u8],
     dst: &UnsafeSlice<u8>,
@@ -55,7 +56,7 @@ pub fn filter_rgba_row_sse_u8_i32_app(
     scanned_kernel: &[ScanPoint1d<i32>],
 ) {
     unsafe {
-        filter_rgba_row_sse_u8_i32_impl(
+        filter_rgba_row_neon_u8_i32_impl(
             arena,
             arena_src,
             dst,
@@ -66,8 +67,9 @@ pub fn filter_rgba_row_sse_u8_i32_app(
     }
 }
 
-#[target_feature(enable = "sse4.1")]
-unsafe fn filter_rgba_row_sse_u8_i32_impl(
+#[inline]
+#[target_feature(enable = "avx2")]
+unsafe fn filter_rgba_row_neon_u8_i32_impl(
     arena: Arena,
     arena_src: &[u8],
     dst: &UnsafeSlice<u8>,
@@ -79,7 +81,7 @@ unsafe fn filter_rgba_row_sse_u8_i32_impl(
 
     const N: usize = 4;
 
-    let src = &arena_src;
+    let src = arena_src;
 
     let dst_stride = image_size.width * arena.components;
 
@@ -91,6 +93,41 @@ unsafe fn filter_rgba_row_sse_u8_i32_impl(
         let local_src = src.get_unchecked((y * arena_width)..);
 
         let mut _cx = 0usize;
+
+        while _cx + 32 < width {
+            let coeff = _mm256_set1_epi16(scanned_kernel.get_unchecked(0).weight as i16);
+
+            let shifted_src = local_src.get_unchecked((_cx * N)..);
+
+            let source = _mm256_load_deinterleave_rgba(shifted_src.as_ptr());
+            let mut k0 = _mm256_mul_epi8_by_epi16_x4(source.0, coeff);
+            let mut k1 = _mm256_mul_epi8_by_epi16_x4(source.1, coeff);
+            let mut k2 = _mm256_mul_epi8_by_epi16_x4(source.2, coeff);
+            let mut k3 = _mm256_mul_epi8_by_epi16_x4(source.3, coeff);
+
+            for i in 1..length {
+                let coeff = _mm256_set1_epi16(scanned_kernel.get_unchecked(i).weight as i16);
+                let v_source =
+                    _mm256_load_deinterleave_rgba(shifted_src.get_unchecked((i * N)..).as_ptr());
+                k0 = _mm256_mul_add_epi8_by_epi16_x4(k0, v_source.0, coeff);
+                k1 = _mm256_mul_add_epi8_by_epi16_x4(k1, v_source.1, coeff);
+                k2 = _mm256_mul_add_epi8_by_epi16_x4(k2, v_source.2, coeff);
+                k3 = _mm256_mul_add_epi8_by_epi16_x4(k3, v_source.3, coeff);
+            }
+
+            let dst_offset = y * dst_stride + _cx * N;
+            let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+            _mm256_store_interleave_rgba(
+                dst_ptr0,
+                (
+                    _mm256_pack_epi32_x4_epi8(k0),
+                    _mm256_pack_epi32_x4_epi8(k1),
+                    _mm256_pack_epi32_x4_epi8(k2),
+                    _mm256_pack_epi32_x4_epi8(k3),
+                ),
+            );
+            _cx += 32;
+        }
 
         while _cx + 16 < width {
             let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(0).weight as i16);
