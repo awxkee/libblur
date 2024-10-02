@@ -211,6 +211,34 @@ pub unsafe fn _mm_mul_add_epi8_by_ps_x2<const FMA: bool>(
 
 #[inline]
 #[target_feature(enable = "sse4.1")]
+pub unsafe fn _mm_mul_add_symm_epi8_by_ps_x2<const FMA: bool>(
+    accumulator: (__m128, __m128),
+    input0: __m128i,
+    input1: __m128i,
+    weight: __m128,
+) -> (__m128, __m128) {
+    let zeros = _mm_setzero_si128();
+    let lo_16 = _mm_add_epi16(
+        _mm_unpacklo_epi8(input0, zeros),
+        _mm_unpacklo_epi8(input1, zeros),
+    );
+
+    (
+        _mm_opt_fmlaf_ps::<FMA>(
+            accumulator.0,
+            _mm_cvtepi32_ps(_mm_unpacklo_epi16(lo_16, zeros)),
+            weight,
+        ),
+        _mm_opt_fmlaf_ps::<FMA>(
+            accumulator.1,
+            _mm_cvtepi32_ps(_mm_unpackhi_epi16(lo_16, zeros)),
+            weight,
+        ),
+    )
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_mul_add_epi8_by_epi16_x4(
     accumulator: (__m128i, __m128i, __m128i, __m128i),
     input: __m128i,

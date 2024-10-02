@@ -134,16 +134,16 @@ unsafe fn filter_rgb_row_avx_u8_f32_impl<const FMA: bool>(
 
     const N: usize = 3;
 
-    let src = &arena_src;
+    let src = arena_src;
 
     let dst_stride = image_size.width * arena.components;
 
     let arena_width = arena.width * N;
 
+    let length = scanned_kernel.len();
+
     for y in filter_region.start..filter_region.end {
         let local_src = src.get_unchecked((y * arena_width)..);
-
-        let length = scanned_kernel.iter().len();
 
         let mut _cx = 0usize;
 

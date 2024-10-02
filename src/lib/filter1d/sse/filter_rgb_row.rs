@@ -136,10 +136,10 @@ unsafe fn filter_rgb_row_sse_u8_f32_impl<const FMA: bool>(
 
     let arena_width = arena.width * N;
 
+    let length = scanned_kernel.len();
+
     for y in filter_region.start..filter_region.end {
         let local_src = src.get_unchecked((y * arena_width)..);
-
-        let length = scanned_kernel.iter().len();
 
         let mut _cx = 0usize;
 

@@ -38,7 +38,9 @@ use crate::filter1d::neon::{
 };
 use crate::filter1d::region::FilterRegion;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-use crate::filter1d::sse::{filter_rgba_row_sse_f32_f32, filter_rgba_row_sse_u8_f32};
+use crate::filter1d::sse::{
+    filter_rgba_row_sse_f32_f32, filter_rgba_row_sse_symm_u8_f32, filter_rgba_row_sse_u8_f32,
+};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::ImageSize;
 use half::f16;
@@ -113,6 +115,9 @@ impl Filter1DRgbaRowHandler<u8, f32> for u8 {
             return filter_rgba_row_avx_u8_f32;
         }
         if std::arch::is_x86_feature_detected!("sse4.1") {
+            if is_kernel_symmetric {
+                return filter_rgba_row_sse_symm_u8_f32;
+            }
             return filter_rgba_row_sse_u8_f32;
         }
         if is_kernel_symmetric {
