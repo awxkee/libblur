@@ -26,17 +26,49 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::avx::{
+    _mm256_load_pack_x2, _mm256_load_pack_x4, _mm256_store_pack_x2, _mm256_store_pack_x4,
+};
 use crate::filter1d::arena::Arena;
+use crate::filter1d::avx::utils::{
+    _mm256_mul_add_symm_epi8_by_epi16_x4, _mm256_mul_epi8_by_epi16_x4, _mm256_pack_epi32_x4_epi8,
+};
 use crate::filter1d::filter_scan::ScanPoint1d;
-use crate::filter1d::neon::utils::{vfmlaq_symm_u8_s16, vmulq_u8_by_i16, vqmovnq_s32_u8};
 use crate::filter1d::region::FilterRegion;
+use crate::filter1d::sse::utils::{
+    _mm_mul_add_symm_epi8_by_epi16_x4, _mm_mul_epi8_by_epi16_x4, _mm_pack_epi32_x4_epi8,
+};
 use crate::filter1d::to_approx_storage::ToApproxStorage;
 use crate::img_size::ImageSize;
 use crate::unsafe_slice::UnsafeSlice;
-use std::arch::aarch64::*;
+#[cfg(target_arch = "x86")]
+use std::arch::x86::*;
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::*;
 use std::ops::{Add, Mul};
 
-pub fn filter_column_symm_neon_u8_i32_app(
+pub fn filter_column_avx_symm_u8_i32_app(
+    arena: Arena,
+    arena_src: &[u8],
+    dst: &UnsafeSlice<u8>,
+    image_size: ImageSize,
+    filter_region: FilterRegion,
+    scanned_kernel: &[ScanPoint1d<i32>],
+) {
+    unsafe {
+        filter_column_avx_symm_u8_i32_impl(
+            arena,
+            arena_src,
+            dst,
+            image_size,
+            filter_region,
+            scanned_kernel,
+        );
+    }
+}
+
+#[target_feature(enable = "avx2")]
+unsafe fn filter_column_avx_symm_u8_i32_impl(
     arena: Arena,
     arena_src: &[u8],
     dst: &UnsafeSlice<u8>,
@@ -61,136 +93,142 @@ pub fn filter_column_symm_neon_u8_i32_app(
 
             let local_src = src.get_unchecked((y * arena_width)..);
 
-            while _cx + 64 < image_width {
-                let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(half_len).weight as i16);
+            while _cx + 128 < image_width {
+                let coeff = _mm256_set1_epi16(scanned_kernel.get_unchecked(half_len).weight as i16);
 
                 let shifted_src = local_src.get_unchecked(_cx..);
 
-                let source = vld1q_u8_x4(
+                let source = _mm256_load_pack_x4(
                     shifted_src
                         .get_unchecked((half_len * arena_width)..)
                         .as_ptr(),
                 );
-                let mut k0 = vmulq_u8_by_i16(source.0, coeff);
-                let mut k1 = vmulq_u8_by_i16(source.1, coeff);
-                let mut k2 = vmulq_u8_by_i16(source.2, coeff);
-                let mut k3 = vmulq_u8_by_i16(source.3, coeff);
+                let mut k0 = _mm256_mul_epi8_by_epi16_x4(source.0, coeff);
+                let mut k1 = _mm256_mul_epi8_by_epi16_x4(source.1, coeff);
+                let mut k2 = _mm256_mul_epi8_by_epi16_x4(source.2, coeff);
+                let mut k3 = _mm256_mul_epi8_by_epi16_x4(source.3, coeff);
 
                 for i in 0..half_len {
-                    let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight as i16);
                     let rollback = length - i - 1;
+                    let coeff = _mm256_set1_epi16(scanned_kernel.get_unchecked(i).weight as i16);
                     let v_source0 =
-                        vld1q_u8_x4(shifted_src.get_unchecked(i * arena_width..).as_ptr());
-                    let v_source1 =
-                        vld1q_u8_x4(shifted_src.get_unchecked(rollback * arena_width..).as_ptr());
-                    k0 = vfmlaq_symm_u8_s16(k0, v_source0.0, v_source1.0, coeff);
-                    k1 = vfmlaq_symm_u8_s16(k1, v_source0.1, v_source1.1, coeff);
-                    k2 = vfmlaq_symm_u8_s16(k2, v_source0.2, v_source1.2, coeff);
-                    k3 = vfmlaq_symm_u8_s16(k3, v_source0.3, v_source1.3, coeff);
+                        _mm256_load_pack_x4(shifted_src.get_unchecked(i * arena_width..).as_ptr());
+                    let v_source1 = _mm256_load_pack_x4(
+                        shifted_src.get_unchecked(rollback * arena_width..).as_ptr(),
+                    );
+                    k0 = _mm256_mul_add_symm_epi8_by_epi16_x4(k0, v_source0.0, v_source1.0, coeff);
+                    k1 = _mm256_mul_add_symm_epi8_by_epi16_x4(k1, v_source0.1, v_source1.1, coeff);
+                    k2 = _mm256_mul_add_symm_epi8_by_epi16_x4(k2, v_source0.2, v_source1.2, coeff);
+                    k3 = _mm256_mul_add_symm_epi8_by_epi16_x4(k3, v_source0.3, v_source1.3, coeff);
                 }
 
                 let dst_offset = y * dst_stride + _cx;
                 let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
-                vst1q_u8_x4(
+                _mm256_store_pack_x4(
                     dst_ptr0,
-                    uint8x16x4_t(
-                        vqmovnq_s32_u8(k0),
-                        vqmovnq_s32_u8(k1),
-                        vqmovnq_s32_u8(k2),
-                        vqmovnq_s32_u8(k3),
+                    (
+                        _mm256_pack_epi32_x4_epi8(k0),
+                        _mm256_pack_epi32_x4_epi8(k1),
+                        _mm256_pack_epi32_x4_epi8(k2),
+                        _mm256_pack_epi32_x4_epi8(k3),
                     ),
+                );
+                _cx += 128;
+            }
+
+            while _cx + 64 < image_width {
+                let coeff = _mm256_set1_epi16(scanned_kernel.get_unchecked(half_len).weight as i16);
+
+                let shifted_src = local_src.get_unchecked(_cx..);
+
+                let source = _mm256_load_pack_x2(
+                    shifted_src
+                        .get_unchecked((half_len * arena_width)..)
+                        .as_ptr(),
+                );
+                let mut k0 = _mm256_mul_epi8_by_epi16_x4(source.0, coeff);
+                let mut k1 = _mm256_mul_epi8_by_epi16_x4(source.1, coeff);
+
+                for i in 0..half_len {
+                    let rollback = length - i - 1;
+                    let coeff = _mm256_set1_epi16(scanned_kernel.get_unchecked(i).weight as i16);
+                    let v_source0 =
+                        _mm256_load_pack_x2(shifted_src.get_unchecked(i * arena_width..).as_ptr());
+                    let v_source1 = _mm256_load_pack_x2(
+                        shifted_src.get_unchecked(rollback * arena_width..).as_ptr(),
+                    );
+                    k0 = _mm256_mul_add_symm_epi8_by_epi16_x4(k0, v_source0.0, v_source1.0, coeff);
+                    k1 = _mm256_mul_add_symm_epi8_by_epi16_x4(k1, v_source0.1, v_source1.1, coeff);
+                }
+
+                let dst_offset = y * dst_stride + _cx;
+                let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+                _mm256_store_pack_x2(
+                    dst_ptr0,
+                    (_mm256_pack_epi32_x4_epi8(k0), _mm256_pack_epi32_x4_epi8(k1)),
                 );
                 _cx += 64;
             }
 
-            while _cx + 48 < image_width {
-                let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(half_len).weight as i16);
-
-                let shifted_src = local_src.get_unchecked(_cx..);
-
-                let source = vld1q_u8_x3(
-                    shifted_src
-                        .get_unchecked((half_len * arena_width)..)
-                        .as_ptr(),
-                );
-                let mut k0 = vmulq_u8_by_i16(source.0, coeff);
-                let mut k1 = vmulq_u8_by_i16(source.1, coeff);
-                let mut k2 = vmulq_u8_by_i16(source.2, coeff);
-
-                for i in 0..half_len {
-                    let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight as i16);
-                    let rollback = length - i - 1;
-                    let v_source0 =
-                        vld1q_u8_x3(shifted_src.get_unchecked(i * arena_width..).as_ptr());
-                    let v_source1 =
-                        vld1q_u8_x3(shifted_src.get_unchecked(rollback * arena_width..).as_ptr());
-                    k0 = vfmlaq_symm_u8_s16(k0, v_source0.0, v_source1.0, coeff);
-                    k1 = vfmlaq_symm_u8_s16(k1, v_source0.1, v_source1.1, coeff);
-                    k2 = vfmlaq_symm_u8_s16(k2, v_source0.2, v_source1.2, coeff);
-                }
-
-                let dst_offset = y * dst_stride + _cx;
-                let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
-                vst1q_u8_x3(
-                    dst_ptr0,
-                    uint8x16x3_t(vqmovnq_s32_u8(k0), vqmovnq_s32_u8(k1), vqmovnq_s32_u8(k2)),
-                );
-                _cx += 48;
-            }
-
             while _cx + 32 < image_width {
-                let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(half_len).weight as i16);
+                let coeff = _mm256_set1_epi16(scanned_kernel.get_unchecked(half_len).weight as i16);
 
                 let shifted_src = local_src.get_unchecked(_cx..);
 
-                let source = vld1q_u8_x2(
+                let source = _mm256_loadu_si256(
                     shifted_src
                         .get_unchecked((half_len * arena_width)..)
-                        .as_ptr(),
+                        .as_ptr() as *const __m256i,
                 );
-                let mut k0 = vmulq_u8_by_i16(source.0, coeff);
-                let mut k1 = vmulq_u8_by_i16(source.1, coeff);
+                let mut k0 = _mm256_mul_epi8_by_epi16_x4(source, coeff);
 
                 for i in 0..half_len {
-                    let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight as i16);
                     let rollback = length - i - 1;
-                    let v_source0 =
-                        vld1q_u8_x2(shifted_src.get_unchecked(i * arena_width..).as_ptr());
-                    let v_source1 =
-                        vld1q_u8_x2(shifted_src.get_unchecked(rollback * arena_width..).as_ptr());
-                    k0 = vfmlaq_symm_u8_s16(k0, v_source0.0, v_source1.0, coeff);
-                    k1 = vfmlaq_symm_u8_s16(k1, v_source0.1, v_source1.1, coeff);
+                    let coeff = _mm256_set1_epi16(scanned_kernel.get_unchecked(i).weight as i16);
+                    let v_source0 = _mm256_loadu_si256(
+                        shifted_src.get_unchecked(i * arena_width..).as_ptr() as *const __m256i,
+                    );
+                    let v_source1 = _mm256_loadu_si256(
+                        shifted_src.get_unchecked(rollback * arena_width..).as_ptr()
+                            as *const __m256i,
+                    );
+                    k0 = _mm256_mul_add_symm_epi8_by_epi16_x4(k0, v_source0, v_source1, coeff);
                 }
 
                 let dst_offset = y * dst_stride + _cx;
                 let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
-                vst1q_u8_x2(
-                    dst_ptr0,
-                    uint8x16x2_t(vqmovnq_s32_u8(k0), vqmovnq_s32_u8(k1)),
-                );
+                _mm256_storeu_si256(dst_ptr0 as *mut __m256i, _mm256_pack_epi32_x4_epi8(k0));
                 _cx += 32;
             }
 
             while _cx + 16 < image_width {
-                let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(half_len).weight as i16);
+                let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(half_len).weight as i16);
 
                 let shifted_src = local_src.get_unchecked(_cx..);
 
-                let source = vld1q_u8(shifted_src.as_ptr());
-                let mut k0 = vmulq_u8_by_i16(source, coeff);
+                let source = _mm_loadu_si128(
+                    shifted_src
+                        .get_unchecked((half_len * arena_width)..)
+                        .as_ptr() as *const __m128i,
+                );
+                let mut k0 = _mm_mul_epi8_by_epi16_x4(source, coeff);
 
                 for i in 0..half_len {
-                    let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight as i16);
                     let rollback = length - i - 1;
-                    let v_source0 = vld1q_u8(shifted_src.get_unchecked(i * arena_width..).as_ptr());
-                    let v_source1 =
-                        vld1q_u8(shifted_src.get_unchecked(rollback * arena_width..).as_ptr());
-                    k0 = vfmlaq_symm_u8_s16(k0, v_source0, v_source1, coeff);
+                    let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(i).weight as i16);
+                    let v_source0 = _mm_loadu_si128(
+                        shifted_src.get_unchecked(i * arena_width..).as_ptr() as *const __m128i,
+                    );
+                    let v_source1 = _mm_loadu_si128(
+                        shifted_src.get_unchecked(rollback * arena_width..).as_ptr()
+                            as *const __m128i,
+                    );
+                    k0 = _mm_mul_add_symm_epi8_by_epi16_x4(k0, v_source0, v_source1, coeff);
                 }
 
                 let dst_offset = y * dst_stride + _cx;
                 let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
-                vst1q_u8(dst_ptr0, vqmovnq_s32_u8(k0));
+                _mm_storeu_si128(dst_ptr0 as *mut __m128i, _mm_pack_epi32_x4_epi8(k0));
                 _cx += 16;
             }
 

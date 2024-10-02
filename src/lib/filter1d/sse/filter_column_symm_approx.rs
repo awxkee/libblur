@@ -30,7 +30,7 @@ use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::region::FilterRegion;
 use crate::filter1d::sse::utils::{
-    _mm_mul_add_epi8_by_epi16_x4, _mm_mul_epi8_by_epi16_x4, _mm_pack_epi32_x4_epi8,
+    _mm_mul_add_symm_epi8_by_epi16_x4, _mm_mul_epi8_by_epi16_x4, _mm_pack_epi32_x4_epi8,
 };
 use crate::filter1d::to_approx_storage::ToApproxStorage;
 use crate::img_size::ImageSize;
@@ -45,7 +45,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 use std::ops::{Add, Mul};
 
-pub fn filter_column_sse_u8_i32_app(
+pub fn filter_column_symm_u8_i32_app(
     arena: Arena,
     arena_src: &[u8],
     dst: &UnsafeSlice<u8>,
@@ -54,7 +54,7 @@ pub fn filter_column_sse_u8_i32_app(
     scanned_kernel: &[ScanPoint1d<i32>],
 ) {
     unsafe {
-        filter_column_sse_u8_i32_impl(
+        filter_column_symm_u8_i32_impl(
             arena,
             arena_src,
             dst,
@@ -66,7 +66,7 @@ pub fn filter_column_sse_u8_i32_app(
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn filter_column_sse_u8_i32_impl(
+unsafe fn filter_column_symm_u8_i32_impl(
     arena: Arena,
     arena_src: &[u8],
     dst: &UnsafeSlice<u8>,
@@ -84,6 +84,7 @@ unsafe fn filter_column_sse_u8_i32_impl(
         let dst_stride = image_size.width * arena.components;
 
         let length = scanned_kernel.len();
+        let half_len = length / 2;
 
         for y in filter_region.start..filter_region.end {
             let mut _cx = 0usize;
@@ -91,24 +92,32 @@ unsafe fn filter_column_sse_u8_i32_impl(
             let local_src = src.get_unchecked((y * arena_width)..);
 
             while _cx + 64 < image_width {
-                let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(0).weight as i16);
+                let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(half_len).weight as i16);
 
                 let shifted_src = local_src.get_unchecked(_cx..);
 
-                let source = _mm_load_pack_x4(shifted_src.as_ptr());
+                let source = _mm_load_pack_x4(
+                    shifted_src
+                        .get_unchecked((half_len * arena_width)..)
+                        .as_ptr(),
+                );
                 let mut k0 = _mm_mul_epi8_by_epi16_x4(source.0, coeff);
                 let mut k1 = _mm_mul_epi8_by_epi16_x4(source.1, coeff);
                 let mut k2 = _mm_mul_epi8_by_epi16_x4(source.2, coeff);
                 let mut k3 = _mm_mul_epi8_by_epi16_x4(source.3, coeff);
 
-                for i in 1..length {
+                for i in 0..half_len {
+                    let rollback = length - i - 1;
                     let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(i).weight as i16);
-                    let v_source =
+                    let v_source0 =
                         _mm_load_pack_x4(shifted_src.get_unchecked(i * arena_width..).as_ptr());
-                    k0 = _mm_mul_add_epi8_by_epi16_x4(k0, v_source.0, coeff);
-                    k1 = _mm_mul_add_epi8_by_epi16_x4(k1, v_source.1, coeff);
-                    k2 = _mm_mul_add_epi8_by_epi16_x4(k2, v_source.2, coeff);
-                    k3 = _mm_mul_add_epi8_by_epi16_x4(k3, v_source.3, coeff);
+                    let v_source1 = _mm_load_pack_x4(
+                        shifted_src.get_unchecked(rollback * arena_width..).as_ptr(),
+                    );
+                    k0 = _mm_mul_add_symm_epi8_by_epi16_x4(k0, v_source0.0, v_source1.0, coeff);
+                    k1 = _mm_mul_add_symm_epi8_by_epi16_x4(k1, v_source0.1, v_source1.1, coeff);
+                    k2 = _mm_mul_add_symm_epi8_by_epi16_x4(k2, v_source0.2, v_source1.2, coeff);
+                    k3 = _mm_mul_add_symm_epi8_by_epi16_x4(k3, v_source0.3, v_source1.3, coeff);
                 }
 
                 let dst_offset = y * dst_stride + _cx;
@@ -126,22 +135,30 @@ unsafe fn filter_column_sse_u8_i32_impl(
             }
 
             while _cx + 48 < image_width {
-                let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(0).weight as i16);
+                let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(half_len).weight as i16);
 
                 let shifted_src = local_src.get_unchecked(_cx..);
 
-                let source = _mm_load_pack_x3(shifted_src.as_ptr());
+                let source = _mm_load_pack_x3(
+                    shifted_src
+                        .get_unchecked((half_len * arena_width)..)
+                        .as_ptr(),
+                );
                 let mut k0 = _mm_mul_epi8_by_epi16_x4(source.0, coeff);
                 let mut k1 = _mm_mul_epi8_by_epi16_x4(source.1, coeff);
                 let mut k2 = _mm_mul_epi8_by_epi16_x4(source.2, coeff);
 
-                for i in 1..length {
+                for i in 0..half_len {
+                    let rollback = length - i - 1;
                     let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(i).weight as i16);
-                    let v_source =
+                    let v_source0 =
                         _mm_load_pack_x3(shifted_src.get_unchecked(i * arena_width..).as_ptr());
-                    k0 = _mm_mul_add_epi8_by_epi16_x4(k0, v_source.0, coeff);
-                    k1 = _mm_mul_add_epi8_by_epi16_x4(k1, v_source.1, coeff);
-                    k2 = _mm_mul_add_epi8_by_epi16_x4(k2, v_source.2, coeff);
+                    let v_source1 = _mm_load_pack_x3(
+                        shifted_src.get_unchecked(rollback * arena_width..).as_ptr(),
+                    );
+                    k0 = _mm_mul_add_symm_epi8_by_epi16_x4(k0, v_source0.0, v_source1.0, coeff);
+                    k1 = _mm_mul_add_symm_epi8_by_epi16_x4(k1, v_source0.1, v_source1.1, coeff);
+                    k2 = _mm_mul_add_symm_epi8_by_epi16_x4(k2, v_source0.2, v_source1.2, coeff);
                 }
 
                 let dst_offset = y * dst_stride + _cx;
@@ -158,20 +175,28 @@ unsafe fn filter_column_sse_u8_i32_impl(
             }
 
             while _cx + 32 < image_width {
-                let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(0).weight as i16);
+                let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(half_len).weight as i16);
 
                 let shifted_src = local_src.get_unchecked(_cx..);
 
-                let source = _mm_load_pack_x2(shifted_src.as_ptr());
+                let source = _mm_load_pack_x2(
+                    shifted_src
+                        .get_unchecked((half_len * arena_width)..)
+                        .as_ptr(),
+                );
                 let mut k0 = _mm_mul_epi8_by_epi16_x4(source.0, coeff);
                 let mut k1 = _mm_mul_epi8_by_epi16_x4(source.1, coeff);
 
-                for i in 1..length {
+                for i in 0..half_len {
+                    let rollback = length - i - 1;
                     let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(i).weight as i16);
-                    let v_source =
+                    let v_source0 =
                         _mm_load_pack_x2(shifted_src.get_unchecked(i * arena_width..).as_ptr());
-                    k0 = _mm_mul_add_epi8_by_epi16_x4(k0, v_source.0, coeff);
-                    k1 = _mm_mul_add_epi8_by_epi16_x4(k1, v_source.1, coeff);
+                    let v_source1 = _mm_load_pack_x2(
+                        shifted_src.get_unchecked(rollback * arena_width..).as_ptr(),
+                    );
+                    k0 = _mm_mul_add_symm_epi8_by_epi16_x4(k0, v_source0.0, v_source1.0, coeff);
+                    k1 = _mm_mul_add_symm_epi8_by_epi16_x4(k1, v_source0.1, v_source1.1, coeff);
                 }
 
                 let dst_offset = y * dst_stride + _cx;
@@ -184,19 +209,28 @@ unsafe fn filter_column_sse_u8_i32_impl(
             }
 
             while _cx + 16 < image_width {
-                let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(0).weight as i16);
+                let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(half_len).weight as i16);
 
                 let shifted_src = local_src.get_unchecked(_cx..);
 
-                let source = _mm_loadu_si128(shifted_src.as_ptr() as *const __m128i);
+                let source = _mm_loadu_si128(
+                    shifted_src
+                        .get_unchecked((half_len * arena_width)..)
+                        .as_ptr() as *const __m128i,
+                );
                 let mut k0 = _mm_mul_epi8_by_epi16_x4(source, coeff);
 
-                for i in 1..length {
+                for i in 0..half_len {
+                    let rollback = length - i - 1;
                     let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(i).weight as i16);
-                    let v_source = _mm_loadu_si128(
+                    let v_source0 = _mm_loadu_si128(
                         shifted_src.get_unchecked(i * arena_width..).as_ptr() as *const __m128i,
                     );
-                    k0 = _mm_mul_add_epi8_by_epi16_x4(k0, v_source, coeff);
+                    let v_source1 = _mm_loadu_si128(
+                        shifted_src.get_unchecked(rollback * arena_width..).as_ptr()
+                            as *const __m128i,
+                    );
+                    k0 = _mm_mul_add_symm_epi8_by_epi16_x4(k0, v_source0, v_source1, coeff);
                 }
 
                 let dst_offset = y * dst_stride + _cx;
@@ -206,27 +240,32 @@ unsafe fn filter_column_sse_u8_i32_impl(
             }
 
             while _cx + 4 < image_width {
-                let coeff = *scanned_kernel.get_unchecked(0);
+                let coeff = *scanned_kernel.get_unchecked(half_len);
 
                 let shifted_src = local_src.get_unchecked(_cx..);
 
-                let mut k0 = (*shifted_src.get_unchecked(0) as i32).mul(coeff.weight);
-                let mut k1 = (*shifted_src.get_unchecked(1) as i32).mul(coeff.weight);
-                let mut k2 = (*shifted_src.get_unchecked(2) as i32).mul(coeff.weight);
-                let mut k3 = (*shifted_src.get_unchecked(3) as i32).mul(coeff.weight);
+                let mut k0 = (*shifted_src.get_unchecked(half_len) as i32).mul(coeff.weight);
+                let mut k1 = (*shifted_src.get_unchecked(half_len + 1) as i32).mul(coeff.weight);
+                let mut k2 = (*shifted_src.get_unchecked(half_len + 2) as i32).mul(coeff.weight);
+                let mut k3 = (*shifted_src.get_unchecked(half_len + 3) as i32).mul(coeff.weight);
 
-                for i in 1..length {
+                for i in 0..half_len {
                     let coeff = *scanned_kernel.get_unchecked(i);
+                    let rollback = length - i - 1;
                     k0 = ((*shifted_src.get_unchecked(i * arena_width)) as i32)
+                        .add((*shifted_src.get_unchecked(rollback * arena_width)) as i32)
                         .mul(coeff.weight)
                         .add(k0);
                     k1 = ((*shifted_src.get_unchecked(i * arena_width + 1)) as i32)
+                        .add((*shifted_src.get_unchecked(rollback * arena_width + 1)) as i32)
                         .mul(coeff.weight)
                         .add(k1);
                     k2 = ((*shifted_src.get_unchecked(i * arena_width + 2)) as i32)
+                        .add((*shifted_src.get_unchecked(rollback * arena_width + 2)) as i32)
                         .mul(coeff.weight)
                         .add(k2);
                     k3 = ((*shifted_src.get_unchecked(i * arena_width + 3)) as i32)
+                        .add((*shifted_src.get_unchecked(rollback * arena_width + 3)) as i32)
                         .mul(coeff.weight)
                         .add(k3);
                 }
@@ -245,11 +284,13 @@ unsafe fn filter_column_sse_u8_i32_impl(
 
                 let shifted_src = local_src.get_unchecked(x..);
 
-                let mut k0 = ((*shifted_src.get_unchecked(0)) as i32).mul(coeff.weight);
+                let mut k0 = ((*shifted_src.get_unchecked(half_len)) as i32).mul(coeff.weight);
 
-                for i in 1..length {
+                for i in 0..half_len {
                     let coeff = *scanned_kernel.get_unchecked(i);
+                    let rollback = length - i - 1;
                     k0 = ((*shifted_src.get_unchecked(i * arena_width)) as i32)
+                        .add((*shifted_src.get_unchecked(rollback * arena_width)) as i32)
                         .mul(coeff.weight)
                         .add(k0);
                 }

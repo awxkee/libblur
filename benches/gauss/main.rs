@@ -2,7 +2,8 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use image::{GenericImageView, ImageReader};
 use libblur::{
     filter_2d_exact, filter_2d_rgb_exact, filter_2d_rgba_exact, get_gaussian_kernel_1d,
-    get_sigma_size, EdgeMode, FastBlurChannels, GaussianPreciseLevel, ImageSize, ThreadingPolicy,
+    get_sigma_size, EdgeMode, FastBlurChannels, GaussianPreciseLevel, ImageSize, Scalar,
+    ThreadingPolicy,
 };
 use opencv::core::{find_file, split, Mat, Size, Vector, BORDER_DEFAULT};
 use opencv::imgcodecs::{imread, IMREAD_COLOR};
@@ -51,7 +52,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| {
             let mut dst_bytes: Vec<u8> = vec![0u8; dimensions.1 as usize * stride];
             libblur::gaussian_blur(
-                &src_bytes,
+                src_bytes,
                 stride as u32,
                 &mut dst_bytes,
                 stride as u32,
@@ -72,12 +73,13 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             let mut dst_bytes: Vec<u8> = vec![0u8; dimensions.1 as usize * stride];
             let kernel = get_gaussian_kernel_1d(151, get_sigma_size(151));
             filter_2d_rgba_exact(
-                &src_bytes,
+                src_bytes,
                 &mut dst_bytes,
                 ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
                 &kernel,
                 &kernel,
                 EdgeMode::Clamp,
+                Scalar::default(),
                 ThreadingPolicy::Adaptive,
             )
             .unwrap();
@@ -250,7 +252,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| {
             let mut dst_bytes: Vec<u8> = vec![0u8; dimensions.1 as usize * stride];
             libblur::gaussian_blur(
-                &src_bytes,
+                src_bytes,
                 stride as u32,
                 &mut dst_bytes,
                 stride as u32,
@@ -270,7 +272,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| {
             let mut dst_bytes: Vec<u8> = vec![0u8; dimensions.1 as usize * stride];
             libblur::gaussian_blur(
-                &src_bytes,
+                src_bytes,
                 stride as u32,
                 &mut dst_bytes,
                 stride as u32,
@@ -291,12 +293,13 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             let mut dst_bytes: Vec<u8> = vec![0u8; dimensions.1 as usize * stride];
             let kernel = get_gaussian_kernel_1d(25, get_sigma_size(25));
             filter_2d_rgb_exact(
-                &src_bytes,
+                src_bytes,
                 &mut dst_bytes,
                 ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
                 &kernel,
                 &kernel,
                 EdgeMode::Clamp,
+                Scalar::default(),
                 ThreadingPolicy::Adaptive,
             )
             .unwrap();
@@ -308,12 +311,13 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             let mut dst_bytes: Vec<u8> = vec![0u8; dimensions.1 as usize * stride];
             let kernel = get_gaussian_kernel_1d(151, get_sigma_size(151));
             filter_2d_rgb_exact(
-                &src_bytes,
+                src_bytes,
                 &mut dst_bytes,
                 ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
                 &kernel,
                 &kernel,
                 EdgeMode::Clamp,
+                Scalar::default(),
                 ThreadingPolicy::Adaptive,
             )
             .unwrap();
@@ -376,7 +380,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         let mut plane_3 = vec![0u8; width * height];
 
         split_channels_3(
-            &src_bytes,
+            src_bytes,
             width,
             height,
             &mut plane_1,
@@ -416,6 +420,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                     &kernel,
                     &kernel,
                     EdgeMode::Clamp,
+                    Scalar::default(),
                     ThreadingPolicy::Adaptive,
                 )
                 .unwrap();
@@ -444,7 +449,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         });
 
         let src = imread(
-            &find_file(&"assets/test_image_1.jpg", false, false).unwrap(),
+            &find_file("assets/test_image_1.jpg", false, false).unwrap(),
             IMREAD_COLOR,
         )
         .unwrap();

@@ -36,7 +36,7 @@ use crate::unsafe_slice::UnsafeSlice;
 use std::arch::aarch64::*;
 use std::ops::{Add, Mul};
 
-pub fn filter_column_neon_u8_i32(
+pub fn filter_column_neon_u8_i32_app(
     arena: Arena,
     arena_src: &[u8],
     dst: &UnsafeSlice<u8>,

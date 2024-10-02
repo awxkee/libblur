@@ -28,15 +28,15 @@
  */
 use crate::filter1d::arena::Arena;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-use crate::filter1d::avx::filter_column_avx_u8_i32;
+use crate::filter1d::avx::{filter_column_avx_symm_u8_i32_app, filter_column_avx_u8_i32_app};
 use crate::filter1d::filter_column_approx::filter_column_approx;
 use crate::filter1d::filter_column_approx_symmetric::filter_column_symmetric_approx;
 use crate::filter1d::filter_scan::ScanPoint1d;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use crate::filter1d::neon::{filter_column_neon_u8_i32, filter_column_symm_neon_u8_i32};
+use crate::filter1d::neon::{filter_column_neon_u8_i32_app, filter_column_symm_neon_u8_i32_app};
 use crate::filter1d::region::FilterRegion;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-use crate::filter1d::sse::filter_column_sse_u8_i32;
+use crate::filter1d::sse::{filter_column_sse_u8_i32_app, filter_column_symm_u8_i32_app};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::ImageSize;
 
@@ -96,9 +96,9 @@ impl Filter1DColumnHandlerApprox<u8, i32> for u8 {
         is_kernel_symmetric: bool,
     ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<i32>]) {
         if is_kernel_symmetric {
-            filter_column_symm_neon_u8_i32
+            filter_column_symm_neon_u8_i32_app
         } else {
-            filter_column_neon_u8_i32
+            filter_column_neon_u8_i32_app
         }
     }
 
@@ -107,10 +107,16 @@ impl Filter1DColumnHandlerApprox<u8, i32> for u8 {
         is_kernel_symmetric: bool,
     ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<i32>]) {
         if std::arch::is_x86_feature_detected!("avx2") {
-            return filter_column_avx_u8_i32;
+            if is_kernel_symmetric {
+                return filter_column_avx_symm_u8_i32_app;
+            }
+            return filter_column_avx_u8_i32_app;
         }
         if std::arch::is_x86_feature_detected!("sse4.1") {
-            return filter_column_sse_u8_i32;
+            if is_kernel_symmetric {
+                return filter_column_symm_u8_i32_app;
+            }
+            return filter_column_sse_u8_i32_app;
         }
         if is_kernel_symmetric {
             filter_column_symmetric_approx

@@ -14,7 +14,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let stride = dimensions.0 as usize * components;
     let src_bytes = img.as_bytes();
     c.bench_function("libblur: RGBA stack blur", |b| {
-        let mut dst_bytes: Vec<u8> = src_bytes.iter().copied().collect::<Vec<_>>();
+        let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
         b.iter(|| {
             libblur::stack_blur(
                 &mut dst_bytes,
@@ -29,7 +29,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     });
 
     let src = imread(
-        &find_file(&"assets/test_image_4.png", false, false).unwrap(),
+        &find_file("assets/test_image_4.png", false, false).unwrap(),
         IMREAD_COLOR,
     )
     .unwrap();
@@ -48,7 +48,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let rgb_image = rgb_img.as_bytes();
 
     c.bench_function("libblur: RGB stack blur", |b| {
-        let mut dst = rgb_image.iter().copied().collect::<Vec<_>>();
+        let mut dst = rgb_image.to_vec();
         b.iter(|| {
             libblur::stack_blur(
                 &mut dst,
@@ -63,7 +63,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     });
 
     let src_rgb = imread(
-        &find_file(&"assets/test_image_1.jpg", false, false).unwrap(),
+        &find_file("assets/test_image_1.jpg", false, false).unwrap(),
         IMREAD_COLOR,
     )
     .unwrap();

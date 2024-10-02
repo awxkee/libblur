@@ -32,14 +32,12 @@ use crate::avx::{
 };
 use crate::filter1d::arena::Arena;
 use crate::filter1d::avx::utils::{
-    _mm256_mul_add_epi8_by_ps_x4, _mm256_mul_add_symm_epi8_by_ps_x4, _mm256_mul_epi8_by_ps_x4,
-    _mm256_pack_ps_x4_epi8,
+    _mm256_mul_add_symm_epi8_by_ps_x4, _mm256_mul_epi8_by_ps_x4, _mm256_pack_ps_x4_epi8,
 };
 use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::region::FilterRegion;
 use crate::filter1d::sse::utils::{
-    _mm_mul_add_epi8_by_ps_x4, _mm_mul_add_symm_epi8_by_ps_x4, _mm_mul_epi8_by_ps_x4,
-    _mm_pack_ps_x4_epi8,
+    _mm_mul_add_symm_epi8_by_ps_x4, _mm_mul_epi8_by_ps_x4, _mm_pack_ps_x4_epi8,
 };
 use crate::img_size::ImageSize;
 use crate::to_storage::ToStorage;

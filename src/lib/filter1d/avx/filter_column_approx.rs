@@ -47,7 +47,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 use std::ops::{Add, Mul};
 
-pub fn filter_column_avx_u8_i32(
+pub fn filter_column_avx_u8_i32_app(
     arena: Arena,
     arena_src: &[u8],
     dst: &UnsafeSlice<u8>,
@@ -85,9 +85,9 @@ unsafe fn filter_column_avx_u8_i32_impl(
 
         let dst_stride = image_size.width * arena.components;
 
-        for y in filter_region.start..filter_region.end {
-            let length = scanned_kernel.iter().len();
+        let length = scanned_kernel.len();
 
+        for y in filter_region.start..filter_region.end {
             let mut _cx = 0usize;
 
             let local_src = src.get_unchecked((y * arena_width)..);

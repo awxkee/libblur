@@ -139,7 +139,6 @@ unsafe fn filter_column_avx_u8_f32_impl<const FMA: bool>(
     let length = scanned_kernel.len();
 
     for y in filter_region.start..filter_region.end {
-
         let mut _cx = 0usize;
 
         let local_src = src.get_unchecked((y * arena_width)..);

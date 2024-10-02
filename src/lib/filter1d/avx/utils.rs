@@ -121,6 +121,49 @@ pub unsafe fn _mm256_mul_add_epi8_by_epi16_x4(
 }
 
 #[inline]
+#[target_feature(enable = "avx2")]
+pub unsafe fn _mm256_mul_add_symm_epi8_by_epi16_x4(
+    accumulator: (__m256i, __m256i, __m256i, __m256i),
+    input0: __m256i,
+    input1: __m256i,
+    weight: __m256i,
+) -> (__m256i, __m256i, __m256i, __m256i) {
+    let lo_16 = _mm256_add_epi16(
+        _mm256_cvtepu8_epi16(_mm256_castsi256_si128(input0)),
+        _mm256_cvtepu8_epi16(_mm256_castsi256_si128(input1)),
+    );
+    let hi_16 = _mm256_add_epi16(
+        _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(input0)),
+        _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(input1)),
+    );
+
+    (
+        _mm256_add_epi32(
+            accumulator.0,
+            _mm256_madd_epi16(_mm256_cvtepi16_epi32(_mm256_castsi256_si128(lo_16)), weight),
+        ),
+        _mm256_add_epi32(
+            accumulator.1,
+            _mm256_madd_epi16(
+                _mm256_cvtepi16_epi32(_mm256_extracti128_si256::<1>(lo_16)),
+                weight,
+            ),
+        ),
+        _mm256_add_epi32(
+            accumulator.2,
+            _mm256_madd_epi16(_mm256_cvtepi16_epi32(_mm256_castsi256_si128(hi_16)), weight),
+        ),
+        _mm256_add_epi32(
+            accumulator.3,
+            _mm256_madd_epi16(
+                _mm256_cvtepi16_epi32(_mm256_extracti128_si256::<1>(hi_16)),
+                weight,
+            ),
+        ),
+    )
+}
+
+#[inline]
 #[target_feature(enable = "avx2,fma")]
 pub unsafe fn _mm256_fmlaf_ps(a: __m256, b: __m256, c: __m256) -> __m256 {
     _mm256_fmadd_ps(b, c, a)
