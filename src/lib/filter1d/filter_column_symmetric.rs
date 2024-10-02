@@ -26,6 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::region::FilterRegion;
@@ -33,9 +34,9 @@ use crate::img_size::ImageSize;
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
 use num_traits::{AsPrimitive, MulAdd};
-use std::ops::Mul;
+use std::ops::{Add, Mul};
 
-pub fn filter_column<T, F>(
+pub fn filter_symmetric_column<T, F>(
     arena: Arena,
     arena_src: &[T],
     dst: &UnsafeSlice<T>,
@@ -44,7 +45,7 @@ pub fn filter_column<T, F>(
     scanned_kernel: &[ScanPoint1d<F>],
 ) where
     T: Copy + AsPrimitive<F>,
-    F: ToStorage<T> + Mul<F, Output = F> + MulAdd<F, Output = F>,
+    F: ToStorage<T> + Mul<F, Output = F> + MulAdd<F, Output = F> + Add<F, Output = F>,
 {
     unsafe {
         let src = arena_src;
@@ -55,42 +56,60 @@ pub fn filter_column<T, F>(
 
         let dst_stride = image_size.width * arena.components;
 
-        for y in _yy..region.end {
-            let length = scanned_kernel.iter().len();
+        let length = scanned_kernel.len();
+        let half_len = length / 2;
 
+        for y in _yy..region.end {
             let mut _cx = 0usize;
 
             let local_src = src.get_unchecked((y * arena_width)..);
 
             while _cx + 4 < dst_stride {
-                let coeff = *scanned_kernel.get_unchecked(0);
+                let coeff = scanned_kernel.get_unchecked(half_len).weight;
 
                 let shifted_src = local_src.get_unchecked(_cx..);
 
-                let mut k0 = shifted_src.get_unchecked(0).as_().mul(coeff.weight);
-                let mut k1 = shifted_src.get_unchecked(1).as_().mul(coeff.weight);
-                let mut k2 = shifted_src.get_unchecked(2).as_().mul(coeff.weight);
-                let mut k3 = shifted_src.get_unchecked(3).as_().mul(coeff.weight);
+                let mut k0 = (*shifted_src.get_unchecked(half_len * arena_width))
+                    .as_()
+                    .mul(coeff);
+                let mut k1 = (*shifted_src.get_unchecked((half_len * arena_width) + 1))
+                    .as_()
+                    .mul(coeff);
+                let mut k2 = (*shifted_src.get_unchecked((half_len * arena_width) + 2))
+                    .as_()
+                    .mul(coeff);
+                let mut k3 = (*shifted_src.get_unchecked((half_len * arena_width) + 3))
+                    .as_()
+                    .mul(coeff);
 
-                for i in 1..length {
+                for i in 0..half_len {
                     let coeff = *scanned_kernel.get_unchecked(i);
+                    let rollback = length - i - 1;
                     k0 = MulAdd::mul_add(
-                        shifted_src.get_unchecked(i * arena_width).as_(),
+                        (*shifted_src.get_unchecked(i * arena_width))
+                            .as_()
+                            .add((*shifted_src.get_unchecked((rollback) * arena_width)).as_()),
                         coeff.weight,
                         k0,
                     );
                     k1 = MulAdd::mul_add(
-                        shifted_src.get_unchecked(i * arena_width + 1).as_(),
+                        (*shifted_src.get_unchecked(i * arena_width + 1))
+                            .as_()
+                            .add((*shifted_src.get_unchecked(rollback * arena_width + 1)).as_()),
                         coeff.weight,
                         k1,
                     );
                     k2 = MulAdd::mul_add(
-                        shifted_src.get_unchecked(i * arena_width + 2).as_(),
+                        (*shifted_src.get_unchecked(i * arena_width + 2))
+                            .as_()
+                            .add((*shifted_src.get_unchecked(rollback * arena_width + 2)).as_()),
                         coeff.weight,
                         k2,
                     );
                     k3 = MulAdd::mul_add(
-                        shifted_src.get_unchecked(i * arena_width + 3).as_(),
+                        (*shifted_src.get_unchecked(i * arena_width + 3))
+                            .as_()
+                            .add((*shifted_src.get_unchecked(rollback * arena_width + 3)).as_()),
                         coeff.weight,
                         k3,
                     );
@@ -106,16 +125,21 @@ pub fn filter_column<T, F>(
             }
 
             for x in _cx..dst_stride {
-                let coeff = *scanned_kernel.get_unchecked(0);
+                let coeff = scanned_kernel.get_unchecked(half_len).weight;
 
                 let shifted_src = local_src.get_unchecked(x..);
 
-                let mut k0 = shifted_src.get_unchecked(0).as_().mul(coeff.weight);
+                let mut k0 = (*shifted_src.get_unchecked(half_len * arena_width))
+                    .as_()
+                    .mul(coeff);
 
                 for i in 1..length {
                     let coeff = *scanned_kernel.get_unchecked(i);
+                    let rollback = length - i - 1;
                     k0 = MulAdd::mul_add(
-                        shifted_src.get_unchecked(i * arena_width).as_(),
+                        (*shifted_src.get_unchecked(i * arena_width))
+                            .as_()
+                            .add((*shifted_src.get_unchecked((rollback) * arena_width)).as_()),
                         coeff.weight,
                         k0,
                     );

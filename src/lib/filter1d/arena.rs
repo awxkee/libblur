@@ -30,7 +30,8 @@ use crate::edge_mode::{reflect_index, reflect_index_101};
 use crate::filter1d::arena_roi::copy_roi;
 use crate::filter1d::filter_element::KernelShape;
 use crate::img_size::ImageSize;
-use crate::EdgeMode;
+use crate::{EdgeMode, Scalar};
+use num_traits::AsPrimitive;
 
 #[derive(Copy, Clone)]
 pub struct Arena {
@@ -66,9 +67,11 @@ pub fn make_arena<T, const COMPONENTS: usize>(
     image_size: ImageSize,
     kernel_size: KernelShape,
     border_mode: EdgeMode,
+    scalar: Scalar,
 ) -> Result<(Vec<T>, Arena), String>
 where
-    T: Default + Copy + Send + Sync,
+    T: Default + Copy + Send + Sync + 'static,
+    f64: AsPrimitive<T>,
 {
     if image.len() != COMPONENTS * image_size.width * image_size.height {
         return Err(format!(
@@ -179,6 +182,20 @@ where
                             for i in 0..COMPONENTS {
                                 *padded_image.get_unchecked_mut(v_dst + i) =
                                     *image.get_unchecked(v_src + i);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        EdgeMode::Constant => {
+            for ranges in filling_ranges.iter() {
+                for i in ranges.0.clone() {
+                    for j in ranges.1.clone() {
+                        unsafe {
+                            let v_dst = i * new_stride + j * COMPONENTS;
+                            for i in 0..COMPONENTS {
+                                *padded_image.get_unchecked_mut(v_dst + i) = scalar[i].as_();
                             }
                         }
                     }

@@ -30,16 +30,17 @@ use crate::filter1d::arena::Arena;
 use crate::filter1d::color_group::ColorGroup;
 use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::neon::utils::{
-    vfmla_u8_f32, vfmlaq_u8_f32, vmul_u8_by_f32, vmulq_u8_by_f32, vqmovn_f32_u8, vqmovnq_f32_u8,
+    vfmla_symm_u8_f32, vfmlaq_symm_u8_f32, vmul_u8_by_f32, vmulq_u8_by_f32, vqmovn_f32_u8,
+    vqmovnq_f32_u8,
 };
 use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
 use crate::unsafe_slice::UnsafeSlice;
 use num_traits::MulAdd;
 use std::arch::aarch64::*;
-use std::ops::Mul;
+use std::ops::{Add, Mul};
 
-pub fn filter_rgb_row_neon_u8_f32(
+pub fn filter_rgb_symm_row_neon_u8_f32(
     arena: Arena,
     arena_src: &[u8],
     dst: &UnsafeSlice<u8>,
@@ -52,13 +53,14 @@ pub fn filter_rgb_row_neon_u8_f32(
 
         const N: usize = 3;
 
-        let src = &arena_src;
+        let src = arena_src;
 
         let dst_stride = image_size.width * arena.components;
 
         let arena_width = arena.width * N;
 
         let length = scanned_kernel.len();
+        let half_len = length / 2;
 
         for y in filter_region.start..filter_region.end {
             let local_src = src.get_unchecked((y * arena_width)..);
@@ -66,21 +68,23 @@ pub fn filter_rgb_row_neon_u8_f32(
             let mut _cx = 0usize;
 
             while _cx + 16 < width {
-                let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(0).weight);
+                let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(half_len).weight);
 
                 let shifted_src = local_src.get_unchecked((_cx * N)..);
 
-                let source = vld3q_u8(shifted_src.as_ptr());
+                let source = vld3q_u8(shifted_src.get_unchecked((half_len * N)..).as_ptr());
                 let mut k0 = vmulq_u8_by_f32(source.0, coeff);
                 let mut k1 = vmulq_u8_by_f32(source.1, coeff);
                 let mut k2 = vmulq_u8_by_f32(source.2, coeff);
 
-                for i in 1..length {
+                for i in 0..half_len {
                     let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(i).weight);
-                    let v_source = vld3q_u8(shifted_src.get_unchecked((i * N)..).as_ptr());
-                    k0 = vfmlaq_u8_f32(k0, v_source.0, coeff);
-                    k1 = vfmlaq_u8_f32(k1, v_source.1, coeff);
-                    k2 = vfmlaq_u8_f32(k2, v_source.2, coeff);
+                    let rollback = length - i - 1;
+                    let v_source0 = vld3q_u8(shifted_src.get_unchecked((i * N)..).as_ptr());
+                    let v_source1 = vld3q_u8(shifted_src.get_unchecked((rollback * N)..).as_ptr());
+                    k0 = vfmlaq_symm_u8_f32(k0, v_source0.0, v_source1.0, coeff);
+                    k1 = vfmlaq_symm_u8_f32(k1, v_source0.1, v_source1.1, coeff);
+                    k2 = vfmlaq_symm_u8_f32(k2, v_source0.2, v_source1.2, coeff);
                 }
 
                 let dst_offset = y * dst_stride + _cx * N;
@@ -93,21 +97,23 @@ pub fn filter_rgb_row_neon_u8_f32(
             }
 
             while _cx + 8 < width {
-                let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(0).weight);
+                let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(half_len).weight);
 
                 let shifted_src = local_src.get_unchecked((_cx * N)..);
 
-                let source = vld3_u8(shifted_src.as_ptr());
+                let source = vld3_u8(shifted_src.get_unchecked((half_len * N)..).as_ptr());
                 let mut k0 = vmul_u8_by_f32(source.0, coeff);
                 let mut k1 = vmul_u8_by_f32(source.1, coeff);
                 let mut k2 = vmul_u8_by_f32(source.2, coeff);
 
-                for i in 1..length {
+                for i in 0..half_len {
                     let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(i).weight);
-                    let v_source = vld3_u8(shifted_src.get_unchecked((i * N)..).as_ptr());
-                    k0 = vfmla_u8_f32(k0, v_source.0, coeff);
-                    k1 = vfmla_u8_f32(k1, v_source.1, coeff);
-                    k2 = vfmla_u8_f32(k2, v_source.2, coeff);
+                    let rollback = length - i - 1;
+                    let v_source0 = vld3_u8(shifted_src.get_unchecked((i * N)..).as_ptr());
+                    let v_source1 = vld3_u8(shifted_src.get_unchecked((rollback * N)..).as_ptr());
+                    k0 = vfmla_symm_u8_f32(k0, v_source0.0, v_source1.0, coeff);
+                    k1 = vfmla_symm_u8_f32(k1, v_source0.1, v_source1.1, coeff);
+                    k2 = vfmla_symm_u8_f32(k2, v_source0.2, v_source1.2, coeff);
                 }
 
                 let dst_offset = y * dst_stride + _cx * N;
@@ -120,24 +126,42 @@ pub fn filter_rgb_row_neon_u8_f32(
             }
 
             while _cx + 4 < width {
-                let coeff = *scanned_kernel.get_unchecked(0);
+                let coeff = *scanned_kernel.get_unchecked(half_len);
 
                 let shifted_src = local_src.get_unchecked((_cx * N)..);
 
-                let mut k0 = ColorGroup::<N, f32>::from_slice(shifted_src, 0).mul(coeff.weight);
-                let mut k1 = ColorGroup::<N, f32>::from_slice(shifted_src, N).mul(coeff.weight);
-                let mut k2 = ColorGroup::<N, f32>::from_slice(shifted_src, N * 2).mul(coeff.weight);
-                let mut k3 = ColorGroup::<N, f32>::from_slice(shifted_src, N * 3).mul(coeff.weight);
+                let mut k0 =
+                    ColorGroup::<N, f32>::from_slice(shifted_src, half_len * N).mul(coeff.weight);
+                let mut k1 = ColorGroup::<N, f32>::from_slice(shifted_src, (half_len * N) + N)
+                    .mul(coeff.weight);
+                let mut k2 = ColorGroup::<N, f32>::from_slice(shifted_src, (half_len * N) + N * 2)
+                    .mul(coeff.weight);
+                let mut k3 = ColorGroup::<N, f32>::from_slice(shifted_src, (half_len * N) + N * 3)
+                    .mul(coeff.weight);
 
-                for i in 1..length {
+                for i in 0..half_len {
                     let coeff = *scanned_kernel.get_unchecked(i);
+                    let rollback = length - i - 1;
                     k0 = ColorGroup::<N, f32>::from_slice(shifted_src, i * N)
+                        .add(ColorGroup::<N, f32>::from_slice(shifted_src, rollback * N))
                         .mul_add(k0, coeff.weight);
                     k1 = ColorGroup::<N, f32>::from_slice(shifted_src, (i + 1) * N)
+                        .add(ColorGroup::<N, f32>::from_slice(
+                            shifted_src,
+                            (rollback + 1) * N,
+                        ))
                         .mul_add(k1, coeff.weight);
                     k2 = ColorGroup::<N, f32>::from_slice(shifted_src, (i + 2) * N)
+                        .add(ColorGroup::<N, f32>::from_slice(
+                            shifted_src,
+                            (rollback + 2) * N,
+                        ))
                         .mul_add(k2, coeff.weight);
                     k3 = ColorGroup::<N, f32>::from_slice(shifted_src, (i + 3) * N)
+                        .add(ColorGroup::<N, f32>::from_slice(
+                            shifted_src,
+                            (rollback + 3) * N,
+                        ))
                         .mul_add(k3, coeff.weight);
                 }
 
@@ -151,13 +175,16 @@ pub fn filter_rgb_row_neon_u8_f32(
             }
 
             for x in _cx..width {
-                let coeff = *scanned_kernel.get_unchecked(0);
+                let coeff = *scanned_kernel.get_unchecked(half_len);
                 let shifted_src = local_src.get_unchecked((x * N)..);
-                let mut k0 = ColorGroup::<N, f32>::from_slice(shifted_src, 0).mul(coeff.weight);
+                let mut k0 =
+                    ColorGroup::<N, f32>::from_slice(shifted_src, half_len * N).mul(coeff.weight);
 
-                for i in 1..length {
+                for i in 0..half_len {
                     let coeff = *scanned_kernel.get_unchecked(i);
+                    let rollback = length - i - 1;
                     k0 = ColorGroup::<N, f32>::from_slice(shifted_src, i * N)
+                        .add(ColorGroup::<N, f32>::from_slice(shifted_src, rollback * N))
                         .mul_add(k0, coeff.weight);
                 }
 

@@ -27,7 +27,11 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use crate::avx::{_mm256_interleave_rgb, _mm256_interleave_rgba_epi8};
+use crate::avx::{
+    _mm256_interleave_rgb, _mm256_interleave_rgb_ps, _mm256_interleave_rgba_epi8,
+    _mm256_interleave_rgba_ps,
+};
+use crate::sse::{_mm_interleave_rgba_ps, _mm_store_pack_ps_x4};
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -50,11 +54,19 @@ pub unsafe fn _mm256_store_pack_x2(ptr: *mut u8, v: (__m256i, __m256i)) {
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
+#[target_feature(enable = "avx2")]
 pub unsafe fn _mm256_store_pack_x3(ptr: *mut u8, v: (__m256i, __m256i, __m256i)) {
     _mm256_storeu_si256(ptr as *mut __m256i, v.0);
     _mm256_storeu_si256(ptr.add(32) as *mut __m256i, v.1);
     _mm256_storeu_si256(ptr.add(64) as *mut __m256i, v.2);
+}
+
+#[inline]
+#[target_feature(enable = "avx2")]
+pub unsafe fn _mm256_store_pack_x3_ps(ptr: *mut f32, v: (__m256, __m256, __m256)) {
+    _mm256_storeu_ps(ptr, v.0);
+    _mm256_storeu_ps(ptr.add(8), v.1);
+    _mm256_storeu_ps(ptr.add(16), v.2);
 }
 
 #[inline]
@@ -72,7 +84,7 @@ pub unsafe fn _mm256_store_interleave_rgba(ptr: *mut u8, v: (__m256i, __m256i, _
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
+#[target_feature(enable = "avx2")]
 pub unsafe fn _mm256_store_pack_ps_x4(ptr: *mut f32, v: (__m256, __m256, __m256, __m256)) {
     _mm256_storeu_ps(ptr, v.0);
     _mm256_storeu_ps(ptr.add(8), v.1);
@@ -81,8 +93,22 @@ pub unsafe fn _mm256_store_pack_ps_x4(ptr: *mut f32, v: (__m256, __m256, __m256,
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
+#[target_feature(enable = "avx2")]
 pub unsafe fn _mm256_store_pack_ps_x2(ptr: *mut f32, v: (__m256, __m256)) {
     _mm256_storeu_ps(ptr, v.0);
     _mm256_storeu_ps(ptr.add(8), v.1);
+}
+
+#[inline]
+#[target_feature(enable = "avx2")]
+pub unsafe fn _mm256_store_interleave_rgb_ps(ptr: *mut f32, v: (__m256, __m256, __m256)) {
+    let (v0, v1, v2) = _mm256_interleave_rgb_ps(v);
+    _mm256_store_pack_x3_ps(ptr, (v0, v1, v2));
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+pub unsafe fn _mm256_store_interleave_rgba_ps(ptr: *mut f32, v: (__m256, __m256, __m256, __m256)) {
+    let (v0, v1, v2, v3) = _mm256_interleave_rgba_ps(v);
+    _mm256_store_pack_ps_x4(ptr, (v0, v1, v2, v3));
 }

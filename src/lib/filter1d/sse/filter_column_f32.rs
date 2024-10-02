@@ -125,9 +125,9 @@ unsafe fn filter_column_sse_f32_f32_impl<const FMA: bool>(
     unsafe {
         let src = arena_src;
 
-        let arena_width = arena.width;
+        let arena_width = arena.width * arena.components;
 
-        let dst_stride = image_size.width;
+        let dst_stride = image_size.width * arena.components;
 
         for y in filter_region.start..filter_region.end {
             let length = scanned_kernel.iter().len();
@@ -136,7 +136,7 @@ unsafe fn filter_column_sse_f32_f32_impl<const FMA: bool>(
 
             let local_src = src.get_unchecked((y * arena_width)..);
 
-            while _cx + 16 < image_size.width {
+            while _cx + 16 < dst_stride {
                 let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(0).weight);
 
                 let shifted_src = local_src.get_unchecked(_cx..);
@@ -163,7 +163,7 @@ unsafe fn filter_column_sse_f32_f32_impl<const FMA: bool>(
                 _cx += 16;
             }
 
-            while _cx + 8 < image_size.width {
+            while _cx + 8 < dst_stride {
                 let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(0).weight);
 
                 let shifted_src = local_src.get_unchecked(_cx..);
@@ -188,7 +188,7 @@ unsafe fn filter_column_sse_f32_f32_impl<const FMA: bool>(
                 _cx += 8;
             }
 
-            while _cx + 4 < image_size.width {
+            while _cx + 4 < dst_stride {
                 let coeff = *scanned_kernel.get_unchecked(0);
 
                 let shifted_src = local_src.get_unchecked(_cx..);
@@ -209,7 +209,7 @@ unsafe fn filter_column_sse_f32_f32_impl<const FMA: bool>(
                 _cx += 4;
             }
 
-            for x in _cx..image_size.width {
+            for x in _cx..dst_stride {
                 let coeff = *scanned_kernel.get_unchecked(0);
 
                 let shifted_src = local_src.get_unchecked(x..);

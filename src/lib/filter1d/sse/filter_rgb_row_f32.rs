@@ -30,14 +30,89 @@ use crate::filter1d::arena::Arena;
 use crate::filter1d::color_group::ColorGroup;
 use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::region::FilterRegion;
+use crate::filter1d::sse::utils::_mm_opt_fmlaf_ps;
 use crate::img_size::ImageSize;
-use crate::neon::{prefer_vfma_f32, prefer_vfmaq_f32};
+use crate::sse::{_mm_load_deinterleave_rgb_ps, _mm_store_interleave_rgb_ps};
 use crate::unsafe_slice::UnsafeSlice;
 use num_traits::MulAdd;
-use std::arch::aarch64::*;
+#[cfg(target_arch = "x86")]
+use std::arch::x86::*;
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::*;
 use std::ops::Mul;
 
-pub fn filter_rgb_row_neon_f32_f32(
+pub fn filter_rgb_row_sse_f32_f32(
+    arena: Arena,
+    arena_src: &[f32],
+    dst: &UnsafeSlice<f32>,
+    image_size: ImageSize,
+    filter_region: FilterRegion,
+    scanned_kernel: &[ScanPoint1d<f32>],
+) {
+    unsafe {
+        let has_fma = std::arch::is_x86_feature_detected!("fma");
+        if has_fma {
+            filter_rgb_row_sse_f32_f32_fma(
+                arena,
+                arena_src,
+                dst,
+                image_size,
+                filter_region,
+                scanned_kernel,
+            );
+        } else {
+            filter_rgb_row_sse_f32_f32_def(
+                arena,
+                arena_src,
+                dst,
+                image_size,
+                filter_region,
+                scanned_kernel,
+            );
+        }
+    }
+}
+
+#[target_feature(enable = "sse4.1", enable = "fma")]
+unsafe fn filter_rgb_row_sse_f32_f32_fma(
+    arena: Arena,
+    arena_src: &[f32],
+    dst: &UnsafeSlice<f32>,
+    image_size: ImageSize,
+    filter_region: FilterRegion,
+    scanned_kernel: &[ScanPoint1d<f32>],
+) {
+    filter_rgb_row_sse_f32_f32_impl::<true>(
+        arena,
+        arena_src,
+        dst,
+        image_size,
+        filter_region,
+        scanned_kernel,
+    );
+}
+
+#[target_feature(enable = "sse4.1")]
+unsafe fn filter_rgb_row_sse_f32_f32_def(
+    arena: Arena,
+    arena_src: &[f32],
+    dst: &UnsafeSlice<f32>,
+    image_size: ImageSize,
+    filter_region: FilterRegion,
+    scanned_kernel: &[ScanPoint1d<f32>],
+) {
+    filter_rgb_row_sse_f32_f32_impl::<false>(
+        arena,
+        arena_src,
+        dst,
+        image_size,
+        filter_region,
+        scanned_kernel,
+    );
+}
+
+#[inline(always)]
+unsafe fn filter_rgb_row_sse_f32_f32_impl<const FMA: bool>(
     arena: Arena,
     arena_src: &[f32],
     dst: &UnsafeSlice<f32>,
@@ -64,51 +139,28 @@ pub fn filter_rgb_row_neon_f32_f32(
             let mut _cx = 0usize;
 
             while _cx + 4 < width {
-                let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(0).weight);
+                let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(0).weight);
 
                 let shifted_src = local_src.get_unchecked((_cx * N)..);
 
-                let source = vld3q_f32(shifted_src.as_ptr());
-                let mut k0 = vmulq_f32(source.0, coeff);
-                let mut k1 = vmulq_f32(source.1, coeff);
-                let mut k2 = vmulq_f32(source.2, coeff);
+                let source = _mm_load_deinterleave_rgb_ps(shifted_src.as_ptr());
+                let mut k0 = _mm_mul_ps(source.0, coeff);
+                let mut k1 = _mm_mul_ps(source.1, coeff);
+                let mut k2 = _mm_mul_ps(source.2, coeff);
 
                 for i in 1..length {
-                    let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(i).weight);
-                    let v_source = vld3q_f32(shifted_src.get_unchecked((i * N)..).as_ptr());
-                    k0 = prefer_vfmaq_f32(k0, v_source.0, coeff);
-                    k1 = prefer_vfmaq_f32(k1, v_source.1, coeff);
-                    k2 = prefer_vfmaq_f32(k2, v_source.2, coeff);
+                    let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(i).weight);
+                    let v_source =
+                        _mm_load_deinterleave_rgb_ps(shifted_src.get_unchecked((i * N)..).as_ptr());
+                    k0 = _mm_opt_fmlaf_ps::<FMA>(k0, v_source.0, coeff);
+                    k1 = _mm_opt_fmlaf_ps::<FMA>(k1, v_source.1, coeff);
+                    k2 = _mm_opt_fmlaf_ps::<FMA>(k2, v_source.2, coeff);
                 }
 
                 let dst_offset = y * dst_stride + _cx * N;
                 let dst_ptr0 = (dst.slice.as_ptr() as *mut f32).add(dst_offset);
-                vst3q_f32(dst_ptr0, float32x4x3_t(k0, k1, k2));
+                _mm_store_interleave_rgb_ps(dst_ptr0, (k0, k1, k2));
                 _cx += 4;
-            }
-
-            while _cx + 2 < width {
-                let coeff = vdup_n_f32(scanned_kernel.get_unchecked(0).weight);
-
-                let shifted_src = local_src.get_unchecked((_cx * N)..);
-
-                let source = vld3_f32(shifted_src.as_ptr());
-                let mut k0 = vmul_f32(source.0, coeff);
-                let mut k1 = vmul_f32(source.1, coeff);
-                let mut k2 = vmul_f32(source.2, coeff);
-
-                for i in 1..length {
-                    let coeff = vdup_n_f32(scanned_kernel.get_unchecked(i).weight);
-                    let v_source = vld3_f32(shifted_src.get_unchecked((i * N)..).as_ptr());
-                    k0 = prefer_vfma_f32(k0, v_source.0, coeff);
-                    k1 = prefer_vfma_f32(k1, v_source.1, coeff);
-                    k2 = prefer_vfma_f32(k2, v_source.2, coeff);
-                }
-
-                let dst_offset = y * dst_stride + _cx * N;
-                let dst_ptr0 = (dst.slice.as_ptr() as *mut f32).add(dst_offset);
-                vst3_f32(dst_ptr0, float32x2x3_t(k0, k1, k2));
-                _cx += 2;
             }
 
             for x in _cx..width {

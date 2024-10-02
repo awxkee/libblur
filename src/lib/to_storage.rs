@@ -26,10 +26,9 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use half::f16;
-use num_traits::Float;
 
 /// Helper trait to convert and round if we are storing in integral type
-pub trait ToStorage<T>: 'static + Copy + Float
+pub trait ToStorage<T>: 'static + Copy
 where
     T: 'static + Copy,
 {
@@ -47,6 +46,8 @@ macro_rules! impl_to_integral_storage {
     };
 }
 
+impl_to_integral_storage!(f32, i8);
+impl_to_integral_storage!(f64, i8);
 impl_to_integral_storage!(f32, u8);
 impl_to_integral_storage!(f64, u8);
 impl_to_integral_storage!(f32, u16);
@@ -60,7 +61,7 @@ impl_to_integral_storage!(f64, i32);
 impl_to_integral_storage!(f32, usize);
 impl_to_integral_storage!(f64, usize);
 
-macro_rules! impl_to_float_storage {
+macro_rules! impl_to_direct_storage {
     ($from:ty, $to:ty) => {
         impl ToStorage<$to> for $from {
             fn to_(self) -> $to {
@@ -70,10 +71,27 @@ macro_rules! impl_to_float_storage {
     };
 }
 
-impl_to_float_storage!(f32, f32);
-impl_to_float_storage!(f64, f64);
-impl_to_float_storage!(f64, f32);
-impl_to_float_storage!(f32, f64);
+impl_to_direct_storage!(f32, f32);
+impl_to_direct_storage!(f64, f64);
+impl_to_direct_storage!(f64, f32);
+impl_to_direct_storage!(f32, f64);
+
+macro_rules! impl_signed_to_unsigned_storage {
+    ($from:ty, $to:ty) => {
+        impl ToStorage<$to> for $from {
+            fn to_(self) -> $to {
+                self.max(0) as $to
+            }
+        }
+    };
+}
+
+impl_signed_to_unsigned_storage!(i16, u8);
+impl_signed_to_unsigned_storage!(i32, u8);
+impl_signed_to_unsigned_storage!(i64, u8);
+impl_to_direct_storage!(u16, u8);
+impl_to_direct_storage!(u32, u8);
+impl_to_direct_storage!(u64, u8);
 
 impl ToStorage<f16> for f32 {
     fn to_(self) -> f16 {

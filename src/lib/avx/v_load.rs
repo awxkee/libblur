@@ -27,7 +27,11 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use crate::avx::{_mm256_deinterleave_rgb, _mm256_deinterleave_rgba_epi8};
+use crate::avx::{
+    _mm256_deinterleave_rgb, _mm256_deinterleave_rgb_ps, _mm256_deinterleave_rgba_epi8,
+    _mm256_deinterleave_rgba_ps,
+};
+use crate::sse::_mm_deinterleave_rgba_ps;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -97,4 +101,25 @@ pub unsafe fn _mm256_load_pack_ps_x2(ptr: *const f32) -> (__m256, __m256) {
     let row0 = _mm256_loadu_ps(ptr);
     let row1 = _mm256_loadu_ps(ptr.add(8));
     (row0, row1)
+}
+
+#[inline]
+#[target_feature(enable = "avx2")]
+pub unsafe fn _mm256_load_deinterleave_rgb_ps(ptr: *const f32) -> (__m256, __m256, __m256) {
+    let row0 = _mm256_loadu_ps(ptr);
+    let row1 = _mm256_loadu_ps(ptr.add(8));
+    let row2 = _mm256_loadu_ps(ptr.add(16));
+    _mm256_deinterleave_rgb_ps((row0, row1, row2))
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+pub unsafe fn _mm256_load_deinterleave_rgba_ps(
+    ptr: *const f32,
+) -> (__m256, __m256, __m256, __m256) {
+    let row0 = _mm256_loadu_ps(ptr);
+    let row1 = _mm256_loadu_ps(ptr.add(8));
+    let row2 = _mm256_loadu_ps(ptr.add(16));
+    let row3 = _mm256_loadu_ps(ptr.add(24));
+    _mm256_deinterleave_rgba_ps((row0, row1, row2, row3))
 }

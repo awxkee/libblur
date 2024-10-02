@@ -423,7 +423,11 @@ pub(crate) fn gaussian_blur_impl_approx<const CHANNEL_CONFIGURATION: usize>(
     };
 
     match edge_mode {
-        EdgeMode::Reflect | EdgeMode::Clamp | EdgeMode::Reflect101 | EdgeMode::Wrap => {
+        EdgeMode::Reflect
+        | EdgeMode::Clamp
+        | EdgeMode::Reflect101
+        | EdgeMode::Wrap
+        | EdgeMode::Constant => {
             let kernel = get_gaussian_kernel_1d_integral(kernel_size, sigma);
             gaussian_blur_horizontal_pass::<CHANNEL_CONFIGURATION>(
                 src,

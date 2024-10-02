@@ -48,10 +48,14 @@ mod filter_2d_rgba;
 mod filter_2d_rgba_approx;
 mod filter_column;
 mod filter_column_approx;
+mod filter_column_approx_symmetric;
+mod filter_column_symmetric;
 mod filter_element;
 mod filter_row;
 mod filter_row_cg;
 mod filter_row_cg_approx;
+mod filter_row_cg_approx_symmetric;
+mod filter_row_cg_symmetric;
 mod filter_scan;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 mod neon;

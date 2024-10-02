@@ -607,7 +607,11 @@ fn gaussian_blur_impl<
     };
 
     match edge_mode {
-        EdgeMode::Reflect | EdgeMode::Wrap | EdgeMode::Clamp | EdgeMode::Reflect101 => {
+        EdgeMode::Reflect
+        | EdgeMode::Wrap
+        | EdgeMode::Clamp
+        | EdgeMode::Reflect101
+        | EdgeMode::Constant => {
             let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
             gaussian_blur_horizontal_pass::<T, CHANNEL_CONFIGURATION>(
                 src,

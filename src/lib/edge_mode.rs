@@ -26,6 +26,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use num_traits::{AsPrimitive, Euclid, FromPrimitive, Signed};
+use std::ops::Index;
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Default)]
 /// Declares an edge handling mode
@@ -42,6 +43,9 @@ pub enum EdgeMode {
     Reflect = 3,
     /// If filter goes out of bounds image will be replicated with rule `gfedcb|abcdefgh|gfedcba`
     Reflect101 = 4,
+    /// If filter goes out of bounds image will be replicated with provided constant
+    /// Works only for clear filter, otherwise ignored
+    Constant = 5,
 }
 
 impl From<usize> for EdgeMode {
@@ -52,6 +56,7 @@ impl From<usize> for EdgeMode {
             2 => EdgeMode::Wrap,
             3 => EdgeMode::Reflect,
             4 => EdgeMode::Reflect101,
+            5 => EdgeMode::Constant,
             _ => {
                 panic!("Unknown edge mode for value: {}", value);
             }
@@ -140,7 +145,7 @@ macro_rules! reflect_101 {
 macro_rules! clamp_edge {
     ($edge_mode:expr, $value:expr, $min:expr, $max:expr) => {{
         match $edge_mode {
-            EdgeMode::Clamp | EdgeMode::KernelClip => {
+            EdgeMode::Clamp | EdgeMode::KernelClip | EdgeMode::Constant => {
                 (std::cmp::min(std::cmp::max($value, $min), $max) as u32) as usize
             }
             EdgeMode::Wrap => {
@@ -160,4 +165,40 @@ macro_rules! clamp_edge {
             }
         }
     }};
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
+pub struct Scalar {
+    pub v0: f64,
+    pub v1: f64,
+    pub v2: f64,
+    pub v3: f64,
+}
+
+impl Scalar {
+    pub fn new(v0: f64, v1: f64, v2: f64, v3: f64) -> Self {
+        Self { v0, v1, v2, v3 }
+    }
+}
+
+impl Default for Scalar {
+    fn default() -> Self {
+        Self::new(0.0, 0.0, 0.0, 0.0)
+    }
+}
+
+impl Index<usize> for Scalar {
+    type Output = f64;
+    fn index(&self, index: usize) -> &Self::Output {
+        match index {
+            0 => &self.v0,
+            1 => &self.v1,
+            2 => &self.v2,
+            3 => &self.v3,
+            _ => {
+                panic!("Index out of bounds: {}", index);
+            }
+        }
+    }
 }

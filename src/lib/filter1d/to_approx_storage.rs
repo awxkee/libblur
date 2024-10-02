@@ -49,6 +49,9 @@ macro_rules! impl_to_approx_storage {
     };
 }
 
+impl_to_approx_storage!(i32, i8);
+impl_to_approx_storage!(i64, i8);
+impl_to_approx_storage!(i16, i8);
 impl_to_approx_storage!(i32, u8);
 impl_to_approx_storage!(i64, u8);
 impl_to_approx_storage!(u32, u8);
@@ -59,6 +62,8 @@ impl_to_approx_storage!(i32, u16);
 impl_to_approx_storage!(i64, u16);
 impl_to_approx_storage!(u32, u16);
 impl_to_approx_storage!(u64, u16);
+impl_to_approx_storage!(i32, i16);
+impl_to_approx_storage!(i64, i16);
 
 pub trait ApproxLevel {
     fn approx_level() -> i32;

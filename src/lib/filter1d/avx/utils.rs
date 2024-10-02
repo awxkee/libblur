@@ -62,6 +62,65 @@ pub unsafe fn _mm256_mul_epi8_by_ps_x4(
 }
 
 #[inline]
+#[target_feature(enable = "avx2")]
+pub unsafe fn _mm256_mul_epi8_by_epi16_x4(
+    input: __m256i,
+    weight: __m256i,
+) -> (__m256i, __m256i, __m256i, __m256i) {
+    let lo_16 = _mm256_cvtepu8_epi16(_mm256_castsi256_si128(input));
+    let hi_16 = _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(input));
+
+    (
+        _mm256_madd_epi16(_mm256_cvtepi16_epi32(_mm256_castsi256_si128(lo_16)), weight),
+        _mm256_madd_epi16(
+            _mm256_cvtepi16_epi32(_mm256_extracti128_si256::<1>(lo_16)),
+            weight,
+        ),
+        _mm256_madd_epi16(_mm256_cvtepi16_epi32(_mm256_castsi256_si128(hi_16)), weight),
+        _mm256_madd_epi16(
+            _mm256_cvtepi16_epi32(_mm256_extracti128_si256::<1>(hi_16)),
+            weight,
+        ),
+    )
+}
+
+#[inline]
+#[target_feature(enable = "avx2")]
+pub unsafe fn _mm256_mul_add_epi8_by_epi16_x4(
+    accumulator: (__m256i, __m256i, __m256i, __m256i),
+    input: __m256i,
+    weight: __m256i,
+) -> (__m256i, __m256i, __m256i, __m256i) {
+    let lo_16 = _mm256_cvtepu8_epi16(_mm256_castsi256_si128(input));
+    let hi_16 = _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(input));
+
+    (
+        _mm256_add_epi32(
+            accumulator.0,
+            _mm256_madd_epi16(_mm256_cvtepi16_epi32(_mm256_castsi256_si128(lo_16)), weight),
+        ),
+        _mm256_add_epi32(
+            accumulator.1,
+            _mm256_madd_epi16(
+                _mm256_cvtepi16_epi32(_mm256_extracti128_si256::<1>(lo_16)),
+                weight,
+            ),
+        ),
+        _mm256_add_epi32(
+            accumulator.2,
+            _mm256_madd_epi16(_mm256_cvtepi16_epi32(_mm256_castsi256_si128(hi_16)), weight),
+        ),
+        _mm256_add_epi32(
+            accumulator.3,
+            _mm256_madd_epi16(
+                _mm256_cvtepi16_epi32(_mm256_extracti128_si256::<1>(hi_16)),
+                weight,
+            ),
+        ),
+    )
+}
+
+#[inline]
 #[target_feature(enable = "avx2,fma")]
 pub unsafe fn _mm256_fmlaf_ps(a: __m256, b: __m256, c: __m256) -> __m256 {
     _mm256_fmadd_ps(b, c, a)
@@ -122,6 +181,21 @@ pub unsafe fn _mm256_pack_ps_x4_epi8(store: (__m256, __m256, __m256, __m256)) ->
     let lo_s = _mm256_pack_i32(
         _mm256_cvtps_epi32(_mm256_round_ps::<ROUNDING_FLAGS>(store.0)),
         _mm256_cvtps_epi32(_mm256_round_ps::<ROUNDING_FLAGS>(store.1)),
+    );
+    _mm256_pack_u16(lo_s, hi_s)
+}
+
+#[inline]
+#[target_feature(enable = "avx2")]
+pub unsafe fn _mm256_pack_epi32_x4_epi8(store: (__m256i, __m256i, __m256i, __m256i)) -> __m256i {
+    let rounding_const = _mm256_set1_epi32(1 << 14);
+    let hi_s = _mm256_pack_i32(
+        _mm256_srai_epi32::<15>(_mm256_add_epi32(store.2, rounding_const)),
+        _mm256_srai_epi32::<15>(_mm256_add_epi32(store.3, rounding_const)),
+    );
+    let lo_s = _mm256_pack_i32(
+        _mm256_srai_epi32::<15>(_mm256_add_epi32(store.0, rounding_const)),
+        _mm256_srai_epi32::<15>(_mm256_add_epi32(store.1, rounding_const)),
     );
     _mm256_pack_u16(lo_s, hi_s)
 }

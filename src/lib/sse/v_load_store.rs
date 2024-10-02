@@ -27,7 +27,8 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::sse::{
-    _mm_deinterleave_rgb, _mm_deinterleave_rgba, _mm_interleave_rgb, _mm_interleave_rgba,
+    _mm_deinterleave_rgb, _mm_deinterleave_rgb_ps, _mm_deinterleave_rgba, _mm_deinterleave_rgba_ps,
+    _mm_interleave_rgb, _mm_interleave_rgb_ps, _mm_interleave_rgba, _mm_interleave_rgba_ps,
 };
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
@@ -78,6 +79,14 @@ pub unsafe fn _mm_store_pack_ps_x4(ptr: *mut f32, v: (__m128, __m128, __m128, __
     _mm_storeu_ps(ptr.add(4), v.1);
     _mm_storeu_ps(ptr.add(8), v.2);
     _mm_storeu_ps(ptr.add(12), v.3);
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+pub unsafe fn _mm_store_pack_ps_x3(ptr: *mut f32, v: (__m128, __m128, __m128)) {
+    _mm_storeu_ps(ptr, v.0);
+    _mm_storeu_ps(ptr.add(4), v.1);
+    _mm_storeu_ps(ptr.add(8), v.2);
 }
 
 #[inline]
@@ -187,4 +196,37 @@ pub unsafe fn _mm_load_deinterleave_rgba_half(
     let row0 = _mm_loadu_si128(ptr as *const __m128i);
     let row1 = _mm_loadu_si128(ptr.add(16) as *const __m128i);
     _mm_deinterleave_rgba(row0, row1, _mm_setzero_si128(), _mm_setzero_si128())
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+pub unsafe fn _mm_load_deinterleave_rgba_ps(ptr: *const f32) -> (__m128, __m128, __m128, __m128) {
+    let row0 = _mm_loadu_ps(ptr);
+    let row1 = _mm_loadu_ps(ptr.add(4));
+    let row2 = _mm_loadu_ps(ptr.add(8));
+    let row3 = _mm_loadu_ps(ptr.add(12));
+    _mm_deinterleave_rgba_ps(row0, row1, row2, row3)
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+pub unsafe fn _mm_load_deinterleave_rgb_ps(ptr: *const f32) -> (__m128, __m128, __m128) {
+    let row0 = _mm_loadu_ps(ptr);
+    let row1 = _mm_loadu_ps(ptr.add(4));
+    let row2 = _mm_loadu_ps(ptr.add(8));
+    _mm_deinterleave_rgb_ps(row0, row1, row2)
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+pub unsafe fn _mm_store_interleave_rgba_ps(ptr: *mut f32, v: (__m128, __m128, __m128, __m128)) {
+    let (v0, v1, v2, v3) = _mm_interleave_rgba_ps(v.0, v.1, v.2, v.3);
+    _mm_store_pack_ps_x4(ptr, (v0, v1, v2, v3));
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+pub unsafe fn _mm_store_interleave_rgb_ps(ptr: *mut f32, v: (__m128, __m128, __m128)) {
+    let (v0, v1, v2) = _mm_interleave_rgb_ps(v.0, v.1, v.2);
+    _mm_store_pack_ps_x3(ptr, (v0, v1, v2));
 }

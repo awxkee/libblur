@@ -119,49 +119,28 @@ pub unsafe fn _mm_mul_add_epi8_by_ps_x4<const FMA: bool>(
     let lo_16 = _mm_unpacklo_epi8(input, zeros);
     let hi_16 = _mm_unpackhi_epi8(input, zeros);
 
-    if FMA {
-        (
-            _mm_fmlaf_ps(
-                accumulator.0,
-                _mm_cvtepi32_ps(_mm_unpacklo_epi16(lo_16, zeros)),
-                weight,
-            ),
-            _mm_fmlaf_ps(
-                accumulator.1,
-                _mm_cvtepi32_ps(_mm_unpackhi_epi16(lo_16, zeros)),
-                weight,
-            ),
-            _mm_fmlaf_ps(
-                accumulator.2,
-                _mm_cvtepi32_ps(_mm_unpacklo_epi16(hi_16, zeros)),
-                weight,
-            ),
-            _mm_fmlaf_ps(
-                accumulator.3,
-                _mm_cvtepi32_ps(_mm_unpackhi_epi16(hi_16, zeros)),
-                weight,
-            ),
-        )
-    } else {
-        (
-            _mm_add_ps(
-                _mm_mul_ps(_mm_cvtepi32_ps(_mm_unpacklo_epi16(lo_16, zeros)), weight),
-                accumulator.0,
-            ),
-            _mm_add_ps(
-                _mm_mul_ps(_mm_cvtepi32_ps(_mm_unpackhi_epi16(lo_16, zeros)), weight),
-                accumulator.1,
-            ),
-            _mm_add_ps(
-                _mm_mul_ps(_mm_cvtepi32_ps(_mm_unpacklo_epi16(hi_16, zeros)), weight),
-                accumulator.2,
-            ),
-            _mm_add_ps(
-                _mm_mul_ps(_mm_cvtepi32_ps(_mm_unpackhi_epi16(hi_16, zeros)), weight),
-                accumulator.3,
-            ),
-        )
-    }
+    (
+        _mm_opt_fmlaf_ps::<FMA>(
+            accumulator.0,
+            _mm_cvtepi32_ps(_mm_unpacklo_epi16(lo_16, zeros)),
+            weight,
+        ),
+        _mm_opt_fmlaf_ps::<FMA>(
+            accumulator.1,
+            _mm_cvtepi32_ps(_mm_unpackhi_epi16(lo_16, zeros)),
+            weight,
+        ),
+        _mm_opt_fmlaf_ps::<FMA>(
+            accumulator.2,
+            _mm_cvtepi32_ps(_mm_unpacklo_epi16(hi_16, zeros)),
+            weight,
+        ),
+        _mm_opt_fmlaf_ps::<FMA>(
+            accumulator.3,
+            _mm_cvtepi32_ps(_mm_unpackhi_epi16(hi_16, zeros)),
+            weight,
+        ),
+    )
 }
 
 #[inline]
@@ -174,31 +153,18 @@ pub unsafe fn _mm_mul_add_epi8_by_ps_x2<const FMA: bool>(
     let zeros = _mm_setzero_si128();
     let lo_16 = _mm_unpacklo_epi8(input, zeros);
 
-    if FMA {
-        (
-            _mm_fmlaf_ps(
-                accumulator.0,
-                _mm_cvtepi32_ps(_mm_unpacklo_epi16(lo_16, zeros)),
-                weight,
-            ),
-            _mm_fmlaf_ps(
-                accumulator.1,
-                _mm_cvtepi32_ps(_mm_unpackhi_epi16(lo_16, zeros)),
-                weight,
-            ),
-        )
-    } else {
-        (
-            _mm_add_ps(
-                _mm_mul_ps(_mm_cvtepi32_ps(_mm_unpacklo_epi16(lo_16, zeros)), weight),
-                accumulator.0,
-            ),
-            _mm_add_ps(
-                _mm_mul_ps(_mm_cvtepi32_ps(_mm_unpackhi_epi16(lo_16, zeros)), weight),
-                accumulator.1,
-            ),
-        )
-    }
+    (
+        _mm_opt_fmlaf_ps::<FMA>(
+            accumulator.0,
+            _mm_cvtepi32_ps(_mm_unpacklo_epi16(lo_16, zeros)),
+            weight,
+        ),
+        _mm_opt_fmlaf_ps::<FMA>(
+            accumulator.1,
+            _mm_cvtepi32_ps(_mm_unpackhi_epi16(lo_16, zeros)),
+            weight,
+        ),
+    )
 }
 
 #[inline]

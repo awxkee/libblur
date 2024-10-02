@@ -28,9 +28,10 @@
  */
 use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_row_cg_approx::filter_color_group_row_approx;
+use crate::filter1d::filter_row_cg_approx_symmetric::filter_color_group_row_symmetric_approx;
 use crate::filter1d::filter_scan::ScanPoint1d;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use crate::filter1d::neon::filter_rgba_row_neon_u8_i32;
+use crate::filter1d::neon::{filter_rgba_row_neon_u8_i32, filter_rgba_row_symm_neon_u8_i32};
 use crate::filter1d::region::FilterRegion;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::filter1d::sse::filter_rgba_row_sse_u8_i32;
@@ -38,7 +39,9 @@ use crate::unsafe_slice::UnsafeSlice;
 use crate::ImageSize;
 
 pub trait Filter1DRgbaRowHandlerApprox<T, F> {
-    fn get_rgba_row_handler() -> fn(
+    fn get_rgba_row_handler(
+        is_kernel_symmetric: bool,
+    ) -> fn(
         arena: Arena,
         arena_src: &[T],
         dst: &UnsafeSlice<T>,
@@ -51,7 +54,9 @@ pub trait Filter1DRgbaRowHandlerApprox<T, F> {
 macro_rules! default_1d_row_handler {
     ($store:ty, $intermediate:ty) => {
         impl Filter1DRgbaRowHandlerApprox<$store, $intermediate> for $store {
-            fn get_rgba_row_handler() -> fn(
+            fn get_rgba_row_handler(
+                is_kernel_symmetric: bool,
+            ) -> fn(
                 Arena,
                 &[$store],
                 &UnsafeSlice<$store>,
@@ -59,7 +64,11 @@ macro_rules! default_1d_row_handler {
                 FilterRegion,
                 &[ScanPoint1d<$intermediate>],
             ) {
-                filter_color_group_row_approx::<$store, $intermediate, 4>
+                if is_kernel_symmetric {
+                    filter_color_group_row_symmetric_approx::<$store, $intermediate, 4>
+                } else {
+                    filter_color_group_row_approx::<$store, $intermediate, 4>
+                }
             }
         }
     };
@@ -71,23 +80,38 @@ impl Filter1DRgbaRowHandlerApprox<u8, i32> for u8 {
         any(target_arch = "x86_64", target_arch = "x86")
     )))]
     fn get_rgba_row_handler(
+        is_kernel_symmetric: bool,
     ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<i32>]) {
-        filter_color_group_row_approx::<u8, i32, 4>
+        if is_kernel_symmetric {
+            filter_color_group_row_symmetric_approx::<u8, i32, 4>
+        } else {
+            filter_color_group_row_approx::<u8, i32, 4>
+        }
     }
 
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     fn get_rgba_row_handler(
+        is_kernel_symmetric: bool,
     ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<i32>]) {
-        filter_rgba_row_neon_u8_i32
+        if is_kernel_symmetric {
+            filter_rgba_row_symm_neon_u8_i32
+        } else {
+            filter_rgba_row_neon_u8_i32
+        }
     }
 
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     fn get_rgba_row_handler(
+        is_kernel_symmetric: bool,
     ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<i32>]) {
         if std::arch::is_x86_feature_detected!("sse4.1") {
             return filter_rgba_row_sse_u8_i32;
         }
-        filter_color_group_row_approx::<u8, i32, 4>
+        if is_kernel_symmetric {
+            filter_color_group_row_symmetric_approx::<u8, i32, 4>
+        } else {
+            filter_color_group_row_approx::<u8, i32, 4>
+        }
     }
 }
 
@@ -96,7 +120,12 @@ default_1d_row_handler!(u8, u16);
 default_1d_row_handler!(u8, i16);
 default_1d_row_handler!(u8, u32);
 default_1d_row_handler!(u8, u64);
+default_1d_row_handler!(i8, i32);
+default_1d_row_handler!(i8, i64);
+default_1d_row_handler!(i8, i16);
 default_1d_row_handler!(u16, u32);
 default_1d_row_handler!(u16, i32);
 default_1d_row_handler!(u16, i64);
 default_1d_row_handler!(u16, u64);
+default_1d_row_handler!(i16, i32);
+default_1d_row_handler!(i16, i64);

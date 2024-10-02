@@ -56,3 +56,22 @@ where
 
     left_front.to_vec()
 }
+
+pub(crate) unsafe fn is_symmetric_1d<F>(kernel: &[F]) -> bool
+where
+    F: Copy + PartialEq + 'static,
+    i32: AsPrimitive<F>,
+{
+    {
+        let len = kernel.len();
+        for i in 0..len / 2 {
+            if kernel
+                .get_unchecked(i)
+                .ne(kernel.get_unchecked(len - 1 - i))
+            {
+                return false;
+            }
+        }
+        true
+    }
+}

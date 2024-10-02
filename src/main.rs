@@ -10,7 +10,7 @@ use libblur::{
     fast_gaussian_next_f32, filter_2d_approx, filter_2d_exact, filter_2d_rgb_approx,
     filter_2d_rgb_exact, filter_2d_rgba_approx, filter_2d_rgba_exact, gaussian_blur_image,
     get_gaussian_kernel_1d, get_sigma_size, stack_blur_image, EdgeMode, FastBlurChannels,
-    GaussianPreciseLevel, ImageSize, ThreadingPolicy,
+    GaussianPreciseLevel, ImageSize, Scalar, ThreadingPolicy,
 };
 use std::time::Instant;
 
@@ -106,7 +106,8 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
         ImageSize::new(width, height),
         &kernel,
         &kernel,
-        EdgeMode::Reflect,
+        EdgeMode::Constant,
+        Scalar::new(255.0, 0.0, 0.0, 255.0),
         ThreadingPolicy::Adaptive,
     )
     .unwrap();
@@ -308,6 +309,10 @@ fn main() {
 
     let kernel = get_gaussian_kernel_1d(151, get_sigma_size(151));
     // dst_bytes.fill(0);
+
+    let sobel_horizontal: [f32; 3] = [-1., 0., 1.];
+    let sobel_vertical: [f32; 3] = [1., 2., 1.];
+
     filter_2d_rgba_exact(
         &bytes,
         &mut dst_bytes,
@@ -315,7 +320,8 @@ fn main() {
         &kernel,
         &kernel,
         EdgeMode::Clamp,
-        ThreadingPolicy::Adaptive,
+        Scalar::new(127.0, 0., 0., 255.0),
+        ThreadingPolicy::default(),
     )
     .unwrap();
     //

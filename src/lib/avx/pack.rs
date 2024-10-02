@@ -234,3 +234,155 @@ pub unsafe fn _mm256_deinterleave_rgb(
     let r0 = _mm256_shuffle_epi8(r0, sh_r);
     (b0, g0, r0)
 }
+
+#[inline]
+#[target_feature(enable = "avx2")]
+pub unsafe fn _mm256_deinterleave_rgba_epi32(
+    vals: (__m256i, __m256i, __m256i, __m256i),
+) -> (__m256i, __m256i, __m256i, __m256i) {
+    let p01l = _mm256_unpacklo_epi32(vals.0, vals.1);
+    let p01h = _mm256_unpackhi_epi32(vals.0, vals.1);
+    let p23l = _mm256_unpacklo_epi32(vals.2, vals.3);
+    let p23h = _mm256_unpackhi_epi32(vals.2, vals.3);
+
+    let pll = _mm256_permute2x128_si256::<32>(p01l, p23l);
+    let plh = _mm256_permute2x128_si256::<49>(p01l, p23l);
+    let phl = _mm256_permute2x128_si256::<32>(p01h, p23h);
+    let phh = _mm256_permute2x128_si256::<49>(p01h, p23h);
+
+    let v0 = _mm256_unpacklo_epi32(pll, plh);
+    let v1 = _mm256_unpackhi_epi32(pll, plh);
+    let v2 = _mm256_unpacklo_epi32(phl, phh);
+    let v3 = _mm256_unpackhi_epi32(phl, phh);
+    (v0, v1, v2, v3)
+}
+
+#[inline]
+#[target_feature(enable = "avx2")]
+pub unsafe fn _mm256_deinterleave_rgb_epi32(
+    vals: (__m256i, __m256i, __m256i),
+) -> (__m256i, __m256i, __m256i) {
+    let s02_low = _mm256_permute2x128_si256::<32>(vals.0, vals.2);
+    let s02_high = _mm256_permute2x128_si256::<49>(vals.0, vals.2);
+
+    let b0 = _mm256_blend_epi32::<0x92>(_mm256_blend_epi32::<0x24>(s02_low, s02_high), vals.1);
+    let g0 = _mm256_blend_epi32::<0x24>(_mm256_blend_epi32::<0x92>(s02_high, s02_low), vals.1);
+    let r0 = _mm256_blend_epi32::<0x92>(_mm256_blend_epi32::<0x24>(vals.1, s02_low), s02_high);
+
+    let v0 = _mm256_shuffle_epi32::<0x6c>(b0);
+    let v1 = _mm256_shuffle_epi32::<0xb1>(g0);
+    let v2 = _mm256_shuffle_epi32::<0xc6>(r0);
+    (v0, v1, v2)
+}
+
+#[inline]
+#[target_feature(enable = "avx2")]
+pub unsafe fn _mm256_deinterleave_rgba_ps(
+    vals: (__m256, __m256, __m256, __m256),
+) -> (__m256, __m256, __m256, __m256) {
+    let (v0, v1, v2, v3) = _mm256_deinterleave_rgba_epi32((
+        _mm256_castps_si256(vals.0),
+        _mm256_castps_si256(vals.1),
+        _mm256_castps_si256(vals.2),
+        _mm256_castps_si256(vals.3),
+    ));
+    (
+        _mm256_castsi256_ps(v0),
+        _mm256_castsi256_ps(v1),
+        _mm256_castsi256_ps(v2),
+        _mm256_castsi256_ps(v3),
+    )
+}
+
+#[inline]
+#[target_feature(enable = "avx2")]
+pub unsafe fn _mm256_deinterleave_rgb_ps(
+    vals: (__m256, __m256, __m256),
+) -> (__m256, __m256, __m256) {
+    let (v0, v1, v2) = _mm256_deinterleave_rgb_epi32((
+        _mm256_castps_si256(vals.0),
+        _mm256_castps_si256(vals.1),
+        _mm256_castps_si256(vals.2),
+    ));
+    (
+        _mm256_castsi256_ps(v0),
+        _mm256_castsi256_ps(v1),
+        _mm256_castsi256_ps(v2),
+    )
+}
+
+#[inline]
+#[target_feature(enable = "avx2")]
+pub unsafe fn _mm256_interleave_rgb_epi32(
+    vals: (__m256i, __m256i, __m256i),
+) -> (__m256i, __m256i, __m256i) {
+    let b0 = _mm256_shuffle_epi32::<0x6c>(vals.0);
+    let g0 = _mm256_shuffle_epi32::<0xb1>(vals.1);
+    let r0 = _mm256_shuffle_epi32::<0xc6>(vals.2);
+
+    let p0 = _mm256_blend_epi32::<0x24>(_mm256_blend_epi32::<0x92>(b0, g0), r0);
+    let p1 = _mm256_blend_epi32::<0x24>(_mm256_blend_epi32::<0x92>(g0, r0), b0);
+    let p2 = _mm256_blend_epi32::<0x24>(_mm256_blend_epi32::<0x92>(r0, b0), g0);
+
+    let v0 = _mm256_permute2x128_si256::<32>(p0, p1);
+    let v1 = p2;
+    let v2 = _mm256_permute2x128_si256::<49>(p0, p1);
+    (v0, v1, v2)
+}
+
+#[inline]
+#[target_feature(enable = "avx2")]
+pub unsafe fn _mm256_interleave_rgb_ps(vals: (__m256, __m256, __m256)) -> (__m256, __m256, __m256) {
+    let (v0, v1, v2) = _mm256_interleave_rgb_epi32((
+        _mm256_castps_si256(vals.0),
+        _mm256_castps_si256(vals.1),
+        _mm256_castps_si256(vals.2),
+    ));
+    (
+        _mm256_castsi256_ps(v0),
+        _mm256_castsi256_ps(v1),
+        _mm256_castsi256_ps(v2),
+    )
+}
+
+#[inline]
+#[target_feature(enable = "avx2")]
+pub unsafe fn _mm256_interleave_rgba_epi32(
+    vals: (__m256i, __m256i, __m256i, __m256i),
+) -> (__m256i, __m256i, __m256i, __m256i) {
+    let bg0 = _mm256_unpacklo_epi32(vals.0, vals.1);
+    let bg1 = _mm256_unpackhi_epi32(vals.0, vals.1);
+    let ra0 = _mm256_unpacklo_epi32(vals.2, vals.3);
+    let ra1 = _mm256_unpackhi_epi32(vals.2, vals.3);
+
+    let bgra0_ = _mm256_unpacklo_epi64(bg0, ra0);
+    let bgra1_ = _mm256_unpackhi_epi64(bg0, ra0);
+    let bgra2_ = _mm256_unpacklo_epi64(bg1, ra1);
+    let bgra3_ = _mm256_unpackhi_epi64(bg1, ra1);
+
+    let v0 = _mm256_permute2x128_si256::<32>(bgra0_, bgra1_);
+    let v1 = _mm256_permute2x128_si256::<49>(bgra0_, bgra1_);
+    let v2 = _mm256_permute2x128_si256::<32>(bgra2_, bgra3_);
+    let v3 = _mm256_permute2x128_si256::<49>(bgra2_, bgra3_);
+
+    (v0, v1, v2, v3)
+}
+
+#[inline]
+#[target_feature(enable = "avx2")]
+pub unsafe fn _mm256_interleave_rgba_ps(
+    vals: (__m256, __m256, __m256, __m256),
+) -> (__m256, __m256, __m256, __m256) {
+    let (v0, v1, v2, v3) = _mm256_interleave_rgba_epi32((
+        _mm256_castps_si256(vals.0),
+        _mm256_castps_si256(vals.1),
+        _mm256_castps_si256(vals.2),
+        _mm256_castps_si256(vals.3),
+    ));
+    (
+        _mm256_castsi256_ps(v0),
+        _mm256_castsi256_ps(v1),
+        _mm256_castsi256_ps(v2),
+        _mm256_castsi256_ps(v3),
+    )
+}

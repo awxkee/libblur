@@ -30,12 +30,12 @@ use crate::filter1d::arena::make_arena;
 use crate::filter1d::filter_1d_column_handler_approx::Filter1DColumnHandlerApprox;
 use crate::filter1d::filter_1d_rgb_row_handler_approx::Filter1DRgbRowHandlerApprox;
 use crate::filter1d::filter_element::KernelShape;
-use crate::filter1d::filter_scan::scan_se_1d;
+use crate::filter1d::filter_scan::{is_symmetric_1d, scan_se_1d};
 use crate::filter1d::region::FilterRegion;
 use crate::filter1d::to_approx_storage::{ApproxLevel, ToApproxStorage};
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
-use crate::{EdgeMode, ImageSize, ThreadingPolicy};
+use crate::{EdgeMode, ImageSize, Scalar, ThreadingPolicy};
 use num_traits::{AsPrimitive, Float, MulAdd};
 use std::ops::{Add, Mul, Shl, Shr};
 
@@ -46,6 +46,7 @@ pub fn filter_2d_rgb_approx<T, F, I>(
     row_kernel: &[F],
     column_kernel: &[F],
     border_mode: EdgeMode,
+    border_constant: Scalar,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), String>
 where
@@ -72,6 +73,7 @@ where
         + Shl<Output = I>,
     i32: AsPrimitive<F> + AsPrimitive<I>,
     i64: AsPrimitive<I> + AsPrimitive<F>,
+    f64: AsPrimitive<T>,
 {
     if image.len() != 3 * image_size.width * image_size.height {
         return Err(format!(
@@ -116,12 +118,15 @@ where
     let scanned_row_kernel_slice = scanned_row_kernel.as_slice();
     let scanned_column_kernel = unsafe { scan_se_1d::<I>(&scaled_column_kernel) };
     let scanned_column_kernel_slice = scanned_column_kernel.as_slice();
+    let is_column_kernel_symmetric = unsafe { is_symmetric_1d(column_kernel) };
+    let is_row_kernel_symmetric = unsafe { is_symmetric_1d(row_kernel) };
 
     let (mut row_arena_src, arena) = make_arena::<T, 3>(
         image,
         image_size,
         KernelShape::new(row_kernel.len(), 0),
         border_mode,
+        border_constant,
     )?;
     let thread_count = threading_policy
         .get_threads_count(image_size.width as u32, image_size.height as u32)
@@ -139,7 +144,7 @@ where
     let row_arena_src_slice = row_arena_src.as_slice();
 
     if let Some(pool) = &pool {
-        let row_handler = T::get_rgb_row_handler_apr();
+        let row_handler = T::get_rgb_row_handler_apr(is_row_kernel_symmetric);
         pool.scope(|scope| {
             let transient_cell = UnsafeSlice::new(destination);
 
@@ -166,7 +171,7 @@ where
             }
         });
     } else {
-        let row_handler = T::get_rgb_row_handler_apr();
+        let row_handler = T::get_rgb_row_handler_apr(is_row_kernel_symmetric);
         let transient_cell = UnsafeSlice::new(destination);
         row_handler(
             arena,
@@ -185,13 +190,14 @@ where
         image_size,
         KernelShape::new(0, scanned_column_kernel_slice.len()),
         border_mode,
+        border_constant,
     )?;
     let column_arena_src_slice = column_arena_src.as_slice();
 
     if let Some(pool) = &pool {
         pool.scope(|scope| {
             let transient_cell_0 = UnsafeSlice::new(destination);
-            let column_handler = T::get_column_handler();
+            let column_handler = T::get_column_handler(is_column_kernel_symmetric);
             let copied_arena = column_arena;
             let segment_size = image_size.height as u32 / thread_count;
             for i in 0..thread_count {
@@ -214,7 +220,7 @@ where
             }
         });
     } else {
-        let column_handler = T::get_column_handler();
+        let column_handler = T::get_column_handler(is_column_kernel_symmetric);
         let final_cell_0 = UnsafeSlice::new(destination);
         column_handler(
             column_arena,

@@ -58,10 +58,10 @@ pub fn filter_rgba_row_neon_u8_f32(
 
         let arena_width = arena.width * N;
 
+        let length = scanned_kernel.len();
+
         for y in filter_region.start..filter_region.end {
             let local_src = src.get_unchecked((y * arena_width)..);
-
-            let length = scanned_kernel.iter().len();
 
             let mut _cx = 0usize;
 

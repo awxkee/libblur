@@ -106,6 +106,28 @@ pub unsafe fn vfmlaq_u8_f32(
 }
 
 #[inline(always)]
+pub unsafe fn vfmlaq_symm_u8_f32(
+    store: (float32x4_t, float32x4_t, float32x4_t, float32x4_t),
+    input0: uint8x16_t,
+    input1: uint8x16_t,
+    weight: float32x4_t,
+) -> (float32x4_t, float32x4_t, float32x4_t, float32x4_t) {
+    let lo_16 = vaddq_u16(vmovl_u8(vget_low_u8(input0)), vmovl_u8(vget_low_u8(input1)));
+    let lo_lo = vcvtq_f32_u32(vmovl_u16(vget_low_u16(lo_16)));
+    let lo_hi = vcvtq_f32_u32(vmovl_high_u16(lo_16));
+    let hi_16 = vaddq_u16(vmovl_high_u8(input0), vmovl_high_u8(input1));
+    let hi_lo = vcvtq_f32_u32(vmovl_u16(vget_low_u16(hi_16)));
+    let hi_hi = vcvtq_f32_u32(vmovl_high_u16(hi_16));
+
+    (
+        prefer_vfmaq_f32(store.0, lo_lo, weight),
+        prefer_vfmaq_f32(store.1, lo_hi, weight),
+        prefer_vfmaq_f32(store.2, hi_lo, weight),
+        prefer_vfmaq_f32(store.3, hi_hi, weight),
+    )
+}
+
+#[inline(always)]
 pub unsafe fn vfmlaq_u8_s16(
     store: (int32x4_t, int32x4_t, int32x4_t, int32x4_t),
     input: uint8x16_t,
@@ -113,6 +135,27 @@ pub unsafe fn vfmlaq_u8_s16(
 ) -> (int32x4_t, int32x4_t, int32x4_t, int32x4_t) {
     let lo_16 = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(input)));
     let hi_16 = vreinterpretq_s16_u16(vmovl_high_u8(input));
+
+    (
+        vmlal_s16(store.0, vget_low_s16(lo_16), vget_low_s16(weight)),
+        vmlal_high_s16(store.1, lo_16, weight),
+        vmlal_s16(store.2, vget_low_s16(hi_16), vget_low_s16(weight)),
+        vmlal_high_s16(store.3, hi_16, weight),
+    )
+}
+
+#[inline(always)]
+pub unsafe fn vfmlaq_symm_u8_s16(
+    store: (int32x4_t, int32x4_t, int32x4_t, int32x4_t),
+    input0: uint8x16_t,
+    input1: uint8x16_t,
+    weight: int16x8_t,
+) -> (int32x4_t, int32x4_t, int32x4_t, int32x4_t) {
+    let lo_16 = vreinterpretq_s16_u16(vaddq_u16(
+        vmovl_u8(vget_low_u8(input0)),
+        vmovl_u8(vget_low_u8(input1)),
+    ));
+    let hi_16 = vreinterpretq_s16_u16(vaddq_u16(vmovl_high_u8(input0), vmovl_high_u8(input1)));
 
     (
         vmlal_s16(store.0, vget_low_s16(lo_16), vget_low_s16(weight)),
@@ -137,12 +180,44 @@ pub unsafe fn vfmla_u8_s16(
 }
 
 #[inline(always)]
+pub unsafe fn vfmla_symm_u8_s16(
+    store: (int32x4_t, int32x4_t),
+    input0: uint8x8_t,
+    input1: uint8x8_t,
+    weight: int16x4_t,
+) -> (int32x4_t, int32x4_t) {
+    let lo_16 = vreinterpretq_s16_u16(vaddq_u16(vmovl_u8(input0), vmovl_u8(input1)));
+
+    (
+        vmlal_s16(store.0, vget_low_s16(lo_16), weight),
+        vmlal_s16(store.1, vget_high_s16(lo_16), weight),
+    )
+}
+
+#[inline(always)]
 pub unsafe fn vfmla_u8_f32(
     store: (float32x4_t, float32x4_t),
     input: uint8x8_t,
     weight: float32x4_t,
 ) -> (float32x4_t, float32x4_t) {
     let lo_16 = vmovl_u8(input);
+    let lo_lo = vcvtq_f32_u32(vmovl_u16(vget_low_u16(lo_16)));
+    let lo_hi = vcvtq_f32_u32(vmovl_high_u16(lo_16));
+
+    (
+        prefer_vfmaq_f32(store.0, lo_lo, weight),
+        prefer_vfmaq_f32(store.1, lo_hi, weight),
+    )
+}
+
+#[inline(always)]
+pub unsafe fn vfmla_symm_u8_f32(
+    store: (float32x4_t, float32x4_t),
+    input0: uint8x8_t,
+    input1: uint8x8_t,
+    weight: float32x4_t,
+) -> (float32x4_t, float32x4_t) {
+    let lo_16 = vaddq_u16(vmovl_u8(input0), vmovl_u8(input1));
     let lo_lo = vcvtq_f32_u32(vmovl_u16(vget_low_u16(lo_16)));
     let lo_hi = vcvtq_f32_u32(vmovl_high_u16(lo_16));
 

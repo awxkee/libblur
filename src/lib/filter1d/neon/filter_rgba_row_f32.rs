@@ -37,7 +37,7 @@ use num_traits::MulAdd;
 use std::arch::aarch64::*;
 use std::ops::Mul;
 
-pub fn filter_rgb_row_neon_f32_f32(
+pub fn filter_rgba_row_neon_f32_f32(
     arena: Arena,
     arena_src: &[f32],
     dst: &UnsafeSlice<f32>,
@@ -48,7 +48,7 @@ pub fn filter_rgb_row_neon_f32_f32(
     unsafe {
         let width = image_size.width;
 
-        const N: usize = 3;
+        const N: usize = 4;
 
         let src = &arena_src;
 
@@ -68,22 +68,24 @@ pub fn filter_rgb_row_neon_f32_f32(
 
                 let shifted_src = local_src.get_unchecked((_cx * N)..);
 
-                let source = vld3q_f32(shifted_src.as_ptr());
+                let source = vld4q_f32(shifted_src.as_ptr());
                 let mut k0 = vmulq_f32(source.0, coeff);
                 let mut k1 = vmulq_f32(source.1, coeff);
                 let mut k2 = vmulq_f32(source.2, coeff);
+                let mut k3 = vmulq_f32(source.3, coeff);
 
                 for i in 1..length {
                     let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(i).weight);
-                    let v_source = vld3q_f32(shifted_src.get_unchecked((i * N)..).as_ptr());
+                    let v_source = vld4q_f32(shifted_src.get_unchecked((i * N)..).as_ptr());
                     k0 = prefer_vfmaq_f32(k0, v_source.0, coeff);
                     k1 = prefer_vfmaq_f32(k1, v_source.1, coeff);
                     k2 = prefer_vfmaq_f32(k2, v_source.2, coeff);
+                    k3 = prefer_vfmaq_f32(k3, v_source.3, coeff);
                 }
 
                 let dst_offset = y * dst_stride + _cx * N;
                 let dst_ptr0 = (dst.slice.as_ptr() as *mut f32).add(dst_offset);
-                vst3q_f32(dst_ptr0, float32x4x3_t(k0, k1, k2));
+                vst4q_f32(dst_ptr0, float32x4x4_t(k0, k1, k2, k3));
                 _cx += 4;
             }
 
@@ -92,22 +94,24 @@ pub fn filter_rgb_row_neon_f32_f32(
 
                 let shifted_src = local_src.get_unchecked((_cx * N)..);
 
-                let source = vld3_f32(shifted_src.as_ptr());
+                let source = vld4_f32(shifted_src.as_ptr());
                 let mut k0 = vmul_f32(source.0, coeff);
                 let mut k1 = vmul_f32(source.1, coeff);
                 let mut k2 = vmul_f32(source.2, coeff);
+                let mut k3 = vmul_f32(source.3, coeff);
 
                 for i in 1..length {
                     let coeff = vdup_n_f32(scanned_kernel.get_unchecked(i).weight);
-                    let v_source = vld3_f32(shifted_src.get_unchecked((i * N)..).as_ptr());
+                    let v_source = vld4_f32(shifted_src.get_unchecked((i * N)..).as_ptr());
                     k0 = prefer_vfma_f32(k0, v_source.0, coeff);
                     k1 = prefer_vfma_f32(k1, v_source.1, coeff);
                     k2 = prefer_vfma_f32(k2, v_source.2, coeff);
+                    k3 = prefer_vfma_f32(k3, v_source.3, coeff);
                 }
 
                 let dst_offset = y * dst_stride + _cx * N;
                 let dst_ptr0 = (dst.slice.as_ptr() as *mut f32).add(dst_offset);
-                vst3_f32(dst_ptr0, float32x2x3_t(k0, k1, k2));
+                vst4_f32(dst_ptr0, float32x2x4_t(k0, k1, k2, k3));
                 _cx += 2;
             }
 

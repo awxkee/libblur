@@ -48,9 +48,9 @@ pub fn filter_column_neon_f32_f32(
     unsafe {
         let src = arena_src;
 
-        let arena_width = arena.width;
+        let arena_width = arena.width * arena.components;
 
-        let dst_stride = image_size.width;
+        let dst_stride = image_size.width * arena.components;
 
         for y in filter_region.start..filter_region.end {
             let length = scanned_kernel.iter().len();
@@ -59,7 +59,7 @@ pub fn filter_column_neon_f32_f32(
 
             let local_src = src.get_unchecked((y * arena_width)..);
 
-            while _cx + 16 < image_size.width {
+            while _cx + 16 < dst_stride {
                 let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(0).weight);
 
                 let shifted_src = local_src.get_unchecked(_cx..);
@@ -86,7 +86,7 @@ pub fn filter_column_neon_f32_f32(
                 _cx += 16;
             }
 
-            while _cx + 8 < image_size.width {
+            while _cx + 8 < dst_stride {
                 let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(0).weight);
 
                 let shifted_src = local_src.get_unchecked(_cx..);
@@ -110,7 +110,7 @@ pub fn filter_column_neon_f32_f32(
                 _cx += 8;
             }
 
-            while _cx + 4 < image_size.width {
+            while _cx + 4 < dst_stride {
                 let coeff = *scanned_kernel.get_unchecked(0);
 
                 let shifted_src = local_src.get_unchecked(_cx..);
@@ -131,7 +131,7 @@ pub fn filter_column_neon_f32_f32(
                 _cx += 4;
             }
 
-            while _cx + 2 < image_size.width {
+            while _cx + 2 < dst_stride {
                 let coeff = *scanned_kernel.get_unchecked(0);
 
                 let shifted_src = local_src.get_unchecked(_cx..);
@@ -152,7 +152,7 @@ pub fn filter_column_neon_f32_f32(
                 _cx += 2;
             }
 
-            for x in _cx..image_size.width {
+            for x in _cx..dst_stride {
                 let coeff = *scanned_kernel.get_unchecked(0);
 
                 let shifted_src = local_src.get_unchecked(x..);
