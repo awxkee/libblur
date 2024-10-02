@@ -64,7 +64,7 @@ pub fn filter_row_sse_f32_f32(
                 scanned_kernel,
             );
         } else {
-            filter_row_sse_f32_f32_impl(
+            filter_row_sse_f32_f32_def(
                 arena,
                 arena_src,
                 dst,

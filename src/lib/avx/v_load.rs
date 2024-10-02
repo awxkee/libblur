@@ -31,7 +31,6 @@ use crate::avx::{
     _mm256_deinterleave_rgb, _mm256_deinterleave_rgb_ps, _mm256_deinterleave_rgba_epi8,
     _mm256_deinterleave_rgba_ps,
 };
-use crate::sse::_mm_deinterleave_rgba_ps;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]

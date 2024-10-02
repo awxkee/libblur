@@ -43,7 +43,7 @@ mod filter_rgba_symm_row;
 mod filter_row;
 mod filter_row_approx;
 mod filter_row_f32;
-mod filter_symm_column;
+mod filter_column_symm;
 mod utils;
 
 pub use filter_column::filter_column_neon_u8_f32;
@@ -63,4 +63,4 @@ pub use filter_rgba_symm_row::filter_rgba_row_symm_neon_u8_f32;
 pub use filter_row::filter_row_neon_u8_f32;
 pub use filter_row_approx::filter_row_neon_u8_i32;
 pub use filter_row_f32::filter_row_neon_f32_f32;
-pub use filter_symm_column::filter_symm_column_neon_u8_f32;
+pub use filter_column_symm::filter_symm_column_neon_u8_f32;

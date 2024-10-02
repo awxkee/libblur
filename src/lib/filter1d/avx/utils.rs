@@ -172,6 +172,47 @@ pub unsafe fn _mm256_mul_add_epi8_by_ps_x4<const FMA: bool>(
 
 #[inline]
 #[target_feature(enable = "avx2")]
+pub unsafe fn _mm256_mul_add_symm_epi8_by_ps_x4<const FMA: bool>(
+    accumulator: (__m256, __m256, __m256, __m256),
+    input0: __m256i,
+    input1: __m256i,
+    weight: __m256,
+) -> (__m256, __m256, __m256, __m256) {
+    let lo_16 = _mm256_add_epi16(
+        _mm256_cvtepu8_epi16(_mm256_castsi256_si128(input0)),
+        _mm256_cvtepu8_epi16(_mm256_castsi256_si128(input1)),
+    );
+    let hi_16 = _mm256_add_epi16(
+        _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(input0)),
+        _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(input1)),
+    );
+
+    (
+        _mm256_opt_fmlaf_ps::<FMA>(
+            accumulator.0,
+            _mm256_cvtepi32_ps(_mm256_cvtepi16_epi32(_mm256_castsi256_si128(lo_16))),
+            weight,
+        ),
+        _mm256_opt_fmlaf_ps::<FMA>(
+            accumulator.1,
+            _mm256_cvtepi32_ps(_mm256_cvtepi16_epi32(_mm256_extracti128_si256::<1>(lo_16))),
+            weight,
+        ),
+        _mm256_opt_fmlaf_ps::<FMA>(
+            accumulator.2,
+            _mm256_cvtepi32_ps(_mm256_cvtepi16_epi32(_mm256_castsi256_si128(hi_16))),
+            weight,
+        ),
+        _mm256_opt_fmlaf_ps::<FMA>(
+            accumulator.3,
+            _mm256_cvtepi32_ps(_mm256_cvtepi16_epi32(_mm256_extracti128_si256::<1>(hi_16))),
+            weight,
+        ),
+    )
+}
+
+#[inline]
+#[target_feature(enable = "avx2")]
 pub unsafe fn _mm256_pack_ps_x4_epi8(store: (__m256, __m256, __m256, __m256)) -> __m256i {
     const ROUNDING_FLAGS: i32 = 0;
     let hi_s = _mm256_pack_i32(
