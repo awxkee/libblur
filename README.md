@@ -15,7 +15,8 @@ options also available
 # Performance
 
 Most blur algorithms done very good and works at excellent speed. Where appropriate comparison with OpenCV is available.
-For measurement was used M3 Pro with NEON feature. On x86_84 OpenCV might be better sometimes since AVX-2 is not fully supported in library
+For measurement was used M3 Pro with NEON feature. On x86_84 OpenCV might be better sometimes since AVX-2 is not fully
+supported in library
 
 # Usage
 
@@ -27,17 +28,17 @@ cargo add libblur
 
 ```rust
 let blurred = gaussian_blur_image(
-     img,
-     61,
-     0.,
-     EdgeMode::Clamp,
-     GaussianPreciseLevel::INTEGRAL,
-     ThreadingPolicy::Adaptive,
- )
- .unwrap();
- blurred
-     .save_with_format("blurred.jpg", ImageFormat::Jpeg)
-     .unwrap();
+img,
+61,
+0.,
+EdgeMode::Clamp,
+GaussianPreciseLevel::INTEGRAL,
+ThreadingPolicy::Adaptive,
+)
+.unwrap();
+blurred
+.save_with_format("blurred.jpg", ImageFormat::Jpeg)
+.unwrap();
 ```
 
 ### Gaussian blur
@@ -53,12 +54,12 @@ Kernel size must be odd. Will panic if kernel size is not odd.
 O(R) complexity.
 
 ```rust
-libblur::gaussian_blur(&bytes, src_stride, & mut dst_bytes, dst_stride, width, height, kernel_size, sigma, FastBlurChannels::Channels3, GaussianPreciseLevel::EXACT);
+libblur::gaussian_blur( & bytes, src_stride, & mut dst_bytes, dst_stride, width, height, kernel_size, sigma, FastBlurChannels::Channels3, GaussianPreciseLevel::EXACT);
 ```
 
 Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded mode with 151 kernel size.
 
-|                   | Time(NEON) | Time(SSE) | 
+|                   | Time(NEON) | Time(AVX) | 
 |-------------------|:----------:|:---------:| 
 | libblur(Exact)    |  119.21ms  | 180.14ms  | 
 | libblur(Integral) |  86.81ms   | 129.67ms  | 
@@ -66,11 +67,11 @@ Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded 
 
 Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded mode with 151 kernel size.
 
-|                   | time(NEON) | Time(SSE/AVX) |
-|-------------------|:----------:|:-------------:|
-| libblur(Exact)    |  128.67ms  |   192.68ms    |
-| libblur(Integral) |  81.60ms   |   160.29ms    |
-| OpenCV            |  187.51ms  |   191.31ms    |
+|                   | time(NEON) | Time(AVX) |
+|-------------------|:----------:|:---------:|
+| libblur(Exact)    |  128.67ms  | 192.68ms  |
+| libblur(Integral) |  81.60ms   | 160.29ms  |
+| OpenCV            |  187.51ms  | 191.31ms  |
 
 Example comparison time for blurring image 3000x4000 single plane 8-bit in multithreaded mode with 151 kernel size.
 
@@ -243,14 +244,14 @@ By the nature of this filter the more spatial sigma are the faster method is.
 
 ```rust
 fast_bilateral_filter(
-    src_bytes,
-    &mut dst_bytes,
-    dimensions.0,
-    dimensions.1,
-    kernel_size,
-    spatial_sigma,
-    range_sigma,
-    FastBlurChannels::Channels3,
+src_bytes,
+& mut dst_bytes,
+dimensions.0,
+dimensions.1,
+kernel_size,
+spatial_sigma,
+range_sigma,
+FastBlurChannels::Channels3,
 );
 ```
 

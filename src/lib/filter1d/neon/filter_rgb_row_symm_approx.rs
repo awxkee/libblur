@@ -77,8 +77,8 @@ pub fn filter_rgb_row_symm_neon_u8_i32(
                 let mut k2 = vmulq_u8_by_i16(source.2, coeff);
 
                 for i in 0..half_len {
-                    let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight as i16);
                     let rollback = length - i - 1;
+                    let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight as i16);
                     let v_source0 = vld3q_u8(shifted_src.get_unchecked((i * N)..).as_ptr());
                     let v_source1 = vld3q_u8(shifted_src.get_unchecked((rollback * N)..).as_ptr());
                     k0 = vfmlaq_symm_u8_s16(k0, v_source0.0, v_source1.0, coeff);

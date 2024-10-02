@@ -330,6 +330,32 @@ pub unsafe fn _mm_mul_add_epi8_by_epi16_x2(
 
 #[inline]
 #[target_feature(enable = "sse4.1")]
+pub unsafe fn _mm_mul_add_symm_epi8_by_epi16_x2(
+    accumulator: (__m128i, __m128i),
+    input0: __m128i,
+    input1: __m128i,
+    weight: __m128i,
+) -> (__m128i, __m128i) {
+    let zeros = _mm_setzero_si128();
+    let lo_16 = _mm_add_epi16(
+        _mm_unpacklo_epi8(input0, zeros),
+        _mm_unpacklo_epi8(input1, zeros),
+    );
+
+    (
+        _mm_add_epi32(
+            _mm_madd_epi16(_mm_unpacklo_epi16(lo_16, zeros), weight),
+            accumulator.0,
+        ),
+        _mm_add_epi32(
+            _mm_madd_epi16(_mm_unpackhi_epi16(lo_16, zeros), weight),
+            accumulator.1,
+        ),
+    )
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_pack_epi32_x4_epi8(store: (__m128i, __m128i, __m128i, __m128i)) -> __m128i {
     let rounding_const = _mm_set1_epi32(1 << 14);
     let hi_s = _mm_packs_epi32(
