@@ -303,15 +303,12 @@ fn main() {
     let kernel = get_gaussian_kernel_1d(151, get_sigma_size(151));
     // dst_bytes.fill(0);
 
-    let source_f32 = bytes.iter().map(|&x| x as f32).collect::<Vec<f32>>();
-    let mut dest = vec![0f32; bytes.len()];
-
     let sobel_horizontal: [i16; 3] = [-1, 0, 1];
     let sobel_vertical: [i16; 3] = [1, 2, 1];
 
-    filter_2d_rgb_exact(
-        &source_f32,
-        &mut dest,
+    filter_2d_rgb_approx::<u8, f32, i32>(
+        &bytes,
+        &mut dst_bytes,
         ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
         &kernel,
         &kernel,
@@ -320,8 +317,6 @@ fn main() {
         ThreadingPolicy::default(),
     )
     .unwrap();
-
-    dst_bytes = dest.iter().map(|&x| x as u8).collect();
 
     //
     // filter_2d_rgba_approx::<u8, f32, i32>(
