@@ -176,7 +176,7 @@ impl Filter1DColumnHandler<f32, f32> for f32 {
 
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     fn get_column_handler(
-        _: bool,
+        is_symmetric_kernel: bool,
     ) -> fn(Arena, &[&[f32]], &UnsafeSlice<f32>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
         if std::arch::is_x86_feature_detected!("avx2") {
             return filter_column_avx_f32_f32;
