@@ -26,7 +26,6 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use std::time::Instant;
 use crate::edge_mode::{reflect_index, reflect_index_101};
 use crate::filter1d::arena_roi::copy_roi;
 use crate::filter1d::filter_element::KernelShape;
@@ -98,8 +97,6 @@ where
     let old_stride = image_size.width * COMPONENTS;
     let new_stride = new_width * COMPONENTS;
 
-    let arent_time = Instant::now();
-
     unsafe {
         let offset = pad_h * new_stride + pad_w * COMPONENTS;
         copy_roi(
@@ -110,8 +107,6 @@ where
             height,
         );
     }
-
-    println!("transfer time {:?}", arent_time.elapsed());
 
     let filling_ranges = [
         (0..pad_h, 0..new_width),                                  // Top outer
@@ -213,4 +208,321 @@ where
         padded_image,
         Arena::new(new_width, new_height, pad_w, pad_h, COMPONENTS),
     ))
+}
+
+/// Pads an image with chosen border strategy
+pub fn make_arena_row<T, const COMPONENTS: usize>(
+    image: &[T],
+    source_y: usize,
+    image_size: ImageSize,
+    kernel_size: KernelShape,
+    border_mode: EdgeMode,
+    scalar: Scalar,
+) -> Result<(Vec<T>, usize), String>
+where
+    T: Default + Copy + Send + Sync + 'static,
+    f64: AsPrimitive<T>,
+{
+    if image.len() != COMPONENTS * image_size.width * image_size.height {
+        return Err(format!(
+            "Can't create arena, expected image with size {} but got {}",
+            COMPONENTS * image_size.width * image_size.height,
+            image.len()
+        ));
+    }
+
+    let pad_w = kernel_size.width / 2;
+
+    let arena_width = image_size.width * COMPONENTS + pad_w * 2 * COMPONENTS;
+    let mut row = vec![T::default(); arena_width];
+
+    let source_offset = source_y * image_size.width * COMPONENTS;
+
+    let source_row = unsafe { image.get_unchecked(source_offset..) };
+
+    unsafe {
+        std::ptr::copy_nonoverlapping(
+            source_row.as_ptr(),
+            row.get_unchecked_mut((pad_w * COMPONENTS)..).as_mut_ptr(),
+            image_size.width * COMPONENTS,
+        );
+    }
+
+    for x in 0..pad_w {
+        match border_mode {
+            EdgeMode::Clamp => {
+                let old_x = x.saturating_sub(pad_w).min(image_size.width - 1);
+                let old_px = old_x * COMPONENTS;
+                let px = x * COMPONENTS;
+                for i in 0..COMPONENTS {
+                    unsafe {
+                        *row.get_unchecked_mut(px + i) = *source_row.get_unchecked(old_px + i);
+                    }
+                }
+            }
+            EdgeMode::Wrap => {
+                let old_x =
+                    (x as i64 - pad_w as i64).rem_euclid(image_size.width as i64 - 1) as usize;
+                let old_px = old_x * COMPONENTS;
+                let px = x * COMPONENTS;
+                for i in 0..COMPONENTS {
+                    unsafe {
+                        *row.get_unchecked_mut(px + i) = *source_row.get_unchecked(old_px + i);
+                    }
+                }
+            }
+            EdgeMode::Reflect => {
+                let old_x = reflect_index(x as i64 - pad_w as i64, image_size.width as i64 - 1);
+                let old_px = old_x * COMPONENTS;
+                let px = x * COMPONENTS;
+                for i in 0..COMPONENTS {
+                    unsafe {
+                        *row.get_unchecked_mut(px + i) = *source_row.get_unchecked(old_px + i);
+                    }
+                }
+            }
+            EdgeMode::Reflect101 => {
+                let old_x = reflect_index_101(x as i64 - pad_w as i64, image_size.width as i64 - 1);
+                let old_px = old_x * COMPONENTS;
+                let px = x * COMPONENTS;
+                for i in 0..COMPONENTS {
+                    unsafe {
+                        *row.get_unchecked_mut(px + i) = *source_row.get_unchecked(old_px + i);
+                    }
+                }
+            }
+            EdgeMode::Constant => {
+                let px = x * COMPONENTS;
+                for i in 0..COMPONENTS {
+                    unsafe {
+                        *row.get_unchecked_mut(px + i) = scalar[i].as_();
+                    }
+                }
+            }
+        }
+    }
+
+    for x in image_size.width..(image_size.width + pad_w) {
+        match border_mode {
+            EdgeMode::Clamp => {
+                let old_x = x.max(0).min(image_size.width - 1);
+                let old_px = old_x * COMPONENTS;
+                let px = pad_w * COMPONENTS + x * COMPONENTS;
+                for i in 0..COMPONENTS {
+                    unsafe {
+                        *row.get_unchecked_mut(px + i) = *source_row.get_unchecked(old_px + i);
+                    }
+                }
+            }
+            EdgeMode::Wrap => {
+                let old_x = (x as i64).rem_euclid(image_size.width as i64 - 1) as usize;
+                let old_px = old_x * COMPONENTS;
+                let px = pad_w * COMPONENTS + x * COMPONENTS;
+                for i in 0..COMPONENTS {
+                    unsafe {
+                        *row.get_unchecked_mut(px + i) = *source_row.get_unchecked(old_px + i);
+                    }
+                }
+            }
+            EdgeMode::Reflect => {
+                let old_x = reflect_index(x as i64, image_size.width as i64 - 1);
+                let old_px = old_x * COMPONENTS;
+                let px = pad_w * COMPONENTS + x * COMPONENTS;
+                for i in 0..COMPONENTS {
+                    unsafe {
+                        *row.get_unchecked_mut(px + i) = *source_row.get_unchecked(old_px + i);
+                    }
+                }
+            }
+            EdgeMode::Reflect101 => {
+                let old_x = reflect_index_101(x as i64, image_size.width as i64 - 1);
+                let old_px = old_x * COMPONENTS;
+                let px = pad_w * COMPONENTS + x * COMPONENTS;
+                for i in 0..COMPONENTS {
+                    unsafe {
+                        *row.get_unchecked_mut(px + i) = *source_row.get_unchecked(old_px + i);
+                    }
+                }
+            }
+            EdgeMode::Constant => {
+                let px = pad_w * COMPONENTS + x * COMPONENTS;
+                for i in 0..COMPONENTS {
+                    unsafe {
+                        *row.get_unchecked_mut(px + i) = scalar[i].as_();
+                    }
+                }
+            }
+        }
+    }
+
+    Ok((row, image_size.width + pad_w * 2))
+}
+
+#[derive(Clone)]
+pub struct ArenaColumns<T>
+where
+    T: Copy,
+{
+    pub top_pad: Vec<T>,
+    pub bottom_pad: Vec<T>,
+}
+
+impl<T> ArenaColumns<T>
+where
+    T: Copy,
+{
+    pub fn new(top_pad: Vec<T>, bottom_pad: Vec<T>) -> ArenaColumns<T> {
+        ArenaColumns {
+            top_pad,
+            bottom_pad,
+        }
+    }
+}
+
+/// Pads a column image with chosen border strategy
+pub fn make_arena_columns<T, const COMPONENTS: usize>(
+    image: &[T],
+    image_size: ImageSize,
+    kernel_size: KernelShape,
+    border_mode: EdgeMode,
+    scalar: Scalar,
+) -> Result<ArenaColumns<T>, String>
+where
+    T: Default + Copy + Send + Sync + 'static,
+    f64: AsPrimitive<T>,
+{
+    if image.len() != COMPONENTS * image_size.width * image_size.height {
+        return Err(format!(
+            "Can't create arena, expected image with size {} but got {}",
+            COMPONENTS * image_size.width * image_size.height,
+            image.len()
+        ));
+    }
+    let pad_h = kernel_size.height / 2;
+
+    let mut top_pad = vec![T::default(); pad_h * image_size.width * COMPONENTS];
+    let mut bottom_pad = vec![T::default(); pad_h * image_size.width * COMPONENTS];
+
+    let top_pad_stride = image_size.width * COMPONENTS;
+
+    for ky in 0..pad_h {
+        for kx in 0..image_size.width {
+            match border_mode {
+                EdgeMode::Clamp => {
+                    let y = ky.saturating_sub(pad_h).min(image_size.height - 1);
+                    unsafe {
+                        let v_dst = ky * top_pad_stride + kx * COMPONENTS;
+                        let v_src = y * top_pad_stride + kx * COMPONENTS;
+                        for i in 0..COMPONENTS {
+                            *top_pad.get_unchecked_mut(v_dst + i) = *image.get_unchecked(v_src + i);
+                        }
+                    }
+                }
+                EdgeMode::Wrap => {
+                    let y = (ky as i64 - pad_h as i64).rem_euclid(image_size.height as i64 - 1)
+                        as usize;
+                    unsafe {
+                        let v_dst = ky * top_pad_stride + kx * COMPONENTS;
+                        let v_src = y * top_pad_stride + kx * COMPONENTS;
+                        for i in 0..COMPONENTS {
+                            *top_pad.get_unchecked_mut(v_dst + i) = *image.get_unchecked(v_src + i);
+                        }
+                    }
+                }
+                EdgeMode::Reflect => {
+                    let y = reflect_index(ky as i64 - pad_h as i64, image_size.height as i64 - 1);
+                    unsafe {
+                        let v_dst = ky * top_pad_stride + kx * COMPONENTS;
+                        let v_src = y * top_pad_stride + kx * COMPONENTS;
+                        for i in 0..COMPONENTS {
+                            *top_pad.get_unchecked_mut(v_dst + i) = *image.get_unchecked(v_src + i);
+                        }
+                    }
+                }
+                EdgeMode::Reflect101 => {
+                    let y =
+                        reflect_index_101(ky as i64 - pad_h as i64, image_size.height as i64 - 1);
+                    unsafe {
+                        let v_dst = ky * top_pad_stride + kx * COMPONENTS;
+                        let v_src = y * top_pad_stride + kx * COMPONENTS;
+                        for i in 0..COMPONENTS {
+                            *top_pad.get_unchecked_mut(v_dst + i) = *image.get_unchecked(v_src + i);
+                        }
+                    }
+                }
+                EdgeMode::Constant => unsafe {
+                    let v_dst = ky * top_pad_stride + kx * COMPONENTS;
+                    for i in 0..COMPONENTS {
+                        *top_pad.get_unchecked_mut(v_dst + i) = scalar[i].as_();
+                    }
+                },
+            }
+        }
+    }
+
+    for ky in 0..pad_h {
+        for kx in 0..image_size.width {
+            match border_mode {
+                EdgeMode::Clamp => {
+                    let y = (ky + image_size.height).min(image_size.height - 1);
+                    unsafe {
+                        let v_dst = ky * top_pad_stride + kx * COMPONENTS;
+                        let v_src = y * top_pad_stride + kx * COMPONENTS;
+                        for i in 0..COMPONENTS {
+                            *bottom_pad.get_unchecked_mut(v_dst + i) =
+                                *image.get_unchecked(v_src + i);
+                        }
+                    }
+                }
+                EdgeMode::Wrap => {
+                    let y = (ky as i64 + image_size.height as i64)
+                        .rem_euclid(image_size.height as i64 - 1)
+                        as usize;
+                    unsafe {
+                        let v_dst = ky * top_pad_stride + kx * COMPONENTS;
+                        let v_src = y * top_pad_stride + kx * COMPONENTS;
+                        for i in 0..COMPONENTS {
+                            *bottom_pad.get_unchecked_mut(v_dst + i) =
+                                *image.get_unchecked(v_src + i);
+                        }
+                    }
+                }
+                EdgeMode::Reflect => {
+                    let y = reflect_index(
+                        ky as i64 + image_size.height as i64,
+                        image_size.height as i64 - 1,
+                    );
+                    unsafe {
+                        let v_dst = ky * top_pad_stride + kx * COMPONENTS;
+                        let v_src = y * top_pad_stride + kx * COMPONENTS;
+                        for i in 0..COMPONENTS {
+                            *bottom_pad.get_unchecked_mut(v_dst + i) =
+                                *image.get_unchecked(v_src + i);
+                        }
+                    }
+                }
+                EdgeMode::Reflect101 => {
+                    let y = reflect_index_101(
+                        ky as i64 + image_size.height as i64,
+                        image_size.height as i64 - 1,
+                    );
+                    unsafe {
+                        let v_dst = ky * top_pad_stride + kx * COMPONENTS;
+                        let v_src = y * top_pad_stride + kx * COMPONENTS;
+                        for i in 0..COMPONENTS {
+                            *top_pad.get_unchecked_mut(v_dst + i) = *image.get_unchecked(v_src + i);
+                        }
+                    }
+                }
+                EdgeMode::Constant => unsafe {
+                    let v_dst = ky * top_pad_stride + kx * COMPONENTS;
+                    for i in 0..COMPONENTS {
+                        *bottom_pad.get_unchecked_mut(v_dst + i) = scalar[i].as_();
+                    }
+                },
+            }
+        }
+    }
+
+    Ok(ArenaColumns::new(top_pad, bottom_pad))
 }

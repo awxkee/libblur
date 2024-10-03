@@ -40,7 +40,7 @@ macro_rules! impl_to_integral_storage {
     ($from:ty, $to:ty) => {
         impl ToStorage<$to> for $from {
             fn to_(self) -> $to {
-                self.round() as $to
+                self.round().max(0 as $from).min(<$to>::MAX as $from) as $to
             }
         }
     };
@@ -80,7 +80,7 @@ macro_rules! impl_signed_to_unsigned_storage {
     ($from:ty, $to:ty) => {
         impl ToStorage<$to> for $from {
             fn to_(self) -> $to {
-                self.max(0) as $to
+                self.max(0).min(<$to>::MAX as $from) as $to
             }
         }
     };

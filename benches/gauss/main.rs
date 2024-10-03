@@ -84,23 +84,23 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
-    c.bench_function("RGBA gauss blur kernel clip approx: 13", |b| {
-        b.iter(|| {
-            let mut dst_bytes: Vec<u8> = vec![0u8; dimensions.1 as usize * stride];
-            libblur::gaussian_blur(
-                &src_bytes,
-                &mut dst_bytes,
-                dimensions.0,
-                dimensions.1,
-                13,
-                0.,
-                FastBlurChannels::Channels4,
-                EdgeMode::Clamp,
-                ThreadingPolicy::Adaptive,
-                GaussianPreciseLevel::INTEGRAL,
-            );
-        })
-    });
+    // c.bench_function("RGBA gauss blur kernel clip approx: 13", |b| {
+    //     b.iter(|| {
+    //         let mut dst_bytes: Vec<u8> = vec![0u8; dimensions.1 as usize * stride];
+    //         libblur::gaussian_blur(
+    //             &src_bytes,
+    //             &mut dst_bytes,
+    //             dimensions.0,
+    //             dimensions.1,
+    //             13,
+    //             0.,
+    //             FastBlurChannels::Channels4,
+    //             EdgeMode::Clamp,
+    //             ThreadingPolicy::Adaptive,
+    //             GaussianPreciseLevel::INTEGRAL,
+    //         );
+    //     })
+    // });
 
     //
     // c.bench_function("Filter 2D Rgba Blur Clamp: 25", |b| {

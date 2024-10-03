@@ -38,18 +38,6 @@ pub unsafe fn load_u8_s32_fast<const CHANNELS_COUNT: usize>(ptr: *const u8) -> i
 }
 
 #[inline(always)]
-pub unsafe fn load_u8_u32_one(ptr: *const u8) -> uint32x2_t {
-    let u_first = u32::from_le_bytes([ptr.read_unaligned(), 0, 0, 0]);
-    vdup_n_u32(u_first)
-}
-
-#[inline(always)]
-pub unsafe fn load_u8_u16_one(ptr: *const u8) -> uint16x4_t {
-    let u_first = u16::from_le_bytes([ptr.read_unaligned(), 0]);
-    vdup_n_u16(u_first)
-}
-
-#[inline(always)]
 pub unsafe fn store_f32<const CHANNELS_COUNT: usize>(dst_ptr: *mut f32, regi: float32x4_t) {
     if CHANNELS_COUNT == 4 {
         vst1q_f32(dst_ptr, regi);
@@ -139,62 +127,6 @@ pub unsafe fn load_f32_fast<const CHANNELS_COUNT: usize>(ptr: *const f32) -> flo
         );
     }
     vld1q_f32([ptr.read_unaligned(), 0f32, 0f32, 0f32].as_ptr())
-}
-
-#[inline(always)]
-pub unsafe fn load_u8_f32_fast<const CHANNELS_COUNT: usize>(ptr: *const u8) -> float32x4_t {
-    vcvtq_f32_u32(load_u8_u32_fast::<CHANNELS_COUNT>(ptr))
-}
-
-#[inline(always)]
-pub unsafe fn load_u8_u16_fast<const CHANNELS_COUNT: usize>(ptr: *const u8) -> uint16x4_t {
-    // LLVM generates a little trash code so better here is to use assembly
-    let mut out_reg: uint16x4_t;
-    if CHANNELS_COUNT == 4 {
-        asm!("\
-             ldr  {tmp1:w}, [{0}]           // Load the first byte into w1
-             mov  {1:v}.s[0], {tmp1:w}      // Move w1 to the first lane of v0
-             uxtl {1:v}.8h, {1:v}.8b
-        \
-        ", in(reg) ptr, out(vreg) out_reg,
-        tmp1 = out(reg) _);
-        out_reg
-    } else if CHANNELS_COUNT == 3 {
-        asm!("\
-             ldrb    {tmp1:w}, [{0}]           // Load the first byte into w1
-             ldrb    {tmp2:w}, [{0}, #1]       // Load the second byte into w2
-             ldrb    {tmp3:w}, [{0}, #2]       // Load the third byte into w3
-
-             mov     {1:v}.h[0], {tmp1:w}      // Move w1 to the first lane of v0
-             mov     {1:v}.h[1], {tmp2:w}      // Move w2 to the second lane of v0
-             mov     {1:v}.h[2], {tmp3:w}      // Move w3 to the third lane of v0
-        \
-        ", in(reg) ptr, out(vreg) out_reg,
-        tmp1 = out(reg) _,
-        tmp2 = out(reg) _,
-        tmp3 = out(reg) _);
-        out_reg
-    } else if CHANNELS_COUNT == 2 {
-        asm!("\
-             ldrb    {tmp1:w}, [{0}]           // Load the first byte into w1
-             ldrb    {tmp2:w}, [{0}, #1]       // Load the second byte into w2
-
-             mov     {1:v}.h[0], {tmp1:w}      // Move w1 to the first lane of v0
-             mov     {1:v}.h[1], {tmp2:w}      // Move w2 to the second lane of v0
-        \
-        ", in(reg) ptr, out(vreg) out_reg,
-        tmp1 = out(reg) _,
-        tmp2 = out(reg) _);
-        out_reg
-    } else {
-        asm!("\
-             ldrb    {tmp1:w}, [{0}]           // Load the first byte into w1
-             mov     {1:v}.h[0], {tmp1:w}      // Move w1 to the first lane of v0
-        \
-        ", in(reg) ptr, out(vreg) out_reg,
-        tmp1 = out(reg) _);
-        out_reg
-    }
 }
 
 #[inline(always)]
@@ -314,29 +246,6 @@ pub unsafe fn prefer_vfma_f32(a: float32x2_t, b: float32x2_t, c: float32x2_t) ->
         vmla_f32(a, b, c)
     }
 }
-
-#[inline(always)]
-pub unsafe fn vhsumq_f32(a: float32x4_t) -> f32 {
-    let va = vadd_f32(vget_low_f32(a), vget_high_f32(a));
-    vpadds_f32(va)
-}
-
-#[inline(always)]
-pub unsafe fn vsplit_rgb_5(px: float32x4x4_t) -> Float32x5T {
-    let first_pixel = px.0;
-    let second_pixel = vextq_f32::<3>(px.0, px.1);
-    let third_pixel = vextq_f32::<2>(px.1, px.2);
-    let four_pixel = vextq_f32::<1>(px.2, px.3);
-    Float32x5T(first_pixel, second_pixel, third_pixel, four_pixel, px.3)
-}
-
-pub(crate) struct Float32x5T(
-    pub float32x4_t,
-    pub float32x4_t,
-    pub float32x4_t,
-    pub float32x4_t,
-    pub float32x4_t,
-);
 
 #[inline(always)]
 pub unsafe fn load_f32_f16<const CHANNELS_COUNT: usize>(ptr: *const f16) -> float32x4_t {

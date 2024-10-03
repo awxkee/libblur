@@ -35,29 +35,39 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-unsafe fn copy_row_neon(dst: &mut [u8], src: &[u8], start: usize, stride: usize) -> usize {
+unsafe fn copy_row_neon(
+    dst: &UnsafeSlice<u8>,
+    offset: usize,
+    src: &[u8],
+    start: usize,
+    stride: usize,
+) -> usize {
     let mut _cx = start;
     while _cx + 64 < stride {
         let rows = vld1q_u8_x4(src.as_ptr().add(_cx));
-        vst1q_u8_x4(dst.as_mut_ptr().add(_cx), rows);
+        let dst_offset_ptr = (dst.slice.as_ptr() as *mut u8).add(_cx + offset);
+        vst1q_u8_x4(dst_offset_ptr, rows);
         _cx += 64;
     }
 
     while _cx + 32 < stride {
         let rows = vld1q_u8_x2(src.as_ptr().add(_cx));
-        vst1q_u8_x2(dst.as_mut_ptr().add(_cx), rows);
+        let dst_offset_ptr = (dst.slice.as_ptr() as *mut u8).add(_cx + offset);
+        vst1q_u8_x2(dst_offset_ptr, rows);
         _cx += 32;
     }
 
     while _cx + 16 < stride {
         let rows = vld1q_u8(src.as_ptr().add(_cx));
-        vst1q_u8(dst.as_mut_ptr().add(_cx), rows);
+        let dst_offset_ptr = (dst.slice.as_ptr() as *mut u8).add(_cx + offset);
+        vst1q_u8(dst_offset_ptr, rows);
         _cx += 16;
     }
 
     while _cx + 8 < stride {
         let rows = vld1_u8(src.as_ptr().add(_cx));
-        vst1_u8(dst.as_mut_ptr().add(_cx), rows);
+        let dst_offset_ptr = (dst.slice.as_ptr() as *mut u8).add(_cx + offset);
+        vst1_u8(dst_offset_ptr, rows);
         _cx += 8;
     }
 

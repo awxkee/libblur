@@ -28,9 +28,10 @@
  */
 use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_row_cg_approx::filter_color_group_row_approx;
+use crate::filter1d::filter_row_cg_approx_symmetric::filter_color_group_row_symmetric_approx;
 use crate::filter1d::filter_scan::ScanPoint1d;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use crate::filter1d::neon::filter_row_neon_u8_i32;
+use crate::filter1d::neon::filter_row_neon_u8_i32_app;
 use crate::filter1d::region::FilterRegion;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::filter1d::sse::filter_row_sse_u8_i32;
@@ -39,7 +40,9 @@ use crate::ImageSize;
 
 pub trait Filter1DRowHandlerApprox<T, F> {
     #[allow(clippy::type_complexity)]
-    fn get_row_handler_apr() -> fn(
+    fn get_row_handler_apr(
+        is_kernel_symmetric: bool,
+    ) -> fn(
         arena: Arena,
         arena_src: &[T],
         dst: &UnsafeSlice<T>,
@@ -52,7 +55,9 @@ pub trait Filter1DRowHandlerApprox<T, F> {
 macro_rules! default_1d_row_handler {
     ($store:ty, $intermediate:ty) => {
         impl Filter1DRowHandlerApprox<$store, $intermediate> for $store {
-            fn get_row_handler_apr() -> fn(
+            fn get_row_handler_apr(
+                is_kernel_symmetric: bool,
+            ) -> fn(
                 Arena,
                 &[$store],
                 &UnsafeSlice<$store>,
@@ -60,7 +65,11 @@ macro_rules! default_1d_row_handler {
                 FilterRegion,
                 &[ScanPoint1d<$intermediate>],
             ) {
-                filter_color_group_row_approx::<$store, $intermediate, 1>
+                if is_kernel_symmetric {
+                    filter_color_group_row_symmetric_approx::<$store, $intermediate, 1>
+                } else {
+                    filter_color_group_row_approx::<$store, $intermediate, 1>
+                }
             }
         }
     };
@@ -72,23 +81,34 @@ impl Filter1DRowHandlerApprox<u8, i32> for u8 {
         any(target_arch = "x86_64", target_arch = "x86")
     )))]
     fn get_row_handler_apr(
+        _: bool,
     ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<i32>]) {
-        filter_color_group_row_approx::<u8, i32, 1>
+        if is_kernel_symmetric {
+            filter_color_group_row_symmetric_approx::<u8, i32, 1>
+        } else {
+            filter_color_group_row_approx::<u8, i32, 1>
+        }
     }
 
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     fn get_row_handler_apr(
+        _: bool,
     ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<i32>]) {
-        filter_row_neon_u8_i32
+        filter_row_neon_u8_i32_app
     }
 
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     fn get_row_handler_apr(
+        is_kernel_symmetric: bool,
     ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<i32>]) {
         if std::arch::is_x86_feature_detected!("sse4.1") {
             return filter_row_sse_u8_i32;
         }
-        filter_color_group_row_approx::<u8, i32, 1>
+        if is_kernel_symmetric {
+            filter_color_group_row_symmetric_approx::<u8, i32, 1>
+        } else {
+            filter_color_group_row_approx::<u8, i32, 1>
+        }
     }
 }
 

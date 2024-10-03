@@ -26,7 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::filter1d::arena::make_arena;
+use crate::filter1d::arena::{make_arena_columns, make_arena_row, Arena};
 use crate::filter1d::filter_1d_column_handler::Filter1DColumnHandler;
 use crate::filter1d::filter_1d_rgb_row_handler::Filter1DRgbRowHandler;
 use crate::filter1d::filter_element::KernelShape;
@@ -88,13 +88,6 @@ where
     let is_column_kernel_symmetrical = unsafe { is_symmetric_1d(column_kernel) };
     let is_row_kernel_symmetrical = unsafe { is_symmetric_1d(row_kernel) };
 
-    let (mut row_arena_src, arena) = make_arena::<T, 3>(
-        image,
-        image_size,
-        KernelShape::new(row_kernel.len(), 0),
-        border_mode,
-        border_constant,
-    )?;
     let thread_count = threading_policy
         .get_threads_count(image_size.width as u32, image_size.height as u32)
         as u32;
@@ -108,30 +101,35 @@ where
         Some(hold)
     };
 
-    let row_arena_src_slice = row_arena_src.as_slice();
+    const N: usize = 3;
+
+    let mut transient_image = vec![T::default(); image_size.width * image_size.height * N];
 
     if let Some(pool) = &pool {
         let row_handler = T::get_rgb_row_handler(is_row_kernel_symmetrical);
         pool.scope(|scope| {
-            let transient_cell = UnsafeSlice::new(destination);
+            let transient_cell = UnsafeSlice::new(transient_image.as_mut_slice());
 
-            let segment_size = image_size.height as u32 / thread_count;
-            for i in 0..thread_count {
-                let start_y = i * segment_size;
-                let mut end_y = (i + 1) * segment_size;
-                if i == thread_count - 1 {
-                    end_y = image_size.height as u32;
-                }
+            let pad_w = scanned_row_kernel.len() / 2;
 
-                let copied_arena = arena;
-
+            for y in 0..image_size.height {
                 scope.spawn(move |_| {
+                    let (row, arena_width) = make_arena_row::<T, N>(
+                        image,
+                        y,
+                        image_size,
+                        KernelShape::new(row_kernel.len(), 0),
+                        border_mode,
+                        border_constant,
+                    )
+                    .unwrap();
+
                     row_handler(
-                        copied_arena,
-                        row_arena_src_slice,
+                        Arena::new(arena_width, 1, pad_w, 0, N),
+                        &row,
                         &transient_cell,
                         image_size,
-                        FilterRegion::new(start_y as usize, end_y as usize),
+                        FilterRegion::new(y, y + 1),
                         scanned_row_kernel_slice,
                     );
                 });
@@ -139,48 +137,89 @@ where
         });
     } else {
         let row_handler = T::get_rgb_row_handler(is_row_kernel_symmetrical);
-        let transient_cell = UnsafeSlice::new(destination);
-        row_handler(
-            arena,
-            row_arena_src_slice,
-            &transient_cell,
-            image_size,
-            FilterRegion::new(0usize, image_size.height),
-            scanned_row_kernel_slice,
-        );
+        let transient_cell = UnsafeSlice::new(transient_image.as_mut_slice());
+
+        let pad_w = scanned_row_kernel.len() / 2;
+
+        for y in 0..image_size.height {
+            let (row, arena_width) = make_arena_row::<T, N>(
+                image,
+                y,
+                image_size,
+                KernelShape::new(row_kernel.len(), 0),
+                border_mode,
+                border_constant,
+            )?;
+            row_handler(
+                Arena::new(arena_width, 1, pad_w, 0, N),
+                &row,
+                &transient_cell,
+                image_size,
+                FilterRegion::new(y, y + 1),
+                scanned_row_kernel_slice,
+            );
+        }
     }
 
-    row_arena_src.clear();
+    let column_kernel_shape = KernelShape::new(0, scanned_column_kernel_slice.len());
 
-    let (mut column_arena_src, column_arena) = make_arena::<T, 3>(
-        destination,
+    let column_arena_k = make_arena_columns::<T, N>(
+        transient_image.as_slice(),
         image_size,
-        KernelShape::new(0, scanned_column_kernel_slice.len()),
+        column_kernel_shape,
         border_mode,
         border_constant,
     )?;
-    let column_arena_src_slice = column_arena_src.as_slice();
+
+    let top_pad = column_arena_k.top_pad.as_slice();
+    let bottom_pad = column_arena_k.bottom_pad.as_slice();
+
+    let pad_h = column_kernel_shape.height / 2;
+
+    let transient_image_slice = transient_image.as_slice();
 
     if let Some(pool) = &pool {
         pool.scope(|scope| {
             let transient_cell_0 = UnsafeSlice::new(destination);
             let column_handler = T::get_column_handler(is_column_kernel_symmetrical);
-            let copied_arena = column_arena;
-            let segment_size = image_size.height as u32 / thread_count;
-            for i in 0..thread_count {
-                let start_y = i * segment_size;
-                let mut end_y = (i + 1) * segment_size;
-                if i == thread_count - 1 {
-                    end_y = image_size.height as u32;
-                }
 
+            let src_stride = image_size.width * N;
+
+            for y in 0..image_size.height {
                 scope.spawn(move |_| {
+                    let mut brows: Vec<&[T]> =
+                        vec![unsafe { image.get_unchecked(0..) }; column_kernel_shape.height];
+
+                    for k in 0..column_kernel_shape.height {
+                        if (y as i64 - pad_h as i64 + k as i64) < 0 {
+                            unsafe {
+                                *brows.get_unchecked_mut(k) =
+                                    &top_pad.get_unchecked((pad_h - k - 1) * src_stride..);
+                            }
+                        } else if (y as i64 - pad_h as i64 + k as i64) as usize >= image_size.height
+                        {
+                            unsafe {
+                                *brows.get_unchecked_mut(k) =
+                                    &bottom_pad.get_unchecked((k - pad_h - 1) * src_stride..);
+                            }
+                        } else {
+                            let fy = (y as i64 + k as i64 - pad_h as i64) as usize;
+                            let start_offset = src_stride * fy;
+                            unsafe {
+                                *brows.get_unchecked_mut(k) = transient_image_slice
+                                    .get_unchecked(start_offset..(start_offset + src_stride))
+                            };
+                        }
+                    }
+
+                    let brows_slice = brows.as_slice();
+
                     column_handler(
-                        copied_arena,
-                        column_arena_src_slice,
+                        Arena::new(image_size.width, pad_h, 0, pad_h, N),
+                        brows_slice,
                         &transient_cell_0,
                         image_size,
-                        FilterRegion::new(start_y as usize, end_y as usize),
+                        FilterRegion::new(y, y + 1),
                         scanned_column_kernel_slice,
                     );
                 });
@@ -189,16 +228,44 @@ where
     } else {
         let column_handler = T::get_column_handler(is_column_kernel_symmetrical);
         let final_cell_0 = UnsafeSlice::new(destination);
-        column_handler(
-            column_arena,
-            column_arena_src_slice,
-            &final_cell_0,
-            image_size,
-            FilterRegion::new(0usize, image_size.height),
-            scanned_column_kernel_slice,
-        );
+        let src_stride = image_size.width * N;
+        for y in 0..image_size.height {
+            let mut brows: Vec<&[T]> =
+                vec![unsafe { image.get_unchecked(0..) }; column_kernel_shape.height];
+
+            for k in 0..column_kernel_shape.height {
+                if (y as i64 - pad_h as i64 + k as i64) < 0 {
+                    unsafe {
+                        *brows.get_unchecked_mut(k) =
+                            &top_pad.get_unchecked((pad_h - k - 1) * src_stride..);
+                    }
+                } else if (y as i64 - pad_h as i64 + k as i64) as usize >= image_size.height {
+                    unsafe {
+                        *brows.get_unchecked_mut(k) =
+                            &bottom_pad.get_unchecked((k - pad_h - 1) * src_stride..);
+                    }
+                } else {
+                    let fy = (y as i64 + k as i64 - pad_h as i64) as usize;
+                    let start_offset = src_stride * fy;
+                    unsafe {
+                        *brows.get_unchecked_mut(k) = transient_image_slice
+                            .get_unchecked(start_offset..(start_offset + src_stride))
+                    };
+                }
+            }
+
+            let brows_slice = brows.as_slice();
+
+            column_handler(
+                Arena::new(image_size.width, pad_h, 0, pad_h, N),
+                brows_slice,
+                &final_cell_0,
+                image_size,
+                FilterRegion::new(y, y + 1),
+                scanned_column_kernel_slice,
+            );
+        }
     }
 
-    column_arena_src.clear();
     Ok(())
 }

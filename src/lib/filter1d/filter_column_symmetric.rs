@@ -38,7 +38,7 @@ use std::ops::{Add, Mul};
 
 pub fn filter_symmetric_column<T, F>(
     arena: Arena,
-    arena_src: &[T],
+    arena_src: &[&[T]],
     dst: &UnsafeSlice<T>,
     image_size: ImageSize,
     region: FilterRegion,
@@ -48,10 +48,6 @@ pub fn filter_symmetric_column<T, F>(
     F: ToStorage<T> + Mul<F, Output = F> + MulAdd<F, Output = F> + Add<F, Output = F>,
 {
     unsafe {
-        let src = arena_src;
-
-        let arena_width = arena.width * arena.components;
-
         let _yy = region.start;
 
         let dst_stride = image_size.width * arena.components;
@@ -59,94 +55,82 @@ pub fn filter_symmetric_column<T, F>(
         let length = scanned_kernel.len();
         let half_len = length / 2;
 
-        for y in _yy..region.end {
-            let mut _cx = 0usize;
+        let mut _cx = 0usize;
 
-            let local_src = src.get_unchecked((y * arena_width)..);
+        let y = region.start;
 
-            while _cx + 4 < dst_stride {
-                let coeff = scanned_kernel.get_unchecked(half_len).weight;
+        while _cx + 4 < dst_stride {
+            let coeff = scanned_kernel.get_unchecked(half_len).weight;
 
-                let shifted_src = local_src.get_unchecked(_cx..);
+            let v_crc = arena_src.get_unchecked(half_len);
 
-                let mut k0 = (*shifted_src.get_unchecked(half_len * arena_width))
-                    .as_()
-                    .mul(coeff);
-                let mut k1 = (*shifted_src.get_unchecked((half_len * arena_width) + 1))
-                    .as_()
-                    .mul(coeff);
-                let mut k2 = (*shifted_src.get_unchecked((half_len * arena_width) + 2))
-                    .as_()
-                    .mul(coeff);
-                let mut k3 = (*shifted_src.get_unchecked((half_len * arena_width) + 3))
-                    .as_()
-                    .mul(coeff);
+            let mut k0 = (*v_crc.get_unchecked(_cx)).as_().mul(coeff);
+            let mut k1 = (*v_crc.get_unchecked(_cx + 1)).as_().mul(coeff);
+            let mut k2 = (*v_crc.get_unchecked(_cx + 2)).as_().mul(coeff);
+            let mut k3 = (*v_crc.get_unchecked(_cx + 3)).as_().mul(coeff);
 
-                for i in 0..half_len {
-                    let coeff = *scanned_kernel.get_unchecked(i);
-                    let rollback = length - i - 1;
-                    k0 = MulAdd::mul_add(
-                        (*shifted_src.get_unchecked(i * arena_width))
-                            .as_()
-                            .add((*shifted_src.get_unchecked((rollback) * arena_width)).as_()),
-                        coeff.weight,
-                        k0,
-                    );
-                    k1 = MulAdd::mul_add(
-                        (*shifted_src.get_unchecked(i * arena_width + 1))
-                            .as_()
-                            .add((*shifted_src.get_unchecked(rollback * arena_width + 1)).as_()),
-                        coeff.weight,
-                        k1,
-                    );
-                    k2 = MulAdd::mul_add(
-                        (*shifted_src.get_unchecked(i * arena_width + 2))
-                            .as_()
-                            .add((*shifted_src.get_unchecked(rollback * arena_width + 2)).as_()),
-                        coeff.weight,
-                        k2,
-                    );
-                    k3 = MulAdd::mul_add(
-                        (*shifted_src.get_unchecked(i * arena_width + 3))
-                            .as_()
-                            .add((*shifted_src.get_unchecked(rollback * arena_width + 3)).as_()),
-                        coeff.weight,
-                        k3,
-                    );
-                }
-
-                let dst_offset = y * dst_stride + _cx;
-
-                dst.write(dst_offset, k0.to_());
-                dst.write(dst_offset + 1, k1.to_());
-                dst.write(dst_offset + 2, k2.to_());
-                dst.write(dst_offset + 3, k3.to_());
-                _cx += 4;
+            for i in 0..half_len {
+                let coeff = *scanned_kernel.get_unchecked(i);
+                let rollback = length - i - 1;
+                k0 = MulAdd::mul_add(
+                    (*arena_src.get_unchecked(i).get_unchecked(_cx))
+                        .as_()
+                        .add((*arena_src.get_unchecked(rollback).get_unchecked(_cx)).as_()),
+                    coeff.weight,
+                    k0,
+                );
+                k1 = MulAdd::mul_add(
+                    (*arena_src.get_unchecked(i).get_unchecked(_cx + 1))
+                        .as_()
+                        .add((*arena_src.get_unchecked(rollback).get_unchecked(_cx + 1)).as_()),
+                    coeff.weight,
+                    k1,
+                );
+                k2 = MulAdd::mul_add(
+                    (*arena_src.get_unchecked(i).get_unchecked(_cx + 2))
+                        .as_()
+                        .add((*arena_src.get_unchecked(rollback).get_unchecked(_cx + 2)).as_()),
+                    coeff.weight,
+                    k2,
+                );
+                k3 = MulAdd::mul_add(
+                    (*arena_src.get_unchecked(i).get_unchecked(_cx + 3))
+                        .as_()
+                        .add((*arena_src.get_unchecked(rollback).get_unchecked(_cx + 3)).as_()),
+                    coeff.weight,
+                    k3,
+                );
             }
 
-            for x in _cx..dst_stride {
-                let coeff = scanned_kernel.get_unchecked(half_len).weight;
+            let dst_offset = y * dst_stride + _cx;
 
-                let shifted_src = local_src.get_unchecked(x..);
+            dst.write(dst_offset, k0.to_());
+            dst.write(dst_offset + 1, k1.to_());
+            dst.write(dst_offset + 2, k2.to_());
+            dst.write(dst_offset + 3, k3.to_());
+            _cx += 4;
+        }
 
-                let mut k0 = (*shifted_src.get_unchecked(half_len * arena_width))
-                    .as_()
-                    .mul(coeff);
+        for x in _cx..dst_stride {
+            let coeff = scanned_kernel.get_unchecked(half_len).weight;
 
-                for i in 1..length {
-                    let coeff = *scanned_kernel.get_unchecked(i);
-                    let rollback = length - i - 1;
-                    k0 = MulAdd::mul_add(
-                        (*shifted_src.get_unchecked(i * arena_width))
-                            .as_()
-                            .add((*shifted_src.get_unchecked((rollback) * arena_width)).as_()),
-                        coeff.weight,
-                        k0,
-                    );
-                }
+            let mut k0 = (*arena_src.get_unchecked(half_len).get_unchecked(x))
+                .as_()
+                .mul(coeff);
 
-                dst.write(y * dst_stride + x, k0.to_());
+            for i in 1..length {
+                let coeff = *scanned_kernel.get_unchecked(i);
+                let rollback = length - i - 1;
+                k0 = MulAdd::mul_add(
+                    (*arena_src.get_unchecked(i).get_unchecked(x))
+                        .as_()
+                        .add((*arena_src.get_unchecked(rollback).get_unchecked(x)).as_()),
+                    coeff.weight,
+                    k0,
+                );
             }
+
+            dst.write(y * dst_stride + x, k0.to_());
         }
     }
 }

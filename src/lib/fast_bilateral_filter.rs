@@ -346,12 +346,12 @@ fn fast_bilateral_filter_impl<
     let spatial_sigma_scale = if spatial_sigma > 1. {
         (1. / spatial_sigma * (if spatial_sigma > 1.3 { 1.3 } else { 1. }))
             .min(1. / 1.2f32)
-            .max(1. / 15f32)
+            .max(1. / 5f32)
     } else {
         1.
     };
     let range_sigma_scale = if range_sigma > 1. {
-        (1. / range_sigma).min(1. / 1.1f32).max(1. / 15f32)
+        (1. / range_sigma).min(1. / 1.1f32).max(1. / 5f32)
     } else {
         1.
     };
@@ -385,43 +385,57 @@ fn fast_bilateral_filter_impl<
 
     let gaussian_kernel = get_gaussian_kernel_1d(kernel_size, preferred_sigma);
     let half_kernel = gaussian_kernel.len() / 2;
-    let kernel_size = gaussian_kernel.len();
 
     // Unrolled 3D convolution
 
     for z in 0..small_depth {
         for y in 0..small_height {
             for x in 0..half_kernel.min(small_width) {
-                let mut sum = Vector::default();
-                for i in 0..kernel_size {
+                let mut sum = data
+                    .get(x, y, z)
+                    .mul(unsafe { *gaussian_kernel.get_unchecked(half_kernel) }.as_());
+                for i in 0..half_kernel {
                     let weight = unsafe { *gaussian_kernel.get_unchecked(i) }.as_();
-                    sum += data.get(
+                    let start_p = data.get(
                         (x + i).saturating_sub(half_kernel).min(small_width - 1),
                         y,
                         z,
-                    ) * weight;
+                    );
+                    let rolled = half_kernel - i - 1;
+                    let end_p = data.get((x + rolled).min(small_width - 1), y, z);
+                    sum += (start_p + end_p) * weight;
                 }
                 buffer.set(x, y, z, sum);
             }
 
             for x in half_kernel..small_width.saturating_sub(half_kernel) {
-                let mut sum = Vector::default();
-                for i in 0..kernel_size {
+                let mut sum = data
+                    .get(x, y, z)
+                    .mul(unsafe { *gaussian_kernel.get_unchecked(half_kernel) }.as_());
+                for i in 0..half_kernel {
                     let weight = unsafe { *gaussian_kernel.get_unchecked(i) }.as_();
-                    sum += data.get((x + i).sub(half_kernel), y, z) * weight;
+                    let start_px = data.get((x + i).sub(half_kernel), y, z);
+                    let rolled = half_kernel - i - 1;
+                    let end_px = data.get(x + rolled, y, z);
+                    sum += (start_px + end_px) * weight;
                 }
                 buffer.set(x, y, z, sum);
             }
 
             for x in small_width.saturating_sub(half_kernel)..small_width {
-                let mut sum = Vector::default();
-                for i in 0..kernel_size {
+                let mut sum = data
+                    .get(x, y, z)
+                    .mul(unsafe { *gaussian_kernel.get_unchecked(half_kernel) }.as_());
+                for i in 0..half_kernel {
                     let weight = unsafe { *gaussian_kernel.get_unchecked(i) }.as_();
-                    sum += data.get(
+                    let start_p = data.get(
                         (x + i).saturating_sub(half_kernel).min(small_width - 1),
                         y,
                         z,
-                    ) * weight;
+                    );
+                    let rolled = half_kernel - i - 1;
+                    let end_p = data.get((x + rolled).min(small_width - 1), y, z);
+                    sum += (start_p + end_p) * weight;
                 }
                 buffer.set(x, y, z, sum);
             }
@@ -433,36 +447,51 @@ fn fast_bilateral_filter_impl<
     for y in 0..small_height {
         for x in 0..small_width {
             for z in 0..half_kernel.min(small_depth) {
-                let mut sum = Vector::default();
-                for i in 0..kernel_size {
+                let mut sum = data
+                    .get(x, y, z)
+                    .mul(unsafe { *gaussian_kernel.get_unchecked(half_kernel) }.as_());
+                for i in 0..half_kernel {
                     let weight = unsafe { *gaussian_kernel.get_unchecked(i) };
-                    sum += data.get(
+                    let rolled = half_kernel - i - 1;
+                    let start_px = data.get(
                         x,
                         y,
                         (z + i).saturating_sub(half_kernel).min(small_depth - 1),
-                    ) * weight.as_();
+                    );
+                    let end_px = data.get(x, y, (z + rolled).min(small_depth - 1));
+                    sum += (start_px + end_px) * weight.as_();
                 }
                 buffer.set(x, y, z, sum);
             }
 
             for z in half_kernel..small_depth.saturating_sub(half_kernel) {
-                let mut sum = Vector::default();
-                for i in 0..kernel_size {
+                let mut sum = data
+                    .get(x, y, z)
+                    .mul(unsafe { *gaussian_kernel.get_unchecked(half_kernel) }.as_());
+                for i in 0..half_kernel {
                     let weight = unsafe { *gaussian_kernel.get_unchecked(i) };
-                    sum += data.get(x, y, (z + i).sub(half_kernel)) * weight.as_();
+                    let start_px = data.get(x, y, (z + i).sub(half_kernel));
+                    let rolled = half_kernel - i - 1;
+                    let end_px = data.get(x, y, z + rolled);
+                    sum += (start_px + end_px) * weight.as_();
                 }
                 buffer.set(x, y, z, sum);
             }
 
             for z in small_depth.saturating_sub(small_depth)..small_depth {
-                let mut sum = Vector::default();
-                for i in 0..kernel_size {
+                let mut sum = data
+                    .get(x, y, z)
+                    .mul(unsafe { *gaussian_kernel.get_unchecked(half_kernel) }.as_());
+                for i in 0..half_kernel {
                     let weight = unsafe { *gaussian_kernel.get_unchecked(i) };
-                    sum += data.get(
+                    let rolled = half_kernel - i - 1;
+                    let start_px = data.get(
                         x,
                         y,
                         (z + i).saturating_sub(half_kernel).min(small_depth - 1),
-                    ) * weight.as_();
+                    );
+                    let end_px = data.get(x, y, (z + rolled).min(small_depth - 1));
+                    sum += (start_px + end_px) * weight.as_();
                 }
                 buffer.set(x, y, z, sum);
             }
@@ -474,36 +503,51 @@ fn fast_bilateral_filter_impl<
     for z in 0..small_depth {
         for x in 0..small_width {
             for y in 0..half_kernel.min(small_height) {
-                let mut sum = Vector::default();
-                for i in 0..kernel_size {
+                let mut sum = data
+                    .get(x, y, z)
+                    .mul(unsafe { *gaussian_kernel.get_unchecked(half_kernel) }.as_());
+                for i in 0..half_kernel {
                     let weight = unsafe { *gaussian_kernel.get_unchecked(i) };
-                    sum += data.get(
+                    let start_px = data.get(
                         x,
                         (y + i).saturating_sub(half_kernel).min(small_height - 1),
                         z,
-                    ) * weight.as_();
+                    );
+                    let rolled = half_kernel - i - 1;
+                    let end_px = data.get(x, (y + rolled).min(small_height - 1), z);
+                    sum += (start_px + end_px) * weight.as_();
                 }
                 buffer.set(x, y, z, sum);
             }
 
             for y in half_kernel..small_height.saturating_sub(half_kernel) {
-                let mut sum = Vector::default();
-                for i in 0..kernel_size {
+                let mut sum = data
+                    .get(x, y, z)
+                    .mul(unsafe { *gaussian_kernel.get_unchecked(half_kernel) }.as_());
+                for i in 0..half_kernel {
                     let weight = unsafe { *gaussian_kernel.get_unchecked(i) };
-                    sum += data.get(x, (y + i).sub(half_kernel), z) * weight.as_();
+                    let start_px = data.get(x, (y + i).sub(half_kernel), z);
+                    let rolled = half_kernel - i - 1;
+                    let end_px = data.get(x, y + rolled, z);
+                    sum += (start_px + end_px) * weight.as_();
                 }
                 buffer.set(x, y, z, sum);
             }
 
             for y in small_height.saturating_sub(half_kernel)..small_height {
-                let mut sum = Vector::default();
-                for i in 0..kernel_size {
+                let mut sum = data
+                    .get(x, y, z)
+                    .mul(unsafe { *gaussian_kernel.get_unchecked(half_kernel) }.as_());
+                for i in 0..half_kernel {
                     let weight = unsafe { *gaussian_kernel.get_unchecked(i) };
-                    sum += data.get(
+                    let start_px = data.get(
                         x,
                         (y + i).saturating_sub(half_kernel).min(small_height - 1),
                         z,
-                    ) * weight.as_();
+                    );
+                    let rolled = half_kernel - i - 1;
+                    let end_px = data.get(x, (y + rolled).min(small_height - 1), z);
+                    sum += (start_px + end_px) * weight.as_();
                 }
                 buffer.set(x, y, z, sum);
             }
@@ -586,6 +630,20 @@ fn fast_bilateral_filter_plane_impl<V: Copy + Default + 'static + BilinearWorkin
     spatial_sigma: f32,
     range_sigma: f32,
 ) {
+    if img.len() != width as usize * height as usize {
+        panic!(
+            "Input image dimensions do not match expected {} but got {}",
+            width * height,
+            img.len()
+        );
+    }
+    if dst.len() != width as usize * height as usize {
+        panic!(
+            "Input image dimensions do not match expected {} but got {}",
+            width * height,
+            dst.len()
+        );
+    }
     if kernel_size & 1 == 0 {
         panic!("kernel_size must not be odd");
     }
@@ -688,6 +746,20 @@ fn fast_bilateral_filter_rgb_impl<
     spatial_sigma: f32,
     range_sigma: f32,
 ) {
+    if img.len() != width as usize * height as usize * 3 {
+        panic!(
+            "Input image dimensions do not match expected {} but got {}",
+            width * height * 3,
+            img.len()
+        );
+    }
+    if dst.len() != width as usize * height as usize * 3 {
+        panic!(
+            "Input image dimensions do not match expected {} but got {}",
+            width * height * 3,
+            dst.len()
+        );
+    }
     if kernel_size & 1 == 0 {
         panic!("kernel_size must not be odd");
     }
@@ -767,6 +839,20 @@ fn fast_bilateral_filter_rgba_impl<
     spatial_sigma: f32,
     range_sigma: f32,
 ) {
+    if img.len() != width as usize * height as usize * 4 {
+        panic!(
+            "Input image dimensions do not match expected {} but got {}",
+            width * height * 4,
+            img.len()
+        );
+    }
+    if dst.len() != width as usize * height as usize * 4 {
+        panic!(
+            "Input image dimensions do not match expected {} but got {}",
+            width * height * 4,
+            dst.len()
+        );
+    }
     if kernel_size & 1 == 0 {
         panic!("kernel_size must not be odd");
     }

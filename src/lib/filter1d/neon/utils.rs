@@ -30,7 +30,7 @@ use crate::neon::prefer_vfmaq_f32;
 use std::arch::aarch64::*;
 
 #[inline(always)]
-pub unsafe fn vmulq_u8_by_i16(
+pub unsafe fn vmullq_u8_by_i16(
     input: uint8x16_t,
     weight: int16x8_t,
 ) -> (int32x4_t, int32x4_t, int32x4_t, int32x4_t) {
@@ -46,13 +46,26 @@ pub unsafe fn vmulq_u8_by_i16(
 }
 
 #[inline(always)]
-pub unsafe fn vmul_u8_by_i16(input: uint8x8_t, weight: int16x4_t) -> (int32x4_t, int32x4_t) {
+pub unsafe fn vmull_u8_by_i16(input: uint8x8_t, weight: int16x4_t) -> (int32x4_t, int32x4_t) {
     let lo_16 = vreinterpretq_s16_u16(vmovl_u8(input));
 
     (
         vmull_s16(vget_low_s16(lo_16), weight),
         vmull_s16(vget_high_s16(lo_16), weight),
     )
+}
+
+#[inline(always)]
+pub unsafe fn vmulq_u8_by_i16(input: uint8x16_t, weight: int16x8_t) -> (int16x8_t, int16x8_t) {
+    (
+        vmulq_s16(vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(input))), weight),
+        vmulq_s16(vreinterpretq_s16_u16(vmovl_u8(vget_high_u8(input))), weight),
+    )
+}
+
+#[inline(always)]
+pub unsafe fn vmul_u8_by_i16(input: uint8x8_t, weight: int16x8_t) -> int16x8_t {
+    vmulq_s16(vreinterpretq_s16_u16(vmovl_u8(input)), weight)
 }
 
 #[inline(always)]
@@ -124,6 +137,63 @@ pub unsafe fn vfmlaq_symm_u8_f32(
         prefer_vfmaq_f32(store.1, lo_hi, weight),
         prefer_vfmaq_f32(store.2, hi_lo, weight),
         prefer_vfmaq_f32(store.3, hi_hi, weight),
+    )
+}
+
+#[inline(always)]
+pub unsafe fn vdotq_exact_s16(
+    store: (int16x8_t, int16x8_t),
+    input: uint8x16_t,
+    weight: int16x8_t,
+) -> (int16x8_t, int16x8_t) {
+    (
+        vaddq_s16(
+            store.0,
+            vmulq_s16(vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(input))), weight),
+        ),
+        vaddq_s16(
+            store.1,
+            vmulq_s16(vreinterpretq_s16_u16(vmovl_u8(vget_high_u8(input))), weight),
+        ),
+    )
+}
+
+#[inline(always)]
+pub unsafe fn vdot_exact_s16(store: int16x8_t, input: uint8x8_t, weight: int16x8_t) -> int16x8_t {
+    vaddq_s16(
+        store,
+        vmulq_s16(vreinterpretq_s16_u16(vmovl_u8(input)), weight),
+    )
+}
+
+#[inline(always)]
+pub unsafe fn vdot_exact_symm_s16(
+    store: int16x8_t,
+    input0: uint8x8_t,
+    input1: uint8x8_t,
+    weight: int16x8_t,
+) -> int16x8_t {
+    vaddq_s16(
+        store,
+        vmulq_s16(
+            vreinterpretq_s16_u16(vaddq_u16(vmovl_u8(input0), vmovl_u8(input1))),
+            weight,
+        ),
+    )
+}
+
+#[inline(always)]
+pub unsafe fn vdotq_exact_symm_s16(
+    store: (int16x8_t, int16x8_t),
+    input0: uint8x16_t,
+    input1: uint8x16_t,
+    weight: int16x8_t,
+) -> (int16x8_t, int16x8_t) {
+    let wide_lo = vaddl_u8(vget_low_u8(input0), vget_low_u8(input1));
+    let wide_hi = vaddl_u8(vget_high_u8(input0), vget_high_u8(input1));
+    (
+        vaddq_s16(store.0, vmulq_s16(vreinterpretq_s16_u16(wide_lo), weight)),
+        vaddq_s16(store.1, vmulq_s16(vreinterpretq_s16_u16(wide_hi), weight)),
     )
 }
 

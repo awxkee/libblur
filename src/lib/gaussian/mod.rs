@@ -26,10 +26,10 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 mod declaration;
+mod gaussian_kernel;
 mod gaussian_linear;
 mod gaussian_precise_level;
 mod gaussian_util;
-mod gaussian_kernel;
 
 pub use declaration::*;
 pub use gaussian_kernel::get_gaussian_kernel_1d;

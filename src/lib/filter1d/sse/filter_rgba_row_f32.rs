@@ -124,60 +124,55 @@ unsafe fn filter_rgba_row_sse_f32_f32_impl<const FMA: bool>(
 
         const N: usize = 4;
 
-        let src = &arena_src;
+        let src = arena_src;
 
         let dst_stride = image_size.width * arena.components;
 
-        let arena_width = arena.width * N;
+        let y = filter_region.start;
+        let local_src = src;
 
-        for y in filter_region.start..filter_region.end {
-            let local_src = src.get_unchecked((y * arena_width)..);
+        let length = scanned_kernel.iter().len();
 
-            let length = scanned_kernel.iter().len();
+        let mut _cx = 0usize;
 
-            let mut _cx = 0usize;
+        while _cx + 4 < width {
+            let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(0).weight);
 
-            while _cx + 4 < width {
-                let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(0).weight);
+            let shifted_src = local_src.get_unchecked((_cx * N)..);
 
-                let shifted_src = local_src.get_unchecked((_cx * N)..);
+            let source = _mm_load_deinterleave_rgba_ps(shifted_src.as_ptr());
+            let mut k0 = _mm_mul_ps(source.0, coeff);
+            let mut k1 = _mm_mul_ps(source.1, coeff);
+            let mut k2 = _mm_mul_ps(source.2, coeff);
+            let mut k3 = _mm_mul_ps(source.3, coeff);
 
-                let source = _mm_load_deinterleave_rgba_ps(shifted_src.as_ptr());
-                let mut k0 = _mm_mul_ps(source.0, coeff);
-                let mut k1 = _mm_mul_ps(source.1, coeff);
-                let mut k2 = _mm_mul_ps(source.2, coeff);
-                let mut k3 = _mm_mul_ps(source.3, coeff);
-
-                for i in 1..length {
-                    let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(i).weight);
-                    let v_source = _mm_load_deinterleave_rgba_ps(
-                        shifted_src.get_unchecked((i * N)..).as_ptr(),
-                    );
-                    k0 = _mm_opt_fmlaf_ps::<FMA>(k0, v_source.0, coeff);
-                    k1 = _mm_opt_fmlaf_ps::<FMA>(k1, v_source.1, coeff);
-                    k2 = _mm_opt_fmlaf_ps::<FMA>(k2, v_source.2, coeff);
-                    k3 = _mm_opt_fmlaf_ps::<FMA>(k3, v_source.3, coeff);
-                }
-
-                let dst_offset = y * dst_stride + _cx * N;
-                let dst_ptr0 = (dst.slice.as_ptr() as *mut f32).add(dst_offset);
-                _mm_store_interleave_rgba_ps(dst_ptr0, (k0, k1, k2, k3));
-                _cx += 4;
+            for i in 1..length {
+                let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(i).weight);
+                let v_source =
+                    _mm_load_deinterleave_rgba_ps(shifted_src.get_unchecked((i * N)..).as_ptr());
+                k0 = _mm_opt_fmlaf_ps::<FMA>(k0, v_source.0, coeff);
+                k1 = _mm_opt_fmlaf_ps::<FMA>(k1, v_source.1, coeff);
+                k2 = _mm_opt_fmlaf_ps::<FMA>(k2, v_source.2, coeff);
+                k3 = _mm_opt_fmlaf_ps::<FMA>(k3, v_source.3, coeff);
             }
 
-            for x in _cx..width {
-                let coeff = *scanned_kernel.get_unchecked(0);
-                let shifted_src = local_src.get_unchecked((x * N)..);
-                let mut k0 = ColorGroup::<N, f32>::from_slice(shifted_src, 0).mul(coeff.weight);
+            let dst_offset = y * dst_stride + _cx * N;
+            let dst_ptr0 = (dst.slice.as_ptr() as *mut f32).add(dst_offset);
+            _mm_store_interleave_rgba_ps(dst_ptr0, (k0, k1, k2, k3));
+            _cx += 4;
+        }
 
-                for i in 1..length {
-                    let coeff = *scanned_kernel.get_unchecked(i);
-                    k0 = ColorGroup::<N, f32>::from_slice(shifted_src, i * N)
-                        .mul_add(k0, coeff.weight);
-                }
+        for x in _cx..width {
+            let coeff = *scanned_kernel.get_unchecked(0);
+            let shifted_src = local_src.get_unchecked((x * N)..);
+            let mut k0 = ColorGroup::<N, f32>::from_slice(shifted_src, 0).mul(coeff.weight);
 
-                k0.to_store(dst, y * dst_stride + x * N);
+            for i in 1..length {
+                let coeff = *scanned_kernel.get_unchecked(i);
+                k0 = ColorGroup::<N, f32>::from_slice(shifted_src, i * N).mul_add(k0, coeff.weight);
             }
+
+            k0.to_store(dst, y * dst_stride + x * N);
         }
     }
 }

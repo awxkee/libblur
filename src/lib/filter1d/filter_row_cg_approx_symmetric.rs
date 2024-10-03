@@ -37,7 +37,7 @@ use num_traits::AsPrimitive;
 use std::ops::{Add, Mul, Shr};
 
 pub fn filter_color_group_row_symmetric_approx<T, I, const N: usize>(
-    arena: Arena,
+    _: Arena,
     arena_src: &[T],
     dst: &UnsafeSlice<T>,
     image_size: ImageSize,
@@ -56,90 +56,87 @@ pub fn filter_color_group_row_symmetric_approx<T, I, const N: usize>(
     unsafe {
         let width = image_size.width;
 
-        let src = &arena_src;
+        let src = arena_src;
 
         let dst_stride = image_size.width * N;
-
-        let arena_width = arena.width * N;
 
         let length = scanned_kernel.len();
         let half_len = length / 2;
 
-        for y in filter_region.start..filter_region.end {
-            let local_src = src.get_unchecked((y * arena_width)..);
+        let y = filter_region.start;
+        let local_src = src;
 
-            let mut _cx = 0usize;
+        let mut _cx = 0usize;
 
-            while _cx + 4 < width {
-                let coeff = *scanned_kernel.get_unchecked(half_len);
+        while _cx + 4 < width {
+            let coeff = *scanned_kernel.get_unchecked(half_len);
 
-                let shifted_src = local_src.get_unchecked((_cx * N)..);
+            let shifted_src = local_src.get_unchecked((_cx * N)..);
 
-                let mut k0 =
-                    ColorGroup::<N, I>::from_slice(shifted_src, half_len * N).mul(coeff.weight);
-                let mut k1 =
-                    ColorGroup::<N, I>::from_slice(shifted_src, half_len * N + N).mul(coeff.weight);
-                let mut k2 = ColorGroup::<N, I>::from_slice(shifted_src, half_len * N + N * 2)
-                    .mul(coeff.weight);
-                let mut k3 = ColorGroup::<N, I>::from_slice(shifted_src, half_len * N + N * 3)
-                    .mul(coeff.weight);
+            let mut k0 =
+                ColorGroup::<N, I>::from_slice(shifted_src, half_len * N).mul(coeff.weight);
+            let mut k1 =
+                ColorGroup::<N, I>::from_slice(shifted_src, half_len * N + N).mul(coeff.weight);
+            let mut k2 =
+                ColorGroup::<N, I>::from_slice(shifted_src, half_len * N + N * 2).mul(coeff.weight);
+            let mut k3 =
+                ColorGroup::<N, I>::from_slice(shifted_src, half_len * N + N * 3).mul(coeff.weight);
 
-                for i in 0..half_len {
-                    let coeff = *scanned_kernel.get_unchecked(i);
-                    let rollback = length - i - 1;
-                    k0 = ColorGroup::<N, I>::from_slice(shifted_src, i * N)
-                        .add(ColorGroup::<N, I>::from_slice(shifted_src, rollback * N))
-                        .mul(coeff.weight)
-                        .add(k0);
-                    k1 = ColorGroup::<N, I>::from_slice(shifted_src, (i + 1) * N)
-                        .add(ColorGroup::<N, I>::from_slice(
-                            shifted_src,
-                            (rollback + 1) * N,
-                        ))
-                        .mul(coeff.weight)
-                        .add(k1);
-                    k2 = ColorGroup::<N, I>::from_slice(shifted_src, (i + 2) * N)
-                        .add(ColorGroup::<N, I>::from_slice(
-                            shifted_src,
-                            (rollback + 2) * N,
-                        ))
-                        .mul(coeff.weight)
-                        .add(k2);
-                    k3 = ColorGroup::<N, I>::from_slice(shifted_src, (i + 3) * N)
-                        .add(ColorGroup::<N, I>::from_slice(
-                            shifted_src,
-                            (rollback + 3) * N,
-                        ))
-                        .mul(coeff.weight)
-                        .add(k3);
-                }
-
-                let dst_offset = y * dst_stride + _cx * N;
-
-                k0.to_approx_store(dst, dst_offset);
-                k1.to_approx_store(dst, dst_offset + N);
-                k2.to_approx_store(dst, dst_offset + N * 2);
-                k3.to_approx_store(dst, dst_offset + N * 3);
-                _cx += 4;
+            for i in 0..half_len {
+                let coeff = *scanned_kernel.get_unchecked(i);
+                let rollback = length - i - 1;
+                k0 = ColorGroup::<N, I>::from_slice(shifted_src, i * N)
+                    .add(ColorGroup::<N, I>::from_slice(shifted_src, rollback * N))
+                    .mul(coeff.weight)
+                    .add(k0);
+                k1 = ColorGroup::<N, I>::from_slice(shifted_src, (i + 1) * N)
+                    .add(ColorGroup::<N, I>::from_slice(
+                        shifted_src,
+                        (rollback + 1) * N,
+                    ))
+                    .mul(coeff.weight)
+                    .add(k1);
+                k2 = ColorGroup::<N, I>::from_slice(shifted_src, (i + 2) * N)
+                    .add(ColorGroup::<N, I>::from_slice(
+                        shifted_src,
+                        (rollback + 2) * N,
+                    ))
+                    .mul(coeff.weight)
+                    .add(k2);
+                k3 = ColorGroup::<N, I>::from_slice(shifted_src, (i + 3) * N)
+                    .add(ColorGroup::<N, I>::from_slice(
+                        shifted_src,
+                        (rollback + 3) * N,
+                    ))
+                    .mul(coeff.weight)
+                    .add(k3);
             }
 
-            for x in _cx..width {
-                let coeff = *scanned_kernel.get_unchecked(half_len);
-                let shifted_src = local_src.get_unchecked((x * N)..);
-                let mut k0 =
-                    ColorGroup::<N, I>::from_slice(shifted_src, half_len * N).mul(coeff.weight);
+            let dst_offset = y * dst_stride + _cx * N;
 
-                for i in 0..half_len {
-                    let coeff = *scanned_kernel.get_unchecked(i);
-                    let rollback = length - i - 1;
-                    k0 = ColorGroup::<N, I>::from_slice(shifted_src, i * N)
-                        .add(ColorGroup::<N, I>::from_slice(shifted_src, rollback * N))
-                        .mul(coeff.weight)
-                        .add(k0);
-                }
+            k0.to_approx_store(dst, dst_offset);
+            k1.to_approx_store(dst, dst_offset + N);
+            k2.to_approx_store(dst, dst_offset + N * 2);
+            k3.to_approx_store(dst, dst_offset + N * 3);
+            _cx += 4;
+        }
 
-                k0.to_approx_store(dst, y * dst_stride + x * N);
+        for x in _cx..width {
+            let coeff = *scanned_kernel.get_unchecked(half_len);
+            let shifted_src = local_src.get_unchecked((x * N)..);
+            let mut k0 =
+                ColorGroup::<N, I>::from_slice(shifted_src, half_len * N).mul(coeff.weight);
+
+            for i in 0..half_len {
+                let coeff = *scanned_kernel.get_unchecked(i);
+                let rollback = length - i - 1;
+                k0 = ColorGroup::<N, I>::from_slice(shifted_src, i * N)
+                    .add(ColorGroup::<N, I>::from_slice(shifted_src, rollback * N))
+                    .mul(coeff.weight)
+                    .add(k0);
             }
+
+            k0.to_approx_store(dst, y * dst_stride + x * N);
         }
     }
 }

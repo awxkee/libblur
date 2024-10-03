@@ -176,6 +176,10 @@ impl Filter1DRgbaRowHandler<f32, f32> for f32 {
 default_1d_row_handler!(i8, f32);
 default_1d_row_handler!(i8, f64);
 default_1d_row_handler!(u8, f64);
+default_1d_row_handler!(u8, i16);
+default_1d_row_handler!(u8, u16);
+default_1d_row_handler!(u8, i32);
+default_1d_row_handler!(u8, u32);
 default_1d_row_handler!(u16, f32);
 default_1d_row_handler!(u16, f64);
 default_1d_row_handler!(i16, f32);

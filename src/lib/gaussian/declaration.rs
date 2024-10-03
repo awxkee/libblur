@@ -36,7 +36,6 @@ use crate::{
 };
 use half::f16;
 
-
 /// Performs gaussian blur on the image.
 ///
 /// This performs a gaussian kernel filter on the image producing beautiful looking result.
@@ -82,9 +81,9 @@ pub fn gaussian_blur(
     match precise_level {
         GaussianPreciseLevel::EXACT => {
             let _dispatcher = match channels {
-                FastBlurChannels::Plane => filter_2d_approx::<u8, f32, i32>,
-                FastBlurChannels::Channels3 => filter_2d_rgb_approx::<u8, f32, i32>,
-                FastBlurChannels::Channels4 => filter_2d_rgba_approx::<u8, f32, i32>,
+                FastBlurChannels::Plane => filter_2d_exact::<u8, f32>,
+                FastBlurChannels::Channels3 => filter_2d_rgb_exact::<u8, f32>,
+                FastBlurChannels::Channels4 => filter_2d_rgba_exact::<u8, f32>,
             };
             _dispatcher(
                 src,
@@ -100,9 +99,9 @@ pub fn gaussian_blur(
         }
         GaussianPreciseLevel::INTEGRAL => {
             let _dispatcher = match channels {
-                FastBlurChannels::Plane => filter_2d_exact::<u8, f32>,
-                FastBlurChannels::Channels3 => filter_2d_rgb_exact::<u8, f32>,
-                FastBlurChannels::Channels4 => filter_2d_rgba_exact::<u8, f32>,
+                FastBlurChannels::Plane => filter_2d_approx::<u8, f32, i32>,
+                FastBlurChannels::Channels3 => filter_2d_rgb_approx::<u8, f32, i32>,
+                FastBlurChannels::Channels4 => filter_2d_rgba_approx::<u8, f32, i32>,
             };
             _dispatcher(
                 src,
@@ -172,7 +171,7 @@ pub fn gaussian_blur_u16(
         Scalar::default(),
         threading_policy,
     )
-        .unwrap();
+    .unwrap();
 }
 
 /// Performs gaussian blur on the image.
@@ -229,7 +228,7 @@ pub fn gaussian_blur_f32(
         Scalar::default(),
         threading_policy,
     )
-        .unwrap();
+    .unwrap();
 }
 
 /// Performs gaussian blur on the image.
@@ -285,5 +284,5 @@ pub fn gaussian_blur_f16(
         Scalar::default(),
         threading_policy,
     )
-        .unwrap();
+    .unwrap();
 }
