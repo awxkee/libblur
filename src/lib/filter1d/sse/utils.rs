@@ -70,6 +70,28 @@ pub unsafe fn _mm_mul_epi8_by_ps_x4(
 
 #[inline]
 #[target_feature(enable = "sse4.1")]
+pub unsafe fn _mm_mull_epi8_by_epi16_x4(input: __m128i, weight: __m128i) -> (__m128i, __m128i) {
+    let zeros = _mm_setzero_si128();
+    let lo_16 = _mm_unpacklo_epi8(input, zeros);
+    let hi_16 = _mm_unpackhi_epi8(input, zeros);
+
+    (
+        _mm_mullo_epi16(lo_16, weight),
+        _mm_mullo_epi16(hi_16, weight),
+    )
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+pub unsafe fn _mm_mull_epi8_by_epi16_x2(input: __m128i, weight: __m128i) -> __m128i {
+    let zeros = _mm_setzero_si128();
+    let lo_16 = _mm_unpacklo_epi8(input, zeros);
+
+    _mm_mullo_epi16(lo_16, weight)
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_mul_epi8_by_ps_x2(input: __m128i, weight: __m128) -> (__m128, __m128) {
     let zeros = _mm_setzero_si128();
     let lo_16 = _mm_unpacklo_epi8(input, zeros);
@@ -140,6 +162,60 @@ pub unsafe fn _mm_mul_add_epi8_by_ps_x4<const FMA: bool>(
             _mm_cvtepi32_ps(_mm_unpackhi_epi16(hi_16, zeros)),
             weight,
         ),
+    )
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+pub unsafe fn _mm_mull_add_epi8_by_epi16_x4(
+    accumulator: (__m128i, __m128i),
+    input: __m128i,
+    weight: __m128i,
+) -> (__m128i, __m128i) {
+    let zeros = _mm_setzero_si128();
+    let lo_16 = _mm_unpacklo_epi8(input, zeros);
+    let hi_16 = _mm_unpackhi_epi8(input, zeros);
+
+    (
+        _mm_add_epi16(accumulator.0, _mm_mullo_epi16(lo_16, weight)),
+        _mm_add_epi16(accumulator.1, _mm_mullo_epi16(hi_16, weight)),
+    )
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+pub unsafe fn _mm_mull_add_epi8_by_epi16_x2(
+    accumulator: __m128i,
+    input: __m128i,
+    weight: __m128i,
+) -> __m128i {
+    let zeros = _mm_setzero_si128();
+    let lo_16 = _mm_unpacklo_epi8(input, zeros);
+
+    _mm_add_epi16(accumulator, _mm_mullo_epi16(lo_16, weight))
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+pub unsafe fn _mm_mull_add_symm_epi8_by_epi16_x4(
+    accumulator: (__m128i, __m128i),
+    input0: __m128i,
+    input1: __m128i,
+    weight: __m128i,
+) -> (__m128i, __m128i) {
+    let zeros = _mm_setzero_si128();
+    let lo_16 = _mm_add_epi16(
+        _mm_unpacklo_epi8(input0, zeros),
+        _mm_unpacklo_epi8(input1, zeros),
+    );
+    let hi_16 = _mm_add_epi16(
+        _mm_unpackhi_epi8(input0, zeros),
+        _mm_unpackhi_epi8(input1, zeros),
+    );
+
+    (
+        _mm_add_epi16(accumulator.0, _mm_mullo_epi16(lo_16, weight)),
+        _mm_add_epi16(accumulator.1, _mm_mullo_epi16(hi_16, weight)),
     )
 }
 
@@ -235,6 +311,23 @@ pub unsafe fn _mm_mul_add_symm_epi8_by_ps_x2<const FMA: bool>(
             weight,
         ),
     )
+}
+
+#[inline]
+#[target_feature(enable = "sse4.1")]
+pub unsafe fn _mm_mull_add_symm_epi8_by_epi16_x2(
+    accumulator: __m128i,
+    input0: __m128i,
+    input1: __m128i,
+    weight: __m128i,
+) -> __m128i {
+    let zeros = _mm_setzero_si128();
+    let lo_16 = _mm_add_epi16(
+        _mm_unpacklo_epi8(input0, zeros),
+        _mm_unpacklo_epi8(input1, zeros),
+    );
+
+    _mm_add_epi16(accumulator, _mm_mullo_epi16(lo_16, weight))
 }
 
 #[inline]

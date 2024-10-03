@@ -81,7 +81,7 @@ impl Filter1DRowHandlerApprox<u8, i32> for u8 {
         any(target_arch = "x86_64", target_arch = "x86")
     )))]
     fn get_row_handler_apr(
-        _: bool,
+        is_kernel_symmetric: bool,
     ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<i32>]) {
         if is_kernel_symmetric {
             filter_color_group_row_symmetric_approx::<u8, i32, 1>
