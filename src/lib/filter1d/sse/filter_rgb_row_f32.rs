@@ -132,7 +132,7 @@ unsafe fn filter_rgb_row_sse_f32_f32_impl<const FMA: bool>(
         let y = filter_region.start;
         let local_src = src;
 
-        let length = scanned_kernel.iter().len();
+        let length = scanned_kernel.len();
 
         let mut _cx = 0usize;
 

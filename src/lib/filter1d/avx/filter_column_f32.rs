@@ -128,7 +128,7 @@ unsafe fn filter_column_avx_f32_f32_impl<const FMA: bool>(
         let dst_stride = image_size.width * arena.components;
 
         let y = filter_region.start;
-        let length = scanned_kernel.iter().len();
+        let length = scanned_kernel.len();
 
         let mut _cx = 0usize;
 

@@ -52,205 +52,204 @@ pub fn filter_column_symm_neon_u8_i32_app(
         let length = scanned_kernel.len();
         let half_len = length / 2;
 
-        for y in filter_region.start..filter_region.end {
-            let mut _cx = 0usize;
+        let y = filter_region.start;
 
-            while _cx + 64 < image_width {
-                let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(half_len).weight as i16);
+        let mut _cx = 0usize;
 
-                let v_src = arena_src.get_unchecked(half_len).get_unchecked(_cx..);
+        while _cx + 64 < image_width {
+            let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(half_len).weight as i16);
 
-                let source = vld1q_u8_x4(v_src.as_ptr());
-                let mut k0 = vmullq_u8_by_i16(source.0, coeff);
-                let mut k1 = vmullq_u8_by_i16(source.1, coeff);
-                let mut k2 = vmullq_u8_by_i16(source.2, coeff);
-                let mut k3 = vmullq_u8_by_i16(source.3, coeff);
+            let v_src = arena_src.get_unchecked(half_len).get_unchecked(_cx..);
 
-                for i in 0..half_len {
-                    let rollback = length - i - 1;
-                    let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight as i16);
-                    let v_source0 =
-                        vld1q_u8_x4(arena_src.get_unchecked(i).get_unchecked(_cx..).as_ptr());
-                    let v_source1 = vld1q_u8_x4(
-                        arena_src
-                            .get_unchecked(rollback)
-                            .get_unchecked(_cx..)
-                            .as_ptr(),
-                    );
-                    k0 = vfmlaq_symm_u8_s16(k0, v_source0.0, v_source1.0, coeff);
-                    k1 = vfmlaq_symm_u8_s16(k1, v_source0.1, v_source1.1, coeff);
-                    k2 = vfmlaq_symm_u8_s16(k2, v_source0.2, v_source1.2, coeff);
-                    k3 = vfmlaq_symm_u8_s16(k3, v_source0.3, v_source1.3, coeff);
-                }
+            let source = vld1q_u8_x4(v_src.as_ptr());
+            let mut k0 = vmullq_u8_by_i16(source.0, coeff);
+            let mut k1 = vmullq_u8_by_i16(source.1, coeff);
+            let mut k2 = vmullq_u8_by_i16(source.2, coeff);
+            let mut k3 = vmullq_u8_by_i16(source.3, coeff);
 
-                let dst_offset = y * dst_stride + _cx;
-                let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
-                vst1q_u8_x4(
-                    dst_ptr0,
-                    uint8x16x4_t(
-                        vqmovnq_s32_u8(k0),
-                        vqmovnq_s32_u8(k1),
-                        vqmovnq_s32_u8(k2),
-                        vqmovnq_s32_u8(k3),
-                    ),
+            for i in 0..half_len {
+                let rollback = length - i - 1;
+                let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight as i16);
+                let v_source0 =
+                    vld1q_u8_x4(arena_src.get_unchecked(i).get_unchecked(_cx..).as_ptr());
+                let v_source1 = vld1q_u8_x4(
+                    arena_src
+                        .get_unchecked(rollback)
+                        .get_unchecked(_cx..)
+                        .as_ptr(),
                 );
-                _cx += 64;
+                k0 = vfmlaq_symm_u8_s16(k0, v_source0.0, v_source1.0, coeff);
+                k1 = vfmlaq_symm_u8_s16(k1, v_source0.1, v_source1.1, coeff);
+                k2 = vfmlaq_symm_u8_s16(k2, v_source0.2, v_source1.2, coeff);
+                k3 = vfmlaq_symm_u8_s16(k3, v_source0.3, v_source1.3, coeff);
             }
 
-            while _cx + 48 < image_width {
-                let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(half_len).weight as i16);
+            let dst_offset = y * dst_stride + _cx;
+            let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+            vst1q_u8_x4(
+                dst_ptr0,
+                uint8x16x4_t(
+                    vqmovnq_s32_u8(k0),
+                    vqmovnq_s32_u8(k1),
+                    vqmovnq_s32_u8(k2),
+                    vqmovnq_s32_u8(k3),
+                ),
+            );
+            _cx += 64;
+        }
 
-                let v_src = arena_src.get_unchecked(half_len).get_unchecked(_cx..);
+        while _cx + 48 < image_width {
+            let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(half_len).weight as i16);
 
-                let source = vld1q_u8_x3(v_src.as_ptr());
-                let mut k0 = vmullq_u8_by_i16(source.0, coeff);
-                let mut k1 = vmullq_u8_by_i16(source.1, coeff);
-                let mut k2 = vmullq_u8_by_i16(source.2, coeff);
+            let v_src = arena_src.get_unchecked(half_len).get_unchecked(_cx..);
 
-                for i in 0..half_len {
-                    let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight as i16);
-                    let rollback = length - i - 1;
-                    let v_source0 =
-                        vld1q_u8_x3(arena_src.get_unchecked(i).get_unchecked(_cx..).as_ptr());
-                    let v_source1 = vld1q_u8_x3(
-                        arena_src
-                            .get_unchecked(rollback)
-                            .get_unchecked(_cx..)
-                            .as_ptr(),
-                    );
-                    k0 = vfmlaq_symm_u8_s16(k0, v_source0.0, v_source1.0, coeff);
-                    k1 = vfmlaq_symm_u8_s16(k1, v_source0.1, v_source1.1, coeff);
-                    k2 = vfmlaq_symm_u8_s16(k2, v_source0.2, v_source1.2, coeff);
-                }
+            let source = vld1q_u8_x3(v_src.as_ptr());
+            let mut k0 = vmullq_u8_by_i16(source.0, coeff);
+            let mut k1 = vmullq_u8_by_i16(source.1, coeff);
+            let mut k2 = vmullq_u8_by_i16(source.2, coeff);
 
-                let dst_offset = y * dst_stride + _cx;
-                let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
-                vst1q_u8_x3(
-                    dst_ptr0,
-                    uint8x16x3_t(vqmovnq_s32_u8(k0), vqmovnq_s32_u8(k1), vqmovnq_s32_u8(k2)),
+            for i in 0..half_len {
+                let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight as i16);
+                let rollback = length - i - 1;
+                let v_source0 =
+                    vld1q_u8_x3(arena_src.get_unchecked(i).get_unchecked(_cx..).as_ptr());
+                let v_source1 = vld1q_u8_x3(
+                    arena_src
+                        .get_unchecked(rollback)
+                        .get_unchecked(_cx..)
+                        .as_ptr(),
                 );
-                _cx += 48;
+                k0 = vfmlaq_symm_u8_s16(k0, v_source0.0, v_source1.0, coeff);
+                k1 = vfmlaq_symm_u8_s16(k1, v_source0.1, v_source1.1, coeff);
+                k2 = vfmlaq_symm_u8_s16(k2, v_source0.2, v_source1.2, coeff);
             }
 
-            while _cx + 32 < image_width {
-                let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(half_len).weight as i16);
+            let dst_offset = y * dst_stride + _cx;
+            let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+            vst1q_u8_x3(
+                dst_ptr0,
+                uint8x16x3_t(vqmovnq_s32_u8(k0), vqmovnq_s32_u8(k1), vqmovnq_s32_u8(k2)),
+            );
+            _cx += 48;
+        }
 
-                let v_src = arena_src.get_unchecked(half_len).get_unchecked(_cx..);
+        while _cx + 32 < image_width {
+            let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(half_len).weight as i16);
 
-                let source = vld1q_u8_x2(v_src.as_ptr());
-                let mut k0 = vmullq_u8_by_i16(source.0, coeff);
-                let mut k1 = vmullq_u8_by_i16(source.1, coeff);
+            let v_src = arena_src.get_unchecked(half_len).get_unchecked(_cx..);
 
-                for i in 0..half_len {
-                    let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight as i16);
-                    let rollback = length - i - 1;
-                    let v_source0 =
-                        vld1q_u8_x2(arena_src.get_unchecked(i).get_unchecked(_cx..).as_ptr());
-                    let v_source1 = vld1q_u8_x2(
-                        arena_src
-                            .get_unchecked(rollback)
-                            .get_unchecked(_cx..)
-                            .as_ptr(),
-                    );
-                    k0 = vfmlaq_symm_u8_s16(k0, v_source0.0, v_source1.0, coeff);
-                    k1 = vfmlaq_symm_u8_s16(k1, v_source0.1, v_source1.1, coeff);
-                }
+            let source = vld1q_u8_x2(v_src.as_ptr());
+            let mut k0 = vmullq_u8_by_i16(source.0, coeff);
+            let mut k1 = vmullq_u8_by_i16(source.1, coeff);
 
-                let dst_offset = y * dst_stride + _cx;
-                let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
-                vst1q_u8_x2(
-                    dst_ptr0,
-                    uint8x16x2_t(vqmovnq_s32_u8(k0), vqmovnq_s32_u8(k1)),
+            for i in 0..half_len {
+                let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight as i16);
+                let rollback = length - i - 1;
+                let v_source0 =
+                    vld1q_u8_x2(arena_src.get_unchecked(i).get_unchecked(_cx..).as_ptr());
+                let v_source1 = vld1q_u8_x2(
+                    arena_src
+                        .get_unchecked(rollback)
+                        .get_unchecked(_cx..)
+                        .as_ptr(),
                 );
-                _cx += 32;
+                k0 = vfmlaq_symm_u8_s16(k0, v_source0.0, v_source1.0, coeff);
+                k1 = vfmlaq_symm_u8_s16(k1, v_source0.1, v_source1.1, coeff);
             }
 
-            while _cx + 16 < image_width {
-                let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(half_len).weight as i16);
+            let dst_offset = y * dst_stride + _cx;
+            let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+            vst1q_u8_x2(
+                dst_ptr0,
+                uint8x16x2_t(vqmovnq_s32_u8(k0), vqmovnq_s32_u8(k1)),
+            );
+            _cx += 32;
+        }
 
-                let v_src = arena_src.get_unchecked(half_len).get_unchecked(_cx..);
+        while _cx + 16 < image_width {
+            let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(half_len).weight as i16);
 
-                let source = vld1q_u8(v_src.as_ptr());
-                let mut k0 = vmullq_u8_by_i16(source, coeff);
+            let v_src = arena_src.get_unchecked(half_len).get_unchecked(_cx..);
 
-                for i in 0..half_len {
-                    let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight as i16);
-                    let rollback = length - i - 1;
-                    let v_source0 =
-                        vld1q_u8(arena_src.get_unchecked(i).get_unchecked(_cx..).as_ptr());
-                    let v_source1 = vld1q_u8(
-                        arena_src
-                            .get_unchecked(rollback)
-                            .get_unchecked(_cx..)
-                            .as_ptr(),
-                    );
-                    k0 = vfmlaq_symm_u8_s16(k0, v_source0, v_source1, coeff);
-                }
+            let source = vld1q_u8(v_src.as_ptr());
+            let mut k0 = vmullq_u8_by_i16(source, coeff);
 
-                let dst_offset = y * dst_stride + _cx;
-                let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
-                vst1q_u8(dst_ptr0, vqmovnq_s32_u8(k0));
-                _cx += 16;
+            for i in 0..half_len {
+                let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight as i16);
+                let rollback = length - i - 1;
+                let v_source0 = vld1q_u8(arena_src.get_unchecked(i).get_unchecked(_cx..).as_ptr());
+                let v_source1 = vld1q_u8(
+                    arena_src
+                        .get_unchecked(rollback)
+                        .get_unchecked(_cx..)
+                        .as_ptr(),
+                );
+                k0 = vfmlaq_symm_u8_s16(k0, v_source0, v_source1, coeff);
             }
 
-            while _cx + 4 < image_width {
-                let coeff = *scanned_kernel.get_unchecked(half_len);
+            let dst_offset = y * dst_stride + _cx;
+            let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+            vst1q_u8(dst_ptr0, vqmovnq_s32_u8(k0));
+            _cx += 16;
+        }
 
-                let v_src = arena_src.get_unchecked(half_len).get_unchecked(_cx..);
+        while _cx + 4 < image_width {
+            let coeff = *scanned_kernel.get_unchecked(half_len);
 
-                let mut k0 = (*v_src.get_unchecked(0) as i32).mul(coeff.weight);
-                let mut k1 = (*v_src.get_unchecked(1) as i32).mul(coeff.weight);
-                let mut k2 = (*v_src.get_unchecked(2) as i32).mul(coeff.weight);
-                let mut k3 = (*v_src.get_unchecked(3) as i32).mul(coeff.weight);
+            let v_src = arena_src.get_unchecked(half_len).get_unchecked(_cx..);
 
-                for i in 0..half_len {
-                    let coeff = *scanned_kernel.get_unchecked(i);
-                    let rollback = length - i - 1;
-                    k0 = ((*arena_src.get_unchecked(i).get_unchecked(_cx)) as i32)
-                        .add((*arena_src.get_unchecked(rollback).get_unchecked(_cx)) as i32)
-                        .mul(coeff.weight)
-                        .add(k0);
-                    k1 = ((*arena_src.get_unchecked(i).get_unchecked(_cx + 1)) as i32)
-                        .add((*arena_src.get_unchecked(rollback).get_unchecked(_cx + 1)) as i32)
-                        .mul(coeff.weight)
-                        .add(k1);
-                    k2 = ((*arena_src.get_unchecked(i).get_unchecked(_cx + 2)) as i32)
-                        .add((*arena_src.get_unchecked(rollback).get_unchecked(_cx + 2)) as i32)
-                        .mul(coeff.weight)
-                        .add(k2);
-                    k3 = ((*arena_src.get_unchecked(i).get_unchecked(_cx + 3)) as i32)
-                        .add((*arena_src.get_unchecked(rollback).get_unchecked(_cx + 3)) as i32)
-                        .mul(coeff.weight)
-                        .add(k3);
-                }
+            let mut k0 = (*v_src.get_unchecked(0) as i32).mul(coeff.weight);
+            let mut k1 = (*v_src.get_unchecked(1) as i32).mul(coeff.weight);
+            let mut k2 = (*v_src.get_unchecked(2) as i32).mul(coeff.weight);
+            let mut k3 = (*v_src.get_unchecked(3) as i32).mul(coeff.weight);
 
-                let dst_offset = y * dst_stride + _cx;
-
-                dst.write(dst_offset, k0.to_approx_());
-                dst.write(dst_offset + 1, k1.to_approx_());
-                dst.write(dst_offset + 2, k2.to_approx_());
-                dst.write(dst_offset + 3, k3.to_approx_());
-                _cx += 4;
+            for i in 0..half_len {
+                let coeff = *scanned_kernel.get_unchecked(i);
+                let rollback = length - i - 1;
+                k0 = ((*arena_src.get_unchecked(i).get_unchecked(_cx)) as i32)
+                    .add((*arena_src.get_unchecked(rollback).get_unchecked(_cx)) as i32)
+                    .mul(coeff.weight)
+                    .add(k0);
+                k1 = ((*arena_src.get_unchecked(i).get_unchecked(_cx + 1)) as i32)
+                    .add((*arena_src.get_unchecked(rollback).get_unchecked(_cx + 1)) as i32)
+                    .mul(coeff.weight)
+                    .add(k1);
+                k2 = ((*arena_src.get_unchecked(i).get_unchecked(_cx + 2)) as i32)
+                    .add((*arena_src.get_unchecked(rollback).get_unchecked(_cx + 2)) as i32)
+                    .mul(coeff.weight)
+                    .add(k2);
+                k3 = ((*arena_src.get_unchecked(i).get_unchecked(_cx + 3)) as i32)
+                    .add((*arena_src.get_unchecked(rollback).get_unchecked(_cx + 3)) as i32)
+                    .mul(coeff.weight)
+                    .add(k3);
             }
 
-            for x in _cx..image_width {
-                let coeff = *scanned_kernel.get_unchecked(0);
+            let dst_offset = y * dst_stride + _cx;
 
-                let v_src = arena_src.get_unchecked(half_len).get_unchecked(_cx..);
+            dst.write(dst_offset, k0.to_approx_());
+            dst.write(dst_offset + 1, k1.to_approx_());
+            dst.write(dst_offset + 2, k2.to_approx_());
+            dst.write(dst_offset + 3, k3.to_approx_());
+            _cx += 4;
+        }
 
-                let mut k0 = ((*v_src.get_unchecked(0)) as i32).mul(coeff.weight);
+        for x in _cx..image_width {
+            let coeff = *scanned_kernel.get_unchecked(0);
 
-                for i in 0..half_len {
-                    let coeff = *scanned_kernel.get_unchecked(i);
-                    let rollback = length - i - 1;
-                    k0 = ((*arena_src.get_unchecked(i).get_unchecked(x)) as i32)
-                        .add((*arena_src.get_unchecked(rollback).get_unchecked(x)) as i32)
-                        .mul(coeff.weight)
-                        .add(k0);
-                }
+            let v_src = arena_src.get_unchecked(half_len).get_unchecked(_cx..);
 
-                dst.write(y * dst_stride + x, k0.to_approx_());
+            let mut k0 = ((*v_src.get_unchecked(0)) as i32).mul(coeff.weight);
+
+            for i in 0..half_len {
+                let coeff = *scanned_kernel.get_unchecked(i);
+                let rollback = length - i - 1;
+                k0 = ((*arena_src.get_unchecked(i).get_unchecked(x)) as i32)
+                    .add((*arena_src.get_unchecked(rollback).get_unchecked(x)) as i32)
+                    .mul(coeff.weight)
+                    .add(k0);
             }
+
+            dst.write(y * dst_stride + x, k0.to_approx_());
         }
     }
 }

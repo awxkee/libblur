@@ -36,8 +36,8 @@ use crate::filter1d::filter_column_symmetric::filter_symmetric_column;
 use crate::filter1d::filter_scan::ScanPoint1d;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::filter1d::neon::{
-    filter_column_neon_f32_f32, filter_column_neon_u8_f32, filter_column_neon_u8_i16,
-    filter_column_symm_neon_u8_i16, filter_symm_column_neon_u8_f32,
+    filter_column_neon_f32_f32, filter_column_neon_symm_f32_f32, filter_column_neon_u8_f32,
+    filter_column_neon_u8_i16, filter_column_symm_neon_u8_i16, filter_symm_column_neon_u8_f32,
 };
 use crate::filter1d::region::FilterRegion;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
@@ -156,14 +156,22 @@ impl Filter1DColumnHandler<f32, f32> for f32 {
     fn get_column_handler(
         _: bool,
     ) -> fn(Arena, &[&[f32]], &UnsafeSlice<f32>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
-        filter_column
+        if is_symmetric_kernel {
+            filter_symmetric_column
+        } else {
+            filter_column
+        }
     }
 
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     fn get_column_handler(
-        _: bool,
+        is_symmetric_kernel: bool,
     ) -> fn(Arena, &[&[f32]], &UnsafeSlice<f32>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
-        filter_column_neon_f32_f32
+        if is_symmetric_kernel {
+            filter_column_neon_symm_f32_f32
+        } else {
+            filter_column_neon_f32_f32
+        }
     }
 
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
@@ -176,7 +184,11 @@ impl Filter1DColumnHandler<f32, f32> for f32 {
         if std::arch::is_x86_feature_detected!("sse4.1") {
             return filter_column_sse_f32_f32;
         }
-        filter_column
+        if is_symmetric_kernel {
+            filter_symmetric_column
+        } else {
+            filter_column
+        }
     }
 }
 
