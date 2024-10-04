@@ -36,7 +36,6 @@ use crate::ImageSize;
 use num_traits::MulAdd;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
-use std::arch::x86_64::_mm_setzero_si128;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 use std::ops::Mul;
