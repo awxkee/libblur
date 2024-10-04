@@ -26,7 +26,6 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #![allow(clippy::too_many_arguments)]
-extern crate core;
 
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 mod avx;
@@ -45,11 +44,13 @@ mod fast_gaussian_image_next;
 mod fast_gaussian_next;
 mod fast_gaussian_superior;
 mod filter1d;
+mod filter2d;
 mod gaussian;
 #[cfg(feature = "image")]
 mod gaussian_blur_image;
 mod img_size;
 mod median_blur;
+mod motion_blur;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 mod neon;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
@@ -90,9 +91,12 @@ pub use fast_gaussian_next::fast_gaussian_next_in_linear;
 pub use fast_gaussian_next::fast_gaussian_next_u16;
 pub use fast_gaussian_superior::fast_gaussian_superior;
 pub use filter1d::{
-    filter_2d_approx, filter_2d_exact, filter_2d_rgb_approx, filter_2d_rgb_exact,
-    filter_2d_rgba_approx, filter_2d_rgba_exact,
+    filter_1d_approx, filter_1d_exact, filter_1d_rgb_approx, filter_1d_rgb_exact,
+    filter_1d_rgba_approx, filter_1d_rgba_exact, make_arena, Arena, ArenaPads, KernelShape,
 };
+#[cfg(feature = "fft")]
+pub use filter2d::{fft_next_good_size, filter_2d_fft, filter_2d_rgb_fft, filter_2d_rgba_fft};
+pub use filter2d::{filter_2d, filter_2d_rgb, filter_2d_rgba};
 pub use gaussian::gaussian_blur;
 pub use gaussian::gaussian_blur_f16;
 pub use gaussian::gaussian_blur_f32;
@@ -105,6 +109,7 @@ pub use gaussian::GaussianPreciseLevel;
 pub use gaussian_blur_image::gaussian_blur_image;
 pub use img_size::ImageSize;
 pub use median_blur::median_blur;
+pub use motion_blur::{generate_motion_kernel, motion_blur};
 pub use r#box::box_blur;
 pub use r#box::box_blur_f32;
 pub use r#box::box_blur_in_linear;

@@ -28,7 +28,7 @@
  */
 use crate::filter1d::arena::{make_arena_columns, make_arena_row, Arena};
 use crate::filter1d::filter_1d_column_handler::Filter1DColumnHandler;
-use crate::filter1d::filter_1d_rgb_row_handler::Filter1DRgbRowHandler;
+use crate::filter1d::filter_1d_rgba_row_handler::Filter1DRgbaRowHandler;
 use crate::filter1d::filter_element::KernelShape;
 use crate::filter1d::filter_scan::{is_symmetric_1d, scan_se_1d};
 use crate::filter1d::region::FilterRegion;
@@ -38,7 +38,30 @@ use crate::{EdgeMode, ImageSize, Scalar, ThreadingPolicy};
 use num_traits::{AsPrimitive, MulAdd};
 use std::ops::Mul;
 
-pub fn filter_2d_rgb_exact<T, F>(
+/// Performs 2D separable convolution on RGBA image
+///
+/// This method does exact convolution on the image without any approximations using required
+/// intermediate type based on kernel data type.
+/// Note, in most cases for convolution alpha must be premultiplied.
+///
+/// # Arguments
+///
+/// * `image`: Single RGBA image
+/// * `destination`: Destination RGBA image
+/// * `image_size`: Image size see [ImageSize]
+/// * `row_kernel`: Row kernel, *size must be odd*!
+/// * `column_kernel`: Column kernel, *size must be odd*!
+/// * `border_mode`: See [EdgeMode] for more info
+/// * `border_constant`: If [EdgeMode::Constant] border will be replaced with this provided [Scalar] value
+/// * `threading_policy`: See [ThreadingPolicy] for more info
+///
+/// returns: Result<(), String>
+///
+/// # Examples
+///
+/// See [crate::gaussian_blur] for example
+///
+pub fn filter_1d_rgba_exact<T, F>(
     image: &[T],
     destination: &mut [T],
     image_size: ImageSize,
@@ -54,23 +77,23 @@ where
         + Default
         + Send
         + Sync
-        + Filter1DRgbRowHandler<T, F>
+        + Filter1DRgbaRowHandler<T, F>
         + Filter1DColumnHandler<T, F>,
     F: ToStorage<T> + Mul<F> + MulAdd<F, Output = F> + Send + Sync + PartialEq,
     i32: AsPrimitive<F>,
     f64: AsPrimitive<T>,
 {
-    if image.len() != 3 * image_size.width * image_size.height {
+    if image.len() != 4 * image_size.width * image_size.height {
         return Err(format!(
             "Can't create arena, expected image with size {} but got {}",
-            3 * image_size.width * image_size.height,
+            4 * image_size.width * image_size.height,
             image.len()
         ));
     }
-    if destination.len() != 3 * image_size.width * image_size.height {
+    if destination.len() != 4 * image_size.width * image_size.height {
         return Err(format!(
             "Can't create arena, expected image with size {} but got {}",
-            3 * image_size.width * image_size.height,
+            4 * image_size.width * image_size.height,
             destination.len()
         ));
     }
@@ -86,7 +109,7 @@ where
     let scanned_column_kernel = unsafe { scan_se_1d(column_kernel) };
     let scanned_column_kernel_slice = scanned_column_kernel.as_slice();
     let is_column_kernel_symmetrical = unsafe { is_symmetric_1d(column_kernel) };
-    let is_row_kernel_symmetrical = unsafe { is_symmetric_1d(row_kernel) };
+    let is_row_column_kernel_symmetrical = unsafe { is_symmetric_1d(row_kernel) };
 
     let thread_count = threading_policy
         .get_threads_count(image_size.width as u32, image_size.height as u32)
@@ -101,12 +124,12 @@ where
         Some(hold)
     };
 
-    const N: usize = 3;
+    const N: usize = 4;
 
     let mut transient_image = vec![T::default(); image_size.width * image_size.height * N];
 
     if let Some(pool) = &pool {
-        let row_handler = T::get_rgb_row_handler(is_row_kernel_symmetrical);
+        let row_handler = T::get_rgba_row_handler(is_row_column_kernel_symmetrical);
         pool.scope(|scope| {
             let transient_cell = UnsafeSlice::new(transient_image.as_mut_slice());
 
@@ -136,10 +159,10 @@ where
             }
         });
     } else {
-        let row_handler = T::get_rgb_row_handler(is_row_kernel_symmetrical);
-        let transient_cell = UnsafeSlice::new(transient_image.as_mut_slice());
-
         let pad_w = scanned_row_kernel.len() / 2;
+
+        let row_handler = T::get_rgba_row_handler(is_row_column_kernel_symmetrical);
+        let transient_cell = UnsafeSlice::new(transient_image.as_mut_slice());
 
         for y in 0..image_size.height {
             let (row, arena_width) = make_arena_row::<T, N>(
@@ -150,6 +173,7 @@ where
                 border_mode,
                 border_constant,
             )?;
+
             row_handler(
                 Arena::new(arena_width, 1, pad_w, 0, N),
                 &row,

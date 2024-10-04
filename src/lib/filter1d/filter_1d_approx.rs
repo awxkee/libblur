@@ -28,7 +28,7 @@
  */
 use crate::filter1d::arena::{make_arena_columns, make_arena_row, Arena};
 use crate::filter1d::filter_1d_column_handler_approx::Filter1DColumnHandlerApprox;
-use crate::filter1d::filter_1d_rgb_row_handler_approx::Filter1DRgbRowHandlerApprox;
+use crate::filter1d::filter_1d_row_handler_approx::Filter1DRowHandlerApprox;
 use crate::filter1d::filter_element::KernelShape;
 use crate::filter1d::filter_scan::{is_symmetric_1d, scan_se_1d};
 use crate::filter1d::region::FilterRegion;
@@ -39,7 +39,28 @@ use crate::{EdgeMode, ImageSize, Scalar, ThreadingPolicy};
 use num_traits::{AsPrimitive, Float, MulAdd};
 use std::ops::{Add, Mul, Shl, Shr};
 
-pub fn filter_2d_rgb_approx<T, F, I>(
+/// Performs 2D separable approximated convolution on single plane image
+///
+/// This method does approximate convolution in fixed point.
+///
+/// # Arguments
+///
+/// * `image`: Single plane image
+/// * `destination`: Destination image
+/// * `image_size`: Image size see [ImageSize]
+/// * `row_kernel`: Row kernel, *size must be odd*!
+/// * `column_kernel`: Column kernel, *size must be odd*!
+/// * `border_mode`: See [EdgeMode] for more info
+/// * `border_constant`: If [EdgeMode::Constant] border will be replaced with this provided [Scalar] value
+/// * `threading_policy`: See [ThreadingPolicy] for more info
+///
+/// returns: Result<(), String>
+///
+/// # Examples
+///
+/// See [crate::gaussian_blur] for example
+///
+pub fn filter_1d_approx<T, F, I>(
     image: &[T],
     destination: &mut [T],
     image_size: ImageSize,
@@ -55,7 +76,7 @@ where
         + Default
         + Send
         + Sync
-        + Filter1DRgbRowHandlerApprox<T, I>
+        + Filter1DRowHandlerApprox<T, I>
         + Filter1DColumnHandlerApprox<T, I>,
     F: ToStorage<T> + Mul<F> + MulAdd<F, Output = F> + Send + Sync + AsPrimitive<I> + Float,
     I: Copy
@@ -75,17 +96,17 @@ where
     i64: AsPrimitive<I> + AsPrimitive<F>,
     f64: AsPrimitive<T>,
 {
-    if image.len() != 3 * image_size.width * image_size.height {
+    if image.len() != image_size.width * image_size.height {
         return Err(format!(
             "Can't create arena, expected image with size {} but got {}",
-            3 * image_size.width * image_size.height,
+            image_size.width * image_size.height,
             image.len()
         ));
     }
-    if destination.len() != 3 * image_size.width * image_size.height {
+    if destination.len() != image_size.width * image_size.height {
         return Err(format!(
             "Can't create arena, expected image with size {} but got {}",
-            3 * image_size.width * image_size.height,
+            image_size.width * image_size.height,
             destination.len()
         ));
     }
@@ -102,11 +123,11 @@ where
 
     let scaled_row_kernel = row_kernel
         .iter()
-        .map(|&x| (x * initial_scale).round().as_())
+        .map(|&x| (x * initial_scale).as_())
         .collect::<Vec<I>>();
     let scaled_column_kernel = column_kernel
         .iter()
-        .map(|&x| (x * initial_scale).round().as_())
+        .map(|&x| (x * initial_scale).as_())
         .collect::<Vec<I>>();
 
     let scanned_row_kernel = unsafe { scan_se_1d::<I>(&scaled_row_kernel) };
@@ -129,12 +150,12 @@ where
         Some(hold)
     };
 
-    const N: usize = 3;
+    const N: usize = 1;
 
     let mut transient_image = vec![T::default(); image_size.width * image_size.height * N];
 
     if let Some(pool) = &pool {
-        let row_handler = T::get_rgb_row_handler_apr(is_row_kernel_symmetric);
+        let row_handler = T::get_row_handler_apr(is_row_kernel_symmetric);
         pool.scope(|scope| {
             let transient_cell = UnsafeSlice::new(transient_image.as_mut_slice());
 
@@ -164,7 +185,7 @@ where
             }
         });
     } else {
-        let row_handler = T::get_rgb_row_handler_apr(is_row_kernel_symmetric);
+        let row_handler = T::get_row_handler_apr(is_row_kernel_symmetric);
         let transient_cell = UnsafeSlice::new(transient_image.as_mut_slice());
 
         let pad_w = scanned_row_kernel.len() / 2;

@@ -26,49 +26,8 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#![allow(clippy::type_complexity)]
-mod arena;
-mod arena_roi;
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-mod avx;
-mod color_group;
-mod filter;
-mod filter_1d_approx;
-mod filter_1d_column_handler;
-mod filter_1d_column_handler_approx;
-mod filter_1d_rgb;
-mod filter_1d_rgb_approx;
-mod filter_1d_rgb_row_handler;
-mod filter_1d_rgb_row_handler_approx;
-mod filter_1d_rgba;
-mod filter_1d_rgba_approx;
-mod filter_1d_rgba_row_handler;
-mod filter_1d_rgba_row_handler_approx;
-mod filter_1d_row_handler;
-mod filter_1d_row_handler_approx;
-mod filter_column;
-mod filter_column_approx;
-mod filter_column_approx_symmetric;
-mod filter_column_symmetric;
-mod filter_element;
-mod filter_row;
-mod filter_row_cg;
-mod filter_row_cg_approx;
-mod filter_row_cg_approx_symmetric;
-mod filter_row_cg_symmetric;
-mod filter_scan;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-pub(crate) mod neon;
-mod region;
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-pub(crate) mod sse;
-mod to_approx_storage;
+mod convolve_op_u8_f32;
+mod convolve_op_u8_i16;
 
-pub use arena::{make_arena, Arena, ArenaPads};
-pub use filter::filter_1d_exact;
-pub use filter_1d_approx::filter_1d_approx;
-pub use filter_1d_rgb::filter_1d_rgb_exact;
-pub use filter_1d_rgb_approx::filter_1d_rgb_approx;
-pub use filter_1d_rgba::filter_1d_rgba_exact;
-pub use filter_1d_rgba_approx::filter_1d_rgba_approx;
-pub use filter_element::KernelShape;
+pub use convolve_op_u8_f32::convolve_segment_sse_2d_u8_f32;
+pub use convolve_op_u8_i16::convolve_segment_sse_2d_u8_i16;

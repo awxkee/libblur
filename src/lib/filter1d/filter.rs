@@ -39,7 +39,29 @@ use crate::{EdgeMode, Scalar, ThreadingPolicy};
 use num_traits::{AsPrimitive, MulAdd};
 use std::ops::Mul;
 
-pub fn filter_2d_exact<T, F>(
+/// Performs 2D separable convolution on single plane image
+///
+/// This method does exact convolution on the image without any approximations using required
+/// intermediate type based on kernel data type.
+///
+/// # Arguments
+///
+/// * `image`: Single plane image
+/// * `destination`: Destination image
+/// * `image_size`: Image size see [ImageSize]
+/// * `row_kernel`: Row kernel, *size must be odd*!
+/// * `column_kernel`: Column kernel, *size must be odd*!
+/// * `border_mode`: See [EdgeMode] for more info
+/// * `border_constant`: If [EdgeMode::Constant] border will be replaced with this provided [Scalar] value
+/// * `threading_policy`: See [ThreadingPolicy] for more info
+///
+/// returns: Result<(), String>
+///
+/// # Examples
+///
+/// See [crate::gaussian_blur] for example
+///
+pub fn filter_1d_exact<T, F>(
     image: &[T],
     destination: &mut [T],
     image_size: ImageSize,

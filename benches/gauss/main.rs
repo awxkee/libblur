@@ -1,7 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use image::{GenericImageView, ImageReader};
 use libblur::{
-    filter_2d_exact, filter_2d_rgb_exact, filter_2d_rgba_exact, get_gaussian_kernel_1d,
+    filter_1d_exact, filter_1d_rgb_exact, filter_1d_rgba_exact, get_gaussian_kernel_1d,
     get_sigma_size, EdgeMode, FastBlurChannels, GaussianPreciseLevel, ImageSize, Scalar,
     ThreadingPolicy,
 };
@@ -285,7 +285,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| {
             let mut dst_bytes: Vec<u8> = vec![0u8; dimensions.1 as usize * stride];
             let kernel = get_gaussian_kernel_1d(25, get_sigma_size(25));
-            filter_2d_rgb_exact(
+            filter_1d_rgb_exact(
                 src_bytes,
                 &mut dst_bytes,
                 ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
@@ -303,7 +303,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| {
             let mut dst_bytes: Vec<u8> = vec![0u8; dimensions.1 as usize * stride];
             let kernel = get_gaussian_kernel_1d(151, get_sigma_size(151));
-            filter_2d_rgb_exact(
+            filter_1d_rgb_exact(
                 src_bytes,
                 &mut dst_bytes,
                 ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
@@ -404,7 +404,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             b.iter(|| {
                 let mut dst_plane_1 = vec![0u8; width * height];
                 let kernel = get_gaussian_kernel_1d(151, get_sigma_size(151));
-                filter_2d_exact(
+                filter_1d_exact(
                     &plane_1,
                     &mut dst_plane_1,
                     ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),

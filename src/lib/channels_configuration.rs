@@ -33,12 +33,14 @@
 /// except cases when transformation into linear colorspace is performed
 /// in case of linear transformation alpha plane expected to be last so if colorspace has 4 channels then it should be
 /// RGBA, BGRA etc
+/// *NOTE*: For images with alpha even that order of alpha doesn't matter alpha must be premultiplied!
 pub enum FastBlurChannels {
     /// Single plane image
     Plane = 1,
     /// RGB, BGR etc
     Channels3 = 3,
     /// RGBA, BGRA etc
+    /// *NOTE*: For images with alpha even that order of alpha doesn't matter alpha must be premultiplied!
     Channels4 = 4,
 }
 

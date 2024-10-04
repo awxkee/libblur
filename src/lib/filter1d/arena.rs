@@ -61,11 +61,36 @@ impl Arena {
     }
 }
 
+#[derive(Copy, Clone)]
+pub struct ArenaPads {
+    pub pad_left: usize,
+    pub pad_top: usize,
+    pub pad_right: usize,
+    pub pad_bottom: usize,
+}
+
+impl ArenaPads {
+    pub fn new(pad_left: usize, pad_top: usize, pad_right: usize, pad_bottom: usize) -> ArenaPads {
+        ArenaPads {
+            pad_left,
+            pad_top,
+            pad_right,
+            pad_bottom,
+        }
+    }
+
+    pub fn from_kernel_shape(kernel_shape: KernelShape) -> ArenaPads {
+        let pad_w = kernel_shape.width / 2;
+        let pad_h = kernel_shape.height / 2;
+        ArenaPads::new(pad_w, pad_h, pad_w, pad_h)
+    }
+}
+
 /// Pads an image with chosen border strategy
 pub fn make_arena<T, const COMPONENTS: usize>(
     image: &[T],
     image_size: ImageSize,
-    kernel_size: KernelShape,
+    pads: ArenaPads,
     border_mode: EdgeMode,
     scalar: Scalar,
 ) -> Result<(Vec<T>, Arena), String>
@@ -81,13 +106,8 @@ where
         ));
     }
 
-    let (kw, kh) = (kernel_size.width, kernel_size.height);
-
-    let pad_w = kw / 2;
-    let pad_h = kh / 2;
-
-    let new_height = image_size.height + 2 * pad_h;
-    let new_width = image_size.width + 2 * pad_w;
+    let new_height = image_size.height + pads.pad_top + pads.pad_bottom;
+    let new_width = image_size.width + pads.pad_left + pads.pad_right;
 
     let height = image_size.height;
     let width = image_size.width;
@@ -98,7 +118,7 @@ where
     let new_stride = new_width * COMPONENTS;
 
     unsafe {
-        let offset = pad_h * new_stride + pad_w * COMPONENTS;
+        let offset = pads.pad_top * new_stride + pads.pad_left * COMPONENTS;
         copy_roi(
             padded_image.get_unchecked_mut(offset..),
             image,
@@ -109,11 +129,20 @@ where
     }
 
     let filling_ranges = [
-        (0..pad_h, 0..new_width),                                  // Top outer
-        (pad_h..(new_height - pad_h), 0..pad_w),                   // Left outer
-        ((height + pad_h)..new_height, 0..new_width),              // Bottom outer
-        (pad_h..(new_height - pad_h), (width + pad_w)..new_width), // Bottom outer,
+        (0..pads.pad_top, 0..new_width), // Top outer
+        (
+            pads.pad_top..(new_height - pads.pad_bottom),
+            0..pads.pad_left,
+        ), // Left outer
+        ((height + pads.pad_top)..new_height, 0..new_width), // Bottom outer
+        (
+            pads.pad_top..(new_height - pads.pad_bottom),
+            (width + pads.pad_left)..new_width,
+        ), // Right outer,
     ];
+
+    let pad_w = pads.pad_left;
+    let pad_h = pads.pad_top;
 
     match border_mode {
         EdgeMode::Clamp => {

@@ -26,49 +26,39 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#![allow(clippy::type_complexity)]
-mod arena;
-mod arena_roi;
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-mod avx;
-mod color_group;
-mod filter;
-mod filter_1d_approx;
-mod filter_1d_column_handler;
-mod filter_1d_column_handler_approx;
-mod filter_1d_rgb;
-mod filter_1d_rgb_approx;
-mod filter_1d_rgb_row_handler;
-mod filter_1d_rgb_row_handler_approx;
-mod filter_1d_rgba;
-mod filter_1d_rgba_approx;
-mod filter_1d_rgba_row_handler;
-mod filter_1d_rgba_row_handler_approx;
-mod filter_1d_row_handler;
-mod filter_1d_row_handler_approx;
-mod filter_column;
-mod filter_column_approx;
-mod filter_column_approx_symmetric;
-mod filter_column_symmetric;
-mod filter_element;
-mod filter_row;
-mod filter_row_cg;
-mod filter_row_cg_approx;
-mod filter_row_cg_approx_symmetric;
-mod filter_row_cg_symmetric;
-mod filter_scan;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-pub(crate) mod neon;
-mod region;
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-pub(crate) mod sse;
-mod to_approx_storage;
+use crate::filter1d::KernelShape;
+use crate::filter2d::scan_point_2d::ScanPoint2d;
+use num_traits::AsPrimitive;
 
-pub use arena::{make_arena, Arena, ArenaPads};
-pub use filter::filter_1d_exact;
-pub use filter_1d_approx::filter_1d_approx;
-pub use filter_1d_rgb::filter_1d_rgb_exact;
-pub use filter_1d_rgb_approx::filter_1d_rgb_approx;
-pub use filter_1d_rgba::filter_1d_rgba_exact;
-pub use filter_1d_rgba_approx::filter_1d_rgba_approx;
-pub use filter_element::KernelShape;
+pub(crate) unsafe fn scan_se_2d<F>(
+    structuring_element: &[F],
+    structuring_element_size: KernelShape,
+) -> Vec<ScanPoint2d<F>>
+where
+    F: Copy + PartialEq + 'static,
+    i32: AsPrimitive<F>,
+{
+    let mut left_front = vec![];
+
+    let kernel_width = structuring_element_size.width;
+    let kernel_height = structuring_element_size.height;
+
+    let horizontal_anchor = kernel_width as i64 / 2;
+    let half_kernel_height = kernel_height as i64 / 2;
+
+    for y in 0..kernel_height {
+        for x in 0..kernel_width {
+            let item = *structuring_element.get_unchecked(y * kernel_height + x);
+            let zero_f = 0i32.as_();
+            if item.ne(&zero_f) {
+                left_front.push(ScanPoint2d::new(
+                    y as i64 - half_kernel_height,
+                    x as i64 - horizontal_anchor,
+                    item,
+                ));
+            }
+        }
+    }
+
+    left_front
+}

@@ -51,7 +51,7 @@ mod filter_rgba_symm_row;
 mod filter_row;
 mod filter_row_approx;
 mod filter_row_f32;
-mod utils;
+pub mod utils;
 
 pub use filter_column::filter_column_neon_u8_f32;
 pub use filter_column_approx::filter_column_neon_u8_i32_app;

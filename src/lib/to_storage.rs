@@ -58,6 +58,10 @@ impl_to_integral_storage!(f32, u32);
 impl_to_integral_storage!(f64, u32);
 impl_to_integral_storage!(f32, i32);
 impl_to_integral_storage!(f64, i32);
+impl_to_integral_storage!(f32, i64);
+impl_to_integral_storage!(f64, i64);
+impl_to_integral_storage!(f32, u64);
+impl_to_integral_storage!(f64, u64);
 impl_to_integral_storage!(f32, usize);
 impl_to_integral_storage!(f64, usize);
 
@@ -76,7 +80,7 @@ impl_to_direct_storage!(f64, f64);
 impl_to_direct_storage!(f64, f32);
 impl_to_direct_storage!(f32, f64);
 
-macro_rules! impl_signed_to_unsigned_storage {
+macro_rules! impl_to_saturated_signed_storage {
     ($from:ty, $to:ty) => {
         impl ToStorage<$to> for $from {
             fn to_(self) -> $to {
@@ -86,12 +90,30 @@ macro_rules! impl_signed_to_unsigned_storage {
     };
 }
 
-impl_signed_to_unsigned_storage!(i16, u8);
-impl_signed_to_unsigned_storage!(i32, u8);
-impl_signed_to_unsigned_storage!(i64, u8);
-impl_to_direct_storage!(u16, u8);
-impl_to_direct_storage!(u32, u8);
-impl_to_direct_storage!(u64, u8);
+macro_rules! impl_to_saturated_storage {
+    ($from:ty, $to:ty) => {
+        impl ToStorage<$to> for $from {
+            fn to_(self) -> $to {
+                self.min(<$to>::MAX as $from) as $to
+            }
+        }
+    };
+}
+
+impl_to_saturated_signed_storage!(i16, u8);
+impl_to_saturated_signed_storage!(i32, u8);
+impl_to_saturated_signed_storage!(i64, u8);
+impl_to_saturated_signed_storage!(i32, u16);
+impl_to_saturated_signed_storage!(i64, u16);
+impl_to_saturated_storage!(u16, u8);
+impl_to_saturated_storage!(u32, u8);
+impl_to_saturated_storage!(u64, u8);
+impl_to_saturated_signed_storage!(i32, i8);
+impl_to_saturated_signed_storage!(i64, i8);
+impl_to_saturated_signed_storage!(i32, i16);
+impl_to_saturated_signed_storage!(i64, i16);
+impl_to_saturated_signed_storage!(i16, i8);
+impl_to_saturated_signed_storage!(u16, i8);
 
 impl ToStorage<f16> for f32 {
     fn to_(self) -> f16 {

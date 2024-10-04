@@ -5,9 +5,10 @@ use crate::merge::merge_channels_3;
 use crate::split::split_channels_3;
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use libblur::{
-    fast_bilateral_filter, filter_2d_exact, filter_2d_rgb_approx, filter_2d_rgb_exact,
-    filter_2d_rgba_approx, filter_2d_rgba_exact, get_gaussian_kernel_1d, get_sigma_size, EdgeMode,
-    FastBlurChannels, GaussianPreciseLevel, ImageSize, Scalar, ThreadingPolicy,
+    filter_1d_exact, filter_1d_rgb_approx, filter_2d_rgb, filter_2d_rgb_fft,
+    generate_motion_kernel, get_gaussian_kernel_1d, get_sigma_size, make_arena, motion_blur,
+    ArenaPads, EdgeMode, FastBlurChannels, GaussianPreciseLevel, ImageSize, KernelShape, Scalar,
+    ThreadingPolicy,
 };
 use std::time::Instant;
 
@@ -95,7 +96,7 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
 
     let start = Instant::now();
 
-    filter_2d_exact(
+    filter_1d_exact(
         &plane_2,
         &mut dst_plane_2,
         ImageSize::new(width, height),
@@ -161,7 +162,7 @@ fn main() {
     //     vst1q_s64(t.as_mut_ptr(), mul);
     //     println!("{:?}", t);
     // }
-    let img = ImageReader::open("assets/test_image_4.png")
+    let img = ImageReader::open("assets/car.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -306,17 +307,38 @@ fn main() {
     let sobel_horizontal: [i16; 3] = [-1, 0, 1];
     let sobel_vertical: [i16; 3] = [1, 2, 1];
 
-    filter_2d_rgb_approx::<u8, f32, i32>(
+    // filter_1d_rgb_approx::<u8, f32, i32>(
+    //     &bytes,
+    //     &mut dst_bytes,
+    //     ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
+    //     &kernel,
+    //     &kernel,
+    //     EdgeMode::Clamp,
+    //     Scalar::new(127.0, 0., 0., 255.0),
+    //     ThreadingPolicy::default(),
+    // )
+    // .unwrap();
+
+    motion_blur(
         &bytes,
         &mut dst_bytes,
         ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
-        &kernel,
-        &kernel,
-        EdgeMode::Clamp,
-        Scalar::new(127.0, 0., 0., 255.0),
-        ThreadingPolicy::default(),
-    )
-    .unwrap();
+        90f32,
+        125,
+        FastBlurChannels::Channels3,
+        ThreadingPolicy::Adaptive,
+    );
+
+    // filter_2d_rgb_fft::<u8, f32, f32>(
+    //     &bytes,
+    //     &mut dst_bytes,
+    //     ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
+    //     &laplacian,
+    //     KernelShape::new(kern_size, kern_size),
+    //     EdgeMode::Constant,
+    //     Scalar::new(255.0, 0., 0., 255.0),
+    // )
+    // .unwrap();
 
     //
     // filter_2d_rgba_approx::<u8, f32, i32>(

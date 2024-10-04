@@ -147,7 +147,7 @@ macro_rules! clamp_edge {
             }
             EdgeMode::Wrap => {
                 if $value < $min || $value > $max {
-                    $value.rem_euclid($max) as usize
+                    $value.rem_euclid($max + 1) as usize
                 } else {
                     $value as usize
                 }
@@ -176,6 +176,10 @@ pub struct Scalar {
 impl Scalar {
     pub fn new(v0: f64, v1: f64, v2: f64, v3: f64) -> Self {
         Self { v0, v1, v2, v3 }
+    }
+
+    pub fn dup(v: f64) -> Self {
+        Scalar::new(v, v, v, v)
     }
 }
 

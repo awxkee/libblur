@@ -39,7 +39,29 @@ use crate::{EdgeMode, ImageSize, Scalar, ThreadingPolicy};
 use num_traits::{AsPrimitive, Float, MulAdd};
 use std::ops::{Add, Mul, Shl, Shr};
 
-pub fn filter_2d_rgba_approx<T, F, I>(
+/// Performs 2D separable approximated convolution on RGBA image
+///
+/// This method does approximate convolution in fixed point.
+/// Note, in most cases for convolution alpha must be premultiplied.
+///
+/// # Arguments
+///
+/// * `image`: Single RGBA image
+/// * `destination`: Destination RGBA image
+/// * `image_size`: Image size see [ImageSize]
+/// * `row_kernel`: Row kernel, *size must be odd*!
+/// * `column_kernel`: Column kernel, *size must be odd*!
+/// * `border_mode`: See [EdgeMode] for more info
+/// * `border_constant`: If [EdgeMode::Constant] border will be replaced with this provided [Scalar] value
+/// * `threading_policy`: See [ThreadingPolicy] for more info
+///
+/// returns: Result<(), String>
+///
+/// # Examples
+///
+/// See [crate::gaussian_blur] for example
+///
+pub fn filter_1d_rgba_approx<T, F, I>(
     image: &[T],
     destination: &mut [T],
     image_size: ImageSize,
@@ -102,11 +124,11 @@ where
 
     let scaled_row_kernel = row_kernel
         .iter()
-        .map(|&x| (x * initial_scale).round().as_())
+        .map(|&x| (x * initial_scale).as_())
         .collect::<Vec<I>>();
     let scaled_column_kernel = column_kernel
         .iter()
-        .map(|&x| (x * initial_scale).round().as_())
+        .map(|&x| (x * initial_scale).as_())
         .collect::<Vec<I>>();
 
     let scanned_row_kernel = unsafe { scan_se_1d::<I>(&scaled_row_kernel) };
