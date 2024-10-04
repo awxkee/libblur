@@ -219,13 +219,13 @@ where
                         if (y as i64 - pad_h as i64 + k as i64) < 0 {
                             unsafe {
                                 *brows.get_unchecked_mut(k) =
-                                    &top_pad.get_unchecked((pad_h - k - 1) * src_stride..);
+                                    top_pad.get_unchecked((pad_h - k - 1) * src_stride..);
                             }
                         } else if (y as i64 - pad_h as i64 + k as i64) as usize >= image_size.height
                         {
                             unsafe {
                                 *brows.get_unchecked_mut(k) =
-                                    &bottom_pad.get_unchecked((k - pad_h - 1) * src_stride..);
+                                    bottom_pad.get_unchecked((k - pad_h - 1) * src_stride..);
                             }
                         } else {
                             let fy = (y as i64 + k as i64 - pad_h as i64) as usize;
@@ -262,12 +262,12 @@ where
                 if (y as i64 - pad_h as i64 + k as i64) < 0 {
                     unsafe {
                         *brows.get_unchecked_mut(k) =
-                            &top_pad.get_unchecked((pad_h - k - 1) * src_stride..);
+                            top_pad.get_unchecked((pad_h - k - 1) * src_stride..);
                     }
                 } else if (y as i64 - pad_h as i64 + k as i64) as usize >= image_size.height {
                     unsafe {
                         *brows.get_unchecked_mut(k) =
-                            &bottom_pad.get_unchecked((k - pad_h - 1) * src_stride..);
+                            bottom_pad.get_unchecked((k - pad_h - 1) * src_stride..);
                     }
                 } else {
                     let fy = (y as i64 + k as i64 - pad_h as i64) as usize;

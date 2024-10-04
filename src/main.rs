@@ -4,12 +4,7 @@ mod split;
 use crate::merge::merge_channels_3;
 use crate::split::split_channels_3;
 use image::{EncodableLayout, GenericImageView, ImageReader};
-use libblur::{
-    filter_1d_exact, filter_1d_rgb_approx, filter_2d_rgb, filter_2d_rgb_fft,
-    generate_motion_kernel, get_gaussian_kernel_1d, get_sigma_size, make_arena, motion_blur,
-    ArenaPads, EdgeMode, FastBlurChannels, GaussianPreciseLevel, ImageSize, KernelShape, Scalar,
-    ThreadingPolicy,
-};
+use libblur::{filter_1d_exact, filter_1d_rgb_approx, filter_2d_rgb, filter_2d_rgb_fft, generate_motion_kernel, get_gaussian_kernel_1d, get_laplacian_kernel, get_sigma_size, laplacian, make_arena, motion_blur, sobel_operator, ArenaPads, EdgeMode, FastBlurChannels, GaussianPreciseLevel, ImageSize, KernelShape, Scalar, ThreadingPolicy};
 use std::time::Instant;
 
 #[allow(dead_code)]
@@ -319,26 +314,40 @@ fn main() {
     // )
     // .unwrap();
 
-    motion_blur(
-        &bytes,
-        &mut dst_bytes,
-        ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
-        90f32,
-        125,
-        FastBlurChannels::Channels3,
-        ThreadingPolicy::Adaptive,
-    );
-
-    // filter_2d_rgb_fft::<u8, f32, f32>(
+    // motion_blur(
     //     &bytes,
     //     &mut dst_bytes,
     //     ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
-    //     &laplacian,
-    //     KernelShape::new(kern_size, kern_size),
-    //     EdgeMode::Constant,
-    //     Scalar::new(255.0, 0., 0., 255.0),
-    // )
-    // .unwrap();
+    //     90f32,
+    //     125,
+    //     EdgeMode::Wrap,
+    //     Scalar::default(),
+    //     FastBlurChannels::Channels3,
+    //     ThreadingPolicy::Adaptive,
+    // );
+
+    // laplacian(
+    //     &bytes,
+    //     &mut dst_bytes,
+    //     ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
+    //     EdgeMode::Clamp,
+    //     Scalar::default(),
+    //     FastBlurChannels::Channels3,
+    //     ThreadingPolicy::Adaptive,
+    // );
+
+    let motion_kernel = generate_motion_kernel(225, 15.);
+
+    filter_2d_rgb_fft::<u8, f32, f32>(
+        &bytes,
+        &mut dst_bytes,
+        ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
+        &motion_kernel,
+        KernelShape::new(225, 225),
+        EdgeMode::Clamp,
+        Scalar::new(255.0, 0., 0., 255.0),
+    )
+    .unwrap();
 
     //
     // filter_2d_rgba_approx::<u8, f32, i32>(
@@ -389,7 +398,7 @@ fn main() {
 
     if components == 3 {
         image::save_buffer(
-            "blurred_stack_oklab.jpg",
+            "blurred_stack_oklab_log.jpg",
             bytes.as_bytes(),
             dimensions.0,
             dimensions.1,

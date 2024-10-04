@@ -124,12 +124,30 @@ pub fn generate_motion_kernel(size: usize, angle_deg: f32) -> Vec<f32> {
     kernel
 }
 
+/// Performs motion blur on the image
+///
+/// # Arguments
+///
+/// * `image`: Source image
+/// * `destination`: Destination image
+/// * `image_size`: [ImageSize] of the images
+/// * `angle`: Degree of acceleration, in degrees
+/// * `kernel_size`: Convolve kernel size, must be odd!
+/// * `border_mode`: See [EdgeMode] for more info
+/// * `border_constant`: If [EdgeMode::Constant] border will be replaced with this provided [Scalar] value
+/// * `channels`: see [FastBlurChannels] for more info
+/// * `threading_policy`: see [ThreadingPolicy] for more info
+///
+/// returns: ()
+///
 pub fn motion_blur(
     image: &[u8],
     destination: &mut [u8],
     image_size: ImageSize,
     angle: f32,
     kernel_size: usize,
+    border_mode: EdgeMode,
+    border_constant: Scalar,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) {
@@ -148,8 +166,8 @@ pub fn motion_blur(
         image_size,
         &kernel,
         KernelShape::new(kernel_size, kernel_size),
-        EdgeMode::Reflect101,
-        Scalar::default(),
+        border_mode,
+        border_constant,
         threading_policy,
     )
     .unwrap();

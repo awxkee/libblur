@@ -27,6 +27,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/// Kernel shape must be always odd!
 #[derive(Debug, Clone, Copy)]
 pub struct KernelShape {
     pub width: usize,
@@ -34,6 +35,7 @@ pub struct KernelShape {
 }
 
 impl KernelShape {
+    /// Kernel shape must be always odd!
     pub fn new(width: usize, height: usize) -> KernelShape {
         KernelShape { width, height }
     }

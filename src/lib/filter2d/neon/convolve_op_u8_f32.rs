@@ -165,6 +165,7 @@ pub fn convolve_segment_neon_2d_u8_f32(
             let mut k0 = ((*(*offsets.get_unchecked(0)).get_unchecked(x)) as f32).mul(k_weight);
 
             for i in 1..length {
+                let k_weight = prepared_kernel.get_unchecked(i).weight;
                 k0 = ((*offsets.get_unchecked(i).get_unchecked(x)) as f32).mul_add(k_weight, k0);
             }
             dst.write(y * stride + x, k0.to_());

@@ -30,7 +30,7 @@ use crate::filter1d::{make_arena, ArenaPads};
 use crate::filter2d::fft_utils::fft_next_good_size;
 use crate::filter2d::scan_se_2d::scan_se_2d;
 use crate::to_storage::ToStorage;
-use crate::{EdgeMode, ImageSize, KernelShape, Scalar, ThreadingPolicy};
+use crate::{EdgeMode, ImageSize, KernelShape, Scalar};
 use num_traits::AsPrimitive;
 use rayon::iter::ParallelIterator;
 use rayon::prelude::ParallelSliceMut;
@@ -118,7 +118,7 @@ where
     let kernel_height = kernel_shape.height;
     if kernel_height * kernel_width != kernel.len() {
         return Err(format!(
-            "Structuring element expected to be {} but it was {}",
+            "Kernel expected to be {} but it was {}",
             kernel_height * kernel_width,
             kernel.len()
         ));

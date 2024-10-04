@@ -223,7 +223,7 @@ where
                 let dst_offset = arena_stride * y;
 
                 if let Some(row_handle) = _row_handle {
-                    _cx = row_handle(&unsafe_dst, dst_offset, src, _cx, stride);
+                    _cx = row_handle(unsafe_dst, dst_offset, src, _cx, stride);
                 }
 
                 while _cx < stride {

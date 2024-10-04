@@ -64,6 +64,8 @@ mod to_storage;
 mod unsafe_slice;
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 mod wasm32;
+mod sobel;
+mod laplacian;
 
 pub use channels_configuration::FastBlurChannels;
 pub use colorutils_rs::TransferFunction;
@@ -129,3 +131,5 @@ pub use stackblur::stack_blur::stack_blur;
 pub use stackblur::stack_blur_f16::stack_blur_f16;
 pub use stackblur::stack_blur_f32::stack_blur_f32;
 pub use threading_policy::ThreadingPolicy;
+pub use sobel::sobel_operator;
+pub use laplacian::{get_laplacian_kernel, laplacian};
