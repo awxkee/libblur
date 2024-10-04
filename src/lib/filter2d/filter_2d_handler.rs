@@ -101,7 +101,7 @@ impl Filter2dHandler<u8, i16> for i16 {
         convolve_segment_neon_2d_u8_i16
     }
 
-    #[cfg(not(all(target_arch = "aarch64", target_feature = "neon")))]
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     fn get_executor() -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, &[ScanPoint2d<i16>], usize) {
         if std::arch::is_x86_feature_detected!("sse4.1") {
             return convolve_segment_sse_2d_u8_i16;

@@ -154,7 +154,7 @@ impl Filter1DColumnHandler<f32, f32> for f32 {
         any(target_arch = "x86_64", target_arch = "x86")
     )))]
     fn get_column_handler(
-        _: bool,
+        is_symmetric_kernel: bool,
     ) -> fn(Arena, &[&[f32]], &UnsafeSlice<f32>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
         if is_symmetric_kernel {
             filter_symmetric_column
