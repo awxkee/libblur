@@ -26,7 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::{filter_1d_exact, filter_1d_rgb_exact, filter_1d_rgba_exact, filter_2d, filter_2d_rgb, filter_2d_rgba, get_sigma_size, EdgeMode, FastBlurChannels, ImageSize, KernelShape, Scalar, ThreadingPolicy};
+use crate::{filter_2d, filter_2d_rgb, filter_2d_rgba, get_sigma_size, EdgeMode, FastBlurChannels, ImageSize, KernelShape, Scalar, ThreadingPolicy};
 
 pub fn get_laplacian_kernel(size: usize) -> Vec<f32> {
     if size & 1 == 0 {
