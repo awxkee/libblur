@@ -124,8 +124,8 @@ where
 
     let mut chanel_fourth = gather_channel::<T, 4>(src, image_size, 3);
     filter_2d_fft(
-        &chanel_third,
-        &mut chanel_fourth,
+        &chanel_fourth,
+        &mut working_channel,
         image_size,
         kernel,
         kernel_shape,

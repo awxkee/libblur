@@ -4,7 +4,7 @@ mod split;
 use crate::merge::merge_channels_3;
 use crate::split::split_channels_3;
 use image::{EncodableLayout, GenericImageView, ImageReader};
-use libblur::{filter_1d_exact, filter_1d_rgb_approx, filter_1d_rgba_exact, filter_2d_rgb, filter_2d_rgb_fft, generate_motion_kernel, get_gaussian_kernel_1d, get_laplacian_kernel, get_sigma_size, laplacian, make_arena, motion_blur, sobel, ArenaPads, EdgeMode, FastBlurChannels, GaussianPreciseLevel, ImageSize, KernelShape, Scalar, ThreadingPolicy};
+use libblur::{filter_1d_exact, filter_1d_rgb_approx, filter_1d_rgba_exact, filter_2d_rgb, filter_2d_rgb_fft, filter_2d_rgba, filter_2d_rgba_fft, generate_motion_kernel, get_gaussian_kernel_1d, get_laplacian_kernel, get_sigma_size, laplacian, make_arena, motion_blur, sobel, ArenaPads, EdgeMode, FastBlurChannels, GaussianPreciseLevel, ImageSize, KernelShape, Scalar, ThreadingPolicy};
 use std::time::Instant;
 
 #[allow(dead_code)]
@@ -314,17 +314,17 @@ fn main() {
     // )
     // .unwrap();
 
-    motion_blur(
-        &bytes,
-        &mut dst_bytes,
-        ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
-        90f32,
-        75,
-        EdgeMode::Reflect101,
-        Scalar::default(),
-        FastBlurChannels::Channels4,
-        ThreadingPolicy::Adaptive,
-    );
+    // motion_blur(
+    //     &bytes,
+    //     &mut dst_bytes,
+    //     ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
+    //     90f32,
+    //     75,
+    //     EdgeMode::Reflect101,
+    //     Scalar::default(),
+    //     FastBlurChannels::Channels4,
+    //     ThreadingPolicy::Adaptive,
+    // );
 
     // laplacian(
     //     &bytes,
@@ -336,19 +336,18 @@ fn main() {
     //     ThreadingPolicy::Adaptive,
     // );
     //
-    // let motion_kernel = generate_motion_kernel(225, 15.);
-    //
-    // filter_2d_rgb(
-    //     &bytes,
-    //     &mut dst_bytes,
-    //     ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
-    //     &motion_kernel,
-    //     KernelShape::new(225, 225),
-    //     EdgeMode::Clamp,
-    //     Scalar::new(255.0, 0., 0., 255.0),
-    //     ThreadingPolicy::Adaptive,
-    // )
-    // .unwrap();
+    let motion_kernel = generate_motion_kernel(225, 15.);
+
+    filter_2d_rgba_fft::<u8, f32, f32>(
+        &bytes,
+        &mut dst_bytes,
+        ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
+        &motion_kernel,
+        KernelShape::new(225, 225),
+        EdgeMode::Clamp,
+        Scalar::new(255.0, 0., 0., 255.0),
+    )
+    .unwrap();
 
     //
     // filter_2d_rgba_approx::<u8, f32, i32>(
