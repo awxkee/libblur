@@ -38,7 +38,7 @@ use rustfft::num_complex::Complex;
 use rustfft::{FftNum, FftPlanner};
 use std::ops::Mul;
 
-fn transpose<T: Copy + Default>(matrix: &Vec<T>, width: usize, height: usize) -> Vec<T> {
+fn transpose<T: Copy + Default>(matrix: &[T], width: usize, height: usize) -> Vec<T> {
     if matrix.is_empty() {
         return Vec::new();
     }

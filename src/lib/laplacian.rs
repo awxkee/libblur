@@ -26,7 +26,10 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::{filter_2d, filter_2d_rgb, filter_2d_rgba, get_sigma_size, EdgeMode, FastBlurChannels, ImageSize, KernelShape, Scalar, ThreadingPolicy};
+use crate::{
+    filter_2d, filter_2d_rgb, filter_2d_rgba, get_sigma_size, EdgeMode, FastBlurChannels,
+    ImageSize, KernelShape, Scalar, ThreadingPolicy,
+};
 
 pub fn get_laplacian_kernel(size: usize) -> Vec<f32> {
     if size & 1 == 0 {
@@ -59,9 +62,8 @@ pub fn get_laplacian_kernel(size: usize) -> Vec<f32> {
         let scale = 1. / sum;
 
         for item in kernel.iter_mut() {
-            *item = (*item) * scale;
+            *item *= scale;
         }
-
     }
     kernel
 }
@@ -105,5 +107,5 @@ pub fn laplacian(
         border_constant,
         threading_policy,
     )
-        .unwrap();
+    .unwrap();
 }

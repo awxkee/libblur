@@ -115,7 +115,7 @@ pub unsafe fn _mm_mul_epi8_by_epi16_x2(input: __m128i, weight: __m128i) -> (__m1
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1,fma")]
+#[target_feature(enable = "sse4.1", enable = "fma")]
 pub unsafe fn _mm_fmlaf_ps(a: __m128, b: __m128, c: __m128) -> __m128 {
     _mm_fmadd_ps(b, c, a)
 }

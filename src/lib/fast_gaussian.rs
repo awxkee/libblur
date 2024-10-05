@@ -842,7 +842,7 @@ fn fast_gaussian_impl<
 /// * `width` - Width of the image
 /// * `height` - Height of the image
 /// * `radius` - Radius more than 319 is not supported. To use larger radius convert image to f32 and use function for f32
-/// * `channels` - Count of channels of the image, only 3 and 4 is supported, alpha position, and channels order does not matter
+/// * `channels` - Count of channels of the image, see [FastBlurChannels] for more info
 /// * `threading_policy` - Threads usage policy
 /// * `edge_mode` - Edge handling mode, *Kernel clip* is not supported!
 ///
@@ -884,7 +884,7 @@ pub fn fast_gaussian(
 /// * `width` - Width of the image
 /// * `height` - Height of the image
 /// * `radius` - Radius more than 255 is not supported. To use larger radius convert image to f32 and use function for f32
-/// * `channels` - Count of channels in the image
+/// * `channels` - Count of channels in the image, see [FastBlurChannels] for more info
 /// * `edge_mode` - Edge handling mode, *Kernel clip* is not supported!
 ///
 /// # Panics
@@ -923,7 +923,7 @@ pub fn fast_gaussian_u16(
 /// * `width` - Width of the image
 /// * `height` - Height of the image
 /// * `radius` - almost any radius is supported
-/// * `channels` - Count of channels in the image
+/// * `channels` - Count of channels in the image, see [FastBlurChannels] for more info
 /// * `transfer_function` - Transfer function in linear colorspace
 /// * `edge_mode` - Edge handling mode, *Kernel clip* is not supported!
 ///
@@ -963,7 +963,7 @@ pub fn fast_gaussian_f32(
 /// * `width` - Width of the image
 /// * `height` - Height of the image
 /// * `radius` - Almost any reasonable radius is supported
-/// * `channels` - Count of channels of the image, only 3 and 4 is supported, alpha position, and channels order does not matter
+/// * `channels` - Count of channels of the image, see [FastBlurChannels] for more info
 /// * `threading_policy` - Threads usage policy
 /// * `transfer_function` - Transfer function in linear colorspace
 /// * `edge_mode` - Edge handling mode, *Kernel clip* is not supported!
@@ -1038,7 +1038,7 @@ pub fn fast_gaussian_in_linear(
 /// * `width` - Width of the image
 /// * `height` - Height of the image
 /// * `radius` - almost any radius is supported
-/// * `channels` - Count of channels of the image, only 3 and 4 is supported, alpha position, and channels order does not matter
+/// * `channels` - Count of channels of the image, see [FastBlurChannels] for more info
 /// * `threading_policy` - Threads usage policy
 /// * `edge_mode` - Edge handling mode, *Kernel clip* is not supported!
 ///

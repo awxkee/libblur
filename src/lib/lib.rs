@@ -49,10 +49,12 @@ mod gaussian;
 #[cfg(feature = "image")]
 mod gaussian_blur_image;
 mod img_size;
+mod laplacian;
 mod median_blur;
 mod motion_blur;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 mod neon;
+mod sobel;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 mod sse;
 #[cfg(feature = "image")]
@@ -64,8 +66,6 @@ mod to_storage;
 mod unsafe_slice;
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 mod wasm32;
-mod sobel;
-mod laplacian;
 
 pub use channels_configuration::FastBlurChannels;
 pub use colorutils_rs::TransferFunction;
@@ -110,6 +110,7 @@ pub use gaussian::GaussianPreciseLevel;
 #[cfg(feature = "image")]
 pub use gaussian_blur_image::gaussian_blur_image;
 pub use img_size::ImageSize;
+pub use laplacian::{get_laplacian_kernel, laplacian};
 pub use median_blur::median_blur;
 pub use motion_blur::{generate_motion_kernel, motion_blur};
 pub use r#box::box_blur;
@@ -124,6 +125,7 @@ pub use r#box::tent_blur;
 pub use r#box::tent_blur_f32;
 pub use r#box::tent_blur_in_linear;
 pub use r#box::tent_blur_u16;
+pub use sobel::sobel;
 #[cfg(feature = "image")]
 pub use stack_blur_image::stack_blur_image;
 pub use stack_blur_linear::stack_blur_in_linear;
@@ -131,5 +133,3 @@ pub use stackblur::stack_blur::stack_blur;
 pub use stackblur::stack_blur_f16::stack_blur_f16;
 pub use stackblur::stack_blur_f32::stack_blur_f32;
 pub use threading_policy::ThreadingPolicy;
-pub use sobel::sobel_operator;
-pub use laplacian::{get_laplacian_kernel, laplacian};

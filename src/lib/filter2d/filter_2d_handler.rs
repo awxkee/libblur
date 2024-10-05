@@ -36,6 +36,7 @@ use crate::filter2d::sse::{convolve_segment_sse_2d_u8_f32, convolve_segment_sse_
 use crate::unsafe_slice::UnsafeSlice;
 use crate::ImageSize;
 
+#[allow(clippy::type_complexity)]
 pub trait Filter2dHandler<T, F> {
     fn get_executor() -> fn(
         arena: Arena,

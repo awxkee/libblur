@@ -859,7 +859,7 @@ fn fast_gaussian_next_impl<
 /// * `width` - Width of the image
 /// * `height` - Height of the image
 /// * `radius` - Radius is limited to 280
-/// * `channels` - Count of channels of the image, only 3 and 4 is supported, alpha position, and channels order does not matter
+/// * `channels` - Count of channels of the image, see [FastBlurChannels] for more info
 /// * `threading_policy` - Threads usage policy
 /// * `edge_mode` - Edge handling mode, *Kernel clip* is not supported!
 ///
@@ -901,7 +901,7 @@ pub fn fast_gaussian_next(
 /// * `width` - Width of the image
 /// * `height` - Height of the image
 /// * `radius` - Radius more than ~152 is not supported. To use larger radius convert image to f32 and use function for f32
-/// * `channels` - Count of channels of the image, only 3 and 4 is supported, alpha position, and channels order does not matter
+/// * `channels` - Count of channels of the image, see [FastBlurChannels] for more info
 /// * `threading_policy` - Threads usage policy
 /// * `edge_mode` - Edge handling mode, *Kernel clip* is not supported!
 ///
@@ -980,7 +980,7 @@ pub fn fast_gaussian_next_f32(
 /// * `width` - Width of the image
 /// * `height` - Height of the image
 /// * `radius` - Almost any radius is supported, in real world radius > 300 is too big for this implementation
-/// * `channels` - Count of channels of the image, only 3 and 4 is supported, alpha position, and channels order does not matter
+/// * `channels` - Count of channels of the image, see [FastBlurChannels] for more info
 /// * `threading_policy` - Threads usage policy
 /// * `edge_mode` - Edge handling mode, *Kernel clip* is not supported!
 ///
@@ -1019,7 +1019,7 @@ pub fn fast_gaussian_next_f16(
 /// * `width` - Width of the image
 /// * `height` - Height of the image
 /// * `radius` - Almost any reasonable radius is supported
-/// * `channels` - Count of channels of the image, only 3 and 4 is supported, alpha position, and channels order does not matter
+/// * `channels` - Count of channels of the image, see [FastBlurChannels] for more info
 /// * `threading_policy` - Threads usage policy
 /// * `transfer_function` - Transfer function in linear colorspace
 /// * `edge_mode` - Edge handling mode, *Kernel clip* is not supported!

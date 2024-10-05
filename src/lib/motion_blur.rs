@@ -118,7 +118,7 @@ pub fn generate_motion_kernel(size: usize, angle_deg: f32) -> Vec<f32> {
     }
 
     for item in kernel.iter_mut() {
-        *item = *item / sum;
+        *item /= sum;
     }
 
     kernel

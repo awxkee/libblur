@@ -26,7 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::avx::{_mm256_pack_i32, _mm256_pack_u16};
+use crate::avx::_mm256_packus_four_epi32;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -164,7 +164,7 @@ pub unsafe fn _mm256_mul_add_symm_epi8_by_epi16_x4(
 }
 
 #[inline]
-#[target_feature(enable = "avx2,fma")]
+#[target_feature(enable = "avx2", enable = "fma")]
 pub unsafe fn _mm256_fmlaf_ps(a: __m256, b: __m256, c: __m256) -> __m256 {
     _mm256_fmadd_ps(b, c, a)
 }
@@ -257,29 +257,23 @@ pub unsafe fn _mm256_mul_add_symm_epi8_by_ps_x4<const FMA: bool>(
 #[inline]
 #[target_feature(enable = "avx2")]
 pub unsafe fn _mm256_pack_ps_x4_epi8(store: (__m256, __m256, __m256, __m256)) -> __m256i {
-    const ROUNDING_FLAGS: i32 = 0;
-    let hi_s = _mm256_pack_i32(
-        _mm256_cvtps_epi32(_mm256_round_ps::<ROUNDING_FLAGS>(store.2)),
-        _mm256_cvtps_epi32(_mm256_round_ps::<ROUNDING_FLAGS>(store.3)),
-    );
-    let lo_s = _mm256_pack_i32(
+    const ROUNDING_FLAGS: i32 = 0x0;
+    _mm256_packus_four_epi32(
         _mm256_cvtps_epi32(_mm256_round_ps::<ROUNDING_FLAGS>(store.0)),
         _mm256_cvtps_epi32(_mm256_round_ps::<ROUNDING_FLAGS>(store.1)),
-    );
-    _mm256_pack_u16(lo_s, hi_s)
+        _mm256_cvtps_epi32(_mm256_round_ps::<ROUNDING_FLAGS>(store.2)),
+        _mm256_cvtps_epi32(_mm256_round_ps::<ROUNDING_FLAGS>(store.3)),
+    )
 }
 
 #[inline]
 #[target_feature(enable = "avx2")]
 pub unsafe fn _mm256_pack_epi32_x4_epi8(store: (__m256i, __m256i, __m256i, __m256i)) -> __m256i {
     let rounding_const = _mm256_set1_epi32(1 << 14);
-    let hi_s = _mm256_pack_i32(
-        _mm256_srai_epi32::<15>(_mm256_add_epi32(store.2, rounding_const)),
-        _mm256_srai_epi32::<15>(_mm256_add_epi32(store.3, rounding_const)),
-    );
-    let lo_s = _mm256_pack_i32(
+    _mm256_packus_four_epi32(
         _mm256_srai_epi32::<15>(_mm256_add_epi32(store.0, rounding_const)),
         _mm256_srai_epi32::<15>(_mm256_add_epi32(store.1, rounding_const)),
-    );
-    _mm256_pack_u16(lo_s, hi_s)
+        _mm256_srai_epi32::<15>(_mm256_add_epi32(store.2, rounding_const)),
+        _mm256_srai_epi32::<15>(_mm256_add_epi32(store.3, rounding_const)),
+    )
 }

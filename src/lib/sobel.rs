@@ -45,7 +45,7 @@ use crate::{
 ///
 /// returns: ()
 ///
-pub fn sobel_operator(
+pub fn sobel(
     image: &[u8],
     destination: &mut [u8],
     image_size: ImageSize,

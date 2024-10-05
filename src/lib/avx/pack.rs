@@ -56,6 +56,18 @@ pub unsafe fn _mm256_pack_i32(s_1: __m256i, s_2: __m256i) -> __m256i {
 
 #[inline]
 #[target_feature(enable = "avx2")]
+pub unsafe fn _mm256_packus_four_epi32(a: __m256i, b: __m256i, c: __m256i, d: __m256i) -> __m256i {
+    let ab = _mm256_packs_epi32(a, b);
+    let cd = _mm256_packs_epi32(c, d);
+
+    const MASK: i32 = shuffle(3, 1, 2, 0);
+
+    let abcd = _mm256_permute4x64_epi64::<MASK>(_mm256_packus_epi16(ab, cd));
+    _mm256_shuffle_epi32::<MASK>(abcd)
+}
+
+#[inline]
+#[target_feature(enable = "avx2")]
 pub unsafe fn _mm256_deinterleave_rgba_epi8(
     rgba0: __m256i,
     rgba1: __m256i,

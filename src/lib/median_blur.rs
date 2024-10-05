@@ -298,7 +298,7 @@ fn median_blur_impl<const CHANNELS_CONFIGURATION: usize>(
 /// * `width` - Width of the image
 /// * `height` - Height of the image
 /// * `radius` - Radius of kernel
-/// * `channels` - Count of channels in the image
+/// * `channels` - Count of channels in the image, see [FastBlurChannels] for more info
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
