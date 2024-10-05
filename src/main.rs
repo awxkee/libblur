@@ -338,7 +338,7 @@ fn main() {
 
     let motion_kernel = generate_motion_kernel(225, 15.);
 
-    filter_2d_rgb_fft::<u8, f32, f32>(
+    filter_2d_rgb(
         &bytes,
         &mut dst_bytes,
         ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
@@ -346,6 +346,7 @@ fn main() {
         KernelShape::new(225, 225),
         EdgeMode::Clamp,
         Scalar::new(255.0, 0., 0., 255.0),
+        ThreadingPolicy::Adaptive,
     )
     .unwrap();
 

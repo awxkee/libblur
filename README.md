@@ -29,14 +29,15 @@ cargo add libblur
 
 ```rust
 let blurred = gaussian_blur_image(
-img,
-61,
-0.,
-EdgeMode::Clamp,
-GaussianPreciseLevel::INTEGRAL,
-ThreadingPolicy::Adaptive,
+    img,
+    61,
+    0.,
+    EdgeMode::Clamp,
+    GaussianPreciseLevel::INTEGRAL,
+    ThreadingPolicy::Adaptive,
 )
 .unwrap();
+
 blurred
 .save_with_format("blurred.jpg", ImageFormat::Jpeg)
 .unwrap();
@@ -245,14 +246,14 @@ By the nature of this filter the more spatial sigma are the faster method is.
 
 ```rust
 fast_bilateral_filter(
-src_bytes,
-& mut dst_bytes,
-dimensions.0,
-dimensions.1,
-kernel_size,
-spatial_sigma,
-range_sigma,
-FastBlurChannels::Channels3,
+    src_bytes,
+    & mut dst_bytes,
+    dimensions.0,
+    dimensions.1,
+    kernel_size,
+    spatial_sigma,
+    range_sigma,
+    FastBlurChannels::Channels3,
 );
 ```
 
