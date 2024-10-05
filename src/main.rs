@@ -4,12 +4,7 @@ mod split;
 use crate::merge::merge_channels_3;
 use crate::split::split_channels_3;
 use image::{EncodableLayout, GenericImageView, ImageReader};
-use libblur::{
-    filter_1d_exact, filter_1d_rgb_approx, filter_2d_rgb, filter_2d_rgb_fft,
-    generate_motion_kernel, get_gaussian_kernel_1d, get_laplacian_kernel, get_sigma_size,
-    laplacian, make_arena, motion_blur, sobel, ArenaPads, EdgeMode, FastBlurChannels,
-    GaussianPreciseLevel, ImageSize, KernelShape, Scalar, ThreadingPolicy,
-};
+use libblur::{filter_1d_exact, filter_1d_rgb_approx, filter_1d_rgba_exact, filter_2d_rgb, filter_2d_rgb_fft, generate_motion_kernel, get_gaussian_kernel_1d, get_laplacian_kernel, get_sigma_size, laplacian, make_arena, motion_blur, sobel, ArenaPads, EdgeMode, FastBlurChannels, GaussianPreciseLevel, ImageSize, KernelShape, Scalar, ThreadingPolicy};
 use std::time::Instant;
 
 #[allow(dead_code)]
@@ -162,7 +157,7 @@ fn main() {
     //     vst1q_s64(t.as_mut_ptr(), mul);
     //     println!("{:?}", t);
     // }
-    let img = ImageReader::open("assets/test_image_1.jpg")
+    let img = ImageReader::open("assets/test_augea.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -171,9 +166,9 @@ fn main() {
     println!("type {:?}", img.color());
 
     println!("{:?}", img.color());
-    let img = img.to_rgb8();
+    let img = img.to_rgba8();
     let src_bytes = img.as_bytes();
-    let components = 3;
+    let components = 4;
     let stride = dimensions.0 as usize * components;
     let mut bytes: Vec<u8> = src_bytes.to_vec();
     let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
@@ -301,13 +296,13 @@ fn main() {
 
     // dst_bytes = perform_planar_pass_3(&bytes, dimensions.0 as usize, dimensions.1 as usize);
 
-    let kernel = get_gaussian_kernel_1d(151, get_sigma_size(151));
-    // dst_bytes.fill(0);
-
-    let sobel_horizontal: [i16; 3] = [-1, 0, 1];
-    let sobel_vertical: [i16; 3] = [1, 2, 1];
-
-    // filter_1d_rgb_approx::<u8, f32, i32>(
+    // let kernel = get_gaussian_kernel_1d(5, get_sigma_size(5));
+    // // dst_bytes.fill(0);
+    //
+    // let sobel_horizontal: [i16; 3] = [-1, 0, 1];
+    // let sobel_vertical: [i16; 3] = [1, 2, 1];
+    //
+    // filter_1d_rgba::<u8, f32>(
     //     &bytes,
     //     &mut dst_bytes,
     //     ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
@@ -319,17 +314,17 @@ fn main() {
     // )
     // .unwrap();
 
-    // motion_blur(
-    //     &bytes,
-    //     &mut dst_bytes,
-    //     ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
-    //     90f32,
-    //     125,
-    //     EdgeMode::Wrap,
-    //     Scalar::default(),
-    //     FastBlurChannels::Channels3,
-    //     ThreadingPolicy::Adaptive,
-    // );
+    motion_blur(
+        &bytes,
+        &mut dst_bytes,
+        ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
+        90f32,
+        75,
+        EdgeMode::Reflect101,
+        Scalar::default(),
+        FastBlurChannels::Channels4,
+        ThreadingPolicy::Adaptive,
+    );
 
     // laplacian(
     //     &bytes,
@@ -340,20 +335,20 @@ fn main() {
     //     FastBlurChannels::Channels3,
     //     ThreadingPolicy::Adaptive,
     // );
-
-    let motion_kernel = generate_motion_kernel(225, 15.);
-
-    filter_2d_rgb(
-        &bytes,
-        &mut dst_bytes,
-        ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
-        &motion_kernel,
-        KernelShape::new(225, 225),
-        EdgeMode::Clamp,
-        Scalar::new(255.0, 0., 0., 255.0),
-        ThreadingPolicy::Adaptive,
-    )
-    .unwrap();
+    //
+    // let motion_kernel = generate_motion_kernel(225, 15.);
+    //
+    // filter_2d_rgb(
+    //     &bytes,
+    //     &mut dst_bytes,
+    //     ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
+    //     &motion_kernel,
+    //     KernelShape::new(225, 225),
+    //     EdgeMode::Clamp,
+    //     Scalar::new(255.0, 0., 0., 255.0),
+    //     ThreadingPolicy::Adaptive,
+    // )
+    // .unwrap();
 
     //
     // filter_2d_rgba_approx::<u8, f32, i32>(
@@ -404,7 +399,7 @@ fn main() {
 
     if components == 3 {
         image::save_buffer(
-            "blurred_stack_oklab_log.jpg",
+            "blurred_stack_oklab.jpg",
             bytes.as_bytes(),
             dimensions.0,
             dimensions.1,

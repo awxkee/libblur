@@ -50,10 +50,10 @@ impl From<usize> for EdgeMode {
     fn from(value: usize) -> Self {
         match value {
             0 => EdgeMode::Clamp,
-            2 => EdgeMode::Wrap,
-            3 => EdgeMode::Reflect,
-            4 => EdgeMode::Reflect101,
-            5 => EdgeMode::Constant,
+            1 => EdgeMode::Wrap,
+            2 => EdgeMode::Reflect,
+            3 => EdgeMode::Reflect101,
+            4 => EdgeMode::Constant,
             _ => {
                 panic!("Unknown edge mode for value: {}", value);
             }
