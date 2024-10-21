@@ -30,10 +30,10 @@ use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
+use crate::mlaf::mlaf;
 use crate::neon::{prefer_vfma_f32, prefer_vfmaq_f32};
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
-use num_traits::MulAdd;
 use std::arch::aarch64::*;
 use std::ops::{Add, Mul};
 
@@ -193,13 +193,13 @@ pub fn filter_column_neon_symm_f32_f32(
             for i in 0..half_len {
                 let rollback = length - i - 1;
                 let coeff = *scanned_kernel.get_unchecked(i);
-                k0 = MulAdd::mul_add(
+                k0 = mlaf(
+                    k0,
                     arena_src
                         .get_unchecked(i)
                         .get_unchecked(x)
                         .add(arena_src.get_unchecked(rollback).get_unchecked(x)),
                     coeff.weight,
-                    k0,
                 );
             }
 

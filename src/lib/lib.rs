@@ -51,6 +51,7 @@ mod gaussian_blur_image;
 mod img_size;
 mod laplacian;
 mod median_blur;
+mod mlaf;
 mod motion_blur;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 mod neon;

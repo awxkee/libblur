@@ -131,12 +131,12 @@ where
         .map(|&x| (x * initial_scale).as_())
         .collect::<Vec<I>>();
 
-    let scanned_row_kernel = unsafe { scan_se_1d::<I>(&scaled_row_kernel) };
+    let scanned_row_kernel = scan_se_1d::<I>(&scaled_row_kernel);
     let scanned_row_kernel_slice = scanned_row_kernel.as_slice();
-    let scanned_column_kernel = unsafe { scan_se_1d::<I>(&scaled_column_kernel) };
+    let scanned_column_kernel = scan_se_1d::<I>(&scaled_column_kernel);
     let scanned_column_kernel_slice = scanned_column_kernel.as_slice();
-    let is_column_kernel_symmetric = unsafe { is_symmetric_1d(column_kernel) };
-    let is_row_kernel_symmetric = unsafe { is_symmetric_1d(row_kernel) };
+    let is_column_kernel_symmetric = is_symmetric_1d(column_kernel);
+    let is_row_kernel_symmetric = is_symmetric_1d(row_kernel);
 
     let thread_count = threading_policy
         .get_threads_count(image_size.width as u32, image_size.height as u32)

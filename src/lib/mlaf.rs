@@ -26,45 +26,37 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use num_traits::AsPrimitive;
+use num_traits::MulAdd;
+use std::ops::{Add, Mul};
 
-#[repr(C)]
-#[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
-pub struct ScanPoint1d<F> {
-    pub weight: F,
+#[cfg(any(
+    all(
+        any(target_arch = "x86", target_arch = "x86_64"),
+        target_feature = "fma"
+    ),
+    all(target_arch = "aarch64", target_feature = "neon")
+))]
+#[inline(always)]
+pub fn mlaf<T: Copy + Mul<T, Output = T> + Add<T, Output = T> + MulAdd<T, Output = T>>(
+    acc: T,
+    a: T,
+    b: T,
+) -> T {
+    MulAdd::mul_add(a, b, acc)
 }
 
-impl<F> ScanPoint1d<F> {
-    pub fn new(weight: F) -> ScanPoint1d<F> {
-        ScanPoint1d { weight }
-    }
-}
-
-pub(crate) fn scan_se_1d<F>(kernel: &[F]) -> Vec<ScanPoint1d<F>>
-where
-    F: Copy + PartialEq + 'static + Default,
-    i32: AsPrimitive<F>,
-{
-    let mut left_front = vec![ScanPoint1d::new(F::default()); kernel.len()];
-
-    for (dst, src) in left_front.iter_mut().zip(kernel.iter()) {
-        *dst = ScanPoint1d::new(*src);
-    }
-    left_front
-}
-
-pub(crate) fn is_symmetric_1d<F>(kernel: &[F]) -> bool
-where
-    F: Copy + PartialEq + 'static,
-    i32: AsPrimitive<F>,
-{
-    let len = kernel.len();
-    let fw = kernel.iter().take(len / 2);
-    let bw = kernel.iter().rev().take(len / 2);
-    for (&f, w) in fw.rev().zip(bw.rev()) {
-        if f.ne(w) {
-            return false;
-        }
-    }
-    true
+#[inline(always)]
+#[cfg(not(any(
+    all(
+        any(target_arch = "x86", target_arch = "x86_64"),
+        target_feature = "fma"
+    ),
+    all(target_arch = "aarch64", target_feature = "neon")
+)))]
+pub fn mlaf<T: Copy + Mul<T, Output = T> + Add<T, Output = T> + MulAdd<T, Output = T>>(
+    acc: T,
+    a: T,
+    b: T,
+) -> T {
+    acc + a * b
 }

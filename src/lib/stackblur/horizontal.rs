@@ -82,7 +82,8 @@ where
         let mut stack_start;
         let mut stacks0 = vec![SlidingWindow::<COMPONENTS, J>::new(); div];
 
-        let mul_value = 1. / ((radius as f32 + 1.) * (radius as f32 + 1.));
+        let rad_p_1 = radius as f32 + 1.;
+        let scale_filter_value = 1. / (rad_p_1 * rad_p_1);
 
         let wm = width - 1;
         let div = (radius * 2) + 1;
@@ -132,7 +133,8 @@ where
             let mut dst_ptr = y * stride as usize;
             for _ in 0..width {
                 let sum_intermediate: SlidingWindow<COMPONENTS, f32> = sum.cast();
-                let finalized: SlidingWindow<COMPONENTS, J> = (sum_intermediate * mul_value).cast();
+                let finalized: SlidingWindow<COMPONENTS, J> =
+                    (sum_intermediate * scale_filter_value).cast();
                 finalized.to_store(pixels, dst_ptr);
 
                 dst_ptr += COMPONENTS;

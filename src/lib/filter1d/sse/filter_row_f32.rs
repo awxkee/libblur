@@ -31,6 +31,7 @@ use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::region::FilterRegion;
 use crate::filter1d::sse::utils::_mm_opt_fmlaf_ps;
 use crate::img_size::ImageSize;
+use crate::mlaf::mlaf;
 use crate::sse::{
     _mm_load_pack_ps_x2, _mm_load_pack_ps_x4, _mm_store_pack_ps_x2, _mm_store_pack_ps_x4,
 };
@@ -214,7 +215,7 @@ unsafe fn filter_row_sse_f32_f32_impl<const FMA: bool>(
 
         for i in 1..length {
             let coeff = *scanned_kernel.get_unchecked(i);
-            k0 = MulAdd::mul_add(*shifted_src.get_unchecked(i), coeff.weight, k0);
+            k0 = mlaf(k0, *shifted_src.get_unchecked(i), coeff.weight);
         }
         dst.write(y * dst_stride + x, k0.to_());
     }

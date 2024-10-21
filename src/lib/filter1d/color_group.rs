@@ -27,6 +27,7 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter1d::to_approx_storage::ToApproxStorage;
+use crate::mlaf::mlaf;
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
 use num_traits::{AsPrimitive, FromPrimitive, MulAdd};
@@ -59,6 +60,43 @@ where
     pub fn from_components(r: J, g: J, b: J, a: J) -> ColorGroup<COMPS, J> {
         ColorGroup { r, g, b, a }
     }
+}
+
+#[macro_export]
+macro_rules! fast_load_color_group_with_offset {
+    ($store: expr, $channels: expr, $offset: expr) => {{
+        if $channels == 1 {
+            ColorGroup {
+                r: $store[$offset].as_(),
+                g: 0.as_(),
+                b: 0.as_(),
+                a: 0.as_(),
+            }
+        } else if $channels == 2 {
+            ColorGroup {
+                r: $store[$offset].as_(),
+                g: $store[$offset + 1].as_(),
+                b: 0.as_(),
+                a: 0.as_(),
+            }
+        } else if $channels == 3 {
+            ColorGroup {
+                r: $store[$offset].as_(),
+                g: $store[$offset + 1].as_(),
+                b: $store[$offset + 2].as_(),
+                a: 0.as_(),
+            }
+        } else if $channels == 4 {
+            ColorGroup {
+                r: $store[$offset].as_(),
+                g: $store[$offset + 1].as_(),
+                b: $store[$offset + 2].as_(),
+                a: $store[$offset + 3].as_(),
+            }
+        } else {
+            panic!("Not implemented.")
+        }
+    }};
 }
 
 impl<const COMPS: usize, J> ColorGroup<COMPS, J>
@@ -317,34 +355,29 @@ where
 
 impl<const COMPS: usize, J> MulAdd<ColorGroup<COMPS, J>, J> for ColorGroup<COMPS, J>
 where
-    J: Copy + MulAdd<J, Output = J> + Default + 'static,
+    J: Copy + MulAdd<J, Output = J> + Default + 'static + Mul<J, Output = J> + Add<J, Output = J>,
 {
     type Output = Self;
 
     #[inline]
     fn mul_add(self, a: ColorGroup<COMPS, J>, b: J) -> Self::Output {
         if COMPS == 1 {
-            ColorGroup::from_components(self.r.mul_add(b, a.r), self.g, self.b, self.a)
+            ColorGroup::from_components(mlaf(a.r, self.r, b), self.g, self.b, self.a)
         } else if COMPS == 2 {
-            ColorGroup::from_components(
-                self.r.mul_add(b, a.r),
-                self.g.mul_add(b, a.g),
-                self.b,
-                self.a,
-            )
+            ColorGroup::from_components(mlaf(a.r, self.r, b), mlaf(a.g, self.g, b), self.b, self.a)
         } else if COMPS == 3 {
             ColorGroup::from_components(
-                self.r.mul_add(b, a.r),
-                self.g.mul_add(b, a.g),
-                self.b.mul_add(b, a.b),
+                mlaf(a.r, self.r, b),
+                mlaf(a.g, self.g, b),
+                mlaf(a.b, self.b, b),
                 self.a,
             )
         } else if COMPS == 4 {
             ColorGroup::from_components(
-                self.r.mul_add(b, a.r),
-                self.g.mul_add(b, a.g),
-                self.b.mul_add(b, a.b),
-                self.a.mul_add(b, a.a),
+                mlaf(a.r, self.r, b),
+                mlaf(a.g, self.g, b),
+                mlaf(a.b, self.b, b),
+                mlaf(a.a, self.a, b),
             )
         } else {
             panic!("Not implemented.");

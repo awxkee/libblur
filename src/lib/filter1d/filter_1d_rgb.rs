@@ -78,7 +78,7 @@ where
         + Sync
         + Filter1DRgbRowHandler<T, F>
         + Filter1DColumnHandler<T, F>,
-    F: ToStorage<T> + Mul<F> + MulAdd<F, Output = F> + Send + Sync + PartialEq,
+    F: ToStorage<T> + Mul<F> + MulAdd<F, Output = F> + Send + Sync + PartialEq + Default,
     i32: AsPrimitive<F>,
     f64: AsPrimitive<T>,
 {
@@ -103,12 +103,12 @@ where
         return Err(String::from("Column kernel length must be odd"));
     }
 
-    let scanned_row_kernel = unsafe { scan_se_1d(row_kernel) };
+    let scanned_row_kernel = scan_se_1d(row_kernel);
     let scanned_row_kernel_slice = scanned_row_kernel.as_slice();
-    let scanned_column_kernel = unsafe { scan_se_1d(column_kernel) };
+    let scanned_column_kernel = scan_se_1d(column_kernel);
     let scanned_column_kernel_slice = scanned_column_kernel.as_slice();
-    let is_column_kernel_symmetrical = unsafe { is_symmetric_1d(column_kernel) };
-    let is_row_kernel_symmetrical = unsafe { is_symmetric_1d(row_kernel) };
+    let is_column_kernel_symmetrical = is_symmetric_1d(column_kernel);
+    let is_row_kernel_symmetrical = is_symmetric_1d(row_kernel);
 
     let thread_count = threading_policy
         .get_threads_count(image_size.width as u32, image_size.height as u32)

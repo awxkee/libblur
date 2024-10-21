@@ -34,7 +34,7 @@ use crate::img_size::ImageSize;
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
 use num_traits::{AsPrimitive, MulAdd};
-use std::ops::Mul;
+use std::ops::{Add, Mul};
 
 pub fn filter_color_group_row<T, F, const N: usize>(
     _: Arena,
@@ -45,7 +45,7 @@ pub fn filter_color_group_row<T, F, const N: usize>(
     scanned_kernel: &[ScanPoint1d<F>],
 ) where
     T: Copy + AsPrimitive<F> + Default,
-    F: ToStorage<T> + Mul<Output = F> + MulAdd<F, Output = F> + Default,
+    F: ToStorage<T> + Mul<Output = F> + MulAdd<F, Output = F> + Default + Add<F, Output = F>,
 {
     unsafe {
         let width = image_size.width;

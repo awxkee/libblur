@@ -30,10 +30,11 @@ use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
+use crate::mlaf::mlaf;
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
 use num_traits::{AsPrimitive, MulAdd};
-use std::ops::Mul;
+use std::ops::{Add, Mul};
 
 pub fn filter_column<T, F>(
     arena: Arena,
@@ -44,7 +45,7 @@ pub fn filter_column<T, F>(
     scanned_kernel: &[ScanPoint1d<F>],
 ) where
     T: Copy + AsPrimitive<F>,
-    F: ToStorage<T> + Mul<F, Output = F> + MulAdd<F, Output = F>,
+    F: ToStorage<T> + Mul<F, Output = F> + MulAdd<F, Output = F> + Add<F, Output = F>,
 {
     unsafe {
         let dst_stride = image_size.width * arena.components;
@@ -67,25 +68,25 @@ pub fn filter_column<T, F>(
 
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
-                k0 = MulAdd::mul_add(
+                k0 = mlaf(
+                    k0,
                     arena_src.get_unchecked(i).get_unchecked(_cx).as_(),
                     coeff.weight,
-                    k0,
                 );
-                k1 = MulAdd::mul_add(
+                k1 = mlaf(
+                    k1,
                     arena_src.get_unchecked(i).get_unchecked(_cx + 1).as_(),
                     coeff.weight,
-                    k1,
                 );
-                k2 = MulAdd::mul_add(
+                k2 = mlaf(
+                    k2,
                     arena_src.get_unchecked(i).get_unchecked(_cx + 2).as_(),
                     coeff.weight,
-                    k2,
                 );
-                k3 = MulAdd::mul_add(
+                k3 = mlaf(
+                    k3,
                     arena_src.get_unchecked(i).get_unchecked(_cx + 3).as_(),
                     coeff.weight,
-                    k3,
                 );
             }
 
@@ -107,10 +108,10 @@ pub fn filter_column<T, F>(
 
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
-                k0 = MulAdd::mul_add(
+                k0 = mlaf(
+                    k0,
                     arena_src.get_unchecked(i).get_unchecked(x).as_(),
                     coeff.weight,
-                    k0,
                 );
             }
 

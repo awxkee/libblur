@@ -30,10 +30,10 @@ use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
+use crate::mlaf::mlaf;
 use crate::neon::{prefer_vfma_f32, prefer_vfmaq_f32};
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
-use num_traits::MulAdd;
 use std::arch::aarch64::*;
 use std::ops::Mul;
 
@@ -154,7 +154,7 @@ pub fn filter_row_neon_f32_f32(
 
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
-                k0 = MulAdd::mul_add(*shifted_src.get_unchecked(i), coeff.weight, k0);
+                k0 = mlaf(k0, *shifted_src.get_unchecked(i), coeff.weight);
             }
             dst.write(y * dst_stride + x, k0.to_());
         }

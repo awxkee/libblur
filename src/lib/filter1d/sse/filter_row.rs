@@ -33,6 +33,7 @@ use crate::filter1d::sse::utils::{
     _mm_mul_add_epi8_by_ps_x4, _mm_mul_epi8_by_ps_x4, _mm_pack_ps_x4_epi8,
 };
 use crate::img_size::ImageSize;
+use crate::mlaf::mlaf;
 use crate::sse::{_mm_load_pack_x2, _mm_load_pack_x4, _mm_store_pack_x2, _mm_store_pack_x4};
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
@@ -222,10 +223,10 @@ unsafe fn filter_row_sse_u8_f32_impl<const FMA: bool>(
 
         for i in 1..length {
             let coeff = *scanned_kernel.get_unchecked(i);
-            k0 = MulAdd::mul_add((*shifted_src.get_unchecked(i)) as f32, coeff.weight, k0);
-            k1 = MulAdd::mul_add((*shifted_src.get_unchecked(i + 1)) as f32, coeff.weight, k1);
-            k2 = MulAdd::mul_add((*shifted_src.get_unchecked(i + 2)) as f32, coeff.weight, k2);
-            k3 = MulAdd::mul_add((*shifted_src.get_unchecked(i + 3)) as f32, coeff.weight, k3);
+            k0 = mlaf(k0, (*shifted_src.get_unchecked(i)) as f32, coeff.weight);
+            k1 = mlaf(k1, (*shifted_src.get_unchecked(i + 1)) as f32, coeff.weight);
+            k2 = mlaf(k2, (*shifted_src.get_unchecked(i + 2)) as f32, coeff.weight);
+            k3 = mlaf(k3, (*shifted_src.get_unchecked(i + 3)) as f32, coeff.weight);
         }
 
         let dst_offset = y * dst_stride + _cx;
@@ -244,7 +245,7 @@ unsafe fn filter_row_sse_u8_f32_impl<const FMA: bool>(
 
         for i in 1..length {
             let coeff = *scanned_kernel.get_unchecked(i);
-            k0 = MulAdd::mul_add((*shifted_src.get_unchecked(i)) as f32, coeff.weight, k0);
+            k0 = mlaf(k0, (*shifted_src.get_unchecked(i)) as f32, coeff.weight);
         }
         dst.write(y * dst_stride + x, k0.to_());
     }

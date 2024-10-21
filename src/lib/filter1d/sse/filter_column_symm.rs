@@ -33,6 +33,7 @@ use crate::filter1d::sse::utils::{
     _mm_mul_add_symm_epi8_by_ps_x4, _mm_mul_epi8_by_ps_x4, _mm_pack_ps_x4_epi8,
 };
 use crate::img_size::ImageSize;
+use crate::mlaf::mlaf;
 use crate::sse::{
     _mm_load_pack_x2, _mm_load_pack_x3, _mm_load_pack_x4, _mm_store_pack_x2, _mm_store_pack_x3,
     _mm_store_pack_x4,
@@ -295,29 +296,29 @@ unsafe fn filter_column_symm_sse_u8_f32_impl<const FMA: bool>(
         for i in 0..half_len {
             let coeff = *scanned_kernel.get_unchecked(i);
             let rollback = length - i - 1;
-            k0 = MulAdd::mul_add(
+            k0 = mlaf(
+                k0,
                 ((*arena_src.get_unchecked(i).get_unchecked(_cx)) as f32)
                     .add(*arena_src.get_unchecked(rollback).get_unchecked(_cx) as f32),
                 coeff.weight,
-                k0,
             );
-            k1 = MulAdd::mul_add(
+            k1 = mlaf(
+                k1,
                 ((*arena_src.get_unchecked(i).get_unchecked(_cx + 1)) as f32)
                     .add(*arena_src.get_unchecked(rollback).get_unchecked(_cx + 1) as f32),
                 coeff.weight,
-                k1,
             );
-            k2 = MulAdd::mul_add(
+            k2 = mlaf(
+                k2,
                 ((*arena_src.get_unchecked(i).get_unchecked(_cx + 2)) as f32)
                     .add(*arena_src.get_unchecked(rollback).get_unchecked(_cx + 2) as f32),
                 coeff.weight,
-                k2,
             );
-            k3 = MulAdd::mul_add(
+            k3 = mlaf(
+                k3,
                 ((*arena_src.get_unchecked(i).get_unchecked(_cx + 3)) as f32)
                     .add(*arena_src.get_unchecked(rollback).get_unchecked(_cx + 3) as f32),
                 coeff.weight,
-                k3,
             );
         }
 
@@ -340,11 +341,11 @@ unsafe fn filter_column_symm_sse_u8_f32_impl<const FMA: bool>(
         for i in 0..half_len {
             let coeff = *scanned_kernel.get_unchecked(i);
             let rollback = length - i - 1;
-            k0 = MulAdd::mul_add(
+            k0 = mlaf(
+                k0,
                 ((*arena_src.get_unchecked(i).get_unchecked(x)) as f32)
                     .add(*arena_src.get_unchecked(rollback).get_unchecked(x) as f32),
                 coeff.weight,
-                k0,
             );
         }
 

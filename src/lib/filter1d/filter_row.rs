@@ -30,10 +30,11 @@ use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
+use crate::mlaf::mlaf;
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
 use num_traits::{AsPrimitive, MulAdd};
-use std::ops::Mul;
+use std::ops::{Add, Mul};
 
 pub fn filter_row<T, F>(
     _: Arena,
@@ -44,7 +45,7 @@ pub fn filter_row<T, F>(
     scanned_kernel: &[ScanPoint1d<F>],
 ) where
     T: Copy + AsPrimitive<F>,
-    F: ToStorage<T> + Mul<Output = F> + MulAdd<F, Output = F>,
+    F: ToStorage<T> + Mul<Output = F> + MulAdd<F, Output = F> + Add<F, Output = F>,
 {
     unsafe {
         let width = image_size.width;
@@ -72,10 +73,10 @@ pub fn filter_row<T, F>(
 
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
-                k0 = MulAdd::mul_add((*shifted_src.get_unchecked(i)).as_(), coeff.weight, k0);
-                k1 = MulAdd::mul_add((*shifted_src.get_unchecked(i + 1)).as_(), coeff.weight, k1);
-                k2 = MulAdd::mul_add((*shifted_src.get_unchecked(i + 2)).as_(), coeff.weight, k2);
-                k3 = MulAdd::mul_add((*shifted_src.get_unchecked(i + 3)).as_(), coeff.weight, k3);
+                k0 = mlaf(k0, (*shifted_src.get_unchecked(i)).as_(), coeff.weight);
+                k1 = mlaf(k1, (*shifted_src.get_unchecked(i + 1)).as_(), coeff.weight);
+                k2 = mlaf(k2, (*shifted_src.get_unchecked(i + 2)).as_(), coeff.weight);
+                k3 = mlaf(k3, (*shifted_src.get_unchecked(i + 3)).as_(), coeff.weight);
             }
 
             let dst_offset = y * dst_stride + x;
@@ -94,7 +95,7 @@ pub fn filter_row<T, F>(
 
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
-                k0 = MulAdd::mul_add((*shifted_src.get_unchecked(i)).as_(), coeff.weight, k0);
+                k0 = mlaf(k0, (*shifted_src.get_unchecked(i)).as_(), coeff.weight);
             }
             dst.write(y * dst_stride + x, k0.to_());
         }

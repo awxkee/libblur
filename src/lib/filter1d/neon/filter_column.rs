@@ -31,9 +31,9 @@ use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::neon::utils::{vfmlaq_u8_f32, vmulq_u8_by_f32, vqmovnq_f32_u8};
 use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
+use crate::mlaf::mlaf;
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
-use num_traits::MulAdd;
 use std::arch::aarch64::*;
 use std::ops::Mul;
 
@@ -178,25 +178,25 @@ pub fn filter_column_neon_u8_f32(
 
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
-                k0 = MulAdd::mul_add(
+                k0 = mlaf(
+                    k0,
                     (*arena_src.get_unchecked(i).get_unchecked(_cx)) as f32,
                     coeff.weight,
-                    k0,
                 );
-                k1 = MulAdd::mul_add(
+                k1 = mlaf(
+                    k1,
                     (*arena_src.get_unchecked(i).get_unchecked(_cx + 1)) as f32,
                     coeff.weight,
-                    k1,
                 );
-                k2 = MulAdd::mul_add(
+                k2 = mlaf(
+                    k2,
                     (*arena_src.get_unchecked(i).get_unchecked(_cx + 2)) as f32,
                     coeff.weight,
-                    k2,
                 );
-                k3 = MulAdd::mul_add(
+                k3 = mlaf(
+                    k3,
                     (*arena_src.get_unchecked(i).get_unchecked(_cx + 3)) as f32,
                     coeff.weight,
-                    k3,
                 );
             }
 
@@ -218,10 +218,10 @@ pub fn filter_column_neon_u8_f32(
 
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
-                k0 = MulAdd::mul_add(
+                k0 = mlaf(
+                    k0,
                     (*arena_src.get_unchecked(i).get_unchecked(x)) as f32,
                     coeff.weight,
-                    k0,
                 );
             }
 
