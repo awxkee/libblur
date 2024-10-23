@@ -30,7 +30,7 @@ use crate::filter1d::KernelShape;
 use crate::filter2d::scan_point_2d::ScanPoint2d;
 use num_traits::AsPrimitive;
 
-pub(crate) unsafe fn scan_se_2d<F>(
+pub(crate) fn scan_se_2d<F>(
     structuring_element: &[F],
     structuring_element_size: KernelShape,
 ) -> Vec<ScanPoint2d<F>>
@@ -46,19 +46,21 @@ where
     let horizontal_anchor = kernel_width as i64 / 2;
     let half_kernel_height = kernel_height as i64 / 2;
 
-    for y in 0..kernel_height {
-        for x in 0..kernel_width {
-            let item = *structuring_element.get_unchecked(y * kernel_height + x);
-            let zero_f = 0i32.as_();
-            if item.ne(&zero_f) {
-                left_front.push(ScanPoint2d::new(
-                    y as i64 - half_kernel_height,
-                    x as i64 - horizontal_anchor,
-                    item,
-                ));
+    structuring_element
+        .chunks_exact(kernel_width)
+        .enumerate()
+        .for_each(|(y, row)| {
+            for (x, &element) in row.iter().enumerate() {
+                let zero_f = 0i32.as_();
+                if element.ne(&zero_f) {
+                    left_front.push(ScanPoint2d::new(
+                        y as i64 - half_kernel_height,
+                        x as i64 - horizontal_anchor,
+                        element,
+                    ));
+                }
             }
-        }
-    }
+        });
 
     left_front
 }

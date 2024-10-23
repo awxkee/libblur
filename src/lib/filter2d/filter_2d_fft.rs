@@ -26,6 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#![forbid(unsafe_code)]
 use crate::filter1d::{make_arena, ArenaPads};
 use crate::filter2d::fft_utils::fft_next_good_size;
 use crate::filter2d::scan_se_2d::scan_se_2d;
@@ -45,14 +46,11 @@ fn transpose<T: Copy + Default>(matrix: &[T], width: usize, height: usize) -> Ve
 
     let mut transposed = vec![T::default(); width * height];
 
-    for i in 0..height {
-        for j in 0..width {
-            unsafe {
-                *transposed.get_unchecked_mut(j * height + i) =
-                    *matrix.get_unchecked(i * width + j);
-            }
+    matrix.chunks_exact(width).enumerate().for_each(|(y, row)| {
+        for (dst, src) in transposed[y..].iter_mut().step_by(height).zip(row.iter()) {
+            *dst = *src;
         }
-    }
+    });
 
     transposed
 }
@@ -139,7 +137,7 @@ where
         ));
     }
 
-    let analyzed_se = unsafe { scan_se_2d(kernel, kernel_shape) };
+    let analyzed_se = scan_se_2d(kernel, kernel_shape);
 
     if analyzed_se.is_empty() {
         for (src, dst) in src.iter().zip(dst.iter_mut()) {
@@ -182,18 +180,19 @@ where
     let shift_x = kernel_width as i64 / 2;
     let shift_y = kernel_height as i64 / 2;
 
-    for y in 0..kernel_shape.height {
-        for x in 0..kernel_shape.width {
-            let new_y = (y as i64 - shift_y).rem_euclid(best_height as i64) as usize;
-            let new_x = (x as i64 - shift_x).rem_euclid(best_width as i64) as usize;
-            unsafe {
-                *kernel_arena.get_unchecked_mut(new_y * best_width + new_x) = Complex {
-                    re: kernel.get_unchecked(y * kernel_shape.height + x).as_(),
+    kernel
+        .chunks_exact(kernel_shape.width)
+        .enumerate()
+        .for_each(|(y, row)| {
+            for (x, item) in row.iter().enumerate() {
+                let new_y = (y as i64 - shift_y).rem_euclid(best_height as i64) as usize;
+                let new_x = (x as i64 - shift_x).rem_euclid(best_width as i64) as usize;
+                kernel_arena[new_y * best_width + new_x] = Complex {
+                    re: item.as_(),
                     im: 0f64.as_(),
                 };
             }
-        }
-    }
+        });
 
     let mut fft_planner = FftPlanner::<FftIntermediate>::new();
     let rows_planner = fft_planner.plan_fft_forward(best_width);

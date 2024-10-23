@@ -98,7 +98,7 @@ where
         ));
     }
 
-    let analyzed_se = unsafe { scan_se_2d(kernel, kernel_shape) };
+    let analyzed_se = scan_se_2d(kernel, kernel_shape);
 
     if analyzed_se.is_empty() {
         for (src, dst) in src.iter().zip(dst.iter_mut()) {

@@ -68,7 +68,7 @@ pub fn convolve_segment_neon_2d_u8_i16(
 
         let mut _cx = 0usize;
 
-        while _cx + 64 < length {
+        while _cx + 64 < width {
             let k_weight = vdupq_n_s16(prepared_kernel.get_unchecked(0).weight);
             let items0 = vld1q_u8_x4(offsets.get_unchecked(0).get_unchecked(_cx..).as_ptr());
             let mut k0 = vmulq_u8_by_i16(items0.0, k_weight);
@@ -110,7 +110,7 @@ pub fn convolve_segment_neon_2d_u8_i16(
             _cx += 64;
         }
 
-        while _cx + 32 < length {
+        while _cx + 32 < width {
             let k_weight = vdupq_n_s16(prepared_kernel.get_unchecked(0).weight);
             let items0 = vld1q_u8_x2(offsets.get_unchecked(0).get_unchecked(_cx..).as_ptr());
             let mut k0 = vmulq_u8_by_i16(items0.0, k_weight);
@@ -140,7 +140,7 @@ pub fn convolve_segment_neon_2d_u8_i16(
             _cx += 32;
         }
 
-        while _cx + 16 < length {
+        while _cx + 16 < width {
             let k_weight = vdupq_n_s16(prepared_kernel.get_unchecked(0).weight);
             let items0 = vld1q_u8(offsets.get_unchecked(0).get_unchecked(_cx..).as_ptr());
             let mut k0 = vmulq_u8_by_i16(items0, k_weight);

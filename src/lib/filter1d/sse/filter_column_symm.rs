@@ -40,7 +40,6 @@ use crate::sse::{
 };
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
-use num_traits::MulAdd;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]

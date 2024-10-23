@@ -93,7 +93,7 @@ unsafe fn convolve_segment_sse_2d_u8_i16_impl(
 
         let mut _cx = 0usize;
 
-        while _cx + 64 < length {
+        while _cx + 64 < width {
             let k_weight = _mm_set1_epi16(prepared_kernel.get_unchecked(0).weight);
             let items0 = _mm_load_pack_x4(offsets.get_unchecked(0).get_unchecked(_cx..).as_ptr());
             let mut k0 = _mm_mull_epi8_by_epi16_x4(items0.0, k_weight);
@@ -123,7 +123,7 @@ unsafe fn convolve_segment_sse_2d_u8_i16_impl(
             _cx += 64;
         }
 
-        while _cx + 32 < length {
+        while _cx + 32 < width {
             let k_weight = _mm_set1_epi16(prepared_kernel.get_unchecked(0).weight);
             let items0 = _mm_load_pack_x2(offsets.get_unchecked(0).get_unchecked(_cx..).as_ptr());
             let mut k0 = _mm_mull_epi8_by_epi16_x4(items0.0, k_weight);
@@ -147,7 +147,7 @@ unsafe fn convolve_segment_sse_2d_u8_i16_impl(
             _cx += 32;
         }
 
-        while _cx + 16 < length {
+        while _cx + 16 < width {
             let k_weight = _mm_set1_epi16(prepared_kernel.get_unchecked(0).weight);
             let items0 = _mm_loadu_si128(
                 offsets.get_unchecked(0).get_unchecked(_cx..).as_ptr() as *const __m128i

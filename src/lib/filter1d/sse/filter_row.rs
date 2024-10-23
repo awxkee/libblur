@@ -37,7 +37,6 @@ use crate::mlaf::mlaf;
 use crate::sse::{_mm_load_pack_x2, _mm_load_pack_x4, _mm_store_pack_x2, _mm_store_pack_x4};
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
-use num_traits::MulAdd;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]

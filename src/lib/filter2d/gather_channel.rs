@@ -26,6 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#![forbid(unsafe_code)]
 use crate::ImageSize;
 
 pub fn gather_channel<T: Copy + Default, const CHANNELS: usize>(
@@ -33,12 +34,11 @@ pub fn gather_channel<T: Copy + Default, const CHANNELS: usize>(
     image_size: ImageSize,
     order: usize,
 ) -> Vec<T> {
+    assert!(order < CHANNELS);
     let mut channel = vec![T::default(); image_size.width * image_size.height];
     let src_chunks = image.chunks_exact(CHANNELS);
     for (dst, src) in channel.iter_mut().zip(src_chunks) {
-        unsafe {
-            *dst = *src.get_unchecked(order);
-        }
+        *dst = src[order];
     }
     channel
 }
@@ -48,9 +48,8 @@ pub fn squash_channel<T: Copy + Default, const CHANNELS: usize>(
     source: &[T],
     order: usize,
 ) {
+    assert!(order < CHANNELS);
     for (dst, src) in image.chunks_exact_mut(CHANNELS).zip(source.iter()) {
-        unsafe {
-            *dst.get_unchecked_mut(order) = *src;
-        }
+        dst[order] = *src;
     }
 }
