@@ -63,62 +63,84 @@ pub fn filter_column_symmetric_approx<T, I>(
 
         let mut _cx = 0usize;
 
-        while _cx + 4 < dst_stride {
-            let coeff = scanned_kernel.get_unchecked(half_len).weight;
+        while _cx + 32 < dst_stride {
+            let coeff = scanned_kernel[half_len].weight;
 
-            let v_src = arena_src.get_unchecked(half_len).get_unchecked(_cx..);
+            let mut store: [I; 32] = [I::default(); 32];
 
-            let mut k0 = (*v_src.get_unchecked(0)).as_().mul(coeff);
-            let mut k1 = (*v_src.get_unchecked(1)).as_().mul(coeff);
-            let mut k2 = (*v_src.get_unchecked(2)).as_().mul(coeff);
-            let mut k3 = (*v_src.get_unchecked(3)).as_().mul(coeff);
+            let v_src = &arena_src[half_len][_cx..(_cx + 32)];
 
-            for i in 0..half_len {
-                let coeff = scanned_kernel.get_unchecked(i).weight;
+            for (dst, src) in store.iter_mut().zip(v_src) {
+                *dst = src.as_().mul(coeff);
+            }
+
+            for (i, coeff) in scanned_kernel.iter().take(half_len).enumerate() {
                 let rollback = length - i - 1;
-                k0 = arena_src
-                    .get_unchecked(i)
-                    .get_unchecked(_cx)
-                    .as_()
-                    .add(arena_src.get_unchecked(rollback).get_unchecked(_cx).as_())
-                    .mul(coeff)
-                    .add(k0);
-                k1 = arena_src
-                    .get_unchecked(i)
-                    .get_unchecked(_cx + 1)
-                    .as_()
-                    .add(
-                        arena_src
-                            .get_unchecked(rollback)
-                            .get_unchecked(_cx + 1)
-                            .as_(),
-                    )
-                    .mul(coeff)
-                    .add(k1);
-                k2 = arena_src
-                    .get_unchecked(i)
-                    .get_unchecked(_cx + 2)
-                    .as_()
-                    .add(
-                        arena_src
-                            .get_unchecked(rollback)
-                            .get_unchecked(_cx + 2)
-                            .as_(),
-                    )
-                    .mul(coeff)
-                    .add(k2);
-                k3 = arena_src
-                    .get_unchecked(i)
-                    .get_unchecked(_cx + 3)
-                    .as_()
-                    .add(
-                        arena_src
-                            .get_unchecked(rollback)
-                            .get_unchecked(_cx + 3)
-                            .as_(),
-                    )
-                    .mul(coeff)
-                    .add(k3);
+                let fw = &arena_src[i][_cx..(_cx + 32)];
+                let bw = &arena_src[rollback][_cx..(_cx + 32)];
+
+                for ((dst, fw), bw) in store.iter_mut().zip(fw).zip(bw) {
+                    *dst = *dst + fw.as_().add(bw.as_()).mul(coeff.weight);
+                }
+            }
+
+            let dst_offset = y * dst_stride + _cx;
+
+            for (y, src) in store.iter().enumerate() {
+                dst.write(dst_offset + y, src.to_approx_());
+            }
+
+            _cx += 32;
+        }
+
+        while _cx + 16 < dst_stride {
+            let coeff = scanned_kernel[half_len].weight;
+
+            let mut store: [I; 16] = [I::default(); 16];
+
+            let v_src = &arena_src[half_len][_cx..(_cx + 16)];
+
+            for (dst, src) in store.iter_mut().zip(v_src) {
+                *dst = src.as_().mul(coeff);
+            }
+
+            for (i, coeff) in scanned_kernel.iter().take(half_len).enumerate() {
+                let rollback = length - i - 1;
+                let fw = &arena_src[i][_cx..(_cx + 16)];
+                let bw = &arena_src[rollback][_cx..(_cx + 16)];
+
+                for ((dst, fw), bw) in store.iter_mut().zip(fw).zip(bw) {
+                    *dst = *dst + fw.as_().add(bw.as_()).mul(coeff.weight);
+                }
+            }
+
+            let dst_offset = y * dst_stride + _cx;
+
+            for (y, src) in store.iter().enumerate() {
+                dst.write(dst_offset + y, src.to_approx_());
+            }
+
+            _cx += 16;
+        }
+
+        while _cx + 4 < dst_stride {
+            let coeff = scanned_kernel[half_len].weight;
+
+            let v_src = &arena_src[half_len][_cx..(_cx + 4)];
+
+            let mut k0 = v_src[0].as_().mul(coeff);
+            let mut k1 = v_src[1].as_().mul(coeff);
+            let mut k2 = v_src[2].as_().mul(coeff);
+            let mut k3 = v_src[3].as_().mul(coeff);
+
+            for (i, coeff) in scanned_kernel.iter().take(half_len).enumerate() {
+                let rollback = length - i - 1;
+                let fw = &arena_src[i][_cx..(_cx + 4)];
+                let bw = &arena_src[rollback][_cx..(_cx + 4)];
+                k0 = fw[0].as_().add(bw[0].as_()).mul(coeff.weight).add(k0);
+                k1 = fw[1].as_().add(bw[1].as_()).mul(coeff.weight).add(k1);
+                k2 = fw[2].as_().add(bw[2].as_()).mul(coeff.weight).add(k2);
+                k3 = fw[3].as_().add(bw[3].as_()).mul(coeff.weight).add(k3);
             }
 
             let dst_offset = y * dst_stride + _cx;
@@ -131,22 +153,17 @@ pub fn filter_column_symmetric_approx<T, I>(
         }
 
         for x in _cx..dst_stride {
-            let coeff = scanned_kernel.get_unchecked(half_len).weight;
+            let coeff = scanned_kernel[half_len].weight;
 
-            let v_src = arena_src.get_unchecked(half_len).get_unchecked(x..);
+            let v_src = &arena_src[half_len][x..(x + 1)];
 
-            let mut k0 = (*v_src.get_unchecked(0)).as_().mul(coeff);
+            let mut k0 = v_src[0].as_().mul(coeff);
 
-            for i in 0..half_len {
-                let coeff = scanned_kernel.get_unchecked(i).weight;
+            for (i, coeff) in scanned_kernel.iter().take(half_len).enumerate() {
                 let rollback = length - i - 1;
-                k0 = arena_src
-                    .get_unchecked(i)
-                    .get_unchecked(x)
-                    .as_()
-                    .add(arena_src.get_unchecked(rollback).get_unchecked(x).as_())
-                    .mul(coeff)
-                    .add(k0);
+                let fw = &arena_src[i][x..(x + 1)];
+                let bw = &arena_src[rollback][x..(x + 1)];
+                k0 = fw[0].as_().add(bw[0].as_()).mul(coeff.weight).add(k0);
             }
 
             dst.write(y * dst_stride + x, k0.to_approx_());

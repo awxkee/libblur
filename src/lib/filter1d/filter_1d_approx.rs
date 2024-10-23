@@ -26,6 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#![forbid(unsafe_code)]
 use crate::filter1d::arena::{make_arena_columns, make_arena_row, Arena};
 use crate::filter1d::filter_1d_column_handler_approx::Filter1DColumnHandlerApprox;
 use crate::filter1d::filter_1d_row_handler_approx::Filter1DRowHandlerApprox;
@@ -236,28 +237,20 @@ where
 
             for y in 0..image_size.height {
                 scope.spawn(move |_| {
-                    let mut brows: Vec<&[T]> =
-                        vec![unsafe { image.get_unchecked(0..) }; column_kernel_shape.height];
+                    let mut brows: Vec<&[T]> = vec![&image[0..]; column_kernel_shape.height];
 
                     for k in 0..column_kernel_shape.height {
                         if (y as i64 - pad_h as i64 + k as i64) < 0 {
-                            unsafe {
-                                *brows.get_unchecked_mut(k) =
-                                    top_pad.get_unchecked((pad_h - k - 1) * src_stride..);
-                            }
+                            brows[k] = &top_pad[(pad_h - k - 1) * src_stride..];
                         } else if (y as i64 - pad_h as i64 + k as i64) as usize >= image_size.height
                         {
-                            unsafe {
-                                *brows.get_unchecked_mut(k) =
-                                    bottom_pad.get_unchecked((k - pad_h - 1) * src_stride..);
-                            }
+                            brows[k] = &bottom_pad[(k - pad_h - 1) * src_stride..];
                         } else {
                             let fy = (y as i64 + k as i64 - pad_h as i64) as usize;
                             let start_offset = src_stride * fy;
-                            unsafe {
-                                *brows.get_unchecked_mut(k) = transient_image_slice
-                                    .get_unchecked(start_offset..(start_offset + src_stride))
-                            };
+
+                            brows[k] =
+                                &transient_image_slice[start_offset..(start_offset + src_stride)];
                         }
                     }
 
@@ -279,27 +272,18 @@ where
         let final_cell_0 = UnsafeSlice::new(destination);
         let src_stride = image_size.width * N;
         for y in 0..image_size.height {
-            let mut brows: Vec<&[T]> =
-                vec![unsafe { image.get_unchecked(0..) }; column_kernel_shape.height];
+            let mut brows: Vec<&[T]> = vec![&image[0..]; column_kernel_shape.height];
 
             for k in 0..column_kernel_shape.height {
                 if (y as i64 - pad_h as i64 + k as i64) < 0 {
-                    unsafe {
-                        *brows.get_unchecked_mut(k) =
-                            top_pad.get_unchecked((pad_h - k - 1) * src_stride..);
-                    }
+                    brows[k] = &top_pad[(pad_h - k - 1) * src_stride..];
                 } else if (y as i64 - pad_h as i64 + k as i64) as usize >= image_size.height {
-                    unsafe {
-                        *brows.get_unchecked_mut(k) =
-                            bottom_pad.get_unchecked((k - pad_h - 1) * src_stride..);
-                    }
+                    brows[k] = &bottom_pad[(k - pad_h - 1) * src_stride..];
                 } else {
                     let fy = (y as i64 + k as i64 - pad_h as i64) as usize;
                     let start_offset = src_stride * fy;
-                    unsafe {
-                        *brows.get_unchecked_mut(k) = transient_image_slice
-                            .get_unchecked(start_offset..(start_offset + src_stride))
-                    };
+
+                    brows[k] = &transient_image_slice[start_offset..(start_offset + src_stride)];
                 }
             }
 

@@ -47,6 +47,9 @@ impl<T, J, const COMPONENTS: usize> Default for HorizontalStackBlurPass<T, J, CO
     }
 }
 
+/// # Generics
+/// `T` - data type
+/// `J` - accumulator type
 impl<T, J, const COMPONENTS: usize> HorizontalStackBlurPass<T, J, COMPONENTS>
 where
     J: Copy

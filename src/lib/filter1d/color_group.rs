@@ -63,7 +63,7 @@ where
 }
 
 #[macro_export]
-macro_rules! fast_load_color_group_with_offset {
+macro_rules! load_color_group_with_offset {
     ($store: expr, $channels: expr, $offset: expr) => {{
         if $channels == 1 {
             ColorGroup {

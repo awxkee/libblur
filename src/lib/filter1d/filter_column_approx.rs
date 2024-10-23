@@ -56,7 +56,7 @@ pub fn filter_column_approx<T, I>(
         let dst_stride = image_size.width * arena.components;
 
         let y = region.start;
-        let length = scanned_kernel.iter().len();
+        let length = scanned_kernel.len();
 
         let mut _cx = 0usize;
 

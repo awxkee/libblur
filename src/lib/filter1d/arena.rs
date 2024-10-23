@@ -26,6 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#![forbid(unsafe_code)]
 use crate::edge_mode::{reflect_index, reflect_index_101};
 use crate::filter1d::arena_roi::copy_roi;
 use crate::filter1d::filter_element::KernelShape;
@@ -117,16 +118,8 @@ where
     let old_stride = image_size.width * COMPONENTS;
     let new_stride = new_width * COMPONENTS;
 
-    unsafe {
-        let offset = pads.pad_top * new_stride + pads.pad_left * COMPONENTS;
-        copy_roi(
-            padded_image.get_unchecked_mut(offset..),
-            image,
-            new_stride,
-            old_stride,
-            height,
-        );
-    }
+    let offset = pads.pad_top * new_stride + pads.pad_left * COMPONENTS;
+    copy_roi(&mut padded_image[offset..], image, new_stride, old_stride);
 
     let filling_ranges = [
         (0..pads.pad_top, 0..new_width), // Top outer
@@ -147,17 +140,23 @@ where
     match border_mode {
         EdgeMode::Clamp => {
             for ranges in filling_ranges.iter() {
-                for i in ranges.0.clone() {
-                    for j in ranges.1.clone() {
+                for (i, dst) in ranges.0.clone().zip(
+                    padded_image
+                        .chunks_exact_mut(new_stride)
+                        .skip(ranges.0.start),
+                ) {
+                    for (j, dst) in ranges
+                        .1
+                        .clone()
+                        .zip(dst.chunks_exact_mut(COMPONENTS).skip(ranges.1.start))
+                    {
                         let y = i.saturating_sub(pad_h).min(height - 1);
                         let x = j.saturating_sub(pad_w).min(width - 1);
-                        unsafe {
-                            let v_dst = i * new_stride + j * COMPONENTS;
-                            let v_src = y * old_stride + x * COMPONENTS;
-                            for i in 0..COMPONENTS {
-                                *padded_image.get_unchecked_mut(v_dst + i) =
-                                    *image.get_unchecked(v_src + i);
-                            }
+
+                        let v_src = y * old_stride + x * COMPONENTS;
+                        let src_iter = &image[v_src..(v_src + COMPONENTS)];
+                        for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
+                            *dst = *src;
                         }
                     }
                 }
@@ -165,17 +164,22 @@ where
         }
         EdgeMode::Wrap => {
             for ranges in filling_ranges.iter() {
-                for i in ranges.0.clone() {
-                    for j in ranges.1.clone() {
+                for (i, dst) in ranges.0.clone().zip(
+                    padded_image
+                        .chunks_exact_mut(new_stride)
+                        .skip(ranges.0.start),
+                ) {
+                    for (j, dst) in ranges
+                        .1
+                        .clone()
+                        .zip(dst.chunks_exact_mut(COMPONENTS).skip(ranges.1.start))
+                    {
                         let y = (i as i64 - pad_h as i64).rem_euclid(height as i64 - 1) as usize;
                         let x = (j as i64 - pad_w as i64).rem_euclid(width as i64 - 1) as usize;
-                        unsafe {
-                            let v_dst = i * new_stride + j * COMPONENTS;
-                            let v_src = y * old_stride + x * COMPONENTS;
-                            for i in 0..COMPONENTS {
-                                *padded_image.get_unchecked_mut(v_dst + i) =
-                                    *image.get_unchecked(v_src + i);
-                            }
+                        let v_src = y * old_stride + x * COMPONENTS;
+                        let src_iter = &image[v_src..(v_src + COMPONENTS)];
+                        for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
+                            *dst = *src;
                         }
                     }
                 }
@@ -183,17 +187,22 @@ where
         }
         EdgeMode::Reflect => {
             for ranges in filling_ranges.iter() {
-                for i in ranges.0.clone() {
-                    for j in ranges.1.clone() {
+                for (i, dst) in ranges.0.clone().zip(
+                    padded_image
+                        .chunks_exact_mut(new_stride)
+                        .skip(ranges.0.start),
+                ) {
+                    for (j, dst) in ranges
+                        .1
+                        .clone()
+                        .zip(dst.chunks_exact_mut(COMPONENTS).skip(ranges.1.start))
+                    {
                         let y = reflect_index(i as i64 - pad_h as i64, height as i64 - 1);
                         let x = reflect_index(j as i64 - pad_w as i64, width as i64 - 1);
-                        unsafe {
-                            let v_dst = i * new_stride + j * COMPONENTS;
-                            let v_src = y * old_stride + x * COMPONENTS;
-                            for i in 0..COMPONENTS {
-                                *padded_image.get_unchecked_mut(v_dst + i) =
-                                    *image.get_unchecked(v_src + i);
-                            }
+                        let v_src = y * old_stride + x * COMPONENTS;
+                        let src_iter = &image[v_src..(v_src + COMPONENTS)];
+                        for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
+                            *dst = *src;
                         }
                     }
                 }
@@ -201,17 +210,22 @@ where
         }
         EdgeMode::Reflect101 => {
             for ranges in filling_ranges.iter() {
-                for i in ranges.0.clone() {
-                    for j in ranges.1.clone() {
+                for (i, dst) in ranges.0.clone().zip(
+                    padded_image
+                        .chunks_exact_mut(new_stride)
+                        .skip(ranges.0.start),
+                ) {
+                    for (j, dst) in ranges
+                        .1
+                        .clone()
+                        .zip(dst.chunks_exact_mut(COMPONENTS).skip(ranges.1.start))
+                    {
                         let y = reflect_index_101(i as i64 - pad_h as i64, height as i64 - 1);
                         let x = reflect_index_101(j as i64 - pad_w as i64, width as i64 - 1);
-                        unsafe {
-                            let v_dst = i * new_stride + j * COMPONENTS;
-                            let v_src = y * old_stride + x * COMPONENTS;
-                            for i in 0..COMPONENTS {
-                                *padded_image.get_unchecked_mut(v_dst + i) =
-                                    *image.get_unchecked(v_src + i);
-                            }
+                        let v_src = y * old_stride + x * COMPONENTS;
+                        let src_iter = &image[v_src..(v_src + COMPONENTS)];
+                        for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
+                            *dst = *src;
                         }
                     }
                 }
@@ -219,20 +233,24 @@ where
         }
         EdgeMode::Constant => {
             for ranges in filling_ranges.iter() {
-                for i in ranges.0.clone() {
-                    for j in ranges.1.clone() {
-                        unsafe {
-                            let v_dst = i * new_stride + j * COMPONENTS;
-                            for i in 0..COMPONENTS {
-                                *padded_image.get_unchecked_mut(v_dst + i) = scalar[i].as_();
-                            }
+                for (_, dst) in ranges.0.clone().zip(
+                    padded_image
+                        .chunks_exact_mut(new_stride)
+                        .skip(ranges.0.start),
+                ) {
+                    for (_, dst) in ranges
+                        .1
+                        .clone()
+                        .zip(dst.chunks_exact_mut(COMPONENTS).skip(ranges.1.start))
+                    {
+                        for (y, dst) in dst.iter_mut().enumerate() {
+                            *dst = scalar[y].as_();
                         }
                     }
                 }
             }
         }
     }
-
     Ok((
         padded_image,
         Arena::new(new_width, new_height, pad_w, pad_h, COMPONENTS),
@@ -267,118 +285,97 @@ where
 
     let source_offset = source_y * image_size.width * COMPONENTS;
 
-    let source_row = unsafe { image.get_unchecked(source_offset..) };
+    let source_row = &image[source_offset..(source_offset + image_size.width * COMPONENTS)];
 
-    unsafe {
-        std::ptr::copy_nonoverlapping(
-            source_row.as_ptr(),
-            row.get_unchecked_mut((pad_w * COMPONENTS)..).as_mut_ptr(),
-            image_size.width * COMPONENTS,
-        );
+    let row_dst =
+        &mut row[pad_w * COMPONENTS..(pad_w * COMPONENTS + image_size.width * COMPONENTS)];
+
+    for (dst, src) in row_dst.iter_mut().zip(source_row.iter()) {
+        *dst = *src;
     }
 
-    for x in 0..pad_w {
+    for (x, dst) in (0..pad_w).zip(row.chunks_exact_mut(COMPONENTS)) {
         match border_mode {
             EdgeMode::Clamp => {
                 let old_x = x.saturating_sub(pad_w).min(image_size.width - 1);
                 let old_px = old_x * COMPONENTS;
-                let px = x * COMPONENTS;
-                for i in 0..COMPONENTS {
-                    unsafe {
-                        *row.get_unchecked_mut(px + i) = *source_row.get_unchecked(old_px + i);
-                    }
+                let src_iter = &source_row[old_px..(old_px + COMPONENTS)];
+                for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
+                    *dst = *src;
                 }
             }
             EdgeMode::Wrap => {
                 let old_x =
                     (x as i64 - pad_w as i64).rem_euclid(image_size.width as i64 - 1) as usize;
                 let old_px = old_x * COMPONENTS;
-                let px = x * COMPONENTS;
-                for i in 0..COMPONENTS {
-                    unsafe {
-                        *row.get_unchecked_mut(px + i) = *source_row.get_unchecked(old_px + i);
-                    }
+                let src_iter = &source_row[old_px..(old_px + COMPONENTS)];
+                for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
+                    *dst = *src;
                 }
             }
             EdgeMode::Reflect => {
                 let old_x = reflect_index(x as i64 - pad_w as i64, image_size.width as i64 - 1);
                 let old_px = old_x * COMPONENTS;
-                let px = x * COMPONENTS;
-                for i in 0..COMPONENTS {
-                    unsafe {
-                        *row.get_unchecked_mut(px + i) = *source_row.get_unchecked(old_px + i);
-                    }
+                let src_iter = &source_row[old_px..(old_px + COMPONENTS)];
+                for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
+                    *dst = *src;
                 }
             }
             EdgeMode::Reflect101 => {
                 let old_x = reflect_index_101(x as i64 - pad_w as i64, image_size.width as i64 - 1);
                 let old_px = old_x * COMPONENTS;
-                let px = x * COMPONENTS;
-                for i in 0..COMPONENTS {
-                    unsafe {
-                        *row.get_unchecked_mut(px + i) = *source_row.get_unchecked(old_px + i);
-                    }
+                let src_iter = &source_row[old_px..(old_px + COMPONENTS)];
+                for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
+                    *dst = *src;
                 }
             }
             EdgeMode::Constant => {
-                let px = x * COMPONENTS;
-                for i in 0..COMPONENTS {
-                    unsafe {
-                        *row.get_unchecked_mut(px + i) = scalar[i].as_();
-                    }
+                for (i, dst) in dst.iter_mut().enumerate() {
+                    *dst = scalar[i].as_();
                 }
             }
         }
     }
 
-    for x in image_size.width..(image_size.width + pad_w) {
+    for (x, dst) in
+        (image_size.width..(image_size.width + pad_w)).zip(row.chunks_exact_mut(COMPONENTS).rev())
+    {
         match border_mode {
             EdgeMode::Clamp => {
                 let old_x = x.max(0).min(image_size.width - 1);
                 let old_px = old_x * COMPONENTS;
-                let px = pad_w * COMPONENTS + x * COMPONENTS;
-                for i in 0..COMPONENTS {
-                    unsafe {
-                        *row.get_unchecked_mut(px + i) = *source_row.get_unchecked(old_px + i);
-                    }
+                let src_iter = &source_row[old_px..(old_px + COMPONENTS)];
+                for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
+                    *dst = *src;
                 }
             }
             EdgeMode::Wrap => {
                 let old_x = (x as i64).rem_euclid(image_size.width as i64 - 1) as usize;
                 let old_px = old_x * COMPONENTS;
-                let px = pad_w * COMPONENTS + x * COMPONENTS;
-                for i in 0..COMPONENTS {
-                    unsafe {
-                        *row.get_unchecked_mut(px + i) = *source_row.get_unchecked(old_px + i);
-                    }
+                let src_iter = &source_row[old_px..(old_px + COMPONENTS)];
+                for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
+                    *dst = *src;
                 }
             }
             EdgeMode::Reflect => {
                 let old_x = reflect_index(x as i64, image_size.width as i64 - 1);
                 let old_px = old_x * COMPONENTS;
-                let px = pad_w * COMPONENTS + x * COMPONENTS;
-                for i in 0..COMPONENTS {
-                    unsafe {
-                        *row.get_unchecked_mut(px + i) = *source_row.get_unchecked(old_px + i);
-                    }
+                let src_iter = &source_row[old_px..(old_px + COMPONENTS)];
+                for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
+                    *dst = *src;
                 }
             }
             EdgeMode::Reflect101 => {
                 let old_x = reflect_index_101(x as i64, image_size.width as i64 - 1);
                 let old_px = old_x * COMPONENTS;
-                let px = pad_w * COMPONENTS + x * COMPONENTS;
-                for i in 0..COMPONENTS {
-                    unsafe {
-                        *row.get_unchecked_mut(px + i) = *source_row.get_unchecked(old_px + i);
-                    }
+                let src_iter = &source_row[old_px..(old_px + COMPONENTS)];
+                for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
+                    *dst = *src;
                 }
             }
             EdgeMode::Constant => {
-                let px = pad_w * COMPONENTS + x * COMPONENTS;
-                for i in 0..COMPONENTS {
-                    unsafe {
-                        *row.get_unchecked_mut(px + i) = scalar[i].as_();
-                    }
+                for (i, dst) in dst.iter_mut().enumerate() {
+                    *dst = scalar[i].as_();
                 }
             }
         }
@@ -434,86 +431,74 @@ where
 
     let top_pad_stride = image_size.width * COMPONENTS;
 
-    for ky in 0..pad_h {
-        for kx in 0..image_size.width {
+    for (ky, dst) in (0..pad_h).zip(top_pad.chunks_exact_mut(top_pad_stride)) {
+        for (kx, dst) in (0..image_size.width).zip(dst.chunks_exact_mut(COMPONENTS)) {
             match border_mode {
                 EdgeMode::Clamp => {
                     let y = ky.saturating_sub(pad_h).min(image_size.height - 1);
-                    unsafe {
-                        let v_dst = ky * top_pad_stride + kx * COMPONENTS;
-                        let v_src = y * top_pad_stride + kx * COMPONENTS;
-                        for i in 0..COMPONENTS {
-                            *top_pad.get_unchecked_mut(v_dst + i) = *image.get_unchecked(v_src + i);
-                        }
+                    let v_src = y * top_pad_stride + kx * COMPONENTS;
+
+                    let src_iter = &image[v_src..(v_src + COMPONENTS)];
+                    for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
+                        *dst = *src;
                     }
                 }
                 EdgeMode::Wrap => {
                     let y = (ky as i64 - pad_h as i64).rem_euclid(image_size.height as i64 - 1)
                         as usize;
-                    unsafe {
-                        let v_dst = ky * top_pad_stride + kx * COMPONENTS;
-                        let v_src = y * top_pad_stride + kx * COMPONENTS;
-                        for i in 0..COMPONENTS {
-                            *top_pad.get_unchecked_mut(v_dst + i) = *image.get_unchecked(v_src + i);
-                        }
+                    let v_src = y * top_pad_stride + kx * COMPONENTS;
+                    let src_iter = &image[v_src..(v_src + COMPONENTS)];
+                    for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
+                        *dst = *src;
                     }
                 }
                 EdgeMode::Reflect => {
                     let y = reflect_index(ky as i64 - pad_h as i64, image_size.height as i64 - 1);
-                    unsafe {
-                        let v_dst = ky * top_pad_stride + kx * COMPONENTS;
-                        let v_src = y * top_pad_stride + kx * COMPONENTS;
-                        for i in 0..COMPONENTS {
-                            *top_pad.get_unchecked_mut(v_dst + i) = *image.get_unchecked(v_src + i);
-                        }
+                    let v_src = y * top_pad_stride + kx * COMPONENTS;
+                    let src_iter = &image[v_src..(v_src + COMPONENTS)];
+                    for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
+                        *dst = *src;
                     }
                 }
                 EdgeMode::Reflect101 => {
                     let y =
                         reflect_index_101(ky as i64 - pad_h as i64, image_size.height as i64 - 1);
-                    unsafe {
-                        let v_dst = ky * top_pad_stride + kx * COMPONENTS;
-                        let v_src = y * top_pad_stride + kx * COMPONENTS;
-                        for i in 0..COMPONENTS {
-                            *top_pad.get_unchecked_mut(v_dst + i) = *image.get_unchecked(v_src + i);
-                        }
+                    let v_src = y * top_pad_stride + kx * COMPONENTS;
+                    let src_iter = &image[v_src..(v_src + COMPONENTS)];
+                    for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
+                        *dst = *src;
                     }
                 }
-                EdgeMode::Constant => unsafe {
-                    let v_dst = ky * top_pad_stride + kx * COMPONENTS;
-                    for i in 0..COMPONENTS {
-                        *top_pad.get_unchecked_mut(v_dst + i) = scalar[i].as_();
+                EdgeMode::Constant => {
+                    for (i, dst) in dst.iter_mut().enumerate() {
+                        *dst = scalar[i].as_();
                     }
-                },
+                }
             }
         }
     }
 
-    for ky in 0..pad_h {
-        for kx in 0..image_size.width {
+    let bottom_iter_dst = bottom_pad.chunks_exact_mut(top_pad_stride);
+
+    for (ky, dst) in (0..pad_h).zip(bottom_iter_dst) {
+        for (kx, dst) in (0..image_size.width).zip(dst.chunks_exact_mut(COMPONENTS)) {
             match border_mode {
                 EdgeMode::Clamp => {
                     let y = (ky + image_size.height).min(image_size.height - 1);
-                    unsafe {
-                        let v_dst = ky * top_pad_stride + kx * COMPONENTS;
-                        let v_src = y * top_pad_stride + kx * COMPONENTS;
-                        for i in 0..COMPONENTS {
-                            *bottom_pad.get_unchecked_mut(v_dst + i) =
-                                *image.get_unchecked(v_src + i);
-                        }
+                    let v_src = y * top_pad_stride + kx * COMPONENTS;
+                    let src_iter = &image[v_src..(v_src + COMPONENTS)];
+                    for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
+                        *dst = *src;
                     }
                 }
                 EdgeMode::Wrap => {
                     let y = (ky as i64 + image_size.height as i64)
                         .rem_euclid(image_size.height as i64 - 1)
                         as usize;
-                    unsafe {
-                        let v_dst = ky * top_pad_stride + kx * COMPONENTS;
-                        let v_src = y * top_pad_stride + kx * COMPONENTS;
-                        for i in 0..COMPONENTS {
-                            *bottom_pad.get_unchecked_mut(v_dst + i) =
-                                *image.get_unchecked(v_src + i);
-                        }
+                    let v_src = y * top_pad_stride + kx * COMPONENTS;
+                    let src_iter = &image[v_src..(v_src + COMPONENTS)];
+                    for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
+                        *dst = *src;
                     }
                 }
                 EdgeMode::Reflect => {
@@ -521,13 +506,10 @@ where
                         ky as i64 + image_size.height as i64,
                         image_size.height as i64 - 1,
                     );
-                    unsafe {
-                        let v_dst = ky * top_pad_stride + kx * COMPONENTS;
-                        let v_src = y * top_pad_stride + kx * COMPONENTS;
-                        for i in 0..COMPONENTS {
-                            *bottom_pad.get_unchecked_mut(v_dst + i) =
-                                *image.get_unchecked(v_src + i);
-                        }
+                    let v_src = y * top_pad_stride + kx * COMPONENTS;
+                    let src_iter = &image[v_src..(v_src + COMPONENTS)];
+                    for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
+                        *dst = *src;
                     }
                 }
                 EdgeMode::Reflect101 => {
@@ -535,20 +517,17 @@ where
                         ky as i64 + image_size.height as i64,
                         image_size.height as i64 - 1,
                     );
-                    unsafe {
-                        let v_dst = ky * top_pad_stride + kx * COMPONENTS;
-                        let v_src = y * top_pad_stride + kx * COMPONENTS;
-                        for i in 0..COMPONENTS {
-                            *top_pad.get_unchecked_mut(v_dst + i) = *image.get_unchecked(v_src + i);
-                        }
+                    let v_src = y * top_pad_stride + kx * COMPONENTS;
+                    let src_iter = &image[v_src..(v_src + COMPONENTS)];
+                    for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
+                        *dst = *src;
                     }
                 }
-                EdgeMode::Constant => unsafe {
-                    let v_dst = ky * top_pad_stride + kx * COMPONENTS;
-                    for i in 0..COMPONENTS {
-                        *bottom_pad.get_unchecked_mut(v_dst + i) = scalar[i].as_();
+                EdgeMode::Constant => {
+                    for (i, dst) in dst.iter_mut().enumerate() {
+                        *dst = scalar[i].as_();
                     }
-                },
+                }
             }
         }
     }
