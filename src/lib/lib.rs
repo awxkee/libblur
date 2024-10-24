@@ -27,6 +27,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #![allow(clippy::too_many_arguments)]
 
+#[cfg(feature = "fft")]
 mod adaptive_blur;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 mod avx;
@@ -69,6 +70,7 @@ mod unsafe_slice;
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 mod wasm32;
 
+#[cfg(feature = "fft")]
 pub use adaptive_blur::adaptive_blur;
 pub use channels_configuration::FastBlurChannels;
 pub use colorutils_rs::TransferFunction;
