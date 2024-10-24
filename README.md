@@ -88,7 +88,7 @@ Example comparison time for blurring image 3000x4000 single plane 8-bit in multi
 The fastest with acceptable results. Result are quite close to gaussian and look good. Sometimes noticeable changes
 may be
 observed. However, if you'll use advanced analysis algorithms non gaussian methods will be detected. Not suitable for
-antialias. Results just a little worse than in 'fast gaussian', however it's faster.
+advanced analysis. Results just a little worse than in 'fast gaussian', however it's faster.
 
 O(1) complexity.
 
@@ -115,7 +115,7 @@ Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded
 Very fast. Result are quite close to gaussian and look good. Sometimes noticeable changes
 may be
 observed. However, if you'll use advanced analysis algorithms non gaussian methods will be detected. Not suitable for
-antialias.
+advanced analysis.
 Do not use when you need gaussian. Based on binomial filter, generally speed close, might be a little faster than stack
 blur ( except NEON or except non multithreaded stack blur, on NEON much faster or overcome non multithreaded
 stackblur ), however results better as I see. Max radius ~320 for u8, for u16 will be less.

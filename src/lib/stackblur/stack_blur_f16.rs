@@ -174,7 +174,7 @@ fn stack_blur_worker_vertical(
 /// * `width` - image width
 /// * `height` - image height
 /// * `radius` - radius almost is not limited, minimum is one
-/// * `channels` - Count of channels of the image, only 3 and 4 is supported, alpha position, and channels order does not matter
+/// * `channels` - Count of channels of the image
 /// * `threading_policy` - Threads usage policy
 ///
 /// # Complexity

@@ -197,8 +197,8 @@ fn stack_blur_worker_vertical(
 /// * `stride` - Bytes per lane, default is width * channels_count if not aligned
 /// * `width` - image width
 /// * `height` - image height
-/// * `radius` - radius almost is not limited, minimum is one
-/// * `channels` - Count of channels of the image, only 3 and 4 is supported, alpha position, and channels order does not matter
+/// * `radius` - radius almost is limited to 1449, minimum is one
+/// * `channels` - Count of channels of the image
 /// * `threading_policy` - Threads usage policy
 ///
 /// # Complexity
@@ -212,7 +212,7 @@ pub fn stack_blur(
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) {
-    let radius = radius.max(1);
+    let radius = radius.max(1).min(1449);
     let thread_count = threading_policy.get_threads_count(width, height) as u32;
     if thread_count == 1 {
         let slice = UnsafeSlice::new(in_place);
@@ -257,5 +257,5 @@ pub fn stack_blur(
                 );
             });
         }
-    })
+    });
 }

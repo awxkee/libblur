@@ -163,7 +163,7 @@ fn main() {
     //     vst1q_s64(t.as_mut_ptr(), mul);
     //     println!("{:?}", t);
     // }
-    let img = ImageReader::open("assets/test_image_2.png")
+    let img = ImageReader::open("assets/sonderland.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -180,20 +180,19 @@ fn main() {
     let mut bytes: Vec<u8> = src_bytes.to_vec();
     let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
 
-    // let start = Instant::now();
-    //
-    // libblur::stack_blur_in_linear(
-    //     &mut dst_bytes,
-    //     stride as u32,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     35,
-    //     FastBlurChannels::Channels3,
-    //     ThreadingPolicy::Single,
-    //     TransferFunction::Rec709,
-    // );
-    //
-    // println!("stackblur {:?}", start.elapsed());
+    let start = Instant::now();
+
+    libblur::stack_blur(
+        &mut dst_bytes,
+        stride as u32,
+        dimensions.0,
+        dimensions.1,
+        1450,
+        FastBlurChannels::Channels3,
+        ThreadingPolicy::Adaptive,
+    );
+
+    println!("stackblur {:?}", start.elapsed());
 
     // //
     // libblur::gaussian_box_blur(
@@ -305,25 +304,25 @@ fn main() {
     //     .map(|&x| (x.to_f32() * 255f32) as u8)
     //     .collect();
 
-    let adaptive_blurred = adaptive_blur(
-        &bytes,
-        dimensions.0 as usize,
-        dimensions.1 as usize,
-        55,
-        FastBlurChannels::Channels3,
-        TransferFunction::Srgb,
-        EdgeMode::Reflect101,
-        Scalar::default(),
-    );
-
-    image::save_buffer(
-        "edges.jpg",
-        &adaptive_blurred,
-        dimensions.0,
-        dimensions.1,
-        image::ExtendedColorType::Rgb8,
-    )
-    .unwrap();
+    // let adaptive_blurred = adaptive_blur(
+    //     &bytes,
+    //     dimensions.0 as usize,
+    //     dimensions.1 as usize,
+    //     55,
+    //     FastBlurChannels::Channels3,
+    //     TransferFunction::Srgb,
+    //     EdgeMode::Reflect101,
+    //     Scalar::default(),
+    // );
+    //
+    // image::save_buffer(
+    //     "edges.jpg",
+    //     &adaptive_blurred,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     image::ExtendedColorType::Rgb8,
+    // )
+    // .unwrap();
 
     // dst_bytes = perform_planar_pass_3(&bytes, dimensions.0 as usize, dimensions.1 as usize);
 
@@ -367,18 +366,18 @@ fn main() {
     //     ThreadingPolicy::Adaptive,
     // );
     //
-    let motion_kernel = generate_motion_kernel(225, 15.);
-    //
-    filter_2d_rgb_fft::<u8, f32, f32>(
-        &bytes,
-        &mut dst_bytes,
-        ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
-        &motion_kernel,
-        KernelShape::new(225, 225),
-        EdgeMode::Clamp,
-        Scalar::new(255.0, 0., 0., 255.0),
-    )
-    .unwrap();
+    // let motion_kernel = generate_motion_kernel(225, 15.);
+    // //
+    // filter_2d_rgb_fft::<u8, f32, f32>(
+    //     &bytes,
+    //     &mut dst_bytes,
+    //     ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
+    //     &motion_kernel,
+    //     KernelShape::new(225, 225),
+    //     EdgeMode::Clamp,
+    //     Scalar::new(255.0, 0., 0., 255.0),
+    // )
+    // .unwrap();
 
     //
     // filter_2d_rgba_approx::<u8, f32, i32>(

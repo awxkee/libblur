@@ -1057,7 +1057,7 @@ pub fn fast_gaussian_f16(
         half::f16,
         channels,
         edge_mode,
-        unsafe { std::mem::transmute::<&mut [half::f16], &mut [half::f16]>(bytes) },
+        bytes,
         width * channels.get_channels() as u32,
         width,
         height,
