@@ -34,7 +34,6 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_deinterleave_rgba(
     rgba0: __m128i,
     rgba1: __m128i,
@@ -72,7 +71,6 @@ pub unsafe fn _mm_deinterleave_rgba(
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_deinterleave_rgb(
     s0: __m128i,
     s1: __m128i,
@@ -95,7 +93,6 @@ pub unsafe fn _mm_deinterleave_rgb(
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_interleave_rgb(
     r: __m128i,
     g: __m128i,
@@ -117,7 +114,6 @@ pub unsafe fn _mm_interleave_rgb(
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_interleave_rgba(
     r: __m128i,
     g: __m128i,
@@ -137,7 +133,6 @@ pub unsafe fn _mm_interleave_rgba(
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_deinterleave_rgba_ps(
     t0: __m128,
     t1: __m128,
@@ -156,7 +151,6 @@ pub unsafe fn _mm_deinterleave_rgba_ps(
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_deinterleave_rgb_ps(
     t0: __m128,
     t1: __m128,
@@ -181,7 +175,6 @@ pub unsafe fn _mm_deinterleave_rgb_ps(
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_interleave_rgb_ps(
     t0: __m128,
     t1: __m128,
@@ -209,7 +202,6 @@ pub unsafe fn _mm_interleave_rgb_ps(
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_interleave_rgba_ps(
     t0: __m128,
     t1: __m128,

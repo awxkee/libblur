@@ -404,6 +404,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "fast_transpose"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "70a2714bf0e4afa420670d704b658b4db4c30e3fb4331b298c3a5fa5d2b99e62"
+dependencies = [
+ "bytemuck",
+]
+
+[[package]]
 name = "fdeflate"
 version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -614,10 +623,11 @@ checksum = "03087c2bad5e1034e8cace5926dec053fb3790248370865f5117a7d0213354c8"
 
 [[package]]
 name = "libblur"
-version = "0.14.4"
+version = "0.14.5"
 dependencies = [
  "colorutils-rs",
  "erydanos",
+ "fast_transpose",
  "half",
  "image",
  "libc",

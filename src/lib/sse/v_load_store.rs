@@ -36,7 +36,6 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_load_pack_x4(ptr: *const u8) -> (__m128i, __m128i, __m128i, __m128i) {
     let row0 = _mm_loadu_si128(ptr as *const __m128i);
     let row1 = _mm_loadu_si128(ptr.add(16) as *const __m128i);
@@ -46,7 +45,6 @@ pub unsafe fn _mm_load_pack_x4(ptr: *const u8) -> (__m128i, __m128i, __m128i, __
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_load_pack_ps_x4(ptr: *const f32) -> (__m128, __m128, __m128, __m128) {
     let row0 = _mm_loadu_ps(ptr);
     let row1 = _mm_loadu_ps(ptr.add(4));
@@ -56,7 +54,6 @@ pub unsafe fn _mm_load_pack_ps_x4(ptr: *const f32) -> (__m128, __m128, __m128, _
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_load_pack_ps_x2(ptr: *const f32) -> (__m128, __m128) {
     let row0 = _mm_loadu_ps(ptr);
     let row1 = _mm_loadu_ps(ptr.add(4));
@@ -64,7 +61,6 @@ pub unsafe fn _mm_load_pack_ps_x2(ptr: *const f32) -> (__m128, __m128) {
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_store_pack_x4(ptr: *mut u8, v: (__m128i, __m128i, __m128i, __m128i)) {
     _mm_storeu_si128(ptr as *mut __m128i, v.0);
     _mm_storeu_si128(ptr.add(16) as *mut __m128i, v.1);
@@ -73,7 +69,6 @@ pub unsafe fn _mm_store_pack_x4(ptr: *mut u8, v: (__m128i, __m128i, __m128i, __m
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_store_pack_ps_x4(ptr: *mut f32, v: (__m128, __m128, __m128, __m128)) {
     _mm_storeu_ps(ptr, v.0);
     _mm_storeu_ps(ptr.add(4), v.1);
@@ -82,7 +77,6 @@ pub unsafe fn _mm_store_pack_ps_x4(ptr: *mut f32, v: (__m128, __m128, __m128, __
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_store_pack_ps_x3(ptr: *mut f32, v: (__m128, __m128, __m128)) {
     _mm_storeu_ps(ptr, v.0);
     _mm_storeu_ps(ptr.add(4), v.1);
@@ -90,14 +84,12 @@ pub unsafe fn _mm_store_pack_ps_x3(ptr: *mut f32, v: (__m128, __m128, __m128)) {
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_store_pack_ps_x2(ptr: *mut f32, v: (__m128, __m128)) {
     _mm_storeu_ps(ptr, v.0);
     _mm_storeu_ps(ptr.add(4), v.1);
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_load_pack_x3(ptr: *const u8) -> (__m128i, __m128i, __m128i) {
     let row0 = _mm_loadu_si128(ptr as *const __m128i);
     let row1 = _mm_loadu_si128(ptr.add(16) as *const __m128i);
@@ -106,7 +98,6 @@ pub unsafe fn _mm_load_pack_x3(ptr: *const u8) -> (__m128i, __m128i, __m128i) {
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_load_pack_x2(ptr: *const u8) -> (__m128i, __m128i) {
     let row0 = _mm_loadu_si128(ptr as *const __m128i);
     let row1 = _mm_loadu_si128(ptr.add(16) as *const __m128i);
@@ -114,7 +105,6 @@ pub unsafe fn _mm_load_pack_x2(ptr: *const u8) -> (__m128i, __m128i) {
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_store_pack_x3(ptr: *mut u8, v: (__m128i, __m128i, __m128i)) {
     _mm_storeu_si128(ptr as *mut __m128i, v.0);
     _mm_storeu_si128(ptr.add(16) as *mut __m128i, v.1);
@@ -122,21 +112,18 @@ pub unsafe fn _mm_store_pack_x3(ptr: *mut u8, v: (__m128i, __m128i, __m128i)) {
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_store_pack_x2(ptr: *mut u8, v: (__m128i, __m128i)) {
     _mm_storeu_si128(ptr as *mut __m128i, v.0);
     _mm_storeu_si128(ptr.add(16) as *mut __m128i, v.1);
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_store_interleave_rgb(ptr: *mut u8, v: (__m128i, __m128i, __m128i)) {
     let (v0, v1, v2) = _mm_interleave_rgb(v.0, v.1, v.2);
     _mm_store_pack_x3(ptr, (v0, v1, v2));
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_store_interleave_rgb_half(ptr: *mut u8, v: (__m128i, __m128i, __m128i)) {
     let (v0, v1, _) = _mm_interleave_rgb(v.0, v.1, v.2);
     _mm_storeu_si128(ptr as *mut __m128i, v0);
@@ -144,14 +131,12 @@ pub unsafe fn _mm_store_interleave_rgb_half(ptr: *mut u8, v: (__m128i, __m128i, 
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_store_interleave_rgba(ptr: *mut u8, v: (__m128i, __m128i, __m128i, __m128i)) {
     let (v0, v1, v2, v3) = _mm_interleave_rgba(v.0, v.1, v.2, v.3);
     _mm_store_pack_x4(ptr, (v0, v1, v2, v3));
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_store_interleave_rgba_half(
     ptr: *mut u8,
     v: (__m128i, __m128i, __m128i, __m128i),
@@ -162,7 +147,6 @@ pub unsafe fn _mm_store_interleave_rgba_half(
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_load_deinterleave_rgb(ptr: *const u8) -> (__m128i, __m128i, __m128i) {
     let row0 = _mm_loadu_si128(ptr as *const __m128i);
     let row1 = _mm_loadu_si128(ptr.add(16) as *const __m128i);
@@ -171,7 +155,6 @@ pub unsafe fn _mm_load_deinterleave_rgb(ptr: *const u8) -> (__m128i, __m128i, __
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_load_deinterleave_rgb_half(ptr: *const u8) -> (__m128i, __m128i, __m128i) {
     let row0 = _mm_loadu_si128(ptr as *const __m128i);
     let row1 = _mm_loadu_si64(ptr.add(16));
@@ -179,7 +162,6 @@ pub unsafe fn _mm_load_deinterleave_rgb_half(ptr: *const u8) -> (__m128i, __m128
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_load_deinterleave_rgba(ptr: *const u8) -> (__m128i, __m128i, __m128i, __m128i) {
     let row0 = _mm_loadu_si128(ptr as *const __m128i);
     let row1 = _mm_loadu_si128(ptr.add(16) as *const __m128i);
@@ -189,7 +171,6 @@ pub unsafe fn _mm_load_deinterleave_rgba(ptr: *const u8) -> (__m128i, __m128i, _
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_load_deinterleave_rgba_half(
     ptr: *const u8,
 ) -> (__m128i, __m128i, __m128i, __m128i) {
@@ -199,7 +180,6 @@ pub unsafe fn _mm_load_deinterleave_rgba_half(
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_load_deinterleave_rgba_ps(ptr: *const f32) -> (__m128, __m128, __m128, __m128) {
     let row0 = _mm_loadu_ps(ptr);
     let row1 = _mm_loadu_ps(ptr.add(4));
@@ -209,7 +189,6 @@ pub unsafe fn _mm_load_deinterleave_rgba_ps(ptr: *const f32) -> (__m128, __m128,
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_load_deinterleave_rgb_ps(ptr: *const f32) -> (__m128, __m128, __m128) {
     let row0 = _mm_loadu_ps(ptr);
     let row1 = _mm_loadu_ps(ptr.add(4));
@@ -218,14 +197,12 @@ pub unsafe fn _mm_load_deinterleave_rgb_ps(ptr: *const f32) -> (__m128, __m128, 
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_store_interleave_rgba_ps(ptr: *mut f32, v: (__m128, __m128, __m128, __m128)) {
     let (v0, v1, v2, v3) = _mm_interleave_rgba_ps(v.0, v.1, v.2, v.3);
     _mm_store_pack_ps_x4(ptr, (v0, v1, v2, v3));
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
 pub unsafe fn _mm_store_interleave_rgb_ps(ptr: *mut f32, v: (__m128, __m128, __m128)) {
     let (v0, v1, v2) = _mm_interleave_rgb_ps(v.0, v.1, v.2);
     _mm_store_pack_ps_x3(ptr, (v0, v1, v2));

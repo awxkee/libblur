@@ -212,6 +212,7 @@ pub fn stack_blur(
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) {
+    #[allow(clippy::manual_clamp)]
     let radius = radius.max(1).min(1449);
     let thread_count = threading_policy.get_threads_count(width, height) as u32;
     if thread_count == 1 {

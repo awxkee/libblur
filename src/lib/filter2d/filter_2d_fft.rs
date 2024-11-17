@@ -32,6 +32,7 @@ use crate::filter2d::fft_utils::fft_next_good_size;
 use crate::filter2d::scan_se_2d::scan_se_2d;
 use crate::to_storage::ToStorage;
 use crate::{EdgeMode, ImageSize, KernelShape, Scalar};
+use fast_transpose::{transpose_arbitrary, FlipMode, FlopMode};
 use num_traits::AsPrimitive;
 use rayon::iter::ParallelIterator;
 use rayon::prelude::ParallelSliceMut;
@@ -39,18 +40,27 @@ use rustfft::num_complex::Complex;
 use rustfft::{FftNum, FftPlanner};
 use std::ops::Mul;
 
-fn transpose<T: Copy + Default>(matrix: &[T], width: usize, height: usize) -> Vec<T> {
+fn transpose<T: Copy + Default>(
+    matrix: &[T],
+    width: usize,
+    height: usize,
+    flop_mode: FlopMode,
+) -> Vec<T> {
     if matrix.is_empty() {
         return Vec::new();
     }
 
     let mut transposed = vec![T::default(); width * height];
 
-    matrix.chunks_exact(width).enumerate().for_each(|(y, row)| {
-        for (dst, src) in transposed[y..].iter_mut().step_by(height).zip(row.iter()) {
-            *dst = *src;
-        }
-    });
+    transpose_arbitrary(
+        matrix,
+        &mut transposed,
+        width,
+        height,
+        FlipMode::NoFlip,
+        flop_mode,
+    )
+    .unwrap();
 
     transposed
 }
@@ -185,8 +195,8 @@ where
         .enumerate()
         .for_each(|(y, row)| {
             for (x, item) in row.iter().enumerate() {
-                let new_y = (y as i64 - shift_y).rem_euclid(best_height as i64) as usize;
-                let new_x = (x as i64 - shift_x).rem_euclid(best_width as i64) as usize;
+                let new_y = (y as i64 - shift_y).rem_euclid(best_height as i64 - 1) as usize;
+                let new_x = (x as i64 - shift_x).rem_euclid(best_width as i64 - 1) as usize;
                 kernel_arena[new_y * best_width + new_x] = Complex {
                     re: item.as_(),
                     im: 0f64.as_(),
@@ -210,8 +220,8 @@ where
             rows_planner.process(row);
         });
 
-    arena_source = transpose(&arena_source, best_width, best_height);
-    kernel_arena = transpose(&kernel_arena, best_width, best_height);
+    arena_source = transpose(&arena_source, best_width, best_height, FlopMode::Flop);
+    kernel_arena = transpose(&kernel_arena, best_width, best_height, FlopMode::Flop);
 
     arena_source
         .par_chunks_exact_mut(best_height)
@@ -238,7 +248,7 @@ where
             columns_inverse_planner.process(column);
         });
 
-    kernel_arena = transpose(&kernel_arena, best_height, best_width);
+    kernel_arena = transpose(&kernel_arena, best_height, best_width, FlopMode::Flop);
 
     kernel_arena
         .par_chunks_exact_mut(best_width)
