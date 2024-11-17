@@ -28,11 +28,12 @@
  */
 use crate::filter1d::Arena;
 use crate::filter2d::scan_point_2d::ScanPoint2d;
+use crate::mlaf::mlaf;
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::ImageSize;
 use num_traits::{AsPrimitive, MulAdd};
-use std::ops::Mul;
+use std::ops::{Add, Mul};
 
 pub(crate) fn convolve_segment_2d<T, F>(
     arena: Arena,
@@ -43,7 +44,7 @@ pub(crate) fn convolve_segment_2d<T, F>(
     y: usize,
 ) where
     T: Copy + AsPrimitive<F>,
-    F: ToStorage<T> + Mul<Output = F> + MulAdd<F, Output = F>,
+    F: ToStorage<T> + Mul<Output = F> + MulAdd<F, Output = F> + Add<Output = F>,
 {
     unsafe {
         let width = image_size.width;
@@ -88,26 +89,22 @@ pub(crate) fn convolve_segment_2d<T, F>(
 
             for i in 1..length {
                 let weight = prepared_kernel.get_unchecked(i).weight;
-                k0 = offsets
-                    .get_unchecked(i)
-                    .get_unchecked(x)
-                    .as_()
-                    .mul_add(weight, k0);
-                k1 = offsets
-                    .get_unchecked(i)
-                    .get_unchecked(x + 1)
-                    .as_()
-                    .mul_add(weight, k1);
-                k2 = offsets
-                    .get_unchecked(i)
-                    .get_unchecked(x + 2)
-                    .as_()
-                    .mul_add(weight, k2);
-                k3 = offsets
-                    .get_unchecked(i)
-                    .get_unchecked(x + 3)
-                    .as_()
-                    .mul_add(weight, k3);
+                k0 = mlaf(k0, offsets.get_unchecked(i).get_unchecked(x).as_(), weight);
+                k1 = mlaf(
+                    k1,
+                    offsets.get_unchecked(i).get_unchecked(x + 1).as_(),
+                    weight,
+                );
+                k2 = mlaf(
+                    k2,
+                    offsets.get_unchecked(i).get_unchecked(x + 2).as_(),
+                    weight,
+                );
+                k3 = mlaf(
+                    k3,
+                    offsets.get_unchecked(i).get_unchecked(x + 3).as_(),
+                    weight,
+                );
             }
 
             let dst_offset = y * stride + x;
@@ -129,11 +126,11 @@ pub(crate) fn convolve_segment_2d<T, F>(
 
             for i in 1..length {
                 let k_weight = prepared_kernel.get_unchecked(i).weight;
-                k0 = offsets
-                    .get_unchecked(i)
-                    .get_unchecked(x)
-                    .as_()
-                    .mul_add(k_weight, k0);
+                k0 = mlaf(
+                    k0,
+                    offsets.get_unchecked(i).get_unchecked(x).as_(),
+                    k_weight,
+                );
             }
             dst.write(y * stride + x, k0.to_());
         }
