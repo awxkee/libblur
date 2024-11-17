@@ -36,7 +36,7 @@ use crate::filter1d::avx::utils::{
 use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::region::FilterRegion;
 use crate::filter1d::sse::utils::{
-    _mm_mul_add_epi8_by_epi16_x4, _mm_mul_epi8_by_epi16_x4, _mm_pack_epi32_x4_epi8,
+    _mm_mul_add_epi8_by_epi16_x4, _mm_mul_epi8_by_epi16_x4, _mm_pack_epi32_x2_epi8,
 };
 use crate::filter1d::to_approx_storage::ToApproxStorage;
 use crate::img_size::ImageSize;
@@ -47,7 +47,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 use std::ops::{Add, Mul};
 
-pub fn filter_column_avx_u8_i32_app(
+pub(crate) fn filter_column_avx_u8_i32_app(
     arena: Arena,
     arena_src: &[&[u8]],
     dst: &UnsafeSlice<u8>,
@@ -188,7 +188,7 @@ unsafe fn filter_column_avx_u8_i32_impl(
 
             let dst_offset = y * dst_stride + _cx;
             let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
-            _mm_storeu_si128(dst_ptr0 as *mut __m128i, _mm_pack_epi32_x4_epi8(k0));
+            _mm_storeu_si128(dst_ptr0 as *mut __m128i, _mm_pack_epi32_x2_epi8(k0));
             _cx += 16;
         }
 

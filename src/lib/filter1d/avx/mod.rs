@@ -47,10 +47,10 @@ mod filter_row_f32;
 mod utils;
 
 pub use filter_column::filter_column_avx_u8_f32;
-pub use filter_column_approx::filter_column_avx_u8_i32_app;
+pub(crate) use filter_column_approx::filter_column_avx_u8_i32_app;
 pub use filter_column_f32::filter_column_avx_f32_f32;
 pub use filter_column_symm::filter_column_avx_symm_u8_f32;
-pub use filter_column_symm_approx::filter_column_avx_symm_u8_i32_app;
+pub(crate) use filter_column_symm_approx::filter_column_avx_symm_u8_i32_app;
 pub use filter_rgb_row::filter_rgb_row_avx_u8_f32;
 pub use filter_rgb_row_approx::filter_rgb_row_avx_u8_i32_app;
 pub use filter_rgb_row_f32::filter_rgb_row_avx_f32_f32;

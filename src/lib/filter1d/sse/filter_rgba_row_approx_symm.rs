@@ -32,7 +32,7 @@ use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::region::FilterRegion;
 use crate::filter1d::sse::utils::{
     _mm_mul_add_symm_epi8_by_epi16_x2, _mm_mul_add_symm_epi8_by_epi16_x4, _mm_mul_epi8_by_epi16_x2,
-    _mm_mul_epi8_by_epi16_x4, _mm_pack_epi32_x2_epi8, _mm_pack_epi32_x4_epi8,
+    _mm_mul_epi8_by_epi16_x4, _mm_pack_epi32_epi8, _mm_pack_epi32_x2_epi8,
 };
 use crate::img_size::ImageSize;
 use crate::sse::{
@@ -121,10 +121,10 @@ unsafe fn filter_rgba_row_symm_sse_u8_i32_impl(
         _mm_store_interleave_rgba(
             dst_ptr0,
             (
-                _mm_pack_epi32_x4_epi8(k0),
-                _mm_pack_epi32_x4_epi8(k1),
-                _mm_pack_epi32_x4_epi8(k2),
-                _mm_pack_epi32_x4_epi8(k3),
+                _mm_pack_epi32_x2_epi8(k0),
+                _mm_pack_epi32_x2_epi8(k1),
+                _mm_pack_epi32_x2_epi8(k2),
+                _mm_pack_epi32_x2_epi8(k3),
             ),
         );
         _cx += 16;
@@ -161,10 +161,10 @@ unsafe fn filter_rgba_row_symm_sse_u8_i32_impl(
         _mm_store_interleave_rgba_half(
             dst_ptr0,
             (
-                _mm_pack_epi32_x2_epi8(k0),
-                _mm_pack_epi32_x2_epi8(k1),
-                _mm_pack_epi32_x2_epi8(k2),
-                _mm_pack_epi32_x2_epi8(k3),
+                _mm_pack_epi32_epi8(k0),
+                _mm_pack_epi32_epi8(k1),
+                _mm_pack_epi32_epi8(k2),
+                _mm_pack_epi32_epi8(k3),
             ),
         );
         _cx += 8;

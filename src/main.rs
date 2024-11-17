@@ -163,7 +163,7 @@ fn main() {
     //     vst1q_s64(t.as_mut_ptr(), mul);
     //     println!("{:?}", t);
     // }
-    let img = ImageReader::open("assets/sonderland.jpg")
+    let img = ImageReader::open("assets/test_image_1_small.jpg")
         .unwrap()
         .decode()
         .unwrap();

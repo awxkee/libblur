@@ -30,7 +30,7 @@ use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::region::FilterRegion;
 use crate::filter1d::sse::utils::{
-    _mm_mul_add_epi8_by_epi16_x4, _mm_mul_epi8_by_epi16_x4, _mm_pack_epi32_x4_epi8,
+    _mm_mul_add_epi8_by_epi16_x4, _mm_mul_epi8_by_epi16_x4, _mm_pack_epi32_x2_epi8,
 };
 use crate::filter1d::to_approx_storage::ToApproxStorage;
 use crate::img_size::ImageSize;
@@ -111,10 +111,10 @@ unsafe fn filter_column_sse_u8_i32_impl(
             _mm_store_pack_x4(
                 dst_ptr0,
                 (
-                    _mm_pack_epi32_x4_epi8(k0),
-                    _mm_pack_epi32_x4_epi8(k1),
-                    _mm_pack_epi32_x4_epi8(k2),
-                    _mm_pack_epi32_x4_epi8(k3),
+                    _mm_pack_epi32_x2_epi8(k0),
+                    _mm_pack_epi32_x2_epi8(k1),
+                    _mm_pack_epi32_x2_epi8(k2),
+                    _mm_pack_epi32_x2_epi8(k3),
                 ),
             );
             _cx += 64;
@@ -144,9 +144,9 @@ unsafe fn filter_column_sse_u8_i32_impl(
             _mm_store_pack_x3(
                 dst_ptr0,
                 (
-                    _mm_pack_epi32_x4_epi8(k0),
-                    _mm_pack_epi32_x4_epi8(k1),
-                    _mm_pack_epi32_x4_epi8(k2),
+                    _mm_pack_epi32_x2_epi8(k0),
+                    _mm_pack_epi32_x2_epi8(k1),
+                    _mm_pack_epi32_x2_epi8(k2),
                 ),
             );
             _cx += 48;
@@ -173,7 +173,7 @@ unsafe fn filter_column_sse_u8_i32_impl(
             let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
             _mm_store_pack_x2(
                 dst_ptr0,
-                (_mm_pack_epi32_x4_epi8(k0), _mm_pack_epi32_x4_epi8(k1)),
+                (_mm_pack_epi32_x2_epi8(k0), _mm_pack_epi32_x2_epi8(k1)),
             );
             _cx += 32;
         }
@@ -196,7 +196,7 @@ unsafe fn filter_column_sse_u8_i32_impl(
 
             let dst_offset = y * dst_stride + _cx;
             let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
-            _mm_storeu_si128(dst_ptr0 as *mut __m128i, _mm_pack_epi32_x4_epi8(k0));
+            _mm_storeu_si128(dst_ptr0 as *mut __m128i, _mm_pack_epi32_x2_epi8(k0));
             _cx += 16;
         }
 
