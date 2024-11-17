@@ -43,80 +43,80 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let stride = dimensions.0 as usize * components;
     let src_bytes = img.as_bytes();
 
-    c.bench_function("RGBA gauss blur kernel clip exact: 13", |b| {
-        b.iter(|| {
-            let mut dst_bytes: Vec<u8> = vec![0u8; dimensions.1 as usize * stride];
-            libblur::gaussian_blur(
-                &src_bytes,
-                &mut dst_bytes,
-                dimensions.0,
-                dimensions.1,
-                13,
-                0.,
-                FastBlurChannels::Channels4,
-                EdgeMode::Clamp,
-                ThreadingPolicy::Adaptive,
-                GaussianPreciseLevel::EXACT,
-            );
-        })
-    });
-
-    c.bench_function("RGBA gauss blur clamp approx: 13", |b| {
-        b.iter(|| {
-            let mut dst_bytes: Vec<u8> = vec![0u8; dimensions.1 as usize * stride];
-            libblur::gaussian_blur(
-                &src_bytes,
-                &mut dst_bytes,
-                dimensions.0,
-                dimensions.1,
-                13,
-                0.,
-                FastBlurChannels::Channels4,
-                EdgeMode::Clamp,
-                ThreadingPolicy::Adaptive,
-                GaussianPreciseLevel::INTEGRAL,
-            );
-        })
-    });
-
+    // c.bench_function("RGBA gauss blur kernel clip exact: 13", |b| {
+    //     b.iter(|| {
+    //         let mut dst_bytes: Vec<u8> = vec![0u8; dimensions.1 as usize * stride];
+    //         libblur::gaussian_blur(
+    //             &src_bytes,
+    //             &mut dst_bytes,
+    //             dimensions.0,
+    //             dimensions.1,
+    //             13,
+    //             0.,
+    //             FastBlurChannels::Channels4,
+    //             EdgeMode::Clamp,
+    //             ThreadingPolicy::Adaptive,
+    //             GaussianPreciseLevel::EXACT,
+    //         );
+    //     })
+    // });
+    //
+    // c.bench_function("RGBA gauss blur clamp approx: 13", |b| {
+    //     b.iter(|| {
+    //         let mut dst_bytes: Vec<u8> = vec![0u8; dimensions.1 as usize * stride];
+    //         libblur::gaussian_blur(
+    //             &src_bytes,
+    //             &mut dst_bytes,
+    //             dimensions.0,
+    //             dimensions.1,
+    //             13,
+    //             0.,
+    //             FastBlurChannels::Channels4,
+    //             EdgeMode::Clamp,
+    //             ThreadingPolicy::Adaptive,
+    //             GaussianPreciseLevel::INTEGRAL,
+    //         );
+    //     })
+    // });
+    //
     let src = imread(
         &find_file(&"assets/test_image_4.png", false, false).unwrap(),
         IMREAD_COLOR,
     )
     .unwrap();
-
-    c.bench_function("OpenCV RGBA Gaussian: 13", |b| {
-        b.iter(|| {
-            let mut dst = Mat::default();
-            opencv::imgproc::gaussian_blur(
-                &src,
-                &mut dst,
-                Size::new(13, 13),
-                0.,
-                0.,
-                BORDER_DEFAULT,
-            )
-            .unwrap();
-        })
-    });
-
-    c.bench_function("RGBA gauss blur edge clamp: rad 151", |b| {
-        b.iter(|| {
-            let mut dst_bytes: Vec<u8> = vec![0u8; dimensions.1 as usize * stride];
-            libblur::gaussian_blur(
-                &src_bytes,
-                &mut dst_bytes,
-                dimensions.0,
-                dimensions.1,
-                77 * 2 + 1,
-                (77f32 * 2f32 + 1f32) / 6f32,
-                FastBlurChannels::Channels4,
-                EdgeMode::Clamp,
-                ThreadingPolicy::Adaptive,
-                GaussianPreciseLevel::EXACT,
-            );
-        })
-    });
+    //
+    // c.bench_function("OpenCV RGBA Gaussian: 13", |b| {
+    //     b.iter(|| {
+    //         let mut dst = Mat::default();
+    //         opencv::imgproc::gaussian_blur(
+    //             &src,
+    //             &mut dst,
+    //             Size::new(13, 13),
+    //             0.,
+    //             0.,
+    //             BORDER_DEFAULT,
+    //         )
+    //         .unwrap();
+    //     })
+    // });
+    //
+    // c.bench_function("RGBA gauss blur edge clamp: rad 151", |b| {
+    //     b.iter(|| {
+    //         let mut dst_bytes: Vec<u8> = vec![0u8; dimensions.1 as usize * stride];
+    //         libblur::gaussian_blur(
+    //             &src_bytes,
+    //             &mut dst_bytes,
+    //             dimensions.0,
+    //             dimensions.1,
+    //             77 * 2 + 1,
+    //             (77f32 * 2f32 + 1f32) / 6f32,
+    //             FastBlurChannels::Channels4,
+    //             EdgeMode::Clamp,
+    //             ThreadingPolicy::Adaptive,
+    //             GaussianPreciseLevel::EXACT,
+    //         );
+    //     })
+    // });
 
     c.bench_function("RGBA gauss blur edge clamp approx: rad 151", |b| {
         b.iter(|| {

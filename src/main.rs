@@ -249,18 +249,18 @@ fn main() {
     //     .map(|&x| f16::from_f32(x as f32 * (1. / 255.)))
     //     .collect();
     // //
-    // libblur::gaussian_blur(
-    //     &bytes,
-    //     &mut dst_bytes,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     513,
-    //     0.,
-    //     FastBlurChannels::Channels3,
-    //     EdgeMode::Wrap,
-    //     ThreadingPolicy::Adaptive,
-    //     GaussianPreciseLevel::INTEGRAL,
-    // );
+    libblur::gaussian_blur(
+        &bytes,
+        &mut dst_bytes,
+        dimensions.0,
+        dimensions.1,
+        513,
+        0.,
+        FastBlurChannels::Channels3,
+        EdgeMode::Clamp,
+        ThreadingPolicy::Adaptive,
+        GaussianPreciseLevel::INTEGRAL,
+    );
     //
     // //
     // println!(
@@ -366,7 +366,7 @@ fn main() {
     //     ThreadingPolicy::Adaptive,
     // );
     //
-    let motion_kernel = generate_motion_kernel(501, 15.);
+    // let motion_kernel = generate_motion_kernel(501, 15.);
 
     // motion_blur(
     //     &bytes,
@@ -380,16 +380,16 @@ fn main() {
     //     ThreadingPolicy::Adaptive,
     // );
 
-    filter_2d_rgb_fft::<u8, f32, f32>(
-        &bytes,
-        &mut dst_bytes,
-        ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
-        &motion_kernel,
-        KernelShape::new(501, 501),
-        EdgeMode::Clamp,
-        Scalar::new(255.0, 0., 0., 255.0),
-    )
-    .unwrap();
+    // filter_2d_rgb_fft::<u8, f32, f32>(
+    //     &bytes,
+    //     &mut dst_bytes,
+    //     ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
+    //     &motion_kernel,
+    //     KernelShape::new(501, 501),
+    //     EdgeMode::Clamp,
+    //     Scalar::new(255.0, 0., 0., 255.0),
+    // )
+    // .unwrap();
 
     //
     // filter_2d_rgba_approx::<u8, f32, i32>(
