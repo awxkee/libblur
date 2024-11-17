@@ -31,6 +31,6 @@ mod pack;
 mod v_load;
 mod v_store;
 
-pub use pack::*;
+pub(crate) use pack::*;
 pub use v_load::*;
 pub use v_store::*;
