@@ -64,7 +64,7 @@ Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded 
 |                   | Time(NEON) | Time(AVX) | 
 |-------------------|:----------:|:---------:| 
 | libblur(Exact)    |  55.89ms   | 105.11ms  | 
-| libblur(Integral) |  33.20ms   |  68.37ms  | 
+| libblur(Integral) |  33.20ms   |  66.02ms  | 
 | OpenCV            |  180.56ms  | 182.44ms  | 
 
 Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded mode with 151 kernel size.
@@ -79,8 +79,8 @@ Example comparison time for blurring image 3000x4000 single plane 8-bit in multi
 
 |                   | time(NEON) | Time(SSE/AVX) |
 |-------------------|:----------:|:-------------:|
-| libblur(Exact)    |  24.19ms   |    29.89ms    |
-| libblur(Integral) |  13.70ms   |    19.36ms    |
+| libblur(Exact)    |  24.19ms   |    28.73ms    |
+| libblur(Integral) |  13.70ms   |    18.97ms    |
 | OpenCV            |  74.73ms   |    64.20ms    |
 
 ### Stack blur
