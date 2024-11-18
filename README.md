@@ -80,7 +80,7 @@ Example comparison time for blurring image 3000x4000 single plane 8-bit in multi
 |                   | time(NEON) | Time(SSE/AVX) |
 |-------------------|:----------:|:-------------:|
 | libblur(Exact)    |  24.19ms   |    28.73ms    |
-| libblur(Integral) |  13.70ms   |    18.97ms    |
+| libblur(Integral) |  11.49ms   |    18.97ms    |
 | OpenCV            |  74.73ms   |    64.20ms    |
 
 ### Stack blur

@@ -31,7 +31,7 @@
     all(target_arch = "aarch64", target_feature = "neon"),
     any(target_arch = "x86", target_arch = "x86_64")
 ))]
-#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[cfg(any(target_os = "macos", target_os = "ios", target_os = "tvos"))]
 #[allow(dead_code)]
 fn apple_has_cpu_feature(feature_name: &str) -> bool {
     use libc::{c_int, sysctlbyname};
@@ -61,11 +61,11 @@ fn apple_has_cpu_feature(feature_name: &str) -> bool {
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[allow(dead_code)]
 pub fn is_x86_avx512dq_supported() -> bool {
-    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    #[cfg(any(target_os = "macos", target_os = "ios", target_os = "tvos"))]
     {
         apple_has_cpu_feature("hw.optional.avx512dq")
     }
-    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+    #[cfg(not(any(target_os = "macos", target_os = "ios", target_os = "tvos")))]
     {
         std::arch::is_x86_feature_detected!("avx512dq")
     }
@@ -74,11 +74,11 @@ pub fn is_x86_avx512dq_supported() -> bool {
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[allow(dead_code)]
 pub fn is_x86_avx512vl_supported() -> bool {
-    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    #[cfg(any(target_os = "macos", target_os = "ios", target_os = "tvos"))]
     {
         apple_has_cpu_feature("hw.optional.avx512vl")
     }
-    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+    #[cfg(not(any(target_os = "macos", target_os = "ios", target_os = "tvos")))]
     {
         std::arch::is_x86_feature_detected!("avx512vl")
     }
@@ -88,7 +88,7 @@ pub fn is_x86_avx512vl_supported() -> bool {
     all(target_arch = "aarch64", target_feature = "neon"),
     any(target_arch = "x86", target_arch = "x86_64")
 )))]
-#[cfg(not(any(target_os = "macos", target_os = "ios")))]
+#[cfg(not(any(target_os = "macos", target_os = "ios", target_os = "tvos")))]
 #[allow(dead_code)]
 fn apple_has_cpu_feature(_feature_name: &str) -> bool {
     false
@@ -98,12 +98,12 @@ fn apple_has_cpu_feature(_feature_name: &str) -> bool {
 /// on *Apple* platform [libc](https://developer.apple.com/documentation/kernel/1387446-sysctlbyname/determining_instruction_set_characteristics) be used
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 #[allow(dead_code)]
-pub fn is_aarch_f16_supported() -> bool {
-    #[cfg(any(target_os = "macos", target_os = "ios"))]
+pub(crate) fn is_aarch_f16_supported() -> bool {
+    #[cfg(any(target_os = "macos", target_os = "ios", target_os = "tvos"))]
     {
         apple_has_cpu_feature("hw.optional.arm.FEAT_FP16")
     }
-    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+    #[cfg(not(any(target_os = "macos", target_os = "ios", target_os = "tvos")))]
     {
         std::arch::is_aarch64_feature_detected!("fp16")
     }
@@ -114,12 +114,12 @@ pub fn is_aarch_f16_supported() -> bool {
 /// otherwise consider it is always available
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 #[allow(dead_code)]
-pub fn is_aarch_f16c_supported() -> bool {
-    #[cfg(any(target_os = "macos", target_os = "ios"))]
+pub(crate) fn is_aarch_f16c_supported() -> bool {
+    #[cfg(any(target_os = "macos", target_os = "ios", target_os = "tvos"))]
     {
         apple_has_cpu_feature("hw.optional.AdvSIMD_HPFPCvt")
     }
-    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+    #[cfg(not(any(target_os = "macos", target_os = "ios", target_os = "tvos")))]
     {
         true
     }
@@ -130,13 +130,28 @@ pub fn is_aarch_f16c_supported() -> bool {
 /// otherwise consider it is always available
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 #[allow(dead_code)]
-pub fn is_aarch_fhm_supported() -> bool {
-    #[cfg(any(target_os = "macos", target_os = "ios"))]
+pub(crate) fn is_aarch_fhm_supported() -> bool {
+    #[cfg(any(target_os = "macos", target_os = "ios", target_os = "tvos"))]
     {
         apple_has_cpu_feature("hw.optional.arm.FEAT_FHM")
     }
-    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+    #[cfg(not(any(target_os = "macos", target_os = "ios", target_os = "tvos")))]
     {
         std::arch::is_aarch64_feature_detected!("fhm")
+    }
+}
+
+/// Test aarch64 cpu with *rdm* check,
+/// on *Apple* platform [libc](https://developer.apple.com/documentation/kernel/1387446-sysctlbyname/determining_instruction_set_characteristics) be used
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[allow(dead_code)]
+pub(crate) fn is_aarch_rdm_supported() -> bool {
+    #[cfg(any(target_os = "macos", target_os = "ios", target_os = "tvos"))]
+    {
+        apple_has_cpu_feature("hw.optional.arm.FEAT_RDM")
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "ios", target_os = "tvos")))]
+    {
+        std::arch::is_aarch64_feature_detected!("rdm")
     }
 }

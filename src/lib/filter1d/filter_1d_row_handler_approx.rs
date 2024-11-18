@@ -26,6 +26,8 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+use crate::cpu_features::is_aarch_rdm_supported;
 use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_row_cg_approx::filter_color_group_row_approx;
 use crate::filter1d::filter_row_cg_approx_symmetric::filter_color_group_row_symmetric_approx;
@@ -94,7 +96,7 @@ impl Filter1DRowHandlerApprox<u8, i32> for u8 {
     fn get_row_handler_apr(
         _: bool,
     ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<i32>]) {
-        if std::arch::is_aarch64_feature_detected!("rdm") {
+        if is_aarch_rdm_supported() {
             return filter_row_neon_u8_i32_rdm;
         }
         filter_row_neon_u8_i32_app
