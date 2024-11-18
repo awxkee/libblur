@@ -70,7 +70,6 @@ pub fn filter_rgba_row_avx_u8_i32_app(
     }
 }
 
-#[inline]
 #[target_feature(enable = "avx2")]
 unsafe fn filter_rgba_row_neon_u8_i32_impl(
     arena: Arena,

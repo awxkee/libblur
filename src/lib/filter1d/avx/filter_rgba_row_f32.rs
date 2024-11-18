@@ -113,6 +113,7 @@ unsafe fn filter_rgba_row_avx_f32_f32_fma(
     );
 }
 
+#[inline(always)]
 unsafe fn filter_rgba_row_avx_f32_f32_impl<const FMA: bool>(
     arena: Arena,
     arena_src: &[f32],
