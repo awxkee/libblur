@@ -106,8 +106,8 @@ pub(crate) unsafe fn _mm256_mul_add_symm_epi8_by_epi16_x4(
     ));
 
     (
-        _mm256_add_epi32(accumulator.0, _mm256_mulhrs_epi16(lo_16, weight)),
-        _mm256_add_epi32(accumulator.1, _mm256_mulhrs_epi16(hi_16, weight)),
+        _mm256_add_epi16(accumulator.0, _mm256_mulhrs_epi16(lo_16, weight)),
+        _mm256_add_epi16(accumulator.1, _mm256_mulhrs_epi16(hi_16, weight)),
     )
 }
 

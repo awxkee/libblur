@@ -352,7 +352,7 @@ pub(crate) unsafe fn _mm_mul_add_symm_epi8_by_epi16_x4(
 }
 
 #[inline(always)]
-pub unsafe fn _mm_mul_add_epi8_by_epi16_x2(
+pub(crate) unsafe fn _mm_mul_add_epi8_by_epi16_x2(
     accumulator: __m128i,
     input: __m128i,
     weight: __m128i,
@@ -364,7 +364,7 @@ pub unsafe fn _mm_mul_add_epi8_by_epi16_x2(
 }
 
 #[inline(always)]
-pub unsafe fn _mm_mul_add_symm_epi8_by_epi16_x2(
+pub(crate) unsafe fn _mm_mul_add_symm_epi8_by_epi16_x2(
     accumulator: __m128i,
     input0: __m128i,
     input1: __m128i,

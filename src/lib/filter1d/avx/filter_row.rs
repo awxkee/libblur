@@ -48,7 +48,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 use std::ops::Mul;
 
-pub fn filter_row_avx_u8_f32(
+pub(crate) fn filter_row_avx_u8_f32(
     arena: Arena,
     arena_src: &[u8],
     dst: &UnsafeSlice<u8>,

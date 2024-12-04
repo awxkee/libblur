@@ -33,8 +33,8 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-#[inline]
-pub unsafe fn _mm_deinterleave_rgba(
+#[inline(always)]
+pub(crate) unsafe fn _mm_deinterleave_rgba(
     rgba0: __m128i,
     rgba1: __m128i,
     rgba2: __m128i,
@@ -70,8 +70,8 @@ pub unsafe fn _mm_deinterleave_rgba(
     (r1, r2, r3, r4)
 }
 
-#[inline]
-pub unsafe fn _mm_deinterleave_rgb(
+#[inline(always)]
+pub(crate) unsafe fn _mm_deinterleave_rgb(
     s0: __m128i,
     s1: __m128i,
     s2: __m128i,
@@ -92,8 +92,8 @@ pub unsafe fn _mm_deinterleave_rgb(
     (a0, b0, c0)
 }
 
-#[inline]
-pub unsafe fn _mm_interleave_rgb(
+#[inline(always)]
+pub(crate) unsafe fn _mm_interleave_rgb(
     r: __m128i,
     g: __m128i,
     b: __m128i,
@@ -113,8 +113,8 @@ pub unsafe fn _mm_interleave_rgb(
     (v0, v1, v2)
 }
 
-#[inline]
-pub unsafe fn _mm_interleave_rgba(
+#[inline(always)]
+pub(crate) unsafe fn _mm_interleave_rgba(
     r: __m128i,
     g: __m128i,
     b: __m128i,
@@ -132,8 +132,8 @@ pub unsafe fn _mm_interleave_rgba(
     (rgba_0_lo, rgba_0_hi, rgba_1_lo, rgba_1_hi)
 }
 
-#[inline]
-pub unsafe fn _mm_deinterleave_rgba_ps(
+#[inline(always)]
+pub(crate) unsafe fn _mm_deinterleave_rgba_ps(
     t0: __m128,
     t1: __m128,
     t2: __m128,
@@ -150,8 +150,8 @@ pub unsafe fn _mm_deinterleave_rgba_ps(
     (v0, v1, v2, v3)
 }
 
-#[inline]
-pub unsafe fn _mm_deinterleave_rgb_ps(
+#[inline(always)]
+pub(crate) unsafe fn _mm_deinterleave_rgb_ps(
     t0: __m128,
     t1: __m128,
     t2: __m128,
@@ -174,8 +174,8 @@ pub unsafe fn _mm_deinterleave_rgb_ps(
     (v0, v1, v2)
 }
 
-#[inline]
-pub unsafe fn _mm_interleave_rgb_ps(
+#[inline(always)]
+pub(crate) unsafe fn _mm_interleave_rgb_ps(
     t0: __m128,
     t1: __m128,
     t2: __m128,
@@ -201,8 +201,8 @@ pub unsafe fn _mm_interleave_rgb_ps(
     (v0, v1, v2)
 }
 
-#[inline]
-pub unsafe fn _mm_interleave_rgba_ps(
+#[inline(always)]
+pub(crate) unsafe fn _mm_interleave_rgba_ps(
     t0: __m128,
     t1: __m128,
     t2: __m128,

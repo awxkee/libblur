@@ -47,7 +47,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 use std::ops::{Add, Mul};
 
-pub fn filter_rgb_row_sse_symm_u8_i16(
+pub(crate) fn filter_rgb_row_sse_symm_u8_i16(
     arena: Arena,
     arena_src: &[u8],
     dst: &UnsafeSlice<u8>,

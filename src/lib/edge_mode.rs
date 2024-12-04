@@ -121,7 +121,6 @@ where
     i.as_()
 }
 
-#[macro_export]
 macro_rules! reflect_101 {
     ($i:expr, $n:expr) => {{
         if $i < 0 {
@@ -138,7 +137,8 @@ macro_rules! reflect_101 {
     }};
 }
 
-#[macro_export]
+pub(crate) use reflect_101;
+
 macro_rules! clamp_edge {
     ($edge_mode:expr, $value:expr, $min:expr, $max:expr) => {{
         match $edge_mode {
@@ -163,6 +163,8 @@ macro_rules! clamp_edge {
         }
     }};
 }
+
+pub(crate) use clamp_edge;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
@@ -198,7 +200,7 @@ impl Index<usize> for Scalar {
             2 => &self.v2,
             3 => &self.v3,
             _ => {
-                panic!("Index out of bounds: {}", index);
+                unimplemented!("Index out of bounds: {}", index);
             }
         }
     }

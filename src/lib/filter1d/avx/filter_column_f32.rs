@@ -45,7 +45,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 use std::ops::Mul;
 
-pub fn filter_column_avx_f32_f32(
+pub(crate) fn filter_column_avx_f32_f32(
     arena: Arena,
     arena_src: &[&[f32]],
     dst: &UnsafeSlice<f32>,

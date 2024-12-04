@@ -36,7 +36,7 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-pub fn fast_gaussian_next_vertical_pass_sse_u8<T, const CHANNELS_COUNT: usize>(
+pub(crate) fn fast_gaussian_next_vertical_pass_sse_u8<T, const CHANNELS_COUNT: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -60,7 +60,6 @@ pub fn fast_gaussian_next_vertical_pass_sse_u8<T, const CHANNELS_COUNT: usize>(
     }
 }
 
-#[inline]
 #[target_feature(enable = "sse4.1")]
 unsafe fn fast_gaussian_next_vertical_pass_sse_u8_impl<T, const CHANNELS_COUNT: usize>(
     undefined_slice: &UnsafeSlice<T>,
@@ -158,7 +157,7 @@ unsafe fn fast_gaussian_next_vertical_pass_sse_u8_impl<T, const CHANNELS_COUNT: 
     }
 }
 
-pub fn fast_gaussian_next_horizontal_pass_sse_u8<T, const CHANNELS_COUNT: usize>(
+pub(crate) fn fast_gaussian_next_horizontal_pass_sse_u8<T, const CHANNELS_COUNT: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,

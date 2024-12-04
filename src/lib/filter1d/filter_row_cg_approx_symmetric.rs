@@ -27,12 +27,11 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter1d::arena::Arena;
-use crate::filter1d::color_group::ColorGroup;
+use crate::filter1d::color_group::{ld_group, ColorGroup};
 use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::region::FilterRegion;
 use crate::filter1d::to_approx_storage::ToApproxStorage;
 use crate::img_size::ImageSize;
-use crate::load_color_group_with_offset;
 use crate::unsafe_slice::UnsafeSlice;
 use num_traits::AsPrimitive;
 use std::ops::{Add, Mul, Shr};
@@ -73,57 +72,49 @@ pub fn filter_color_group_row_symmetric_approx<T, I, const N: usize>(
         let src = &src[_cx * N..(v_cx + length * N + N * 8)];
         let coeff = scanned_kernel[half_len];
 
-        let mut k0: ColorGroup<N, I> =
-            load_color_group_with_offset!(src, N, half_len * N).mul(coeff.weight);
-        let mut k1: ColorGroup<N, I> =
-            load_color_group_with_offset!(src, N, half_len * N + N).mul(coeff.weight);
-        let mut k2: ColorGroup<N, I> =
-            load_color_group_with_offset!(src, N, half_len * N + N * 2).mul(coeff.weight);
-        let mut k3: ColorGroup<N, I> =
-            load_color_group_with_offset!(src, N, half_len * N + N * 3).mul(coeff.weight);
-        let mut k4: ColorGroup<N, I> =
-            load_color_group_with_offset!(src, N, half_len * N + N * 4).mul(coeff.weight);
-        let mut k5: ColorGroup<N, I> =
-            load_color_group_with_offset!(src, N, half_len * N + N * 5).mul(coeff.weight);
-        let mut k6: ColorGroup<N, I> =
-            load_color_group_with_offset!(src, N, half_len * N + N * 6).mul(coeff.weight);
-        let mut k7: ColorGroup<N, I> =
-            load_color_group_with_offset!(src, N, half_len * N + N * 7).mul(coeff.weight);
+        let mut k0: ColorGroup<N, I> = ld_group!(src, N, half_len * N).mul(coeff.weight);
+        let mut k1: ColorGroup<N, I> = ld_group!(src, N, half_len * N + N).mul(coeff.weight);
+        let mut k2: ColorGroup<N, I> = ld_group!(src, N, half_len * N + N * 2).mul(coeff.weight);
+        let mut k3: ColorGroup<N, I> = ld_group!(src, N, half_len * N + N * 3).mul(coeff.weight);
+        let mut k4: ColorGroup<N, I> = ld_group!(src, N, half_len * N + N * 4).mul(coeff.weight);
+        let mut k5: ColorGroup<N, I> = ld_group!(src, N, half_len * N + N * 5).mul(coeff.weight);
+        let mut k6: ColorGroup<N, I> = ld_group!(src, N, half_len * N + N * 6).mul(coeff.weight);
+        let mut k7: ColorGroup<N, I> = ld_group!(src, N, half_len * N + N * 7).mul(coeff.weight);
 
         for (i, coeff) in scanned_kernel.iter().take(half_len).enumerate() {
             let rollback = length - i - 1;
             let fw = &src[(i * N)..((i + 8) * N)];
             let bw = &src[(rollback * N)..((rollback + 8) * N)];
-            k0 = load_color_group_with_offset!(fw, N, 0)
-                .add(load_color_group_with_offset!(bw, N, 0))
+            k0 = ld_group!(fw, N, 0)
+                .add(ld_group!(bw, N, 0))
                 .mul(coeff.weight)
                 .add(k0);
-            k1 = load_color_group_with_offset!(fw, N, N)
-                .add(load_color_group_with_offset!(bw, N, N))
+            k1 = ld_group!(fw, N, N)
+                .add(ld_group!(bw, N, N))
                 .mul(coeff.weight)
                 .add(k1);
-            k2 = load_color_group_with_offset!(fw, N, 2 * N)
-                .add(load_color_group_with_offset!(bw, N, 2 * N))
+            k2 = ld_group!(fw, N, 2 * N)
+                .add(ld_group!(bw, N, 2 * N))
                 .mul(coeff.weight)
                 .add(k2);
-            k3 = load_color_group_with_offset!(fw, N, 3 * N)
-                .add(load_color_group_with_offset!(bw, N, 3 * N))
+            k3 = ld_group!(fw, N, 3 * N)
+                .add(ld_group!(bw, N, 3 * N))
                 .mul(coeff.weight)
                 .add(k3);
-            k4 = load_color_group_with_offset!(fw, N, 4 * N)
-                .add(load_color_group_with_offset!(bw, N, 4 * N))
+            k4 = ld_group!(fw, N, 4 * N)
+                .add(ld_group!(bw, N, 4 * N))
                 .mul(coeff.weight)
                 .add(k4);
-            k5 = load_color_group_with_offset!(fw, N, 5 * N)
-                .add(load_color_group_with_offset!(bw, N, 5 * N))
+            k5 = ld_group!(fw, N, 5 * N)
+                .add(ld_group!(bw, N, 5 * N))
                 .mul(coeff.weight)
                 .add(k5);
-            k6 = load_color_group_with_offset!(fw, N, 6 * N)
-                .add(load_color_group_with_offset!(bw, N, 6 * N))
+            k6 = ld_group!(fw, N, 6 * N)
+                .add(ld_group!(bw, N, 6 * N))
                 .mul(coeff.weight)
                 .add(k6);
-            k7 = load_color_group_with_offset!(fw, N, 7 * N)
-                .add(load_color_group_with_offset!(bw, N, 7 * N))
+            k7 = ld_group!(fw, N, 7 * N)
+                .add(ld_group!(bw, N, 7 * N))
                 .mul(coeff.weight)
                 .add(k7);
         }
@@ -146,33 +137,29 @@ pub fn filter_color_group_row_symmetric_approx<T, I, const N: usize>(
         let src = &src[_cx * N..(v_cx + length * N + N * 4)];
         let coeff = scanned_kernel[half_len];
 
-        let mut k0: ColorGroup<N, I> =
-            load_color_group_with_offset!(src, N, half_len * N).mul(coeff.weight);
-        let mut k1: ColorGroup<N, I> =
-            load_color_group_with_offset!(src, N, half_len * N + N).mul(coeff.weight);
-        let mut k2: ColorGroup<N, I> =
-            load_color_group_with_offset!(src, N, half_len * N + N * 2).mul(coeff.weight);
-        let mut k3: ColorGroup<N, I> =
-            load_color_group_with_offset!(src, N, half_len * N + N * 3).mul(coeff.weight);
+        let mut k0: ColorGroup<N, I> = ld_group!(src, N, half_len * N).mul(coeff.weight);
+        let mut k1: ColorGroup<N, I> = ld_group!(src, N, half_len * N + N).mul(coeff.weight);
+        let mut k2: ColorGroup<N, I> = ld_group!(src, N, half_len * N + N * 2).mul(coeff.weight);
+        let mut k3: ColorGroup<N, I> = ld_group!(src, N, half_len * N + N * 3).mul(coeff.weight);
 
         for (i, coeff) in scanned_kernel.iter().take(half_len).enumerate() {
             let rollback = length - i - 1;
             let fw = &src[(i * N)..((i + 4) * N)];
             let bw = &src[(rollback * N)..((rollback + 4) * N)];
-            k0 = load_color_group_with_offset!(fw, N, 0)
-                .add(load_color_group_with_offset!(bw, N, 0))
+            k0 = ld_group!(fw, N, 0)
+                .add(ld_group!(bw, N, 0))
                 .mul(coeff.weight)
                 .add(k0);
-            k1 = load_color_group_with_offset!(fw, N, N)
-                .add(load_color_group_with_offset!(bw, N, N))
+            k1 = ld_group!(fw, N, N)
+                .add(ld_group!(bw, N, N))
                 .mul(coeff.weight)
                 .add(k1);
-            k2 = load_color_group_with_offset!(fw, N, 2 * N)
-                .add(load_color_group_with_offset!(bw, N, 2 * N))
+            k2 = ld_group!(fw, N, 2 * N)
+                .add(ld_group!(bw, N, 2 * N))
                 .mul(coeff.weight)
                 .add(k2);
-            k3 = load_color_group_with_offset!(fw, N, 3 * N)
-                .add(load_color_group_with_offset!(bw, N, 3 * N))
+            k3 = ld_group!(fw, N, 3 * N)
+                .add(ld_group!(bw, N, 3 * N))
                 .mul(coeff.weight)
                 .add(k3);
         }
@@ -191,15 +178,14 @@ pub fn filter_color_group_row_symmetric_approx<T, I, const N: usize>(
         let src = &src[v_cx..(v_cx + length * N)];
         let coeff = scanned_kernel[half_len];
 
-        let mut k0: ColorGroup<N, I> =
-            load_color_group_with_offset!(src, N, half_len * N).mul(coeff.weight);
+        let mut k0: ColorGroup<N, I> = ld_group!(src, N, half_len * N).mul(coeff.weight);
 
         for (i, coeff) in scanned_kernel.iter().take(half_len).enumerate() {
             let rollback = length - i - 1;
             let fw = &src[(i * N)..((i + 1) * N)];
             let bw = &src[(rollback * N)..((rollback + 1) * N)];
-            k0 = load_color_group_with_offset!(fw, N, 0)
-                .add(load_color_group_with_offset!(bw, N, 0))
+            k0 = ld_group!(fw, N, 0)
+                .add(ld_group!(bw, N, 0))
                 .mul(coeff.weight)
                 .add(k0);
         }

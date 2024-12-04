@@ -112,7 +112,7 @@ pub(crate) unsafe fn _mm_mul_ps_epi32(ab: __m128i, cd: __m128) -> __m128i {
 }
 
 #[inline(always)]
-pub unsafe fn _mm_blendv_epi32x(xmm0: __m128i, xmm1: __m128i, mask: __m128i) -> __m128i {
+pub(crate) unsafe fn _mm_blendv_epi32x(xmm0: __m128i, xmm1: __m128i, mask: __m128i) -> __m128i {
     _mm_castps_si128(_mm_blendv_ps(
         _mm_castsi128_ps(xmm0),
         _mm_castsi128_ps(xmm1),
@@ -120,7 +120,7 @@ pub unsafe fn _mm_blendv_epi32x(xmm0: __m128i, xmm1: __m128i, mask: __m128i) -> 
     ))
 }
 
-pub const fn shuffle(z: u32, y: u32, x: u32, w: u32) -> i32 {
+pub(crate) const fn shuffle(z: u32, y: u32, x: u32, w: u32) -> i32 {
     // Checked: we want to reinterpret the bits
     ((z << 6) | (y << 4) | (x << 2) | w) as i32
 }
@@ -201,7 +201,7 @@ pub(crate) unsafe fn store_u8_u32<const CHANNELS_COUNT: usize>(dst_ptr: *mut u8,
 
 #[inline]
 #[target_feature(enable = "sse4.1")]
-pub unsafe fn _mm_hsum_ps(v: __m128) -> f32 {
+pub(crate) unsafe fn _mm_hsum_ps(v: __m128) -> f32 {
     let mut shuf = _mm_movehdup_ps(v);
     let mut sums = _mm_add_ps(v, shuf);
     shuf = _mm_movehl_ps(shuf, sums);
@@ -211,7 +211,7 @@ pub unsafe fn _mm_hsum_ps(v: __m128) -> f32 {
 
 // #[inline]
 // #[target_feature(enable = "sse4.1")]
-// pub unsafe fn _mm_hsum_epi32(v: __m128i) -> i32 {
+// pub(crate) unsafe   fn _mm_hsum_epi32(v: __m128i) -> i32 {
 //     const SHUFFLE_1: i32 = shuffle(1, 0, 3, 2);
 //     let hi64 = _mm_shuffle_epi32::<SHUFFLE_1>(v);
 //     let sum64 = _mm_add_epi32(hi64, v);
@@ -222,7 +222,7 @@ pub unsafe fn _mm_hsum_ps(v: __m128) -> f32 {
 
 #[inline]
 #[target_feature(enable = "sse4.1")]
-pub unsafe fn _mm_loadu_si128_x2(ptr: *const u8) -> (__m128i, __m128i) {
+pub(crate) unsafe fn _mm_loadu_si128_x2(ptr: *const u8) -> (__m128i, __m128i) {
     (
         _mm_loadu_si128(ptr as *const __m128i),
         _mm_loadu_si128(ptr.add(16) as *const __m128i),
@@ -231,7 +231,7 @@ pub unsafe fn _mm_loadu_si128_x2(ptr: *const u8) -> (__m128i, __m128i) {
 
 #[inline]
 #[target_feature(enable = "sse4.1")]
-pub unsafe fn _mm_loadu_ps_x4(ptr: *const f32) -> (__m128, __m128, __m128, __m128) {
+pub(crate) unsafe fn _mm_loadu_ps_x4(ptr: *const f32) -> (__m128, __m128, __m128, __m128) {
     (
         _mm_loadu_ps(ptr),
         _mm_loadu_ps(ptr.add(4)),
@@ -241,19 +241,19 @@ pub unsafe fn _mm_loadu_ps_x4(ptr: *const f32) -> (__m128, __m128, __m128, __m12
 }
 
 #[inline(always)]
-pub unsafe fn _mm_loadu_ps_x2(ptr: *const f32) -> (__m128, __m128) {
+pub(crate) unsafe fn _mm_loadu_ps_x2(ptr: *const f32) -> (__m128, __m128) {
     (_mm_loadu_ps(ptr), _mm_loadu_ps(ptr.add(4)))
 }
 
 #[inline(always)]
-pub unsafe fn _mm_erase_last_ps(item: __m128) -> __m128 {
+pub(crate) unsafe fn _mm_erase_last_ps(item: __m128) -> __m128 {
     #[allow(overflowing_literals)]
     let mask = _mm_castsi128_ps(_mm_setr_epi32(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0));
     _mm_and_ps(item, mask)
 }
 
 #[inline(always)]
-pub unsafe fn _mm_split_rgb_5_ps(
+pub(crate) unsafe fn _mm_split_rgb_5_ps(
     vals: (__m128, __m128, __m128, __m128),
 ) -> (__m128, __m128, __m128, __m128, __m128) {
     let first = _mm_erase_last_ps(vals.0);
@@ -275,25 +275,25 @@ pub unsafe fn _mm_split_rgb_5_ps(
 }
 
 #[inline(always)]
-pub unsafe fn _mm_broadcast_first(item: __m128) -> __m128 {
+pub(crate) unsafe fn _mm_broadcast_first(item: __m128) -> __m128 {
     const FLAG: i32 = shuffle(0, 0, 0, 0);
     _mm_shuffle_ps::<FLAG>(item, item)
 }
 
 #[inline(always)]
-pub unsafe fn _mm_broadcast_second(item: __m128) -> __m128 {
+pub(crate) unsafe fn _mm_broadcast_second(item: __m128) -> __m128 {
     const FLAG: i32 = shuffle(1, 1, 1, 1);
     _mm_shuffle_ps::<FLAG>(item, item)
 }
 
 #[inline(always)]
-pub unsafe fn _mm_broadcast_third(item: __m128) -> __m128 {
+pub(crate) unsafe fn _mm_broadcast_third(item: __m128) -> __m128 {
     const FLAG: i32 = shuffle(2, 2, 2, 2);
     _mm_shuffle_ps::<FLAG>(item, item)
 }
 
 #[inline(always)]
-pub unsafe fn _mm_broadcast_fourth(item: __m128) -> __m128 {
+pub(crate) unsafe fn _mm_broadcast_fourth(item: __m128) -> __m128 {
     const FLAG: i32 = shuffle(3, 3, 3, 3);
     _mm_shuffle_ps::<FLAG>(item, item)
 }

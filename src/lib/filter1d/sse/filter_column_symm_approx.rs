@@ -45,7 +45,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 use std::ops::{Add, Mul};
 
-pub fn filter_column_symm_u8_i32_app(
+pub(crate) fn filter_column_symm_u8_i32_app(
     arena: Arena,
     arena_src: &[&[u8]],
     dst: &UnsafeSlice<u8>,

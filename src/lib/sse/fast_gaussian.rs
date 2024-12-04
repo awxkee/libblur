@@ -37,7 +37,7 @@ use crate::sse::utils::load_u8_s32_fast;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, EdgeMode};
 
-pub fn fast_gaussian_horizontal_pass_sse_u8<T, const CHANNELS_COUNT: usize>(
+pub(crate) fn fast_gaussian_horizontal_pass_sse_u8<T, const CHANNELS_COUNT: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -61,7 +61,6 @@ pub fn fast_gaussian_horizontal_pass_sse_u8<T, const CHANNELS_COUNT: usize>(
     }
 }
 
-#[inline]
 #[target_feature(enable = "sse4.1")]
 unsafe fn fast_gaussian_horizontal_pass_sse_u8_impl<T, const CHANNELS_COUNT: usize>(
     undefined_slice: &UnsafeSlice<T>,
@@ -139,7 +138,7 @@ unsafe fn fast_gaussian_horizontal_pass_sse_u8_impl<T, const CHANNELS_COUNT: usi
     }
 }
 
-pub fn fast_gaussian_vertical_pass_sse_u8<T, const CHANNELS_COUNT: usize>(
+pub(crate) fn fast_gaussian_vertical_pass_sse_u8<T, const CHANNELS_COUNT: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -163,7 +162,6 @@ pub fn fast_gaussian_vertical_pass_sse_u8<T, const CHANNELS_COUNT: usize>(
     }
 }
 
-#[inline]
 #[target_feature(enable = "sse4.1")]
 unsafe fn fast_gaussian_vertical_pass_sse_u8_impl<T, const CHANNELS_COUNT: usize>(
     undefined_slice: &UnsafeSlice<T>,

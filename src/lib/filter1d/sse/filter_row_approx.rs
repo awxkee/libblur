@@ -42,7 +42,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 use std::ops::{Add, Mul};
 
-pub fn filter_row_sse_u8_i32(
+pub(crate) fn filter_row_sse_u8_i32(
     arena: Arena,
     arena_src: &[u8],
     dst: &UnsafeSlice<u8>,

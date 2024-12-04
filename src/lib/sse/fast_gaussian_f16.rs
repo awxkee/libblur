@@ -38,7 +38,7 @@ use crate::sse::{load_f32_f16, store_f32_f16};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, EdgeMode};
 
-pub fn fast_gaussian_horizontal_pass_sse_f16<T, const CHANNELS_COUNT: usize>(
+pub(crate) fn fast_gaussian_horizontal_pass_sse_f16<T, const CHANNELS_COUNT: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -137,7 +137,7 @@ unsafe fn fast_gaussian_horizontal_pass_sse_f16_impl<T, const CHANNELS_COUNT: us
     }
 }
 
-pub fn fast_gaussian_vertical_pass_sse_f16<T, const CHANNELS_COUNT: usize>(
+pub(crate) fn fast_gaussian_vertical_pass_sse_f16<T, const CHANNELS_COUNT: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,

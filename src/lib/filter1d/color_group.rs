@@ -62,8 +62,7 @@ where
     }
 }
 
-#[macro_export]
-macro_rules! load_color_group_with_offset {
+macro_rules! ld_group {
     ($store: expr, $channels: expr, $offset: expr) => {{
         if $channels == 1 {
             ColorGroup {
@@ -98,6 +97,8 @@ macro_rules! load_color_group_with_offset {
         }
     }};
 }
+
+pub(crate) use ld_group;
 
 impl<const COMPS: usize, J> ColorGroup<COMPS, J>
 where

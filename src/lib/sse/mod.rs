@@ -24,7 +24,7 @@
 // CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
+#![deny(unreachable_pub)]
 mod fast_gaussian;
 mod fast_gaussian_f16;
 mod fast_gaussian_f32;
@@ -35,20 +35,22 @@ mod packing;
 pub(crate) mod utils;
 mod v_load_store;
 
-pub use fast_gaussian::*;
-pub use fast_gaussian_f16::{
+pub(crate) use fast_gaussian::{
+    fast_gaussian_horizontal_pass_sse_u8, fast_gaussian_vertical_pass_sse_u8,
+};
+pub(crate) use fast_gaussian_f16::{
     fast_gaussian_horizontal_pass_sse_f16, fast_gaussian_vertical_pass_sse_f16,
 };
-pub use fast_gaussian_f32::{
+pub(crate) use fast_gaussian_f32::{
     fast_gaussian_horizontal_pass_sse_f32, fast_gaussian_vertical_pass_sse_f32,
 };
-pub use fast_gaussian_next::*;
-pub use fast_gaussian_next_f16::{
+pub(crate) use fast_gaussian_next::*;
+pub(crate) use fast_gaussian_next_f16::{
     fast_gaussian_next_horizontal_pass_sse_f16, fast_gaussian_next_vertical_pass_sse_f16,
 };
-pub use fast_gaussian_next_f32::{
+pub(crate) use fast_gaussian_next_f32::{
     fast_gaussian_next_horizontal_pass_sse_f32, fast_gaussian_next_vertical_pass_sse_f32,
 };
-pub use packing::*;
-pub use utils::*;
-pub use v_load_store::*;
+pub(crate) use packing::*;
+pub(crate) use utils::*;
+pub(crate) use v_load_store::*;

@@ -26,7 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
+#![deny(unreachable_pub)]
 mod filter_column;
 mod filter_column_approx;
 mod filter_column_f32;
@@ -46,20 +46,20 @@ mod filter_row;
 mod filter_row_f32;
 mod utils;
 
-pub use filter_column::filter_column_avx_u8_f32;
+pub(crate) use filter_column::filter_column_avx_u8_f32;
 pub(crate) use filter_column_approx::filter_column_avx_u8_i32_app;
-pub use filter_column_f32::filter_column_avx_f32_f32;
-pub use filter_column_symm::filter_column_avx_symm_u8_f32;
+pub(crate) use filter_column_f32::filter_column_avx_f32_f32;
+pub(crate) use filter_column_symm::filter_column_avx_symm_u8_f32;
 pub(crate) use filter_column_symm_approx::filter_column_avx_symm_u8_i32_app;
-pub use filter_rgb_row::filter_rgb_row_avx_u8_f32;
-pub use filter_rgb_row_approx::filter_rgb_row_avx_u8_i32_app;
-pub use filter_rgb_row_f32::filter_rgb_row_avx_f32_f32;
-pub use filter_rgb_row_symm::filter_rgb_row_avx_symm_u8_f32;
-pub use filter_rgb_row_symm_approx::filter_rgb_row_avx_symm_u8_i32_approx;
-pub use filter_rgba_row::filter_rgba_row_avx_u8_f32;
-pub use filter_rgba_row_approx::filter_rgba_row_avx_u8_i32_app;
-pub use filter_rgba_row_f32::filter_rgba_row_avx_f32_f32;
-pub use filter_rgba_row_symm::filter_rgba_row_avx_symm_u8_f32;
-pub use filter_rgba_row_symm_approx::filter_rgba_row_avx_symm_u8_i32_app;
-pub use filter_row::filter_row_avx_u8_f32;
-pub use filter_row_f32::filter_row_avx_f32_f32;
+pub(crate) use filter_rgb_row::filter_rgb_row_avx_u8_f32;
+pub(crate) use filter_rgb_row_approx::filter_rgb_row_avx_u8_i32_app;
+pub(crate) use filter_rgb_row_f32::filter_rgb_row_avx_f32_f32;
+pub(crate) use filter_rgb_row_symm::filter_rgb_row_avx_symm_u8_f32;
+pub(crate) use filter_rgb_row_symm_approx::filter_rgb_row_avx_symm_u8_i32_approx;
+pub(crate) use filter_rgba_row::filter_rgba_row_avx_u8_f32;
+pub(crate) use filter_rgba_row_approx::filter_rgba_row_avx_u8_i32_app;
+pub(crate) use filter_rgba_row_f32::filter_rgba_row_avx_f32_f32;
+pub(crate) use filter_rgba_row_symm::filter_rgba_row_avx_symm_u8_f32;
+pub(crate) use filter_rgba_row_symm_approx::filter_rgba_row_avx_symm_u8_i32_app;
+pub(crate) use filter_row::filter_row_avx_u8_f32;
+pub(crate) use filter_row_f32::filter_row_avx_f32_f32;

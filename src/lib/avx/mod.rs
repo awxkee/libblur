@@ -26,11 +26,11 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
+#![deny(unreachable_pub)]
 mod pack;
 mod v_load;
 mod v_store;
 
 pub(crate) use pack::*;
-pub use v_load::*;
-pub use v_store::*;
+pub(crate) use v_load::*;
+pub(crate) use v_store::*;

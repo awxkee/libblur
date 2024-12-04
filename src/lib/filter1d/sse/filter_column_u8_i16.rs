@@ -44,7 +44,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 use std::ops::Mul;
 
-pub fn filter_column_sse_u8_i16(
+pub(crate) fn filter_column_sse_u8_i16(
     arena: Arena,
     arena_src: &[&[u8]],
     dst: &UnsafeSlice<u8>,
