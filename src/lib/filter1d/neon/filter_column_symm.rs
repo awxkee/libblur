@@ -226,7 +226,7 @@ pub fn filter_symm_column_neon_u8_f32(
         for x in _cx..dst_stride {
             let coeff = scanned_kernel.get_unchecked(half_len).weight;
 
-            let mut k0 = (*brows.get_unchecked(half_len).get_unchecked(_cx) as f32).mul(coeff);
+            let mut k0 = (*brows.get_unchecked(half_len).get_unchecked(x) as f32).mul(coeff);
 
             for i in 0..half_len {
                 let coeff = *scanned_kernel.get_unchecked(i);

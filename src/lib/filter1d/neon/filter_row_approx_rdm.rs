@@ -56,8 +56,8 @@ pub(crate) fn filter_row_neon_u8_i32_rdm(
 
         let length = scanned_kernel.iter().len();
 
-        const EXPAND: i32 = 7;
-        const PRECISION: i32 = 7;
+        const EXPAND: i32 = 6;
+        const PRECISION: i32 = 6;
 
         let mut _cx = 0usize;
 

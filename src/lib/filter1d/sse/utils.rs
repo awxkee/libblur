@@ -42,8 +42,8 @@ pub(crate) unsafe fn _mm_mul_epi8_by_epi16_x4(
     let hi_16 = _mm_slli_epi16::<6>(_mm_unpackhi_epi8(input, zeros));
 
     (
-        _mm_mulhi_epi16(lo_16, weight),
-        _mm_mulhi_epi16(hi_16, weight),
+        _mm_mulhrs_epi16(lo_16, weight),
+        _mm_mulhrs_epi16(hi_16, weight),
     )
 }
 
@@ -74,8 +74,8 @@ pub(crate) unsafe fn _mm_mull_epi8_by_epi16_x4(
     let hi_16 = _mm_slli_epi16::<6>(_mm_unpackhi_epi8(input, zeros));
 
     (
-        _mm_mulhi_epi16(lo_16, weight),
-        _mm_mulhi_epi16(hi_16, weight),
+        _mm_mulhrs_epi16(lo_16, weight),
+        _mm_mulhrs_epi16(hi_16, weight),
     )
 }
 
@@ -84,7 +84,7 @@ pub(crate) unsafe fn _mm_mull_epi8_by_epi16_x2(input: __m128i, weight: __m128i) 
     let zeros = _mm_setzero_si128();
     let lo_16 = _mm_slli_epi16::<6>(_mm_unpacklo_epi8(input, zeros));
 
-    _mm_mulhi_epi16(lo_16, weight)
+    _mm_mulhrs_epi16(lo_16, weight)
 }
 
 #[inline(always)]
@@ -103,7 +103,7 @@ pub(crate) unsafe fn _mm_mul_epi8_by_epi16_x2(input: __m128i, weight: __m128i) -
     let zeros = _mm_setzero_si128();
     let lo_16 = _mm_slli_epi16::<6>(_mm_unpacklo_epi8(input, zeros));
 
-    _mm_mulhi_epi16(lo_16, weight)
+    _mm_mulhrs_epi16(lo_16, weight)
 }
 
 #[inline(always)]
@@ -165,8 +165,8 @@ pub(crate) unsafe fn _mm_mull_add_epi8_by_epi16_x4(
     let hi_16 = _mm_slli_epi16::<6>(_mm_unpackhi_epi8(input, zeros));
 
     (
-        _mm_add_epi16(accumulator.0, _mm_mulhi_epi16(lo_16, weight)),
-        _mm_add_epi16(accumulator.1, _mm_mulhi_epi16(hi_16, weight)),
+        _mm_add_epi16(accumulator.0, _mm_mulhrs_epi16(lo_16, weight)),
+        _mm_add_epi16(accumulator.1, _mm_mulhrs_epi16(hi_16, weight)),
     )
 }
 
@@ -179,7 +179,7 @@ pub(crate) unsafe fn _mm_mull_add_epi8_by_epi16_x2(
     let zeros = _mm_setzero_si128();
     let lo_16 = _mm_slli_epi16::<6>(_mm_unpacklo_epi8(input, zeros));
 
-    _mm_add_epi16(accumulator, _mm_mulhi_epi16(lo_16, weight))
+    _mm_add_epi16(accumulator, _mm_mulhrs_epi16(lo_16, weight))
 }
 
 #[inline(always)]
@@ -200,8 +200,8 @@ pub(crate) unsafe fn _mm_mull_add_symm_epi8_by_epi16_x4(
     ));
 
     (
-        _mm_add_epi16(accumulator.0, _mm_mulhi_epi16(lo_16, weight)),
-        _mm_add_epi16(accumulator.1, _mm_mulhi_epi16(hi_16, weight)),
+        _mm_add_epi16(accumulator.0, _mm_mulhrs_epi16(lo_16, weight)),
+        _mm_add_epi16(accumulator.1, _mm_mulhrs_epi16(hi_16, weight)),
     )
 }
 
@@ -309,7 +309,7 @@ pub(crate) unsafe fn _mm_mull_add_symm_epi8_by_epi16_x2(
         _mm_unpacklo_epi8(input1, zeros),
     ));
 
-    _mm_add_epi16(accumulator, _mm_mulhi_epi16(lo_16, weight))
+    _mm_add_epi16(accumulator, _mm_mulhrs_epi16(lo_16, weight))
 }
 
 #[inline(always)]
@@ -323,8 +323,8 @@ pub(crate) unsafe fn _mm_mul_add_epi8_by_epi16_x4(
     let hi_16 = _mm_slli_epi16::<6>(_mm_unpackhi_epi8(input, zeros));
 
     (
-        _mm_add_epi16(_mm_mulhi_epi16(lo_16, weight), accumulator.0),
-        _mm_add_epi16(_mm_mulhi_epi16(hi_16, weight), accumulator.1),
+        _mm_add_epi16(_mm_mulhrs_epi16(lo_16, weight), accumulator.0),
+        _mm_add_epi16(_mm_mulhrs_epi16(hi_16, weight), accumulator.1),
     )
 }
 
@@ -346,8 +346,8 @@ pub(crate) unsafe fn _mm_mul_add_symm_epi8_by_epi16_x4(
     ));
 
     (
-        _mm_add_epi16(_mm_mulhi_epi16(lo_16, weight), accumulator.0),
-        _mm_add_epi16(_mm_mulhi_epi16(hi_16, weight), accumulator.1),
+        _mm_add_epi16(_mm_mulhrs_epi16(lo_16, weight), accumulator.0),
+        _mm_add_epi16(_mm_mulhrs_epi16(hi_16, weight), accumulator.1),
     )
 }
 
@@ -360,7 +360,7 @@ pub unsafe fn _mm_mul_add_epi8_by_epi16_x2(
     let zeros = _mm_setzero_si128();
     let lo_16 = _mm_slli_epi16::<6>(_mm_unpacklo_epi8(input, zeros));
 
-    _mm_add_epi16(_mm_mulhi_epi16(lo_16, weight), accumulator)
+    _mm_add_epi16(_mm_mulhrs_epi16(lo_16, weight), accumulator)
 }
 
 #[inline(always)]
@@ -377,25 +377,25 @@ pub unsafe fn _mm_mul_add_symm_epi8_by_epi16_x2(
     ));
 
     _mm_add_epi16(
-        _mm_mulhi_epi16(_mm_unpacklo_epi16(lo_16, zeros), weight),
+        _mm_mulhrs_epi16(_mm_unpacklo_epi16(lo_16, zeros), weight),
         accumulator,
     )
 }
 
 #[inline(always)]
 pub(crate) unsafe fn _mm_pack_epi32_x2_epi8(store: (__m128i, __m128i)) -> __m128i {
-    let rounding_const = _mm_set1_epi16(1 << 4);
+    let rounding_const = _mm_set1_epi16(1 << 5);
     _mm_packus_epi16(
-        _mm_srai_epi16::<5>(_mm_add_epi16(store.0, rounding_const)),
-        _mm_srai_epi16::<5>(_mm_add_epi16(store.1, rounding_const)),
+        _mm_srai_epi16::<6>(_mm_add_epi16(store.0, rounding_const)),
+        _mm_srai_epi16::<6>(_mm_add_epi16(store.1, rounding_const)),
     )
 }
 
 #[inline(always)]
 pub(crate) unsafe fn _mm_pack_epi32_epi8(store: __m128i) -> __m128i {
-    let rounding_const = _mm_set1_epi16(1 << 4);
+    let rounding_const = _mm_set1_epi16(1 << 5);
     _mm_packus_epi16(
-        _mm_srai_epi16::<5>(_mm_add_epi16(store, rounding_const)),
+        _mm_srai_epi16::<6>(_mm_add_epi16(store, rounding_const)),
         _mm_setzero_si128(),
     )
 }

@@ -69,8 +69,8 @@ pub(crate) unsafe fn _mm256_mul_epi8_by_epi16_x4(
     let hi_16 = _mm256_slli_epi16::<6>(_mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(input)));
 
     (
-        _mm256_mulhi_epi16(lo_16, weight),
-        _mm256_mulhi_epi16(hi_16, weight),
+        _mm256_mulhrs_epi16(lo_16, weight),
+        _mm256_mulhrs_epi16(hi_16, weight),
     )
 }
 
@@ -84,8 +84,8 @@ pub(crate) unsafe fn _mm256_mul_add_epi8_by_epi16_x4(
     let hi_16 = _mm256_slli_epi16::<6>(_mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(input)));
 
     (
-        _mm256_add_epi16(accumulator.0, _mm256_mulhi_epi16(lo_16, weight)),
-        _mm256_add_epi16(accumulator.1, _mm256_mulhi_epi16(hi_16, weight)),
+        _mm256_add_epi16(accumulator.0, _mm256_mulhrs_epi16(lo_16, weight)),
+        _mm256_add_epi16(accumulator.1, _mm256_mulhrs_epi16(hi_16, weight)),
     )
 }
 
@@ -106,8 +106,8 @@ pub(crate) unsafe fn _mm256_mul_add_symm_epi8_by_epi16_x4(
     ));
 
     (
-        _mm256_add_epi32(accumulator.0, _mm256_mulhi_epi16(lo_16, weight)),
-        _mm256_add_epi32(accumulator.1, _mm256_mulhi_epi16(hi_16, weight)),
+        _mm256_add_epi32(accumulator.0, _mm256_mulhrs_epi16(lo_16, weight)),
+        _mm256_add_epi32(accumulator.1, _mm256_mulhrs_epi16(hi_16, weight)),
     )
 }
 
@@ -215,9 +215,9 @@ pub(crate) unsafe fn _mm256_pack_ps_x4_epi8(store: (__m256, __m256, __m256, __m2
 
 #[inline]
 pub(crate) unsafe fn _mm256_pack_epi32_x4_epi8(store: (__m256i, __m256i)) -> __m256i {
-    let rounding_const = _mm256_set1_epi16(1 << 4);
+    let rounding_const = _mm256_set1_epi16(1 << 5);
     _mm256_pack_u16(
-        _mm256_srai_epi16::<5>(_mm256_add_epi16(store.0, rounding_const)),
-        _mm256_srai_epi16::<5>(_mm256_add_epi16(store.1, rounding_const)),
+        _mm256_srai_epi16::<6>(_mm256_add_epi16(store.0, rounding_const)),
+        _mm256_srai_epi16::<6>(_mm256_add_epi16(store.1, rounding_const)),
     )
 }

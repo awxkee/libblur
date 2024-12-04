@@ -188,7 +188,7 @@ pub fn filter_color_group_row_symmetric_approx<T, I, const N: usize>(
 
     for x in _cx..width {
         let v_cx = x * N;
-        let src = &src[v_cx * N..(v_cx + length * N)];
+        let src = &src[v_cx..(v_cx + length * N)];
         let coeff = scanned_kernel[half_len];
 
         let mut k0: ColorGroup<N, I> =

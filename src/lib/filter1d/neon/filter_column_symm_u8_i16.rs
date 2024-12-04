@@ -288,7 +288,7 @@ pub fn filter_column_symm_neon_u8_i16(
         for x in _cx..image_width {
             let coeff = *scanned_kernel.get_unchecked(half_len);
 
-            let v_src = arena_src.get_unchecked(half_len).get_unchecked(_cx..);
+            let v_src = arena_src.get_unchecked(half_len).get_unchecked(x..);
 
             let mut k0 = ((*v_src.get_unchecked(0)) as i16).mul(coeff.weight);
 

@@ -163,17 +163,17 @@ fn main() {
     //     vst1q_s64(t.as_mut_ptr(), mul);
     //     println!("{:?}", t);
     // }
-    let img = ImageReader::open("assets/sonderland.jpg")
+    let dyn_image = ImageReader::open("assets/test_image_1.jpg")
         .unwrap()
         .decode()
         .unwrap();
-    let dimensions = img.dimensions();
-    println!("dimensions {:?}", img.dimensions());
-    println!("type {:?}", img.color());
+    let dimensions = dyn_image.dimensions();
+    println!("dimensions {:?}", dyn_image.dimensions());
+    println!("type {:?}", dyn_image.color());
 
-    println!("{:?}", img.color());
+    println!("{:?}", dyn_image.color());
 
-    let img = img.to_rgb8();
+    let img = dyn_image.to_rgb8();
     let src_bytes = img.as_bytes();
     let components = 3;
     let stride = dimensions.0 as usize * components;
@@ -254,11 +254,11 @@ fn main() {
         &mut dst_bytes,
         dimensions.0,
         dimensions.1,
-        513,
+        251,
         0.,
         FastBlurChannels::Channels3,
         EdgeMode::Clamp,
-        ThreadingPolicy::Adaptive,
+        ThreadingPolicy::Single,
         GaussianPreciseLevel::INTEGRAL,
     );
     //
@@ -406,6 +406,11 @@ fn main() {
     let elapsed_time = start_time.elapsed();
     // Print the elapsed time in milliseconds
     println!("Elapsed time: {:.2?}", elapsed_time);
+
+    let start_time = Instant::now();
+    let blurred = dyn_image.blur(125f32);
+    println!("Gauss image: {:.2?}", start_time.elapsed());
+    blurred.save("dyn.jpg").unwrap();
 
     // libblur::gaussian_blur(
     //     &bytes,

@@ -294,7 +294,7 @@ unsafe fn filter_column_sse_u8_f32_impl<const FMA: bool>(
     for x in _cx..image_width {
         let coeff = *scanned_kernel.get_unchecked(0);
 
-        let v_src = arena_src.get_unchecked(0).get_unchecked(_cx..);
+        let v_src = arena_src.get_unchecked(0).get_unchecked(x..);
 
         let mut k0 = ((*v_src.get_unchecked(0)) as f32).mul(coeff.weight);
 

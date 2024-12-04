@@ -230,7 +230,7 @@ unsafe fn filter_column_avx_f32_f32_impl<const FMA: bool>(
         for x in _cx..dst_stride {
             let coeff = *scanned_kernel.get_unchecked(0);
 
-            let v_src = arena_src.get_unchecked(0).get_unchecked(_cx..);
+            let v_src = arena_src.get_unchecked(0).get_unchecked(x..);
 
             let mut k0 = (*v_src.get_unchecked(0)).mul(coeff.weight);
 
