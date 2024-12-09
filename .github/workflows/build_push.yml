@@ -32,8 +32,8 @@ jobs:
       - name: Test release pipeline
         run: cargo publish --dry-run --manifest-path src/lib/Cargo.toml
 
-  fuzz_8bit:
-    name: Fuzzing 8bit
+  fuzz_gauss:
+    name: Fuzzing Gauss
     strategy:
       matrix:
         os: [ ubuntu-latest, macos-latest ]

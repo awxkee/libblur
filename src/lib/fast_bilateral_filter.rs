@@ -645,9 +645,8 @@ fn fast_bilateral_filter_plane_impl<V: Copy + Default + 'static + BilinearWorkin
         dst.len()
     );
     assert_ne!(kernel_size & 1, 0, "kernel size must be odd");
-    assert_ne!(
-        spatial_sigma <= 0. || range_sigma <= 0.0,
-        true,
+    assert!(
+        !(spatial_sigma <= 0. || range_sigma <= 0.0),
         "Spatial sigma and range sigma must be more than 0"
     );
     let mut chan0 = vec![0f32; width as usize * height as usize];
@@ -684,9 +683,8 @@ pub(crate) fn fast_bilateral_filter_gray_alpha_impl<
     range_sigma: f32,
 ) {
     assert_ne!(kernel_size & 1, 0, "kernel size must be odd");
-    assert_ne!(
-        spatial_sigma <= 0. || range_sigma <= 0.0,
-        true,
+    assert!(
+        !(spatial_sigma <= 0. || range_sigma <= 0.0),
         "Spatial sigma and range sigma must be more than 0"
     );
     let mut chan0 = vec![0f32; width as usize * height as usize];
@@ -730,8 +728,8 @@ pub(crate) fn fast_bilateral_filter_gray_alpha_impl<
     dst.par_chunks_exact_mut(width as usize * 2)
         .zip(dst_chan0.par_chunks_exact(width as usize))
         .zip(dst_chan1.par_chunks_exact(width as usize))
-        .for_each(|(((dst, src0), src1))| {
-            for (((dst, src0), src1)) in dst.chunks_exact_mut(2).zip(src0.iter()).zip(src1.iter()) {
+        .for_each(|((dst, src0), src1)| {
+            for ((dst, src0), src1) in dst.chunks_exact_mut(2).zip(src0.iter()).zip(src1.iter()) {
                 dst[0] = V::from_bi_linear_f32(*src0);
                 dst[1] = V::from_bi_linear_f32(*src1);
             }
@@ -764,9 +762,8 @@ fn fast_bilateral_filter_rgb_impl<
         dst.len()
     );
     assert_ne!(kernel_size & 1, 0, "kernel size must be odd");
-    assert_ne!(
-        spatial_sigma <= 0. || range_sigma <= 0.0,
-        true,
+    assert!(
+        !(spatial_sigma <= 0. || range_sigma <= 0.0),
         "Spatial sigma and range sigma must be more than 0"
     );
     let mut chan0 = vec![0f32; width as usize * height as usize];
@@ -866,9 +863,8 @@ fn fast_bilateral_filter_rgba_impl<
         dst.len()
     );
     assert_ne!(kernel_size & 1, 0, "kernel size must be odd");
-    assert_ne!(
-        spatial_sigma <= 0. || range_sigma <= 0.0,
-        true,
+    assert!(
+        !(spatial_sigma <= 0. || range_sigma <= 0.0),
         "Spatial sigma and range sigma must be more than 0"
     );
     let mut chan0 = vec![0f32; width as usize * height as usize];
