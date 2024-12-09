@@ -31,3 +31,17 @@ jobs:
       - run: cargo build --target armv7-unknown-linux-gnueabi --manifest-path ./src/lib/Cargo.toml
       - name: Test release pipeline
         run: cargo publish --dry-run --manifest-path src/lib/Cargo.toml
+
+  fuzz_8bit:
+    name: Fuzzing 8bit
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, macos-latest ]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo install cargo-fuzz
+      - run: cargo fuzz run gauss -- -max_total_time=30
+      - run: cargo fuzz run gauss_u16 -- -max_total_time=30
+      - run: cargo fuzz run gauss_f32 -- -max_total_time=30

@@ -31,7 +31,7 @@ use crate::FastBlurChannels;
 use num_traits::real::Real;
 use num_traits::AsPrimitive;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-use rayon::prelude::ParallelSliceMut;
+use rayon::prelude::{ParallelSlice, ParallelSliceMut};
 use std::fmt::{Debug, Display};
 use std::ops::{Add, AddAssign, Div, Index, Mul, MulAssign, Sub};
 
@@ -630,26 +630,26 @@ fn fast_bilateral_filter_plane_impl<V: Copy + Default + 'static + BilinearWorkin
     spatial_sigma: f32,
     range_sigma: f32,
 ) {
-    if img.len() != width as usize * height as usize {
-        panic!(
-            "Input image dimensions do not match expected {} but got {}",
-            width * height,
-            img.len()
-        );
-    }
-    if dst.len() != width as usize * height as usize {
-        panic!(
-            "Input image dimensions do not match expected {} but got {}",
-            width * height,
-            dst.len()
-        );
-    }
-    if kernel_size & 1 == 0 {
-        panic!("kernel_size must not be odd");
-    }
-    if spatial_sigma <= 0. || range_sigma <= 0.0 {
-        panic!("Spatial sigma and range sigma must be more than 0");
-    }
+    assert_eq!(
+        img.len(),
+        width as usize * height as usize,
+        "Input image dimensions do not match expected {} but got {}",
+        width * height,
+        img.len()
+    );
+    assert_eq!(
+        dst.len(),
+        width as usize * height as usize,
+        "Input image dimensions do not match expected {} but got {}",
+        width * height,
+        dst.len()
+    );
+    assert_ne!(kernel_size & 1, 0, "kernel size must be odd");
+    assert_ne!(
+        spatial_sigma <= 0. || range_sigma <= 0.0,
+        true,
+        "Spatial sigma and range sigma must be more than 0"
+    );
     let mut chan0 = vec![0f32; width as usize * height as usize];
     for (r, &src) in chan0.iter_mut().zip(img.iter()) {
         *r = src.to_bi_linear_f32();
@@ -683,12 +683,12 @@ pub(crate) fn fast_bilateral_filter_gray_alpha_impl<
     spatial_sigma: f32,
     range_sigma: f32,
 ) {
-    if kernel_size & 1 == 0 {
-        panic!("kernel size must be odd");
-    }
-    if spatial_sigma <= 0. || range_sigma <= 0.0 {
-        panic!("Spatial sigma and range sigma must be more than 0");
-    }
+    assert_ne!(kernel_size & 1, 0, "kernel size must be odd");
+    assert_ne!(
+        spatial_sigma <= 0. || range_sigma <= 0.0,
+        true,
+        "Spatial sigma and range sigma must be more than 0"
+    );
     let mut chan0 = vec![0f32; width as usize * height as usize];
     let mut chan1 = vec![0f32; width as usize * height as usize];
     for ((r, g), src) in chan0
@@ -727,11 +727,14 @@ pub(crate) fn fast_bilateral_filter_gray_alpha_impl<
         });
     });
 
-    dst.par_chunks_exact_mut(2)
-        .enumerate()
-        .for_each(|(i, v_dst)| unsafe {
-            v_dst[0] = V::from_bi_linear_f32(*dst_chan0.get_unchecked(i));
-            v_dst[1] = V::from_bi_linear_f32(*dst_chan1.get_unchecked(i));
+    dst.par_chunks_exact_mut(width as usize * 2)
+        .zip(dst_chan0.par_chunks_exact(width as usize))
+        .zip(dst_chan1.par_chunks_exact(width as usize))
+        .for_each(|(((dst, src0), src1))| {
+            for (((dst, src0), src1)) in dst.chunks_exact_mut(2).zip(src0.iter()).zip(src1.iter()) {
+                dst[0] = V::from_bi_linear_f32(*src0);
+                dst[1] = V::from_bi_linear_f32(*src1);
+            }
         });
 }
 
@@ -746,26 +749,26 @@ fn fast_bilateral_filter_rgb_impl<
     spatial_sigma: f32,
     range_sigma: f32,
 ) {
-    if img.len() != width as usize * height as usize * 3 {
-        panic!(
-            "Input image dimensions do not match expected {} but got {}",
-            width * height * 3,
-            img.len()
-        );
-    }
-    if dst.len() != width as usize * height as usize * 3 {
-        panic!(
-            "Input image dimensions do not match expected {} but got {}",
-            width * height * 3,
-            dst.len()
-        );
-    }
-    if kernel_size & 1 == 0 {
-        panic!("kernel_size must not be odd");
-    }
-    if spatial_sigma <= 0. || range_sigma <= 0.0 {
-        panic!("Spatial sigma and range sigma must be more than 0");
-    }
+    assert_eq!(
+        img.len(),
+        width as usize * height as usize * 3,
+        "Input image dimensions do not match expected {} but got {}",
+        width * height * 3,
+        img.len()
+    );
+    assert_eq!(
+        dst.len(),
+        width as usize * height as usize * 3,
+        "Input image dimensions do not match expected {} but got {}",
+        width * height * 3,
+        dst.len()
+    );
+    assert_ne!(kernel_size & 1, 0, "kernel size must be odd");
+    assert_ne!(
+        spatial_sigma <= 0. || range_sigma <= 0.0,
+        true,
+        "Spatial sigma and range sigma must be more than 0"
+    );
     let mut chan0 = vec![0f32; width as usize * height as usize];
     let mut chan1 = vec![0f32; width as usize * height as usize];
     let mut chan2 = vec![0f32; width as usize * height as usize];
@@ -819,12 +822,21 @@ fn fast_bilateral_filter_rgb_impl<
         });
     });
 
-    dst.par_chunks_exact_mut(3)
-        .enumerate()
-        .for_each(|(i, v_dst)| unsafe {
-            v_dst[0] = V::from_bi_linear_f32(*dst_chan0.get_unchecked(i));
-            v_dst[1] = V::from_bi_linear_f32(*dst_chan1.get_unchecked(i));
-            v_dst[2] = V::from_bi_linear_f32(*dst_chan2.get_unchecked(i));
+    dst.par_chunks_exact_mut(width as usize * 3)
+        .zip(dst_chan0.par_chunks_exact(width as usize))
+        .zip(dst_chan1.par_chunks_exact(width as usize))
+        .zip(dst_chan2.par_chunks_exact(width as usize))
+        .for_each(|(((dst, src0), src1), src2)| {
+            for (((dst, src0), src1), src2) in dst
+                .chunks_exact_mut(3)
+                .zip(src0.iter())
+                .zip(src1.iter())
+                .zip(src2.iter())
+            {
+                dst[0] = V::from_bi_linear_f32(*src0);
+                dst[1] = V::from_bi_linear_f32(*src1);
+                dst[2] = V::from_bi_linear_f32(*src2);
+            }
         });
 }
 
@@ -839,26 +851,26 @@ fn fast_bilateral_filter_rgba_impl<
     spatial_sigma: f32,
     range_sigma: f32,
 ) {
-    if img.len() != width as usize * height as usize * 4 {
-        panic!(
-            "Input image dimensions do not match expected {} but got {}",
-            width * height * 4,
-            img.len()
-        );
-    }
-    if dst.len() != width as usize * height as usize * 4 {
-        panic!(
-            "Input image dimensions do not match expected {} but got {}",
-            width * height * 4,
-            dst.len()
-        );
-    }
-    if kernel_size & 1 == 0 {
-        panic!("kernel_size must not be odd");
-    }
-    if spatial_sigma <= 0. || range_sigma <= 0.0 {
-        panic!("Spatial sigma and range sigma must be more than 0");
-    }
+    assert_eq!(
+        img.len(),
+        width as usize * height as usize * 4,
+        "Input image dimensions do not match expected {} but got {}",
+        width * height * 4,
+        img.len()
+    );
+    assert_eq!(
+        dst.len(),
+        width as usize * height as usize * 4,
+        "Input image dimensions do not match expected {} but got {}",
+        width * height * 4,
+        dst.len()
+    );
+    assert_ne!(kernel_size & 1, 0, "kernel size must be odd");
+    assert_ne!(
+        spatial_sigma <= 0. || range_sigma <= 0.0,
+        true,
+        "Spatial sigma and range sigma must be more than 0"
+    );
     let mut chan0 = vec![0f32; width as usize * height as usize];
     let mut chan1 = vec![0f32; width as usize * height as usize];
     let mut chan2 = vec![0f32; width as usize * height as usize];
@@ -927,13 +939,24 @@ fn fast_bilateral_filter_rgba_impl<
         });
     });
 
-    dst.par_chunks_exact_mut(4)
-        .enumerate()
-        .for_each(|(i, v_dst)| unsafe {
-            v_dst[0] = V::from_bi_linear_f32(*dst_chan0.get_unchecked(i));
-            v_dst[1] = V::from_bi_linear_f32(*dst_chan1.get_unchecked(i));
-            v_dst[2] = V::from_bi_linear_f32(*dst_chan2.get_unchecked(i));
-            v_dst[3] = V::from_bi_linear_f32(*dst_chan3.get_unchecked(i));
+    dst.par_chunks_exact_mut(width as usize * 4)
+        .zip(dst_chan0.par_chunks_exact(width as usize))
+        .zip(dst_chan1.par_chunks_exact(width as usize))
+        .zip(dst_chan2.par_chunks_exact(width as usize))
+        .zip(dst_chan3.par_chunks_exact(width as usize))
+        .for_each(|((((dst, src0), src1), src2), src3)| {
+            for ((((dst, src0), src1), src2), src3) in dst
+                .chunks_exact_mut(4)
+                .zip(src0.iter())
+                .zip(src1.iter())
+                .zip(src2.iter())
+                .zip(src3.iter())
+            {
+                dst[0] = V::from_bi_linear_f32(*src0);
+                dst[1] = V::from_bi_linear_f32(*src1);
+                dst[2] = V::from_bi_linear_f32(*src2);
+                dst[3] = V::from_bi_linear_f32(*src3);
+            }
         });
 }
 
@@ -964,9 +987,7 @@ pub fn fast_bilateral_filter(
     range_sigma: f32,
     channels: FastBlurChannels,
 ) {
-    if kernel_size & 1 == 0 {
-        panic!("kernel_size must be odd");
-    }
+    assert_ne!(kernel_size & 1, 0, "kernel_size must be odd");
     match channels {
         FastBlurChannels::Plane => {
             fast_bilateral_filter_plane_impl(
