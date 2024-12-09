@@ -31,3 +31,17 @@ path = "gauss_f32/gauss_f32.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "stack_blur"
+path = "stack_blur/stack_blur.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "stack_blur_f32"
+path = "stack_blur_f32/stack_blur_f32.rs"
+test = false
+doc = false
+bench = false

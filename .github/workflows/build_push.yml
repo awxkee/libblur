@@ -45,3 +45,16 @@ jobs:
       - run: cargo fuzz run gauss -- -max_total_time=30
       - run: cargo fuzz run gauss_u16 -- -max_total_time=30
       - run: cargo fuzz run gauss_f32 -- -max_total_time=30
+
+  fuzz_stack_blur:
+    name: Fuzzing Stack Blur
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, macos-latest ]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo install cargo-fuzz
+      - run: cargo fuzz run stack_blur -- -max_total_time=30
+      - run: cargo fuzz run stack_blur_f32 -- -max_total_time=30
