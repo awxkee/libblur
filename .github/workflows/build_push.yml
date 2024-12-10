@@ -30,6 +30,17 @@ jobs:
       - run: RUSTFLAGS="-C target-feature=+avx2,+f16c" cargo build --target x86_64-unknown-linux-gnu --features image --manifest-path ./src/lib/Cargo.toml
       - run: cargo build --target armv7-unknown-linux-gnueabi --manifest-path ./src/lib/Cargo.toml
 
+  clippy:
+    name: Clippy
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, macos-latest ]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo clippy
+
   fuzz_gauss:
     name: Fuzzing Gauss
     strategy:
