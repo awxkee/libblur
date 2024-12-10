@@ -45,3 +45,24 @@ path = "stack_blur_f32/stack_blur_f32.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "fast_gaussian"
+path = "fast_gaussian/fast_gaussian.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fast_gaussian_u16"
+path = "fast_gaussian_u16/fast_gaussian_u16.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fast_gaussian_f32"
+path = "fast_gaussian_f32/fast_gaussian_f32.rs"
+test = false
+doc = false
+bench = false
