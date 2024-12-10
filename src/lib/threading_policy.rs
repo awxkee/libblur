@@ -49,13 +49,16 @@ impl ThreadingPolicy {
     pub fn thread_count(&self, width: u32, height: u32) -> usize {
         match self {
             ThreadingPolicy::Single => 1,
-            ThreadingPolicy::Adaptive => ((width * height / (256 * 256)) as usize)
-                .clamp(1, available_parallelism().unwrap().get()),
+            ThreadingPolicy::Adaptive => {
+                ((width * height / (256 * 256)) as usize).clamp(1, Self::available_parallelism())
+            }
             ThreadingPolicy::AdaptiveReserve(reserve) => {
-                let max_threads = {
-                    let max_threads = available_parallelism().unwrap().get();
+                let reserve = reserve.get();
 
-                    if max_threads <= reserve.get() {
+                let max_threads = {
+                    let max_threads = Self::available_parallelism();
+
+                    if max_threads <= reserve {
                         1
                     } else {
                         max_threads
@@ -63,9 +66,15 @@ impl ThreadingPolicy {
                 };
 
                 ((width * height / (256 * 256)) as usize)
-                    .clamp(1, max_threads.min(max_threads - reserve.get()))
+                    .clamp(1, max_threads.min(max_threads - reserve))
             }
             ThreadingPolicy::Fixed(fixed) => fixed.get(),
         }
+    }
+
+    fn available_parallelism() -> usize {
+        available_parallelism()
+            .unwrap_or_else(|_| NonZeroUsize::new(1).unwrap())
+            .get()
     }
 }
