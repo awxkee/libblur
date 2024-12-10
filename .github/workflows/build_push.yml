@@ -7,8 +7,10 @@ concurrency:
 on:
   push:
     branches:
-      - '*'
+      - 'master'
+      - 'main'
       - '!ci_test_*'
+      - 'ci_testing'
     tags-ignore:
       - '*'
   pull_request:
@@ -29,5 +31,55 @@ jobs:
       - run: cargo build --target powerpc-unknown-linux-gnu --manifest-path ./src/lib/Cargo.toml
       - run: RUSTFLAGS="-C target-feature=+avx2,+f16c" cargo build --target x86_64-unknown-linux-gnu --features image --manifest-path ./src/lib/Cargo.toml
       - run: cargo build --target armv7-unknown-linux-gnueabi --manifest-path ./src/lib/Cargo.toml
-      - name: Test release pipeline
-        run: cargo publish --dry-run --manifest-path src/lib/Cargo.toml
+
+  clippy:
+    name: Clippy
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, macos-latest ]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo clippy
+
+  fuzz_gauss:
+    name: Fuzzing Gauss
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, macos-latest ]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo install cargo-fuzz
+      - run: cargo fuzz run gauss -- -max_total_time=45
+      - run: cargo fuzz run gauss_u16 -- -max_total_time=45
+      - run: cargo fuzz run gauss_f32 -- -max_total_time=45
+
+  fuzz_stack_blur:
+    name: Fuzzing Stack Blur
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, macos-latest ]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo install cargo-fuzz
+      - run: cargo fuzz run stack_blur -- -max_total_time=45
+      - run: cargo fuzz run stack_blur_f32 -- -max_total_time=45
+
+  fuzz_fast_gaussian_blur:
+    name: Fuzzing Fast Gaussian Blur
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, macos-latest ]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo install cargo-fuzz
+      - run: cargo fuzz run fast_gaussian -- -max_total_time=45
+      - run: cargo fuzz run fast_gaussian_u16 -- -max_total_time=45
+      - run: cargo fuzz run fast_gaussian_f32 -- -max_total_time=45

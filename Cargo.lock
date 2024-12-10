@@ -603,6 +603,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "libblur-fuzz"
+version = "0.0.0"
+dependencies = [
+ "libblur",
+ "libfuzzer-sys",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.161"
 source = "registry+https://github.com/rust-lang/crates.io-index"
