@@ -320,7 +320,7 @@ pub fn median_blur(
         FastBlurChannels::Channels3 => median_blur_impl::<3>,
         FastBlurChannels::Channels4 => median_blur_impl::<4>,
     };
-    let thread_count = threading_policy.get_threads_count(width, height) as u32;
+    let thread_count = threading_policy.thread_count(width, height) as u32;
     if thread_count == 1 {
         _dispatcher(
             src,

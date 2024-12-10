@@ -626,7 +626,7 @@ pub fn box_blur(
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) {
-    let thread_count = threading_policy.get_threads_count(width, height) as u32;
+    let thread_count = threading_policy.thread_count(width, height) as u32;
     let _dispatcher = match channels {
         FastBlurChannels::Plane => box_blur_impl::<u8, 1>,
         FastBlurChannels::Channels3 => box_blur_impl::<u8, 3>,
@@ -681,7 +681,7 @@ pub fn box_blur_u16(
     threading_policy: ThreadingPolicy,
 ) {
     let stride = width * channels.get_channels() as u32;
-    let thread_count = threading_policy.get_threads_count(width, height) as u32;
+    let thread_count = threading_policy.thread_count(width, height) as u32;
     let pool = if thread_count == 1 {
         None
     } else {
@@ -735,7 +735,7 @@ pub fn box_blur_f32(
     threading_policy: ThreadingPolicy,
 ) {
     let stride = width * channels.get_channels() as u32;
-    let thread_count = threading_policy.get_threads_count(width, height) as u32;
+    let thread_count = threading_policy.thread_count(width, height) as u32;
     let pool = if thread_count == 1 {
         None
     } else {
@@ -870,7 +870,7 @@ fn tent_blur_impl<
 ) where
     f32: ToStorage<T>,
 {
-    let thread_count = threading_policy.get_threads_count(width, height) as u32;
+    let thread_count = threading_policy.thread_count(width, height) as u32;
     let pool = if thread_count == 1 {
         None
     } else {
@@ -1152,7 +1152,7 @@ fn gaussian_box_blur_impl<
 ) where
     f32: ToStorage<T>,
 {
-    let thread_count = threading_policy.get_threads_count(width, height) as u32;
+    let thread_count = threading_policy.thread_count(width, height) as u32;
     let pool = if thread_count == 1 {
         None
     } else {

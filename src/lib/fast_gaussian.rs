@@ -739,7 +739,7 @@ fn fast_gaussian_impl<
     f64: AsPrimitive<T> + ToStorage<T>,
 {
     let unsafe_image = UnsafeSlice::new(bytes);
-    let thread_count = threading_policy.get_threads_count(width, height) as u32;
+    let thread_count = threading_policy.thread_count(width, height) as u32;
     let pool = rayon::ThreadPoolBuilder::new()
         .num_threads(thread_count as usize)
         .build()
