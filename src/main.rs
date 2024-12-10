@@ -5,7 +5,12 @@ use crate::merge::merge_channels_3;
 use crate::split::split_channels_3;
 use colorutils_rs::TransferFunction;
 use image::{EncodableLayout, GenericImageView, ImageReader};
-use libblur::{adaptive_blur, fast_bilateral_filter, filter_1d_approx, filter_1d_exact, filter_1d_rgb_approx, filter_1d_rgb_exact, filter_2d_rgb_fft, filter_2d_rgba_fft, generate_motion_kernel, get_gaussian_kernel_1d, get_sigma_size, motion_blur, EdgeMode, FastBlurChannels, GaussianPreciseLevel, ImageSize, KernelShape, Scalar, ThreadingPolicy};
+use libblur::{
+    adaptive_blur, fast_bilateral_filter, filter_1d_approx, filter_1d_exact, filter_1d_rgb_approx,
+    filter_1d_rgb_exact, filter_2d_rgb_fft, filter_2d_rgba_fft, generate_motion_kernel,
+    get_gaussian_kernel_1d, get_sigma_size, motion_blur, EdgeMode, FastBlurChannels,
+    GaussianPreciseLevel, ImageSize, KernelShape, Scalar, ThreadingPolicy,
+};
 use std::time::Instant;
 
 #[allow(dead_code)]
