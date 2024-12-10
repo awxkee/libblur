@@ -25,28 +25,47 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use std::{num::NonZeroUsize, thread::available_parallelism};
+
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Default, Hash)]
-/// Declares thread policy usage
+/// Set threading policy.
 pub enum ThreadingPolicy {
-    /// Will use only one thread, current is preferred
+    /// Use only one thread, current is preferred.
     Single,
-    /// Computes adaptive thread count between 1...12 for given image bounds
+    /// Compute adaptive thread count between 1..available CPUs.
     #[default]
     Adaptive,
-    /// Spawn provided threads count
-    Fixed(usize),
+    /// Like `Adaptive`, but reserve given amount of threads (i.e. those will not be
+    /// used).
+    AdaptiveReserve(NonZeroUsize),
+    /// Use specified number of threads.
+    Fixed(NonZeroUsize),
 }
 
 impl ThreadingPolicy {
-    pub fn get_threads_count(&self, width: u32, height: u32) -> usize {
+    /// Returns the number of threads to use for the given image dimensions under the
+    /// selected policy variant.
+    pub fn thread_count(&self, width: u32, height: u32) -> usize {
         match self {
             ThreadingPolicy::Single => 1,
-            ThreadingPolicy::Adaptive => {
-                let thread_count = (width * height / (256 * 256)).clamp(1, 12);
-                thread_count as usize
+            ThreadingPolicy::Adaptive => ((width * height / (256 * 256)) as usize)
+                .clamp(1, available_parallelism().unwrap().get()),
+            ThreadingPolicy::AdaptiveReserve(reserve) => {
+                let max_threads = {
+                    let max_threads = available_parallelism().unwrap().get();
+
+                    if max_threads <= reserve.get() {
+                        1
+                    } else {
+                        max_threads
+                    }
+                };
+
+                ((width * height / (256 * 256)) as usize)
+                    .clamp(1, max_threads.min(max_threads - reserve.get()))
             }
-            ThreadingPolicy::Fixed(fixed) => *fixed,
+            ThreadingPolicy::Fixed(fixed) => fixed.get(),
         }
     }
 }

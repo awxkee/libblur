@@ -117,9 +117,8 @@ where
         border_constant,
     )?;
 
-    let thread_count = threading_policy
-        .get_threads_count(image_size.width as u32, image_size.height as u32)
-        as u32;
+    let thread_count =
+        threading_policy.thread_count(image_size.width as u32, image_size.height as u32) as u32;
     let pool = if thread_count == 1 {
         None
     } else {

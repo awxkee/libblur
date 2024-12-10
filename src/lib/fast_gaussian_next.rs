@@ -767,7 +767,7 @@ fn fast_gaussian_next_impl<
         end: u32,
         EdgeMode,
     ) = T::get_horizontal::<CHANNEL_CONFIGURATION>(radius);
-    let thread_count = threading_policy.get_threads_count(width, height) as u32;
+    let thread_count = threading_policy.thread_count(width, height) as u32;
     if thread_count == 1 {
         let unsafe_image = UnsafeSlice::new(bytes);
         _dispatcher_vertical(

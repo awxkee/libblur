@@ -483,7 +483,7 @@ pub(crate) fn fast_gaussian_impl<
     f64: ToStorage<T> + AsPrimitive<T>,
 {
     let unsafe_image = UnsafeSlice::new(bytes);
-    let thread_count = threading_policy.get_threads_count(width, height) as u32;
+    let thread_count = threading_policy.thread_count(width, height) as u32;
     if thread_count == 1 {
         fast_gaussian_vertical_pass::<T, CHANNELS_COUNT>(
             &unsafe_image,

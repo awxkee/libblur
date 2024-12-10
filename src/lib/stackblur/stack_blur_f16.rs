@@ -189,7 +189,7 @@ pub fn stack_blur_f16(
 ) {
     let radius = radius.max(1);
     let stride = width * channels.get_channels() as u32;
-    let thread_count = threading_policy.get_threads_count(width, height) as u32;
+    let thread_count = threading_policy.thread_count(width, height) as u32;
     if thread_count == 1 {
         let slice = UnsafeSlice::new(in_place);
         stack_blur_worker_horizontal(&slice, stride, width, height, radius, channels, 0, 1);

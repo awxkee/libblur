@@ -111,9 +111,8 @@ where
     let is_column_kernel_symmetrical = is_symmetric_1d(column_kernel);
     let is_row_kernel_symmetrical = is_symmetric_1d(row_kernel);
 
-    let thread_count = threading_policy
-        .get_threads_count(image_size.width as u32, image_size.height as u32)
-        as u32;
+    let thread_count =
+        threading_policy.thread_count(image_size.width as u32, image_size.height as u32) as u32;
     let pool = if thread_count == 1 {
         None
     } else {
