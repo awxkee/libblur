@@ -74,9 +74,7 @@ pub fn gaussian_blur(
     } else {
         sigma
     };
-    if kernel_size % 2 == 0 {
-        panic!("kernel size must be odd");
-    }
+    assert_ne!(kernel_size % 2, 0, "kernel size must be odd");
     let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
     match precise_level {
         GaussianPreciseLevel::EXACT => {
@@ -152,9 +150,7 @@ pub fn gaussian_blur_u16(
     } else {
         sigma
     };
-    if kernel_size % 2 == 0 {
-        panic!("kernel size must be odd");
-    }
+    assert_ne!(kernel_size % 2, 0, "kernel size must be odd");
     let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
     let _dispatcher = match channels {
         FastBlurChannels::Plane => filter_1d_exact::<u16, f32>,
@@ -209,9 +205,7 @@ pub fn gaussian_blur_f32(
     } else {
         sigma
     };
-    if kernel_size % 2 == 0 {
-        panic!("kernel size must be odd");
-    }
+    assert_ne!(kernel_size % 2, 0, "kernel size must be odd");
     let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
     let _dispatcher = match channels {
         FastBlurChannels::Plane => filter_1d_exact::<f32, f32>,
@@ -265,9 +259,7 @@ pub fn gaussian_blur_f16(
     } else {
         sigma
     };
-    if kernel_size % 2 == 0 {
-        panic!("kernel size must be odd");
-    }
+    assert_ne!(kernel_size % 2, 0, "kernel size must be odd");
     let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
     let _dispatcher = match channels {
         FastBlurChannels::Plane => filter_1d_exact::<f16, f32>,

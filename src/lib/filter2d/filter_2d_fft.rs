@@ -117,9 +117,7 @@ where
     f64: AsPrimitive<T> + AsPrimitive<FftIntermediate>,
 {
     if src.len() != dst.len() {
-        return Err("Source slice size and destination must match"
-            .parse()
-            .unwrap());
+        return Err("Source slice size and destination must match".to_string());
     }
 
     let kernel_width = kernel_shape.width;
@@ -133,7 +131,7 @@ where
     }
 
     if kernel_shape.width & 1 == 0 || kernel_shape.height & 1 == 0 {
-        return Err("Kernel shape dimensions must be odd".parse().unwrap());
+        return Err("Kernel shape dimensions must be odd".to_string());
     }
 
     let width = image_size.width;

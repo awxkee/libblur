@@ -1,4 +1,4 @@
-workspace = { members = ["src/lib"] }
+workspace = { members = ["src/lib", "fuzz"] }
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [package]
