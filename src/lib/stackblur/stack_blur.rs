@@ -55,13 +55,13 @@ fn stack_blur_worker_horizontal(
         thread_count: usize,
     ) {
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-        let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-        fn select_blur_pass<const N: usize>() -> impl StackBlurWorkingPass<u8, N> {
+        fn select_blur_pass<const N: usize>() -> Box<dyn StackBlurWorkingPass<u8, N>> {
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+            let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
             if std::arch::is_x86_feature_detected!("sse4.1") {
-                HorizontalSseStackBlurPass::<u8, i32, N>::default()
+                Box::new(HorizontalSseStackBlurPass::<u8, i32, N>::default())
             } else {
-                HorizontalStackBlurPass::<u8, i32, f32, N>::default()
+                Box::new(HorizontalStackBlurPass::<u8, i32, f32, N>::default())
             }
         }
 
@@ -122,13 +122,13 @@ fn stack_blur_worker_vertical(
         thread_count: usize,
     ) {
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-        let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-        fn select_blur_pass<const N: usize>() -> impl StackBlurWorkingPass<u8, N> {
+        fn select_blur_pass<const N: usize>() -> Box<dyn StackBlurWorkingPass<u8, N>> {
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+            let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
             if std::arch::is_x86_feature_detected!("sse4.1") {
-                VerticalSseStackBlurPass::<u8, i32, N>::default()
+                Box::new(VerticalSseStackBlurPass::<u8, i32, N>::default())
             } else {
-                VerticalStackBlurPass::<u8, i32, f32, N>::default()
+                Box::new(VerticalStackBlurPass::<u8, i32, f32, N>::default())
             }
         }
 

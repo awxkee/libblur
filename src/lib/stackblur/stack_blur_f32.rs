@@ -54,25 +54,25 @@ fn stack_blur_worker_horizontal(
         thread: usize,
         thread_count: usize,
     ) {
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-        let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
         #[cfg(not(any(
             all(target_arch = "aarch64", target_feature = "neon"),
             any(target_arch = "x86_64", target_arch = "x86"),
         )))]
         fn select_blur_pass<const N: usize>() -> impl StackBlurWorkingPass<f32, N> {
-            HorizontalStackBlurPass::<f32, f32, N>::default()
+            HorizontalStackBlurPass::<f32, f32, f32, N>::default()
         }
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         fn select_blur_pass<const N: usize>() -> impl StackBlurWorkingPass<f32, N> {
             HorizontalNeonStackBlurPassFloat32::<f32, f32, N>::default()
         }
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-        fn select_blur_pass<const N: usize>() -> impl StackBlurWorkingPass<f32, N> {
+        fn select_blur_pass<const N: usize>() -> Box<dyn StackBlurWorkingPass<f32, N>> {
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+            let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
             if _is_sse_available {
-                HorizontalSseStackBlurPassFloat32::<f32, f32, N>::default()
+                Box::new(HorizontalSseStackBlurPassFloat32::<f32, f32, N>::default())
             } else {
-                HorizontalStackBlurPass::<f32, f32, N>::default()
+                Box::new(HorizontalStackBlurPass::<f32, f32, f32, N>::default())
             }
         }
         let executor = select_blur_pass::<N>();
@@ -111,25 +111,25 @@ fn stack_blur_worker_vertical(
         thread: usize,
         thread_count: usize,
     ) {
-        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-        let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
         #[cfg(not(any(
             all(target_arch = "aarch64", target_feature = "neon"),
             any(target_arch = "x86_64", target_arch = "x86"),
         )))]
         fn select_blur_pass<const N: usize>() -> impl StackBlurWorkingPass<f32, N> {
-            VerticalStackBlurPass::<f32, f32, N>::default()
+            VerticalStackBlurPass::<f32, f32, f32, N>::default()
         }
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         fn select_blur_pass<const N: usize>() -> impl StackBlurWorkingPass<f32, N> {
             VerticalNeonStackBlurPassFloat32::<f32, f32, N>::default()
         }
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-        fn select_blur_pass<const N: usize>() -> impl StackBlurWorkingPass<f32, N> {
+        fn select_blur_pass<const N: usize>() -> Box<dyn StackBlurWorkingPass<f32, N>> {
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+            let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
             if _is_sse_available {
-                VerticalSseStackBlurPassFloat32::<f32, f32, N>::default()
+                Box::new(VerticalSseStackBlurPassFloat32::<f32, f32, N>::default())
             } else {
-                VerticalStackBlurPass::<f32, f32, N>::default()
+                Box::new(VerticalStackBlurPass::<f32, f32, f32, N>::default())
             }
         }
         let executor = select_blur_pass::<N>();
