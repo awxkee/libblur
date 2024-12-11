@@ -49,6 +49,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - run: rustup target add wasm32-unknown-unknown
       - run: cargo clippy --target wasm32-unknown-unknown
 
   fuzz_gauss:
