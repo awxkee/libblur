@@ -73,7 +73,7 @@ where
         } else if COMPS == 4 {
             SlidingWindow::from_components(self.r.as_(), self.g.as_(), self.b.as_(), self.a.as_())
         } else {
-            panic!("Not implemented.");
+            unimplemented!();
         }
     }
 }
@@ -116,7 +116,7 @@ where
                 a: (*store.get(offset + 3)).as_(),
             }
         } else {
-            panic!("Not implemented.")
+            unimplemented!();
         }
     }
 
@@ -158,7 +158,7 @@ where
         } else if COMPS == 4 {
             SlidingWindow::from_components(self.r * rhs, self.g * rhs, self.b * rhs, self.a * rhs)
         } else {
-            panic!("Not implemented.");
+            unimplemented!();
         }
     }
 }
@@ -180,7 +180,7 @@ where
         } else if COMPS == 4 {
             SlidingWindow::from_components(self.r - rhs, self.g - rhs, self.b - rhs, self.a - rhs)
         } else {
-            panic!("Not implemented.");
+            unimplemented!();
         }
     }
 }
@@ -207,7 +207,7 @@ where
                 self.a - rhs.a,
             )
         } else {
-            panic!("Not implemented.");
+            unimplemented!();
         }
     }
 }
@@ -234,7 +234,7 @@ where
                 self.a >> rhs,
             )
         } else {
-            panic!("Not implemented.");
+            unimplemented!();
         }
     }
 }

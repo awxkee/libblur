@@ -47,6 +47,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "stack_blur_u16"
+path = "stack_blur_u16/stack_blur_u16.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "fast_gaussian"
 path = "fast_gaussian/fast_gaussian.rs"
 test = false

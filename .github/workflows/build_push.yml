@@ -68,6 +68,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo install cargo-fuzz
       - run: cargo fuzz run stack_blur -- -max_total_time=45
+      - run: cargo fuzz run stack_blur_u16 -- -max_total_time=45
       - run: cargo fuzz run stack_blur_f32 -- -max_total_time=45
 
   fuzz_fast_gaussian_blur:

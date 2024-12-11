@@ -26,28 +26,52 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::unsafe_slice::UnsafeSlice;
-use num_traits::{AsPrimitive, FromPrimitive};
 
-pub trait StackBlurWorkingPass<T, const COMPONENTS: usize>
-where
-    T: Copy + FromPrimitive + 'static,
-    f32: AsPrimitive<T>,
-{
-    ///
-    ///
-    /// # Generics
-    /// `T` - buffer type u8, u16 etc, this method expected only integral types
-    /// `J` - accumulator type, i32, i64
-    /// `I` - intermediate multiplication type, when sum will be adopting into higher it may overflow, use this parameter to control overflowing
-    fn pass(
-        &self,
-        pixels: &UnsafeSlice<T>,
-        stride: u32,
-        width: u32,
-        height: u32,
-        radius: u32,
-        thread: usize,
-        total_threads: usize,
+#![no_main]
+
+use libblur::{stack_blur, stack_blur_u16, FastBlurChannels, ThreadingPolicy};
+use libfuzzer_sys::fuzz_target;
+
+fuzz_target!(|data: (u8, u8, u8)| {
+    fuzz_image(
+        data.0 as usize,
+        data.1 as usize,
+        data.2 as usize,
+        FastBlurChannels::Channels4,
+    );
+    fuzz_image(
+        data.0 as usize,
+        data.1 as usize,
+        data.2 as usize,
+        FastBlurChannels::Channels3,
+    );
+    fuzz_image(
+        data.0 as usize,
+        data.1 as usize,
+        data.2 as usize,
+        FastBlurChannels::Plane,
+    );
+});
+
+fn fuzz_image(width: usize, height: usize, radius: usize, channels: FastBlurChannels) {
+    if width == 0 || height == 0 || radius == 0 {
+        return;
+    }
+    let mut dst_image = vec![15u16; width * height * channels.get_channels()];
+    stack_blur_u16(
+        &mut dst_image,
+        width as u32,
+        height as u32,
+        radius as u32,
+        channels,
+        ThreadingPolicy::Single,
+    );
+    stack_blur_u16(
+        &mut dst_image,
+        width as u32,
+        height as u32,
+        radius as u32 + 500,
+        channels,
+        ThreadingPolicy::Single,
     );
 }

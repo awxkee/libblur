@@ -137,4 +137,5 @@ pub use stack_blur_linear::stack_blur_in_linear;
 pub use stackblur::stack_blur::stack_blur;
 pub use stackblur::stack_blur_f16::stack_blur_f16;
 pub use stackblur::stack_blur_f32::stack_blur_f32;
+pub use stackblur::stack_blur_u16;
 pub use threading_policy::ThreadingPolicy;

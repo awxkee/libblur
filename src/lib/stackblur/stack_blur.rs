@@ -31,7 +31,7 @@ use crate::stackblur::neon::{HorizontalNeonStackBlurPass, VerticalNeonStackBlurP
 use crate::stackblur::sse::{HorizontalSseStackBlurPass, VerticalSseStackBlurPass};
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 use crate::stackblur::wasm::{HorizontalWasmStackBlurPass, VerticalWasmStackBlurPass};
-use crate::stackblur::{HorizontalStackBlurPass, StackBlurWorkingPass, VerticalStackBlurPass};
+use crate::stackblur::*;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{FastBlurChannels, ThreadingPolicy};
 
@@ -45,68 +45,58 @@ fn stack_blur_worker_horizontal(
     thread: usize,
     thread_count: usize,
 ) {
-    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-    let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+    fn pass<const N: usize>(
+        slice: &UnsafeSlice<u8>,
+        stride: u32,
+        width: u32,
+        height: u32,
+        radius: u32,
+        thread: usize,
+        thread_count: usize,
+    ) {
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        fn select_blur_pass<const N: usize>() -> impl StackBlurWorkingPass<u8, N> {
+            if std::arch::is_x86_feature_detected!("sse4.1") {
+                HorizontalSseStackBlurPass::<u8, i32, N>::default()
+            } else {
+                HorizontalStackBlurPass::<u8, i32, f32, N>::default()
+            }
+        }
+
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        fn select_blur_pass<const N: usize>() -> impl StackBlurWorkingPass<u8, N> {
+            HorizontalNeonStackBlurPass::<u8, i32, N>::default()
+        }
+
+        #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+        fn select_blur_pass<const N: usize>() -> impl StackBlurWorkingPass<u8, N> {
+            HorizontalWasmStackBlurPass::<u8, i32, N>::default()
+        }
+
+        #[cfg(not(any(
+            all(target_arch = "aarch64", target_feature = "neon"),
+            all(target_arch = "wasm32", target_feature = "simd128"),
+            target_arch = "x86_64",
+            target_arch = "x86"
+        )))]
+        fn select_blur_pass<const N: usize>() -> impl StackBlurWorkingPass<u8, N> {
+            HorizontalStackBlurPass::<u8, i32, f32, N>::default()
+        }
+
+        let executor = select_blur_pass::<N>();
+        executor.pass(slice, stride, width, height, radius, thread, thread_count);
+    }
     match channels {
         FastBlurChannels::Plane => {
-            let mut _executor: Box<dyn StackBlurWorkingPass<u8, i32, 1>> =
-                Box::new(HorizontalStackBlurPass::<u8, i32, 1>::default());
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-            {
-                _executor = Box::new(HorizontalNeonStackBlurPass::<u8, i32, 1>::default());
-            }
-            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-            {
-                let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
-                if _is_sse_available {
-                    _executor = Box::new(HorizontalSseStackBlurPass::<u8, i32, 1>::default());
-                }
-            }
-            #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
-            {
-                _executor = Box::new(HorizontalWasmStackBlurPass::<u8, i32, 1>::default());
-            }
-            _executor.pass(slice, stride, width, height, radius, thread, thread_count);
+            pass::<1>(slice, stride, width, height, radius, thread, thread_count);
         }
         FastBlurChannels::Channels3 => {
-            let mut _executor: Box<dyn StackBlurWorkingPass<u8, i32, 3>> =
-                Box::new(HorizontalStackBlurPass::<u8, i32, 3>::default());
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-            {
-                _executor = Box::new(HorizontalNeonStackBlurPass::<u8, i32, 3>::default());
-            }
-            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-            {
-                let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
-                if _is_sse_available {
-                    _executor = Box::new(HorizontalSseStackBlurPass::<u8, i32, 3>::default());
-                }
-            }
-            #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
-            {
-                _executor = Box::new(HorizontalWasmStackBlurPass::<u8, i32, 3>::default());
-            }
-            _executor.pass(slice, stride, width, height, radius, thread, thread_count);
+            pass::<3>(slice, stride, width, height, radius, thread, thread_count);
         }
         FastBlurChannels::Channels4 => {
-            let mut _executor: Box<dyn StackBlurWorkingPass<u8, i32, 4>> =
-                Box::new(HorizontalStackBlurPass::<u8, i32, 4>::default());
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-            {
-                _executor = Box::new(HorizontalNeonStackBlurPass::<u8, i32, 4>::default());
-            }
-            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-            {
-                let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
-                if _is_sse_available {
-                    _executor = Box::new(HorizontalSseStackBlurPass::<u8, i32, 4>::default());
-                }
-            }
-            #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
-            {
-                _executor = Box::new(HorizontalWasmStackBlurPass::<u8, i32, 4>::default());
-            }
-            _executor.pass(slice, stride, width, height, radius, thread, thread_count);
+            pass::<4>(slice, stride, width, height, radius, thread, thread_count);
         }
     }
 }
@@ -122,68 +112,58 @@ fn stack_blur_worker_vertical(
     thread: usize,
     thread_count: usize,
 ) {
-    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-    let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+    fn pass<const N: usize>(
+        slice: &UnsafeSlice<u8>,
+        stride: u32,
+        width: u32,
+        height: u32,
+        radius: u32,
+        thread: usize,
+        thread_count: usize,
+    ) {
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        fn select_blur_pass<const N: usize>() -> impl StackBlurWorkingPass<u8, N> {
+            if std::arch::is_x86_feature_detected!("sse4.1") {
+                VerticalSseStackBlurPass::<u8, i32, N>::default()
+            } else {
+                VerticalStackBlurPass::<u8, i32, f32, N>::default()
+            }
+        }
+
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        fn select_blur_pass<const N: usize>() -> impl StackBlurWorkingPass<u8, N> {
+            VerticalNeonStackBlurPass::<u8, i32, N>::default()
+        }
+
+        #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
+        fn select_blur_pass<const N: usize>() -> impl StackBlurWorkingPass<u8, N> {
+            VerticalWasmStackBlurPass::<u8, i32, N>::default()
+        }
+
+        #[cfg(not(any(
+            all(target_arch = "aarch64", target_feature = "neon"),
+            all(target_arch = "wasm32", target_feature = "simd128"),
+            target_arch = "x86_64",
+            target_arch = "x86"
+        )))]
+        fn select_blur_pass<const N: usize>() -> impl StackBlurWorkingPass<u8, N> {
+            VerticalStackBlurPass::<u8, i32, f32, N>::default()
+        }
+
+        let executor = select_blur_pass::<N>();
+        executor.pass(slice, stride, width, height, radius, thread, thread_count);
+    }
     match channels {
         FastBlurChannels::Plane => {
-            let mut _executor: Box<dyn StackBlurWorkingPass<u8, i32, 1>> =
-                Box::new(VerticalStackBlurPass::<u8, i32, 1>::default());
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-            {
-                _executor = Box::new(VerticalNeonStackBlurPass::<u8, i32, 1>::default());
-            }
-            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-            {
-                let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
-                if _is_sse_available {
-                    _executor = Box::new(VerticalSseStackBlurPass::<u8, i32, 1>::default());
-                }
-            }
-            #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
-            {
-                _executor = Box::new(VerticalWasmStackBlurPass::<u8, i32, 1>::default());
-            }
-            _executor.pass(slice, stride, width, height, radius, thread, thread_count);
+            pass::<1>(slice, stride, width, height, radius, thread, thread_count);
         }
         FastBlurChannels::Channels3 => {
-            let mut _executor: Box<dyn StackBlurWorkingPass<u8, i32, 3>> =
-                Box::new(VerticalStackBlurPass::<u8, i32, 3>::default());
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-            {
-                _executor = Box::new(VerticalNeonStackBlurPass::<u8, i32, 3>::default());
-            }
-            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-            {
-                let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
-                if _is_sse_available {
-                    _executor = Box::new(VerticalSseStackBlurPass::<u8, i32, 3>::default());
-                }
-            }
-            #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
-            {
-                _executor = Box::new(VerticalWasmStackBlurPass::<u8, i32, 3>::default());
-            }
-            _executor.pass(slice, stride, width, height, radius, thread, thread_count);
+            pass::<3>(slice, stride, width, height, radius, thread, thread_count);
         }
         FastBlurChannels::Channels4 => {
-            let mut _executor: Box<dyn StackBlurWorkingPass<u8, i32, 4>> =
-                Box::new(VerticalStackBlurPass::<u8, i32, 4>::default());
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-            {
-                _executor = Box::new(VerticalNeonStackBlurPass::<u8, i32, 4>::default());
-            }
-            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-            {
-                let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
-                if _is_sse_available {
-                    _executor = Box::new(VerticalSseStackBlurPass::<u8, i32, 4>::default());
-                }
-            }
-            #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
-            {
-                _executor = Box::new(VerticalWasmStackBlurPass::<u8, i32, 4>::default());
-            }
-            _executor.pass(slice, stride, width, height, radius, thread, thread_count);
+            pass::<4>(slice, stride, width, height, radius, thread, thread_count);
         }
     }
 }

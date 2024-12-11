@@ -105,13 +105,13 @@ pub fn stack_blur_image(
                     luma_alpha_image.width() as usize * luma_alpha_image.height() as usize * 2
                 ];
 
-            for ((intensity, alpha), raw_buffer) in intensity_plane
+            for ((&intensity, &alpha), raw_buffer) in intensity_plane
                 .iter()
                 .zip(alpha_plane.iter())
                 .zip(new_raw_buffer.chunks_exact_mut(2))
             {
-                raw_buffer[0] = *intensity;
-                raw_buffer[1] = *alpha;
+                raw_buffer[0] = intensity;
+                raw_buffer[1] = alpha;
             }
 
             let new_gray_image = GrayAlphaImage::from_raw(
