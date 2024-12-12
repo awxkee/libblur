@@ -196,30 +196,30 @@ pub(crate) unsafe fn vmulq_s32_f32(a: int32x4_t, b: float32x4_t) -> int32x4_t {
 #[inline(always)]
 pub unsafe fn load_u8_u16<const CHANNELS_COUNT: usize>(ptr: *const u8) -> uint16x4_t {
     if CHANNELS_COUNT == 4 {
-        let u_first = u16::from_le_bytes([ptr.read(), 0]);
+        let u_first = u16::from_le_bytes([ptr.read_unaligned(), 0]);
         let u_second = u16::from_le_bytes([ptr.add(1).read_unaligned(), 0]);
         let u_third = u16::from_le_bytes([ptr.add(2).read_unaligned(), 0]);
         let u_fourth = u16::from_le_bytes([ptr.add(3).read_unaligned(), 0]);
         let store: [u16; 4] = [u_first, u_second, u_third, u_fourth];
-        unsafe { vld1_u16(store.as_ptr()) }
+        vld1_u16(store.as_ptr())
     } else if CHANNELS_COUNT == 3 {
-        let u_first = u16::from_le_bytes([ptr.read(), 0]);
+        let u_first = u16::from_le_bytes([ptr.read_unaligned(), 0]);
         let u_second = u16::from_le_bytes([ptr.add(1).read_unaligned(), 0]);
         let u_third = u16::from_le_bytes([ptr.add(2).read_unaligned(), 0]);
         let u_fourth = 0;
         let store: [u16; 4] = [u_first, u_second, u_third, u_fourth];
-        unsafe { vld1_u16(store.as_ptr()) }
+        vld1_u16(store.as_ptr())
     } else if CHANNELS_COUNT == 2 {
-        let u_first = u16::from_le_bytes([ptr.read(), 0]);
+        let u_first = u16::from_le_bytes([ptr.read_unaligned(), 0]);
         let u_second = u16::from_le_bytes([ptr.add(1).read_unaligned(), 0]);
         let u_third = 0;
         let u_fourth = 0;
         let store: [u16; 4] = [u_first, u_second, u_third, u_fourth];
-        unsafe { vld1_u16(store.as_ptr()) }
+        vld1_u16(store.as_ptr())
     } else {
-        let u_first = u16::from_le_bytes([ptr.read(), 0]);
+        let u_first = u16::from_le_bytes([ptr.read_unaligned(), 0]);
         let store: [u16; 4] = [u_first, 0, 0, 0];
-        unsafe { vld1_u16(store.as_ptr()) }
+        vld1_u16(store.as_ptr())
     }
 }
 
@@ -313,8 +313,8 @@ pub(crate) unsafe fn store_u8x8_m4<const CHANNELS_COUNT: usize>(
     dst_ptr: *mut u8,
     in_regi: uint8x8_t,
 ) {
-    let casted_u32 = unsafe { vreinterpret_u32_u8(in_regi) };
-    let pixel = unsafe { vget_lane_u32::<0>(casted_u32) };
+    let casted_u32 = vreinterpret_u32_u8(in_regi);
+    let pixel = vget_lane_u32::<0>(casted_u32);
 
     if CHANNELS_COUNT == 4 {
         (dst_ptr as *mut u32).write_unaligned(pixel);

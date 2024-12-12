@@ -43,6 +43,15 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo clippy
 
+  clippy-wasm:
+    name: Clippy WASM
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: rustup target add wasm32-unknown-unknown
+      - run: cargo clippy --target wasm32-unknown-unknown
+
   fuzz_gauss:
     name: Fuzzing Gauss
     strategy:
@@ -68,6 +77,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo install cargo-fuzz
       - run: cargo fuzz run stack_blur -- -max_total_time=45
+      - run: cargo fuzz run stack_blur_u16 -- -max_total_time=45
       - run: cargo fuzz run stack_blur_f32 -- -max_total_time=45
 
   fuzz_fast_gaussian_blur:

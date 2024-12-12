@@ -187,7 +187,7 @@ where
     }
 }
 
-impl<T, J, const COMPONENTS: usize> StackBlurWorkingPass<T, J, COMPONENTS>
+impl<T, J, const COMPONENTS: usize> StackBlurWorkingPass<T, COMPONENTS>
     for VerticalSseStackBlurPassFloat16<T, J, COMPONENTS>
 where
     J: Copy

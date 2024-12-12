@@ -33,16 +33,18 @@ use num_traits::{AsPrimitive, FromPrimitive};
 use std::marker::PhantomData;
 use std::ops::{AddAssign, Mul, Sub, SubAssign};
 
-pub struct HorizontalStackBlurPass<T, J, const COMPONENTS: usize> {
+pub(crate) struct HorizontalStackBlurPass<T, J, F, const COMPONENTS: usize> {
     _phantom_t: PhantomData<T>,
     _phantom_j: PhantomData<J>,
+    _phantom_f: PhantomData<F>,
 }
 
-impl<T, J, const COMPONENTS: usize> Default for HorizontalStackBlurPass<T, J, COMPONENTS> {
+impl<T, J, F, const COMPONENTS: usize> Default for HorizontalStackBlurPass<T, J, F, COMPONENTS> {
     fn default() -> Self {
-        HorizontalStackBlurPass::<T, J, COMPONENTS> {
+        HorizontalStackBlurPass::<T, J, F, COMPONENTS> {
             _phantom_t: Default::default(),
             _phantom_j: Default::default(),
+            _phantom_f: Default::default(),
         }
     }
 }
@@ -50,7 +52,7 @@ impl<T, J, const COMPONENTS: usize> Default for HorizontalStackBlurPass<T, J, CO
 /// # Generics
 /// `T` - data type
 /// `J` - accumulator type
-impl<T, J, const COMPONENTS: usize> HorizontalStackBlurPass<T, J, COMPONENTS>
+impl<T, J, F, const COMPONENTS: usize> HorizontalStackBlurPass<T, J, F, COMPONENTS>
 where
     J: Copy
         + 'static
@@ -58,15 +60,16 @@ where
         + AddAssign<J>
         + Mul<Output = J>
         + Sub<Output = J>
-        + AsPrimitive<f32>
+        + AsPrimitive<F>
         + SubAssign
         + AsPrimitive<T>
         + Default,
     T: Copy + AsPrimitive<J> + FromPrimitive,
     i32: AsPrimitive<J>,
     u32: AsPrimitive<J>,
-    f32: AsPrimitive<T> + AsPrimitive<J>,
+    F: AsPrimitive<T> + AsPrimitive<J> + 'static + Copy + Mul<Output = F> + Default,
     usize: AsPrimitive<J>,
+    f32: AsPrimitive<F>,
 {
     #[inline]
     unsafe fn pass_impl(
@@ -86,7 +89,7 @@ where
         let mut stacks0 = vec![SlidingWindow::<COMPONENTS, J>::new(); div];
 
         let rad_p_1 = radius as f32 + 1.;
-        let scale_filter_value = 1. / (rad_p_1 * rad_p_1);
+        let scale_filter_value = (1. / (rad_p_1 * rad_p_1)).as_();
 
         let wm = width - 1;
         let div = (radius * 2) + 1;
@@ -135,7 +138,7 @@ where
             src_ptr = COMPONENTS * xp as usize + y * stride as usize;
             let mut dst_ptr = y * stride as usize;
             for _ in 0..width {
-                let sum_intermediate: SlidingWindow<COMPONENTS, f32> = sum.cast();
+                let sum_intermediate: SlidingWindow<COMPONENTS, F> = sum.cast();
                 let finalized: SlidingWindow<COMPONENTS, J> =
                     (sum_intermediate * scale_filter_value).cast();
                 finalized.to_store(pixels, dst_ptr);
@@ -175,8 +178,8 @@ where
     }
 }
 
-impl<T, J, const COMPONENTS: usize> StackBlurWorkingPass<T, J, COMPONENTS>
-    for HorizontalStackBlurPass<T, J, COMPONENTS>
+impl<T, J, F, const COMPONENTS: usize> StackBlurWorkingPass<T, COMPONENTS>
+    for HorizontalStackBlurPass<T, J, F, COMPONENTS>
 where
     J: Copy
         + 'static
@@ -184,15 +187,17 @@ where
         + AddAssign<J>
         + Mul<Output = J>
         + Sub<Output = J>
-        + AsPrimitive<f32>
+        + AsPrimitive<F>
         + SubAssign
         + AsPrimitive<T>
+        + AsPrimitive<f32>
         + Default,
     T: Copy + AsPrimitive<J> + FromPrimitive,
     i32: AsPrimitive<J>,
     u32: AsPrimitive<J>,
-    f32: AsPrimitive<T> + AsPrimitive<J>,
+    F: AsPrimitive<T> + AsPrimitive<J> + 'static + Copy + Mul<Output = F> + Default,
     usize: AsPrimitive<J>,
+    f32: AsPrimitive<F> + AsPrimitive<T>,
 {
     fn pass(
         &self,

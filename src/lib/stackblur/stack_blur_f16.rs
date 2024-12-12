@@ -52,8 +52,8 @@ fn stack_blur_worker_horizontal(
     let _is_f16c_available = std::arch::is_x86_feature_detected!("f16c");
     match channels {
         FastBlurChannels::Plane => {
-            let mut _executor: Box<dyn StackBlurWorkingPass<f16, f32, 1>> =
-                Box::new(HorizontalStackBlurPass::<f16, f32, 1>::default());
+            let mut _executor: Box<dyn StackBlurWorkingPass<f16, 1>> =
+                Box::new(HorizontalStackBlurPass::<f16, f32, f32, 1>::default());
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
                 if _is_sse_available {
@@ -68,8 +68,8 @@ fn stack_blur_worker_horizontal(
             _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }
         FastBlurChannels::Channels3 => {
-            let mut _executor: Box<dyn StackBlurWorkingPass<f16, f32, 3>> =
-                Box::new(HorizontalStackBlurPass::<f16, f32, 3>::default());
+            let mut _executor: Box<dyn StackBlurWorkingPass<f16, 3>> =
+                Box::new(HorizontalStackBlurPass::<f16, f32, f32, 3>::default());
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
                 if _is_sse_available {
@@ -84,8 +84,8 @@ fn stack_blur_worker_horizontal(
             _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }
         FastBlurChannels::Channels4 => {
-            let mut _executor: Box<dyn StackBlurWorkingPass<f16, f32, 4>> =
-                Box::new(HorizontalStackBlurPass::<f16, f32, 4>::default());
+            let mut _executor: Box<dyn StackBlurWorkingPass<f16, 4>> =
+                Box::new(HorizontalStackBlurPass::<f16, f32, f32, 4>::default());
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
                 if _is_sse_available {
@@ -118,8 +118,8 @@ fn stack_blur_worker_vertical(
     let _is_f16c_available = std::arch::is_x86_feature_detected!("f16c");
     match channels {
         FastBlurChannels::Plane => {
-            let mut _executor: Box<dyn StackBlurWorkingPass<f16, f32, 1>> =
-                Box::new(VerticalStackBlurPass::<f16, f32, 1>::default());
+            let mut _executor: Box<dyn StackBlurWorkingPass<f16, 1>> =
+                Box::new(VerticalStackBlurPass::<f16, f32, f32, 1>::default());
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
                 if _is_sse_available {
@@ -133,8 +133,8 @@ fn stack_blur_worker_vertical(
             _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }
         FastBlurChannels::Channels3 => {
-            let mut _executor: Box<dyn StackBlurWorkingPass<f16, f32, 3>> =
-                Box::new(VerticalStackBlurPass::<f16, f32, 3>::default());
+            let mut _executor: Box<dyn StackBlurWorkingPass<f16, 3>> =
+                Box::new(VerticalStackBlurPass::<f16, f32, f32, 3>::default());
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
                 if _is_sse_available {
@@ -148,8 +148,8 @@ fn stack_blur_worker_vertical(
             _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }
         FastBlurChannels::Channels4 => {
-            let mut _executor: Box<dyn StackBlurWorkingPass<f16, f32, 4>> =
-                Box::new(VerticalStackBlurPass::<f16, f32, 4>::default());
+            let mut _executor: Box<dyn StackBlurWorkingPass<f16, 4>> =
+                Box::new(VerticalStackBlurPass::<f16, f32, f32, 4>::default());
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
                 if _is_sse_available {

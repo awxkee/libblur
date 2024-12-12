@@ -48,7 +48,7 @@ impl<T, J, const COMPONENTS: usize> Default for HorizontalNeonStackBlurPass<T, J
     }
 }
 
-impl<T, J, const COMPONENTS: usize> StackBlurWorkingPass<T, J, COMPONENTS>
+impl<T, J, const COMPONENTS: usize> StackBlurWorkingPass<T, COMPONENTS>
     for HorizontalNeonStackBlurPass<T, J, COMPONENTS>
 where
     J: Copy

@@ -33,21 +33,23 @@ use num_traits::{AsPrimitive, FromPrimitive};
 use std::marker::PhantomData;
 use std::ops::{AddAssign, Mul, Sub, SubAssign};
 
-pub struct VerticalStackBlurPass<T, J, const COMPONENTS: usize> {
+pub struct VerticalStackBlurPass<T, J, F, const COMPONENTS: usize> {
     _phantom_t: PhantomData<T>,
     _phantom_j: PhantomData<J>,
+    _phantom_f: PhantomData<F>,
 }
 
-impl<T, J, const COMPONENTS: usize> Default for VerticalStackBlurPass<T, J, COMPONENTS> {
+impl<T, J, F, const COMPONENTS: usize> Default for VerticalStackBlurPass<T, J, F, COMPONENTS> {
     fn default() -> Self {
         VerticalStackBlurPass {
             _phantom_t: Default::default(),
             _phantom_j: Default::default(),
+            _phantom_f: Default::default(),
         }
     }
 }
 
-impl<T, J, const COMPONENTS: usize> VerticalStackBlurPass<T, J, COMPONENTS>
+impl<T, J, F, const COMPONENTS: usize> VerticalStackBlurPass<T, J, F, COMPONENTS>
 where
     J: Copy
         + 'static
@@ -56,13 +58,15 @@ where
         + Mul<Output = J>
         + Sub<Output = J>
         + AsPrimitive<f32>
+        + AsPrimitive<F>
         + SubAssign
         + AsPrimitive<T>
         + Default,
     T: Copy + AsPrimitive<J> + FromPrimitive,
     i32: AsPrimitive<J>,
     u32: AsPrimitive<J>,
-    f32: AsPrimitive<T> + AsPrimitive<J>,
+    f32: AsPrimitive<T> + AsPrimitive<J> + AsPrimitive<F>,
+    F: AsPrimitive<T> + 'static + Mul<Output = F>,
     usize: AsPrimitive<J>,
 {
     #[inline]
@@ -95,14 +99,14 @@ where
         let min_x = thread * width as usize / total_threads;
         let max_x = (thread + 1) * width as usize / total_threads;
 
-        let mul_value = 1. / ((radius as f32 + 1.) * (radius as f32 + 1.));
+        let mul_value = (1. / ((radius as f32 + 1.) * (radius as f32 + 1.))).as_();
 
         for x in min_x..max_x {
             sum = SlidingWindow::default();
             sum_in = SlidingWindow::default();
             sum_out = SlidingWindow::default();
 
-            src_ptr = COMPONENTS * x; // x,0
+            src_ptr = COMPONENTS * x;
 
             let src = SlidingWindow::from_store(pixels, src_ptr);
 
@@ -178,8 +182,8 @@ where
     }
 }
 
-impl<T, J, const COMPONENTS: usize> StackBlurWorkingPass<T, J, COMPONENTS>
-    for VerticalStackBlurPass<T, J, COMPONENTS>
+impl<T, J, F, const COMPONENTS: usize> StackBlurWorkingPass<T, COMPONENTS>
+    for VerticalStackBlurPass<T, J, F, COMPONENTS>
 where
     J: Copy
         + 'static
@@ -188,13 +192,15 @@ where
         + Mul<Output = J>
         + Sub<Output = J>
         + AsPrimitive<f32>
+        + AsPrimitive<F>
         + SubAssign
         + AsPrimitive<T>
         + Default,
     T: Copy + AsPrimitive<J> + FromPrimitive,
     i32: AsPrimitive<J>,
     u32: AsPrimitive<J>,
-    f32: AsPrimitive<T> + AsPrimitive<J>,
+    f32: AsPrimitive<T> + AsPrimitive<J> + AsPrimitive<F>,
+    F: AsPrimitive<T> + 'static + Mul<Output = F>,
     usize: AsPrimitive<J>,
 {
     fn pass(
