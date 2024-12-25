@@ -138,16 +138,14 @@ pub(crate) unsafe fn store_f32<const CHANNELS_COUNT: usize>(dst_ptr: *mut f32, r
     if CHANNELS_COUNT == 4 {
         _mm_storeu_ps(dst_ptr, regi);
     } else if CHANNELS_COUNT == 3 {
-        let lo_part = _mm_extract_epi64x::<0>(_mm_castps_si128(regi));
-        (dst_ptr as *mut i64).write_unaligned(lo_part);
+        _mm_storeu_si64(dst_ptr as *mut u8, _mm_castps_si128(regi));
         dst_ptr
             .add(2)
             .write_unaligned(f32::from_bits(_mm_extract_ps::<2>(regi) as u32));
     } else if CHANNELS_COUNT == 2 {
-        let lo_part = _mm_extract_epi64x::<0>(_mm_castps_si128(regi));
-        (dst_ptr as *mut i64).write_unaligned(lo_part);
+        _mm_storeu_si64(dst_ptr as *mut u8, _mm_castps_si128(regi));
     } else {
-        dst_ptr.write_unaligned(f32::from_bits(_mm_extract_ps::<0>(regi) as u32));
+        _mm_storeu_si32(dst_ptr as *mut u8, _mm_castps_si128(regi));
     }
 }
 
@@ -159,11 +157,9 @@ pub(crate) unsafe fn store_u8_s32<const CHANNELS_COUNT: usize>(dst_ptr: *mut u8,
     if CHANNELS_COUNT == 4 {
         _mm_storeu_si32(dst_ptr, v8);
     } else if CHANNELS_COUNT == 3 {
-        let pixel_s32 = _mm_extract_epi32::<0>(v8);
-        let pixel_bytes = pixel_s32.to_le_bytes();
-        let first_byte = u16::from_le_bytes([pixel_bytes[0], pixel_bytes[1]]);
-        (dst_ptr as *mut u16).write_unaligned(first_byte);
-        dst_ptr.add(2).write_unaligned(pixel_bytes[2]);
+        let pixel_3 = _mm_extract_epi8::<2>(v8);
+        _mm_storeu_si16(dst_ptr, v8);
+        dst_ptr.add(2).write_unaligned(pixel_3 as u8);
     } else if CHANNELS_COUNT == 2 {
         _mm_storeu_si16(dst_ptr, v8);
     } else {
@@ -181,11 +177,9 @@ pub(crate) unsafe fn store_u8_u32<const CHANNELS_COUNT: usize>(dst_ptr: *mut u8,
     if CHANNELS_COUNT == 4 {
         _mm_storeu_si32(dst_ptr, v8);
     } else if CHANNELS_COUNT == 3 {
-        let pixel_s32 = _mm_extract_epi32::<0>(v8);
-        let pixel_bytes = pixel_s32.to_le_bytes();
-        let first_byte = u16::from_le_bytes([pixel_bytes[0], pixel_bytes[1]]);
-        (dst_ptr as *mut u16).write_unaligned(first_byte);
-        dst_ptr.add(2).write_unaligned(pixel_bytes[2]);
+        let pixel_3 = _mm_extract_epi8::<2>(v8);
+        _mm_storeu_si16(dst_ptr, v8);
+        dst_ptr.add(2).write_unaligned(pixel_3 as u8);
     } else if CHANNELS_COUNT == 2 {
         _mm_storeu_si16(dst_ptr, v8);
     } else {
@@ -340,9 +334,8 @@ pub(crate) unsafe fn store_f32_f16<const CHANNELS_COUNT: usize>(
         _mm_storeu_si64(dst_ptr as *mut u8, out_regi);
     } else if CHANNELS_COUNT == 3 {
         let casted_ptr = dst_ptr as *mut i16;
-        let item0 = _mm_extract_epi32::<0>(out_regi);
         let item1 = _mm_extract_epi16::<2>(out_regi) as i16;
-        (casted_ptr as *mut i32).write_unaligned(item0);
+        _mm_storeu_si32(dst_ptr as *mut u8, out_regi);
         casted_ptr.add(2).write_unaligned(item1);
     } else if CHANNELS_COUNT == 2 {
         _mm_storeu_si32(dst_ptr as *mut u8, out_regi);
