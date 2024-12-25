@@ -397,7 +397,7 @@ dependencies = [
  "colorutils-rs",
  "criterion",
  "half",
- "image",
+ "image 0.25.5",
  "libblur",
  "opencv",
  "rayon",
@@ -499,8 +499,6 @@ checksum = "fbf6a919d6cf397374f7dfeeea91d974c7c0a7221d0d0f4f20d859d329e53fcc"
 [[package]]
 name = "image"
 version = "0.25.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd6f44aed642f18953a158afeb30206f4d50da59fbc66ecb53c66488de73563b"
 dependencies = [
  "bytemuck",
  "byteorder-lite",
@@ -517,6 +515,17 @@ dependencies = [
  "tiff",
  "zune-core",
  "zune-jpeg",
+]
+
+[[package]]
+name = "image"
+version = "0.25.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cd6f44aed642f18953a158afeb30206f4d50da59fbc66ecb53c66488de73563b"
+dependencies = [
+ "bytemuck",
+ "byteorder-lite",
+ "num-traits",
 ]
 
 [[package]]
@@ -629,7 +638,7 @@ dependencies = [
  "erydanos",
  "fast_transpose",
  "half",
- "image",
+ "image 0.25.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc",
  "num-traits",
  "rayon",

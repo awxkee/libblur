@@ -238,7 +238,7 @@ pub(crate) fn box_blur_vertical_pass_sse<T, const CHANNELS: usize>(
                 let unsafe_offset = y_dst_shift + px;
                 let ptr = unsafe { unsafe_dst.slice.get_unchecked(unsafe_offset).get() };
                 unsafe {
-                    std::ptr::copy_nonoverlapping(&px_8 as *const _ as *mut u8, ptr, 8);
+                    _mm_storeu_si64(ptr, px_8);
                 }
             }
         }

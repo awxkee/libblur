@@ -127,7 +127,7 @@ pub(crate) unsafe fn _mm_store_interleave_rgb(ptr: *mut u8, v: (__m128i, __m128i
 pub(crate) unsafe fn _mm_store_interleave_rgb_half(ptr: *mut u8, v: (__m128i, __m128i, __m128i)) {
     let (v0, v1, _) = _mm_interleave_rgb(v.0, v.1, v.2);
     _mm_storeu_si128(ptr as *mut __m128i, v0);
-    std::ptr::copy_nonoverlapping(&v1 as *const _ as *const u8, ptr.add(16), 8);
+    _mm_storeu_si64(ptr.add(16), v1);
 }
 
 #[inline(always)]

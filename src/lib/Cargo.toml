@@ -12,6 +12,7 @@ categories = ["multimedia::images", "multimedia::video", "algorithms"]
 homepage = "https://github.com/awxkee/libblur"
 repository = "https://github.com/awxkee/libblur.git"
 exclude = ["*.jpg", "../../assets/*", "*.png"]
+rust-version = "1.82.0"
 
 [lib]
 name = "libblur"
