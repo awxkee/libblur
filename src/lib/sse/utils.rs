@@ -25,7 +25,6 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use erydanos::_mm_extract_epi64x;
 use half::f16;
 use std::arch::asm;
 #[cfg(target_arch = "x86")]
@@ -138,16 +137,14 @@ pub(crate) unsafe fn store_f32<const CHANNELS_COUNT: usize>(dst_ptr: *mut f32, r
     if CHANNELS_COUNT == 4 {
         _mm_storeu_ps(dst_ptr, regi);
     } else if CHANNELS_COUNT == 3 {
-        let lo_part = _mm_extract_epi64x::<0>(_mm_castps_si128(regi));
-        (dst_ptr as *mut i64).write_unaligned(lo_part);
+        _mm_storeu_si64(dst_ptr as *mut u8, _mm_castps_si128(regi));
         dst_ptr
             .add(2)
             .write_unaligned(f32::from_bits(_mm_extract_ps::<2>(regi) as u32));
     } else if CHANNELS_COUNT == 2 {
-        let lo_part = _mm_extract_epi64x::<0>(_mm_castps_si128(regi));
-        (dst_ptr as *mut i64).write_unaligned(lo_part);
+        _mm_storeu_si64(dst_ptr as *mut u8, _mm_castps_si128(regi));
     } else {
-        dst_ptr.write_unaligned(f32::from_bits(_mm_extract_ps::<0>(regi) as u32));
+        _mm_storeu_si32(dst_ptr as *mut u8, _mm_castps_si128(regi));
     }
 }
 
@@ -156,20 +153,16 @@ pub(crate) unsafe fn store_f32<const CHANNELS_COUNT: usize>(dst_ptr: *mut f32, r
 pub(crate) unsafe fn store_u8_s32<const CHANNELS_COUNT: usize>(dst_ptr: *mut u8, regi: __m128i) {
     let s16 = _mm_packs_epi32(regi, regi);
     let v8 = _mm_packus_epi16(s16, s16);
-    let pixel_s32 = _mm_extract_epi32::<0>(v8);
     if CHANNELS_COUNT == 4 {
-        let casted_dst = dst_ptr as *mut i32;
-        casted_dst.write_unaligned(pixel_s32);
+        _mm_storeu_si32(dst_ptr, v8);
     } else if CHANNELS_COUNT == 3 {
-        let pixel_bytes = pixel_s32.to_le_bytes();
-        let first_byte = u16::from_le_bytes([pixel_bytes[0], pixel_bytes[1]]);
-        (dst_ptr as *mut u16).write_unaligned(first_byte);
-        dst_ptr.add(2).write_unaligned(pixel_bytes[2]);
+        let pixel_3 = _mm_extract_epi8::<2>(v8);
+        _mm_storeu_si16(dst_ptr, v8);
+        dst_ptr.add(2).write_unaligned(pixel_3 as u8);
     } else if CHANNELS_COUNT == 2 {
-        let pixel_bytes = pixel_s32.to_le_bytes();
-        let first_byte = u16::from_le_bytes([pixel_bytes[0], pixel_bytes[1]]);
-        (dst_ptr as *mut u16).write_unaligned(first_byte);
+        _mm_storeu_si16(dst_ptr, v8);
     } else {
+        let pixel_s32 = _mm_extract_epi32::<0>(v8);
         let pixel_bytes = pixel_s32.to_le_bytes();
         dst_ptr.write_unaligned(pixel_bytes[0]);
     }
@@ -180,27 +173,22 @@ pub(crate) unsafe fn store_u8_s32<const CHANNELS_COUNT: usize>(dst_ptr: *mut u8,
 pub(crate) unsafe fn store_u8_u32<const CHANNELS_COUNT: usize>(dst_ptr: *mut u8, regi: __m128i) {
     let s16 = _mm_packus_epi32(regi, regi);
     let v8 = _mm_packus_epi16(s16, s16);
-    let pixel_s32 = _mm_extract_epi32::<0>(v8);
     if CHANNELS_COUNT == 4 {
-        let casted_dst = dst_ptr as *mut i32;
-        casted_dst.write_unaligned(pixel_s32);
+        _mm_storeu_si32(dst_ptr, v8);
     } else if CHANNELS_COUNT == 3 {
-        let pixel_bytes = pixel_s32.to_le_bytes();
-        let first_byte = u16::from_le_bytes([pixel_bytes[0], pixel_bytes[1]]);
-        (dst_ptr as *mut u16).write_unaligned(first_byte);
-        dst_ptr.add(2).write_unaligned(pixel_bytes[2]);
+        let pixel_3 = _mm_extract_epi8::<2>(v8);
+        _mm_storeu_si16(dst_ptr, v8);
+        dst_ptr.add(2).write_unaligned(pixel_3 as u8);
     } else if CHANNELS_COUNT == 2 {
-        let pixel_bytes = pixel_s32.to_le_bytes();
-        let first_byte = u16::from_le_bytes([pixel_bytes[0], pixel_bytes[1]]);
-        (dst_ptr as *mut u16).write_unaligned(first_byte);
+        _mm_storeu_si16(dst_ptr, v8);
     } else {
+        let pixel_s32 = _mm_extract_epi32::<0>(v8);
         let pixel_bytes = pixel_s32.to_le_bytes();
         dst_ptr.write_unaligned(pixel_bytes[0]);
     }
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
 pub(crate) unsafe fn _mm_hsum_ps(v: __m128) -> f32 {
     let mut shuf = _mm_movehdup_ps(v);
     let mut sums = _mm_add_ps(v, shuf);
@@ -342,26 +330,20 @@ pub(crate) unsafe fn store_f32_f16<const CHANNELS_COUNT: usize>(
 ) {
     let out_regi = _mm_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(in_regi);
     if CHANNELS_COUNT == 4 {
-        std::ptr::copy_nonoverlapping(&out_regi as *const _ as *mut u8, dst_ptr as *mut u8, 8);
+        _mm_storeu_si64(dst_ptr as *mut u8, out_regi);
     } else if CHANNELS_COUNT == 3 {
         let casted_ptr = dst_ptr as *mut i16;
-        let item0 = _mm_extract_epi32::<0>(out_regi);
         let item1 = _mm_extract_epi16::<2>(out_regi) as i16;
-        (casted_ptr as *mut i32).write_unaligned(item0);
+        _mm_storeu_si32(dst_ptr as *mut u8, out_regi);
         casted_ptr.add(2).write_unaligned(item1);
     } else if CHANNELS_COUNT == 2 {
-        let casted_ptr = dst_ptr as *mut i16;
-        let item0 = _mm_extract_epi32::<0>(out_regi);
-        (casted_ptr as *mut i32).write_unaligned(item0);
+        _mm_storeu_si32(dst_ptr as *mut u8, out_regi);
     } else {
-        let casted_ptr = dst_ptr as *mut i16;
-        let item0 = _mm_extract_epi32::<0>(out_regi) as i16;
-        casted_ptr.write_unaligned(item0);
+        _mm_storeu_si16(dst_ptr as *mut u8, out_regi);
     }
 }
 
 #[inline]
-#[target_feature(enable = "sse4.1")]
 pub(crate) unsafe fn _mm_mul_by_3_epi32(v: __m128i) -> __m128i {
     _mm_add_epi32(_mm_slli_epi32::<1>(v), v)
 }

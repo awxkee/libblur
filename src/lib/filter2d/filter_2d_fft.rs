@@ -54,7 +54,9 @@ fn transpose<T: Copy + Default>(
 
     transpose_arbitrary(
         matrix,
+        width,
         &mut transposed,
+        height,
         width,
         height,
         FlipMode::NoFlip,

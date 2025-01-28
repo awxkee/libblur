@@ -4,7 +4,7 @@ mod split;
 use crate::merge::merge_channels_3;
 use crate::split::split_channels_3;
 use colorutils_rs::TransferFunction;
-use image::{EncodableLayout, GenericImageView, ImageReader};
+use image::{DynamicImage, EncodableLayout, GenericImageView, ImageReader};
 use libblur::{
     adaptive_blur, fast_bilateral_filter, filter_1d_approx, filter_1d_exact, filter_1d_rgb_approx,
     filter_1d_rgb_exact, filter_2d_rgb_fft, filter_2d_rgba_fft, generate_motion_kernel,
@@ -171,6 +171,11 @@ fn main() {
     println!("dimensions {:?}", dyn_image.dimensions());
     println!("type {:?}", dyn_image.color());
 
+    // let vldg = dyn_image.to_rgb8();
+    // let new_rgb = image::imageops::blur(&vldg, 66.);
+    // let new_dyn = DynamicImage::ImageRgb8(new_rgb);
+    // new_dyn.save("output.jpg").unwrap();
+
     println!("{:?}", dyn_image.color());
 
     let img = dyn_image.to_rgb8();
@@ -184,14 +189,15 @@ fn main() {
 
     let start = Instant::now();
 
-    libblur::stack_blur(
+    libblur::fast_gaussian_next(
         &mut dst_bytes,
         stride as u32,
         dimensions.0,
         dimensions.1,
-        159,
+        75,
         FastBlurChannels::Channels3,
         ThreadingPolicy::Adaptive,
+        EdgeMode::Clamp,
     );
 
     println!("stackblur {:?}", start.elapsed());
@@ -253,18 +259,24 @@ fn main() {
     //     .map(|&x| f16::from_f32(x as f32 * (1. / 255.)))
     //     .collect();
     // //
-    // libblur::gaussian_blur(
-    //     &bytes,
-    //     &mut dst_bytes,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     251,
-    //     0.,
-    //     FastBlurChannels::Channels3,
-    //     EdgeMode::Clamp,
-    //     ThreadingPolicy::Single,
-    //     GaussianPreciseLevel::INTEGRAL,
-    // );
+
+    let start = Instant::now();
+
+    libblur::gaussian_blur(
+        &bytes,
+        &mut dst_bytes,
+        dimensions.0,
+        dimensions.1,
+        66 * 2 + 1,
+        0.,
+        FastBlurChannels::Channels3,
+        EdgeMode::Clamp,
+        ThreadingPolicy::Single,
+        GaussianPreciseLevel::INTEGRAL,
+    );
+
+    println!("gaussian_blur {:?}", start.elapsed());
+
     //
     // //
     // println!(
