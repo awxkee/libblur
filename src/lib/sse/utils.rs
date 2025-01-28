@@ -25,7 +25,6 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use erydanos::_mm_extract_epi64x;
 use half::f16;
 use std::arch::asm;
 #[cfg(target_arch = "x86")]

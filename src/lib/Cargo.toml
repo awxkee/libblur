@@ -1,6 +1,6 @@
 [package]
 name = "libblur"
-version = "0.14.9"
+version = "0.14.10"
 edition = "2021"
 description = "Fast image blurring in pure Rust"
 readme = "../../README.md"
@@ -27,7 +27,7 @@ num-traits = "0.2.18"
 rayon = "1.10.0"
 image = { version = "0.25.0", optional = true, default-features = false }
 rustfft = { version = "6.2.0", optional = true }
-fast_transpose = { version = "0.1.0", optional = true }
+fast_transpose = { version = "0.2.3", optional = true }
 
 [features]
 default = []

@@ -267,7 +267,7 @@ fn main() {
         &mut dst_bytes,
         dimensions.0,
         dimensions.1,
-        66*2 +1,
+        66 * 2 + 1,
         0.,
         FastBlurChannels::Channels3,
         EdgeMode::Clamp,

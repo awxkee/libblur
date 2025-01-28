@@ -30,7 +30,6 @@ use crate::neon::f16_utils::{
 };
 use half::f16;
 use std::arch::aarch64::*;
-use std::arch::asm;
 
 #[inline(always)]
 pub unsafe fn load_u8_s32_fast<const CHANNELS_COUNT: usize>(ptr: *const u8) -> int32x4_t {
@@ -42,14 +41,12 @@ pub unsafe fn store_f32<const CHANNELS_COUNT: usize>(dst_ptr: *mut f32, regi: fl
     if CHANNELS_COUNT == 4 {
         vst1q_f32(dst_ptr, regi);
     } else if CHANNELS_COUNT == 3 {
-        let lo_part = vget_lane_u64::<0>(vreinterpret_u64_f32(vget_low_f32(regi)));
-        (dst_ptr as *mut u64).write_unaligned(lo_part);
-        dst_ptr.add(2).write_unaligned(vgetq_lane_f32::<2>(regi));
+        vst1q_lane_f64::<0>(dst_ptr as *mut f64, vreinterpretq_f64_f32(regi));
+        vst1q_lane_f32::<2>(dst_ptr.add(2), regi);
     } else if CHANNELS_COUNT == 2 {
-        let lo_part = vget_lane_u64::<0>(vreinterpret_u64_f32(vget_low_f32(regi)));
-        (dst_ptr as *mut u64).write_unaligned(lo_part);
+        vst1q_lane_f64::<0>(dst_ptr as *mut f64, vreinterpretq_f64_f32(regi));
     } else {
-        dst_ptr.write_unaligned(vgetq_lane_f32::<0>(regi));
+        vst1q_lane_f32::<0>(dst_ptr, regi);
     }
 }
 
@@ -58,22 +55,15 @@ pub unsafe fn store_u8_s32<const CHANNELS_COUNT: usize>(dst_ptr: *mut u8, regi: 
     let s16 = vreinterpret_u16_s16(vqmovn_s32(regi));
     let u16_f = vcombine_u16(s16, s16);
     let v8 = vqmovn_u16(u16_f);
-    let pixel_u32 = vget_lane_u32::<0>(vreinterpret_u32_u8(v8));
     if CHANNELS_COUNT == 4 {
-        let casted_dst = dst_ptr as *mut u32;
-        casted_dst.write_unaligned(pixel_u32);
+        vst1_lane_u32::<0>(dst_ptr as *mut u32, vreinterpret_u32_u8(v8));
     } else if CHANNELS_COUNT == 3 {
-        let bits = pixel_u32.to_le_bytes();
-        let first_byte = u16::from_le_bytes([bits[0], bits[1]]);
-        (dst_ptr as *mut u16).write_unaligned(first_byte);
-        dst_ptr.add(2).write_unaligned(bits[2]);
+        vst1_lane_u16::<0>(dst_ptr as *mut u16, vreinterpret_u16_u8(v8));
+        vst1_lane_u8::<2>(dst_ptr.add(2), v8);
     } else if CHANNELS_COUNT == 2 {
-        let bits = pixel_u32.to_le_bytes();
-        let first_byte = u16::from_le_bytes([bits[0], bits[1]]);
-        (dst_ptr as *mut u16).write_unaligned(first_byte);
+        vst1_lane_u16::<0>(dst_ptr as *mut u16, vreinterpret_u16_u8(v8));
     } else {
-        let bits = pixel_u32.to_le_bytes();
-        dst_ptr.write_unaligned(bits[0]);
+        vst1_lane_u8::<0>(dst_ptr, v8);
     }
 }
 
@@ -82,22 +72,15 @@ pub unsafe fn store_u8_u32<const CHANNELS_COUNT: usize>(dst_ptr: *mut u8, regi: 
     let s16 = vqmovn_u32(regi);
     let u16_f = vcombine_u16(s16, s16);
     let v8 = vqmovn_u16(u16_f);
-    let pixel_u32 = vget_lane_u32::<0>(vreinterpret_u32_u8(v8));
     if CHANNELS_COUNT == 4 {
-        let casted_dst = dst_ptr as *mut u32;
-        casted_dst.write_unaligned(pixel_u32);
+        vst1_lane_u32::<0>(dst_ptr as *mut u32, vreinterpret_u32_u8(v8));
     } else if CHANNELS_COUNT == 3 {
-        let bits = pixel_u32.to_le_bytes();
-        let first_byte = u16::from_le_bytes([bits[0], bits[1]]);
-        (dst_ptr as *mut u16).write_unaligned(first_byte);
-        dst_ptr.add(2).write_unaligned(bits[2]);
+        vst1_lane_u16::<0>(dst_ptr as *mut u16, vreinterpret_u16_u8(v8));
+        vst1_lane_u8::<2>(dst_ptr.add(2), v8);
     } else if CHANNELS_COUNT == 2 {
-        let bits = pixel_u32.to_le_bytes();
-        let first_byte = u16::from_le_bytes([bits[0], bits[1]]);
-        (dst_ptr as *mut u16).write_unaligned(first_byte);
+        vst1_lane_u16::<0>(dst_ptr as *mut u16, vreinterpret_u16_u8(v8));
     } else {
-        let bits = pixel_u32.to_le_bytes();
-        dst_ptr.write_unaligned(bits[0]);
+        vst1_lane_u8::<0>(dst_ptr, v8);
     }
 }
 
@@ -131,53 +114,18 @@ pub unsafe fn load_f32_fast<const CHANNELS_COUNT: usize>(ptr: *const f32) -> flo
 
 #[inline(always)]
 pub unsafe fn load_u8_u32_fast<const CHANNELS_COUNT: usize>(ptr: *const u8) -> uint32x4_t {
-    // LLVM generates a little trash code so better here is to use assembly
-    let mut out_reg: uint32x4_t;
     if CHANNELS_COUNT == 4 {
-        asm!("\
-             ldr  {tmp1:w}, [{0}]           // Load the first byte into w1
-             mov  {1:v}.s[0], {tmp1:w}      // Move w1 to the first lane of v0
-             uxtl {1:v}.8h, {1:v}.8b
-             uxtl {1:v}.4s, {1:v}.4h
-        \
-        ", in(reg) ptr, out(vreg) out_reg,
-        tmp1 = out(reg) _);
-        out_reg
+        let v0 = vreinterpret_u8_u32(vld1_lane_u32::<0>(ptr as *const u32, vdup_n_u32(0)));
+        vmovl_u16(vget_low_u16(vmovl_u8(v0)))
     } else if CHANNELS_COUNT == 3 {
-        asm!("\
-             ldrb    {tmp1:w}, [{0}]           // Load the first byte into w1
-             ldrb    {tmp2:w}, [{0}, #1]       // Load the second byte into w2
-             ldrb    {tmp3:w}, [{0}, #2]       // Load the third byte into w3
-
-             mov     {1:v}.s[0], {tmp1:w}      // Move w1 to the first lane of v0
-             mov     {1:v}.s[1], {tmp2:w}      // Move w2 to the second lane of v0
-             mov     {1:v}.s[2], {tmp3:w}      // Move w3 to the third lane of v0
-        \
-        ", in(reg) ptr, out(vreg) out_reg,
-        tmp1 = out(reg) _,
-        tmp2 = out(reg) _,
-        tmp3 = out(reg) _);
-        out_reg
+        let mut v0 = vreinterpret_u8_u16(vld1_lane_u16::<0>(ptr as *const u16, vdup_n_u16(0)));
+        v0 = vld1_lane_u8::<2>(ptr.add(2), v0);
+        vmovl_u16(vget_low_u16(vmovl_u8(v0)))
     } else if CHANNELS_COUNT == 2 {
-        asm!("\
-             ldrb    {tmp1:w}, [{0}]           // Load the first byte into w1
-             ldrb    {tmp2:w}, [{0}, #1]       // Load the second byte into w2
-
-             mov     {1:v}.s[0], {tmp1:w}      // Move w1 to the first lane of v0
-             mov     {1:v}.s[1], {tmp2:w}      // Move w2 to the second lane of v0
-        \
-        ", in(reg) ptr, out(vreg) out_reg,
-        tmp1 = out(reg) _,
-        tmp2 = out(reg) _);
-        out_reg
+        let v0 = vreinterpret_u8_u16(vld1_lane_u16::<0>(ptr as *const u16, vdup_n_u16(0)));
+        vmovl_u16(vget_low_u16(vmovl_u8(v0)))
     } else {
-        asm!("\
-             ldrb    {tmp1:w}, [{0}]           // Load the first byte into w1
-             mov     {1:v}.s[0], {tmp1:w}      // Move w1 to the first lane of v0
-        \
-        ", in(reg) ptr, out(vreg) out_reg,
-        tmp1 = out(reg) _);
-        out_reg
+        vreinterpretq_u32_u8(vld1q_lane_u8::<3>(ptr, vdupq_n_u8(0)))
     }
 }
 
