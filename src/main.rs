@@ -163,7 +163,7 @@ fn main() {
     //     vst1q_s64(t.as_mut_ptr(), mul);
     //     println!("{:?}", t);
     // }
-    let dyn_image = ImageReader::open("assets/test_image_1.jpg")
+    let dyn_image = ImageReader::open("assets/test_image_1_small.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -275,7 +275,24 @@ fn main() {
     //     GaussianPreciseLevel::INTEGRAL,
     // );
 
+    let test_width = 255;
+    let test = vec![0u8; test_width * 3];
+    let mut test_dest = vec![0u8; test_width * 3];
+
     libblur::gaussian_box_blur(
+        &test,
+        test_width as u32 * 3,
+        &mut test_dest,
+        test_width as u32 * 3,
+        test_width as u32,
+        1,
+        232,
+        FastBlurChannels::Channels3,
+        ThreadingPolicy::Single,
+    );
+
+    /*
+        libblur::gaussian_box_blur(
         &bytes,
         dimensions.0 * 3,
         &mut dst_bytes,
@@ -286,6 +303,7 @@ fn main() {
         FastBlurChannels::Channels3,
         ThreadingPolicy::Single,
     );
+     */
 
     println!("gaussian_blur {:?}", start.elapsed());
 

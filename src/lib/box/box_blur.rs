@@ -465,10 +465,15 @@ impl BoxBlurVerticalPass<u8> for u8 {
         ) = box_blur_vertical_pass_impl::<u8, u32, CHANNELS_CONFIGURATION>;
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
-            let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
-            if _is_sse_available {
+            let is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+            if is_sse_available {
                 _dispatcher_vertical = box_blur_vertical_pass_sse::<u8, CHANNELS_CONFIGURATION>;
             }
+            // let is_avx_available = std::arch::is_x86_feature_detected!("avx2");
+            // if is_avx_available {
+            //     use crate::r#box::box_blur_avx::box_blur_vertical_pass_avx2;
+            //     _dispatcher_vertical = box_blur_vertical_pass_avx2::<u8, CHANNELS_CONFIGURATION>;
+            // }
         }
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {

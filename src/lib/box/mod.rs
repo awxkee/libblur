@@ -30,5 +30,7 @@ mod box_blur;
 mod box_blur_neon;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 mod box_blur_sse;
+#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+mod box_blur_avx;
 
 pub use box_blur::*;
