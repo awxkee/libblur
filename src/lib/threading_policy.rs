@@ -50,13 +50,13 @@ impl ThreadingPolicy {
         match self {
             ThreadingPolicy::Single => 1,
             ThreadingPolicy::Adaptive => {
-                ((width * height / (256 * 256)) as usize).clamp(1, Self::available_parallelism())
+                ((width * height / (256 * 256)) as usize).clamp(1, Self::available_parallelism(6))
             }
             ThreadingPolicy::AdaptiveReserve(reserve) => {
                 let reserve = reserve.get();
 
                 let max_threads = {
-                    let max_threads = Self::available_parallelism();
+                    let max_threads = Self::available_parallelism(1);
 
                     if max_threads <= reserve {
                         1
@@ -72,9 +72,11 @@ impl ThreadingPolicy {
         }
     }
 
-    fn available_parallelism() -> usize {
+    fn available_parallelism(min: usize) -> usize {
+        // Make always return at least some threads as we requested
         available_parallelism()
             .unwrap_or_else(|_| NonZeroUsize::new(1).unwrap())
             .get()
+            .max(min)
     }
 }

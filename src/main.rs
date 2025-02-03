@@ -275,19 +275,20 @@ fn main() {
     //     GaussianPreciseLevel::INTEGRAL,
     // );
 
-    let test_width = 255;
-    let test = vec![0u8; test_width * 3];
-    let mut test_dest = vec![0u8; test_width * 3];
+    let test_width = 96;
+    let test_height = 10;
+    let test = vec![0u8; test_width * 1 * test_height];
+    let mut test_dest = vec![0u8; test_width * 1 * test_height];
 
     libblur::gaussian_box_blur(
         &test,
-        test_width as u32 * 3,
+        test_width as u32 * 1,
         &mut test_dest,
-        test_width as u32 * 3,
+        test_width as u32 * 1,
         test_width as u32,
-        1,
-        232,
-        FastBlurChannels::Channels3,
+        test_height as u32,
+        228,
+        FastBlurChannels::Plane,
         ThreadingPolicy::Single,
     );
 

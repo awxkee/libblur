@@ -29,7 +29,7 @@
 
 #![no_main]
 
-use libblur::{EdgeMode, FastBlurChannels, GaussianPreciseLevel, ThreadingPolicy};
+use libblur::{FastBlurChannels, ThreadingPolicy};
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: (u8, u8, u8)| {

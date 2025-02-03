@@ -30,9 +30,11 @@ rustfft = { version = "6.2.0", optional = true }
 fast_transpose = { version = "0.2.3", optional = true }
 
 [features]
-default = []
+default = ["avx", "sse"]
 image = ["dep:image"]
 fft = ["dep:rustfft", "dep:fast_transpose"]
+avx = []
+sse = []
 
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
 libc = "0.2.158"
