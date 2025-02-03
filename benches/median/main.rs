@@ -14,8 +14,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let stride = dimensions.0 as usize * components;
     let src_bytes = img.as_bytes();
     c.bench_function("libblur: RGBA median blur", |b| {
+        let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
         b.iter(|| {
-            let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
             libblur::median_blur(
                 src_bytes,
                 stride as u32,
@@ -50,8 +50,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let rgb_image = rgb_img.as_bytes();
 
     c.bench_function("libblur: RGB median blur", |b| {
+        let mut dst_bytes: Vec<u8> = rgb_image.to_vec();
         b.iter(|| {
-            let mut dst_bytes: Vec<u8> = rgb_image.to_vec();
             libblur::median_blur(
                 rgb_image,
                 rgb_img.dimensions().0 * 3,
