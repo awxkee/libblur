@@ -187,20 +187,20 @@ fn main() {
 
     // let mut spawned_bytes = dst_bytes.iter().map(|&x| ((x as u16) << 8) | (x as u16)).collect::<Vec<_>>();
 
-    let start = Instant::now();
-
-    libblur::fast_gaussian_next(
-        &mut dst_bytes,
-        stride as u32,
-        dimensions.0,
-        dimensions.1,
-        75,
-        FastBlurChannels::Channels3,
-        ThreadingPolicy::Adaptive,
-        EdgeMode::Clamp,
-    );
-
-    println!("stackblur {:?}", start.elapsed());
+    // let start = Instant::now();
+    //
+    // libblur::fast_gaussian_next(
+    //     &mut dst_bytes,
+    //     stride as u32,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     75,
+    //     FastBlurChannels::Channels3,
+    //     ThreadingPolicy::Adaptive,
+    //     EdgeMode::Clamp,
+    // );
+    //
+    // println!("stackblur {:?}", start.elapsed());
 
     // dst_bytes = spawned_bytes.iter().map(|&x| (x >> 8) as u8).collect::<Vec<_>>();
 
@@ -262,17 +262,29 @@ fn main() {
 
     let start = Instant::now();
 
-    libblur::gaussian_blur(
+    // libblur::gaussian_blur(
+    //     &bytes,
+    //     &mut dst_bytes,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     66 * 2 + 1,
+    //     0.,
+    //     FastBlurChannels::Channels3,
+    //     EdgeMode::Clamp,
+    //     ThreadingPolicy::Single,
+    //     GaussianPreciseLevel::INTEGRAL,
+    // );
+
+    libblur::gaussian_box_blur(
         &bytes,
+        dimensions.0 * 3,
         &mut dst_bytes,
+        dimensions.0 * 3,
         dimensions.0,
         dimensions.1,
-        66 * 2 + 1,
-        0.,
+        25,
         FastBlurChannels::Channels3,
-        EdgeMode::Clamp,
         ThreadingPolicy::Single,
-        GaussianPreciseLevel::INTEGRAL,
     );
 
     println!("gaussian_blur {:?}", start.elapsed());

@@ -88,7 +88,7 @@ unsafe fn box_blur_horizontal_pass_impl<T, const CHANNELS: usize>(
         {
             let s_ptr = unsafe { src.as_ptr().add(y_src_shift) };
             let edge_colors = unsafe { load_u8_s32_fast::<CHANNELS>(s_ptr) };
-            store = unsafe { _mm_mullo_epi32(edge_colors, v_edge_count) };
+            store = unsafe { _mm_madd_epi16(edge_colors, v_edge_count) };
         }
 
         for x in 1..std::cmp::min(half_kernel, width) {
@@ -162,104 +162,253 @@ pub(crate) fn box_blur_vertical_pass_sse<T, const CHANNELS: usize>(
 
     let mut cx = start_x;
 
-    for x in (cx..end_x.saturating_sub(2)).step_by(2) {
-        let px = x as usize * CHANNELS;
+    while cx + 16 < end_x {
+        let px = cx as usize;
 
-        let mut store_0;
-        let mut store_1;
+        let mut store_0: __m128i;
+        let mut store_1: __m128i;
+        let mut store_2: __m128i;
+        let mut store_3: __m128i;
 
-        {
-            let s_ptr = unsafe { src.as_ptr().add(px) };
-            let edge_colors_0 = unsafe { load_u8_s32_fast::<CHANNELS>(s_ptr) };
-            let edge_colors_1 = unsafe { load_u8_s32_fast::<CHANNELS>(s_ptr.add(CHANNELS)) };
-            store_0 = unsafe { _mm_mullo_epi32(edge_colors_0, v_edge_count) };
-            store_1 = unsafe { _mm_mullo_epi32(edge_colors_1, v_edge_count) };
+        unsafe {
+            let s_ptr = src.as_ptr().add(px);
+            let edge = _mm_loadu_si128(s_ptr as *const _);
+            let lo0 = _mm_unpacklo_epi8(edge, _mm_setzero_si128());
+            let hi0 = _mm_unpackhi_epi8(edge, _mm_setzero_si128());
+
+            let i16_l0 = _mm_unpacklo_epi16(lo0, _mm_setzero_si128());
+            let i16_h0 = _mm_unpackhi_epi16(lo0, _mm_setzero_si128());
+            let i16_l1 = _mm_unpacklo_epi16(hi0, _mm_setzero_si128());
+            let i16_h1 = _mm_unpackhi_epi16(hi0, _mm_setzero_si128());
+
+            store_0 = _mm_madd_epi16(i16_l0, v_edge_count);
+            store_1 = _mm_madd_epi16(i16_h0, v_edge_count);
+
+            store_2 = _mm_madd_epi16(i16_l1, v_edge_count);
+            store_3 = _mm_madd_epi16(i16_h1, v_edge_count);
         }
 
-        for y in 1..std::cmp::min(half_kernel, height) {
-            let y_src_shift = y as usize * src_stride as usize;
-            let s_ptr = unsafe { src.as_ptr().add(y_src_shift + px) };
-            let edge_colors_0 = unsafe { load_u8_s32_fast::<CHANNELS>(s_ptr) };
-            let edge_colors_1 = unsafe { load_u8_s32_fast::<CHANNELS>(s_ptr.add(CHANNELS)) };
-            store_0 = unsafe { _mm_add_epi32(store_0, edge_colors_0) };
-            store_1 = unsafe { _mm_add_epi32(store_1, edge_colors_1) };
+        unsafe {
+            for y in 1..std::cmp::min(half_kernel, height) {
+                let y_src_shift = y as usize * src_stride as usize;
+                let s_ptr = src.as_ptr().add(y_src_shift + px);
+
+                let edge = _mm_loadu_si128(s_ptr as *const _);
+                let lo0 = _mm_unpacklo_epi8(edge, _mm_setzero_si128());
+                let hi0 = _mm_unpackhi_epi8(edge, _mm_setzero_si128());
+
+                let i16_l0 = _mm_unpacklo_epi16(lo0, _mm_setzero_si128());
+                let i16_h0 = _mm_unpackhi_epi16(lo0, _mm_setzero_si128());
+                let i16_l1 = _mm_unpacklo_epi16(hi0, _mm_setzero_si128());
+                let i16_h1 = _mm_unpackhi_epi16(hi0, _mm_setzero_si128());
+
+                store_0 = _mm_add_epi32(store_0, i16_l0);
+                store_1 = _mm_add_epi32(store_1, i16_h0);
+
+                store_2 = _mm_add_epi32(store_2, i16_l1);
+                store_3 = _mm_add_epi32(store_3, i16_h1);
+            }
         }
 
-        for y in 0..height {
-            // preload edge pixels
-            let next = std::cmp::min(y + half_kernel, height - 1) as usize * src_stride as usize;
-            let previous =
-                std::cmp::max(y as i64 - half_kernel as i64, 0) as usize * src_stride as usize;
-            let y_dst_shift = dst_stride as usize * y as usize;
+        unsafe {
+            for y in 0..height {
+                // preload edge pixels
+                let next =
+                    std::cmp::min(y + half_kernel, height - 1) as usize * src_stride as usize;
+                let previous =
+                    std::cmp::max(y as i64 - half_kernel as i64, 0) as usize * src_stride as usize;
+                let y_dst_shift = dst_stride as usize * y as usize;
 
-            // subtract previous
-            {
-                let s_ptr = unsafe { src.as_ptr().add(previous + px) };
-                let edge_colors_0 = unsafe { load_u8_s32_fast::<CHANNELS>(s_ptr) };
-                let edge_colors_1 = unsafe { load_u8_s32_fast::<CHANNELS>(s_ptr.add(CHANNELS)) };
-                store_0 = unsafe { _mm_sub_epi32(store_0, edge_colors_0) };
-                store_1 = unsafe { _mm_sub_epi32(store_1, edge_colors_1) };
-            }
+                // subtract previous
+                {
+                    let s_ptr = src.as_ptr().add(previous + px);
+                    let edge = _mm_loadu_si128(s_ptr as *const _);
+                    let lo0 = _mm_unpacklo_epi8(edge, _mm_setzero_si128());
+                    let hi0 = _mm_unpackhi_epi8(edge, _mm_setzero_si128());
 
-            // add next
-            {
-                let s_ptr = unsafe { src.as_ptr().add(next + px) };
-                let edge_colors_0 = unsafe { load_u8_s32_fast::<CHANNELS>(s_ptr) };
-                let edge_colors_1 = unsafe { load_u8_s32_fast::<CHANNELS>(s_ptr.add(CHANNELS)) };
-                store_0 = unsafe { _mm_add_epi32(store_0, edge_colors_0) };
-                store_1 = unsafe { _mm_add_epi32(store_1, edge_colors_1) };
-            }
+                    let i16_l0 = _mm_unpacklo_epi16(lo0, _mm_setzero_si128());
+                    let i16_h0 = _mm_unpackhi_epi16(lo0, _mm_setzero_si128());
+                    let i16_l1 = _mm_unpacklo_epi16(hi0, _mm_setzero_si128());
+                    let i16_h1 = _mm_unpackhi_epi16(hi0, _mm_setzero_si128());
 
-            let px = x as usize * CHANNELS;
+                    store_0 = _mm_sub_epi32(store_0, i16_l0);
+                    store_1 = _mm_sub_epi32(store_1, i16_h0);
 
-            if CHANNELS == 3 {
-                store_0 = unsafe { _mm_insert_epi32::<3>(store_0, 0) };
-                store_1 = unsafe { _mm_insert_epi32::<3>(store_1, 0) };
-            }
+                    store_2 = _mm_sub_epi32(store_2, i16_l1);
+                    store_3 = _mm_sub_epi32(store_3, i16_h1);
+                }
 
-            let scale_store_0 = unsafe { _mm_mul_ps_epi32(store_0, v_weight) };
-            let scale_store_1 = unsafe { _mm_mul_ps_epi32(store_1, v_weight) };
+                // add next
+                {
+                    let s_ptr = src.as_ptr().add(next + px);
+                    let edge = _mm_loadu_si128(s_ptr as *const _);
+                    let lo0 = _mm_unpacklo_epi8(edge, _mm_setzero_si128());
+                    let hi0 = _mm_unpackhi_epi8(edge, _mm_setzero_si128());
 
-            if CHANNELS == 3 {
+                    let i16_l0 = _mm_unpacklo_epi16(lo0, _mm_setzero_si128());
+                    let i16_h0 = _mm_unpackhi_epi16(lo0, _mm_setzero_si128());
+                    let i16_l1 = _mm_unpacklo_epi16(hi0, _mm_setzero_si128());
+                    let i16_h1 = _mm_unpackhi_epi16(hi0, _mm_setzero_si128());
+
+                    store_0 = _mm_add_epi32(store_0, i16_l0);
+                    store_1 = _mm_add_epi32(store_1, i16_h0);
+
+                    store_2 = _mm_add_epi32(store_2, i16_l1);
+                    store_3 = _mm_add_epi32(store_3, i16_h1);
+                }
+
+                let px = cx as usize;
+
+                let store0_ps = _mm_cvtepi32_ps(store_0);
+                let store1_ps = _mm_cvtepi32_ps(store_1);
+                let store2_ps = _mm_cvtepi32_ps(store_2);
+                let store3_ps = _mm_cvtepi32_ps(store_3);
+
+                let scale_store_0_ps = _mm_mul_ps(store0_ps, v_weight);
+                let scale_store_1_ps = _mm_mul_ps(store1_ps, v_weight);
+                let scale_store_2_ps = _mm_mul_ps(store2_ps, v_weight);
+                let scale_store_3_ps = _mm_mul_ps(store3_ps, v_weight);
+
+                const RND: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
+
+                let scale_store_0_rnd = _mm_round_ps::<RND>(scale_store_0_ps);
+                let scale_store_1_rnd = _mm_round_ps::<RND>(scale_store_1_ps);
+                let scale_store_2_rnd = _mm_round_ps::<RND>(scale_store_2_ps);
+                let scale_store_3_rnd = _mm_round_ps::<RND>(scale_store_3_ps);
+
+                let scale_store_0 = _mm_cvtps_epi32(scale_store_0_rnd);
+                let scale_store_1 = _mm_cvtps_epi32(scale_store_1_rnd);
+                let scale_store_2 = _mm_cvtps_epi32(scale_store_2_rnd);
+                let scale_store_3 = _mm_cvtps_epi32(scale_store_3_rnd);
+
                 let offset = y_dst_shift + px;
+                let ptr = unsafe_dst.slice.get_unchecked(offset).get();
 
-                unsafe {
-                    let ptr = unsafe_dst.slice.as_ptr().add(offset) as *mut u8;
-                    store_u8_u32::<CHANNELS>(ptr, scale_store_0);
-                }
+                let set0 = _mm_packus_epi32(scale_store_0, scale_store_1);
+                let set1 = _mm_packus_epi32(scale_store_2, scale_store_3);
 
-                unsafe {
-                    let ptr = unsafe_dst.slice.as_ptr().add(offset + CHANNELS) as *mut u8;
-                    store_u8_u32::<CHANNELS>(ptr, scale_store_1);
-                }
-            } else {
-                let px_16 = unsafe { _mm_packus_epi32(scale_store_0, scale_store_1) };
-                let px_8 = unsafe { _mm_packus_epi16(px_16, px_16) };
-                let unsafe_offset = y_dst_shift + px;
-                let ptr = unsafe { unsafe_dst.slice.get_unchecked(unsafe_offset).get() };
-                unsafe {
-                    _mm_storeu_si64(ptr, px_8);
-                }
+                let full_set = _mm_packus_epi16(set0, set1);
+                _mm_storeu_si128(ptr as *mut _, full_set);
             }
         }
 
-        cx = x;
+        cx += 16;
     }
 
+    while cx + 8 < end_x {
+        let px = cx as usize;
+
+        let mut store_0: __m128i;
+        let mut store_1: __m128i;
+
+        unsafe {
+            let s_ptr = src.as_ptr().add(px);
+            let edge = _mm_loadu_si128(s_ptr as *const _);
+            let lo0 = _mm_unpacklo_epi8(edge, _mm_setzero_si128());
+
+            let i16_l0 = _mm_unpacklo_epi16(lo0, _mm_setzero_si128());
+            let i16_h0 = _mm_unpackhi_epi16(lo0, _mm_setzero_si128());
+
+            store_0 = _mm_madd_epi16(i16_l0, v_edge_count);
+            store_1 = _mm_madd_epi16(i16_h0, v_edge_count);
+        }
+
+        unsafe {
+            for y in 1..std::cmp::min(half_kernel, height) {
+                let y_src_shift = y as usize * src_stride as usize;
+                let s_ptr = src.as_ptr().add(y_src_shift + px);
+
+                let edge = _mm_loadu_si64(s_ptr as *const _);
+                let lo0 = _mm_unpacklo_epi8(edge, _mm_setzero_si128());
+
+                let i16_l0 = _mm_unpacklo_epi16(lo0, _mm_setzero_si128());
+                let i16_h0 = _mm_unpackhi_epi16(lo0, _mm_setzero_si128());
+
+                store_0 = _mm_add_epi32(store_0, i16_l0);
+                store_1 = _mm_add_epi32(store_1, i16_h0);
+            }
+        }
+
+        unsafe {
+            for y in 0..height {
+                // preload edge pixels
+                let next =
+                    std::cmp::min(y + half_kernel, height - 1) as usize * src_stride as usize;
+                let previous =
+                    std::cmp::max(y as i64 - half_kernel as i64, 0) as usize * src_stride as usize;
+                let y_dst_shift = dst_stride as usize * y as usize;
+
+                // subtract previous
+                {
+                    let s_ptr = src.as_ptr().add(previous + px);
+                    let edge = _mm_loadu_si64(s_ptr as *const _);
+                    let lo0 = _mm_unpacklo_epi8(edge, _mm_setzero_si128());
+
+                    let i16_l0 = _mm_unpacklo_epi16(lo0, _mm_setzero_si128());
+                    let i16_h0 = _mm_unpackhi_epi16(lo0, _mm_setzero_si128());
+
+                    store_0 = _mm_sub_epi32(store_0, i16_l0);
+                    store_1 = _mm_sub_epi32(store_1, i16_h0);
+                }
+
+                // add next
+                {
+                    let s_ptr = src.as_ptr().add(next + px);
+                    let edge = _mm_loadu_si64(s_ptr as *const _);
+                    let lo0 = _mm_unpacklo_epi8(edge, _mm_setzero_si128());
+
+                    let i16_l0 = _mm_unpacklo_epi16(lo0, _mm_setzero_si128());
+                    let i16_h0 = _mm_unpackhi_epi16(lo0, _mm_setzero_si128());
+
+                    store_0 = _mm_add_epi32(store_0, i16_l0);
+                    store_1 = _mm_add_epi32(store_1, i16_h0);
+                }
+
+                let px = cx as usize;
+
+                let store0_ps = _mm_cvtepi32_ps(store_0);
+                let store1_ps = _mm_cvtepi32_ps(store_1);
+
+                let scale_store_0_ps = _mm_mul_ps(store0_ps, v_weight);
+                let scale_store_1_ps = _mm_mul_ps(store1_ps, v_weight);
+
+                const RND: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
+
+                let scale_store_0_rnd = _mm_round_ps::<RND>(scale_store_0_ps);
+                let scale_store_1_rnd = _mm_round_ps::<RND>(scale_store_1_ps);
+
+                let scale_store_0 = _mm_cvtps_epi32(scale_store_0_rnd);
+                let scale_store_1 = _mm_cvtps_epi32(scale_store_1_rnd);
+
+                let offset = y_dst_shift + px;
+                let ptr = unsafe_dst.slice.get_unchecked(offset).get();
+
+                let set0 = _mm_packus_epi32(scale_store_0, scale_store_1);
+
+                let full_set = _mm_packus_epi16(set0, _mm_setzero_si128());
+                _mm_storeu_si64(ptr as *mut _, full_set);
+            }
+        }
+
+        cx += 8;
+    }
+
+    const TAIL_CN: usize = 1;
+
     for x in cx..end_x {
-        let px = x as usize * CHANNELS;
+        let px = x as usize * TAIL_CN;
 
         let mut store;
         {
             let s_ptr = unsafe { src.as_ptr().add(px) };
-            let edge_colors = unsafe { load_u8_s32_fast::<CHANNELS>(s_ptr) };
-            store = unsafe { _mm_mullo_epi32(edge_colors, v_edge_count) };
+            let edge_colors = unsafe { load_u8_s32_fast::<TAIL_CN>(s_ptr) };
+            store = unsafe { _mm_madd_epi16(edge_colors, v_edge_count) };
         }
 
         for y in 1..std::cmp::min(half_kernel, height) {
             let y_src_shift = y as usize * src_stride as usize;
             let s_ptr = unsafe { src.as_ptr().add(y_src_shift + px) };
-            let edge_colors = unsafe { load_u8_s32_fast::<CHANNELS>(s_ptr) };
+            let edge_colors = unsafe { load_u8_s32_fast::<TAIL_CN>(s_ptr) };
             store = unsafe { _mm_add_epi32(store, edge_colors) };
         }
 
@@ -273,28 +422,24 @@ pub(crate) fn box_blur_vertical_pass_sse<T, const CHANNELS: usize>(
             // subtract previous
             {
                 let s_ptr = unsafe { src.as_ptr().add(previous + px) };
-                let edge_colors = unsafe { load_u8_s32_fast::<CHANNELS>(s_ptr) };
+                let edge_colors = unsafe { load_u8_s32_fast::<TAIL_CN>(s_ptr) };
                 store = unsafe { _mm_sub_epi32(store, edge_colors) };
             }
 
             // add next
             {
                 let s_ptr = unsafe { src.as_ptr().add(next + px) };
-                let edge_colors = unsafe { load_u8_s32_fast::<CHANNELS>(s_ptr) };
+                let edge_colors = unsafe { load_u8_s32_fast::<TAIL_CN>(s_ptr) };
                 store = unsafe { _mm_add_epi32(store, edge_colors) };
             }
 
-            let px = x as usize * CHANNELS;
-
-            if CHANNELS == 3 {
-                store = unsafe { _mm_insert_epi32::<3>(store, 0) };
-            }
+            let px = x as usize;
 
             let scale_store = unsafe { _mm_mul_ps_epi32(store, v_weight) };
 
             unsafe {
                 let ptr = unsafe_dst.slice.as_ptr().add(y_dst_shift + px) as *mut u8;
-                store_u8_u32::<CHANNELS>(ptr, scale_store);
+                store_u8_u32::<TAIL_CN>(ptr, scale_store);
             }
         }
     }

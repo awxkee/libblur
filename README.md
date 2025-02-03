@@ -117,7 +117,7 @@ may be
 observed. However, if you'll use advanced analysis algorithms non gaussian methods will be detected. Not suitable for
 advanced analysis.
 Do not use when you need gaussian. Based on binomial filter, generally speed close, might be a little faster than stack
-blur ( except NEON or except non multithreaded stack blur, on NEON much faster or overcome non multithreaded
+blur ( except NEON or except non-multithreaded stack blur, on NEON much faster or overcome non multithreaded
 stackblur ), however results better as I see. Max radius ~320 for u8, for u16 will be less.
 
 O(log R) complexity.
