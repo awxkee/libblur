@@ -72,8 +72,8 @@ impl ThreadingPolicy {
         }
     }
 
+    // Make always return at least some minimal amount of threads, if multi-threading were requested
     fn available_parallelism(min: usize) -> usize {
-        // Make always return at least some threads as we requested
         available_parallelism()
             .unwrap_or_else(|_| NonZeroUsize::new(1).unwrap())
             .get()
