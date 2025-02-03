@@ -27,7 +27,7 @@
 
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::stackblur::neon::{HorizontalNeonStackBlurPass, VerticalNeonStackBlurPass};
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 use crate::stackblur::sse::{HorizontalSseStackBlurPass, VerticalSseStackBlurPass};
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 use crate::stackblur::wasm::{HorizontalWasmStackBlurPass, VerticalWasmStackBlurPass};
@@ -56,13 +56,14 @@ fn stack_blur_worker_horizontal(
     ) {
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         fn select_blur_pass<const N: usize>() -> Box<dyn StackBlurWorkingPass<u8, N>> {
-            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-            let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+            #[cfg(feature = "sse")]
             if std::arch::is_x86_feature_detected!("sse4.1") {
                 Box::new(HorizontalSseStackBlurPass::<u8, i32, N>::default())
             } else {
                 Box::new(HorizontalStackBlurPass::<u8, i32, f32, N>::default())
             }
+            #[cfg(not(feature = "sse"))]
+            Box::new(HorizontalStackBlurPass::<u8, i32, f32, N>::default())
         }
 
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
@@ -123,13 +124,14 @@ fn stack_blur_worker_vertical(
     ) {
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         fn select_blur_pass<const N: usize>() -> Box<dyn StackBlurWorkingPass<u8, N>> {
-            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-            let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+            #[cfg(feature = "sse")]
             if std::arch::is_x86_feature_detected!("sse4.1") {
                 Box::new(VerticalSseStackBlurPass::<u8, i32, N>::default())
             } else {
                 Box::new(VerticalStackBlurPass::<u8, i32, f32, N>::default())
             }
+            #[cfg(not(feature = "sse"))]
+            Box::new(VerticalStackBlurPass::<u8, i32, f32, N>::default())
         }
 
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]

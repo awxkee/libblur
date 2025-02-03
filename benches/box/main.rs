@@ -3,7 +3,6 @@ use image::{EncodableLayout, GenericImageView, ImageReader};
 use libblur::{FastBlurChannels, ThreadingPolicy};
 use opencv::core::{find_file, Mat, Point, Size, BORDER_DEFAULT};
 use opencv::imgcodecs::{imread, IMREAD_COLOR};
-use opencv::sys::cv_setNumThreads_int;
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     let img = ImageReader::open("assets/test_image_4.png")
@@ -14,7 +13,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let components = 4;
     let stride = dimensions.0 as usize * components;
     let src_bytes = img.as_bytes();
-    opencv::core::set_num_threads(1).unwrap();
+
     c.bench_function("libblur: RGBA box blur", |b| {
         let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
         b.iter(|| {
