@@ -163,7 +163,7 @@ fn main() {
     //     vst1q_s64(t.as_mut_ptr(), mul);
     //     println!("{:?}", t);
     // }
-    let dyn_image = ImageReader::open("assets/test_image_1.jpg")
+    let dyn_image = ImageReader::open("assets/test_image_1_small.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -187,20 +187,20 @@ fn main() {
 
     // let mut spawned_bytes = dst_bytes.iter().map(|&x| ((x as u16) << 8) | (x as u16)).collect::<Vec<_>>();
 
-    let start = Instant::now();
-
-    libblur::fast_gaussian_next(
-        &mut dst_bytes,
-        stride as u32,
-        dimensions.0,
-        dimensions.1,
-        75,
-        FastBlurChannels::Channels3,
-        ThreadingPolicy::Adaptive,
-        EdgeMode::Clamp,
-    );
-
-    println!("stackblur {:?}", start.elapsed());
+    // let start = Instant::now();
+    //
+    // libblur::fast_gaussian_next(
+    //     &mut dst_bytes,
+    //     stride as u32,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     75,
+    //     FastBlurChannels::Channels3,
+    //     ThreadingPolicy::Adaptive,
+    //     EdgeMode::Clamp,
+    // );
+    //
+    // println!("stackblur {:?}", start.elapsed());
 
     // dst_bytes = spawned_bytes.iter().map(|&x| (x >> 8) as u8).collect::<Vec<_>>();
 
@@ -262,18 +262,49 @@ fn main() {
 
     let start = Instant::now();
 
-    libblur::gaussian_blur(
+    // libblur::gaussian_blur(
+    //     &bytes,
+    //     &mut dst_bytes,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     66 * 2 + 1,
+    //     0.,
+    //     FastBlurChannels::Channels3,
+    //     EdgeMode::Clamp,
+    //     ThreadingPolicy::Single,
+    //     GaussianPreciseLevel::INTEGRAL,
+    // );
+
+    let test_width = 96;
+    let test_height = 10;
+    let test = vec![0u8; test_width * 1 * test_height];
+    let mut test_dest = vec![0u8; test_width * 1 * test_height];
+
+    libblur::gaussian_box_blur(
+        &test,
+        test_width as u32 * 1,
+        &mut test_dest,
+        test_width as u32 * 1,
+        test_width as u32,
+        test_height as u32,
+        228,
+        FastBlurChannels::Plane,
+        ThreadingPolicy::Single,
+    );
+
+    /*
+        libblur::gaussian_box_blur(
         &bytes,
+        dimensions.0 * 3,
         &mut dst_bytes,
+        dimensions.0 * 3,
         dimensions.0,
         dimensions.1,
-        66 * 2 + 1,
-        0.,
+        25,
         FastBlurChannels::Channels3,
-        EdgeMode::Clamp,
         ThreadingPolicy::Single,
-        GaussianPreciseLevel::INTEGRAL,
     );
+     */
 
     println!("gaussian_blur {:?}", start.elapsed());
 

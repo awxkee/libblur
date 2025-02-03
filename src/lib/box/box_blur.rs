@@ -38,8 +38,6 @@ use rayon::ThreadPool;
 use crate::channels_configuration::FastBlurChannels;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::r#box::box_blur_neon::*;
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-use crate::r#box::box_blur_sse::*;
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::ThreadingPolicy;
@@ -213,10 +211,14 @@ impl BoxBlurHorizontalPass<u8> for u8 {
             }
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
-                let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
-                if _is_sse_available {
-                    _dispatcher_horizontal =
-                        box_blur_horizontal_pass_sse::<u8, { CHANNEL_CONFIGURATION }>;
+                #[cfg(feature = "sse")]
+                {
+                    let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+                    if _is_sse_available {
+                        use crate::r#box::box_blur_sse::box_blur_horizontal_pass_sse;
+                        _dispatcher_horizontal =
+                            box_blur_horizontal_pass_sse::<u8, { CHANNEL_CONFIGURATION }>;
+                    }
                 }
             }
         }
@@ -326,36 +328,67 @@ fn box_blur_vertical_pass_impl<T, J, const CHANNELS_CONFIGURATION: usize>(
 
     let weight = 1f32 / (radius * 2) as f32;
 
-    for x in start_x..end_x {
+    let mut cx = start_x;
+
+    while cx + 4 < end_x {
+        unsafe {
+            let mut weight0;
+            let mut weight1;
+            let mut weight2;
+            let mut weight3;
+            // replicate edge
+            let px = cx as usize;
+            weight0 = (src.get_unchecked(px).as_()) * edge_count;
+            weight1 = (src.get_unchecked(px + 1).as_()) * edge_count;
+            weight2 = (src.get_unchecked(px + 2).as_()) * edge_count;
+            weight3 = (src.get_unchecked(px + 3).as_()) * edge_count;
+
+            for y in 1..std::cmp::min(half_kernel, height) {
+                let y_src_shift = y as usize * src_stride as usize;
+                weight0 += src.get_unchecked(y_src_shift + px).as_();
+                weight1 += src.get_unchecked(y_src_shift + px + 1).as_();
+                weight2 += src.get_unchecked(y_src_shift + px + 2).as_();
+                weight3 += src.get_unchecked(y_src_shift + px + 3).as_();
+            }
+
+            for y in 0..height {
+                let next =
+                    std::cmp::min(y + half_kernel, height - 1) as usize * src_stride as usize;
+                let previous =
+                    std::cmp::max(y as i64 - half_kernel as i64, 0) as usize * src_stride as usize;
+                let y_dst_shift = dst_stride as usize * y as usize;
+                // Prune previous and add next and compute mean
+
+                weight0 += src.get_unchecked(next + px).as_();
+                weight1 += src.get_unchecked(next + px + 1).as_();
+                weight2 += src.get_unchecked(next + px + 2).as_();
+
+                weight0 -= src.get_unchecked(previous + px).as_();
+                weight1 -= src.get_unchecked(previous + px + 1).as_();
+                weight2 -= src.get_unchecked(previous + px + 2).as_();
+
+                weight3 += src.get_unchecked(next + px + 3).as_();
+                weight3 -= src.get_unchecked(previous + px + 3).as_();
+
+                let write_offset = y_dst_shift + px;
+                unsafe_dst.write(write_offset, (weight0.as_() * weight).to_());
+                unsafe_dst.write(write_offset + 1, (weight1.as_() * weight).to_());
+                unsafe_dst.write(write_offset + 2, (weight2.as_() * weight).to_());
+                unsafe_dst.write(write_offset + 3, (weight3.as_() * weight).to_());
+            }
+        }
+        cx += 4;
+    }
+
+    while cx < end_x {
         let mut weight0;
-        let mut weight1 = J::from_u32(0u32).unwrap();
-        let mut weight2 = J::from_u32(0u32).unwrap();
-        let mut weight3 = J::from_u32(0u32).unwrap();
         // replicate edge
-        let px = x as usize * CHANNELS_CONFIGURATION;
+        let px = cx as usize;
         weight0 = (unsafe { *src.get_unchecked(px) }.as_()) * edge_count;
-        if CHANNELS_CONFIGURATION > 1 {
-            weight1 = (unsafe { *src.get_unchecked(px + 1) }.as_()) * edge_count;
-        }
-        if CHANNELS_CONFIGURATION > 2 {
-            weight2 = (unsafe { *src.get_unchecked(px + 2) }.as_()) * edge_count;
-        }
-        if CHANNELS_CONFIGURATION == 4 {
-            weight3 = (unsafe { *src.get_unchecked(px + 3) }.as_()) * edge_count;
-        }
 
         for y in 1..std::cmp::min(half_kernel, height) {
             let y_src_shift = y as usize * src_stride as usize;
             weight0 += unsafe { *src.get_unchecked(y_src_shift + px) }.as_();
-            if CHANNELS_CONFIGURATION > 1 {
-                weight1 += unsafe { *src.get_unchecked(y_src_shift + px + 1) }.as_();
-            }
-            if CHANNELS_CONFIGURATION > 2 {
-                weight2 += unsafe { *src.get_unchecked(y_src_shift + px + 2) }.as_();
-            }
-            if CHANNELS_CONFIGURATION == 4 {
-                weight3 += unsafe { *src.get_unchecked(y_src_shift + px + 3) }.as_();
-            }
         }
 
         for y in 0..height {
@@ -366,40 +399,15 @@ fn box_blur_vertical_pass_impl<T, J, const CHANNELS_CONFIGURATION: usize>(
             // Prune previous and add next and compute mean
 
             weight0 += unsafe { *src.get_unchecked(next + px) }.as_();
-            if CHANNELS_CONFIGURATION > 1 {
-                weight1 += unsafe { *src.get_unchecked(next + px + 1) }.as_();
-            }
-            if CHANNELS_CONFIGURATION > 2 {
-                weight2 += unsafe { *src.get_unchecked(next + px + 2) }.as_();
-            }
-
             weight0 -= unsafe { *src.get_unchecked(previous + px) }.as_();
-            if CHANNELS_CONFIGURATION > 1 {
-                weight1 -= unsafe { *src.get_unchecked(previous + px + 1) }.as_();
-            }
-            if CHANNELS_CONFIGURATION > 2 {
-                weight2 -= unsafe { *src.get_unchecked(previous + px + 2) }.as_();
-            }
-
-            if CHANNELS_CONFIGURATION == 4 {
-                weight3 += unsafe { *src.get_unchecked(next + px + 3) }.as_();
-                weight3 -= unsafe { *src.get_unchecked(previous + px + 3) }.as_();
-            }
 
             let write_offset = y_dst_shift + px;
             unsafe {
                 unsafe_dst.write(write_offset, (weight0.as_() * weight).to_());
-                if CHANNELS_CONFIGURATION > 1 {
-                    unsafe_dst.write(write_offset + 1, (weight1.as_() * weight).to_());
-                }
-                if CHANNELS_CONFIGURATION > 2 {
-                    unsafe_dst.write(write_offset + 2, (weight2.as_() * weight).to_());
-                }
-                if CHANNELS_CONFIGURATION == 4 {
-                    unsafe_dst.write(write_offset + 3, (weight3.as_() * weight).to_());
-                }
             }
         }
+
+        cx += 1;
     }
 }
 
@@ -459,9 +467,22 @@ impl BoxBlurVerticalPass<u8> for u8 {
         ) = box_blur_vertical_pass_impl::<u8, u32, CHANNELS_CONFIGURATION>;
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
-            let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
-            if _is_sse_available {
-                _dispatcher_vertical = box_blur_vertical_pass_sse::<u8, CHANNELS_CONFIGURATION>;
+            #[cfg(feature = "sse")]
+            {
+                let is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+                if is_sse_available {
+                    use crate::r#box::box_blur_sse::box_blur_vertical_pass_sse;
+                    _dispatcher_vertical = box_blur_vertical_pass_sse::<u8, CHANNELS_CONFIGURATION>;
+                }
+            }
+            #[cfg(feature = "avx")]
+            {
+                let is_avx_available = std::arch::is_x86_feature_detected!("avx2");
+                if is_avx_available {
+                    use crate::r#box::box_blur_avx::box_blur_vertical_pass_avx2;
+                    _dispatcher_vertical =
+                        box_blur_vertical_pass_avx2::<u8, CHANNELS_CONFIGURATION>;
+                }
             }
         }
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
@@ -506,12 +527,13 @@ fn box_blur_vertical_pass<
 
     if let Some(pool) = pool {
         pool.scope(|scope| {
-            let segment_size = width / thread_count;
-            for i in 0..thread_count {
+            let total_width = width as usize * CHANNEL_CONFIGURATION;
+            let segment_size = total_width / thread_count as usize;
+            for i in 0..thread_count as usize {
                 let start_x = i * segment_size;
                 let mut end_x = (i + 1) * segment_size;
-                if i == thread_count - 1 {
-                    end_x = width;
+                if i == thread_count as usize - 1 {
+                    end_x = width as usize;
                 }
 
                 scope.spawn(move |_| {
@@ -523,13 +545,14 @@ fn box_blur_vertical_pass<
                         width,
                         height,
                         radius,
-                        start_x,
-                        end_x,
+                        start_x as u32,
+                        end_x as u32,
                     );
                 });
             }
         });
     } else {
+        let total_width = width as usize * CHANNEL_CONFIGURATION;
         _dispatcher_vertical(
             src,
             src_stride,
@@ -539,7 +562,7 @@ fn box_blur_vertical_pass<
             height,
             radius,
             0,
-            width,
+            total_width as u32,
         );
     }
 }

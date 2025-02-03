@@ -117,7 +117,7 @@ may be
 observed. However, if you'll use advanced analysis algorithms non gaussian methods will be detected. Not suitable for
 advanced analysis.
 Do not use when you need gaussian. Based on binomial filter, generally speed close, might be a little faster than stack
-blur ( except NEON or except non multithreaded stack blur, on NEON much faster or overcome non multithreaded
+blur ( except NEON or except non-multithreaded stack blur, on NEON much faster or overcome non multithreaded
 stackblur ), however results better as I see. Max radius ~320 for u8, for u16 will be less.
 
 O(log R) complexity.
@@ -228,14 +228,14 @@ Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded 
 
 |         | time(NEON) | time(SSE) |
 |---------|:----------:|:---------:|
-| libblur |  15.52ms   |  23.01ms  |
+| libblur |  13.73ms   |  23.01ms  |
 | OpenCV  |  16.81ms   |  24.38ms  |
 
 Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded mode with 77 radius.
 
 |         | Time(NEON) | Time(SSE) |
 |---------|:----------:|:---------:|
-| libblur |  12.79ms   |  24.32ms  |
+| libblur |  12.42ms   |  24.32ms  |
 | OpenCV  |  16.33ms   |  23.75ms  |
 
 ### Fast bilateral blur

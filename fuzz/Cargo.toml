@@ -9,11 +9,22 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-libblur = {path = "../src/lib"}
+libblur = {path = "../src/lib", default-features = false}
+
+[features]
+avx = ["libblur/avx"]
+sse = ["libblur/sse"]
 
 [[bin]]
 name = "gauss"
 path = "gauss/gauss.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "box"
+path = "box/box.rs"
 test = false
 doc = false
 bench = false
