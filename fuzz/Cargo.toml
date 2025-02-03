@@ -19,6 +19,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "box"
+path = "box/box.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "gauss_u16"
 path = "gauss_u16/gauss_u16.rs"
 test = false
