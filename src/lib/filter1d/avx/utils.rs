@@ -32,7 +32,7 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-#[inline]
+#[inline(always)]
 pub(crate) unsafe fn _mm256_mul_epi8_by_ps_x4(
     input: __m256i,
     weight: __m256,
@@ -40,23 +40,21 @@ pub(crate) unsafe fn _mm256_mul_epi8_by_ps_x4(
     let lo_16 = _mm256_cvtepu8_epi16(_mm256_castsi256_si128(input));
     let hi_16 = _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(input));
 
+    let j0 = _mm256_cvtepi16_epi32(_mm256_castsi256_si128(lo_16));
+    let j1 = _mm256_cvtepi16_epi32(_mm256_extracti128_si256::<1>(lo_16));
+    let j2 = _mm256_cvtepi16_epi32(_mm256_castsi256_si128(hi_16));
+    let j3 = _mm256_cvtepi16_epi32(_mm256_extracti128_si256::<1>(hi_16));
+
+    let o0 = _mm256_cvtepi32_ps(j0);
+    let o1 = _mm256_cvtepi32_ps(j1);
+    let o2 = _mm256_cvtepi32_ps(j2);
+    let o3 = _mm256_cvtepi32_ps(j3);
+
     (
-        _mm256_mul_ps(
-            _mm256_cvtepi32_ps(_mm256_cvtepi16_epi32(_mm256_castsi256_si128(lo_16))),
-            weight,
-        ),
-        _mm256_mul_ps(
-            _mm256_cvtepi32_ps(_mm256_cvtepi16_epi32(_mm256_extracti128_si256::<1>(lo_16))),
-            weight,
-        ),
-        _mm256_mul_ps(
-            _mm256_cvtepi32_ps(_mm256_cvtepi16_epi32(_mm256_castsi256_si128(hi_16))),
-            weight,
-        ),
-        _mm256_mul_ps(
-            _mm256_cvtepi32_ps(_mm256_cvtepi16_epi32(_mm256_extracti128_si256::<1>(hi_16))),
-            weight,
-        ),
+        _mm256_mul_ps(o0, weight),
+        _mm256_mul_ps(o1, weight),
+        _mm256_mul_ps(o2, weight),
+        _mm256_mul_ps(o3, weight),
     )
 }
 
@@ -65,8 +63,11 @@ pub(crate) unsafe fn _mm256_mul_epi8_by_epi16_x4(
     input: __m256i,
     weight: __m256i,
 ) -> (__m256i, __m256i) {
-    let lo_16 = _mm256_slli_epi16::<6>(_mm256_cvtepu8_epi16(_mm256_castsi256_si128(input)));
-    let hi_16 = _mm256_slli_epi16::<6>(_mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(input)));
+    let j0 = _mm256_cvtepu8_epi16(_mm256_castsi256_si128(input));
+    let j1 = _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(input));
+
+    let lo_16 = _mm256_slli_epi16::<6>(j0);
+    let hi_16 = _mm256_slli_epi16::<6>(j1);
 
     (
         _mm256_mulhrs_epi16(lo_16, weight),
@@ -80,8 +81,10 @@ pub(crate) unsafe fn _mm256_mul_add_epi8_by_epi16_x4(
     input: __m256i,
     weight: __m256i,
 ) -> (__m256i, __m256i) {
-    let lo_16 = _mm256_slli_epi16::<6>(_mm256_cvtepu8_epi16(_mm256_castsi256_si128(input)));
-    let hi_16 = _mm256_slli_epi16::<6>(_mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(input)));
+    let j0 = _mm256_cvtepu8_epi16(_mm256_castsi256_si128(input));
+    let j1 = _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(input));
+    let lo_16 = _mm256_slli_epi16::<6>(j0);
+    let hi_16 = _mm256_slli_epi16::<6>(j1);
 
     (
         _mm256_add_epi16(accumulator.0, _mm256_mulhrs_epi16(lo_16, weight)),
@@ -96,14 +99,13 @@ pub(crate) unsafe fn _mm256_mul_add_symm_epi8_by_epi16_x4(
     input1: __m256i,
     weight: __m256i,
 ) -> (__m256i, __m256i) {
-    let lo_16 = _mm256_slli_epi16::<6>(_mm256_add_epi16(
-        _mm256_cvtepu8_epi16(_mm256_castsi256_si128(input0)),
-        _mm256_cvtepu8_epi16(_mm256_castsi256_si128(input1)),
-    ));
-    let hi_16 = _mm256_slli_epi16::<6>(_mm256_add_epi16(
-        _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(input0)),
-        _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(input1)),
-    ));
+    let a0 = _mm256_cvtepu8_epi16(_mm256_castsi256_si128(input0));
+    let a1 = _mm256_cvtepu8_epi16(_mm256_castsi256_si128(input1));
+    let a2 = _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(input0));
+    let a3 = _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(input1));
+
+    let lo_16 = _mm256_slli_epi16::<6>(_mm256_add_epi16(a0, a1));
+    let hi_16 = _mm256_slli_epi16::<6>(_mm256_add_epi16(a2, a3));
 
     (
         _mm256_add_epi16(accumulator.0, _mm256_mulhrs_epi16(lo_16, weight)),
@@ -112,24 +114,19 @@ pub(crate) unsafe fn _mm256_mul_add_symm_epi8_by_epi16_x4(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm256_fmlaf_ps(a: __m256, b: __m256, c: __m256) -> __m256 {
-    _mm256_fmadd_ps(b, c, a)
-}
-
-#[inline]
 pub(crate) unsafe fn _mm256_opt_fmlaf_ps<const FMA: bool>(
     a: __m256,
     b: __m256,
     c: __m256,
 ) -> __m256 {
     if FMA {
-        _mm256_fmlaf_ps(a, b, c)
+        _mm256_fmadd_ps(b, c, a)
     } else {
         _mm256_add_ps(_mm256_mul_ps(b, c), a)
     }
 }
 
-#[inline]
+#[inline(always)]
 pub(crate) unsafe fn _mm256_mul_add_epi8_by_ps_x4<const FMA: bool>(
     accumulator: (__m256, __m256, __m256, __m256),
     input: __m256i,
@@ -138,79 +135,71 @@ pub(crate) unsafe fn _mm256_mul_add_epi8_by_ps_x4<const FMA: bool>(
     let lo_16 = _mm256_cvtepu8_epi16(_mm256_castsi256_si128(input));
     let hi_16 = _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(input));
 
+    let j0 = _mm256_cvtepi16_epi32(_mm256_castsi256_si128(lo_16));
+    let j1 = _mm256_cvtepi16_epi32(_mm256_extracti128_si256::<1>(lo_16));
+    let j2 = _mm256_cvtepi16_epi32(_mm256_castsi256_si128(hi_16));
+    let j3 = _mm256_cvtepi16_epi32(_mm256_extracti128_si256::<1>(hi_16));
+
+    let a0 = _mm256_cvtepi32_ps(j0);
+    let a1 = _mm256_cvtepi32_ps(j1);
+    let a2 = _mm256_cvtepi32_ps(j2);
+    let a3 = _mm256_cvtepi32_ps(j3);
+
     (
-        _mm256_opt_fmlaf_ps::<FMA>(
-            accumulator.0,
-            _mm256_cvtepi32_ps(_mm256_cvtepi16_epi32(_mm256_castsi256_si128(lo_16))),
-            weight,
-        ),
-        _mm256_opt_fmlaf_ps::<FMA>(
-            accumulator.1,
-            _mm256_cvtepi32_ps(_mm256_cvtepi16_epi32(_mm256_extracti128_si256::<1>(lo_16))),
-            weight,
-        ),
-        _mm256_opt_fmlaf_ps::<FMA>(
-            accumulator.2,
-            _mm256_cvtepi32_ps(_mm256_cvtepi16_epi32(_mm256_castsi256_si128(hi_16))),
-            weight,
-        ),
-        _mm256_opt_fmlaf_ps::<FMA>(
-            accumulator.3,
-            _mm256_cvtepi32_ps(_mm256_cvtepi16_epi32(_mm256_extracti128_si256::<1>(hi_16))),
-            weight,
-        ),
+        _mm256_opt_fmlaf_ps::<FMA>(accumulator.0, a0, weight),
+        _mm256_opt_fmlaf_ps::<FMA>(accumulator.1, a1, weight),
+        _mm256_opt_fmlaf_ps::<FMA>(accumulator.2, a2, weight),
+        _mm256_opt_fmlaf_ps::<FMA>(accumulator.3, a3, weight),
     )
 }
 
-#[inline]
+#[inline(always)]
 pub(crate) unsafe fn _mm256_mul_add_symm_epi8_by_ps_x4<const FMA: bool>(
     accumulator: (__m256, __m256, __m256, __m256),
     input0: __m256i,
     input1: __m256i,
     weight: __m256,
 ) -> (__m256, __m256, __m256, __m256) {
-    let lo_16 = _mm256_add_epi16(
-        _mm256_cvtepu8_epi16(_mm256_castsi256_si128(input0)),
-        _mm256_cvtepu8_epi16(_mm256_castsi256_si128(input1)),
-    );
-    let hi_16 = _mm256_add_epi16(
-        _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(input0)),
-        _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(input1)),
-    );
+    let j0 = _mm256_cvtepu8_epi16(_mm256_castsi256_si128(input0));
+    let j1 = _mm256_cvtepu8_epi16(_mm256_castsi256_si128(input1));
+    let j2 = _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(input0));
+    let j3 = _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(input1));
+    let lo_16 = _mm256_add_epi16(j0, j1);
+    let hi_16 = _mm256_add_epi16(j2, j3);
+
+    let a0 = _mm256_cvtepi16_epi32(_mm256_castsi256_si128(lo_16));
+    let a1 = _mm256_cvtepi16_epi32(_mm256_extracti128_si256::<1>(lo_16));
+    let a2 = _mm256_cvtepi16_epi32(_mm256_castsi256_si128(hi_16));
+    let a3 = _mm256_cvtepi16_epi32(_mm256_extracti128_si256::<1>(hi_16));
+
+    let v0 = _mm256_cvtepi32_ps(a0);
+    let v1 = _mm256_cvtepi32_ps(a1);
+    let v2 = _mm256_cvtepi32_ps(a2);
+    let v3 = _mm256_cvtepi32_ps(a3);
 
     (
-        _mm256_opt_fmlaf_ps::<FMA>(
-            accumulator.0,
-            _mm256_cvtepi32_ps(_mm256_cvtepi16_epi32(_mm256_castsi256_si128(lo_16))),
-            weight,
-        ),
-        _mm256_opt_fmlaf_ps::<FMA>(
-            accumulator.1,
-            _mm256_cvtepi32_ps(_mm256_cvtepi16_epi32(_mm256_extracti128_si256::<1>(lo_16))),
-            weight,
-        ),
-        _mm256_opt_fmlaf_ps::<FMA>(
-            accumulator.2,
-            _mm256_cvtepi32_ps(_mm256_cvtepi16_epi32(_mm256_castsi256_si128(hi_16))),
-            weight,
-        ),
-        _mm256_opt_fmlaf_ps::<FMA>(
-            accumulator.3,
-            _mm256_cvtepi32_ps(_mm256_cvtepi16_epi32(_mm256_extracti128_si256::<1>(hi_16))),
-            weight,
-        ),
+        _mm256_opt_fmlaf_ps::<FMA>(accumulator.0, v0, weight),
+        _mm256_opt_fmlaf_ps::<FMA>(accumulator.1, v1, weight),
+        _mm256_opt_fmlaf_ps::<FMA>(accumulator.2, v2, weight),
+        _mm256_opt_fmlaf_ps::<FMA>(accumulator.3, v3, weight),
     )
 }
 
-#[inline]
+#[inline(always)]
 pub(crate) unsafe fn _mm256_pack_ps_x4_epi8(store: (__m256, __m256, __m256, __m256)) -> __m256i {
     const ROUNDING_FLAGS: i32 = 0x0;
-    _mm256_packus_four_epi32(
-        _mm256_cvtps_epi32(_mm256_round_ps::<ROUNDING_FLAGS>(store.0)),
-        _mm256_cvtps_epi32(_mm256_round_ps::<ROUNDING_FLAGS>(store.1)),
-        _mm256_cvtps_epi32(_mm256_round_ps::<ROUNDING_FLAGS>(store.2)),
-        _mm256_cvtps_epi32(_mm256_round_ps::<ROUNDING_FLAGS>(store.3)),
-    )
+
+    let l0 = _mm256_round_ps::<ROUNDING_FLAGS>(store.0);
+    let l1 = _mm256_round_ps::<ROUNDING_FLAGS>(store.1);
+    let l2 = _mm256_round_ps::<ROUNDING_FLAGS>(store.2);
+    let l3 = _mm256_round_ps::<ROUNDING_FLAGS>(store.3);
+
+    let v0 = _mm256_cvtps_epi32(l0);
+    let v1 = _mm256_cvtps_epi32(l1);
+    let v2 = _mm256_cvtps_epi32(l2);
+    let v3 = _mm256_cvtps_epi32(l3);
+
+    _mm256_packus_four_epi32(v0, v1, v2, v3)
 }
 
 #[inline]
