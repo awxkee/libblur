@@ -454,17 +454,19 @@ unsafe fn box_blur_vertical_pass_avx2_impl<T, const CHANNELS: usize>(
         let px = x as usize * TAIL_CN;
 
         let mut store;
-        {
-            let s_ptr = unsafe { src.as_ptr().add(px) };
-            let edge_colors = unsafe { load_u8_s32_fast::<TAIL_CN>(s_ptr) };
-            store = unsafe { _mm_madd_epi16(edge_colors, v_edge_count) };
+        unsafe {
+            let s_ptr = src.as_ptr().add(px);
+            let edge_colors = load_u8_s32_fast::<TAIL_CN>(s_ptr);
+            store = _mm_madd_epi16(edge_colors, v_edge_count);
         }
 
-        for y in 1..std::cmp::min(half_kernel, height) {
-            let y_src_shift = y as usize * src_stride as usize;
-            let s_ptr = unsafe { src.as_ptr().add(y_src_shift + px) };
-            let edge_colors = unsafe { load_u8_s32_fast::<TAIL_CN>(s_ptr) };
-            store = unsafe { _mm_add_epi32(store, edge_colors) };
+        unsafe {
+            for y in 1..std::cmp::min(half_kernel, height) {
+                let y_src_shift = y as usize * src_stride as usize;
+                let s_ptr = src.as_ptr().add(y_src_shift + px);
+                let edge_colors = load_u8_s32_fast::<TAIL_CN>(s_ptr);
+                store = _mm_add_epi32(store, edge_colors);
+            }
         }
 
         for y in 0..height {
@@ -475,24 +477,23 @@ unsafe fn box_blur_vertical_pass_avx2_impl<T, const CHANNELS: usize>(
             let y_dst_shift = dst_stride as usize * y as usize;
 
             // subtract previous
-            {
-                let s_ptr = unsafe { src.as_ptr().add(previous + px) };
-                let edge_colors = unsafe { load_u8_s32_fast::<TAIL_CN>(s_ptr) };
-                store = unsafe { _mm_sub_epi32(store, edge_colors) };
+            unsafe {
+                let s_ptr = src.as_ptr().add(previous + px);
+                let edge_colors = load_u8_s32_fast::<TAIL_CN>(s_ptr);
+                store = _mm_sub_epi32(store, edge_colors);
             }
 
             // add next
-            {
-                let s_ptr = unsafe { src.as_ptr().add(next + px) };
-                let edge_colors = unsafe { load_u8_s32_fast::<TAIL_CN>(s_ptr) };
-                store = unsafe { _mm_add_epi32(store, edge_colors) };
+            unsafe {
+                let s_ptr = src.as_ptr().add(next + px);
+                let edge_colors = load_u8_s32_fast::<TAIL_CN>(s_ptr);
+                store = _mm_add_epi32(store, edge_colors);
             }
 
             let px = x as usize;
 
-            let scale_store = unsafe { _mm_mul_ps_epi32(store, v_weight) };
-
             unsafe {
+                let scale_store = _mm_mul_ps_epi32(store, v_weight);
                 let ptr = unsafe_dst.slice.as_ptr().add(y_dst_shift + px) as *mut u8;
                 store_u8_u32::<TAIL_CN>(ptr, scale_store);
             }

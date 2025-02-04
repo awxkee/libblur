@@ -71,7 +71,7 @@ pub(crate) fn filter_rgba_row_avx_symm_u8_f32(
                 scanned_kernel,
             );
         } else {
-            filter_rgba_row_sse_u8_f32_def(
+            filter_rgba_row_avx_u8_f32_def(
                 arena,
                 arena_src,
                 dst,
@@ -103,7 +103,7 @@ unsafe fn filter_rgba_row_avx_symm_u8_f32_fma(
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn filter_rgba_row_sse_u8_f32_def(
+unsafe fn filter_rgba_row_avx_u8_f32_def(
     arena: Arena,
     arena_src: &[u8],
     dst: &UnsafeSlice<u8>,

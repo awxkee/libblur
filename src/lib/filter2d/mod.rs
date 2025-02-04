@@ -44,7 +44,7 @@ mod gather_channel;
 mod neon;
 mod scan_point_2d;
 mod scan_se_2d;
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 mod sse;
 
 #[cfg(feature = "fft")]
