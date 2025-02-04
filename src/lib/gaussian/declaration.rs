@@ -35,6 +35,7 @@ use crate::{
     ThreadingPolicy,
 };
 use half::f16;
+use crate::gaussian::gaussian_util::get_kernel_size;
 
 /// Performs gaussian blur on the image.
 ///
@@ -47,7 +48,7 @@ use half::f16;
 /// * `stride` - Lane length, default is width * channels_count * size_of(PixelType) if not aligned
 /// * `width` - Width of the image
 /// * `height` - Height of the image
-/// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted.
+/// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted. If zero, then sigma must be set.
 /// * `sigma` - Sigma for a gaussian kernel, corresponds to kernel flattening level. If zero of negative then *get_sigma_size* will be used
 /// * `channels` - Count of channels in the image
 /// * `edge_mode` - Rule to handle edge mode
@@ -55,7 +56,8 @@ use half::f16;
 /// * `precise_level` - Gaussian precise level
 ///
 /// # Panics
-/// Panic is stride/width/height/channel configuration do not match provided
+/// Panic is stride/width/height/channel configuration do not match provided.
+/// Panics if sigma = 0.8 and kernel size = 0.
 #[allow(clippy::too_many_arguments)]
 pub fn gaussian_blur(
     src: &[u8],
@@ -69,12 +71,20 @@ pub fn gaussian_blur(
     threading_policy: ThreadingPolicy,
     precise_level: GaussianPreciseLevel,
 ) {
+    assert!(kernel_size != 0 || sigma > 0.0, "Either sigma or kernel size must be set");
+    if kernel_size != 0 {
+        assert_ne!(kernel_size % 2, 0, "Kernel size must be odd");
+    }
     let sigma = if sigma <= 0. {
         get_sigma_size(kernel_size as usize)
     } else {
         sigma
     };
-    assert_ne!(kernel_size % 2, 0, "kernel size must be odd");
+    let kernel_size = if kernel_size == 0 {
+        get_kernel_size(sigma)
+    } else {
+        kernel_size
+    };
     let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
     match precise_level {
         GaussianPreciseLevel::EXACT => {
@@ -126,14 +136,15 @@ pub fn gaussian_blur(
 ///
 /// * `width` - Width of the image
 /// * `height` - Height of the image
-/// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted.
+/// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted. If zero, then sigma must be set.
 /// * `sigma` - Sigma for a gaussian kernel, corresponds to kernel flattening level. If zero of negative then *get_sigma_size* will be used
 /// * `channels` - Count of channels in the image
 /// * `edge_mode` - Rule to handle edge mode
 /// * `threading_policy` - Threading policy according to *ThreadingPolicy*
 ///
 /// # Panics
-/// Panic is stride/width/height/channel configuration do not match provided
+/// Panic is stride/width/height/channel configuration do not match provided.
+/// Panics if sigma = 0.8 and kernel size = 0.
 pub fn gaussian_blur_u16(
     src: &[u16],
     dst: &mut [u16],
@@ -145,12 +156,20 @@ pub fn gaussian_blur_u16(
     edge_mode: EdgeMode,
     threading_policy: ThreadingPolicy,
 ) {
+    assert!(kernel_size != 0 || sigma > 0.0, "Either sigma or kernel size must be set");
+    if kernel_size != 0 {
+        assert_ne!(kernel_size % 2, 0, "Kernel size must be odd");
+    }
     let sigma = if sigma <= 0. {
         get_sigma_size(kernel_size as usize)
     } else {
         sigma
     };
-    assert_ne!(kernel_size % 2, 0, "kernel size must be odd");
+    let kernel_size = if kernel_size == 0 {
+        get_kernel_size(sigma)
+    } else {
+        kernel_size
+    };
     let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
     let _dispatcher = match channels {
         FastBlurChannels::Plane => filter_1d_exact::<u16, f32>,
@@ -180,14 +199,15 @@ pub fn gaussian_blur_u16(
 ///
 /// * `width` - Width of the image
 /// * `height` - Height of the image
-/// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted.
+/// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted. If zero, then sigma must be set.
 /// * `sigma` - Sigma for a gaussian kernel, corresponds to kernel flattening level. If zero of negative then *get_sigma_size* will be used
 /// * `channels` - Count of channels in the image
 /// * `edge_mode` - Rule to handle edge mode
 /// * `threading_policy` - Threading policy according to *ThreadingPolicy*
 ///
 /// # Panics
-/// Panic is stride/width/height/channel configuration do not match provided
+/// Panic is stride/width/height/channel configuration do not match provided.
+/// Panics if sigma = 0.8 and kernel size = 0.
 #[allow(clippy::too_many_arguments)]
 pub fn gaussian_blur_f32(
     src: &[f32],
@@ -200,12 +220,20 @@ pub fn gaussian_blur_f32(
     edge_mode: EdgeMode,
     threading_policy: ThreadingPolicy,
 ) {
+    assert!(kernel_size != 0 || sigma > 0.0, "Either sigma or kernel size must be set");
+    if kernel_size != 0 {
+        assert_ne!(kernel_size % 2, 0, "Kernel size must be odd");
+    }
     let sigma = if sigma <= 0. {
         get_sigma_size(kernel_size as usize)
     } else {
         sigma
     };
-    assert_ne!(kernel_size % 2, 0, "kernel size must be odd");
+    let kernel_size = if kernel_size == 0 {
+        get_kernel_size(sigma)
+    } else {
+        kernel_size
+    };
     let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
     let _dispatcher = match channels {
         FastBlurChannels::Plane => filter_1d_exact::<f32, f32>,
@@ -235,7 +263,7 @@ pub fn gaussian_blur_f32(
 ///
 /// * `width` - Width of the image
 /// * `height` - Height of the image
-/// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted.
+/// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted. If zero, then sigma must be set.
 /// * `sigma` - Sigma for a gaussian kernel, corresponds to kernel flattening level. If zero of negative then *get_sigma_size* will be used
 /// * `channels` - Count of channels in the image
 /// * `edge_mode` - Rule to handle edge mode
@@ -243,6 +271,7 @@ pub fn gaussian_blur_f32(
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
+/// Panics if sigma = 0.8 and kernel size = 0.
 pub fn gaussian_blur_f16(
     src: &[f16],
     dst: &mut [f16],
@@ -254,12 +283,20 @@ pub fn gaussian_blur_f16(
     edge_mode: EdgeMode,
     threading_policy: ThreadingPolicy,
 ) {
+    assert!(kernel_size != 0 || sigma > 0.0, "Either sigma or kernel size must be set");
+    if kernel_size != 0 {
+        assert_ne!(kernel_size % 2, 0, "Kernel size must be odd");
+    }
     let sigma = if sigma <= 0. {
         get_sigma_size(kernel_size as usize)
     } else {
         sigma
     };
-    assert_ne!(kernel_size % 2, 0, "kernel size must be odd");
+    let kernel_size = if kernel_size == 0 {
+        get_kernel_size(sigma)
+    } else {
+        kernel_size
+    };
     let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
     let _dispatcher = match channels {
         FastBlurChannels::Plane => filter_1d_exact::<f16, f32>,

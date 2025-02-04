@@ -262,30 +262,30 @@ fn main() {
 
     let start = Instant::now();
 
-    // libblur::gaussian_blur(
-    //     &bytes,
-    //     &mut dst_bytes,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     66 * 2 + 1,
-    //     0.,
-    //     FastBlurChannels::Channels3,
-    //     EdgeMode::Clamp,
-    //     ThreadingPolicy::Single,
-    //     GaussianPreciseLevel::INTEGRAL,
-    // );
-
-    libblur::gaussian_box_blur(
+    libblur::gaussian_blur(
         &bytes,
-        dimensions.0 * 3,
         &mut dst_bytes,
-        dimensions.0 * 3,
         dimensions.0,
         dimensions.1,
-        5f32,
+        0,
+        16f32,
         FastBlurChannels::Channels3,
+        EdgeMode::Clamp,
         ThreadingPolicy::Single,
+        GaussianPreciseLevel::INTEGRAL,
     );
+
+    // libblur::gaussian_box_blur(
+    //     &bytes,
+    //     dimensions.0 * 3,
+    //     &mut dst_bytes,
+    //     dimensions.0 * 3,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     5f32,
+    //     FastBlurChannels::Channels3,
+    //     ThreadingPolicy::Single,
+    // );
 
     println!("gaussian_blur {:?}", start.elapsed());
 
