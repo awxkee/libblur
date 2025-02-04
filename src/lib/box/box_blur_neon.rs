@@ -66,18 +66,19 @@ pub(crate) fn box_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usiz
         unsafe {
             let s_ptr_0 = src.as_ptr().add(y_src_shift);
             let edge_colors_0 = load_u8_u32_fast::<CHANNEL_CONFIGURATION>(s_ptr_0);
-            store_0 = vmulq_u32(edge_colors_0, v_edge_count);
 
             let s_ptr_1 = src.as_ptr().add(y_src_shift + src_stride as usize);
             let edge_colors_1 = load_u8_u32_fast::<CHANNEL_CONFIGURATION>(s_ptr_1);
-            store_1 = vmulq_u32(edge_colors_1, v_edge_count);
 
             let s_ptr_2 = src.as_ptr().add(y_src_shift + src_stride as usize * 2);
             let edge_colors_2 = load_u8_u32_fast::<CHANNEL_CONFIGURATION>(s_ptr_2);
-            store_2 = vmulq_u32(edge_colors_2, v_edge_count);
 
             let s_ptr_3 = src.as_ptr().add(y_src_shift + src_stride as usize * 3);
             let edge_colors_3 = load_u8_u32_fast::<CHANNEL_CONFIGURATION>(s_ptr_3);
+
+            store_0 = vmulq_u32(edge_colors_0, v_edge_count);
+            store_1 = vmulq_u32(edge_colors_1, v_edge_count);
+            store_2 = vmulq_u32(edge_colors_2, v_edge_count);
             store_3 = vmulq_u32(edge_colors_3, v_edge_count);
         }
 
@@ -87,18 +88,19 @@ pub(crate) fn box_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usiz
 
                 let s_ptr_0 = src.as_ptr().add(y_src_shift + px);
                 let edge_colors_0 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_0);
-                store_0 = vaddw_u16(store_0, edge_colors_0);
 
                 let s_ptr_1 = src.as_ptr().add(y_src_shift + src_stride as usize + px);
                 let edge_colors_1 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_1);
-                store_1 = vaddw_u16(store_1, edge_colors_1);
 
                 let s_ptr_2 = src.as_ptr().add(y_src_shift + src_stride as usize * 2 + px);
                 let edge_colors_2 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_2);
-                store_2 = vaddw_u16(store_2, edge_colors_2);
 
                 let s_ptr_3 = src.as_ptr().add(y_src_shift + src_stride as usize * 3 + px);
                 let edge_colors_3 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_3);
+
+                store_0 = vaddw_u16(store_0, edge_colors_0);
+                store_1 = vaddw_u16(store_1, edge_colors_1);
+                store_2 = vaddw_u16(store_2, edge_colors_2);
                 store_3 = vaddw_u16(store_3, edge_colors_3);
             }
         }
@@ -107,34 +109,32 @@ pub(crate) fn box_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usiz
             // preload edge pixels
 
             // subtract previous
-            {
+            unsafe {
                 let previous_x = std::cmp::max(x as i64 - half_kernel as i64, 0) as usize;
                 let previous = previous_x * CHANNEL_CONFIGURATION;
 
-                let s_ptr_0 = unsafe { src.as_ptr().add(y_src_shift + previous) };
-                let edge_colors_0 = unsafe { load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_0) };
-                store_0 = unsafe { vsubw_u16(store_0, edge_colors_0) };
+                let s_ptr_0 = src.as_ptr().add(y_src_shift + previous);
+                let edge_colors_0 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_0);
 
-                let s_ptr_1 = unsafe {
-                    src.as_ptr()
-                        .add(y_src_shift + src_stride as usize + previous)
-                };
-                let edge_colors_1 = unsafe { load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_1) };
-                store_1 = unsafe { vsubw_u16(store_1, edge_colors_1) };
+                let s_ptr_1 = src
+                    .as_ptr()
+                    .add(y_src_shift + src_stride as usize + previous);
+                let edge_colors_1 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_1);
 
-                let s_ptr_2 = unsafe {
-                    src.as_ptr()
-                        .add(y_src_shift + src_stride as usize * 2 + previous)
-                };
-                let edge_colors_2 = unsafe { load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_2) };
-                store_2 = unsafe { vsubw_u16(store_2, edge_colors_2) };
+                let s_ptr_2 = src
+                    .as_ptr()
+                    .add(y_src_shift + src_stride as usize * 2 + previous);
+                let edge_colors_2 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_2);
 
-                let s_ptr_3 = unsafe {
-                    src.as_ptr()
-                        .add(y_src_shift + src_stride as usize * 3 + previous)
-                };
-                let edge_colors_3 = unsafe { load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_3) };
-                store_3 = unsafe { vsubw_u16(store_3, edge_colors_3) };
+                let s_ptr_3 = src
+                    .as_ptr()
+                    .add(y_src_shift + src_stride as usize * 3 + previous);
+                let edge_colors_3 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_3);
+
+                store_0 = vsubw_u16(store_0, edge_colors_0);
+                store_1 = vsubw_u16(store_1, edge_colors_1);
+                store_2 = vsubw_u16(store_2, edge_colors_2);
+                store_3 = vsubw_u16(store_3, edge_colors_3);
             }
 
             // add next
@@ -145,22 +145,23 @@ pub(crate) fn box_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usiz
 
                 let s_ptr_0 = src.as_ptr().add(y_src_shift + next);
                 let edge_colors_0 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_0);
-                store_0 = vaddw_u16(store_0, edge_colors_0);
 
                 let s_ptr_1 = src.as_ptr().add(y_src_shift + src_stride as usize + next);
                 let edge_colors_1 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_1);
-                store_1 = vaddw_u16(store_1, edge_colors_1);
 
                 let s_ptr_2 = src
                     .as_ptr()
                     .add(y_src_shift + src_stride as usize * 2 + next);
                 let edge_colors_2 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_2);
-                store_2 = vaddw_u16(store_2, edge_colors_2);
 
                 let s_ptr_3 = src
                     .as_ptr()
                     .add(y_src_shift + src_stride as usize * 3 + next);
                 let edge_colors_3 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_3);
+
+                store_0 = vaddw_u16(store_0, edge_colors_0);
+                store_1 = vaddw_u16(store_1, edge_colors_1);
+                store_2 = vaddw_u16(store_2, edge_colors_2);
                 store_3 = vaddw_u16(store_3, edge_colors_3);
             }
 
