@@ -32,7 +32,7 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-#[inline]
+#[inline(always)]
 pub(crate) unsafe fn load_f32<const CHANNELS_COUNT: usize>(ptr: *const f32) -> __m128 {
     if CHANNELS_COUNT == 4 {
         return _mm_loadu_ps(ptr);
@@ -54,7 +54,7 @@ pub(crate) unsafe fn load_f32<const CHANNELS_COUNT: usize>(ptr: *const f32) -> _
     _mm_setr_ps(ptr.read_unaligned(), 0f32, 0f32, 0f32)
 }
 
-#[inline]
+#[inline(always)]
 pub(crate) unsafe fn load_u8_s32_fast<const CHANNELS_COUNT: usize>(ptr: *const u8) -> __m128i {
     // LLVM generates a little trash code until opt-level is 3 so better here is to use assembly
     if CHANNELS_COUNT == 4 {
@@ -124,7 +124,7 @@ pub(crate) const fn shuffle(z: u32, y: u32, x: u32, w: u32) -> i32 {
     ((z << 6) | (y << 4) | (x << 2) | w) as i32
 }
 
-#[inline]
+#[inline(always)]
 pub(crate) unsafe fn _mm_packus_epi64(a: __m128i, b: __m128i) -> __m128i {
     const SHUFFLE_MASK: i32 = shuffle(3, 1, 2, 0);
     let a = _mm_shuffle_epi32::<SHUFFLE_MASK>(a);
@@ -189,7 +189,24 @@ pub(crate) unsafe fn store_u8_u32<const CHANNELS_COUNT: usize>(dst_ptr: *mut u8,
     }
 }
 
-#[inline]
+#[inline(always)]
+#[cfg(feature = "sse")]
+pub(crate) unsafe fn write_u8<const CHANNELS_COUNT: usize>(dst_ptr: *mut u8, v8: __m128i) {
+    if CHANNELS_COUNT == 4 {
+        _mm_storeu_si32(dst_ptr, v8);
+    } else if CHANNELS_COUNT == 3 {
+        let pixel_3 = _mm_extract_epi8::<2>(v8);
+        _mm_storeu_si16(dst_ptr, v8);
+        dst_ptr.add(2).write_unaligned(pixel_3 as u8);
+    } else if CHANNELS_COUNT == 2 {
+        _mm_storeu_si16(dst_ptr, v8);
+    } else {
+        let pixel_s32 = _mm_extract_epi8::<0>(v8);
+        dst_ptr.write_unaligned(pixel_s32 as u8);
+    }
+}
+
+#[inline(always)]
 pub(crate) unsafe fn _mm_hsum_ps(v: __m128) -> f32 {
     let mut shuf = _mm_movehdup_ps(v);
     let mut sums = _mm_add_ps(v, shuf);
@@ -198,7 +215,7 @@ pub(crate) unsafe fn _mm_hsum_ps(v: __m128) -> f32 {
     _mm_cvtss_f32(sums)
 }
 
-// #[inline]
+// #[inline(always)]
 // #[target_feature(enable = "sse4.1")]
 // pub(crate) unsafe   fn _mm_hsum_epi32(v: __m128i) -> i32 {
 //     const SHUFFLE_1: i32 = shuffle(1, 0, 3, 2);
@@ -209,8 +226,7 @@ pub(crate) unsafe fn _mm_hsum_ps(v: __m128) -> f32 {
 //     _mm_cvtsi128_si32(sum32)
 // }
 
-#[inline]
-#[target_feature(enable = "sse4.1")]
+#[inline(always)]
 pub(crate) unsafe fn _mm_loadu_si128_x2(ptr: *const u8) -> (__m128i, __m128i) {
     (
         _mm_loadu_si128(ptr as *const __m128i),
@@ -218,8 +234,7 @@ pub(crate) unsafe fn _mm_loadu_si128_x2(ptr: *const u8) -> (__m128i, __m128i) {
     )
 }
 
-#[inline]
-#[target_feature(enable = "sse4.1")]
+#[inline(always)]
 pub(crate) unsafe fn _mm_loadu_ps_x4(ptr: *const f32) -> (__m128, __m128, __m128, __m128) {
     (
         _mm_loadu_ps(ptr),
@@ -287,7 +302,7 @@ pub(crate) unsafe fn _mm_broadcast_fourth(item: __m128) -> __m128 {
     _mm_shuffle_ps::<FLAG>(item, item)
 }
 
-#[inline]
+#[inline(always)]
 pub(crate) unsafe fn load_f32_f16<const CHANNELS_COUNT: usize>(ptr: *const f16) -> __m128 {
     if CHANNELS_COUNT == 4 {
         let in_regi = _mm_loadu_si64(ptr as *const u8);
@@ -324,7 +339,7 @@ pub(crate) unsafe fn load_f32_f16<const CHANNELS_COUNT: usize>(ptr: *const f16) 
     _mm_cvtph_ps(in_regi)
 }
 
-#[inline]
+#[inline(always)]
 pub(crate) unsafe fn store_f32_f16<const CHANNELS_COUNT: usize>(
     dst_ptr: *mut f16,
     in_regi: __m128,
@@ -344,7 +359,7 @@ pub(crate) unsafe fn store_f32_f16<const CHANNELS_COUNT: usize>(
     }
 }
 
-#[inline]
+#[inline(always)]
 pub(crate) unsafe fn _mm_mul_by_3_epi32(v: __m128i) -> __m128i {
     _mm_add_epi32(_mm_slli_epi32::<1>(v), v)
 }

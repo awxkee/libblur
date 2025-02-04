@@ -865,6 +865,41 @@ pub fn box_blur_in_linear(
     );
 }
 
+#[inline]
+fn create_box_gauss(sigma: f32, n: usize) -> Vec<u32> {
+    let n_float = n as f32;
+
+    // Ideal averaging filter width
+    let w_ideal = (12.0 * sigma * sigma / n_float).sqrt() + 1.0;
+    let mut wl: u32 = w_ideal.floor() as u32;
+
+    if wl % 2 == 0 {
+        wl -= 1;
+    };
+
+    let wu = wl + 2;
+
+    let wl_float = wl as f32;
+    let m_ideal = (12.0 * sigma * sigma
+        - n_float * wl_float * wl_float
+        - 4.0 * n_float * wl_float
+        - 3.0 * n_float)
+        / (-4.0 * wl_float - 4.0);
+    let m: usize = m_ideal.round() as usize;
+
+    let mut sizes = Vec::<u32>::new();
+
+    for i in 0..n {
+        if i < m {
+            sizes.push(wl);
+        } else {
+            sizes.push(wu);
+        }
+    }
+
+    sizes
+}
+
 fn tent_blur_impl<
     T: FromPrimitive
         + Default
@@ -888,11 +923,12 @@ fn tent_blur_impl<
     dst_stride: u32,
     width: u32,
     height: u32,
-    radius: u32,
+    sigma: f32,
     threading_policy: ThreadingPolicy,
 ) where
     f32: ToStorage<T>,
 {
+    assert!(sigma > 0.0, "Sigma can't be 0");
     let thread_count = threading_policy.thread_count(width, height) as u32;
     let pool = if thread_count == 1 {
         None
@@ -906,6 +942,7 @@ fn tent_blur_impl<
     };
     let mut transient: Vec<T> =
         vec![T::from_u32(0).unwrap_or_default(); dst_stride as usize * height as usize];
+    let boxes = create_box_gauss(sigma, 2);
     box_blur_impl::<T, CHANNEL_CONFIGURATION>(
         src,
         src_stride,
@@ -913,7 +950,7 @@ fn tent_blur_impl<
         dst_stride,
         width,
         height,
-        radius,
+        boxes[0],
         &pool,
         thread_count,
     );
@@ -924,7 +961,7 @@ fn tent_blur_impl<
         dst_stride,
         width,
         height,
-        radius,
+        boxes[1],
         &pool,
         thread_count,
     );
@@ -944,7 +981,7 @@ fn tent_blur_impl<
 /// * `stride` - Lane length, default is width * channels_count if not aligned
 /// * `width` - Width of the image
 /// * `height` - Height of the image
-/// * `radius` - almost any radius is supported
+/// * `sigma` - gaussian flattening level
 /// * `channels` - Count of channels in the image
 ///
 /// # Panics
@@ -956,7 +993,7 @@ pub fn tent_blur(
     dst_stride: u32,
     width: u32,
     height: u32,
-    radius: u32,
+    sigma: f32,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) {
@@ -972,7 +1009,7 @@ pub fn tent_blur(
         dst_stride,
         width,
         height,
-        radius,
+        sigma,
         threading_policy,
     );
 }
@@ -988,11 +1025,11 @@ pub fn tent_blur(
 ///
 /// # Arguments
 ///
-/// * `stride` - Lane length, default is width * channels_count if not aligned
-/// * `width` - Width of the image
-/// * `height` - Height of the image
-/// * `radius` - almost any radius is supported
-/// * `channels` - Count of channels in the image
+/// * `stride` - Lane length, default is width * channels_count if not aligned.
+/// * `width` - Width of the image.
+/// * `height` - Height of the image.
+/// * `sigma` - gaussian flattening level.
+/// * `channels` - Count of channels in the image.
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
@@ -1001,7 +1038,7 @@ pub fn tent_blur_u16(
     dst: &mut [u16],
     width: u32,
     height: u32,
-    radius: u32,
+    sigma: f32,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) {
@@ -1018,7 +1055,7 @@ pub fn tent_blur_u16(
         stride,
         width,
         height,
-        radius,
+        sigma,
         threading_policy,
     );
 }
@@ -1034,7 +1071,7 @@ pub fn tent_blur_u16(
 ///
 /// * `width` - Width of the image
 /// * `height` - Height of the image
-/// * `radius` - almost any radius is supported
+/// * `sigma` - gaussian flattening level.
 /// * `channels` - Count of channels in the image
 ///
 /// # Panics
@@ -1044,7 +1081,7 @@ pub fn tent_blur_f32(
     dst: &mut [f32],
     width: u32,
     height: u32,
-    radius: u32,
+    sigma: f32,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) {
@@ -1061,7 +1098,7 @@ pub fn tent_blur_f32(
         stride,
         width,
         height,
-        radius,
+        sigma,
         threading_policy,
     );
 }
@@ -1077,13 +1114,13 @@ pub fn tent_blur_f32(
 ///
 /// # Arguments
 ///
-/// * `stride` - Lane length, default is width * channels_count if not aligned
-/// * `width` - Width of the image
-/// * `height` - Height of the image
-/// * `radius` - almost any radius is supported
-/// * `channels` - Count of channels of the image, only 3 and 4 is supported, alpha position, and channels order does not matter
-/// * `threading_policy` - Threads usage policy
-/// * `transfer_function` - Transfer function in linear colorspace
+/// * `stride` - Lane length, default is width * channels_count if not aligned.
+/// * `width` - Width of the image.
+/// * `height` - Height of the image.
+/// * `sigma` - gaussian flattening level.
+/// * `channels` - Count of channels of the image, only 3 and 4 is supported, alpha position, and channels order does not matter.
+/// * `threading_policy` - Threads usage policy.
+/// * `transfer_function` - Transfer function in linear colorspace.
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
@@ -1094,7 +1131,7 @@ pub fn tent_blur_in_linear(
     dst_stride: u32,
     width: u32,
     height: u32,
-    radius: u32,
+    sigma: f32,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
     transfer_function: TransferFunction,
@@ -1131,7 +1168,7 @@ pub fn tent_blur_in_linear(
         &mut linear_data_2,
         width,
         height,
-        radius,
+        sigma,
         channels,
         threading_policy,
     );
@@ -1170,11 +1207,12 @@ fn gaussian_box_blur_impl<
     dst_stride: u32,
     width: u32,
     height: u32,
-    radius: u32,
+    sigma: f32,
     threading_policy: ThreadingPolicy,
 ) where
     f32: ToStorage<T>,
 {
+    assert!(sigma > 0.0, "Sigma can't be 0");
     let thread_count = threading_policy.thread_count(width, height) as u32;
     let pool = if thread_count == 1 {
         None
@@ -1190,6 +1228,7 @@ fn gaussian_box_blur_impl<
         vec![T::from_u32(0).unwrap_or_default(); dst_stride as usize * height as usize];
     let mut transient2: Vec<T> =
         vec![T::from_u32(0).unwrap_or_default(); dst_stride as usize * height as usize];
+    let boxes = create_box_gauss(sigma, 3);
     box_blur_impl::<T, CHANNEL_CONFIGURATION>(
         src,
         src_stride,
@@ -1197,7 +1236,7 @@ fn gaussian_box_blur_impl<
         dst_stride,
         width,
         height,
-        radius,
+        boxes[0],
         &pool,
         thread_count,
     );
@@ -1208,7 +1247,7 @@ fn gaussian_box_blur_impl<
         dst_stride,
         width,
         height,
-        radius,
+        boxes[1],
         &pool,
         thread_count,
     );
@@ -1219,7 +1258,7 @@ fn gaussian_box_blur_impl<
         dst_stride,
         width,
         height,
-        radius,
+        boxes[2],
         &pool,
         thread_count,
     );
@@ -1237,11 +1276,11 @@ fn gaussian_box_blur_impl<
 ///
 /// # Arguments
 ///
-/// * `stride` - Lane length, default is width * channels_count if not aligned
-/// * `width` - Width of the image
-/// * `height` - Height of the image
-/// * `radius` - almost any radius is supported
-/// * `channels` - Count of channels in the image
+/// * `stride` - Lane length, default is width * channels_count if not aligned.
+/// * `width` - Width of the image.
+/// * `height` - Height of the image.
+/// * `sigma` - gaussian flattening level.
+/// * `channels` - Count of channels in the image.
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
@@ -1252,7 +1291,7 @@ pub fn gaussian_box_blur(
     dst_stride: u32,
     width: u32,
     height: u32,
-    radius: u32,
+    sigma: f32,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) {
@@ -1268,7 +1307,7 @@ pub fn gaussian_box_blur(
         dst_stride,
         width,
         height,
-        radius,
+        sigma,
         threading_policy,
     );
 }
@@ -1285,11 +1324,11 @@ pub fn gaussian_box_blur(
 ///
 /// # Arguments
 ///
-/// * `stride` - Lane length, default is width * channels_count if not aligned
-/// * `width` - Width of the image
-/// * `height` - Height of the image
-/// * `radius` - almost any radius is supported
-/// * `channels` - Count of channels in the image
+/// * `stride` - Lane length, default is width * channels_count if not aligned.
+/// * `width` - Width of the image.
+/// * `height` - Height of the image.
+/// * `sigma` - gaussian flattening level.
+/// * `channels` - Count of channels in the image.
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
@@ -1298,7 +1337,7 @@ pub fn gaussian_box_blur_u16(
     dst: &mut [u16],
     width: u32,
     height: u32,
-    radius: u32,
+    sigma: f32,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) {
@@ -1315,7 +1354,7 @@ pub fn gaussian_box_blur_u16(
         stride,
         width,
         height,
-        radius,
+        sigma,
         threading_policy,
     );
 }
@@ -1332,10 +1371,10 @@ pub fn gaussian_box_blur_u16(
 ///
 /// # Arguments
 ///
-/// * `width` - Width of the image
-/// * `height` - Height of the image
-/// * `radius` - almost any radius is supported
-/// * `channels` - Count of channels in the image
+/// * `width` - Width of the image.
+/// * `height` - Height of the image.
+/// * `sigma` - gaussian flattening level.
+/// * `channels` - Count of channels in the image.
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
@@ -1344,7 +1383,7 @@ pub fn gaussian_box_blur_f32(
     dst: &mut [f32],
     width: u32,
     height: u32,
-    radius: u32,
+    sigma: f32,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) {
@@ -1361,7 +1400,7 @@ pub fn gaussian_box_blur_f32(
         stride,
         width,
         height,
-        radius,
+        sigma,
         threading_policy,
     );
 }
@@ -1377,13 +1416,13 @@ pub fn gaussian_box_blur_f32(
 ///
 /// # Arguments
 ///
-/// * `stride` - Lane length, default is width * channels_count if not aligned
-/// * `width` - Width of the image
-/// * `height` - Height of the image
-/// * `radius` - almost any radius is supported
-/// * `channels` - Count of channels of the image, only 3 and 4 is supported, alpha position, and channels order does not matter
+/// * `stride` - Lane length, default is width * channels_count if not aligned.
+/// * `width` - Width of the image.
+/// * `height` - Height of the image.
+/// * `sigma` - gaussian flattening level.
+/// * `channels` - Count of channels of the image, only 3 and 4 is supported, alpha position, and channels order does not matter.
 /// * `threading_policy` - Threads usage policy
-/// * `transfer_function` - Transfer function in linear colorspace
+/// * `transfer_function` - Transfer function in linear colorspace.
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
@@ -1394,7 +1433,7 @@ pub fn gaussian_box_blur_in_linear(
     dst_stride: u32,
     width: u32,
     height: u32,
-    radius: u32,
+    sigma: f32,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
     transfer_function: TransferFunction,
@@ -1431,7 +1470,7 @@ pub fn gaussian_box_blur_in_linear(
         &mut linear_data_2,
         width,
         height,
-        radius,
+        sigma,
         channels,
         threading_policy,
     );

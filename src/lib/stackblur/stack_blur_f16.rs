@@ -55,7 +55,9 @@ fn stack_blur_worker_horizontal(
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
                 #[cfg(feature = "sse")]
-                if std::arch::is_x86_feature_detected!("sse4.1") {
+                if std::arch::is_x86_feature_detected!("sse4.1")
+                    && std::arch::is_x86_feature_detected!("f16c")
+                {
                     _executor =
                         Box::new(HorizontalSseStackBlurPassFloat16::<f16, f32, 1>::default());
                 }
@@ -72,7 +74,9 @@ fn stack_blur_worker_horizontal(
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
                 #[cfg(feature = "sse")]
-                if std::arch::is_x86_feature_detected!("sse4.1") {
+                if std::arch::is_x86_feature_detected!("sse4.1")
+                    && std::arch::is_x86_feature_detected!("f16c")
+                {
                     _executor =
                         Box::new(HorizontalSseStackBlurPassFloat16::<f16, f32, 3>::default());
                 }
@@ -89,7 +93,9 @@ fn stack_blur_worker_horizontal(
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
                 #[cfg(feature = "sse")]
-                if std::arch::is_x86_feature_detected!("sse4.1") {
+                if std::arch::is_x86_feature_detected!("sse4.1")
+                    && std::arch::is_x86_feature_detected!("f16c")
+                {
                     _executor =
                         Box::new(HorizontalSseStackBlurPassFloat16::<f16, f32, 4>::default());
                 }

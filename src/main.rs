@@ -219,15 +219,15 @@ fn main() {
     // // bytes = dst_bytes;
 
     let start_time = Instant::now();
-    libblur::stack_blur(
-        &mut dst_bytes,
-        stride as u32,
-        dimensions.0,
-        dimensions.1,
-        75,
-        FastBlurChannels::Channels3,
-        ThreadingPolicy::Single,
-    );
+    // libblur::stack_blur(
+    //     &mut dst_bytes,
+    //     stride as u32,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     75,
+    //     FastBlurChannels::Channels3,
+    //     ThreadingPolicy::Single,
+    // );
     // libblur::fast_gaussian_next(
     //     &mut dst_bytes,
     //     stride as u32,
@@ -275,18 +275,17 @@ fn main() {
     //     GaussianPreciseLevel::INTEGRAL,
     // );
 
-    //
-    //     libblur::tent_blur(
-    //     &bytes,
-    //     dimensions.0 * 3,
-    //     &mut dst_bytes,
-    //     dimensions.0 * 3,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     25,
-    //     FastBlurChannels::Channels3,
-    //     ThreadingPolicy::Single,
-    // );
+    libblur::gaussian_box_blur(
+        &bytes,
+        dimensions.0 * 3,
+        &mut dst_bytes,
+        dimensions.0 * 3,
+        dimensions.0,
+        dimensions.1,
+        5f32,
+        FastBlurChannels::Channels3,
+        ThreadingPolicy::Single,
+    );
 
     println!("gaussian_blur {:?}", start.elapsed());
 

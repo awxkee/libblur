@@ -100,15 +100,15 @@ Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded 
 
 |         | time(NEON) | time(SSE) |
 |---------|:----------:|:---------:|
-| libblur |   7.71ms   |  13.60ms  |
-| OpenCV  |   8.43ms   |  9.80ms   |
+| libblur |   7.71ms   |  7.27ms   |
+| OpenCV  |   8.43ms   |  10.36ms  |
 
 Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded mode with 77 radius.
 
 |         | time(NEON) | time(SSE) |
 |---------|:----------:|:---------:|
-| libblur |   7.41ms   |  11.91ms  |
-| OpenCV  |   8.00ms   |  9.62ms   |
+| libblur |   7.41ms   |  8.20ms   |
+| OpenCV  |   8.00ms   |  8.55ms   |
 
 ### Fast gaussian
 
@@ -228,15 +228,15 @@ Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded 
 
 |         | time(NEON) | time(SSE) |
 |---------|:----------:|:---------:|
-| libblur |  13.73ms   |  23.01ms  |
-| OpenCV  |  16.81ms   |  24.38ms  |
+| libblur |  10.13ms   |  12.57ms  |
+| OpenCV  |  16.81ms   |  47.62ms  |
 
 Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded mode with 77 radius.
 
 |         | Time(NEON) | Time(SSE) |
 |---------|:----------:|:---------:|
-| libblur |  12.42ms   |  24.32ms  |
-| OpenCV  |  16.33ms   |  23.75ms  |
+| libblur |  10.68ms   |  10.18ms  |
+| OpenCV  |  16.33ms   |  31.29ms  |
 
 ### Fast bilateral blur
 
@@ -256,6 +256,12 @@ fast_bilateral_filter(
     FastBlurChannels::Channels3,
 );
 ```
+
+### Common speed chain
+
+This is arbitrary example for blurring speed for all methods in descending order. 
+
+stack_blur -> fast_gaussian -> fast_gaussian_next -> box_blur -> fast_gaussian_superior -> tent_blur -> gaussian_box_blur -> gaussian_blur -> bilateral -> median
 
 This project is licensed under either of
 

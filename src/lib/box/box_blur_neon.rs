@@ -53,7 +53,8 @@ pub(crate) fn box_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usiz
 
     let mut yy = start_y;
 
-    for y in (yy..end_y.saturating_sub(4)).step_by(4) {
+    while yy + 4 < end_y {
+        let y = yy;
         let y_src_shift = y as usize * src_stride as usize;
         let y_dst_shift = y as usize * dst_stride as usize;
 
@@ -61,179 +62,164 @@ pub(crate) fn box_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usiz
         let mut store_1: uint32x4_t;
         let mut store_2: uint32x4_t;
         let mut store_3: uint32x4_t;
-        {
-            let s_ptr_0 = unsafe { src.as_ptr().add(y_src_shift) };
-            let edge_colors_0 = unsafe { load_u8_u32_fast::<CHANNEL_CONFIGURATION>(s_ptr_0) };
-            store_0 = unsafe { vmulq_u32(edge_colors_0, v_edge_count) };
 
-            let s_ptr_1 = unsafe { src.as_ptr().add(y_src_shift + src_stride as usize) };
-            let edge_colors_1 = unsafe { load_u8_u32_fast::<CHANNEL_CONFIGURATION>(s_ptr_1) };
-            store_1 = unsafe { vmulq_u32(edge_colors_1, v_edge_count) };
+        unsafe {
+            let s_ptr_0 = src.as_ptr().add(y_src_shift);
+            let edge_colors_0 = load_u8_u32_fast::<CHANNEL_CONFIGURATION>(s_ptr_0);
 
-            let s_ptr_2 = unsafe { src.as_ptr().add(y_src_shift + src_stride as usize * 2) };
-            let edge_colors_2 = unsafe { load_u8_u32_fast::<CHANNEL_CONFIGURATION>(s_ptr_2) };
-            store_2 = unsafe { vmulq_u32(edge_colors_2, v_edge_count) };
+            let s_ptr_1 = src.as_ptr().add(y_src_shift + src_stride as usize);
+            let edge_colors_1 = load_u8_u32_fast::<CHANNEL_CONFIGURATION>(s_ptr_1);
 
-            let s_ptr_3 = unsafe { src.as_ptr().add(y_src_shift + src_stride as usize * 3) };
-            let edge_colors_3 = unsafe { load_u8_u32_fast::<CHANNEL_CONFIGURATION>(s_ptr_3) };
-            store_3 = unsafe { vmulq_u32(edge_colors_3, v_edge_count) };
+            let s_ptr_2 = src.as_ptr().add(y_src_shift + src_stride as usize * 2);
+            let edge_colors_2 = load_u8_u32_fast::<CHANNEL_CONFIGURATION>(s_ptr_2);
+
+            let s_ptr_3 = src.as_ptr().add(y_src_shift + src_stride as usize * 3);
+            let edge_colors_3 = load_u8_u32_fast::<CHANNEL_CONFIGURATION>(s_ptr_3);
+
+            store_0 = vmulq_u32(edge_colors_0, v_edge_count);
+            store_1 = vmulq_u32(edge_colors_1, v_edge_count);
+            store_2 = vmulq_u32(edge_colors_2, v_edge_count);
+            store_3 = vmulq_u32(edge_colors_3, v_edge_count);
         }
 
-        for x in 1..std::cmp::min(half_kernel, width) {
-            let px = x as usize * CHANNEL_CONFIGURATION;
+        unsafe {
+            for x in 1..std::cmp::min(half_kernel, width) {
+                let px = x as usize * CHANNEL_CONFIGURATION;
 
-            let s_ptr_0 = unsafe { src.as_ptr().add(y_src_shift + px) };
-            let edge_colors_0 = unsafe { load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_0) };
-            store_0 = unsafe { vaddw_u16(store_0, edge_colors_0) };
+                let s_ptr_0 = src.as_ptr().add(y_src_shift + px);
+                let edge_colors_0 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_0);
 
-            let s_ptr_1 = unsafe { src.as_ptr().add(y_src_shift + src_stride as usize + px) };
-            let edge_colors_1 = unsafe { load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_1) };
-            store_1 = unsafe { vaddw_u16(store_1, edge_colors_1) };
+                let s_ptr_1 = src.as_ptr().add(y_src_shift + src_stride as usize + px);
+                let edge_colors_1 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_1);
 
-            let s_ptr_2 = unsafe { src.as_ptr().add(y_src_shift + src_stride as usize * 2 + px) };
-            let edge_colors_2 = unsafe { load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_2) };
-            store_2 = unsafe { vaddw_u16(store_2, edge_colors_2) };
+                let s_ptr_2 = src.as_ptr().add(y_src_shift + src_stride as usize * 2 + px);
+                let edge_colors_2 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_2);
 
-            let s_ptr_3 = unsafe { src.as_ptr().add(y_src_shift + src_stride as usize * 3 + px) };
-            let edge_colors_3 = unsafe { load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_3) };
-            store_3 = unsafe { vaddw_u16(store_3, edge_colors_3) };
+                let s_ptr_3 = src.as_ptr().add(y_src_shift + src_stride as usize * 3 + px);
+                let edge_colors_3 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_3);
+
+                store_0 = vaddw_u16(store_0, edge_colors_0);
+                store_1 = vaddw_u16(store_1, edge_colors_1);
+                store_2 = vaddw_u16(store_2, edge_colors_2);
+                store_3 = vaddw_u16(store_3, edge_colors_3);
+            }
         }
 
         for x in 0..width {
             // preload edge pixels
 
             // subtract previous
-            {
+            unsafe {
                 let previous_x = std::cmp::max(x as i64 - half_kernel as i64, 0) as usize;
                 let previous = previous_x * CHANNEL_CONFIGURATION;
 
-                let s_ptr_0 = unsafe { src.as_ptr().add(y_src_shift + previous) };
-                let edge_colors_0 = unsafe { load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_0) };
-                store_0 = unsafe { vsubw_u16(store_0, edge_colors_0) };
+                let s_ptr_0 = src.as_ptr().add(y_src_shift + previous);
+                let edge_colors_0 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_0);
 
-                let s_ptr_1 = unsafe {
-                    src.as_ptr()
-                        .add(y_src_shift + src_stride as usize + previous)
-                };
-                let edge_colors_1 = unsafe { load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_1) };
-                store_1 = unsafe { vsubw_u16(store_1, edge_colors_1) };
+                let s_ptr_1 = src
+                    .as_ptr()
+                    .add(y_src_shift + src_stride as usize + previous);
+                let edge_colors_1 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_1);
 
-                let s_ptr_2 = unsafe {
-                    src.as_ptr()
-                        .add(y_src_shift + src_stride as usize * 2 + previous)
-                };
-                let edge_colors_2 = unsafe { load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_2) };
-                store_2 = unsafe { vsubw_u16(store_2, edge_colors_2) };
+                let s_ptr_2 = src
+                    .as_ptr()
+                    .add(y_src_shift + src_stride as usize * 2 + previous);
+                let edge_colors_2 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_2);
 
-                let s_ptr_3 = unsafe {
-                    src.as_ptr()
-                        .add(y_src_shift + src_stride as usize * 3 + previous)
-                };
-                let edge_colors_3 = unsafe { load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_3) };
-                store_3 = unsafe { vsubw_u16(store_3, edge_colors_3) };
+                let s_ptr_3 = src
+                    .as_ptr()
+                    .add(y_src_shift + src_stride as usize * 3 + previous);
+                let edge_colors_3 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_3);
+
+                store_0 = vsubw_u16(store_0, edge_colors_0);
+                store_1 = vsubw_u16(store_1, edge_colors_1);
+                store_2 = vsubw_u16(store_2, edge_colors_2);
+                store_3 = vsubw_u16(store_3, edge_colors_3);
             }
 
             // add next
-            {
+            unsafe {
                 let next_x = std::cmp::min(x + half_kernel, width - 1) as usize;
 
                 let next = next_x * CHANNEL_CONFIGURATION;
 
-                let s_ptr_0 = unsafe { src.as_ptr().add(y_src_shift + next) };
-                let edge_colors_0 = unsafe { load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_0) };
-                store_0 = unsafe { vaddw_u16(store_0, edge_colors_0) };
+                let s_ptr_0 = src.as_ptr().add(y_src_shift + next);
+                let edge_colors_0 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_0);
 
-                let s_ptr_1 = unsafe { src.as_ptr().add(y_src_shift + src_stride as usize + next) };
-                let edge_colors_1 = unsafe { load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_1) };
-                store_1 = unsafe { vaddw_u16(store_1, edge_colors_1) };
+                let s_ptr_1 = src.as_ptr().add(y_src_shift + src_stride as usize + next);
+                let edge_colors_1 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_1);
 
-                let s_ptr_2 = unsafe {
-                    src.as_ptr()
-                        .add(y_src_shift + src_stride as usize * 2 + next)
-                };
-                let edge_colors_2 = unsafe { load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_2) };
-                store_2 = unsafe { vaddw_u16(store_2, edge_colors_2) };
+                let s_ptr_2 = src
+                    .as_ptr()
+                    .add(y_src_shift + src_stride as usize * 2 + next);
+                let edge_colors_2 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_2);
 
-                let s_ptr_3 = unsafe {
-                    src.as_ptr()
-                        .add(y_src_shift + src_stride as usize * 3 + next)
-                };
-                let edge_colors_3 = unsafe { load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_3) };
-                store_3 = unsafe { vaddw_u16(store_3, edge_colors_3) };
+                let s_ptr_3 = src
+                    .as_ptr()
+                    .add(y_src_shift + src_stride as usize * 3 + next);
+                let edge_colors_3 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_3);
+
+                store_0 = vaddw_u16(store_0, edge_colors_0);
+                store_1 = vaddw_u16(store_1, edge_colors_1);
+                store_2 = vaddw_u16(store_2, edge_colors_2);
+                store_3 = vaddw_u16(store_3, edge_colors_3);
             }
 
             let px = x as usize * CHANNEL_CONFIGURATION;
 
-            let scale_store = unsafe { vmulq_u32_f32(store_0, v_weight) };
-            let px_16 = unsafe { vqmovn_u32(scale_store) };
-            let px_8 = unsafe { vqmovn_u16(vcombine_u16(px_16, px_16)) };
-            let pixel_0 = unsafe { vget_lane_u32::<0>(vreinterpret_u32_u8(px_8)) };
+            unsafe {
+                let scale_store0 = vmulq_u32_f32(store_0, v_weight);
+                let scale_store1 = vmulq_u32_f32(store_1, v_weight);
+                let scale_store2 = vmulq_u32_f32(store_2, v_weight);
+                let scale_store3 = vmulq_u32_f32(store_3, v_weight);
 
-            let scale_store = unsafe { vmulq_u32_f32(store_1, v_weight) };
-            let px_16 = unsafe { vqmovn_u32(scale_store) };
-            let px_8 = unsafe { vqmovn_u16(vcombine_u16(px_16, px_16)) };
-            let pixel_1 = unsafe { vget_lane_u32::<0>(vreinterpret_u32_u8(px_8)) };
+                let px_160 = vqmovn_u32(scale_store0);
+                let px_161 = vqmovn_u32(scale_store1);
+                let px_162 = vqmovn_u32(scale_store2);
+                let px_163 = vqmovn_u32(scale_store3);
 
-            let scale_store = unsafe { vmulq_u32_f32(store_2, v_weight) };
-            let px_16 = unsafe { vqmovn_u32(scale_store) };
-            let px_8 = unsafe { vqmovn_u16(vcombine_u16(px_16, px_16)) };
-            let pixel_2 = unsafe { vget_lane_u32::<0>(vreinterpret_u32_u8(px_8)) };
+                let px_80 = vqmovn_u16(vcombine_u16(px_160, px_160));
+                let px_81 = vqmovn_u16(vcombine_u16(px_161, px_161));
+                let px_82 = vqmovn_u16(vcombine_u16(px_162, px_162));
+                let px_83 = vqmovn_u16(vcombine_u16(px_163, px_163));
 
-            let scale_store = unsafe { vmulq_u32_f32(store_3, v_weight) };
-            let px_16 = unsafe { vqmovn_u32(scale_store) };
-            let px_8 = unsafe { vqmovn_u16(vcombine_u16(px_16, px_16)) };
-            let pixel_3 = unsafe { vget_lane_u32::<0>(vreinterpret_u32_u8(px_8)) };
-
-            let bytes_offset_0 = y_dst_shift + px;
-            let bytes_offset_1 = y_dst_shift + dst_stride as usize + px;
-            let bytes_offset_2 = y_dst_shift + dst_stride as usize * 2 + px;
-            let bytes_offset_3 = y_dst_shift + dst_stride as usize * 3 + px;
-            if CHANNEL_CONFIGURATION == 4 {
-                unsafe {
+                let bytes_offset_0 = y_dst_shift + px;
+                let bytes_offset_1 = y_dst_shift + dst_stride as usize + px;
+                let bytes_offset_2 = y_dst_shift + dst_stride as usize * 2 + px;
+                let bytes_offset_3 = y_dst_shift + dst_stride as usize * 3 + px;
+                if CHANNEL_CONFIGURATION == 4 {
                     let dst_ptr_0 = unsafe_dst.slice.as_ptr().add(bytes_offset_0) as *mut u32;
-                    dst_ptr_0.write_unaligned(pixel_0);
+                    vst1_lane_u32::<0>(dst_ptr_0, vreinterpret_u32_u8(px_80));
 
                     let dst_ptr_1 = unsafe_dst.slice.as_ptr().add(bytes_offset_1) as *mut u32;
-                    dst_ptr_1.write_unaligned(pixel_1);
+                    vst1_lane_u32::<0>(dst_ptr_1, vreinterpret_u32_u8(px_81));
 
                     let dst_ptr_2 = unsafe_dst.slice.as_ptr().add(bytes_offset_2) as *mut u32;
-                    dst_ptr_2.write_unaligned(pixel_2);
+                    vst1_lane_u32::<0>(dst_ptr_2, vreinterpret_u32_u8(px_82));
 
                     let dst_ptr_3 = unsafe_dst.slice.as_ptr().add(bytes_offset_3) as *mut u32;
-                    dst_ptr_3.write_unaligned(pixel_3);
-                }
-            } else {
-                let bits_0 = pixel_0.to_le_bytes();
-                unsafe {
-                    unsafe_dst.write(bytes_offset_0, bits_0[0]);
-                    unsafe_dst.write(bytes_offset_0 + 1, bits_0[1]);
-                    unsafe_dst.write(bytes_offset_0 + 2, bits_0[2]);
-                }
+                    vst1_lane_u32::<0>(dst_ptr_3, vreinterpret_u32_u8(px_83));
+                } else {
+                    let dst_ptr_0 = unsafe_dst.slice.as_ptr().add(bytes_offset_0) as *mut u8;
+                    vst1_lane_u16::<0>(dst_ptr_0 as *mut u16, vreinterpret_u16_u8(px_80));
+                    vst1_lane_u8::<2>(dst_ptr_0.add(2), px_80);
 
-                let bits_1 = pixel_1.to_le_bytes();
-                unsafe {
-                    unsafe_dst.write(bytes_offset_1, bits_1[0]);
-                    unsafe_dst.write(bytes_offset_1 + 1, bits_1[1]);
-                    unsafe_dst.write(bytes_offset_1 + 2, bits_1[2]);
-                }
+                    let dst_ptr_1 = unsafe_dst.slice.as_ptr().add(bytes_offset_1) as *mut u8;
+                    vst1_lane_u16::<0>(dst_ptr_1 as *mut u16, vreinterpret_u16_u8(px_81));
+                    vst1_lane_u8::<2>(dst_ptr_1.add(2), px_81);
 
-                let bits_2 = pixel_2.to_le_bytes();
-                unsafe {
-                    unsafe_dst.write(bytes_offset_2, bits_2[0]);
-                    unsafe_dst.write(bytes_offset_2 + 1, bits_2[1]);
-                    unsafe_dst.write(bytes_offset_2 + 2, bits_2[2]);
-                }
+                    let dst_ptr_2 = unsafe_dst.slice.as_ptr().add(bytes_offset_2) as *mut u8;
+                    vst1_lane_u16::<0>(dst_ptr_2 as *mut u16, vreinterpret_u16_u8(px_82));
+                    vst1_lane_u8::<2>(dst_ptr_2.add(2), px_82);
 
-                let bits_3 = pixel_3.to_le_bytes();
-                unsafe {
-                    unsafe_dst.write(bytes_offset_3, bits_3[0]);
-                    unsafe_dst.write(bytes_offset_3 + 1, bits_3[1]);
-                    unsafe_dst.write(bytes_offset_3 + 2, bits_3[2]);
+                    let dst_ptr_3 = unsafe_dst.slice.as_ptr().add(bytes_offset_3) as *mut u8;
+                    vst1_lane_u16::<0>(dst_ptr_3 as *mut u16, vreinterpret_u16_u8(px_83));
+                    vst1_lane_u8::<2>(dst_ptr_3.add(2), px_83);
                 }
             }
         }
 
-        yy = y;
+        yy += 4;
     }
 
     for y in yy..end_y {
@@ -241,40 +227,42 @@ pub(crate) fn box_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usiz
         let y_dst_shift = y as usize * dst_stride as usize;
 
         let mut store: uint32x4_t;
-        {
-            let s_ptr = unsafe { src.as_ptr().add(y_src_shift) };
-            let edge_colors = unsafe { load_u8_u32_fast::<CHANNEL_CONFIGURATION>(s_ptr) };
-            store = unsafe { vmulq_u32(edge_colors, v_edge_count) };
+        unsafe {
+            let s_ptr = src.as_ptr().add(y_src_shift);
+            let edge_colors = load_u8_u32_fast::<CHANNEL_CONFIGURATION>(s_ptr);
+            store = vmulq_u32(edge_colors, v_edge_count);
         }
 
-        for x in 1..std::cmp::min(half_kernel, width) {
-            let px = x as usize * CHANNEL_CONFIGURATION;
-            let s_ptr = unsafe { src.as_ptr().add(y_src_shift + px) };
-            let edge_colors = unsafe { load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr) };
-            store = unsafe { vaddw_u16(store, edge_colors) };
+        unsafe {
+            for x in 1..std::cmp::min(half_kernel, width) {
+                let px = x as usize * CHANNEL_CONFIGURATION;
+                let s_ptr = src.as_ptr().add(y_src_shift + px);
+                let edge_colors = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr);
+                store = vaddw_u16(store, edge_colors);
+            }
         }
 
         for x in 0..width {
             // preload edge pixels
 
             // subtract previous
-            {
+            unsafe {
                 let previous_x = std::cmp::max(x as i64 - half_kernel as i64, 0) as usize;
                 let previous = previous_x * CHANNEL_CONFIGURATION;
-                let s_ptr = unsafe { src.as_ptr().add(y_src_shift + previous) };
-                let edge_colors = unsafe { load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr) };
-                store = unsafe { vsubw_u16(store, edge_colors) };
+                let s_ptr = src.as_ptr().add(y_src_shift + previous);
+                let edge_colors = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr);
+                store = vsubw_u16(store, edge_colors);
             }
 
             // add next
-            {
+            unsafe {
                 let next_x = std::cmp::min(x + half_kernel, width - 1) as usize;
 
                 let next = next_x * CHANNEL_CONFIGURATION;
 
-                let s_ptr = unsafe { src.as_ptr().add(y_src_shift + next) };
-                let edge_colors = unsafe { load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr) };
-                store = unsafe { vaddw_u16(store, edge_colors) };
+                let s_ptr = src.as_ptr().add(y_src_shift + next);
+                let edge_colors = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr);
+                store = vaddw_u16(store, edge_colors);
             }
 
             let px = x as usize * CHANNEL_CONFIGURATION;

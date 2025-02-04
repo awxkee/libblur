@@ -664,9 +664,9 @@ impl FastGaussianDispatchProvider<f16> for f16 {
         }
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
-            let _is_f16c_available = std::arch::is_x86_feature_detected!("f16c");
-            let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
-            if _is_sse_available && _is_f16c_available {
+            if std::arch::is_x86_feature_detected!("sse4.1")
+                && std::arch::is_x86_feature_detected!("f16c")
+            {
                 _dispatcher_vertical =
                     fast_gaussian_vertical_pass_sse_f16::<f16, CHANNEL_CONFIGURATION>;
             }
@@ -700,9 +700,9 @@ impl FastGaussianDispatchProvider<f16> for f16 {
         }
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
-            let _is_f16c_available = std::arch::is_x86_feature_detected!("f16c");
-            let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
-            if _is_sse_available && _is_f16c_available {
+            if std::arch::is_x86_feature_detected!("sse4.1")
+                && std::arch::is_x86_feature_detected!("f16c")
+            {
                 _dispatcher_horizontal =
                     fast_gaussian_horizontal_pass_sse_f16::<f16, CHANNEL_CONFIGURATION>;
             }
