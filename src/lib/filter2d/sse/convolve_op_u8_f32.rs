@@ -60,7 +60,7 @@ pub fn convolve_segment_sse_2d_u8_f32(
     }
 }
 
-#[target_feature(enable = "sse4.1", enable = "fma")]
+#[target_feature(enable = "sse4.1")]
 unsafe fn convolve_segment_2d_u8_def(
     arena: Arena,
     arena_source: &[u8],
