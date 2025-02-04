@@ -29,7 +29,7 @@
 use crate::stackblur::neon::{
     HorizontalNeonStackBlurPassFloat32, VerticalNeonStackBlurPassFloat32,
 };
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 use crate::stackblur::sse::{HorizontalSseStackBlurPassFloat32, VerticalSseStackBlurPassFloat32};
 use crate::stackblur::*;
 use crate::unsafe_slice::UnsafeSlice;
@@ -67,13 +67,14 @@ fn stack_blur_worker_horizontal(
         }
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         fn select_blur_pass<const N: usize>() -> Box<dyn StackBlurWorkingPass<f32, N>> {
-            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-            let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
-            if _is_sse_available {
+            #[cfg(feature = "sse")]
+            if std::arch::is_x86_feature_detected!("sse4.1") {
                 Box::new(HorizontalSseStackBlurPassFloat32::<f32, f32, N>::default())
             } else {
                 Box::new(HorizontalStackBlurPass::<f32, f32, f32, N>::default())
             }
+            #[cfg(not(feature = "sse"))]
+            Box::new(HorizontalStackBlurPass::<f32, f32, f32, N>::default())
         }
         let executor = select_blur_pass::<N>();
         executor.pass(slice, stride, width, height, radius, thread, thread_count);
@@ -124,13 +125,14 @@ fn stack_blur_worker_vertical(
         }
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         fn select_blur_pass<const N: usize>() -> Box<dyn StackBlurWorkingPass<f32, N>> {
-            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-            let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
-            if _is_sse_available {
+            #[cfg(feature = "sse")]
+            if std::arch::is_x86_feature_detected!("sse4.1") {
                 Box::new(VerticalSseStackBlurPassFloat32::<f32, f32, N>::default())
             } else {
                 Box::new(VerticalStackBlurPass::<f32, f32, f32, N>::default())
             }
+            #[cfg(not(feature = "sse"))]
+            Box::new(VerticalStackBlurPass::<f32, f32, f32, N>::default())
         }
         let executor = select_blur_pass::<N>();
         executor.pass(slice, stride, width, height, radius, thread, thread_count);

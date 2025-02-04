@@ -51,7 +51,7 @@ impl<T, J, const COMPONENTS: usize> Default for VerticalSseStackBlurPass<T, J, C
     }
 }
 
-impl<T, J, const COMPONENTS: usize> VerticalSseStackBlurPass<T, J, COMPONENTS>
+impl<T, J, const CN: usize> VerticalSseStackBlurPass<T, J, CN>
 where
     J: Copy
         + 'static
@@ -86,7 +86,7 @@ where
         let mut yp;
         let mut sp;
         let mut stack_start;
-        let mut stacks = vec![0i32; 4 * div * total_threads];
+        let mut stacks = vec![0i32; 4 * div * 4];
 
         let v_mul_value = _mm_set1_ps(1. / ((radius as f32 + 1.) * (radius as f32 + 1.)));
 
@@ -96,19 +96,177 @@ where
         let mut src_ptr;
         let mut dst_ptr;
 
-        let min_x = thread * width as usize / total_threads;
-        let max_x = (thread + 1) * width as usize / total_threads;
+        let min_x = (thread * width as usize / total_threads) * CN;
+        let max_x = ((thread + 1) * width as usize / total_threads) * CN;
 
-        for x in min_x..max_x {
+        let mut cx = min_x;
+
+        while cx + 8 < max_x {
+            let mut sums0 = _mm_setzero_si128();
+            let mut sums1 = _mm_setzero_si128();
+
+            let mut sum_in0 = _mm_setzero_si128();
+            let mut sum_in1 = _mm_setzero_si128();
+
+            let mut sum_out0 = _mm_setzero_si128();
+            let mut sum_out1 = _mm_setzero_si128();
+
+            let mut src_ptr = cx; // x,0
+
+            let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
+
+            {
+                let src_pixel0 = _mm_loadu_si64(src_ld as *const _);
+                let lo0 = _mm_unpacklo_epi8(src_pixel0, _mm_setzero_si128());
+
+                let i16_l0 = _mm_unpacklo_epi16(lo0, _mm_setzero_si128());
+                let i16_h0 = _mm_unpackhi_epi16(lo0, _mm_setzero_si128());
+
+                for i in 0..=radius {
+                    let stack_ptr = stacks.as_mut_ptr().add(i as usize * 4 * 4);
+
+                    _mm_storeu_si128(stack_ptr as *mut _, i16_l0);
+                    _mm_storeu_si128(stack_ptr.add(4) as *mut _, i16_h0);
+
+                    let j0 = _mm_madd_epi16(i16_l0, _mm_set1_epi32(i as i32 + 1));
+                    let j1 = _mm_madd_epi16(i16_h0, _mm_set1_epi32(i as i32 + 1));
+
+                    sums0 = _mm_add_epi32(sums0, j0);
+                    sums1 = _mm_add_epi32(sums1, j1);
+
+                    sum_out0 = _mm_add_epi32(sum_out0, i16_l0);
+                    sum_out1 = _mm_add_epi32(sum_out1, i16_h0);
+                }
+            }
+
+            {
+                for i in 1..=radius {
+                    if i <= hm {
+                        src_ptr += stride as usize;
+                    }
+
+                    let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4 * 4);
+                    let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
+                    let src_pixel0 = _mm_loadu_si64(src_ld as *const u8);
+                    let lo0 = _mm_unpacklo_epi8(src_pixel0, _mm_setzero_si128());
+
+                    let i16_l0 = _mm_unpacklo_epi16(lo0, _mm_setzero_si128());
+                    let i16_h0 = _mm_unpackhi_epi16(lo0, _mm_setzero_si128());
+
+                    _mm_storeu_si128(stack_ptr as *mut _, i16_l0);
+                    _mm_storeu_si128(stack_ptr.add(4) as *mut _, i16_h0);
+
+                    let vj = _mm_set1_epi32(radius as i32 + 1 - i as i32);
+
+                    let j0 = _mm_madd_epi16(i16_l0, vj);
+                    let j1 = _mm_madd_epi16(i16_h0, vj);
+
+                    sums0 = _mm_add_epi32(sums0, j0);
+                    sums1 = _mm_add_epi32(sums1, j1);
+
+                    sum_in0 = _mm_add_epi32(sum_in0, i16_l0);
+                    sum_in1 = _mm_add_epi32(sum_in1, i16_h0);
+                }
+            }
+
+            sp = radius;
+            yp = radius;
+            if yp > hm {
+                yp = hm;
+            }
+            src_ptr = cx + yp as usize * stride as usize;
+            let mut dst_ptr = cx;
+            for _ in 0..height {
+                let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
+
+                let casted_sum0 = _mm_cvtepi32_ps(sums0);
+                let casted_sum1 = _mm_cvtepi32_ps(sums1);
+
+                const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
+
+                let mut a0 = _mm_mul_ps(casted_sum0, v_mul_value);
+                let mut a1 = _mm_mul_ps(casted_sum1, v_mul_value);
+
+                a0 = _mm_round_ps::<ROUNDING_FLAGS>(a0);
+                a1 = _mm_round_ps::<ROUNDING_FLAGS>(a1);
+
+                let scaled_val0 = _mm_cvtps_epi32(a0);
+                let scaled_val1 = _mm_cvtps_epi32(a1);
+
+                let jv0 = _mm_packus_epi32(scaled_val0, scaled_val1);
+
+                _mm_storeu_si64(store_ld, _mm_packus_epi16(jv0, _mm_setzero_si128()));
+
+                dst_ptr += stride as usize;
+
+                sums0 = _mm_sub_epi32(sums0, sum_out0);
+                sums1 = _mm_sub_epi32(sums1, sum_out1);
+
+                stack_start = sp + div - radius;
+                if stack_start >= div {
+                    stack_start -= div;
+                }
+
+                let stack_ptr = stacks.as_mut_ptr().add(stack_start as usize * 4 * 4);
+
+                let stack_val0 = _mm_loadu_si128(stack_ptr as *const _);
+                let stack_val1 = _mm_loadu_si128(stack_ptr.add(4) as *const _);
+
+                sum_out0 = _mm_sub_epi32(sum_out0, stack_val0);
+                sum_out1 = _mm_sub_epi32(sum_out1, stack_val1);
+
+                if yp < hm {
+                    src_ptr += stride as usize; // stride
+                    yp += 1;
+                }
+
+                let src_ld = pixels.slice.as_ptr().add(src_ptr);
+
+                let src_pixel0 = _mm_loadu_si64(src_ld as *const u8);
+                let lo0 = _mm_unpacklo_epi8(src_pixel0, _mm_setzero_si128());
+
+                let i16_l0 = _mm_unpacklo_epi16(lo0, _mm_setzero_si128());
+                let i16_h0 = _mm_unpackhi_epi16(lo0, _mm_setzero_si128());
+
+                _mm_storeu_si128(stack_ptr as *mut _, i16_l0);
+                _mm_storeu_si128(stack_ptr.add(4) as *mut _, i16_h0);
+
+                sum_in0 = _mm_add_epi32(sum_in0, i16_l0);
+                sum_in1 = _mm_add_epi32(sum_in1, i16_h0);
+
+                sums0 = _mm_add_epi32(sums0, sum_in0);
+                sums1 = _mm_add_epi32(sums1, sum_in1);
+
+                sp += 1;
+
+                if sp >= div {
+                    sp = 0;
+                }
+                let stack_ptr = stacks.as_mut_ptr().add(sp as usize * 4 * 4);
+
+                let stack_val0 = _mm_loadu_si128(stack_ptr as *const _);
+                let stack_val1 = _mm_loadu_si128(stack_ptr.add(4) as *const _);
+
+                sum_out0 = _mm_add_epi32(sum_out0, stack_val0);
+                sum_out1 = _mm_add_epi32(sum_out1, stack_val1);
+
+                sum_in0 = _mm_sub_epi32(sum_in0, stack_val0);
+                sum_in1 = _mm_sub_epi32(sum_in1, stack_val1);
+            }
+
+            cx += 8;
+        }
+
+        while cx + CN < max_x {
             let mut sums = _mm_setzero_si128();
             let mut sum_in = _mm_setzero_si128();
             let mut sum_out = _mm_setzero_si128();
 
-            src_ptr = COMPONENTS * x; // x,0
+            src_ptr = cx; // x,0
 
             let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
 
-            let src_pixel = load_u8_s32_fast::<COMPONENTS>(src_ld as *const u8);
+            let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
 
             for i in 0..=radius {
                 let stack_ptr = stacks.as_mut_ptr().add(i as usize * 4);
@@ -127,7 +285,7 @@ where
 
                 let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4);
                 let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
-                let src_pixel = load_u8_s32_fast::<COMPONENTS>(src_ld as *const u8);
+                let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
                 _mm_storeu_si128(stack_ptr as *mut __m128i, src_pixel);
                 sums = _mm_add_epi32(
                     sums,
@@ -142,8 +300,8 @@ where
             if yp > hm {
                 yp = hm;
             }
-            src_ptr = COMPONENTS * x + yp as usize * stride as usize;
-            dst_ptr = COMPONENTS * x;
+            src_ptr = cx + yp as usize * stride as usize;
+            dst_ptr = cx;
             for _ in 0..height {
                 let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
                 const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
@@ -151,7 +309,7 @@ where
                     _mm_cvtepi32_ps(sums),
                     v_mul_value,
                 )));
-                store_u8_s32::<COMPONENTS>(store_ld, result);
+                store_u8_s32::<CN>(store_ld, result);
 
                 dst_ptr += stride as usize;
 
@@ -172,7 +330,7 @@ where
                 }
 
                 let src_ld = pixels.slice.as_ptr().add(src_ptr);
-                let src_pixel = load_u8_s32_fast::<COMPONENTS>(src_ld as *const u8);
+                let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
                 _mm_storeu_si128(stack_ptr as *mut __m128i, src_pixel);
 
                 sum_in = _mm_add_epi32(sum_in, src_pixel);
@@ -189,6 +347,104 @@ where
                 sum_out = _mm_add_epi32(sum_out, stack_val);
                 sum_in = _mm_sub_epi32(sum_in, stack_val);
             }
+
+            cx += CN;
+        }
+
+        const TAIL: usize = 1;
+
+        while cx < max_x {
+            let mut sums = _mm_setzero_si128();
+            let mut sum_in = _mm_setzero_si128();
+            let mut sum_out = _mm_setzero_si128();
+
+            src_ptr = cx; // x,0
+
+            let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
+
+            let src_pixel = load_u8_s32_fast::<TAIL>(src_ld as *const u8);
+
+            for i in 0..=radius {
+                let stack_ptr = stacks.as_mut_ptr().add(i as usize * 4);
+                _mm_storeu_si128(stack_ptr as *mut __m128i, src_pixel);
+                sums = _mm_add_epi32(
+                    sums,
+                    _mm_madd_epi16(src_pixel, _mm_set1_epi32(i as i32 + 1)),
+                );
+                sum_out = _mm_add_epi32(sum_out, src_pixel);
+            }
+
+            for i in 1..=radius {
+                if i <= hm {
+                    src_ptr += stride as usize;
+                }
+
+                let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4);
+                let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
+                let src_pixel = load_u8_s32_fast::<TAIL>(src_ld as *const u8);
+                _mm_storeu_si128(stack_ptr as *mut __m128i, src_pixel);
+                sums = _mm_add_epi32(
+                    sums,
+                    _mm_madd_epi16(src_pixel, _mm_set1_epi32(radius as i32 + 1 - i as i32)),
+                );
+
+                sum_in = _mm_add_epi32(sum_in, src_pixel);
+            }
+
+            sp = radius;
+            yp = radius;
+            if yp > hm {
+                yp = hm;
+            }
+            src_ptr = cx + yp as usize * stride as usize;
+            dst_ptr = cx;
+            for _ in 0..height {
+                let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
+                const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
+                let result = _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(
+                    _mm_cvtepi32_ps(sums),
+                    v_mul_value,
+                )));
+                store_u8_s32::<TAIL>(store_ld, result);
+
+                dst_ptr += stride as usize;
+
+                sums = _mm_sub_epi32(sums, sum_out);
+
+                stack_start = sp + div - radius;
+                if stack_start >= div {
+                    stack_start -= div;
+                }
+
+                let stack_ptr = stacks.as_mut_ptr().add(stack_start as usize * 4);
+                let stack_val = _mm_loadu_si128(stack_ptr as *const __m128i);
+                sum_out = _mm_sub_epi32(sum_out, stack_val);
+
+                if yp < hm {
+                    src_ptr += stride as usize; // stride
+                    yp += 1;
+                }
+
+                let src_ld = pixels.slice.as_ptr().add(src_ptr);
+                let src_pixel = load_u8_s32_fast::<TAIL>(src_ld as *const u8);
+                _mm_storeu_si128(stack_ptr as *mut __m128i, src_pixel);
+
+                sum_in = _mm_add_epi32(sum_in, src_pixel);
+                sums = _mm_add_epi32(sums, sum_in);
+
+                sp += 1;
+
+                if sp >= div {
+                    sp = 0;
+                }
+                let stack_ptr = stacks.as_mut_ptr().add(sp as usize * 4);
+                let stack_val = _mm_loadu_si128(stack_ptr as *const __m128i);
+
+                sum_out = _mm_add_epi32(sum_out, stack_val);
+                sum_in = _mm_sub_epi32(sum_in, stack_val);
+            }
+
+            cx += TAIL;
         }
     }
 }

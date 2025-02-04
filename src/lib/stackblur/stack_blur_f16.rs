@@ -29,7 +29,7 @@
 use crate::stackblur::neon::{
     HorizontalNeonStackBlurPassFloat16, VerticalNeonStackBlurPassFloat16,
 };
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 use crate::stackblur::sse::{HorizontalSseStackBlurPassFloat16, VerticalSseStackBlurPassFloat16};
 use crate::stackblur::{HorizontalStackBlurPass, StackBlurWorkingPass, VerticalStackBlurPass};
 use crate::unsafe_slice::UnsafeSlice;
@@ -47,8 +47,6 @@ fn stack_blur_worker_horizontal(
     thread_count: usize,
 ) {
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-    let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
-    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     let _is_f16c_available = std::arch::is_x86_feature_detected!("f16c");
     match channels {
         FastBlurChannels::Plane => {
@@ -56,7 +54,8 @@ fn stack_blur_worker_horizontal(
                 Box::new(HorizontalStackBlurPass::<f16, f32, f32, 1>::default());
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
-                if _is_sse_available {
+                #[cfg(feature = "sse")]
+                if std::arch::is_x86_feature_detected!("sse4.1") {
                     _executor =
                         Box::new(HorizontalSseStackBlurPassFloat16::<f16, f32, 1>::default());
                 }
@@ -72,7 +71,8 @@ fn stack_blur_worker_horizontal(
                 Box::new(HorizontalStackBlurPass::<f16, f32, f32, 3>::default());
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
-                if _is_sse_available {
+                #[cfg(feature = "sse")]
+                if std::arch::is_x86_feature_detected!("sse4.1") {
                     _executor =
                         Box::new(HorizontalSseStackBlurPassFloat16::<f16, f32, 3>::default());
                 }
@@ -88,7 +88,8 @@ fn stack_blur_worker_horizontal(
                 Box::new(HorizontalStackBlurPass::<f16, f32, f32, 4>::default());
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
-                if _is_sse_available {
+                #[cfg(feature = "sse")]
+                if std::arch::is_x86_feature_detected!("sse4.1") {
                     _executor =
                         Box::new(HorizontalSseStackBlurPassFloat16::<f16, f32, 4>::default());
                 }
@@ -112,17 +113,16 @@ fn stack_blur_worker_vertical(
     thread: usize,
     thread_count: usize,
 ) {
-    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-    let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
-    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-    let _is_f16c_available = std::arch::is_x86_feature_detected!("f16c");
     match channels {
         FastBlurChannels::Plane => {
             let mut _executor: Box<dyn StackBlurWorkingPass<f16, 1>> =
                 Box::new(VerticalStackBlurPass::<f16, f32, f32, 1>::default());
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
-                if _is_sse_available {
+                #[cfg(feature = "sse")]
+                if std::arch::is_x86_feature_detected!("sse4.1")
+                    && std::arch::is_x86_feature_detected!("f16c")
+                {
                     _executor = Box::new(VerticalSseStackBlurPassFloat16::<f16, f32, 1>::default());
                 }
             }
@@ -137,7 +137,10 @@ fn stack_blur_worker_vertical(
                 Box::new(VerticalStackBlurPass::<f16, f32, f32, 3>::default());
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
-                if _is_sse_available {
+                #[cfg(feature = "sse")]
+                if std::arch::is_x86_feature_detected!("sse4.1")
+                    && std::arch::is_x86_feature_detected!("f16c")
+                {
                     _executor = Box::new(VerticalSseStackBlurPassFloat16::<f16, f32, 3>::default());
                 }
             }
@@ -152,7 +155,10 @@ fn stack_blur_worker_vertical(
                 Box::new(VerticalStackBlurPass::<f16, f32, f32, 4>::default());
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
-                if _is_sse_available {
+                #[cfg(feature = "sse")]
+                if std::arch::is_x86_feature_detected!("sse4.1")
+                    && std::arch::is_x86_feature_detected!("f16c")
+                {
                     _executor = Box::new(VerticalSseStackBlurPassFloat16::<f16, f32, 4>::default());
                 }
             }

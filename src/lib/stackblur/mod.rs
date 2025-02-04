@@ -31,7 +31,7 @@ mod horizontal;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 mod neon;
 mod sliding_window;
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 pub(crate) mod sse;
 pub mod stack_blur;
 pub mod stack_blur_f16;

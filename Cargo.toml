@@ -14,7 +14,7 @@ path = "src/main.rs"
 colorutils-rs = "0.7.0"
 half = "2.4.1"
 image = "0.25.5"
-libblur = {path = "src/lib", features = ["image", "fft"]}
+libblur = {path = "src/lib", features = ["image", "fft"], default-features = false}
 rayon = "1.10.0"
 
 [dev-dependencies]
