@@ -257,6 +257,12 @@ fast_bilateral_filter(
 );
 ```
 
+### Common speed chain
+
+This is arbitrary example for blurring speed for all methods in descending order. 
+
+stack_blur -> fast_gaussian -> fast_gaussian_next -> box_blur -> fast_gaussian_superior -> tent_blur -> gaussian_box_blur -> gaussian_blur -> bilateral -> median
+
 This project is licensed under either of
 
 - BSD-3-Clause License (see [LICENSE](LICENSE.md))
