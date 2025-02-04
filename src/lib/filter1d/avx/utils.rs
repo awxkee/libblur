@@ -58,7 +58,7 @@ pub(crate) unsafe fn _mm256_mul_epi8_by_ps_x4(
     )
 }
 
-#[inline]
+#[inline(always)]
 pub(crate) unsafe fn _mm256_mul_epi8_by_epi16_x4(
     input: __m256i,
     weight: __m256i,
@@ -75,7 +75,7 @@ pub(crate) unsafe fn _mm256_mul_epi8_by_epi16_x4(
     )
 }
 
-#[inline]
+#[inline(always)]
 pub(crate) unsafe fn _mm256_mul_add_epi8_by_epi16_x4(
     accumulator: (__m256i, __m256i),
     input: __m256i,
@@ -92,7 +92,7 @@ pub(crate) unsafe fn _mm256_mul_add_epi8_by_epi16_x4(
     )
 }
 
-#[inline]
+#[inline(always)]
 pub(crate) unsafe fn _mm256_mul_add_symm_epi8_by_epi16_x4(
     accumulator: (__m256i, __m256i),
     input0: __m256i,
@@ -202,7 +202,7 @@ pub(crate) unsafe fn _mm256_pack_ps_x4_epi8(store: (__m256, __m256, __m256, __m2
     _mm256_packus_four_epi32(v0, v1, v2, v3)
 }
 
-#[inline]
+#[inline(always)]
 pub(crate) unsafe fn _mm256_pack_epi32_x4_epi8(store: (__m256i, __m256i)) -> __m256i {
     let rounding_const = _mm256_set1_epi16(1 << 5);
     _mm256_pack_u16(
