@@ -107,7 +107,7 @@ Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded
 
 |         | time(NEON) | time(SSE) |
 |---------|:----------:|:---------:|
-| libblur |   5.76ms   |  5.75ms   |
+| libblur |   5.58ms   |  5.75ms   |
 | OpenCV  |   8.00ms   |  8.55ms   |
 
 ### Fast gaussian
