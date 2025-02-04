@@ -301,10 +301,6 @@ unsafe fn box_blur_horizontal_pass_impl<T, const CHANNELS: usize>(
 
             let px = x as usize * CHANNELS;
 
-            if CHANNELS == 3 {
-                store = _mm_insert_epi32::<3>(store, 0);
-            }
-
             let scale_store = unsafe { _mm_mul_ps_epi32(store, v_weight) };
 
             let bytes_offset = y_dst_shift + px;
