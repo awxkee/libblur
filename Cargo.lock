@@ -623,10 +623,9 @@ checksum = "03087c2bad5e1034e8cace5926dec053fb3790248370865f5117a7d0213354c8"
 
 [[package]]
 name = "libblur"
-version = "0.14.10"
+version = "0.15.0"
 dependencies = [
  "colorutils-rs",
- "erydanos",
  "fast_transpose",
  "half",
  "image",
