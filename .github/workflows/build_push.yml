@@ -103,7 +103,7 @@ jobs:
     name: Fuzzing Stack Blur
     strategy:
       matrix:
-        features: [ sse, avx ]
+        feature: [ sse, avx ]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
