@@ -56,7 +56,8 @@ use crate::gaussian::gaussian_util::get_kernel_size;
 /// * `precise_level` - Gaussian precise level
 ///
 /// # Panics
-/// Panic is stride/width/height/channel configuration do not match provided
+/// Panic is stride/width/height/channel configuration do not match provided.
+/// Panics if sigma = 0.8 and kernel size = 0.
 #[allow(clippy::too_many_arguments)]
 pub fn gaussian_blur(
     src: &[u8],
@@ -142,7 +143,8 @@ pub fn gaussian_blur(
 /// * `threading_policy` - Threading policy according to *ThreadingPolicy*
 ///
 /// # Panics
-/// Panic is stride/width/height/channel configuration do not match provided
+/// Panic is stride/width/height/channel configuration do not match provided.
+/// Panics if sigma = 0.8 and kernel size = 0.
 pub fn gaussian_blur_u16(
     src: &[u16],
     dst: &mut [u16],
@@ -204,7 +206,8 @@ pub fn gaussian_blur_u16(
 /// * `threading_policy` - Threading policy according to *ThreadingPolicy*
 ///
 /// # Panics
-/// Panic is stride/width/height/channel configuration do not match provided
+/// Panic is stride/width/height/channel configuration do not match provided.
+/// Panics if sigma = 0.8 and kernel size = 0.
 #[allow(clippy::too_many_arguments)]
 pub fn gaussian_blur_f32(
     src: &[f32],
@@ -268,6 +271,7 @@ pub fn gaussian_blur_f32(
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
+/// Panics if sigma = 0.8 and kernel size = 0.
 pub fn gaussian_blur_f16(
     src: &[f16],
     dst: &mut [f16],
