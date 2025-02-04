@@ -39,6 +39,7 @@ pub fn get_sigma_size(kernel_size: usize) -> f32 {
 
 /// Computes kernel size from sigma
 pub fn get_kernel_size(sigma: f32) -> u32 {
+    assert_ne!(sigma, 0.8f32);
     let possible_size = (((((sigma - 0.8f32) / 0.3f32) + 1f32) * 2f32) + 1f32).max(3f32) as u32;
     if possible_size % 2 == 0 {
         return possible_size + 1;
