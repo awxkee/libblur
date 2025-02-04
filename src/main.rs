@@ -163,7 +163,7 @@ fn main() {
     //     vst1q_s64(t.as_mut_ptr(), mul);
     //     println!("{:?}", t);
     // }
-    let dyn_image = ImageReader::open("assets/test_image_1_small.jpg")
+    let dyn_image = ImageReader::open("assets/test_image_2.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -219,15 +219,15 @@ fn main() {
     // // bytes = dst_bytes;
 
     let start_time = Instant::now();
-    // libblur::stack_blur(
-    //     &mut dst_bytes,
-    //     stride as u32,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     75,
-    //     FastBlurChannels::Channels3,
-    //     ThreadingPolicy::Single,
-    // );
+    libblur::stack_blur(
+        &mut dst_bytes,
+        stride as u32,
+        dimensions.0,
+        dimensions.1,
+        15,
+        FastBlurChannels::Channels3,
+        ThreadingPolicy::Single,
+    );
     // libblur::fast_gaussian_next(
     //     &mut dst_bytes,
     //     stride as u32,
@@ -262,18 +262,18 @@ fn main() {
 
     let start = Instant::now();
 
-    libblur::gaussian_blur(
-        &bytes,
-        &mut dst_bytes,
-        dimensions.0,
-        dimensions.1,
-        0,
-        16f32,
-        FastBlurChannels::Channels3,
-        EdgeMode::Clamp,
-        ThreadingPolicy::Single,
-        GaussianPreciseLevel::INTEGRAL,
-    );
+    // libblur::gaussian_blur(
+    //     &bytes,
+    //     &mut dst_bytes,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     0,
+    //     16f32,
+    //     FastBlurChannels::Channels3,
+    //     EdgeMode::Clamp,
+    //     ThreadingPolicy::Single,
+    //     GaussianPreciseLevel::EXACT,
+    // );
 
     // libblur::gaussian_box_blur(
     //     &bytes,

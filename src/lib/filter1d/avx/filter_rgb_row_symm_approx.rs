@@ -93,12 +93,12 @@ unsafe fn filter_rgb_row_avx_symm_u8_i32_approx_impl(
     let y = filter_region.start;
     let local_src = src;
 
-    let mut _cx = 0usize;
+    let mut cx = 0usize;
 
-    while _cx + 32 < width {
+    while cx + 32 < width {
         let coeff = _mm256_set1_epi16(scanned_kernel.get_unchecked(half_len).weight as i16);
 
-        let shifted_src = local_src.get_unchecked((_cx * N)..);
+        let shifted_src = local_src.get_unchecked((cx * N)..);
 
         let source =
             _mm256_load_deinterleave_rgb(shifted_src.get_unchecked((half_len * N)..).as_ptr());
@@ -118,7 +118,7 @@ unsafe fn filter_rgb_row_avx_symm_u8_i32_approx_impl(
             k2 = _mm256_mul_add_symm_epi8_by_epi16_x4(k2, v_source0.2, v_source1.2, coeff);
         }
 
-        let dst_offset = y * dst_stride + _cx * N;
+        let dst_offset = y * dst_stride + cx * N;
         let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
         _mm256_store_interleave_rgb(
             dst_ptr0,
@@ -128,13 +128,13 @@ unsafe fn filter_rgb_row_avx_symm_u8_i32_approx_impl(
                 _mm256_pack_epi32_x4_epi8(k2),
             ),
         );
-        _cx += 32;
+        cx += 32;
     }
 
-    while _cx + 16 < width {
+    while cx + 16 < width {
         let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(half_len).weight as i16);
 
-        let shifted_src = local_src.get_unchecked((_cx * N)..);
+        let shifted_src = local_src.get_unchecked((cx * N)..);
 
         let source =
             _mm_load_deinterleave_rgb(shifted_src.get_unchecked((half_len * N)..).as_ptr());
@@ -154,7 +154,7 @@ unsafe fn filter_rgb_row_avx_symm_u8_i32_approx_impl(
             k2 = _mm_mul_add_symm_epi8_by_epi16_x4(k2, v_source0.2, v_source1.2, coeff);
         }
 
-        let dst_offset = y * dst_stride + _cx * N;
+        let dst_offset = y * dst_stride + cx * N;
         let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
         _mm_store_interleave_rgb(
             dst_ptr0,
@@ -164,16 +164,17 @@ unsafe fn filter_rgb_row_avx_symm_u8_i32_approx_impl(
                 _mm_pack_epi32_x2_epi8(k2),
             ),
         );
-        _cx += 16;
+        cx += 16;
     }
 
-    while _cx + 8 < width {
+    while cx + 8 < width {
         let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(half_len).weight as i16);
 
-        let shifted_src = local_src.get_unchecked((_cx * N)..);
+        let shifted_src = local_src.get_unchecked((cx * N)..);
 
         let source =
             _mm_load_deinterleave_rgb_half(shifted_src.get_unchecked((half_len * N)..).as_ptr());
+
         let mut k0 = _mm_mul_epi8_by_epi16_x2(source.0, coeff);
         let mut k1 = _mm_mul_epi8_by_epi16_x2(source.1, coeff);
         let mut k2 = _mm_mul_epi8_by_epi16_x2(source.2, coeff);
@@ -191,7 +192,7 @@ unsafe fn filter_rgb_row_avx_symm_u8_i32_approx_impl(
             k2 = _mm_mul_add_symm_epi8_by_epi16_x2(k2, v_source0.2, v_source1.2, coeff);
         }
 
-        let dst_offset = y * dst_stride + _cx * N;
+        let dst_offset = y * dst_stride + cx * N;
         let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
         _mm_store_interleave_rgb_half(
             dst_ptr0,
@@ -201,13 +202,13 @@ unsafe fn filter_rgb_row_avx_symm_u8_i32_approx_impl(
                 _mm_pack_epi32_epi8(k2),
             ),
         );
-        _cx += 8;
+        cx += 8;
     }
 
-    while _cx + 4 < width {
+    while cx + 4 < width {
         let coeff = *scanned_kernel.get_unchecked(half_len);
 
-        let shifted_src = local_src.get_unchecked((_cx * N)..);
+        let shifted_src = local_src.get_unchecked((cx * N)..);
 
         let mut k0 = ColorGroup::<N, i32>::from_slice(shifted_src, half_len * N).mul(coeff.weight);
         let mut k1 =
@@ -247,16 +248,16 @@ unsafe fn filter_rgb_row_avx_symm_u8_i32_approx_impl(
                 .add(k3);
         }
 
-        let dst_offset = y * dst_stride + _cx * N;
+        let dst_offset = y * dst_stride + cx * N;
 
         k0.to_approx_store(dst, dst_offset);
         k1.to_approx_store(dst, dst_offset + N);
         k2.to_approx_store(dst, dst_offset + N * 2);
         k3.to_approx_store(dst, dst_offset + N * 3);
-        _cx += 4;
+        cx += 4;
     }
 
-    for x in _cx..width {
+    for x in cx..width {
         let coeff = *scanned_kernel.get_unchecked(half_len);
         let shifted_src = local_src.get_unchecked((x * N)..);
         let mut k0 = ColorGroup::<N, i32>::from_slice(shifted_src, half_len * N).mul(coeff.weight);

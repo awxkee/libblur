@@ -86,9 +86,11 @@ pub(crate) unsafe fn _mm256_mul_add_epi8_by_epi16_x4(
     let lo_16 = _mm256_slli_epi16::<6>(j0);
     let hi_16 = _mm256_slli_epi16::<6>(j1);
 
+    let vj0 = _mm256_mulhrs_epi16(lo_16, weight);
+    let vj1 = _mm256_mulhrs_epi16(hi_16, weight);
     (
-        _mm256_add_epi16(accumulator.0, _mm256_mulhrs_epi16(lo_16, weight)),
-        _mm256_add_epi16(accumulator.1, _mm256_mulhrs_epi16(hi_16, weight)),
+        _mm256_add_epi16(accumulator.0, vj0),
+        _mm256_add_epi16(accumulator.1, vj1),
     )
 }
 
@@ -107,9 +109,12 @@ pub(crate) unsafe fn _mm256_mul_add_symm_epi8_by_epi16_x4(
     let lo_16 = _mm256_slli_epi16::<6>(_mm256_add_epi16(a0, a1));
     let hi_16 = _mm256_slli_epi16::<6>(_mm256_add_epi16(a2, a3));
 
+    let vj0 = _mm256_mulhrs_epi16(lo_16, weight);
+    let vj1 = _mm256_mulhrs_epi16(hi_16, weight);
+
     (
-        _mm256_add_epi16(accumulator.0, _mm256_mulhrs_epi16(lo_16, weight)),
-        _mm256_add_epi16(accumulator.1, _mm256_mulhrs_epi16(hi_16, weight)),
+        _mm256_add_epi16(accumulator.0, vj0),
+        _mm256_add_epi16(accumulator.1, vj1),
     )
 }
 

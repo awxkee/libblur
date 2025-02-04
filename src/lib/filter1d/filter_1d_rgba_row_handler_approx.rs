@@ -29,7 +29,7 @@
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::cpu_features::is_aarch_rdm_supported;
 use crate::filter1d::arena::Arena;
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]
 use crate::filter1d::avx::{filter_rgba_row_avx_symm_u8_i32_app, filter_rgba_row_avx_u8_i32_app};
 use crate::filter1d::filter_row_cg_approx::filter_color_group_row_approx;
 use crate::filter1d::filter_row_cg_approx_symmetric::filter_color_group_row_symmetric_approx;
@@ -114,6 +114,7 @@ impl Filter1DRgbaRowHandlerApprox<u8, i32> for u8 {
     fn get_rgba_row_handler(
         is_kernel_symmetric: bool,
     ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<i32>]) {
+        #[cfg(feature = "avx")]
         if std::arch::is_x86_feature_detected!("avx2") {
             if is_kernel_symmetric {
                 return filter_rgba_row_avx_symm_u8_i32_app;

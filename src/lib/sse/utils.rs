@@ -26,7 +26,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use half::f16;
-use std::arch::asm;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -56,47 +55,17 @@ pub(crate) unsafe fn load_f32<const CHANNELS_COUNT: usize>(ptr: *const f32) -> _
 
 #[inline(always)]
 pub(crate) unsafe fn load_u8_s32_fast<const CHANNELS_COUNT: usize>(ptr: *const u8) -> __m128i {
-    // LLVM generates a little trash code until opt-level is 3 so better here is to use assembly
+    let sh1 = _mm_setr_epi8(0, -1, -1, -1, 1, -1, -1, -1, 2, -1, -1, -1, 3, -1, -1, -1);
     if CHANNELS_COUNT == 4 {
-        let mut regi: __m128i;
-        // It is preferred to allow LLVM re-use zeroed register
-        let zeros = _mm_setzero_si128();
-        asm!("\
-           movd {1}, dword ptr [{0}]
-           punpcklbw {1}, {2}
-           punpcklwd {1}, {2}
-    \
-    ",
-        in(reg) ptr,
-        out(xmm_reg) regi,
-        in(xmm_reg) zeros);
-        regi
+        let v = _mm_loadu_si32(ptr);
+        _mm_shuffle_epi8(v, sh1)
     } else if CHANNELS_COUNT == 3 {
-        let mut regi: __m128i;
-        // It is preferred to allow LLVM re-use zeroed register
-        let zeros = _mm_setzero_si128();
-        asm!("\
-            movzx   {t1}, byte ptr [{0}]
-            movzx   {t2}, word ptr [{0} + 1]
-            shl {t2}, 8
-            or {t1}, {t2}
-            movd    {1}, {t1}
-            punpcklbw {1}, {2}
-            punpcklwd {1}, {2}
-    \
-    ",
-        in(reg) ptr,
-        out(xmm_reg) regi,
-        in(xmm_reg) zeros,
-        t1 = out(reg) _, t2 = out(reg) _);
-        regi
+        let mut v0 = _mm_loadu_si16(ptr);
+        v0 = _mm_insert_epi8::<2>(v0, ptr.add(2).read_unaligned() as i32);
+        _mm_shuffle_epi8(v0, sh1)
     } else if CHANNELS_COUNT == 2 {
-        _mm_setr_epi32(
-            ptr.read_unaligned() as i32,
-            ptr.add(1).read_unaligned() as i32,
-            0,
-            0,
-        )
+        let v0 = _mm_loadu_si16(ptr);
+        _mm_shuffle_epi8(v0, sh1)
     } else {
         _mm_setr_epi32(ptr.read_unaligned() as i32, 0, 0, 0)
     }
