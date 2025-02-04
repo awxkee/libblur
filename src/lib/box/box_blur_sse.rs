@@ -93,15 +93,13 @@ unsafe fn box_blur_horizontal_pass_impl<T, const CHANNELS: usize>(
 
         unsafe {
             let s_ptr_0 = src.as_ptr().add(y_src_shift);
-            let edge_colors_0 = load_u8_s32_fast::<CHANNELS>(s_ptr_0);
-
             let s_ptr_1 = src.as_ptr().add(y_src_shift + src_stride as usize);
-            let edge_colors_1 = load_u8_s32_fast::<CHANNELS>(s_ptr_1);
-
             let s_ptr_2 = src.as_ptr().add(y_src_shift + src_stride as usize * 2);
-            let edge_colors_2 = load_u8_s32_fast::<CHANNELS>(s_ptr_2);
-
             let s_ptr_3 = src.as_ptr().add(y_src_shift + src_stride as usize * 3);
+
+            let edge_colors_0 = load_u8_s32_fast::<CHANNELS>(s_ptr_0);
+            let edge_colors_1 = load_u8_s32_fast::<CHANNELS>(s_ptr_1);
+            let edge_colors_2 = load_u8_s32_fast::<CHANNELS>(s_ptr_2);
             let edge_colors_3 = load_u8_s32_fast::<CHANNELS>(s_ptr_3);
 
             store_0 = _mm_madd_epi16(edge_colors_0, v_edge_count);
@@ -115,15 +113,13 @@ unsafe fn box_blur_horizontal_pass_impl<T, const CHANNELS: usize>(
                 let px = x as usize * CHANNELS;
 
                 let s_ptr_0 = src.as_ptr().add(y_src_shift + px);
-                let edge_colors_0 = load_u8_s32_fast::<CHANNELS>(s_ptr_0);
-
                 let s_ptr_1 = src.as_ptr().add(y_src_shift + src_stride as usize + px);
-                let edge_colors_1 = load_u8_s32_fast::<CHANNELS>(s_ptr_1);
-
                 let s_ptr_2 = src.as_ptr().add(y_src_shift + src_stride as usize * 2 + px);
-                let edge_colors_2 = load_u8_s32_fast::<CHANNELS>(s_ptr_2);
-
                 let s_ptr_3 = src.as_ptr().add(y_src_shift + src_stride as usize * 3 + px);
+
+                let edge_colors_0 = load_u8_s32_fast::<CHANNELS>(s_ptr_0);
+                let edge_colors_1 = load_u8_s32_fast::<CHANNELS>(s_ptr_1);
+                let edge_colors_2 = load_u8_s32_fast::<CHANNELS>(s_ptr_2);
                 let edge_colors_3 = load_u8_s32_fast::<CHANNELS>(s_ptr_3);
 
                 store_0 = _mm_add_epi32(store_0, edge_colors_0);
@@ -142,21 +138,19 @@ unsafe fn box_blur_horizontal_pass_impl<T, const CHANNELS: usize>(
                 let previous = previous_x * CHANNELS;
 
                 let s_ptr_0 = src.as_ptr().add(y_src_shift + previous);
-                let edge_colors_0 = load_u8_s32_fast::<CHANNELS>(s_ptr_0);
-
                 let s_ptr_1 = src
                     .as_ptr()
                     .add(y_src_shift + src_stride as usize + previous);
-                let edge_colors_1 = load_u8_s32_fast::<CHANNELS>(s_ptr_1);
-
                 let s_ptr_2 = src
                     .as_ptr()
                     .add(y_src_shift + src_stride as usize * 2 + previous);
-                let edge_colors_2 = load_u8_s32_fast::<CHANNELS>(s_ptr_2);
-
                 let s_ptr_3 = src
                     .as_ptr()
                     .add(y_src_shift + src_stride as usize * 3 + previous);
+
+                let edge_colors_0 = load_u8_s32_fast::<CHANNELS>(s_ptr_0);
+                let edge_colors_1 = load_u8_s32_fast::<CHANNELS>(s_ptr_1);
+                let edge_colors_2 = load_u8_s32_fast::<CHANNELS>(s_ptr_2);
                 let edge_colors_3 = load_u8_s32_fast::<CHANNELS>(s_ptr_3);
 
                 store_0 = _mm_sub_epi32(store_0, edge_colors_0);
@@ -172,19 +166,17 @@ unsafe fn box_blur_horizontal_pass_impl<T, const CHANNELS: usize>(
                 let next = next_x * CHANNELS;
 
                 let s_ptr_0 = src.as_ptr().add(y_src_shift + next);
-                let edge_colors_0 = load_u8_s32_fast::<CHANNELS>(s_ptr_0);
-
                 let s_ptr_1 = src.as_ptr().add(y_src_shift + src_stride as usize + next);
-                let edge_colors_1 = load_u8_s32_fast::<CHANNELS>(s_ptr_1);
-
                 let s_ptr_2 = src
                     .as_ptr()
                     .add(y_src_shift + src_stride as usize * 2 + next);
-                let edge_colors_2 = load_u8_s32_fast::<CHANNELS>(s_ptr_2);
-
                 let s_ptr_3 = src
                     .as_ptr()
                     .add(y_src_shift + src_stride as usize * 3 + next);
+
+                let edge_colors_0 = load_u8_s32_fast::<CHANNELS>(s_ptr_0);
+                let edge_colors_1 = load_u8_s32_fast::<CHANNELS>(s_ptr_1);
+                let edge_colors_2 = load_u8_s32_fast::<CHANNELS>(s_ptr_2);
                 let edge_colors_3 = load_u8_s32_fast::<CHANNELS>(s_ptr_3);
 
                 store_0 = _mm_add_epi32(store_0, edge_colors_0);
