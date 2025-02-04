@@ -163,7 +163,7 @@ fn main() {
     //     vst1q_s64(t.as_mut_ptr(), mul);
     //     println!("{:?}", t);
     // }
-    let dyn_image = ImageReader::open("assets/test_image_2.png")
+    let dyn_image = ImageReader::open("assets/test_image_1.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -224,9 +224,9 @@ fn main() {
         stride as u32,
         dimensions.0,
         dimensions.1,
-        15,
+        150,
         FastBlurChannels::Channels3,
-        ThreadingPolicy::Single,
+        ThreadingPolicy::Adaptive,
     );
     // libblur::fast_gaussian_next(
     //     &mut dst_bytes,
@@ -259,6 +259,8 @@ fn main() {
     //     .map(|&x| f16::from_f32(x as f32 * (1. / 255.)))
     //     .collect();
     // //
+
+    println!("libblur::stack_blur: {:?}", start_time.elapsed());
 
     let start = Instant::now();
 

@@ -29,7 +29,7 @@
 
 #![no_main]
 
-use libblur::{stack_blur, stack_blur_u16, FastBlurChannels, ThreadingPolicy};
+use libblur::{stack_blur_u16, FastBlurChannels, ThreadingPolicy};
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: (u8, u8, u8)| {
