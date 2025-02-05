@@ -163,7 +163,7 @@ fn main() {
     //     vst1q_s64(t.as_mut_ptr(), mul);
     //     println!("{:?}", t);
     // }
-    let dyn_image = ImageReader::open("assets/test_image_1.jpg")
+    let dyn_image = ImageReader::open("assets/test_image_2.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -205,30 +205,30 @@ fn main() {
     // dst_bytes = spawned_bytes.iter().map(|&x| (x >> 8) as u8).collect::<Vec<_>>();
 
     // //
-    // libblur::gaussian_box_blur(
-    //     &bytes,
-    //     stride as u32,
-    //     &mut dst_bytes,
-    //     stride as u32,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     151,
-    //     FastBlurChannels::Channels3,
-    //     ThreadingPolicy::Single,
-    // );
-    // // bytes = dst_bytes;
-
-    let start_time = Instant::now();
-    libblur::fast_gaussian_next(
+    libblur::gaussian_box_blur(
+        &bytes,
+        stride as u32,
         &mut dst_bytes,
         stride as u32,
         dimensions.0,
         dimensions.1,
-        125,
+        15f32,
         FastBlurChannels::Channels3,
-        ThreadingPolicy::Adaptive,
-        EdgeMode::Clamp,
+        ThreadingPolicy::Single,
     );
+    // // bytes = dst_bytes;
+
+    let start_time = Instant::now();
+    // libblur::fast_gaussian_next(
+    //     &mut dst_bytes,
+    //     stride as u32,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     125,
+    //     FastBlurChannels::Channels3,
+    //     ThreadingPolicy::Adaptive,
+    //     EdgeMode::Clamp,
+    // );
     // libblur::fast_gaussian_next(
     //     &mut dst_bytes,
     //     stride as u32,

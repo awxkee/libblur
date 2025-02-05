@@ -193,21 +193,15 @@ pub unsafe fn load_u8_u16<const CHANNELS_COUNT: usize>(ptr: *const u8) -> uint16
             vdup_n_u32(0),
         ))))
     } else if CHANNELS_COUNT == 3 {
-        let u_first = u16::from_le_bytes([ptr.read_unaligned(), 0]);
-        let u_second = u16::from_le_bytes([ptr.add(1).read_unaligned(), 0]);
-        let u_third = u16::from_le_bytes([ptr.add(2).read_unaligned(), 0]);
-        let u_fourth = 0;
-        let store: [u16; 4] = [u_first, u_second, u_third, u_fourth];
-        vld1_u16(store.as_ptr())
+        let a0 = vreinterpret_u8_u16(vld1_lane_u16::<0>(ptr as *const _, vdup_n_u16(0)));
+        let a1 = vld1_lane_u8::<2>(ptr.add(2) as *const _, a0);
+        vget_low_u16(vmovl_u8(a1))
     } else if CHANNELS_COUNT == 2 {
-        vget_low_u16(vmovl_u8(vreinterpret_u8_u16(vld1_lane_u16::<0>(
-            ptr as *mut u16,
-            vdup_n_u16(0),
-        ))))
+        let a0 = vreinterpret_u8_u16(vld1_lane_u16::<0>(ptr as *const _, vdup_n_u16(0)));
+        vget_low_u16(vmovl_u8(a0))
     } else {
-        let u_first = u16::from_le_bytes([ptr.read_unaligned(), 0]);
-        let store: [u16; 4] = [u_first, 0, 0, 0];
-        vld1_u16(store.as_ptr())
+        let a0 = vld1_lane_u8::<0>(ptr as *const _, vdup_n_u8(0));
+        vget_low_u16(vmovl_u8(a0))
     }
 }
 
