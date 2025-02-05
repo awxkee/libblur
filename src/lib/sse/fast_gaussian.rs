@@ -108,7 +108,7 @@ unsafe fn fast_gaussian_horizontal_pass_sse_u8_impl<T, const CN: usize>(
         let start_x = 0 - 2 * radius_64;
         for x in start_x..(width as i64) {
             if x >= 0 {
-                let current_px = ((std::cmp::max(x, 0) as u32) * CN as u32) as usize;
+                let current_px = (x as u32 * CN as u32) as usize;
 
                 let ss0 = _mm_cvtepi32_ps(summs0);
                 let ss1 = _mm_cvtepi32_ps(summs1);
@@ -251,7 +251,7 @@ unsafe fn fast_gaussian_horizontal_pass_sse_u8_impl<T, const CN: usize>(
         let start_x = 0 - 2 * radius_64;
         for x in start_x..(width as i64) {
             if x >= 0 {
-                let current_px = ((std::cmp::max(x, 0) as u32) * CN as u32) as usize;
+                let current_px = (x as u32 * CN as u32) as usize;
 
                 let pixel_f32 =
                     _mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(_mm_cvtepi32_ps(summs), v_weight));
@@ -364,14 +364,12 @@ unsafe fn fast_gaussian_vertical_pass_sse_u8_impl<T, const CN: usize>(
 
         let start_y = 0 - 2 * radius as i64;
 
-        let current_px0 = (xx.max(0) * CN as u32) as usize;
-        let current_px1 = ((xx + 1).max(0) * CN as u32) as usize;
-        let current_px2 = ((xx + 2).max(0) * CN as u32) as usize;
-        let current_px3 = ((xx + 3).max(0) * CN as u32) as usize;
+        let current_px0 = (xx * CN as u32) as usize;
+        let current_px1 = ((xx + 1) * CN as u32) as usize;
+        let current_px2 = ((xx + 2) * CN as u32) as usize;
+        let current_px3 = ((xx + 3) * CN as u32) as usize;
 
         for y in start_y..height_wide {
-            let current_y = (y * (stride as i64)) as usize;
-
             if y >= 0 {
                 let ss0 = _mm_cvtepi32_ps(summs0);
                 let ss1 = _mm_cvtepi32_ps(summs1);
@@ -392,6 +390,8 @@ unsafe fn fast_gaussian_vertical_pass_sse_u8_impl<T, const CN: usize>(
                 let prepared_px1 = _mm_cvtps_epi32(rs1);
                 let prepared_px2 = _mm_cvtps_epi32(rs2);
                 let prepared_px3 = _mm_cvtps_epi32(rs3);
+
+                let current_y = (y * (stride as i64)) as usize;
 
                 let dst_ptr0 = (bytes.slice.as_ptr() as *mut u8).add(current_y + current_px0);
                 let dst_ptr1 = (bytes.slice.as_ptr() as *mut u8).add(current_y + current_px1);
@@ -512,13 +512,13 @@ unsafe fn fast_gaussian_vertical_pass_sse_u8_impl<T, const CN: usize>(
 
         let start_y = 0 - 2 * radius as i64;
         for y in start_y..height_wide {
-            let current_y = (y * (stride as i64)) as usize;
-
             if y >= 0 {
                 let current_px = ((std::cmp::max(x, 0)) * CN as u32) as usize;
 
                 let pixel_f32 =
                     _mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(_mm_cvtepi32_ps(summs), v_weight));
+
+                let current_y = (y * (stride as i64)) as usize;
 
                 let pixel_u32 = _mm_cvtps_epi32(pixel_f32);
 

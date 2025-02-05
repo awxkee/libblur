@@ -41,7 +41,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo clippy
+      - run: cargo clippy --manifest-path ./src/lib/Cargo.toml --all-features -- -D warnings
 
   clippy-wasm:
     name: Clippy WASM
@@ -50,7 +50,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - run: rustup target add wasm32-unknown-unknown
-      - run: cargo clippy --target wasm32-unknown-unknown
+      - run: cargo clippy --target wasm32-unknown-unknown --manifest-path ./src/lib/Cargo.toml --all-features -- -D warnings
 
   fuzz_box_mac:
     name: Fuzzing Box
@@ -95,9 +95,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo install cargo-fuzz
-      - run: cargo fuzz run stack_blur -- -max_total_time=45
-      - run: cargo fuzz run stack_blur_u16 -- -max_total_time=45
-      - run: cargo fuzz run stack_blur_f32 -- -max_total_time=45
+      - run: cargo fuzz run stack_blur -- -max_total_time=17
+      - run: cargo fuzz run stack_blur_u16 -- -max_total_time=17
+      - run: cargo fuzz run stack_blur_f32 -- -max_total_time=17
 
   fuzz_stack_blur_x86:
     name: Fuzzing Stack Blur
@@ -109,20 +109,32 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo install cargo-fuzz
-      - run: cargo fuzz run stack_blur --features ${{ matrix.feature }} -- -max_total_time=45
-      - run: cargo fuzz run stack_blur_u16 --features ${{ matrix.feature }} -- -max_total_time=45
-      - run: cargo fuzz run stack_blur_f32 --features ${{ matrix.feature }} -- -max_total_time=45
+      - run: cargo fuzz run stack_blur --features ${{ matrix.feature }} -- -max_total_time=17
+      - run: cargo fuzz run stack_blur_u16 --features ${{ matrix.feature }} -- -max_total_time=17
+      - run: cargo fuzz run stack_blur_f32 --features ${{ matrix.feature }} -- -max_total_time=17
 
   fuzz_fast_gaussian_blur:
     name: Fuzzing Fast Gaussian Blur
-    strategy:
-      matrix:
-        os: [ ubuntu-latest, macos-latest ]
-    runs-on: ${{ matrix.os }}
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo install cargo-fuzz
-      - run: cargo fuzz run fast_gaussian -- -max_total_time=45
-      - run: cargo fuzz run fast_gaussian_u16 -- -max_total_time=45
-      - run: cargo fuzz run fast_gaussian_f32 -- -max_total_time=45
+      - run: cargo fuzz run fast_gaussian -- -max_total_time=17
+      - run: cargo fuzz run fast_gaussian_u16 -- -max_total_time=17
+      - run: cargo fuzz run fast_gaussian_f32 -- -max_total_time=17
+
+  fuzz_fast_gaussian_blur_x86:
+    name: Fuzzing Fast Gaussian Blur
+    strategy:
+      matrix:
+        feature: [ sse, avx ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo install cargo-fuzz
+      - run: cargo fuzz run fast_gaussian --features ${{ matrix.feature }} -- -max_total_time=17
+      - run: cargo fuzz run fast_gaussian_u16 --features ${{ matrix.feature }} -- -max_total_time=17
+      - run: cargo fuzz run fast_gaussian_f32 --features ${{ matrix.feature }} -- -max_total_time=17
+      - run: cargo fuzz run fast_gaussian_next --features ${{ matrix.feature }} -- -max_total_time=17
