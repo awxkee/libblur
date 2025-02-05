@@ -73,12 +73,9 @@ jobs:
       - run: cargo install cargo-fuzz
       - run: cargo fuzz run box --features ${{ matrix.feature }} -- -max_total_time=45
 
-  fuzz_gauss:
+  fuzz_gauss_arm:
     name: Fuzzing Gauss
-    strategy:
-      matrix:
-        os: [ ubuntu-latest, macos-latest ]
-    runs-on: ${{ matrix.os }}
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
@@ -87,6 +84,21 @@ jobs:
       - run: cargo fuzz run gauss -- -max_total_time=45
       - run: cargo fuzz run gauss_u16 -- -max_total_time=45
       - run: cargo fuzz run gauss_f32 -- -max_total_time=45
+
+  fuzz_gauss_x86:
+    name: Fuzzing Gauss x86
+    strategy:
+      matrix:
+        feature: [ sse, avx ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo install cargo-fuzz
+      - run: cargo fuzz run gauss --features ${{ matrix.feature }} -- -max_total_time=45
+      - run: cargo fuzz run gauss --features ${{ matrix.feature }} -- -max_total_time=45
+      - run: cargo fuzz run gauss_u16 --features ${{ matrix.feature }} -- -max_total_time=45
+      - run: cargo fuzz run gauss_f32 --features ${{ matrix.feature }} -- -max_total_time=45
 
   fuzz_stack_blur:
     name: Fuzzing Stack Blur

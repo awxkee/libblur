@@ -27,7 +27,7 @@
 
 use std::arch::aarch64::*;
 
-use crate::neon::{load_u8_u16, load_u8_u32_fast, store_u8_u32, vmulq_u32_f32};
+use crate::neon::{load_u8_u16, store_u8_u32, vmulq_u32_f32};
 use crate::unsafe_slice::UnsafeSlice;
 
 pub(crate) fn box_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usize>(
@@ -45,7 +45,7 @@ pub(crate) fn box_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usiz
 
     let kernel_size = radius * 2 + 1;
     let edge_count = (kernel_size / 2) + 1;
-    let v_edge_count = unsafe { vdupq_n_u32(edge_count) };
+    let v_edge_count = unsafe { vdupq_n_u16(edge_count as u16) };
 
     let v_weight = unsafe { vdupq_n_f32(1f32 / (radius * 2) as f32) };
 
@@ -65,21 +65,21 @@ pub(crate) fn box_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usiz
 
         unsafe {
             let s_ptr_0 = src.as_ptr().add(y_src_shift);
-            let edge_colors_0 = load_u8_u32_fast::<CHANNEL_CONFIGURATION>(s_ptr_0);
+            let edge_colors_0 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_0);
 
             let s_ptr_1 = src.as_ptr().add(y_src_shift + src_stride as usize);
-            let edge_colors_1 = load_u8_u32_fast::<CHANNEL_CONFIGURATION>(s_ptr_1);
+            let edge_colors_1 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_1);
 
             let s_ptr_2 = src.as_ptr().add(y_src_shift + src_stride as usize * 2);
-            let edge_colors_2 = load_u8_u32_fast::<CHANNEL_CONFIGURATION>(s_ptr_2);
+            let edge_colors_2 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_2);
 
             let s_ptr_3 = src.as_ptr().add(y_src_shift + src_stride as usize * 3);
-            let edge_colors_3 = load_u8_u32_fast::<CHANNEL_CONFIGURATION>(s_ptr_3);
+            let edge_colors_3 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_3);
 
-            store_0 = vmulq_u32(edge_colors_0, v_edge_count);
-            store_1 = vmulq_u32(edge_colors_1, v_edge_count);
-            store_2 = vmulq_u32(edge_colors_2, v_edge_count);
-            store_3 = vmulq_u32(edge_colors_3, v_edge_count);
+            store_0 = vmull_u16(edge_colors_0, vget_low_u16(v_edge_count));
+            store_1 = vmull_u16(edge_colors_1, vget_low_u16(v_edge_count));
+            store_2 = vmull_u16(edge_colors_2, vget_low_u16(v_edge_count));
+            store_3 = vmull_u16(edge_colors_3, vget_low_u16(v_edge_count));
         }
 
         unsafe {
@@ -229,8 +229,8 @@ pub(crate) fn box_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usiz
         let mut store: uint32x4_t;
         unsafe {
             let s_ptr = src.as_ptr().add(y_src_shift);
-            let edge_colors = load_u8_u32_fast::<CHANNEL_CONFIGURATION>(s_ptr);
-            store = vmulq_u32(edge_colors, v_edge_count);
+            let edge_colors = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr);
+            store = vmull_u16(edge_colors, vget_low_u16(v_edge_count));
         }
 
         unsafe {
@@ -294,7 +294,7 @@ pub(crate) fn box_blur_vertical_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
 
     let kernel_size = radius * 2 + 1;
     let edge_count = (kernel_size / 2) + 1;
-    let v_edge_count = unsafe { vdupq_n_u32(edge_count) };
+    let v_edge_count = unsafe { vdupq_n_u16(edge_count as u16) };
 
     let half_kernel = kernel_size / 2;
 
@@ -304,6 +304,194 @@ pub(crate) fn box_blur_vertical_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
     let v_weight = unsafe { vdupq_n_f32(1f32 / (radius * 2) as f32) };
 
     let mut cx = start_x;
+
+    while cx + 32 < end_x {
+        let px = cx;
+
+        let mut store_0: uint32x4_t;
+        let mut store_1: uint32x4_t;
+        let mut store_2: uint32x4_t;
+        let mut store_3: uint32x4_t;
+        let mut store_4: uint32x4_t;
+        let mut store_5: uint32x4_t;
+        let mut store_6: uint32x4_t;
+        let mut store_7: uint32x4_t;
+
+        unsafe {
+            let s_ptr = src.as_ptr().add(px);
+            let edge0 = vld1q_u8(s_ptr);
+            let edge1 = vld1q_u8(s_ptr.add(16));
+
+            let lo0 = vmovl_u8(vget_low_u8(edge0));
+            let hi0 = vmovl_high_u8(edge0);
+            let lo1 = vmovl_u8(vget_low_u8(edge1));
+            let hi1 = vmovl_high_u8(edge1);
+
+            let i16_l0 = vget_low_u16(lo0);
+            let i16_h0 = lo0;
+            let i16_l1 = vget_low_u16(hi0);
+            let i16_h1 = hi0;
+
+            let i16_l01 = vget_low_u16(lo1);
+            let i16_h01 = lo1;
+            let i16_l11 = vget_low_u16(hi1);
+            let i16_h11 = hi1;
+
+            store_0 = vmull_u16(i16_l0, vget_low_u16(v_edge_count));
+            store_1 = vmull_high_u16(i16_h0, v_edge_count);
+
+            store_2 = vmull_u16(i16_l1, vget_low_u16(v_edge_count));
+            store_3 = vmull_high_u16(i16_h1, v_edge_count);
+
+            store_4 = vmull_u16(i16_l01, vget_low_u16(v_edge_count));
+            store_5 = vmull_high_u16(i16_h01, v_edge_count);
+
+            store_6 = vmull_u16(i16_l11, vget_low_u16(v_edge_count));
+            store_7 = vmull_high_u16(i16_h11, v_edge_count);
+        }
+
+        unsafe {
+            for y in 1..std::cmp::min(half_kernel, height) {
+                let y_src_shift = y as usize * src_stride as usize;
+                let s_ptr = src.as_ptr().add(y_src_shift + px);
+
+                let edge0 = vld1q_u8(s_ptr);
+                let edge1 = vld1q_u8(s_ptr.add(16));
+
+                let lo0 = vmovl_u8(vget_low_u8(edge0));
+                let hi0 = vmovl_high_u8(edge0);
+                let lo1 = vmovl_u8(vget_low_u8(edge1));
+                let hi1 = vmovl_high_u8(edge1);
+
+                let i16_l0 = vget_low_u16(lo0);
+                let i16_h0 = lo0;
+                let i16_l1 = vget_low_u16(hi0);
+                let i16_h1 = hi0;
+
+                let i16_l01 = vget_low_u16(lo1);
+                let i16_h01 = lo1;
+                let i16_l11 = vget_low_u16(hi1);
+                let i16_h11 = hi1;
+
+                store_0 = vaddw_u16(store_0, i16_l0);
+                store_1 = vaddw_high_u16(store_1, i16_h0);
+                store_2 = vaddw_u16(store_2, i16_l1);
+                store_3 = vaddw_high_u16(store_3, i16_h1);
+
+                store_4 = vaddw_u16(store_4, i16_l01);
+                store_5 = vaddw_high_u16(store_5, i16_h01);
+                store_6 = vaddw_u16(store_6, i16_l11);
+                store_7 = vaddw_high_u16(store_7, i16_h11);
+            }
+        }
+
+        unsafe {
+            for y in 0..height {
+                // preload edge pixels
+                let next =
+                    std::cmp::min(y + half_kernel, height - 1) as usize * src_stride as usize;
+                let previous =
+                    std::cmp::max(y as i64 - half_kernel as i64, 0) as usize * src_stride as usize;
+                let y_dst_shift = dst_stride as usize * y as usize;
+
+                // subtract previous
+                {
+                    let s_ptr = src.as_ptr().add(previous + px);
+                    let edge0 = vld1q_u8(s_ptr);
+                    let edge1 = vld1q_u8(s_ptr.add(16));
+
+                    let lo0 = vmovl_u8(vget_low_u8(edge0));
+                    let hi0 = vmovl_high_u8(edge0);
+                    let lo1 = vmovl_u8(vget_low_u8(edge1));
+                    let hi1 = vmovl_high_u8(edge1);
+
+                    let i16_l0 = vget_low_u16(lo0);
+                    let i16_h0 = lo0;
+                    let i16_l1 = vget_low_u16(hi0);
+                    let i16_h1 = hi0;
+
+                    let i16_l01 = vget_low_u16(lo1);
+                    let i16_h01 = lo1;
+                    let i16_l11 = vget_low_u16(hi1);
+                    let i16_h11 = hi1;
+
+                    store_0 = vsubw_u16(store_0, i16_l0);
+                    store_1 = vsubw_high_u16(store_1, i16_h0);
+                    store_2 = vsubw_u16(store_2, i16_l1);
+                    store_3 = vsubw_high_u16(store_3, i16_h1);
+
+                    store_4 = vsubw_u16(store_4, i16_l01);
+                    store_5 = vsubw_high_u16(store_5, i16_h01);
+                    store_6 = vsubw_u16(store_6, i16_l11);
+                    store_7 = vsubw_high_u16(store_7, i16_h11);
+                }
+
+                // add next
+                {
+                    let s_ptr = src.as_ptr().add(next + px);
+                    let edge0 = vld1q_u8(s_ptr);
+                    let edge1 = vld1q_u8(s_ptr.add(16));
+
+                    let lo0 = vmovl_u8(vget_low_u8(edge0));
+                    let hi0 = vmovl_high_u8(edge0);
+                    let lo1 = vmovl_u8(vget_low_u8(edge1));
+                    let hi1 = vmovl_high_u8(edge1);
+
+                    let i16_l0 = vget_low_u16(lo0);
+                    let i16_h0 = lo0;
+                    let i16_l1 = vget_low_u16(hi0);
+                    let i16_h1 = hi0;
+
+                    let i16_l01 = vget_low_u16(lo1);
+                    let i16_h01 = lo1;
+                    let i16_l11 = vget_low_u16(hi1);
+                    let i16_h11 = hi1;
+
+                    store_0 = vaddw_u16(store_0, i16_l0);
+                    store_1 = vaddw_high_u16(store_1, i16_h0);
+                    store_2 = vaddw_u16(store_2, i16_l1);
+                    store_3 = vaddw_high_u16(store_3, i16_h1);
+
+                    store_4 = vaddw_u16(store_4, i16_l01);
+                    store_5 = vaddw_high_u16(store_5, i16_h01);
+                    store_6 = vaddw_u16(store_6, i16_l11);
+                    store_7 = vaddw_high_u16(store_7, i16_h11);
+                }
+
+                let px = cx;
+
+                let scale_store_0 = vmulq_u32_f32(store_0, v_weight);
+                let scale_store_1 = vmulq_u32_f32(store_1, v_weight);
+                let scale_store_2 = vmulq_u32_f32(store_2, v_weight);
+                let scale_store_3 = vmulq_u32_f32(store_3, v_weight);
+
+                let scale_store_4 = vmulq_u32_f32(store_4, v_weight);
+                let scale_store_5 = vmulq_u32_f32(store_5, v_weight);
+                let scale_store_6 = vmulq_u32_f32(store_6, v_weight);
+                let scale_store_7 = vmulq_u32_f32(store_7, v_weight);
+
+                let offset = y_dst_shift + px;
+                let ptr = unsafe_dst.slice.get_unchecked(offset).get();
+                let px_16_lo0 = vqmovn_u32(scale_store_0);
+                let px_16_hi0 = vqmovn_u32(scale_store_1);
+                let px_16_lo1 = vqmovn_u32(scale_store_2);
+                let px_16_hi2 = vqmovn_u32(scale_store_3);
+                let px_16_lo3 = vqmovn_u32(scale_store_4);
+                let px_16_hi4 = vqmovn_u32(scale_store_5);
+                let px_16_lo5 = vqmovn_u32(scale_store_6);
+                let px_16_hi6 = vqmovn_u32(scale_store_7);
+                let px0 = vqmovn_u16(vcombine_u16(px_16_lo0, px_16_hi0));
+                let px1 = vqmovn_u16(vcombine_u16(px_16_lo1, px_16_hi2));
+                let px2 = vqmovn_u16(vcombine_u16(px_16_lo3, px_16_hi4));
+                let px3 = vqmovn_u16(vcombine_u16(px_16_lo5, px_16_hi6));
+
+                vst1q_u8(ptr, vcombine_u8(px0, px1));
+                vst1q_u8(ptr.add(16), vcombine_u8(px2, px3));
+            }
+        }
+
+        cx += 32;
+    }
 
     while cx + 16 < end_x {
         let px = cx;
@@ -319,16 +507,16 @@ pub(crate) fn box_blur_vertical_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
             let lo0 = vmovl_u8(vget_low_u8(edge));
             let hi0 = vmovl_high_u8(edge);
 
-            let i16_l0 = vmovl_u16(vget_low_u16(lo0));
-            let i16_h0 = vmovl_high_u16(lo0);
-            let i16_l1 = vmovl_u16(vget_low_u16(hi0));
-            let i16_h1 = vmovl_high_u16(hi0);
+            let i16_l0 = vget_low_u16(lo0);
+            let i16_h0 = lo0;
+            let i16_l1 = vget_low_u16(hi0);
+            let i16_h1 = hi0;
 
-            store_0 = vmulq_u32(i16_l0, v_edge_count);
-            store_1 = vmulq_u32(i16_h0, v_edge_count);
+            store_0 = vmull_u16(i16_l0, vget_low_u16(v_edge_count));
+            store_1 = vmull_high_u16(i16_h0, v_edge_count);
 
-            store_2 = vmulq_u32(i16_l1, v_edge_count);
-            store_3 = vmulq_u32(i16_h1, v_edge_count);
+            store_2 = vmull_u16(i16_l1, vget_low_u16(v_edge_count));
+            store_3 = vmull_high_u16(i16_h1, v_edge_count);
         }
 
         unsafe {
@@ -430,11 +618,11 @@ pub(crate) fn box_blur_vertical_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
             let edge = vld1_u8(s_ptr);
             let lo0 = vmovl_u8(edge);
 
-            let i16_l0 = vmovl_u16(vget_low_u16(lo0));
-            let i16_h0 = vmovl_high_u16(lo0);
+            let i16_l0 = vget_low_u16(lo0);
+            let i16_h0 = lo0;
 
-            store_0 = vmulq_u32(i16_l0, v_edge_count);
-            store_1 = vmulq_u32(i16_h0, v_edge_count);
+            store_0 = vmull_u16(i16_l0, vget_low_u16(v_edge_count));
+            store_1 = vmull_high_u16(i16_h0, v_edge_count);
         }
 
         unsafe {
@@ -514,8 +702,8 @@ pub(crate) fn box_blur_vertical_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
             let mut store: uint32x4_t;
             {
                 let s_ptr = src.as_ptr().add(px);
-                let edge_colors = load_u8_u32_fast::<TAIL_CN>(s_ptr);
-                store = vmulq_u32(edge_colors, v_edge_count);
+                let edge_colors = load_u8_u16::<TAIL_CN>(s_ptr);
+                store = vmull_u16(edge_colors, vget_low_u16(v_edge_count));
             }
 
             for y in 1..std::cmp::min(half_kernel, height) {
