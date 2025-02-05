@@ -119,6 +119,7 @@ pub(crate) unsafe fn store_f32<const CHANNELS_COUNT: usize>(dst_ptr: *mut f32, r
 
 /// Stores u32 up to x4 as u8 up to x4 based on channels count
 #[inline(always)]
+#[cfg(any(feature = "sse", feature = "avx"))]
 pub(crate) unsafe fn store_u8_s32<const CHANNELS_COUNT: usize>(dst_ptr: *mut u8, regi: __m128i) {
     let s16 = _mm_packs_epi32(regi, regi);
     let v8 = _mm_packus_epi16(s16, s16);
