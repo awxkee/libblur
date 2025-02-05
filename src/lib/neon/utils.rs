@@ -241,28 +241,13 @@ pub unsafe fn load_f32_f16<const CHANNELS_COUNT: usize>(ptr: *const f16) -> floa
         let cvt = xvld_f16(ptr);
         return xvcvt_f32_f16(cvt);
     } else if CHANNELS_COUNT == 3 {
-        let recast = ptr as *const u16;
-        let cvt = xreinterpret_f16_u16(vld1_u16(
-            [
-                recast.read_unaligned(),
-                recast.add(1).read_unaligned(),
-                recast.add(2).read_unaligned(),
-                0,
-            ]
-            .as_ptr(),
-        ));
+        let mut jvet = vreinterpret_u16_u32(vld1_lane_u32::<0>(ptr as *const u32, vdup_n_u32(0)));
+        jvet = vld1_lane_u16::<2>(ptr.add(2) as *const u16, jvet);
+        let cvt = xreinterpret_f16_u16(jvet);
         return xvcvt_f32_f16(cvt);
     } else if CHANNELS_COUNT == 2 {
-        let recast = ptr as *const u16;
-        let cvt = xreinterpret_f16_u16(vld1_u16(
-            [
-                recast.read_unaligned(),
-                recast.add(1).read_unaligned(),
-                0,
-                0,
-            ]
-            .as_ptr(),
-        ));
+        let jvet = vld1_lane_u32::<0>(ptr as *const u32, vdup_n_u32(0));
+        let cvt = xreinterpret_f16_u16(vreinterpret_u16_u32(jvet));
         return xvcvt_f32_f16(cvt);
     }
     let recast = ptr as *const u16;
@@ -279,19 +264,16 @@ pub unsafe fn store_f32_f16<const CHANNELS_COUNT: usize>(dst_ptr: *mut f16, in_r
         let casted_out = xreinterpret_u16_f16(out_regi);
         let casted_ptr = dst_ptr as *mut u16;
         let lo_part = vreinterpret_u32_u16(casted_out);
-        (casted_ptr as *mut u32).write_unaligned(vget_lane_u32::<0>(lo_part));
-        casted_ptr
-            .add(2)
-            .write_unaligned(vget_lane_u16::<2>(casted_out));
+        vst1_lane_u32::<0>(casted_ptr as *mut _, lo_part);
+        vst1_lane_u16::<2>(casted_ptr.add(2) as *mut _, vreinterpret_u16_u32(lo_part));
     } else if CHANNELS_COUNT == 2 {
         let casted_out = xreinterpret_u16_f16(out_regi);
         let casted_ptr = dst_ptr as *mut u32;
         let lo_part = vreinterpret_u32_u16(casted_out);
-        casted_ptr.write_unaligned(vget_lane_u32::<0>(lo_part));
+        vst1_lane_u32::<0>(casted_ptr, lo_part);
     } else {
         let casted_out = xreinterpret_u16_f16(out_regi);
-        let casted_ptr = dst_ptr as *mut u16;
-        casted_ptr.write_unaligned(vget_lane_u16::<0>(casted_out));
+        vst1_lane_u16::<0>(dst_ptr as *mut u16, casted_out);
     }
 }
 
@@ -302,22 +284,16 @@ pub(crate) unsafe fn store_u8x8_m4<const CHANNELS_COUNT: usize>(
     in_regi: uint8x8_t,
 ) {
     let casted_u32 = vreinterpret_u32_u8(in_regi);
-    let pixel = vget_lane_u32::<0>(casted_u32);
 
     if CHANNELS_COUNT == 4 {
-        (dst_ptr as *mut u32).write_unaligned(pixel);
+        vst1_lane_u32::<0>(dst_ptr as *mut _, casted_u32);
     } else if CHANNELS_COUNT == 3 {
-        let bits = pixel.to_le_bytes();
-        let first_byte = u16::from_le_bytes([bits[0], bits[1]]);
-        (dst_ptr as *mut u16).write_unaligned(first_byte);
-        dst_ptr.add(2).write_unaligned(bits[2]);
+        vst1_lane_u16::<0>(dst_ptr as *mut _, vreinterpret_u16_u32(casted_u32));
+        vst1_lane_u8::<2>(dst_ptr.add(2) as *mut _, vreinterpret_u8_u32(casted_u32));
     } else if CHANNELS_COUNT == 2 {
-        let bits = pixel.to_le_bytes();
-        let first_byte = u16::from_le_bytes([bits[0], bits[1]]);
-        (dst_ptr as *mut u16).write_unaligned(first_byte);
+        vst1_lane_u16::<0>(dst_ptr as *mut _, vreinterpret_u16_u32(casted_u32));
     } else {
-        let bits = pixel.to_le_bytes();
-        dst_ptr.write_unaligned(bits[0]);
+        vst1_lane_u8::<0>(dst_ptr, vreinterpret_u8_u32(casted_u32));
     }
 }
 
