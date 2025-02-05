@@ -26,7 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::neon::{load_u8_s32_fast, store_u8_s32};
+use crate::neon::{load_u8_s32_fast, store_u8_s32, store_u8_s32_x4};
 use crate::stackblur::stack_blur_pass::StackBlurWorkingPass;
 use crate::unsafe_slice::UnsafeSlice;
 use num_traits::{AsPrimitive, FromPrimitive};
@@ -218,21 +218,14 @@ where
                     let scaled_val2 = vcvtaq_s32_f32(j2);
                     let scaled_val3 = vcvtaq_s32_f32(j3);
 
-                    store_u8_s32::<COMPONENTS>(
-                        pixels.slice.as_ptr().add(dst_ptr0) as *mut u8,
-                        scaled_val0,
-                    );
-                    store_u8_s32::<COMPONENTS>(
-                        pixels.slice.as_ptr().add(dst_ptr1) as *mut u8,
-                        scaled_val1,
-                    );
-                    store_u8_s32::<COMPONENTS>(
-                        pixels.slice.as_ptr().add(dst_ptr2) as *mut u8,
-                        scaled_val2,
-                    );
-                    store_u8_s32::<COMPONENTS>(
-                        pixels.slice.as_ptr().add(dst_ptr3) as *mut u8,
-                        scaled_val3,
+                    store_u8_s32_x4::<COMPONENTS>(
+                        (
+                            pixels.slice.as_ptr().add(dst_ptr0) as *mut u8,
+                            pixels.slice.as_ptr().add(dst_ptr1) as *mut u8,
+                            pixels.slice.as_ptr().add(dst_ptr2) as *mut u8,
+                            pixels.slice.as_ptr().add(dst_ptr3) as *mut u8,
+                        ),
+                        int32x4x4_t(scaled_val0, scaled_val1, scaled_val2, scaled_val3),
                     );
 
                     dst_ptr0 += COMPONENTS;
