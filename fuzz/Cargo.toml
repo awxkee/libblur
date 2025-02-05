@@ -72,6 +72,13 @@ doc = false
 bench = false
 
 [[bin]]
+name = "fast_gaussian_next"
+path = "fast_gaussian_next/fast_gaussian_next.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "fast_gaussian_u16"
 path = "fast_gaussian_u16/fast_gaussian_u16.rs"
 test = false
