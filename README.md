@@ -154,17 +154,17 @@ libblur::fast_gaussian_next( & mut bytes, stride, width, height, radius, FastBlu
 
 Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded mode with 35 radius.
 
-|         | time(NEON) |
-|---------|:----------:|
-| libblur |   4.18ms   |
-| OpenCV  |     -      |
+|         | time(NEON) | time(SSE) |
+|---------|:----------:|:---------:| 
+| libblur |   4.18ms   |  5.53ms   | 
+| OpenCV  |     -      |     -     | 
 
 Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded mode with 77 radius.
 
-|         | time(NEON) |
-|---------|:----------:|
-| libblur |   4.46ms   |
-| OpenCV  |     -      |
+|         | time(NEON) | time(SSE) |
+|---------|:----------:|:---------:|
+| libblur |   4.46ms   |  5.99ms   |
+| OpenCV  |     -      |     -     |
 
 ### Tent blur
 
@@ -261,7 +261,7 @@ fast_bilateral_filter(
 
 This is arbitrary example for blurring speed for all methods in descending order. 
 
-stack_blur -> fast_gaussian -> fast_gaussian_next -> box_blur -> fast_gaussian_superior -> tent_blur -> gaussian_box_blur -> gaussian_blur -> bilateral -> median
+stack_blur -> fast_gaussian_next -> fast_gaussian -> box_blur -> fast_gaussian_superior -> tent_blur -> gaussian_box_blur -> gaussian_blur -> bilateral -> median
 
 This project is licensed under either of
 
