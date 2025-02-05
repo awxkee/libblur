@@ -224,7 +224,7 @@ fn main() {
         stride as u32,
         dimensions.0,
         dimensions.1,
-        150,
+        55,
         FastBlurChannels::Channels3,
         ThreadingPolicy::Adaptive,
     );
