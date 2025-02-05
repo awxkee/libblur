@@ -4,7 +4,7 @@ use libblur::{
     filter_1d_rgb_exact, get_gaussian_kernel_1d, get_sigma_size, EdgeMode, FastBlurChannels,
     GaussianPreciseLevel, ImageSize, Scalar, ThreadingPolicy,
 };
-use opencv::core::{find_file, split, Mat, Size, Vector, BORDER_DEFAULT};
+use opencv::core::{find_file, split, AlgorithmHint, Mat, Size, Vector, BORDER_DEFAULT};
 use opencv::imgcodecs::{imread, IMREAD_COLOR};
 
 pub(crate) fn split_channels_3<T: Copy>(
@@ -95,6 +95,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 0.,
                 0.,
                 BORDER_DEFAULT,
+                AlgorithmHint::ALGO_HINT_ACCURATE,
             )
             .unwrap();
         })
@@ -146,6 +147,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 (77f64 * 2f64 + 1f64) / 6f64,
                 (77f64 * 2f64 + 1f64) / 6f64,
                 BORDER_DEFAULT,
+                AlgorithmHint::ALGO_HINT_ACCURATE,
             )
             .unwrap();
         })
@@ -266,6 +268,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                     (77f64 * 2f64 + 1f64) / 6f64,
                     (77f64 * 2f64 + 1f64) / 6f64,
                     BORDER_DEFAULT,
+                    AlgorithmHint::ALGO_HINT_ACCURATE,
                 )
                 .unwrap();
             })
@@ -348,6 +351,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                     (77f64 * 2f64 + 1f64) / 6f64,
                     (77f64 * 2f64 + 1f64) / 6f64,
                     BORDER_DEFAULT,
+                    AlgorithmHint::ALGO_HINT_ACCURATE,
                 )
                 .unwrap();
             })

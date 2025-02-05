@@ -27,7 +27,7 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter1d::arena::Arena;
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]
 use crate::filter1d::avx::{
     filter_column_avx_f32_f32, filter_column_avx_symm_u8_f32, filter_column_avx_u8_f32,
 };
@@ -88,6 +88,7 @@ impl Filter1DColumnHandler<u8, f32> for u8 {
     fn get_column_handler(
         is_symmetric_kernel: bool,
     ) -> fn(Arena, &[&[u8]], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
+        #[cfg(feature = "avx")]
         if std::arch::is_x86_feature_detected!("avx2") {
             if is_symmetric_kernel {
                 return filter_column_avx_symm_u8_f32;
@@ -178,6 +179,7 @@ impl Filter1DColumnHandler<f32, f32> for f32 {
     fn get_column_handler(
         is_symmetric_kernel: bool,
     ) -> fn(Arena, &[&[f32]], &UnsafeSlice<f32>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
+        #[cfg(feature = "avx")]
         if std::arch::is_x86_feature_detected!("avx2") {
             return filter_column_avx_f32_f32;
         }

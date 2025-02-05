@@ -29,7 +29,7 @@
 
 #[cfg(feature = "fft")]
 mod adaptive_blur;
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]
 mod avx;
 mod r#box;
 mod channels_configuration;

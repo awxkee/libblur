@@ -131,10 +131,12 @@ where
                         vst1q_s32(stack_ptr.add(8), i16_l1);
                         vst1q_s32(stack_ptr.add(12), i16_h1);
 
-                        sums0 = vaddq_s32(sums0, vmulq_s32(i16_l0, vdupq_n_s32(i as i32 + 1)));
-                        sums1 = vaddq_s32(sums1, vmulq_s32(i16_h0, vdupq_n_s32(i as i32 + 1)));
-                        sums2 = vaddq_s32(sums2, vmulq_s32(i16_l1, vdupq_n_s32(i as i32 + 1)));
-                        sums3 = vaddq_s32(sums3, vmulq_s32(i16_h1, vdupq_n_s32(i as i32 + 1)));
+                        let w = vdupq_n_s32(i as i32 + 1);
+
+                        sums0 = vmlaq_s32(sums0, i16_l0, w);
+                        sums1 = vmlaq_s32(sums1, i16_h0, w);
+                        sums2 = vmlaq_s32(sums2, i16_l1, w);
+                        sums3 = vmlaq_s32(sums3, i16_h1, w);
 
                         sum_out0 = vaddq_s32(sum_out0, i16_l0);
                         sum_out1 = vaddq_s32(sum_out1, i16_h0);
@@ -167,10 +169,10 @@ where
 
                         let vj = vdupq_n_s32(radius as i32 + 1 - i as i32);
 
-                        sums0 = vaddq_s32(sums0, vmulq_s32(i16_l0, vj));
-                        sums1 = vaddq_s32(sums1, vmulq_s32(i16_h0, vj));
-                        sums2 = vaddq_s32(sums2, vmulq_s32(i16_l1, vj));
-                        sums3 = vaddq_s32(sums3, vmulq_s32(i16_h1, vj));
+                        sums0 = vmlaq_s32(sums0, i16_l0, vj);
+                        sums1 = vmlaq_s32(sums1, i16_h0, vj);
+                        sums2 = vmlaq_s32(sums2, i16_l1, vj);
+                        sums3 = vmlaq_s32(sums3, i16_h1, vj);
 
                         sum_in0 = vaddq_s32(sum_in0, i16_l0);
                         sum_in1 = vaddq_s32(sum_in1, i16_h0);
@@ -318,8 +320,10 @@ where
                         vst1q_s32(stack_ptr, i16_l0);
                         vst1q_s32(stack_ptr.add(4), i16_h0);
 
-                        sums0 = vaddq_s32(sums0, vmulq_s32(i16_l0, vdupq_n_s32(i as i32 + 1)));
-                        sums1 = vaddq_s32(sums1, vmulq_s32(i16_h0, vdupq_n_s32(i as i32 + 1)));
+                        let w = vdupq_n_s32(i as i32 + 1);
+
+                        sums0 = vmlaq_s32(sums0, i16_l0, w);
+                        sums1 = vmlaq_s32(sums1, i16_h0, w);
 
                         sum_out0 = vaddq_s32(sum_out0, i16_l0);
                         sum_out1 = vaddq_s32(sum_out1, i16_h0);
@@ -345,8 +349,8 @@ where
 
                         let vj = vdupq_n_s32(radius as i32 + 1 - i as i32);
 
-                        sums0 = vaddq_s32(sums0, vmulq_s32(i16_l0, vj));
-                        sums1 = vaddq_s32(sums1, vmulq_s32(i16_h0, vj));
+                        sums0 = vmlaq_s32(sums0, i16_l0, vj);
+                        sums1 = vmlaq_s32(sums1, i16_h0, vj);
 
                         sum_in0 = vaddq_s32(sum_in0, i16_l0);
                         sum_in1 = vaddq_s32(sum_in1, i16_h0);
@@ -450,7 +454,7 @@ where
                 for i in 0..=radius {
                     let stack_ptr = stacks0.as_mut_ptr().add(i as usize * 4);
                     vst1q_s32(stack_ptr, src_pixel);
-                    sums = vaddq_s32(sums, vmulq_s32(src_pixel, vdupq_n_s32(i as i32 + 1)));
+                    sums = vmlaq_s32(sums, src_pixel, vdupq_n_s32(i as i32 + 1));
                     sum_out = vaddq_s32(sum_out, src_pixel);
                 }
 
@@ -463,10 +467,7 @@ where
                     let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
                     let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
                     vst1q_s32(stack_ptr, src_pixel);
-                    sums = vaddq_s32(
-                        sums,
-                        vmulq_s32(src_pixel, vdupq_n_s32(radius as i32 + 1 - i as i32)),
-                    );
+                    sums = vmlaq_s32(sums, src_pixel, vdupq_n_s32(radius as i32 + 1 - i as i32));
 
                     sum_in = vaddq_s32(sum_in, src_pixel);
                 }
@@ -540,7 +541,7 @@ where
                 for i in 0..=radius {
                     let stack_ptr = stacks0.as_mut_ptr().add(i as usize * 4);
                     vst1q_s32(stack_ptr, src_pixel);
-                    sums = vaddq_s32(sums, vmulq_s32(src_pixel, vdupq_n_s32(i as i32 + 1)));
+                    sums = vmlaq_s32(sums, src_pixel, vdupq_n_s32(i as i32 + 1));
                     sum_out = vaddq_s32(sum_out, src_pixel);
                 }
 
@@ -553,10 +554,7 @@ where
                     let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
                     let src_pixel = load_u8_s32_fast::<TAIL>(src_ld as *const u8);
                     vst1q_s32(stack_ptr, src_pixel);
-                    sums = vaddq_s32(
-                        sums,
-                        vmulq_s32(src_pixel, vdupq_n_s32(radius as i32 + 1 - i as i32)),
-                    );
+                    sums = vmlaq_s32(sums, src_pixel, vdupq_n_s32(radius as i32 + 1 - i as i32));
 
                     sum_in = vaddq_s32(sum_in, src_pixel);
                 }

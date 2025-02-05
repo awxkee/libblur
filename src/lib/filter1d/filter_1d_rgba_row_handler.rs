@@ -27,7 +27,7 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter1d::arena::Arena;
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]
 use crate::filter1d::avx::{
     filter_rgba_row_avx_f32_f32, filter_rgba_row_avx_symm_u8_f32, filter_rgba_row_avx_u8_f32,
 };
@@ -114,6 +114,7 @@ impl Filter1DRgbaRowHandler<u8, f32> for u8 {
     fn get_rgba_row_handler(
         is_kernel_symmetric: bool,
     ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
+        #[cfg(feature = "avx")]
         if std::arch::is_x86_feature_detected!("avx2") {
             if is_kernel_symmetric {
                 return filter_rgba_row_avx_symm_u8_f32;
@@ -164,6 +165,7 @@ impl Filter1DRgbaRowHandler<f32, f32> for f32 {
     fn get_rgba_row_handler(
         is_kernel_symmetric: bool,
     ) -> fn(Arena, &[f32], &UnsafeSlice<f32>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
+        #[cfg(feature = "avx")]
         if std::arch::is_x86_feature_detected!("avx2") {
             return filter_rgba_row_avx_f32_f32;
         }

@@ -29,7 +29,7 @@
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::cpu_features::is_aarch_rdm_supported;
 use crate::filter1d::arena::Arena;
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]
 use crate::filter1d::avx::{filter_column_avx_symm_u8_i32_app, filter_column_avx_u8_i32_app};
 use crate::filter1d::filter_column_approx::filter_column_approx;
 use crate::filter1d::filter_column_approx_symmetric::filter_column_symmetric_approx;
@@ -117,6 +117,7 @@ impl Filter1DColumnHandlerApprox<u8, i32> for u8 {
     fn get_column_handler(
         is_kernel_symmetric: bool,
     ) -> fn(Arena, &[&[u8]], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<i32>]) {
+        #[cfg(feature = "avx")]
         if std::arch::is_x86_feature_detected!("avx2") {
             if is_kernel_symmetric {
                 return filter_column_avx_symm_u8_i32_app;

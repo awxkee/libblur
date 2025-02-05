@@ -1,5 +1,5 @@
 /*
- * // Copyright (c) Radzivon Bartoshyk. All rights reserved.
+ * // Copyright (c) Radzivon Bartoshyk 02/2025. All rights reserved.
  * //
  * // Redistribution and use in source and binary forms, with or without modification,
  * // are permitted provided that the following conditions are met:
@@ -26,52 +26,5 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-#![no_main]
-
-use libblur::{stack_blur_u16, FastBlurChannels, ThreadingPolicy};
-use libfuzzer_sys::fuzz_target;
-
-fuzz_target!(|data: (u8, u8, u8)| {
-    fuzz_image(
-        data.0 as usize,
-        data.1 as usize,
-        data.2 as usize,
-        FastBlurChannels::Channels4,
-    );
-    fuzz_image(
-        data.0 as usize,
-        data.1 as usize,
-        data.2 as usize,
-        FastBlurChannels::Channels3,
-    );
-    fuzz_image(
-        data.0 as usize,
-        data.1 as usize,
-        data.2 as usize,
-        FastBlurChannels::Plane,
-    );
-});
-
-fn fuzz_image(width: usize, height: usize, radius: usize, channels: FastBlurChannels) {
-    if width == 0 || height == 0 || radius == 0 {
-        return;
-    }
-    let mut dst_image = vec![15u16; width * height * channels.get_channels()];
-    stack_blur_u16(
-        &mut dst_image,
-        width as u32,
-        height as u32,
-        radius as u32,
-        channels,
-        ThreadingPolicy::Single,
-    );
-    stack_blur_u16(
-        &mut dst_image,
-        width as u32,
-        height as u32,
-        radius as u32 + 500,
-        channels,
-        ThreadingPolicy::Single,
-    );
-}
+mod vertical;
+pub(crate) use vertical::VerticalAvxStackBlurPass;

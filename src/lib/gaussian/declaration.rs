@@ -29,13 +29,13 @@ use crate::channels_configuration::FastBlurChannels;
 use crate::edge_mode::EdgeMode;
 use crate::gaussian::gaussian_kernel::get_gaussian_kernel_1d;
 use crate::gaussian::gaussian_precise_level::GaussianPreciseLevel;
+use crate::gaussian::gaussian_util::get_kernel_size;
 use crate::{
     filter_1d_approx, filter_1d_exact, filter_1d_rgb_approx, filter_1d_rgb_exact,
     filter_1d_rgba_approx, filter_1d_rgba_exact, get_sigma_size, ImageSize, Scalar,
     ThreadingPolicy,
 };
 use half::f16;
-use crate::gaussian::gaussian_util::get_kernel_size;
 
 /// Performs gaussian blur on the image.
 ///
@@ -71,7 +71,10 @@ pub fn gaussian_blur(
     threading_policy: ThreadingPolicy,
     precise_level: GaussianPreciseLevel,
 ) {
-    assert!(kernel_size != 0 || sigma > 0.0, "Either sigma or kernel size must be set");
+    assert!(
+        kernel_size != 0 || sigma > 0.0,
+        "Either sigma or kernel size must be set"
+    );
     if kernel_size != 0 {
         assert_ne!(kernel_size % 2, 0, "Kernel size must be odd");
     }
@@ -156,7 +159,10 @@ pub fn gaussian_blur_u16(
     edge_mode: EdgeMode,
     threading_policy: ThreadingPolicy,
 ) {
-    assert!(kernel_size != 0 || sigma > 0.0, "Either sigma or kernel size must be set");
+    assert!(
+        kernel_size != 0 || sigma > 0.0,
+        "Either sigma or kernel size must be set"
+    );
     if kernel_size != 0 {
         assert_ne!(kernel_size % 2, 0, "Kernel size must be odd");
     }
@@ -220,7 +226,10 @@ pub fn gaussian_blur_f32(
     edge_mode: EdgeMode,
     threading_policy: ThreadingPolicy,
 ) {
-    assert!(kernel_size != 0 || sigma > 0.0, "Either sigma or kernel size must be set");
+    assert!(
+        kernel_size != 0 || sigma > 0.0,
+        "Either sigma or kernel size must be set"
+    );
     if kernel_size != 0 {
         assert_ne!(kernel_size % 2, 0, "Kernel size must be odd");
     }
@@ -283,7 +292,10 @@ pub fn gaussian_blur_f16(
     edge_mode: EdgeMode,
     threading_policy: ThreadingPolicy,
 ) {
-    assert!(kernel_size != 0 || sigma > 0.0, "Either sigma or kernel size must be set");
+    assert!(
+        kernel_size != 0 || sigma > 0.0,
+        "Either sigma or kernel size must be set"
+    );
     if kernel_size != 0 {
         assert_ne!(kernel_size % 2, 0, "Kernel size must be odd");
     }
