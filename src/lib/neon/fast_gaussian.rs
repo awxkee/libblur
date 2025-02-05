@@ -279,10 +279,10 @@ pub(crate) fn fast_gaussian_vertical_pass_neon_u8<T, const CN: usize>(
 
             let start_y = 0 - 2 * radius as i64;
 
-            let current_px0 = (xx.max(0) * CN as u32) as usize;
-            let current_px1 = ((xx + 1).max(0) * CN as u32) as usize;
-            let current_px2 = ((xx + 2).max(0) * CN as u32) as usize;
-            let current_px3 = ((xx + 3).max(0) * CN as u32) as usize;
+            let current_px0 = (xx * CN as u32) as usize;
+            let current_px1 = ((xx + 1) * CN as u32) as usize;
+            let current_px2 = ((xx + 2) * CN as u32) as usize;
+            let current_px3 = ((xx + 3) * CN as u32) as usize;
 
             for y in start_y..height_wide {
                 let current_y = (y * (stride as i64)) as usize;
