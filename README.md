@@ -45,9 +45,8 @@ blurred
 
 ### Gaussian blur
 
-Excellent results. Have improvements, however, much slower than any approximations slow. Use when use need gaussian
-methods - smoothing, anti-alias,
-FFT, advanced analysis etc.
+Excellent results. Have improvements, however, much slower than any approximations. Use when use need gaussian
+methods - smoothing, FFT, advanced analysis etc.
 There are two methods of convolution, integral approximation and exact,
 approximation in integral form is still gaussian with 1-3% of error however about 2x faster.
 
@@ -117,8 +116,7 @@ may be
 observed. However, if you'll use advanced analysis algorithms non gaussian methods will be detected. Not suitable for
 advanced analysis.
 Do not use when you need gaussian. Based on binomial filter, generally speed close, might be a little faster than stack
-blur ( except NEON or except non-multithreaded stack blur, on NEON much faster or overcome non multithreaded
-stackblur ), however results better as I see. Max radius ~320 for u8, for u16 will be less.
+blur , however results are better.
 
 O(log R) complexity.
 
@@ -143,8 +141,7 @@ Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded
 ### Fast gaussian next
 
 Very fast.
-Produces very pleasant results close to gaussian.
-If 4K photo blurred in 10 ms this method will be done in 15 ms. Max radius ~150-180 for u8, for u16 will be less.
+Produces very pleasant results close to gaussian. Max radius ~150-180 for u8, for u16 will be less.
 
 O(log R) complexity.
 
