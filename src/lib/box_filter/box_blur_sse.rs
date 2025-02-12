@@ -374,7 +374,7 @@ pub(crate) fn box_blur_vertical_pass_sse<T, const CHANNELS: usize>(
 ) {
     unsafe {
         let src: &[u8] = std::mem::transmute(undefined_src);
-        let unsafe_dst: &UnsafeSlice<'_, u8> =  std::mem::transmute(undefined_unsafe_dst);
+        let unsafe_dst: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_unsafe_dst);
 
         box_blur_vertical_pass_sse_impl::<CHANNELS>(
             src, src_stride, unsafe_dst, dst_stride, w, height, radius, start_x, end_x,
