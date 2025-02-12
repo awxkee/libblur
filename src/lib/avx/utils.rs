@@ -1,5 +1,5 @@
 /*
- * // Copyright (c) Radzivon Bartoshyk. All rights reserved.
+ * // Copyright (c) Radzivon Bartoshyk 2/2025. All rights reserved.
  * //
  * // Redistribution and use in source and binary forms, with or without modification,
  * // are permitted provided that the following conditions are met:
@@ -26,30 +26,17 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]
-mod avx;
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    feature = "nightly_avx512"
-))]
-mod avx512;
-#[deny(unused, unreachable_pub)]
-mod horizontal;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-mod neon;
-mod sliding_window;
-#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
-pub(crate) mod sse;
-pub mod stack_blur;
-pub mod stack_blur_f16;
-pub mod stack_blur_f32;
-mod stack_blur_pass;
-mod stack_blur_u16;
-mod vertical;
-#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
-mod wasm;
+#[cfg(target_arch = "x86")]
+use std::arch::x86::*;
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::*;
 
-pub(crate) use horizontal::HorizontalStackBlurPass;
-pub use stack_blur_pass::StackBlurWorkingPass;
-pub use stack_blur_u16::stack_blur_u16;
-pub use vertical::VerticalStackBlurPass;
+#[inline(always)]
+pub(crate) unsafe fn _mm256_mul_round_ps(a: __m256, b: __m256) -> __m256 {
+    _mm256_fmadd_ps(a, b, _mm256_set1_ps(0.5f32))
+}
+
+#[inline(always)]
+pub(crate) unsafe fn _mm_mul_round_ps(a: __m128, b: __m128) -> __m128 {
+    _mm_fmadd_ps(a, b, _mm_set1_ps(0.5f32))
+}

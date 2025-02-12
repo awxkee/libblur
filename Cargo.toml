@@ -1,4 +1,4 @@
-workspace = { members = ["src/lib", "fuzz"] }
+workspace = { members = ["src/lib", "fuzz", "src/accelerate"] }
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [package]
@@ -15,6 +15,7 @@ colorutils-rs = "0.7.0"
 half = "2.4.1"
 image = "0.25.5"
 libblur = {path = "src/lib", features = ["image", "fft", "sse"], default-features = false}
+accelerate = {path = "src/accelerate"}
 rayon = "1.10.0"
 
 [dev-dependencies]

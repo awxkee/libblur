@@ -25,9 +25,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::neon::{
-    load_u8_s32_fast, store_u8_s32_x4, store_u8x8_m4, vmulq_by_3_s32, vmulq_s32_f32,
-};
+use crate::neon::{load_u8_s32_fast, store_u8_s32_x4, store_u8x8_m4, vmulq_by_3_s32};
 use crate::reflect_index;
 use crate::{clamp_edge, reflect_101, EdgeMode};
 use std::arch::aarch64::*;
@@ -87,10 +85,20 @@ pub fn fast_gaussian_next_vertical_pass_neon_u8<T, const CN: usize>(
                 let current_y = (y * (stride as i64)) as usize;
 
                 if y >= 0 {
-                    let prepared_px0 = vmulq_s32_f32(summs0, v_weight);
-                    let prepared_px1 = vmulq_s32_f32(summs1, v_weight);
-                    let prepared_px2 = vmulq_s32_f32(summs2, v_weight);
-                    let prepared_px3 = vmulq_s32_f32(summs3, v_weight);
+                    let c0 = vcvtq_f32_s32(summs0);
+                    let c1 = vcvtq_f32_s32(summs1);
+                    let c2 = vcvtq_f32_s32(summs2);
+                    let c3 = vcvtq_f32_s32(summs3);
+
+                    let p0 = vmulq_f32(c0, v_weight);
+                    let p1 = vmulq_f32(c1, v_weight);
+                    let p2 = vmulq_f32(c2, v_weight);
+                    let p3 = vmulq_f32(c3, v_weight);
+
+                    let prepared_px0 = vcvtaq_s32_f32(p0);
+                    let prepared_px1 = vcvtaq_s32_f32(p1);
+                    let prepared_px2 = vcvtaq_s32_f32(p2);
+                    let prepared_px3 = vcvtaq_s32_f32(p3);
 
                     let dst_ptr0 = (bytes.slice.as_ptr() as *mut u8).add(current_y + current_px0);
                     let dst_ptr1 = (bytes.slice.as_ptr() as *mut u8).add(current_y + current_px1);
@@ -234,13 +242,13 @@ pub fn fast_gaussian_next_vertical_pass_neon_u8<T, const CN: usize>(
             let mut ders = vdupq_n_s32(0);
             let mut summs = vdupq_n_s32(0);
 
+            let current_px = (x * CN as u32) as usize;
+
             let start_y = 0 - 3 * radius as i64;
             for y in start_y..height_wide {
                 let current_y = (y * (stride as i64)) as usize;
 
                 if y >= 0 {
-                    let current_px = ((std::cmp::max(x, 0)) * CN as u32) as usize;
-
                     let prepared_px_s32 = vcvtaq_s32_f32(vmulq_f32(vcvtq_f32_s32(summs), v_weight));
                     let prepared_u16 = vqmovun_s32(prepared_px_s32);
                     let prepared_u8 = vqmovn_u16(vcombine_u16(prepared_u16, prepared_u16));
@@ -317,6 +325,7 @@ pub(crate) fn fast_gaussian_next_horizontal_pass_neon_u8<T, const CHANNELS_COUNT
 ) {
     unsafe {
         let bytes: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_slice);
+
         let mut buffer0 = Box::new([[0; 4]; 1024]);
         let mut buffer1 = Box::new([[0; 4]; 1024]);
         let mut buffer2 = Box::new([[0; 4]; 1024]);
@@ -355,10 +364,20 @@ pub(crate) fn fast_gaussian_next_horizontal_pass_neon_u8<T, const CHANNELS_COUNT
                 if x >= 0 {
                     let current_px = x as usize * CHANNELS_COUNT;
 
-                    let prepared_px0 = vmulq_s32_f32(summs0, v_weight);
-                    let prepared_px1 = vmulq_s32_f32(summs1, v_weight);
-                    let prepared_px2 = vmulq_s32_f32(summs2, v_weight);
-                    let prepared_px3 = vmulq_s32_f32(summs3, v_weight);
+                    let c0 = vcvtq_f32_s32(summs0);
+                    let c1 = vcvtq_f32_s32(summs1);
+                    let c2 = vcvtq_f32_s32(summs2);
+                    let c3 = vcvtq_f32_s32(summs3);
+
+                    let p0 = vmulq_f32(c0, v_weight);
+                    let p1 = vmulq_f32(c1, v_weight);
+                    let p2 = vmulq_f32(c2, v_weight);
+                    let p3 = vmulq_f32(c3, v_weight);
+
+                    let prepared_px0 = vcvtaq_s32_f32(p0);
+                    let prepared_px1 = vcvtaq_s32_f32(p1);
+                    let prepared_px2 = vcvtaq_s32_f32(p2);
+                    let prepared_px3 = vcvtaq_s32_f32(p3);
 
                     let dst_ptr0 = (bytes.slice.as_ptr() as *mut u8).add(current_y0 + current_px);
                     let dst_ptr1 = (bytes.slice.as_ptr() as *mut u8).add(current_y1 + current_px);

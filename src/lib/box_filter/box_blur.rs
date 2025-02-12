@@ -35,9 +35,9 @@ use num_traits::cast::FromPrimitive;
 use num_traits::AsPrimitive;
 use rayon::ThreadPool;
 
-use crate::channels_configuration::FastBlurChannels;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use crate::r#box::box_blur_neon::*;
+use crate::box_filter::box_blur_neon::*;
+use crate::channels_configuration::FastBlurChannels;
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::ThreadingPolicy;
@@ -215,7 +215,7 @@ impl BoxBlurHorizontalPass<u8> for u8 {
                 {
                     let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
                     if _is_sse_available {
-                        use crate::r#box::box_blur_sse::box_blur_horizontal_pass_sse;
+                        use crate::box_filter::box_blur_sse::box_blur_horizontal_pass_sse;
                         _dispatcher_horizontal =
                             box_blur_horizontal_pass_sse::<u8, { CHANNEL_CONFIGURATION }>;
                     }
@@ -471,7 +471,7 @@ impl BoxBlurVerticalPass<u8> for u8 {
             {
                 let is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
                 if is_sse_available {
-                    use crate::r#box::box_blur_sse::box_blur_vertical_pass_sse;
+                    use crate::box_filter::box_blur_sse::box_blur_vertical_pass_sse;
                     _dispatcher_vertical = box_blur_vertical_pass_sse::<u8, CHANNELS_CONFIGURATION>;
                 }
             }
@@ -479,7 +479,7 @@ impl BoxBlurVerticalPass<u8> for u8 {
             {
                 let is_avx_available = std::arch::is_x86_feature_detected!("avx2");
                 if is_avx_available {
-                    use crate::r#box::box_blur_avx::box_blur_vertical_pass_avx2;
+                    use crate::box_filter::box_blur_avx::box_blur_vertical_pass_avx2;
                     _dispatcher_vertical =
                         box_blur_vertical_pass_avx2::<u8, CHANNELS_CONFIGURATION>;
                 }
@@ -596,8 +596,7 @@ fn box_blur_impl<
 ) where
     f32: ToStorage<T>,
 {
-    let mut transient: Vec<T> =
-        vec![T::from_u32(0).unwrap_or_default(); dst_stride as usize * height as usize];
+    let mut transient: Vec<T> = vec![T::default(); dst_stride as usize * height as usize];
     box_blur_horizontal_pass::<T, CHANNEL_CONFIGURATION>(
         src,
         src_stride,
@@ -1224,10 +1223,8 @@ fn gaussian_box_blur_impl<
                 .unwrap(),
         )
     };
-    let mut transient: Vec<T> =
-        vec![T::from_u32(0).unwrap_or_default(); dst_stride as usize * height as usize];
-    let mut transient2: Vec<T> =
-        vec![T::from_u32(0).unwrap_or_default(); dst_stride as usize * height as usize];
+    let mut transient: Vec<T> = vec![T::default(); dst_stride as usize * height as usize];
+    let mut transient2: Vec<T> = vec![T::default(); dst_stride as usize * height as usize];
     let boxes = create_box_gauss(sigma, 3);
     box_blur_impl::<T, CHANNEL_CONFIGURATION>(
         src,

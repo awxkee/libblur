@@ -26,30 +26,46 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]
-mod avx;
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    feature = "nightly_avx512"
-))]
-mod avx512;
-#[deny(unused, unreachable_pub)]
-mod horizontal;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-mod neon;
-mod sliding_window;
-#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
-pub(crate) mod sse;
-pub mod stack_blur;
-pub mod stack_blur_f16;
-pub mod stack_blur_f32;
-mod stack_blur_pass;
-mod stack_blur_u16;
-mod vertical;
-#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
-mod wasm;
 
-pub(crate) use horizontal::HorizontalStackBlurPass;
-pub use stack_blur_pass::StackBlurWorkingPass;
-pub use stack_blur_u16::stack_blur_u16;
-pub use vertical::VerticalStackBlurPass;
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+pub mod acc_convenience {
+    use crate::accelerate::*;
+    pub fn box_convolve(
+        src: &[u8],
+        src_stride: usize,
+        dst: &mut [u8],
+        dst_stride: usize,
+        kernel_size: usize,
+        width: usize,
+        height: usize,
+    ) {
+        let src_image = vImage_Buffer {
+            data: src.as_ptr() as *mut libc::c_void,
+            height,
+            width,
+            row_bytes: src_stride,
+        };
+        let mut dst_image = vImage_Buffer {
+            data: dst.as_mut_ptr() as *mut libc::c_void,
+            height,
+            width,
+            row_bytes: dst_stride,
+        };
+        unsafe {
+            let status = vImageBoxConvolve_ARGB8888(
+                &src_image,
+                &mut dst_image,
+                std::ptr::null_mut(),
+                0,
+                0,
+                kernel_size as libc::c_uint,
+                kernel_size as libc::c_uint,
+                std::ptr::null_mut(),
+                kvImageTruncateKernel | kvImageDoNotTile,
+            );
+            if status != 0 {
+                panic!("vImageBoxConvolve returned error: {}", status);
+            }
+        }
+    }
+}

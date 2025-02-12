@@ -27,22 +27,20 @@
 
 pub fn get_gaussian_kernel_1d(width: u32, sigma: f32) -> Vec<f32> {
     let mut sum_norm: f32 = 0f32;
-    let mut kernel: Vec<f32> = Vec::with_capacity(width as usize);
+    let mut kernel: Vec<f32> = vec![0f32; width as usize];
     let scale = 1f32 / (f32::sqrt(2f32 * std::f32::consts::PI) * sigma);
     let mean = (width / 2) as f32;
 
-    for x in 0..width {
+    for (x, item) in kernel.iter_mut().enumerate() {
         let new_weight = f32::exp(-0.5f32 * f32::powf((x as f32 - mean) / sigma, 2.0f32)) * scale;
-        kernel.push(new_weight);
+        *item = new_weight;
         sum_norm += new_weight;
     }
 
     if sum_norm != 0f32 {
         let sum_scale = 1f32 / sum_norm;
-        for x in 0..width as usize {
-            unsafe {
-                *kernel.get_unchecked_mut(x) = (*kernel.get_unchecked(x)) * sum_scale;
-            }
+        for item in kernel.iter_mut() {
+            *item = (*item) * sum_scale;
         }
     }
 

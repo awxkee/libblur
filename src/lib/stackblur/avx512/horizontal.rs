@@ -26,7 +26,9 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::sse::{_mm_mul_round_ps, load_u8_s32_fast, store_u8_s32};
+use crate::sse::{
+    _mm_add_dot_epi16, _mm_mul_round_ps, load_u8_s32_fast_avx512, store_u8_s32_avx512,
+};
 use crate::stackblur::stack_blur_pass::StackBlurWorkingPass;
 use crate::unsafe_slice::UnsafeSlice;
 use num_traits::{AsPrimitive, FromPrimitive};
@@ -37,14 +39,14 @@ use std::arch::x86_64::*;
 use std::marker::PhantomData;
 use std::ops::{AddAssign, Mul, Shr, Sub, SubAssign};
 
-pub struct HorizontalSseStackBlurPass<T, J, const COMPONENTS: usize> {
+pub struct HorizontalAvx512StackBlurPass<T, J, const COMPONENTS: usize> {
     _phantom_t: PhantomData<T>,
     _phantom_j: PhantomData<J>,
 }
 
-impl<T, J, const COMPONENTS: usize> Default for HorizontalSseStackBlurPass<T, J, COMPONENTS> {
+impl<T, J, const COMPONENTS: usize> Default for HorizontalAvx512StackBlurPass<T, J, COMPONENTS> {
     fn default() -> Self {
-        HorizontalSseStackBlurPass::<T, J, COMPONENTS> {
+        HorizontalAvx512StackBlurPass::<T, J, COMPONENTS> {
             _phantom_t: Default::default(),
             _phantom_j: Default::default(),
         }
@@ -52,7 +54,7 @@ impl<T, J, const COMPONENTS: usize> Default for HorizontalSseStackBlurPass<T, J,
 }
 
 #[inline(always)]
-unsafe fn sse_horiz_pass_impl<const CN: usize, const FMA: bool>(
+unsafe fn pass_avx512_impl<const CN: usize, const D: bool>(
     pixels: &UnsafeSlice<u8>,
     stride: u32,
     width: u32,
@@ -61,7 +63,6 @@ unsafe fn sse_horiz_pass_impl<const CN: usize, const FMA: bool>(
     thread: usize,
     total_threads: usize,
 ) {
-    let pixels: &UnsafeSlice<u8> = std::mem::transmute(pixels);
     let div = ((radius * 2) + 1) as usize;
     let mut xp;
     let mut sp;
@@ -94,8 +95,8 @@ unsafe fn sse_horiz_pass_impl<const CN: usize, const FMA: bool>(
         let src_ld0 = pixels.slice.as_ptr().add(src_ptr0) as *const i32;
         let src_ld1 = pixels.slice.as_ptr().add(src_ptr1) as *const i32;
 
-        let src_pixel0 = load_u8_s32_fast::<CN>(src_ld0 as *const u8);
-        let src_pixel1 = load_u8_s32_fast::<CN>(src_ld1 as *const u8);
+        let src_pixel0 = load_u8_s32_fast_avx512::<CN>(src_ld0 as *const u8);
+        let src_pixel1 = load_u8_s32_fast_avx512::<CN>(src_ld1 as *const u8);
 
         for i in 0..=radius {
             let stack_value = stacks.as_mut_ptr().add(i as usize * 4 * 2);
@@ -103,8 +104,9 @@ unsafe fn sse_horiz_pass_impl<const CN: usize, const FMA: bool>(
             _mm_storeu_si128(stack_value.add(4) as *mut __m128i, src_pixel1);
 
             let w = _mm_set1_epi32(i as i32 + 1);
-            sums0 = _mm_add_epi32(sums0, _mm_madd_epi16(src_pixel0, w));
-            sums1 = _mm_add_epi32(sums1, _mm_madd_epi16(src_pixel1, w));
+
+            sums0 = _mm_add_dot_epi16::<D>(sums0, src_pixel0, w);
+            sums1 = _mm_add_dot_epi16::<D>(sums1, src_pixel1, w);
 
             sum_out0 = _mm_add_epi32(sum_out0, src_pixel0);
             sum_out1 = _mm_add_epi32(sum_out1, src_pixel1);
@@ -117,17 +119,17 @@ unsafe fn sse_horiz_pass_impl<const CN: usize, const FMA: bool>(
             }
             let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4 * 2);
             let src_pixel0 =
-                load_u8_s32_fast::<CN>(pixels.slice.as_ptr().add(src_ptr0) as *const u8);
+                load_u8_s32_fast_avx512::<CN>(pixels.slice.as_ptr().add(src_ptr0) as *const u8);
             let src_pixel1 =
-                load_u8_s32_fast::<CN>(pixels.slice.as_ptr().add(src_ptr1) as *const u8);
+                load_u8_s32_fast_avx512::<CN>(pixels.slice.as_ptr().add(src_ptr1) as *const u8);
 
             _mm_storeu_si128(stack_ptr as *mut __m128i, src_pixel0);
             _mm_storeu_si128(stack_ptr.add(4) as *mut __m128i, src_pixel1);
 
             let w = _mm_set1_epi32(radius as i32 + 1 - i as i32);
 
-            sums0 = _mm_add_epi32(sums0, _mm_madd_epi16(src_pixel0, w));
-            sums1 = _mm_add_epi32(sums1, _mm_madd_epi16(src_pixel1, w));
+            sums0 = _mm_add_dot_epi16::<D>(sums0, src_pixel0, w);
+            sums1 = _mm_add_dot_epi16::<D>(sums1, src_pixel1, w);
 
             sum_in0 = _mm_add_epi32(sum_in0, src_pixel0);
             sum_in1 = _mm_add_epi32(sum_in1, src_pixel1);
@@ -152,23 +154,11 @@ unsafe fn sse_horiz_pass_impl<const CN: usize, const FMA: bool>(
             let o0 = _mm_cvtepi32_ps(sums0);
             let o1 = _mm_cvtepi32_ps(sums1);
 
-            let (r0, r1);
+            let r0 = _mm_mul_round_ps(o0, v_mul_value);
+            let r1 = _mm_mul_round_ps(o1, v_mul_value);
 
-            if FMA {
-                r0 = _mm_mul_round_ps(o0, v_mul_value);
-                r1 = _mm_mul_round_ps(o1, v_mul_value);
-            } else {
-                let m0 = _mm_mul_ps(o0, v_mul_value);
-                let m1 = _mm_mul_ps(o1, v_mul_value);
-
-                const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
-
-                r0 = _mm_round_ps::<ROUNDING_FLAGS>(m0);
-                r1 = _mm_round_ps::<ROUNDING_FLAGS>(m1);
-            }
-
-            store_u8_s32::<CN>(store_ld0, _mm_cvtps_epi32(r0));
-            store_u8_s32::<CN>(store_ld1, _mm_cvtps_epi32(r1));
+            store_u8_s32_avx512::<CN>(store_ld0, _mm_cvtps_epi32(r0));
+            store_u8_s32_avx512::<CN>(store_ld1, _mm_cvtps_epi32(r1));
 
             dst_ptr0 += CN;
             dst_ptr1 += CN;
@@ -197,8 +187,8 @@ unsafe fn sse_horiz_pass_impl<const CN: usize, const FMA: bool>(
             let src_ld0 = pixels.slice.as_ptr().add(src_ptr0);
             let src_ld1 = pixels.slice.as_ptr().add(src_ptr1);
 
-            let src_pixel0 = load_u8_s32_fast::<CN>(src_ld0 as *const u8);
-            let src_pixel1 = load_u8_s32_fast::<CN>(src_ld1 as *const u8);
+            let src_pixel0 = load_u8_s32_fast_avx512::<CN>(src_ld0 as *const u8);
+            let src_pixel1 = load_u8_s32_fast_avx512::<CN>(src_ld1 as *const u8);
 
             _mm_storeu_si128(stack as *mut __m128i, src_pixel0);
             _mm_storeu_si128(stack.add(4) as *mut __m128i, src_pixel1);
@@ -235,15 +225,12 @@ unsafe fn sse_horiz_pass_impl<const CN: usize, const FMA: bool>(
         let mut src_ptr = stride as usize * y;
 
         let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
-        let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
+        let src_pixel = load_u8_s32_fast_avx512::<CN>(src_ld as *const u8);
 
         for i in 0..=radius {
             let stack_value = stacks.as_mut_ptr().add(i as usize * 4);
             _mm_storeu_si128(stack_value as *mut __m128i, src_pixel);
-            sums = _mm_add_epi32(
-                sums,
-                _mm_madd_epi16(src_pixel, _mm_set1_epi32(i as i32 + 1)),
-            );
+            sums = _mm_add_dot_epi16::<D>(sums, src_pixel, _mm_set1_epi32(i as i32 + 1));
             sum_out = _mm_add_epi32(sum_out, src_pixel);
         }
 
@@ -253,11 +240,12 @@ unsafe fn sse_horiz_pass_impl<const CN: usize, const FMA: bool>(
             }
             let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4);
             let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
-            let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
+            let src_pixel = load_u8_s32_fast_avx512::<CN>(src_ld as *const u8);
             _mm_storeu_si128(stack_ptr as *mut __m128i, src_pixel);
-            sums = _mm_add_epi32(
+            sums = _mm_add_dot_epi16::<D>(
                 sums,
-                _mm_madd_epi16(src_pixel, _mm_set1_epi32(radius as i32 + 1 - i as i32)),
+                src_pixel,
+                _mm_set1_epi32(radius as i32 + 1 - i as i32),
             );
 
             sum_in = _mm_add_epi32(sum_in, src_pixel);
@@ -273,16 +261,9 @@ unsafe fn sse_horiz_pass_impl<const CN: usize, const FMA: bool>(
         let mut dst_ptr = y * stride as usize;
         for _ in 0..width {
             let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
-            const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
-            let result = if FMA {
-                _mm_cvtps_epi32(_mm_mul_round_ps(_mm_cvtepi32_ps(sums), v_mul_value))
-            } else {
-                _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(
-                    _mm_cvtepi32_ps(sums),
-                    v_mul_value,
-                )))
-            };
-            store_u8_s32::<CN>(store_ld, result);
+
+            let result = _mm_cvtps_epi32(_mm_mul_round_ps(_mm_cvtepi32_ps(sums), v_mul_value));
+            store_u8_s32_avx512::<CN>(store_ld, result);
             dst_ptr += CN;
 
             sums = _mm_sub_epi32(sums, sum_out);
@@ -303,7 +284,7 @@ unsafe fn sse_horiz_pass_impl<const CN: usize, const FMA: bool>(
             }
 
             let src_ld = pixels.slice.as_ptr().add(src_ptr);
-            let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
+            let src_pixel = load_u8_s32_fast_avx512::<CN>(src_ld as *const u8);
             _mm_storeu_si128(stack as *mut __m128i, src_pixel);
 
             sum_in = _mm_add_epi32(sum_in, src_pixel);
@@ -322,8 +303,8 @@ unsafe fn sse_horiz_pass_impl<const CN: usize, const FMA: bool>(
     }
 }
 
-#[target_feature(enable = "sse4.1")]
-unsafe fn sse_horiz_pass_impl_def<const CN: usize>(
+#[target_feature(enable = "avx512vl", enable = "avx512bw")]
+unsafe fn pass_avx512_common<const CN: usize>(
     pixels: &UnsafeSlice<u8>,
     stride: u32,
     width: u32,
@@ -332,11 +313,11 @@ unsafe fn sse_horiz_pass_impl_def<const CN: usize>(
     thread: usize,
     total_threads: usize,
 ) {
-    sse_horiz_pass_impl::<CN, false>(pixels, stride, width, height, radius, thread, total_threads);
+    pass_avx512_impl::<CN, false>(pixels, stride, width, height, radius, thread, total_threads);
 }
 
-#[target_feature(enable = "sse4.1", enable = "fma")]
-unsafe fn sse_horiz_pass_impl_fma<const CN: usize>(
+#[target_feature(enable = "avx512vl", enable = "avx512bw", enable = "avx512vnni")]
+unsafe fn pass_avx512_dot<const CN: usize>(
     pixels: &UnsafeSlice<u8>,
     stride: u32,
     width: u32,
@@ -345,11 +326,11 @@ unsafe fn sse_horiz_pass_impl_fma<const CN: usize>(
     thread: usize,
     total_threads: usize,
 ) {
-    sse_horiz_pass_impl::<CN, true>(pixels, stride, width, height, radius, thread, total_threads);
+    pass_avx512_impl::<CN, true>(pixels, stride, width, height, radius, thread, total_threads);
 }
 
 impl<T, J, const COMPONENTS: usize> StackBlurWorkingPass<T, COMPONENTS>
-    for HorizontalSseStackBlurPass<T, J, COMPONENTS>
+    for HorizontalAvx512StackBlurPass<T, J, COMPONENTS>
 where
     J: Copy
         + 'static
@@ -380,8 +361,8 @@ where
     ) {
         unsafe {
             let pixels: &UnsafeSlice<u8> = std::mem::transmute(pixels);
-            if std::arch::is_x86_feature_detected!("fma") {
-                sse_horiz_pass_impl_fma::<COMPONENTS>(
+            if std::arch::is_x86_feature_detected!("avx512vnni") {
+                pass_avx512_dot::<COMPONENTS>(
                     pixels,
                     stride,
                     width,
@@ -391,7 +372,7 @@ where
                     total_threads,
                 );
             } else {
-                sse_horiz_pass_impl_def::<COMPONENTS>(
+                pass_avx512_common::<COMPONENTS>(
                     pixels,
                     stride,
                     width,

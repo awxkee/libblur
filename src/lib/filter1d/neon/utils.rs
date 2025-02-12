@@ -286,8 +286,8 @@ pub(crate) unsafe fn vdotq_exact_symm_s16(
     let wide_lo = vaddl_u8(vget_low_u8(input0), vget_low_u8(input1));
     let wide_hi = vaddl_u8(vget_high_u8(input0), vget_high_u8(input1));
     (
-        vaddq_s16(store.0, vmulq_s16(vreinterpretq_s16_u16(wide_lo), weight)),
-        vaddq_s16(store.1, vmulq_s16(vreinterpretq_s16_u16(wide_hi), weight)),
+        vmlaq_s16(store.0, vreinterpretq_s16_u16(wide_lo), weight),
+        vmlaq_s16(store.1, vreinterpretq_s16_u16(wide_hi), weight),
     )
 }
 
