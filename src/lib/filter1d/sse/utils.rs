@@ -413,11 +413,11 @@ pub(crate) unsafe fn _mm_pack_epi32_epi8(store: __m128i) -> __m128i {
 
 #[inline(always)]
 pub(crate) unsafe fn _mm_pack_ps_x4_epi8(store: (__m128, __m128, __m128, __m128)) -> __m128i {
-    const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
-    let j0 = _mm_round_ps::<ROUNDING_FLAGS>(store.0);
-    let j1 = _mm_round_ps::<ROUNDING_FLAGS>(store.1);
-    let j2 = _mm_round_ps::<ROUNDING_FLAGS>(store.2);
-    let j3 = _mm_round_ps::<ROUNDING_FLAGS>(store.3);
+    let rnd = _mm_set1_ps(0.5f32);
+    let j0 = _mm_add_ps(store.0, rnd);
+    let j1 = _mm_add_ps(store.1, rnd);
+    let j2 = _mm_add_ps(store.2, rnd);
+    let j3 = _mm_add_ps(store.3, rnd);
     let o0 = _mm_cvtps_epi32(j0);
     let o1 = _mm_cvtps_epi32(j1);
     let o2 = _mm_cvtps_epi32(j2);
@@ -429,10 +429,10 @@ pub(crate) unsafe fn _mm_pack_ps_x4_epi8(store: (__m128, __m128, __m128, __m128)
 
 #[inline(always)]
 pub(crate) unsafe fn _mm_pack_ps_x2_epi8(store: (__m128, __m128)) -> __m128i {
-    const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
+    let rnd = _mm_set1_ps(0.5f32);
     let lo_s = _mm_packs_epi32(
-        _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(store.0)),
-        _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(store.1)),
+        _mm_cvtps_epi32(_mm_add_ps(store.0, rnd)),
+        _mm_cvtps_epi32(_mm_add_ps(store.1, rnd)),
     );
     _mm_packus_epi16(lo_s, _mm_setzero_si128())
 }

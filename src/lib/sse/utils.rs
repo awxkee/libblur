@@ -71,29 +71,6 @@ pub(crate) unsafe fn load_u8_s32_fast<const CN: usize>(ptr: *const u8) -> __m128
     }
 }
 
-#[cfg(feature = "nightly_avx512")]
-#[inline(always)]
-pub(crate) unsafe fn load_u8_s32_fast_avx512<const CN: usize>(ptr: *const u8) -> __m128i {
-    let sh1 = _mm_setr_epi8(0, -1, -1, -1, 1, -1, -1, -1, 2, -1, -1, -1, 3, -1, -1, -1);
-    let mask: __mmask16 = 0xffff >> (16 - CN);
-    let v = _mm_maskz_loadu_epi8(mask, ptr as *const _);
-    _mm_shuffle_epi8(v, sh1)
-}
-
-#[cfg(feature = "nightly_avx512")]
-#[inline(always)]
-pub(crate) unsafe fn _mm_add_dot_epi16<const D: bool>(
-    a: __m128i,
-    b: __m128i,
-    c: __m128i,
-) -> __m128i {
-    if D {
-        _mm_dpwssd_epi32(a, b, c)
-    } else {
-        _mm_add_epi32(a, _mm_madd_epi16(b, c))
-    }
-}
-
 #[inline(always)]
 pub(crate) unsafe fn _mm_mul_ps_epi32(ab: __m128i, cd: __m128) -> __m128i {
     let cvt = _mm_cvtepi32_ps(ab);
@@ -159,16 +136,6 @@ pub(crate) unsafe fn store_u8_s32<const CN: usize>(dst_ptr: *mut u8, regi: __m12
         let pixel_bytes = pixel_s32.to_le_bytes();
         dst_ptr.write_unaligned(pixel_bytes[0]);
     }
-}
-
-/// Stores u32 up to x4 as u8 up to x4 based on channels count
-#[inline(always)]
-#[cfg(any(feature = "nightly_avx512"))]
-pub(crate) unsafe fn store_u8_s32_avx512<const CN: usize>(dst_ptr: *mut u8, regi: __m128i) {
-    let s16 = _mm_packs_epi32(regi, regi);
-    let v8 = _mm_packus_epi16(s16, s16);
-    let mask: __mmask16 = 0xffff >> (16 - CN);
-    _mm_mask_storeu_epi8(dst_ptr as *mut _, mask, v8);
 }
 
 #[inline(always)]

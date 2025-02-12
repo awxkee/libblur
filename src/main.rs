@@ -216,16 +216,15 @@ fn main() {
     // // bytes = dst_bytes;
 
     let start_time = Instant::now();
-    // libblur::fast_gaussian_next(
-    //     &mut dst_bytes,
-    //     stride as u32,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     125,
-    //     FastBlurChannels::Channels3,
-    //     ThreadingPolicy::Adaptive,
-    //     EdgeMode::Clamp,
-    // );
+    libblur::stack_blur(
+        &mut dst_bytes,
+        stride as u32,
+        dimensions.0,
+        dimensions.1,
+        125,
+        FastBlurChannels::Channels3,
+        ThreadingPolicy::Adaptive,
+    );
     // libblur::fast_gaussian_next(
     //     &mut dst_bytes,
     //     stride as u32,

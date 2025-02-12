@@ -28,11 +28,6 @@
  */
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]
 mod avx;
-#[cfg(all(
-    any(target_arch = "x86_64", target_arch = "x86"),
-    feature = "nightly_avx512"
-))]
-mod avx512;
 #[deny(unused, unreachable_pub)]
 mod horizontal;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]

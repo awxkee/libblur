@@ -26,7 +26,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::avx::{_mm256_mul_round_ps, _mm_mul_round_ps};
-use crate::sse::{_mm_mul_ps_epi32, load_u8_s32_fast, store_u8_u32};
+use crate::sse::{load_u8_s32_fast, store_u8_u32};
 use crate::unsafe_slice::UnsafeSlice;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
