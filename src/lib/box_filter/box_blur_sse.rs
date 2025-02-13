@@ -139,8 +139,88 @@ unsafe fn box_blur_horizontal_pass_impl<const CHANNELS: usize, const FMA: bool>(
         }
 
         unsafe {
-            for x in 1..std::cmp::min(half_kernel, width) {
-                let px = x as usize * CHANNELS;
+            let mut jx = 1usize;
+
+            if CHANNELS == 4 {
+                while jx + 4 < half_kernel.min(width) as usize {
+                    let px = jx * CHANNELS;
+
+                    let s_ptr_0 = src.as_ptr().add(y_src_shift + px);
+                    let s_ptr_1 = src.as_ptr().add(y_src_shift + src_stride as usize + px);
+                    let s_ptr_2 = src.as_ptr().add(y_src_shift + src_stride as usize * 2 + px);
+                    let s_ptr_3 = src.as_ptr().add(y_src_shift + src_stride as usize * 3 + px);
+
+                    let sh1 = _mm_setr_epi8(0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15);
+
+                    let mut edge_colors_0 = _mm_loadu_si128(s_ptr_0 as *const __m128i);
+                    let mut edge_colors_1 = _mm_loadu_si128(s_ptr_1 as *const __m128i);
+                    let mut edge_colors_2 = _mm_loadu_si128(s_ptr_2 as *const __m128i);
+                    let mut edge_colors_3 = _mm_loadu_si128(s_ptr_3 as *const __m128i);
+
+                    edge_colors_0 = _mm_shuffle_epi8(edge_colors_0, sh1);
+                    edge_colors_1 = _mm_shuffle_epi8(edge_colors_1, sh1);
+                    edge_colors_2 = _mm_shuffle_epi8(edge_colors_2, sh1);
+                    edge_colors_3 = _mm_shuffle_epi8(edge_colors_3, sh1);
+
+                    let mut m0 = _mm_maddubs_epi16(edge_colors_0, _mm_set1_epi8(1));
+                    let mut m1 = _mm_maddubs_epi16(edge_colors_1, _mm_set1_epi8(1));
+                    let mut m2 = _mm_maddubs_epi16(edge_colors_2, _mm_set1_epi8(1));
+                    let mut m3 = _mm_maddubs_epi16(edge_colors_3, _mm_set1_epi8(1));
+
+                    m0 = _mm_madd_epi16(m0, _mm_set1_epi16(1));
+                    m1 = _mm_madd_epi16(m1, _mm_set1_epi16(1));
+                    m2 = _mm_madd_epi16(m2, _mm_set1_epi16(1));
+                    m3 = _mm_madd_epi16(m3, _mm_set1_epi16(1));
+
+                    store_0 = _mm_add_epi32(store_0, m0);
+                    store_1 = _mm_add_epi32(store_1, m1);
+                    store_2 = _mm_add_epi32(store_2, m2);
+                    store_3 = _mm_add_epi32(store_3, m3);
+
+                    jx += 4;
+                }
+
+                while jx + 2 < half_kernel.min(width) as usize {
+                    let px = jx * CHANNELS;
+
+                    let s_ptr_0 = src.as_ptr().add(y_src_shift + px);
+                    let s_ptr_1 = src.as_ptr().add(y_src_shift + src_stride as usize + px);
+                    let s_ptr_2 = src.as_ptr().add(y_src_shift + src_stride as usize * 2 + px);
+                    let s_ptr_3 = src.as_ptr().add(y_src_shift + src_stride as usize * 3 + px);
+
+                    let sh1 = _mm_setr_epi8(0, 4, -1, -1, 1, 5, -1, -1, 2, 6, -1, -1, 3, 7, -1, -1);
+
+                    let mut edge_colors_0 = _mm_loadu_si64(s_ptr_0);
+                    let mut edge_colors_1 = _mm_loadu_si64(s_ptr_1);
+                    let mut edge_colors_2 = _mm_loadu_si64(s_ptr_2);
+                    let mut edge_colors_3 = _mm_loadu_si64(s_ptr_3);
+
+                    edge_colors_0 = _mm_shuffle_epi8(edge_colors_0, sh1);
+                    edge_colors_1 = _mm_shuffle_epi8(edge_colors_1, sh1);
+                    edge_colors_2 = _mm_shuffle_epi8(edge_colors_2, sh1);
+                    edge_colors_3 = _mm_shuffle_epi8(edge_colors_3, sh1);
+
+                    let mut m0 = _mm_maddubs_epi16(edge_colors_0, _mm_set1_epi8(1));
+                    let mut m1 = _mm_maddubs_epi16(edge_colors_1, _mm_set1_epi8(1));
+                    let mut m2 = _mm_maddubs_epi16(edge_colors_2, _mm_set1_epi8(1));
+                    let mut m3 = _mm_maddubs_epi16(edge_colors_3, _mm_set1_epi8(1));
+
+                    m0 = _mm_madd_epi16(m0, _mm_set1_epi16(1));
+                    m1 = _mm_madd_epi16(m1, _mm_set1_epi16(1));
+                    m2 = _mm_madd_epi16(m2, _mm_set1_epi16(1));
+                    m3 = _mm_madd_epi16(m3, _mm_set1_epi16(1));
+
+                    store_0 = _mm_add_epi32(store_0, m0);
+                    store_1 = _mm_add_epi32(store_1, m1);
+                    store_2 = _mm_add_epi32(store_2, m2);
+                    store_3 = _mm_add_epi32(store_3, m3);
+
+                    jx += 2;
+                }
+            }
+
+            for x in jx..half_kernel.min(width) as usize {
+                let px = x * CHANNELS;
 
                 let s_ptr_0 = src.as_ptr().add(y_src_shift + px);
                 let s_ptr_1 = src.as_ptr().add(y_src_shift + src_stride as usize + px);
@@ -191,7 +271,7 @@ unsafe fn box_blur_horizontal_pass_impl<const CHANNELS: usize, const FMA: bool>(
 
             // add next
             unsafe {
-                let next_x = std::cmp::min(x + half_kernel, width - 1) as usize;
+                let next_x = (x + half_kernel).min(width - 1) as usize;
 
                 let next = next_x * CHANNELS;
 
@@ -307,8 +387,48 @@ unsafe fn box_blur_horizontal_pass_impl<const CHANNELS: usize, const FMA: bool>(
         }
 
         unsafe {
-            for x in 1..std::cmp::min(half_kernel, width) {
-                let px = x as usize * CHANNELS;
+            let mut jx = 1usize;
+
+            if CHANNELS == 4 {
+                while jx + 4 < half_kernel.min(width) as usize {
+                    let px = jx * CHANNELS;
+
+                    let s_ptr_0 = src.as_ptr().add(y_src_shift + px);
+
+                    let sh1 = _mm_setr_epi8(0, 4, 8, 12, 1, 5, 9, 13, 2, 6, 10, 14, 3, 7, 11, 15);
+
+                    let mut edge_colors_0 = _mm_loadu_si128(s_ptr_0 as *const __m128i);
+
+                    edge_colors_0 = _mm_shuffle_epi8(edge_colors_0, sh1);
+
+                    let mut m0 = _mm_maddubs_epi16(edge_colors_0, _mm_set1_epi8(1));
+                    m0 = _mm_madd_epi16(m0, _mm_set1_epi16(1));
+
+                    store = _mm_add_epi32(store, m0);
+
+                    jx += 4;
+                }
+
+                while jx + 2 < half_kernel.min(width) as usize {
+                    let px = jx * CHANNELS;
+
+                    let s_ptr_0 = src.as_ptr().add(y_src_shift + px);
+
+                    let sh1 = _mm_setr_epi8(0, 4, -1, -1, 1, 5, -1, -1, 2, 6, -1, -1, 3, 7, -1, -1);
+
+                    let mut edge_colors_0 = _mm_loadu_si64(s_ptr_0);
+                    edge_colors_0 = _mm_shuffle_epi8(edge_colors_0, sh1);
+
+                    let mut m0 = _mm_maddubs_epi16(edge_colors_0, _mm_set1_epi8(1));
+                    m0 = _mm_madd_epi16(m0, _mm_set1_epi16(1));
+                    store = _mm_add_epi32(store, m0);
+
+                    jx += 2;
+                }
+            }
+
+            for x in jx..half_kernel.min(width) as usize {
+                let px = x * CHANNELS;
                 let s_ptr = src.as_ptr().add(y_src_shift + px);
                 let edge_colors = load_u8_s32_fast::<CHANNELS>(s_ptr);
                 store = _mm_add_epi32(store, edge_colors);

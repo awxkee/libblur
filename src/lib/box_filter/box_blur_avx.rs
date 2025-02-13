@@ -26,7 +26,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::avx::{_mm256_mul_round_ps, _mm_mul_round_ps};
-use crate::sse::{load_u8_s32_fast, store_u8_u32};
+use crate::sse::{load_u8_s16_fast, load_u8_s32_fast, store_u8_u32};
 use crate::unsafe_slice::UnsafeSlice;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
@@ -49,7 +49,17 @@ pub(crate) fn box_blur_vertical_pass_avx2<T, const CHANNELS: usize>(
 
     unsafe {
         if std::arch::is_x86_feature_detected!("fma") {
-            box_blur_vertical_pass_avx2_fma::<CHANNELS>(
+            if radius < 240 {
+                box_blur_vertical_pass_avx2_fma_lr::<CHANNELS>(
+                    src, src_stride, unsafe_dst, dst_stride, w, height, radius, start_x, end_x,
+                )
+            } else {
+                box_blur_vertical_pass_avx2_fma::<CHANNELS>(
+                    src, src_stride, unsafe_dst, dst_stride, w, height, radius, start_x, end_x,
+                )
+            }
+        } else if radius < 240 {
+            box_blur_vertical_pass_avx2_def_lr::<CHANNELS>(
                 src, src_stride, unsafe_dst, dst_stride, w, height, radius, start_x, end_x,
             )
         } else {
@@ -794,17 +804,632 @@ unsafe fn box_blur_vertical_pass_avx2_impl<const CHANNELS: usize, const FMA: boo
             let px = x as usize;
 
             unsafe {
-                let r0;
-
-                if FMA {
-                    r0 = _mm_mul_round_ps(_mm_cvtepi32_ps(store), v_weight);
+                let r0 = if FMA {
+                    _mm_mul_round_ps(_mm_cvtepi32_ps(store), v_weight)
                 } else {
                     let scale_store_0_ps = _mm_mul_ps(_mm_cvtepi32_ps(store), v_weight);
 
                     const RND: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
 
-                    r0 = _mm_round_ps::<RND>(scale_store_0_ps);
+                    _mm_round_ps::<RND>(scale_store_0_ps)
+                };
+                let ptr = unsafe_dst.slice.as_ptr().add(y_dst_shift + px) as *mut u8;
+                store_u8_u32::<TAIL_CN>(ptr, _mm_cvtps_epi32(r0));
+            }
+        }
+    }
+}
+
+#[target_feature(enable = "avx2")]
+unsafe fn box_blur_vertical_pass_avx2_def_lr<const CHANNELS: usize>(
+    undefined_src: &[u8],
+    src_stride: u32,
+    undefined_unsafe_dst: &UnsafeSlice<u8>,
+    dst_stride: u32,
+    w: u32,
+    height: u32,
+    radius: u32,
+    start_x: u32,
+    end_x: u32,
+) {
+    box_blur_vertical_pass_avx2_impl_lr::<CHANNELS, false>(
+        undefined_src,
+        src_stride,
+        undefined_unsafe_dst,
+        dst_stride,
+        w,
+        height,
+        radius,
+        start_x,
+        end_x,
+    )
+}
+
+#[target_feature(enable = "avx2", enable = "fma")]
+unsafe fn box_blur_vertical_pass_avx2_fma_lr<const CHANNELS: usize>(
+    undefined_src: &[u8],
+    src_stride: u32,
+    undefined_unsafe_dst: &UnsafeSlice<u8>,
+    dst_stride: u32,
+    w: u32,
+    height: u32,
+    radius: u32,
+    start_x: u32,
+    end_x: u32,
+) {
+    box_blur_vertical_pass_avx2_impl_lr::<CHANNELS, true>(
+        undefined_src,
+        src_stride,
+        undefined_unsafe_dst,
+        dst_stride,
+        w,
+        height,
+        radius,
+        start_x,
+        end_x,
+    )
+}
+
+#[inline(always)]
+unsafe fn box_blur_vertical_pass_avx2_impl_lr<const CHANNELS: usize, const FMA: bool>(
+    src: &[u8],
+    src_stride: u32,
+    unsafe_dst: &UnsafeSlice<u8>,
+    dst_stride: u32,
+    _: u32,
+    height: u32,
+    radius: u32,
+    start_x: u32,
+    end_x: u32,
+) {
+    let kernel_size = radius * 2 + 1;
+    let edge_count = (kernel_size / 2) + 1;
+    let half_kernel = kernel_size / 2;
+
+    let mut cx = start_x;
+
+    let v_edge_count = unsafe { _mm256_set1_epi8(edge_count as i8) };
+    let v_weight = unsafe { _mm256_set1_ps(1f32 / (radius * 2) as f32) };
+
+    while cx + 64 < end_x {
+        let px = cx as usize;
+
+        let mut store_0: __m256i;
+        let mut store_1: __m256i;
+        let mut store_2: __m256i;
+        let mut store_3: __m256i;
+
+        unsafe {
+            let s_ptr = src.as_ptr().add(px);
+            let edge0 = _mm256_loadu_si256(s_ptr as *const _);
+            let edge1 = _mm256_loadu_si256(s_ptr.add(32) as *const _);
+            let lo0 = _mm256_unpacklo_epi8(edge0, _mm256_setzero_si256());
+            let hi0 = _mm256_unpackhi_epi8(edge0, _mm256_setzero_si256());
+
+            let lo1 = _mm256_unpacklo_epi8(edge1, _mm256_setzero_si256());
+            let hi1 = _mm256_unpackhi_epi8(edge1, _mm256_setzero_si256());
+
+            store_0 = _mm256_maddubs_epi16(lo0, v_edge_count);
+            store_1 = _mm256_maddubs_epi16(hi0, v_edge_count);
+
+            store_2 = _mm256_maddubs_epi16(lo1, v_edge_count);
+            store_3 = _mm256_maddubs_epi16(hi1, v_edge_count);
+        }
+
+        unsafe {
+            for y in 1..half_kernel.min(height) {
+                let y_src_shift = y as usize * src_stride as usize;
+                let s_ptr = src.as_ptr().add(y_src_shift + px);
+
+                let edge0 = _mm256_loadu_si256(s_ptr as *const _);
+                let edge1 = _mm256_loadu_si256(s_ptr.add(32) as *const _);
+                let lo0 = _mm256_unpacklo_epi8(edge0, _mm256_setzero_si256());
+                let hi0 = _mm256_unpackhi_epi8(edge0, _mm256_setzero_si256());
+
+                let lo1 = _mm256_unpacklo_epi8(edge1, _mm256_setzero_si256());
+                let hi1 = _mm256_unpackhi_epi8(edge1, _mm256_setzero_si256());
+
+                store_0 = _mm256_adds_epu16(store_0, lo0);
+                store_1 = _mm256_adds_epu16(store_1, hi0);
+
+                store_2 = _mm256_adds_epu16(store_2, lo1);
+                store_3 = _mm256_adds_epu16(store_3, hi1);
+            }
+        }
+
+        unsafe {
+            for y in 0..height {
+                // preload edge pixels
+                let next = (y + half_kernel).min(height - 1) as usize * src_stride as usize;
+                let previous =
+                    (y as i64 - half_kernel as i64).max(0) as usize * src_stride as usize;
+                let y_dst_shift = dst_stride as usize * y as usize;
+
+                // subtract previous
+                {
+                    let s_ptr = src.as_ptr().add(previous + px);
+                    let edge0 = _mm256_loadu_si256(s_ptr as *const _);
+                    let edge1 = _mm256_loadu_si256(s_ptr.add(32) as *const _);
+                    let lo0 = _mm256_unpacklo_epi8(edge0, _mm256_setzero_si256());
+                    let hi0 = _mm256_unpackhi_epi8(edge0, _mm256_setzero_si256());
+
+                    let lo1 = _mm256_unpacklo_epi8(edge1, _mm256_setzero_si256());
+                    let hi1 = _mm256_unpackhi_epi8(edge1, _mm256_setzero_si256());
+
+                    store_0 = _mm256_subs_epu16(store_0, lo0);
+                    store_1 = _mm256_subs_epu16(store_1, hi0);
+
+                    store_2 = _mm256_subs_epu16(store_2, lo1);
+                    store_3 = _mm256_subs_epu16(store_3, hi1);
                 }
+
+                // add next
+                {
+                    let s_ptr = src.as_ptr().add(next + px);
+                    let edge0 = _mm256_loadu_si256(s_ptr as *const _);
+                    let edge1 = _mm256_loadu_si256(s_ptr.add(32) as *const _);
+                    let lo0 = _mm256_unpacklo_epi8(edge0, _mm256_setzero_si256());
+                    let hi0 = _mm256_unpackhi_epi8(edge0, _mm256_setzero_si256());
+
+                    let lo1 = _mm256_unpacklo_epi8(edge1, _mm256_setzero_si256());
+                    let hi1 = _mm256_unpackhi_epi8(edge1, _mm256_setzero_si256());
+
+                    store_0 = _mm256_adds_epu16(store_0, lo0);
+                    store_1 = _mm256_adds_epu16(store_1, hi0);
+
+                    store_2 = _mm256_adds_epu16(store_2, lo1);
+                    store_3 = _mm256_adds_epu16(store_3, hi1);
+                }
+
+                let px = cx as usize;
+
+                let jw0 = _mm256_unpacklo_epi16(store_0, _mm256_setzero_si256());
+                let jw1 = _mm256_unpackhi_epi16(store_0, _mm256_setzero_si256());
+                let jw2 = _mm256_unpacklo_epi16(store_1, _mm256_setzero_si256());
+                let jw3 = _mm256_unpackhi_epi16(store_1, _mm256_setzero_si256());
+                let jw4 = _mm256_unpacklo_epi16(store_2, _mm256_setzero_si256());
+                let jw5 = _mm256_unpackhi_epi16(store_2, _mm256_setzero_si256());
+                let jw6 = _mm256_unpacklo_epi16(store_3, _mm256_setzero_si256());
+                let jw7 = _mm256_unpackhi_epi16(store_3, _mm256_setzero_si256());
+
+                let store0_ps = _mm256_cvtepi32_ps(jw0);
+                let store1_ps = _mm256_cvtepi32_ps(jw1);
+                let store2_ps = _mm256_cvtepi32_ps(jw2);
+                let store3_ps = _mm256_cvtepi32_ps(jw3);
+                let store4_ps = _mm256_cvtepi32_ps(jw4);
+                let store5_ps = _mm256_cvtepi32_ps(jw5);
+                let store6_ps = _mm256_cvtepi32_ps(jw6);
+                let store7_ps = _mm256_cvtepi32_ps(jw7);
+
+                let (r0, r1, r2, r3, r4, r5, r6, r7);
+
+                if FMA {
+                    r0 = _mm256_mul_round_ps(store0_ps, v_weight);
+                    r1 = _mm256_mul_round_ps(store1_ps, v_weight);
+                    r2 = _mm256_mul_round_ps(store2_ps, v_weight);
+                    r3 = _mm256_mul_round_ps(store3_ps, v_weight);
+                    r4 = _mm256_mul_round_ps(store4_ps, v_weight);
+                    r5 = _mm256_mul_round_ps(store5_ps, v_weight);
+                    r6 = _mm256_mul_round_ps(store6_ps, v_weight);
+                    r7 = _mm256_mul_round_ps(store7_ps, v_weight);
+                } else {
+                    let scale_store_0_ps = _mm256_mul_ps(store0_ps, v_weight);
+                    let scale_store_1_ps = _mm256_mul_ps(store1_ps, v_weight);
+                    let scale_store_2_ps = _mm256_mul_ps(store2_ps, v_weight);
+                    let scale_store_3_ps = _mm256_mul_ps(store3_ps, v_weight);
+                    let scale_store_4_ps = _mm256_mul_ps(store4_ps, v_weight);
+                    let scale_store_5_ps = _mm256_mul_ps(store5_ps, v_weight);
+                    let scale_store_6_ps = _mm256_mul_ps(store6_ps, v_weight);
+                    let scale_store_7_ps = _mm256_mul_ps(store7_ps, v_weight);
+
+                    r0 = _mm256_round_ps::<0x00>(scale_store_0_ps);
+                    r1 = _mm256_round_ps::<0x00>(scale_store_1_ps);
+                    r2 = _mm256_round_ps::<0x00>(scale_store_2_ps);
+                    r3 = _mm256_round_ps::<0x00>(scale_store_3_ps);
+                    r4 = _mm256_round_ps::<0x00>(scale_store_4_ps);
+                    r5 = _mm256_round_ps::<0x00>(scale_store_5_ps);
+                    r6 = _mm256_round_ps::<0x00>(scale_store_6_ps);
+                    r7 = _mm256_round_ps::<0x00>(scale_store_7_ps);
+                }
+
+                let scale_store_0 = _mm256_cvtps_epi32(r0);
+                let scale_store_1 = _mm256_cvtps_epi32(r1);
+                let scale_store_2 = _mm256_cvtps_epi32(r2);
+                let scale_store_3 = _mm256_cvtps_epi32(r3);
+                let scale_store_4 = _mm256_cvtps_epi32(r4);
+                let scale_store_5 = _mm256_cvtps_epi32(r5);
+                let scale_store_6 = _mm256_cvtps_epi32(r6);
+                let scale_store_7 = _mm256_cvtps_epi32(r7);
+
+                let offset = y_dst_shift + px;
+                let ptr = unsafe_dst.slice.get_unchecked(offset).get();
+
+                let set0 = _mm256_packus_epi32(scale_store_0, scale_store_1);
+                let set1 = _mm256_packus_epi32(scale_store_2, scale_store_3);
+                let set2 = _mm256_packus_epi32(scale_store_4, scale_store_5);
+                let set3 = _mm256_packus_epi32(scale_store_6, scale_store_7);
+
+                let full_set0 = _mm256_packus_epi16(set0, set1);
+                let full_set1 = _mm256_packus_epi16(set2, set3);
+                _mm256_storeu_si256(ptr as *mut _, full_set0);
+                _mm256_storeu_si256(ptr.add(32) as *mut _, full_set1);
+            }
+        }
+
+        cx += 64;
+    }
+
+    while cx + 32 < end_x {
+        let px = cx as usize;
+
+        let mut store_0: __m256i;
+        let mut store_1: __m256i;
+
+        unsafe {
+            let s_ptr = src.as_ptr().add(px);
+            let edge = _mm256_loadu_si256(s_ptr as *const _);
+            let lo0 = _mm256_unpacklo_epi8(edge, _mm256_setzero_si256());
+            let hi0 = _mm256_unpackhi_epi8(edge, _mm256_setzero_si256());
+
+            store_0 = _mm256_maddubs_epi16(lo0, v_edge_count);
+            store_1 = _mm256_maddubs_epi16(hi0, v_edge_count);
+        }
+
+        unsafe {
+            for y in 1..std::cmp::min(half_kernel, height) {
+                let y_src_shift = y as usize * src_stride as usize;
+                let s_ptr = src.as_ptr().add(y_src_shift + px);
+
+                let edge = _mm256_loadu_si256(s_ptr as *const _);
+                let lo0 = _mm256_unpacklo_epi8(edge, _mm256_setzero_si256());
+                let hi0 = _mm256_unpackhi_epi8(edge, _mm256_setzero_si256());
+
+                store_0 = _mm256_adds_epu16(store_0, lo0);
+                store_1 = _mm256_adds_epu16(store_1, hi0);
+            }
+        }
+
+        unsafe {
+            for y in 0..height {
+                // preload edge pixels
+                let next = (y + half_kernel).min(height - 1) as usize * src_stride as usize;
+                let previous =
+                    (y as i64 - half_kernel as i64).max(0) as usize * src_stride as usize;
+                let y_dst_shift = dst_stride as usize * y as usize;
+
+                // subtract previous
+                {
+                    let s_ptr = src.as_ptr().add(previous + px);
+                    let edge = _mm256_loadu_si256(s_ptr as *const _);
+                    let lo0 = _mm256_unpacklo_epi8(edge, _mm256_setzero_si256());
+                    let hi0 = _mm256_unpackhi_epi8(edge, _mm256_setzero_si256());
+
+                    store_0 = _mm256_subs_epu16(store_0, lo0);
+                    store_1 = _mm256_subs_epu16(store_1, hi0);
+                }
+
+                // add next
+                {
+                    let s_ptr = src.as_ptr().add(next + px);
+                    let edge = _mm256_loadu_si256(s_ptr as *const _);
+                    let lo0 = _mm256_unpacklo_epi8(edge, _mm256_setzero_si256());
+                    let hi0 = _mm256_unpackhi_epi8(edge, _mm256_setzero_si256());
+
+                    store_0 = _mm256_adds_epu16(store_0, lo0);
+                    store_1 = _mm256_adds_epu16(store_1, hi0);
+                }
+
+                let px = cx as usize;
+
+                let jw0 = _mm256_unpacklo_epi16(store_0, _mm256_setzero_si256());
+                let jw1 = _mm256_unpackhi_epi16(store_0, _mm256_setzero_si256());
+                let jw2 = _mm256_unpacklo_epi16(store_1, _mm256_setzero_si256());
+                let jw3 = _mm256_unpackhi_epi16(store_1, _mm256_setzero_si256());
+
+                let store0_ps = _mm256_cvtepi32_ps(jw0);
+                let store1_ps = _mm256_cvtepi32_ps(jw1);
+                let store2_ps = _mm256_cvtepi32_ps(jw2);
+                let store3_ps = _mm256_cvtepi32_ps(jw3);
+
+                let (r0, r1, r2, r3);
+
+                if FMA {
+                    r0 = _mm256_mul_round_ps(store0_ps, v_weight);
+                    r1 = _mm256_mul_round_ps(store1_ps, v_weight);
+                    r2 = _mm256_mul_round_ps(store2_ps, v_weight);
+                    r3 = _mm256_mul_round_ps(store3_ps, v_weight);
+                } else {
+                    let scale_store_0_ps = _mm256_mul_ps(store0_ps, v_weight);
+                    let scale_store_1_ps = _mm256_mul_ps(store1_ps, v_weight);
+                    let scale_store_2_ps = _mm256_mul_ps(store2_ps, v_weight);
+                    let scale_store_3_ps = _mm256_mul_ps(store3_ps, v_weight);
+
+                    r0 = _mm256_round_ps::<0x00>(scale_store_0_ps);
+                    r1 = _mm256_round_ps::<0x00>(scale_store_1_ps);
+                    r2 = _mm256_round_ps::<0x00>(scale_store_2_ps);
+                    r3 = _mm256_round_ps::<0x00>(scale_store_3_ps);
+                }
+
+                let scale_store_0 = _mm256_cvtps_epi32(r0);
+                let scale_store_1 = _mm256_cvtps_epi32(r1);
+                let scale_store_2 = _mm256_cvtps_epi32(r2);
+                let scale_store_3 = _mm256_cvtps_epi32(r3);
+
+                let offset = y_dst_shift + px;
+                let ptr = unsafe_dst.slice.get_unchecked(offset).get();
+
+                let set0 = _mm256_packus_epi32(scale_store_0, scale_store_1);
+                let set1 = _mm256_packus_epi32(scale_store_2, scale_store_3);
+
+                let full_set = _mm256_packus_epi16(set0, set1);
+                _mm256_storeu_si256(ptr as *mut _, full_set);
+            }
+        }
+
+        cx += 32;
+    }
+
+    let v_edge_count = unsafe { _mm_set1_epi8(edge_count as i8) };
+    let v_weight = unsafe { _mm_set1_ps(1f32 / (radius * 2) as f32) };
+
+    while cx + 16 < end_x {
+        let px = cx as usize;
+
+        let mut store_0: __m128i;
+        let mut store_1: __m128i;
+
+        unsafe {
+            let s_ptr = src.as_ptr().add(px);
+            let edge = _mm_loadu_si128(s_ptr as *const _);
+            let lo0 = _mm_unpacklo_epi8(edge, _mm_setzero_si128());
+            let hi0 = _mm_unpackhi_epi8(edge, _mm_setzero_si128());
+
+            store_0 = _mm_maddubs_epi16(lo0, v_edge_count);
+            store_1 = _mm_maddubs_epi16(hi0, v_edge_count);
+        }
+
+        unsafe {
+            for y in 1..half_kernel.min(height) {
+                let y_src_shift = y as usize * src_stride as usize;
+                let s_ptr = src.as_ptr().add(y_src_shift + px);
+
+                let edge = _mm_loadu_si128(s_ptr as *const _);
+                let lo0 = _mm_unpacklo_epi8(edge, _mm_setzero_si128());
+                let hi0 = _mm_unpackhi_epi8(edge, _mm_setzero_si128());
+
+                store_0 = _mm_adds_epu16(store_0, lo0);
+                store_1 = _mm_adds_epu16(store_1, hi0);
+            }
+        }
+
+        unsafe {
+            for y in 0..height {
+                // preload edge pixels
+                let next = (y + half_kernel).min(height - 1) as usize * src_stride as usize;
+                let previous =
+                    (y as i64 - half_kernel as i64).max(0) as usize * src_stride as usize;
+                let y_dst_shift = dst_stride as usize * y as usize;
+
+                // subtract previous
+                {
+                    let s_ptr = src.as_ptr().add(previous + px);
+                    let edge = _mm_loadu_si128(s_ptr as *const _);
+                    let lo0 = _mm_unpacklo_epi8(edge, _mm_setzero_si128());
+                    let hi0 = _mm_unpackhi_epi8(edge, _mm_setzero_si128());
+
+                    store_0 = _mm_subs_epu16(store_0, lo0);
+                    store_1 = _mm_subs_epu16(store_1, hi0);
+                }
+
+                // add next
+                {
+                    let s_ptr = src.as_ptr().add(next + px);
+                    let edge = _mm_loadu_si128(s_ptr as *const _);
+                    let lo0 = _mm_unpacklo_epi8(edge, _mm_setzero_si128());
+                    let hi0 = _mm_unpackhi_epi8(edge, _mm_setzero_si128());
+
+                    store_0 = _mm_adds_epu16(store_0, lo0);
+                    store_1 = _mm_adds_epu16(store_1, hi0);
+                }
+
+                let px = cx as usize;
+
+                let jw0 = _mm_unpacklo_epi16(store_0, _mm_setzero_si128());
+                let jw1 = _mm_unpackhi_epi16(store_0, _mm_setzero_si128());
+                let jw2 = _mm_unpacklo_epi16(store_1, _mm_setzero_si128());
+                let jw3 = _mm_unpackhi_epi16(store_1, _mm_setzero_si128());
+
+                let store0_ps = _mm_cvtepi32_ps(jw0);
+                let store1_ps = _mm_cvtepi32_ps(jw1);
+                let store2_ps = _mm_cvtepi32_ps(jw2);
+                let store3_ps = _mm_cvtepi32_ps(jw3);
+
+                let (r0, r1, r2, r3);
+
+                if FMA {
+                    r0 = _mm_mul_round_ps(store0_ps, v_weight);
+                    r1 = _mm_mul_round_ps(store1_ps, v_weight);
+                    r2 = _mm_mul_round_ps(store2_ps, v_weight);
+                    r3 = _mm_mul_round_ps(store3_ps, v_weight);
+                } else {
+                    let scale_store_0_ps = _mm_mul_ps(store0_ps, v_weight);
+                    let scale_store_1_ps = _mm_mul_ps(store1_ps, v_weight);
+                    let scale_store_2_ps = _mm_mul_ps(store2_ps, v_weight);
+                    let scale_store_3_ps = _mm_mul_ps(store3_ps, v_weight);
+
+                    const RND: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
+
+                    r0 = _mm_round_ps::<RND>(scale_store_0_ps);
+                    r1 = _mm_round_ps::<RND>(scale_store_1_ps);
+                    r2 = _mm_round_ps::<RND>(scale_store_2_ps);
+                    r3 = _mm_round_ps::<RND>(scale_store_3_ps);
+                }
+
+                let scale_store_0 = _mm_cvtps_epi32(r0);
+                let scale_store_1 = _mm_cvtps_epi32(r1);
+                let scale_store_2 = _mm_cvtps_epi32(r2);
+                let scale_store_3 = _mm_cvtps_epi32(r3);
+
+                let offset = y_dst_shift + px;
+                let ptr = unsafe_dst.slice.get_unchecked(offset).get();
+
+                let set0 = _mm_packus_epi32(scale_store_0, scale_store_1);
+                let set1 = _mm_packus_epi32(scale_store_2, scale_store_3);
+
+                let full_set = _mm_packus_epi16(set0, set1);
+                _mm_storeu_si128(ptr as *mut _, full_set);
+            }
+        }
+
+        cx += 16;
+    }
+
+    while cx + 8 < end_x {
+        let px = cx as usize;
+
+        let mut store_0: __m128i;
+
+        unsafe {
+            let s_ptr = src.as_ptr().add(px);
+            let edge = _mm_loadu_si64(s_ptr as *const _);
+            let lo0 = _mm_unpacklo_epi8(edge, _mm_setzero_si128());
+
+            store_0 = _mm_maddubs_epi16(lo0, v_edge_count);
+        }
+
+        unsafe {
+            for y in 1..half_kernel.min(height) {
+                let y_src_shift = y as usize * src_stride as usize;
+                let s_ptr = src.as_ptr().add(y_src_shift + px);
+
+                let edge = _mm_loadu_si64(s_ptr as *const _);
+                let lo0 = _mm_unpacklo_epi8(edge, _mm_setzero_si128());
+
+                store_0 = _mm_adds_epu16(store_0, lo0);
+            }
+        }
+
+        unsafe {
+            for y in 0..height {
+                // preload edge pixels
+                let next = (y + half_kernel).min(height - 1) as usize * src_stride as usize;
+                let previous =
+                    (y as i64 - half_kernel as i64).max(0) as usize * src_stride as usize;
+                let y_dst_shift = dst_stride as usize * y as usize;
+
+                // subtract previous
+                {
+                    let s_ptr = src.as_ptr().add(previous + px);
+                    let edge = _mm_loadu_si64(s_ptr as *const _);
+                    let lo0 = _mm_unpacklo_epi8(edge, _mm_setzero_si128());
+
+                    store_0 = _mm_subs_epu16(store_0, lo0);
+                }
+
+                // add next
+                {
+                    let s_ptr = src.as_ptr().add(next + px);
+                    let edge = _mm_loadu_si64(s_ptr as *const _);
+                    let lo0 = _mm_unpacklo_epi8(edge, _mm_setzero_si128());
+
+                    store_0 = _mm_adds_epu16(store_0, lo0);
+                }
+
+                let px = cx as usize;
+
+                let jw = store_0;
+
+                let store_0 = _mm_unpacklo_epi16(jw, _mm_setzero_si128());
+                let store_1 = _mm_unpackhi_epi16(jw, _mm_setzero_si128());
+
+                let store0_ps = _mm_cvtepi32_ps(store_0);
+                let store1_ps = _mm_cvtepi32_ps(store_1);
+
+                let (r0, r1);
+
+                if FMA {
+                    r0 = _mm_mul_round_ps(store0_ps, v_weight);
+                    r1 = _mm_mul_round_ps(store1_ps, v_weight);
+                } else {
+                    let scale_store_0_ps = _mm_mul_ps(store0_ps, v_weight);
+                    let scale_store_1_ps = _mm_mul_ps(store1_ps, v_weight);
+
+                    const RND: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
+
+                    r0 = _mm_round_ps::<RND>(scale_store_0_ps);
+                    r1 = _mm_round_ps::<RND>(scale_store_1_ps);
+                }
+
+                let scale_store_0 = _mm_cvtps_epi32(r0);
+                let scale_store_1 = _mm_cvtps_epi32(r1);
+
+                let offset = y_dst_shift + px;
+                let ptr = unsafe_dst.slice.get_unchecked(offset).get();
+
+                let set0 = _mm_packus_epi32(scale_store_0, scale_store_1);
+
+                let full_set = _mm_packus_epi16(set0, _mm_setzero_si128());
+                _mm_storeu_si64(ptr as *mut _, full_set);
+            }
+        }
+
+        cx += 8;
+    }
+
+    const TAIL_CN: usize = 1;
+
+    for x in cx..end_x {
+        let px = x as usize * TAIL_CN;
+
+        let mut store;
+        unsafe {
+            let s_ptr = src.as_ptr().add(px);
+            let edge_colors = load_u8_s16_fast::<TAIL_CN>(s_ptr);
+            store = _mm_maddubs_epi16(edge_colors, v_edge_count);
+        }
+
+        unsafe {
+            for y in 1..half_kernel.min(height) {
+                let y_src_shift = y as usize * src_stride as usize;
+                let s_ptr = src.as_ptr().add(y_src_shift + px);
+                let edge_colors = load_u8_s16_fast::<TAIL_CN>(s_ptr);
+                store = _mm_adds_epu16(store, edge_colors);
+            }
+        }
+
+        for y in 0..height {
+            // preload edge pixels
+            let next = (y + half_kernel).min(height - 1) as usize * src_stride as usize;
+            let previous = (y as i64 - half_kernel as i64).max(0) as usize * src_stride as usize;
+            let y_dst_shift = dst_stride as usize * y as usize;
+
+            // subtract previous
+            unsafe {
+                let s_ptr = src.as_ptr().add(previous + px);
+                let edge_colors = load_u8_s16_fast::<TAIL_CN>(s_ptr);
+                store = _mm_subs_epu16(store, edge_colors);
+            }
+
+            // add next
+            unsafe {
+                let s_ptr = src.as_ptr().add(next + px);
+                let edge_colors = load_u8_s16_fast::<TAIL_CN>(s_ptr);
+                store = _mm_adds_epu16(store, edge_colors);
+            }
+
+            let px = x as usize;
+
+            unsafe {
+                store = _mm_unpacklo_epi16(store, _mm_setzero_si128());
+                let r0 = if FMA {
+                    _mm_mul_round_ps(_mm_cvtepi32_ps(store), v_weight)
+                } else {
+                    let scale_store_0_ps = _mm_mul_ps(_mm_cvtepi32_ps(store), v_weight);
+
+                    const RND: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
+
+                    _mm_round_ps::<RND>(scale_store_0_ps)
+                };
                 let ptr = unsafe_dst.slice.as_ptr().add(y_dst_shift + px) as *mut u8;
                 store_u8_u32::<TAIL_CN>(ptr, _mm_cvtps_epi32(r0));
             }
