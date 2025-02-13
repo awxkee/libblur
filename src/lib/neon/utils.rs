@@ -180,6 +180,12 @@ pub(crate) unsafe fn vmulq_u32_f32(a: uint32x4_t, b: float32x4_t) -> uint32x4_t 
 }
 
 #[inline(always)]
+pub(crate) unsafe fn vmulq_u16_low_f32(a: uint16x8_t, b: float32x4_t) -> uint32x4_t {
+    let cvt = vcvtq_f32_u32(vmovl_u16(vget_low_u16(a)));
+    vcvtaq_u32_f32(vmulq_f32(cvt, b))
+}
+
+#[inline(always)]
 pub(crate) unsafe fn vmulq_s32_f32(a: int32x4_t, b: float32x4_t) -> int32x4_t {
     let cvt = vcvtq_f32_s32(a);
     vcvtaq_s32_f32(vmulq_f32(cvt, b))
@@ -202,6 +208,20 @@ pub unsafe fn load_u8_u16<const CHANNELS_COUNT: usize>(ptr: *const u8) -> uint16
     } else {
         let a0 = vld1_lane_u8::<0>(ptr as *const _, vdup_n_u8(0));
         vget_low_u16(vmovl_u8(a0))
+    }
+}
+
+#[inline(always)]
+pub unsafe fn load_u8<const CHANNELS_COUNT: usize>(ptr: *const u8) -> uint8x8_t {
+    if CHANNELS_COUNT == 4 {
+        vreinterpret_u8_u32(vld1_lane_u32::<0>(ptr as *mut u32, vdup_n_u32(0)))
+    } else if CHANNELS_COUNT == 3 {
+        let a0 = vreinterpret_u8_u16(vld1_lane_u16::<0>(ptr as *const _, vdup_n_u16(0)));
+        vld1_lane_u8::<2>(ptr.add(2) as *const _, a0)
+    } else if CHANNELS_COUNT == 2 {
+        vreinterpret_u8_u16(vld1_lane_u16::<0>(ptr as *const _, vdup_n_u16(0)))
+    } else {
+        vld1_lane_u8::<0>(ptr as *const _, vdup_n_u8(0))
     }
 }
 

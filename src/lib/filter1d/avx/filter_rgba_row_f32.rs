@@ -134,8 +134,6 @@ unsafe fn filter_rgba_row_avx_f32_f32_impl<const FMA: bool>(
         let y = filter_region.start;
         let local_src = src;
 
-        let length = scanned_kernel.iter().len();
-
         let mut _cx = 0usize;
 
         while _cx + 8 < width {
@@ -149,8 +147,8 @@ unsafe fn filter_rgba_row_avx_f32_f32_impl<const FMA: bool>(
             let mut k2 = _mm256_mul_ps(source.2, coeff);
             let mut k3 = _mm256_mul_ps(source.3, coeff);
 
-            for i in 1..length {
-                let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(i).weight);
+            for (i, wt) in scanned_kernel.iter().enumerate().skip(1) {
+                let coeff = _mm256_set1_ps(wt.weight);
                 let v_source =
                     _mm256_load_deinterleave_rgba_ps(shifted_src.get_unchecked((i * N)..).as_ptr());
                 k0 = _mm256_opt_fmlaf_ps::<FMA>(k0, v_source.0, coeff);
@@ -176,14 +174,14 @@ unsafe fn filter_rgba_row_avx_f32_f32_impl<const FMA: bool>(
             let mut k2 = _mm_mul_ps(source.2, coeff);
             let mut k3 = _mm_mul_ps(source.3, coeff);
 
-            for i in 1..length {
-                let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(i).weight);
+            for (i, wt) in scanned_kernel.iter().enumerate().skip(1) {
+                let coeff = _mm_set1_ps(wt.weight);
                 let v_source =
                     _mm_load_deinterleave_rgba_ps(shifted_src.get_unchecked((i * N)..).as_ptr());
                 k0 = _mm_opt_fmlaf_ps::<FMA>(k0, v_source.0, coeff);
                 k1 = _mm_opt_fmlaf_ps::<FMA>(k1, v_source.1, coeff);
                 k2 = _mm_opt_fmlaf_ps::<FMA>(k2, v_source.2, coeff);
-                k3 = _mm_opt_fmlaf_ps::<FMA>(k3, v_source.2, coeff);
+                k3 = _mm_opt_fmlaf_ps::<FMA>(k3, v_source.3, coeff);
             }
 
             let dst_offset = y * dst_stride + _cx * N;
@@ -197,9 +195,8 @@ unsafe fn filter_rgba_row_avx_f32_f32_impl<const FMA: bool>(
             let shifted_src = local_src.get_unchecked((x * N)..);
             let mut k0 = ColorGroup::<N, f32>::from_slice(shifted_src, 0).mul(coeff.weight);
 
-            for i in 1..length {
-                let coeff = *scanned_kernel.get_unchecked(i);
-                k0 = ColorGroup::<N, f32>::from_slice(shifted_src, i * N).mul_add(k0, coeff.weight);
+            for (i, wt) in scanned_kernel.iter().enumerate().skip(1) {
+                k0 = ColorGroup::<N, f32>::from_slice(shifted_src, i * N).mul_add(k0, wt.weight);
             }
 
             k0.to_store(dst, y * dst_stride + x * N);

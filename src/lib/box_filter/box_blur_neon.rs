@@ -27,7 +27,7 @@
 
 use std::arch::aarch64::*;
 
-use crate::neon::{load_u8_u16, store_u8_u32, vmulq_u32_f32};
+use crate::neon::{load_u8, load_u8_u16, store_u8_u32, vmulq_u16_low_f32, vmulq_u32_f32};
 use crate::unsafe_slice::UnsafeSlice;
 
 #[inline(always)]
@@ -55,7 +55,37 @@ unsafe fn mul_set_v4(
     (cv1, cv2, cv3, cv4)
 }
 
-pub(crate) fn box_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usize>(
+#[inline(always)]
+unsafe fn mul_set_low_u16_v4(
+    s1: uint16x8_t,
+    s2: uint16x8_t,
+    s3: uint16x8_t,
+    s4: uint16x8_t,
+    w: float32x4_t,
+) -> (uint32x4_t, uint32x4_t, uint32x4_t, uint32x4_t) {
+    let s1 = vmovl_u16(vget_low_u16(s1));
+    let s2 = vmovl_u16(vget_low_u16(s2));
+    let s3 = vmovl_u16(vget_low_u16(s3));
+    let s4 = vmovl_u16(vget_low_u16(s4));
+
+    let cv1 = vcvtq_f32_u32(s1);
+    let cv2 = vcvtq_f32_u32(s2);
+    let cv3 = vcvtq_f32_u32(s3);
+    let cv4 = vcvtq_f32_u32(s4);
+
+    let m1 = vmulq_f32(cv1, w);
+    let m2 = vmulq_f32(cv2, w);
+    let m3 = vmulq_f32(cv3, w);
+    let m4 = vmulq_f32(cv4, w);
+
+    let cv1 = vcvtaq_u32_f32(m1);
+    let cv2 = vcvtaq_u32_f32(m2);
+    let cv3 = vcvtaq_u32_f32(m3);
+    let cv4 = vcvtaq_u32_f32(m4);
+    (cv1, cv2, cv3, cv4)
+}
+
+pub(crate) fn box_blur_horizontal_pass_neon<T, const CN: usize>(
     undefined_src: &[T],
     src_stride: u32,
     undefined_dst: &UnsafeSlice<T>,
@@ -67,10 +97,30 @@ pub(crate) fn box_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usiz
 ) {
     let src: &[u8] = unsafe { std::mem::transmute(undefined_src) };
     let unsafe_dst: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(undefined_dst) };
+    if radius < 240 {
+        box_blur_horizontal_pass_neon_impl_low_rad::<CN>(
+            src, src_stride, unsafe_dst, dst_stride, width, radius, start_y, end_y,
+        );
+    } else {
+        box_blur_horizontal_pass_neon_impl::<CN>(
+            src, src_stride, unsafe_dst, dst_stride, width, radius, start_y, end_y,
+        );
+    }
+}
 
+fn box_blur_horizontal_pass_neon_impl_low_rad<const CN: usize>(
+    src: &[u8],
+    src_stride: u32,
+    unsafe_dst: &UnsafeSlice<u8>,
+    dst_stride: u32,
+    width: u32,
+    radius: u32,
+    start_y: u32,
+    end_y: u32,
+) {
     let kernel_size = radius * 2 + 1;
     let edge_count = (kernel_size / 2) + 1;
-    let v_edge_count = unsafe { vdupq_n_u16(edge_count as u16) };
+    let v_edge_count = unsafe { vdup_n_u8(edge_count as u8) };
 
     let v_weight = unsafe { vdupq_n_f32(1f32 / (radius * 2) as f32) };
 
@@ -78,94 +128,55 @@ pub(crate) fn box_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usiz
 
     let mut yy = start_y;
 
-    while yy + 8 < end_y {
+    while yy + 4 < end_y {
         let y = yy;
         let y_src_shift = y as usize * src_stride as usize;
         let y_dst_shift = y as usize * dst_stride as usize;
 
-        let mut store_0: uint32x4_t;
-        let mut store_1: uint32x4_t;
-        let mut store_2: uint32x4_t;
-        let mut store_3: uint32x4_t;
-
-        let mut store_4: uint32x4_t;
-        let mut store_5: uint32x4_t;
-        let mut store_6: uint32x4_t;
-        let mut store_7: uint32x4_t;
+        let mut store_0: uint16x8_t;
+        let mut store_1: uint16x8_t;
+        let mut store_2: uint16x8_t;
+        let mut store_3: uint16x8_t;
 
         unsafe {
             let s_ptr_0 = src.as_ptr().add(y_src_shift);
-            let edge_colors_0 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_0);
+            let edge_colors_0 = load_u8::<CN>(s_ptr_0);
 
             let s_ptr_1 = src.as_ptr().add(y_src_shift + src_stride as usize);
-            let edge_colors_1 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_1);
+            let edge_colors_1 = load_u8::<CN>(s_ptr_1);
 
             let s_ptr_2 = src.as_ptr().add(y_src_shift + src_stride as usize * 2);
-            let edge_colors_2 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_2);
+            let edge_colors_2 = load_u8::<CN>(s_ptr_2);
 
             let s_ptr_3 = src.as_ptr().add(y_src_shift + src_stride as usize * 3);
-            let edge_colors_3 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_3);
+            let edge_colors_3 = load_u8::<CN>(s_ptr_3);
 
-            let s_ptr_4 = src.as_ptr().add(y_src_shift + src_stride as usize * 4);
-            let edge_colors_4 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_4);
-
-            let s_ptr_5 = src.as_ptr().add(y_src_shift + src_stride as usize * 5);
-            let edge_colors_5 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_5);
-
-            let s_ptr_6 = src.as_ptr().add(y_src_shift + src_stride as usize * 6);
-            let edge_colors_6 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_6);
-
-            let s_ptr_7 = src.as_ptr().add(y_src_shift + src_stride as usize * 7);
-            let edge_colors_7 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_7);
-
-            store_0 = vmull_u16(edge_colors_0, vget_low_u16(v_edge_count));
-            store_1 = vmull_u16(edge_colors_1, vget_low_u16(v_edge_count));
-            store_2 = vmull_u16(edge_colors_2, vget_low_u16(v_edge_count));
-            store_3 = vmull_u16(edge_colors_3, vget_low_u16(v_edge_count));
-
-            store_4 = vmull_u16(edge_colors_4, vget_low_u16(v_edge_count));
-            store_5 = vmull_u16(edge_colors_5, vget_low_u16(v_edge_count));
-            store_6 = vmull_u16(edge_colors_6, vget_low_u16(v_edge_count));
-            store_7 = vmull_u16(edge_colors_7, vget_low_u16(v_edge_count));
+            store_0 = vmull_u8(edge_colors_0, v_edge_count);
+            store_1 = vmull_u8(edge_colors_1, v_edge_count);
+            store_2 = vmull_u8(edge_colors_2, v_edge_count);
+            store_3 = vmull_u8(edge_colors_3, v_edge_count);
         }
 
         unsafe {
             for x in 1..half_kernel.min(width) {
-                let px = x as usize * CHANNEL_CONFIGURATION;
+                let px = x as usize * CN;
 
                 let s_ptr_0 = src.as_ptr().add(y_src_shift + px);
-                let edge_colors_0 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_0);
+                let edge_colors_0 = load_u8::<CN>(s_ptr_0);
 
                 let s_ptr_1 = src.as_ptr().add(y_src_shift + src_stride as usize + px);
-                let edge_colors_1 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_1);
+                let edge_colors_1 = load_u8::<CN>(s_ptr_1);
 
                 let s_ptr_2 = src.as_ptr().add(y_src_shift + src_stride as usize * 2 + px);
-                let edge_colors_2 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_2);
+                let edge_colors_2 = load_u8::<CN>(s_ptr_2);
 
                 let s_ptr_3 = src.as_ptr().add(y_src_shift + src_stride as usize * 3 + px);
-                let edge_colors_3 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_3);
+                let edge_colors_3 = load_u8::<CN>(s_ptr_3);
 
-                let s_ptr_4 = src.as_ptr().add(y_src_shift + src_stride as usize * 4 + px);
-                let edge_colors_4 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_4);
-
-                let s_ptr_5 = src.as_ptr().add(y_src_shift + src_stride as usize * 5 + px);
-                let edge_colors_5 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_5);
-
-                let s_ptr_6 = src.as_ptr().add(y_src_shift + src_stride as usize * 6 + px);
-                let edge_colors_6 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_6);
-
-                let s_ptr_7 = src.as_ptr().add(y_src_shift + src_stride as usize * 7 + px);
-                let edge_colors_7 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_7);
-
-                store_0 = vaddw_u16(store_0, edge_colors_0);
-                store_1 = vaddw_u16(store_1, edge_colors_1);
-                store_2 = vaddw_u16(store_2, edge_colors_2);
-                store_3 = vaddw_u16(store_3, edge_colors_3);
-
-                store_4 = vaddw_u16(store_4, edge_colors_4);
-                store_5 = vaddw_u16(store_5, edge_colors_5);
-                store_6 = vaddw_u16(store_6, edge_colors_6);
-                store_7 = vaddw_u16(store_7, edge_colors_7);
+                store_0 = vaddw_u8(store_0, edge_colors_0);
+                store_1 = vaddw_u8(store_1, edge_colors_1);
+                store_2 = vaddw_u8(store_2, edge_colors_2);
+                store_3 = vaddw_u8(store_3, edge_colors_3);
             }
         }
 
@@ -175,122 +186,81 @@ pub(crate) fn box_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usiz
             // subtract previous
             unsafe {
                 let previous_x = (x as i64 - half_kernel as i64).max(0) as usize;
-                let px = previous_x * CHANNEL_CONFIGURATION;
+                let previous = previous_x * CN;
 
-                let s_ptr_0 = src.as_ptr().add(y_src_shift + px);
-                let edge_colors_0 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_0);
+                let s_ptr_0 = src.as_ptr().add(y_src_shift + previous);
+                let edge_colors_0 = load_u8::<CN>(s_ptr_0);
 
-                let s_ptr_1 = src.as_ptr().add(y_src_shift + src_stride as usize + px);
-                let edge_colors_1 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_1);
+                let s_ptr_1 = src
+                    .as_ptr()
+                    .add(y_src_shift + src_stride as usize + previous);
+                let edge_colors_1 = load_u8::<CN>(s_ptr_1);
 
-                let s_ptr_2 = src.as_ptr().add(y_src_shift + src_stride as usize * 2 + px);
-                let edge_colors_2 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_2);
+                let s_ptr_2 = src
+                    .as_ptr()
+                    .add(y_src_shift + src_stride as usize * 2 + previous);
+                let edge_colors_2 = load_u8::<CN>(s_ptr_2);
 
-                let s_ptr_3 = src.as_ptr().add(y_src_shift + src_stride as usize * 3 + px);
-                let edge_colors_3 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_3);
+                let s_ptr_3 = src
+                    .as_ptr()
+                    .add(y_src_shift + src_stride as usize * 3 + previous);
+                let edge_colors_3 = load_u8::<CN>(s_ptr_3);
 
-                let s_ptr_4 = src.as_ptr().add(y_src_shift + src_stride as usize * 4 + px);
-                let edge_colors_4 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_4);
-
-                let s_ptr_5 = src.as_ptr().add(y_src_shift + src_stride as usize * 5 + px);
-                let edge_colors_5 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_5);
-
-                let s_ptr_6 = src.as_ptr().add(y_src_shift + src_stride as usize * 6 + px);
-                let edge_colors_6 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_6);
-
-                let s_ptr_7 = src.as_ptr().add(y_src_shift + src_stride as usize * 7 + px);
-                let edge_colors_7 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_7);
-
-                store_0 = vsubw_u16(store_0, edge_colors_0);
-                store_1 = vsubw_u16(store_1, edge_colors_1);
-                store_2 = vsubw_u16(store_2, edge_colors_2);
-                store_3 = vsubw_u16(store_3, edge_colors_3);
-
-                store_4 = vsubw_u16(store_4, edge_colors_4);
-                store_5 = vsubw_u16(store_5, edge_colors_5);
-                store_6 = vsubw_u16(store_6, edge_colors_6);
-                store_7 = vsubw_u16(store_7, edge_colors_7);
+                store_0 = vsubw_u8(store_0, edge_colors_0);
+                store_1 = vsubw_u8(store_1, edge_colors_1);
+                store_2 = vsubw_u8(store_2, edge_colors_2);
+                store_3 = vsubw_u8(store_3, edge_colors_3);
             }
 
             // add next
             unsafe {
                 let next_x = (x + half_kernel).min(width - 1) as usize;
 
-                let px = next_x * CHANNEL_CONFIGURATION;
+                let next = next_x * CN;
 
-                let s_ptr_0 = src.as_ptr().add(y_src_shift + px);
-                let edge_colors_0 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_0);
+                let s_ptr_0 = src.as_ptr().add(y_src_shift + next);
+                let edge_colors_0 = load_u8::<CN>(s_ptr_0);
 
-                let s_ptr_1 = src.as_ptr().add(y_src_shift + src_stride as usize + px);
-                let edge_colors_1 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_1);
+                let s_ptr_1 = src.as_ptr().add(y_src_shift + src_stride as usize + next);
+                let edge_colors_1 = load_u8::<CN>(s_ptr_1);
 
-                let s_ptr_2 = src.as_ptr().add(y_src_shift + src_stride as usize * 2 + px);
-                let edge_colors_2 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_2);
+                let s_ptr_2 = src
+                    .as_ptr()
+                    .add(y_src_shift + src_stride as usize * 2 + next);
+                let edge_colors_2 = load_u8::<CN>(s_ptr_2);
 
-                let s_ptr_3 = src.as_ptr().add(y_src_shift + src_stride as usize * 3 + px);
-                let edge_colors_3 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_3);
+                let s_ptr_3 = src
+                    .as_ptr()
+                    .add(y_src_shift + src_stride as usize * 3 + next);
+                let edge_colors_3 = load_u8::<CN>(s_ptr_3);
 
-                let s_ptr_4 = src.as_ptr().add(y_src_shift + src_stride as usize * 4 + px);
-                let edge_colors_4 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_4);
-
-                let s_ptr_5 = src.as_ptr().add(y_src_shift + src_stride as usize * 5 + px);
-                let edge_colors_5 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_5);
-
-                let s_ptr_6 = src.as_ptr().add(y_src_shift + src_stride as usize * 6 + px);
-                let edge_colors_6 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_6);
-
-                let s_ptr_7 = src.as_ptr().add(y_src_shift + src_stride as usize * 7 + px);
-                let edge_colors_7 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_7);
-
-                store_0 = vaddw_u16(store_0, edge_colors_0);
-                store_1 = vaddw_u16(store_1, edge_colors_1);
-                store_2 = vaddw_u16(store_2, edge_colors_2);
-                store_3 = vaddw_u16(store_3, edge_colors_3);
-
-                store_4 = vaddw_u16(store_4, edge_colors_4);
-                store_5 = vaddw_u16(store_5, edge_colors_5);
-                store_6 = vaddw_u16(store_6, edge_colors_6);
-                store_7 = vaddw_u16(store_7, edge_colors_7);
+                store_0 = vaddw_u8(store_0, edge_colors_0);
+                store_1 = vaddw_u8(store_1, edge_colors_1);
+                store_2 = vaddw_u8(store_2, edge_colors_2);
+                store_3 = vaddw_u8(store_3, edge_colors_3);
             }
 
-            let px = x as usize * CHANNEL_CONFIGURATION;
+            let px = x as usize * CN;
 
             unsafe {
                 let (scale_store0, scale_store1, scale_store2, scale_store3) =
-                    mul_set_v4(store_0, store_1, store_2, store_3, v_weight);
-
-                let (scale_store4, scale_store5, scale_store6, scale_store7) =
-                    mul_set_v4(store_4, store_5, store_6, store_7, v_weight);
+                    mul_set_low_u16_v4(store_0, store_1, store_2, store_3, v_weight);
 
                 let px_160 = vqmovn_u32(scale_store0);
                 let px_161 = vqmovn_u32(scale_store1);
                 let px_162 = vqmovn_u32(scale_store2);
                 let px_163 = vqmovn_u32(scale_store3);
 
-                let px_164 = vqmovn_u32(scale_store4);
-                let px_165 = vqmovn_u32(scale_store5);
-                let px_166 = vqmovn_u32(scale_store6);
-                let px_167 = vqmovn_u32(scale_store7);
-
                 let px_80 = vqmovn_u16(vcombine_u16(px_160, px_160));
                 let px_81 = vqmovn_u16(vcombine_u16(px_161, px_161));
                 let px_82 = vqmovn_u16(vcombine_u16(px_162, px_162));
                 let px_83 = vqmovn_u16(vcombine_u16(px_163, px_163));
-                let px_84 = vqmovn_u16(vcombine_u16(px_164, px_164));
-                let px_85 = vqmovn_u16(vcombine_u16(px_165, px_165));
-                let px_86 = vqmovn_u16(vcombine_u16(px_166, px_166));
-                let px_87 = vqmovn_u16(vcombine_u16(px_167, px_167));
 
                 let bytes_offset_0 = y_dst_shift + px;
                 let bytes_offset_1 = y_dst_shift + dst_stride as usize + px;
                 let bytes_offset_2 = y_dst_shift + dst_stride as usize * 2 + px;
                 let bytes_offset_3 = y_dst_shift + dst_stride as usize * 3 + px;
-
-                let bytes_offset_4 = y_dst_shift + dst_stride as usize * 4 + px;
-                let bytes_offset_5 = y_dst_shift + dst_stride as usize * 5 + px;
-                let bytes_offset_6 = y_dst_shift + dst_stride as usize * 6 + px;
-                let bytes_offset_7 = y_dst_shift + dst_stride as usize * 7 + px;
-                if CHANNEL_CONFIGURATION == 4 {
+                if CN == 4 {
                     let dst_ptr_0 = unsafe_dst.slice.as_ptr().add(bytes_offset_0) as *mut u32;
                     vst1_lane_u32::<0>(dst_ptr_0, vreinterpret_u32_u8(px_80));
 
@@ -302,18 +272,6 @@ pub(crate) fn box_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usiz
 
                     let dst_ptr_3 = unsafe_dst.slice.as_ptr().add(bytes_offset_3) as *mut u32;
                     vst1_lane_u32::<0>(dst_ptr_3, vreinterpret_u32_u8(px_83));
-
-                    let dst_ptr_4 = unsafe_dst.slice.as_ptr().add(bytes_offset_4) as *mut u32;
-                    vst1_lane_u32::<0>(dst_ptr_4, vreinterpret_u32_u8(px_84));
-
-                    let dst_ptr_5 = unsafe_dst.slice.as_ptr().add(bytes_offset_5) as *mut u32;
-                    vst1_lane_u32::<0>(dst_ptr_5, vreinterpret_u32_u8(px_85));
-
-                    let dst_ptr_6 = unsafe_dst.slice.as_ptr().add(bytes_offset_6) as *mut u32;
-                    vst1_lane_u32::<0>(dst_ptr_6, vreinterpret_u32_u8(px_86));
-
-                    let dst_ptr_7 = unsafe_dst.slice.as_ptr().add(bytes_offset_7) as *mut u32;
-                    vst1_lane_u32::<0>(dst_ptr_7, vreinterpret_u32_u8(px_87));
                 } else {
                     let dst_ptr_0 = unsafe_dst.slice.as_ptr().add(bytes_offset_0) as *mut u8;
                     vst1_lane_u16::<0>(dst_ptr_0 as *mut u16, vreinterpret_u16_u8(px_80));
@@ -330,28 +288,89 @@ pub(crate) fn box_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usiz
                     let dst_ptr_3 = unsafe_dst.slice.as_ptr().add(bytes_offset_3) as *mut u8;
                     vst1_lane_u16::<0>(dst_ptr_3 as *mut u16, vreinterpret_u16_u8(px_83));
                     vst1_lane_u8::<2>(dst_ptr_3.add(2), px_83);
-
-                    let dst_ptr_4 = unsafe_dst.slice.as_ptr().add(bytes_offset_4) as *mut u8;
-                    vst1_lane_u16::<0>(dst_ptr_4 as *mut u16, vreinterpret_u16_u8(px_84));
-                    vst1_lane_u8::<2>(dst_ptr_4.add(2), px_84);
-
-                    let dst_ptr_5 = unsafe_dst.slice.as_ptr().add(bytes_offset_5) as *mut u8;
-                    vst1_lane_u16::<0>(dst_ptr_5 as *mut u16, vreinterpret_u16_u8(px_85));
-                    vst1_lane_u8::<2>(dst_ptr_5.add(2), px_85);
-
-                    let dst_ptr_6 = unsafe_dst.slice.as_ptr().add(bytes_offset_6) as *mut u8;
-                    vst1_lane_u16::<0>(dst_ptr_6 as *mut u16, vreinterpret_u16_u8(px_86));
-                    vst1_lane_u8::<2>(dst_ptr_6.add(2), px_86);
-
-                    let dst_ptr_7 = unsafe_dst.slice.as_ptr().add(bytes_offset_7) as *mut u8;
-                    vst1_lane_u16::<0>(dst_ptr_7 as *mut u16, vreinterpret_u16_u8(px_87));
-                    vst1_lane_u8::<2>(dst_ptr_7.add(2), px_87);
                 }
             }
         }
 
-        yy += 8;
+        yy += 4;
     }
+
+    for y in yy..end_y {
+        let y_src_shift = y as usize * src_stride as usize;
+        let y_dst_shift = y as usize * dst_stride as usize;
+
+        let mut store: uint16x8_t;
+        unsafe {
+            let s_ptr = src.as_ptr().add(y_src_shift);
+            let edge_colors = load_u8::<CN>(s_ptr);
+            store = vmull_u8(edge_colors, v_edge_count);
+        }
+
+        unsafe {
+            for x in 1..half_kernel.min(width) {
+                let px = x as usize * CN;
+                let s_ptr = src.as_ptr().add(y_src_shift + px);
+                let edge_colors = load_u8::<CN>(s_ptr);
+                store = vaddw_u8(store, edge_colors);
+            }
+        }
+
+        for x in 0..width {
+            // preload edge pixels
+
+            // subtract previous
+            unsafe {
+                let previous_x = (x as isize - half_kernel as isize).max(0) as usize;
+                let previous = previous_x * CN;
+                let s_ptr = src.as_ptr().add(y_src_shift + previous);
+                let edge_colors = load_u8::<CN>(s_ptr);
+                store = vsubw_u8(store, edge_colors);
+            }
+
+            // add next
+            unsafe {
+                let next_x = (x + half_kernel).min(width - 1) as usize;
+
+                let next = next_x * CN;
+
+                let s_ptr = src.as_ptr().add(y_src_shift + next);
+                let edge_colors = load_u8::<CN>(s_ptr);
+                store = vaddw_u8(store, edge_colors);
+            }
+
+            let px = x as usize * CN;
+
+            let scale_store = unsafe { vmulq_u16_low_f32(store, v_weight) };
+
+            let bytes_offset = y_dst_shift + px;
+
+            unsafe {
+                let dst_ptr = unsafe_dst.slice.as_ptr().add(bytes_offset) as *mut u8;
+                store_u8_u32::<CN>(dst_ptr, scale_store);
+            }
+        }
+    }
+}
+
+fn box_blur_horizontal_pass_neon_impl<const CN: usize>(
+    src: &[u8],
+    src_stride: u32,
+    unsafe_dst: &UnsafeSlice<u8>,
+    dst_stride: u32,
+    width: u32,
+    radius: u32,
+    start_y: u32,
+    end_y: u32,
+) {
+    let kernel_size = radius * 2 + 1;
+    let edge_count = (kernel_size / 2) + 1;
+    let v_edge_count = unsafe { vdupq_n_u16(edge_count as u16) };
+
+    let v_weight = unsafe { vdupq_n_f32(1f32 / (radius * 2) as f32) };
+
+    let half_kernel = kernel_size / 2;
+
+    let mut yy = start_y;
 
     while yy + 4 < end_y {
         let y = yy;
@@ -365,16 +384,16 @@ pub(crate) fn box_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usiz
 
         unsafe {
             let s_ptr_0 = src.as_ptr().add(y_src_shift);
-            let edge_colors_0 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_0);
+            let edge_colors_0 = load_u8_u16::<CN>(s_ptr_0);
 
             let s_ptr_1 = src.as_ptr().add(y_src_shift + src_stride as usize);
-            let edge_colors_1 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_1);
+            let edge_colors_1 = load_u8_u16::<CN>(s_ptr_1);
 
             let s_ptr_2 = src.as_ptr().add(y_src_shift + src_stride as usize * 2);
-            let edge_colors_2 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_2);
+            let edge_colors_2 = load_u8_u16::<CN>(s_ptr_2);
 
             let s_ptr_3 = src.as_ptr().add(y_src_shift + src_stride as usize * 3);
-            let edge_colors_3 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_3);
+            let edge_colors_3 = load_u8_u16::<CN>(s_ptr_3);
 
             store_0 = vmull_u16(edge_colors_0, vget_low_u16(v_edge_count));
             store_1 = vmull_u16(edge_colors_1, vget_low_u16(v_edge_count));
@@ -384,19 +403,19 @@ pub(crate) fn box_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usiz
 
         unsafe {
             for x in 1..half_kernel.min(width) {
-                let px = x as usize * CHANNEL_CONFIGURATION;
+                let px = x as usize * CN;
 
                 let s_ptr_0 = src.as_ptr().add(y_src_shift + px);
-                let edge_colors_0 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_0);
+                let edge_colors_0 = load_u8_u16::<CN>(s_ptr_0);
 
                 let s_ptr_1 = src.as_ptr().add(y_src_shift + src_stride as usize + px);
-                let edge_colors_1 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_1);
+                let edge_colors_1 = load_u8_u16::<CN>(s_ptr_1);
 
                 let s_ptr_2 = src.as_ptr().add(y_src_shift + src_stride as usize * 2 + px);
-                let edge_colors_2 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_2);
+                let edge_colors_2 = load_u8_u16::<CN>(s_ptr_2);
 
                 let s_ptr_3 = src.as_ptr().add(y_src_shift + src_stride as usize * 3 + px);
-                let edge_colors_3 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_3);
+                let edge_colors_3 = load_u8_u16::<CN>(s_ptr_3);
 
                 store_0 = vaddw_u16(store_0, edge_colors_0);
                 store_1 = vaddw_u16(store_1, edge_colors_1);
@@ -411,25 +430,25 @@ pub(crate) fn box_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usiz
             // subtract previous
             unsafe {
                 let previous_x = (x as i64 - half_kernel as i64).max(0) as usize;
-                let previous = previous_x * CHANNEL_CONFIGURATION;
+                let previous = previous_x * CN;
 
                 let s_ptr_0 = src.as_ptr().add(y_src_shift + previous);
-                let edge_colors_0 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_0);
+                let edge_colors_0 = load_u8_u16::<CN>(s_ptr_0);
 
                 let s_ptr_1 = src
                     .as_ptr()
                     .add(y_src_shift + src_stride as usize + previous);
-                let edge_colors_1 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_1);
+                let edge_colors_1 = load_u8_u16::<CN>(s_ptr_1);
 
                 let s_ptr_2 = src
                     .as_ptr()
                     .add(y_src_shift + src_stride as usize * 2 + previous);
-                let edge_colors_2 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_2);
+                let edge_colors_2 = load_u8_u16::<CN>(s_ptr_2);
 
                 let s_ptr_3 = src
                     .as_ptr()
                     .add(y_src_shift + src_stride as usize * 3 + previous);
-                let edge_colors_3 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_3);
+                let edge_colors_3 = load_u8_u16::<CN>(s_ptr_3);
 
                 store_0 = vsubw_u16(store_0, edge_colors_0);
                 store_1 = vsubw_u16(store_1, edge_colors_1);
@@ -441,23 +460,23 @@ pub(crate) fn box_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usiz
             unsafe {
                 let next_x = (x + half_kernel).min(width - 1) as usize;
 
-                let next = next_x * CHANNEL_CONFIGURATION;
+                let next = next_x * CN;
 
                 let s_ptr_0 = src.as_ptr().add(y_src_shift + next);
-                let edge_colors_0 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_0);
+                let edge_colors_0 = load_u8_u16::<CN>(s_ptr_0);
 
                 let s_ptr_1 = src.as_ptr().add(y_src_shift + src_stride as usize + next);
-                let edge_colors_1 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_1);
+                let edge_colors_1 = load_u8_u16::<CN>(s_ptr_1);
 
                 let s_ptr_2 = src
                     .as_ptr()
                     .add(y_src_shift + src_stride as usize * 2 + next);
-                let edge_colors_2 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_2);
+                let edge_colors_2 = load_u8_u16::<CN>(s_ptr_2);
 
                 let s_ptr_3 = src
                     .as_ptr()
                     .add(y_src_shift + src_stride as usize * 3 + next);
-                let edge_colors_3 = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr_3);
+                let edge_colors_3 = load_u8_u16::<CN>(s_ptr_3);
 
                 store_0 = vaddw_u16(store_0, edge_colors_0);
                 store_1 = vaddw_u16(store_1, edge_colors_1);
@@ -465,7 +484,7 @@ pub(crate) fn box_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usiz
                 store_3 = vaddw_u16(store_3, edge_colors_3);
             }
 
-            let px = x as usize * CHANNEL_CONFIGURATION;
+            let px = x as usize * CN;
 
             unsafe {
                 let (scale_store0, scale_store1, scale_store2, scale_store3) =
@@ -485,7 +504,7 @@ pub(crate) fn box_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usiz
                 let bytes_offset_1 = y_dst_shift + dst_stride as usize + px;
                 let bytes_offset_2 = y_dst_shift + dst_stride as usize * 2 + px;
                 let bytes_offset_3 = y_dst_shift + dst_stride as usize * 3 + px;
-                if CHANNEL_CONFIGURATION == 4 {
+                if CN == 4 {
                     let dst_ptr_0 = unsafe_dst.slice.as_ptr().add(bytes_offset_0) as *mut u32;
                     vst1_lane_u32::<0>(dst_ptr_0, vreinterpret_u32_u8(px_80));
 
@@ -527,15 +546,15 @@ pub(crate) fn box_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usiz
         let mut store: uint32x4_t;
         unsafe {
             let s_ptr = src.as_ptr().add(y_src_shift);
-            let edge_colors = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr);
+            let edge_colors = load_u8_u16::<CN>(s_ptr);
             store = vmull_u16(edge_colors, vget_low_u16(v_edge_count));
         }
 
         unsafe {
-            for x in 1..std::cmp::min(half_kernel, width) {
-                let px = x as usize * CHANNEL_CONFIGURATION;
+            for x in 1..half_kernel.min(width) {
+                let px = x as usize * CN;
                 let s_ptr = src.as_ptr().add(y_src_shift + px);
-                let edge_colors = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr);
+                let edge_colors = load_u8_u16::<CN>(s_ptr);
                 store = vaddw_u16(store, edge_colors);
             }
         }
@@ -545,41 +564,67 @@ pub(crate) fn box_blur_horizontal_pass_neon<T, const CHANNEL_CONFIGURATION: usiz
 
             // subtract previous
             unsafe {
-                let previous_x = std::cmp::max(x as i64 - half_kernel as i64, 0) as usize;
-                let previous = previous_x * CHANNEL_CONFIGURATION;
+                let previous_x = (x as isize - half_kernel as isize).max(0) as usize;
+                let previous = previous_x * CN;
                 let s_ptr = src.as_ptr().add(y_src_shift + previous);
-                let edge_colors = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr);
+                let edge_colors = load_u8_u16::<CN>(s_ptr);
                 store = vsubw_u16(store, edge_colors);
             }
 
             // add next
             unsafe {
-                let next_x = std::cmp::min(x + half_kernel, width - 1) as usize;
+                let next_x = (x + half_kernel).min(width - 1) as usize;
 
-                let next = next_x * CHANNEL_CONFIGURATION;
+                let next = next_x * CN;
 
                 let s_ptr = src.as_ptr().add(y_src_shift + next);
-                let edge_colors = load_u8_u16::<CHANNEL_CONFIGURATION>(s_ptr);
+                let edge_colors = load_u8_u16::<CN>(s_ptr);
                 store = vaddw_u16(store, edge_colors);
             }
 
-            let px = x as usize * CHANNEL_CONFIGURATION;
+            let px = x as usize * CN;
 
             let scale_store = unsafe { vmulq_u32_f32(store, v_weight) };
 
             let bytes_offset = y_dst_shift + px;
             unsafe {
                 let dst_ptr = unsafe_dst.slice.as_ptr().add(bytes_offset) as *mut u8;
-                store_u8_u32::<CHANNEL_CONFIGURATION>(dst_ptr, scale_store);
+                store_u8_u32::<CN>(dst_ptr, scale_store);
             }
         }
     }
 }
 
-pub(crate) fn box_blur_vertical_pass_neon<T, const CHANNEL_CONFIGURATION: usize>(
+pub(crate) fn box_blur_vertical_pass_neon<T, const CN: usize>(
     undefined_src: &[T],
     src_stride: u32,
     undefined_unsafe_dst: &UnsafeSlice<T>,
+    dst_stride: u32,
+    w: u32,
+    height: u32,
+    radius: u32,
+    start_x: u32,
+    end_x: u32,
+) {
+    unsafe {
+        let src: &[u8] = std::mem::transmute(undefined_src);
+        let unsafe_dst: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_unsafe_dst);
+        if radius < 240 {
+            box_blur_vertical_pass_neon_low_rad::<CN>(
+                src, src_stride, unsafe_dst, dst_stride, w, height, radius, start_x, end_x,
+            );
+        } else {
+            box_blur_vertical_pass_neon_any::<CN>(
+                src, src_stride, unsafe_dst, dst_stride, w, height, radius, start_x, end_x,
+            );
+        }
+    }
+}
+
+fn box_blur_vertical_pass_neon_low_rad<const CN: usize>(
+    src: &[u8],
+    src_stride: u32,
+    unsafe_dst: &UnsafeSlice<u8>,
     dst_stride: u32,
     _: u32,
     height: u32,
@@ -587,9 +632,334 @@ pub(crate) fn box_blur_vertical_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
     start_x: u32,
     end_x: u32,
 ) {
-    let src: &[u8] = unsafe { std::mem::transmute(undefined_src) };
-    let unsafe_dst: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(undefined_unsafe_dst) };
+    let kernel_size = radius * 2 + 1;
+    let edge_count = (kernel_size / 2) + 1;
+    let v_edge_count = unsafe { vdupq_n_u8(edge_count as u8) };
 
+    let half_kernel = kernel_size / 2;
+
+    let start_x = start_x as usize;
+    let end_x = end_x as usize;
+
+    let v_weight = unsafe { vdupq_n_f32(1f32 / (radius * 2) as f32) };
+
+    let mut cx = start_x;
+
+    while cx + 32 < end_x {
+        let px = cx;
+
+        let mut store_0: uint16x8_t;
+        let mut store_1: uint16x8_t;
+        let mut store_2: uint16x8_t;
+        let mut store_3: uint16x8_t;
+
+        unsafe {
+            let s_ptr = src.as_ptr().add(px);
+            let edge0 = vld1q_u8(s_ptr);
+            let edge1 = vld1q_u8(s_ptr.add(16));
+
+            store_0 = vmull_u8(vget_low_u8(edge0), vget_low_u8(v_edge_count));
+            store_1 = vmull_high_u8(edge0, v_edge_count);
+
+            store_2 = vmull_u8(vget_low_u8(edge1), vget_low_u8(v_edge_count));
+            store_3 = vmull_high_u8(edge1, v_edge_count);
+        }
+
+        unsafe {
+            for y in 1..half_kernel.min(height) {
+                let y_src_shift = y as usize * src_stride as usize;
+                let s_ptr = src.as_ptr().add(y_src_shift + px);
+
+                let edge0 = vld1q_u8(s_ptr);
+                let edge1 = vld1q_u8(s_ptr.add(16));
+
+                store_0 = vaddw_u8(store_0, vget_low_u8(edge0));
+                store_1 = vaddw_high_u8(store_1, edge0);
+                store_2 = vaddw_u8(store_2, vget_low_u8(edge1));
+                store_3 = vaddw_high_u8(store_3, edge1);
+            }
+        }
+
+        unsafe {
+            for y in 0..height {
+                // preload edge pixels
+                let next = (y + half_kernel).min(height - 1) as usize * src_stride as usize;
+                let previous =
+                    (y as i64 - half_kernel as i64).max(0) as usize * src_stride as usize;
+                let y_dst_shift = dst_stride as usize * y as usize;
+
+                // subtract previous
+                {
+                    let s_ptr = src.as_ptr().add(previous + px);
+                    let edge0 = vld1q_u8(s_ptr);
+                    let edge1 = vld1q_u8(s_ptr.add(16));
+
+                    store_0 = vsubw_u8(store_0, vget_low_u8(edge0));
+                    store_1 = vsubw_high_u8(store_1, edge0);
+                    store_2 = vsubw_u8(store_2, vget_low_u8(edge1));
+                    store_3 = vsubw_high_u8(store_3, edge1);
+                }
+
+                // add next
+                {
+                    let s_ptr = src.as_ptr().add(next + px);
+                    let edge0 = vld1q_u8(s_ptr);
+                    let edge1 = vld1q_u8(s_ptr.add(16));
+
+                    store_0 = vaddw_u8(store_0, vget_low_u8(edge0));
+                    store_1 = vaddw_high_u8(store_1, edge0);
+                    store_2 = vaddw_u8(store_2, vget_low_u8(edge1));
+                    store_3 = vaddw_high_u8(store_3, edge1);
+                }
+
+                let px = cx;
+
+                let lw0 = vmovl_u16(vget_low_u16(store_0));
+                let lw1 = vmovl_high_u16(store_0);
+                let lw2 = vmovl_u16(vget_low_u16(store_1));
+                let lw3 = vmovl_high_u16(store_1);
+
+                let lw4 = vmovl_u16(vget_low_u16(store_2));
+                let lw5 = vmovl_high_u16(store_2);
+                let lw6 = vmovl_u16(vget_low_u16(store_3));
+                let lw7 = vmovl_high_u16(store_3);
+
+                let (scale_store_0, scale_store_1, scale_store_2, scale_store_3) =
+                    mul_set_v4(lw0, lw1, lw2, lw3, v_weight);
+
+                let (scale_store_4, scale_store_5, scale_store_6, scale_store_7) =
+                    mul_set_v4(lw4, lw5, lw6, lw7, v_weight);
+
+                let offset = y_dst_shift + px;
+                let ptr = unsafe_dst.slice.get_unchecked(offset).get();
+                let px_16_lo0 = vqmovn_u32(scale_store_0);
+                let px_16_hi0 = vqmovn_u32(scale_store_1);
+                let px_16_lo1 = vqmovn_u32(scale_store_2);
+                let px_16_hi2 = vqmovn_u32(scale_store_3);
+                let px_16_lo3 = vqmovn_u32(scale_store_4);
+                let px_16_hi4 = vqmovn_u32(scale_store_5);
+                let px_16_lo5 = vqmovn_u32(scale_store_6);
+                let px_16_hi6 = vqmovn_u32(scale_store_7);
+                let px0 = vqmovn_u16(vcombine_u16(px_16_lo0, px_16_hi0));
+                let px1 = vqmovn_u16(vcombine_u16(px_16_lo1, px_16_hi2));
+                let px2 = vqmovn_u16(vcombine_u16(px_16_lo3, px_16_hi4));
+                let px3 = vqmovn_u16(vcombine_u16(px_16_lo5, px_16_hi6));
+
+                vst1q_u8(ptr, vcombine_u8(px0, px1));
+                vst1q_u8(ptr.add(16), vcombine_u8(px2, px3));
+            }
+        }
+
+        cx += 32;
+    }
+
+    while cx + 16 < end_x {
+        let px = cx;
+
+        let mut store_0: uint16x8_t;
+        let mut store_1: uint16x8_t;
+
+        unsafe {
+            let s_ptr = src.as_ptr().add(px);
+            let edge = vld1q_u8(s_ptr);
+
+            store_0 = vmull_u8(vget_low_u8(edge), vget_low_u8(v_edge_count));
+            store_1 = vmull_high_u8(edge, v_edge_count);
+        }
+
+        unsafe {
+            for y in 1..half_kernel.min(height) {
+                let y_src_shift = y as usize * src_stride as usize;
+                let s_ptr = src.as_ptr().add(y_src_shift + px);
+
+                let edge = vld1q_u8(s_ptr);
+
+                store_0 = vaddw_u8(store_0, vget_low_u8(edge));
+                store_1 = vaddw_high_u8(store_1, edge);
+            }
+        }
+
+        unsafe {
+            for y in 0..height {
+                // preload edge pixels
+                let next = (y + half_kernel).min(height - 1) as usize * src_stride as usize;
+                let previous =
+                    (y as isize - half_kernel as isize).max(0) as usize * src_stride as usize;
+                let y_dst_shift = dst_stride as usize * y as usize;
+
+                // subtract previous
+                {
+                    let s_ptr = src.as_ptr().add(previous + px);
+                    let edge = vld1q_u8(s_ptr);
+
+                    store_0 = vsubw_u8(store_0, vget_low_u8(edge));
+                    store_1 = vsubw_high_u8(store_1, edge);
+                }
+
+                // add next
+                {
+                    let s_ptr = src.as_ptr().add(next + px);
+                    let edge = vld1q_u8(s_ptr);
+
+                    store_0 = vaddw_u8(store_0, vget_low_u8(edge));
+                    store_1 = vaddw_high_u8(store_1, edge);
+                }
+
+                let px = cx;
+
+                let lw0 = vmovl_u16(vget_low_u16(store_0));
+                let lw1 = vmovl_high_u16(store_0);
+                let lw2 = vmovl_u16(vget_low_u16(store_1));
+                let lw3 = vmovl_high_u16(store_1);
+
+                let (scale_store_0, scale_store_1, scale_store_2, scale_store_3) =
+                    mul_set_v4(lw0, lw1, lw2, lw3, v_weight);
+
+                let offset = y_dst_shift + px;
+                let ptr = unsafe_dst.slice.get_unchecked(offset).get();
+                let px_16_lo0 = vqmovn_u32(scale_store_0);
+                let px_16_hi0 = vqmovn_u32(scale_store_1);
+                let px_16_lo1 = vqmovn_u32(scale_store_2);
+                let px_16_hi2 = vqmovn_u32(scale_store_3);
+                let px0 = vqmovn_u16(vcombine_u16(px_16_lo0, px_16_hi0));
+                let px1 = vqmovn_u16(vcombine_u16(px_16_lo1, px_16_hi2));
+                vst1q_u8(ptr, vcombine_u8(px0, px1));
+            }
+        }
+
+        cx += 16;
+    }
+
+    while cx + 8 < end_x {
+        let px = cx;
+
+        let mut store_0: uint16x8_t;
+
+        unsafe {
+            let s_ptr = src.as_ptr().add(px);
+            let edge = vld1_u8(s_ptr);
+
+            store_0 = vmull_u8(edge, vget_low_u8(v_edge_count));
+        }
+
+        unsafe {
+            for y in 1..half_kernel.min(height) {
+                let y_src_shift = y as usize * src_stride as usize;
+                let s_ptr = src.as_ptr().add(y_src_shift + px);
+
+                let edge = vld1_u8(s_ptr);
+
+                store_0 = vaddw_u8(store_0, edge);
+            }
+        }
+
+        unsafe {
+            for y in 0..height {
+                // preload edge pixels
+                let next = (y + half_kernel).min(height - 1) as usize * src_stride as usize;
+                let previous =
+                    (y as isize - half_kernel as isize).max(0) as usize * src_stride as usize;
+                let y_dst_shift = dst_stride as usize * y as usize;
+
+                // subtract previous
+                {
+                    let s_ptr = src.as_ptr().add(previous + px);
+                    let edge = vld1_u8(s_ptr);
+
+                    store_0 = vsubw_u8(store_0, edge);
+                }
+
+                // add next
+                {
+                    let s_ptr = src.as_ptr().add(next + px);
+                    let edge = vld1_u8(s_ptr);
+
+                    store_0 = vaddw_u8(store_0, edge);
+                }
+
+                let px = cx;
+
+                let lw0 = vmovl_u16(vget_low_u16(store_0));
+                let lw1 = vmovl_high_u16(store_0);
+
+                let scale_store_0 = vmulq_u32_f32(lw0, v_weight);
+                let scale_store_1 = vmulq_u32_f32(lw1, v_weight);
+
+                let offset = y_dst_shift + px;
+                let ptr = unsafe_dst.slice.get_unchecked(offset).get();
+                let px_16_lo0 = vqmovn_u32(scale_store_0);
+                let px_16_hi0 = vqmovn_u32(scale_store_1);
+                let px0 = vqmovn_u16(vcombine_u16(px_16_lo0, px_16_hi0));
+                vst1_u8(ptr, px0);
+            }
+        }
+
+        cx += 8;
+    }
+
+    const TAIL_CN: usize = 1;
+
+    unsafe {
+        for x in cx..end_x {
+            let px = x;
+
+            let mut store: uint16x8_t;
+            {
+                let s_ptr = src.as_ptr().add(px);
+                let edge_colors = load_u8::<TAIL_CN>(s_ptr);
+                store = vmull_u8(edge_colors, vget_low_u8(v_edge_count));
+            }
+
+            for y in 1..half_kernel.min(height) {
+                let y_src_shift = y as usize * src_stride as usize;
+                let s_ptr = src.as_ptr().add(y_src_shift + px);
+                let edge_colors = load_u8::<TAIL_CN>(s_ptr);
+                store = vaddw_u8(store, edge_colors);
+            }
+
+            for y in 0..height {
+                // preload edge pixels
+                let next = (y + half_kernel).min(height - 1) as usize * src_stride as usize;
+                let previous =
+                    (y as i64 - half_kernel as i64).max(0) as usize * src_stride as usize;
+                let y_dst_shift = dst_stride as usize * y as usize;
+
+                // subtract previous
+                {
+                    let s_ptr = src.as_ptr().add(previous + px);
+                    let edge_colors = load_u8::<TAIL_CN>(s_ptr);
+                    store = vsubw_u8(store, edge_colors);
+                }
+
+                // add next
+                {
+                    let s_ptr = src.as_ptr().add(next + px);
+                    let edge_colors = load_u8::<TAIL_CN>(s_ptr);
+                    store = vaddw_u8(store, edge_colors);
+                }
+
+                let px = x;
+
+                let scale_store = vmulq_u16_low_f32(store, v_weight);
+                let bytes_offset = y_dst_shift + px;
+                let dst_ptr = unsafe_dst.slice.as_ptr().add(bytes_offset) as *mut u8;
+                store_u8_u32::<TAIL_CN>(dst_ptr, scale_store);
+            }
+        }
+    }
+}
+
+fn box_blur_vertical_pass_neon_any<const CN: usize>(
+    src: &[u8],
+    src_stride: u32,
+    unsafe_dst: &UnsafeSlice<u8>,
+    dst_stride: u32,
+    _: u32,
+    height: u32,
+    radius: u32,
+    start_x: u32,
+    end_x: u32,
+) {
     let kernel_size = radius * 2 + 1;
     let edge_count = (kernel_size / 2) + 1;
     let v_edge_count = unsafe { vdupq_n_u16(edge_count as u16) };
@@ -649,7 +1019,7 @@ pub(crate) fn box_blur_vertical_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
         }
 
         unsafe {
-            for y in 1..std::cmp::min(half_kernel, height) {
+            for y in 1..half_kernel.min(height) {
                 let y_src_shift = y as usize * src_stride as usize;
                 let s_ptr = src.as_ptr().add(y_src_shift + px);
 
@@ -813,7 +1183,7 @@ pub(crate) fn box_blur_vertical_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
         }
 
         unsafe {
-            for y in 1..std::cmp::min(half_kernel, height) {
+            for y in 1..half_kernel.min(height) {
                 let y_src_shift = y as usize * src_stride as usize;
                 let s_ptr = src.as_ptr().add(y_src_shift + px);
 
@@ -836,10 +1206,9 @@ pub(crate) fn box_blur_vertical_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
         unsafe {
             for y in 0..height {
                 // preload edge pixels
-                let next =
-                    std::cmp::min(y + half_kernel, height - 1) as usize * src_stride as usize;
+                let next = (y + half_kernel).min(height - 1) as usize * src_stride as usize;
                 let previous =
-                    std::cmp::max(y as i64 - half_kernel as i64, 0) as usize * src_stride as usize;
+                    (y as isize - half_kernel as isize).max(0) as usize * src_stride as usize;
                 let y_dst_shift = dst_stride as usize * y as usize;
 
                 // subtract previous
@@ -917,7 +1286,7 @@ pub(crate) fn box_blur_vertical_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
         }
 
         unsafe {
-            for y in 1..std::cmp::min(half_kernel, height) {
+            for y in 1..half_kernel.min(height) {
                 let y_src_shift = y as usize * src_stride as usize;
                 let s_ptr = src.as_ptr().add(y_src_shift + px);
 
@@ -935,10 +1304,9 @@ pub(crate) fn box_blur_vertical_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
         unsafe {
             for y in 0..height {
                 // preload edge pixels
-                let next =
-                    std::cmp::min(y + half_kernel, height - 1) as usize * src_stride as usize;
+                let next = (y + half_kernel).min(height - 1) as usize * src_stride as usize;
                 let previous =
-                    std::cmp::max(y as i64 - half_kernel as i64, 0) as usize * src_stride as usize;
+                    (y as isize - half_kernel as isize).max(0) as usize * src_stride as usize;
                 let y_dst_shift = dst_stride as usize * y as usize;
 
                 // subtract previous
@@ -1006,10 +1374,9 @@ pub(crate) fn box_blur_vertical_pass_neon<T, const CHANNEL_CONFIGURATION: usize>
 
             for y in 0..height {
                 // preload edge pixels
-                let next =
-                    std::cmp::min(y + half_kernel, height - 1) as usize * src_stride as usize;
+                let next = (y + half_kernel).min(height - 1) as usize * src_stride as usize;
                 let previous =
-                    std::cmp::max(y as i64 - half_kernel as i64, 0) as usize * src_stride as usize;
+                    (y as isize - half_kernel as isize).max(0) as usize * src_stride as usize;
                 let y_dst_shift = dst_stride as usize * y as usize;
 
                 // subtract previous
