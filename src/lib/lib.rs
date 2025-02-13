@@ -26,12 +26,33 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #![allow(clippy::too_many_arguments)]
+#![cfg_attr(
+    all(
+        feature = "nightly_avx512",
+        any(target_arch = "x86", target_arch = "x86_64")
+    ),
+    feature(cfg_version)
+)]
+#![cfg_attr(
+    all(
+        feature = "nightly_avx512",
+        any(target_arch = "x86", target_arch = "x86_64")
+    ),
+    feature(avx512_target_feature)
+)]
+#![cfg_attr(
+    all(
+        feature = "nightly_avx512",
+        any(target_arch = "x86", target_arch = "x86_64")
+    ),
+    feature(stdarch_x86_avx512)
+)]
 
 #[cfg(feature = "fft")]
 mod adaptive_blur;
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]
 mod avx;
-mod r#box;
+mod box_filter;
 mod channels_configuration;
 mod cpu_features;
 mod edge_mode;
@@ -72,6 +93,18 @@ mod wasm32;
 
 #[cfg(feature = "fft")]
 pub use adaptive_blur::adaptive_blur;
+pub use box_filter::box_blur;
+pub use box_filter::box_blur_f32;
+pub use box_filter::box_blur_in_linear;
+pub use box_filter::box_blur_u16;
+pub use box_filter::gaussian_box_blur;
+pub use box_filter::gaussian_box_blur_f32;
+pub use box_filter::gaussian_box_blur_in_linear;
+pub use box_filter::gaussian_box_blur_u16;
+pub use box_filter::tent_blur;
+pub use box_filter::tent_blur_f32;
+pub use box_filter::tent_blur_in_linear;
+pub use box_filter::tent_blur_u16;
 pub use channels_configuration::FastBlurChannels;
 pub use colorutils_rs::TransferFunction;
 pub use edge_mode::*;
@@ -118,18 +151,6 @@ pub use img_size::ImageSize;
 pub use laplacian::{get_laplacian_kernel, laplacian};
 pub use median_blur::median_blur;
 pub use motion_blur::{generate_motion_kernel, motion_blur};
-pub use r#box::box_blur;
-pub use r#box::box_blur_f32;
-pub use r#box::box_blur_in_linear;
-pub use r#box::box_blur_u16;
-pub use r#box::gaussian_box_blur;
-pub use r#box::gaussian_box_blur_f32;
-pub use r#box::gaussian_box_blur_in_linear;
-pub use r#box::gaussian_box_blur_u16;
-pub use r#box::tent_blur;
-pub use r#box::tent_blur_f32;
-pub use r#box::tent_blur_in_linear;
-pub use r#box::tent_blur_u16;
 pub use sobel::sobel;
 #[cfg(feature = "image")]
 pub use stack_blur_image::stack_blur_image;

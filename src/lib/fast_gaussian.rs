@@ -236,10 +236,10 @@ fn fast_gaussian_vertical_pass<T, J, M, const CHANNELS_CONFIGURATION: usize>(
     M: Copy + FromPrimitive + std::ops::Mul<Output = M> + AsPrimitive<T> + Float + ToStorage<T>,
     i32: AsPrimitive<J>,
 {
-    let mut buffer_r: [J; 1024] = [0i32.as_(); 1024];
-    let mut buffer_g: [J; 1024] = [0i32.as_(); 1024];
-    let mut buffer_b: [J; 1024] = [0i32.as_(); 1024];
-    let mut buffer_a: [J; 1024] = [0i32.as_(); 1024];
+    let mut buffer_r = Box::new([0i32.as_(); 1024]);
+    let mut buffer_g = Box::new([0i32.as_(); 1024]);
+    let mut buffer_b = Box::new([0i32.as_(); 1024]);
+    let mut buffer_a = Box::new([0i32.as_(); 1024]);
     let radius_64 = radius as i64;
     let height_wide = height as i64;
     let initial = J::from_i64(T::get_initial(radius as usize)).unwrap();
@@ -356,10 +356,10 @@ fn fast_gaussian_horizontal_pass<T, J, M, const CHANNELS_CONFIGURATION: usize>(
     M: Copy + FromPrimitive + std::ops::Mul<Output = M> + AsPrimitive<T> + Float + ToStorage<T>,
     i32: AsPrimitive<J>,
 {
-    let mut buffer_r: [J; 1024] = [0i32.as_(); 1024];
-    let mut buffer_g: [J; 1024] = [0i32.as_(); 1024];
-    let mut buffer_b: [J; 1024] = [0i32.as_(); 1024];
-    let mut buffer_a: [J; 1024] = [0i32.as_(); 1024];
+    let mut buffer_r = Box::new([0i32.as_(); 1024]);
+    let mut buffer_g = Box::new([0i32.as_(); 1024]);
+    let mut buffer_b = Box::new([0i32.as_(); 1024]);
+    let mut buffer_a = Box::new([0i32.as_(); 1024]);
     let radius_64 = radius as i64;
     let width_wide = width as i64;
     let weight = M::from_f64(1f64 / (radius as f64 * radius as f64)).unwrap();

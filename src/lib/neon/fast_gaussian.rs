@@ -58,15 +58,15 @@ pub fn fast_gaussian_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
         let mut yy = start;
 
         while yy + 4 < height.min(end) {
-            let mut diffs0: int32x4_t = vdupq_n_s32(0);
-            let mut diffs1: int32x4_t = vdupq_n_s32(0);
-            let mut diffs2: int32x4_t = vdupq_n_s32(0);
-            let mut diffs3: int32x4_t = vdupq_n_s32(0);
+            let mut diffs0 = vdupq_n_s32(0);
+            let mut diffs1 = vdupq_n_s32(0);
+            let mut diffs2 = vdupq_n_s32(0);
+            let mut diffs3 = vdupq_n_s32(0);
 
-            let mut summs0: int32x4_t = vdupq_n_s32(initial_sum);
-            let mut summs1: int32x4_t = vdupq_n_s32(initial_sum);
-            let mut summs2: int32x4_t = vdupq_n_s32(initial_sum);
-            let mut summs3: int32x4_t = vdupq_n_s32(initial_sum);
+            let mut summs0 = vdupq_n_s32(initial_sum);
+            let mut summs1 = vdupq_n_s32(initial_sum);
+            let mut summs2 = vdupq_n_s32(initial_sum);
+            let mut summs3 = vdupq_n_s32(initial_sum);
 
             let current_y0 = ((yy as i64) * (stride as i64)) as usize;
             let current_y1 = ((yy as i64 + 1) * (stride as i64)) as usize;
@@ -76,12 +76,22 @@ pub fn fast_gaussian_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
             let start_x = 0 - 2 * radius_64;
             for x in start_x..(width as i64) {
                 if x >= 0 {
-                    let current_px = x.max(0) as usize * CHANNELS_COUNT;
+                    let current_px = x as usize * CHANNELS_COUNT;
 
-                    let prepared_px0 = vmulq_s32_f32(summs0, v_weight);
-                    let prepared_px1 = vmulq_s32_f32(summs1, v_weight);
-                    let prepared_px2 = vmulq_s32_f32(summs2, v_weight);
-                    let prepared_px3 = vmulq_s32_f32(summs3, v_weight);
+                    let c0 = vcvtq_f32_s32(summs0);
+                    let c1 = vcvtq_f32_s32(summs1);
+                    let c2 = vcvtq_f32_s32(summs2);
+                    let c3 = vcvtq_f32_s32(summs3);
+
+                    let p0 = vmulq_f32(c0, v_weight);
+                    let p1 = vmulq_f32(c1, v_weight);
+                    let p2 = vmulq_f32(c2, v_weight);
+                    let p3 = vmulq_f32(c3, v_weight);
+
+                    let prepared_px0 = vcvtaq_s32_f32(p0);
+                    let prepared_px1 = vcvtaq_s32_f32(p1);
+                    let prepared_px2 = vcvtaq_s32_f32(p2);
+                    let prepared_px3 = vcvtaq_s32_f32(p3);
 
                     let dst_ptr0 = (bytes.slice.as_ptr() as *mut u8).add(current_y0 + current_px);
                     let dst_ptr1 = (bytes.slice.as_ptr() as *mut u8).add(current_y1 + current_px);
@@ -192,8 +202,7 @@ pub fn fast_gaussian_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
             let start_x = 0 - 2 * radius_64;
             for x in start_x..(width as i64) {
                 if x >= 0 {
-                    let current_px =
-                        ((std::cmp::max(x, 0) as u32) * CHANNELS_COUNT as u32) as usize;
+                    let current_px = (x as u32 * CHANNELS_COUNT as u32) as usize;
 
                     let prepared_px_s32 = vreinterpretq_u32_s32(vmulq_s32_f32(summs, v_weight));
                     let prepared_u16 = vqmovn_u32(prepared_px_s32);
@@ -267,15 +276,15 @@ pub(crate) fn fast_gaussian_vertical_pass_neon_u8<T, const CN: usize>(
         let mut xx = start;
 
         while xx + 4 < width.min(end) {
-            let mut diffs0: int32x4_t = vdupq_n_s32(0);
-            let mut diffs1: int32x4_t = vdupq_n_s32(0);
-            let mut diffs2: int32x4_t = vdupq_n_s32(0);
-            let mut diffs3: int32x4_t = vdupq_n_s32(0);
+            let mut diffs0 = vdupq_n_s32(0);
+            let mut diffs1 = vdupq_n_s32(0);
+            let mut diffs2 = vdupq_n_s32(0);
+            let mut diffs3 = vdupq_n_s32(0);
 
-            let mut summs0: int32x4_t = vdupq_n_s32(initial_sum);
-            let mut summs1: int32x4_t = vdupq_n_s32(initial_sum);
-            let mut summs2: int32x4_t = vdupq_n_s32(initial_sum);
-            let mut summs3: int32x4_t = vdupq_n_s32(initial_sum);
+            let mut summs0 = vdupq_n_s32(initial_sum);
+            let mut summs1 = vdupq_n_s32(initial_sum);
+            let mut summs2 = vdupq_n_s32(initial_sum);
+            let mut summs3 = vdupq_n_s32(initial_sum);
 
             let start_y = 0 - 2 * radius as i64;
 
@@ -288,10 +297,20 @@ pub(crate) fn fast_gaussian_vertical_pass_neon_u8<T, const CN: usize>(
                 let current_y = (y * (stride as i64)) as usize;
 
                 if y >= 0 {
-                    let prepared_px0 = vmulq_s32_f32(summs0, v_weight);
-                    let prepared_px1 = vmulq_s32_f32(summs1, v_weight);
-                    let prepared_px2 = vmulq_s32_f32(summs2, v_weight);
-                    let prepared_px3 = vmulq_s32_f32(summs3, v_weight);
+                    let c0 = vcvtq_f32_s32(summs0);
+                    let c1 = vcvtq_f32_s32(summs1);
+                    let c2 = vcvtq_f32_s32(summs2);
+                    let c3 = vcvtq_f32_s32(summs3);
+
+                    let p0 = vmulq_f32(c0, v_weight);
+                    let p1 = vmulq_f32(c1, v_weight);
+                    let p2 = vmulq_f32(c2, v_weight);
+                    let p3 = vmulq_f32(c3, v_weight);
+
+                    let prepared_px0 = vcvtaq_s32_f32(p0);
+                    let prepared_px1 = vcvtaq_s32_f32(p1);
+                    let prepared_px2 = vcvtaq_s32_f32(p2);
+                    let prepared_px3 = vcvtaq_s32_f32(p3);
 
                     let dst_ptr0 = (bytes.slice.as_ptr() as *mut u8).add(current_y + current_px0);
                     let dst_ptr1 = (bytes.slice.as_ptr() as *mut u8).add(current_y + current_px1);
@@ -403,7 +422,7 @@ pub(crate) fn fast_gaussian_vertical_pass_neon_u8<T, const CN: usize>(
                 let current_y = (y * (stride as i64)) as usize;
 
                 if y >= 0 {
-                    let current_px = ((std::cmp::max(x, 0)) * CN as u32) as usize;
+                    let current_px = (x * CN as u32) as usize;
 
                     let prepared_px_s32 = vreinterpretq_u32_s32(vmulq_s32_f32(summs, v_weight));
                     let prepared_u16 = vqmovn_u32(prepared_px_s32);

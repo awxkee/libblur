@@ -3,13 +3,10 @@ mod split;
 
 use crate::merge::merge_channels_3;
 use crate::split::split_channels_3;
-use colorutils_rs::TransferFunction;
 use image::{DynamicImage, EncodableLayout, GenericImageView, ImageReader};
 use libblur::{
-    adaptive_blur, fast_bilateral_filter, filter_1d_approx, filter_1d_exact, filter_1d_rgb_approx,
-    filter_1d_rgb_exact, filter_2d_rgb_fft, filter_2d_rgba_fft, generate_motion_kernel,
-    get_gaussian_kernel_1d, get_sigma_size, motion_blur, EdgeMode, FastBlurChannels,
-    GaussianPreciseLevel, ImageSize, KernelShape, Scalar, ThreadingPolicy,
+    filter_1d_exact, get_gaussian_kernel_1d, get_sigma_size, EdgeMode, FastBlurChannels,
+    GaussianPreciseLevel, ImageSize, Scalar, ThreadingPolicy,
 };
 use std::time::Instant;
 
@@ -173,14 +170,14 @@ fn main() {
 
     // let vldg = dyn_image.to_rgb8();
     // let new_rgb = image::imageops::blur(&vldg, 66.);
-    // let new_dyn = DynamicImage::ImageRgb8(new_rgb);
+    let dyn_image = DynamicImage::ImageRgba8(dyn_image.to_rgba8());
     // new_dyn.save("output.jpg").unwrap();
 
     println!("{:?}", dyn_image.color());
 
-    let img = dyn_image.to_rgb8();
+    let img = dyn_image.to_rgba8();
     let src_bytes = img.as_bytes();
-    let components = 3;
+    let components = 4;
     let stride = dimensions.0 as usize * components;
     let mut bytes: Vec<u8> = src_bytes.to_vec();
     let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
@@ -189,37 +186,37 @@ fn main() {
 
     // let start = Instant::now();
     //
-    // libblur::fast_gaussian_next(
-    //     &mut dst_bytes,
-    //     stride as u32,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     75,
-    //     FastBlurChannels::Channels3,
-    //     ThreadingPolicy::Adaptive,
-    //     EdgeMode::Clamp,
-    // );
+    /*libblur::fast_gaussian(
+        &mut dst_bytes,
+        stride as u32,
+        dimensions.0,
+        dimensions.1,
+        75,
+        FastBlurChannels::Channels3,
+        ThreadingPolicy::Single,
+        EdgeMode::Clamp,
+    );*/
     //
     // println!("stackblur {:?}", start.elapsed());
 
     // dst_bytes = spawned_bytes.iter().map(|&x| (x >> 8) as u8).collect::<Vec<_>>();
 
     // //
-    libblur::gaussian_box_blur(
-        &bytes,
-        stride as u32,
-        &mut dst_bytes,
-        stride as u32,
-        dimensions.0,
-        dimensions.1,
-        15f32,
-        FastBlurChannels::Channels3,
-        ThreadingPolicy::Single,
-    );
+    // libblur::gaussian_box_blur(
+    //     &bytes,
+    //     stride as u32,
+    //     &mut dst_bytes,
+    //     stride as u32,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     48f32,
+    //     FastBlurChannels::Channels4,
+    //     ThreadingPolicy::Single,
+    // );
     // // bytes = dst_bytes;
 
     let start_time = Instant::now();
-    // libblur::fast_gaussian_next(
+    // libblur::stack_blur(
     //     &mut dst_bytes,
     //     stride as u32,
     //     dimensions.0,
@@ -227,7 +224,6 @@ fn main() {
     //     125,
     //     FastBlurChannels::Channels3,
     //     ThreadingPolicy::Adaptive,
-    //     EdgeMode::Clamp,
     // );
     // libblur::fast_gaussian_next(
     //     &mut dst_bytes,
@@ -265,29 +261,52 @@ fn main() {
 
     let start = Instant::now();
 
-    // libblur::gaussian_blur(
-    //     &bytes,
-    //     &mut dst_bytes,
+    let img_f32 = dyn_image.to_rgba32f();
+
+    let mut j_vet = img_f32.clone();
+
+    libblur::stack_blur_f32(
+        &mut j_vet,
+        dimensions.0,
+        dimensions.1,
+        25,
+        FastBlurChannels::Channels4,
+        ThreadingPolicy::Adaptive,
+    );
+
+    // libblur::gaussian_blur_f32(
+    //     &img_f32,
+    //     &mut j_vet,
     //     dimensions.0,
     //     dimensions.1,
-    //     0,
-    //     16f32,
-    //     FastBlurChannels::Channels3,
+    //     21,
+    //     3.5f32,
+    //     FastBlurChannels::Channels4,
     //     EdgeMode::Clamp,
     //     ThreadingPolicy::Single,
-    //     GaussianPreciseLevel::EXACT,
     // );
 
+    bytes = j_vet.iter().map(|&x| (x * 255f32).round() as u8).collect();
+    //
     // libblur::gaussian_box_blur(
     //     &bytes,
-    //     dimensions.0 * 3,
+    //     dimensions.0 * 4,
     //     &mut dst_bytes,
-    //     dimensions.0 * 3,
+    //     dimensions.0 * 4,
     //     dimensions.0,
     //     dimensions.1,
-    //     5f32,
-    //     FastBlurChannels::Channels3,
+    //     7f32,
+    //     FastBlurChannels::Channels4,
     //     ThreadingPolicy::Single,
+    // );
+    // accelerate::acc_convenience::box_convolve(
+    //     &bytes,
+    //     dimensions.0 as usize * 4,
+    //     &mut dst_bytes,
+    //     dimensions.0 as usize * 4,
+    //   11,
+    //     dimensions.0 as usize,
+    //     dimensions.1 as usize,
     // );
 
     println!("gaussian_blur {:?}", start.elapsed());
@@ -457,7 +476,7 @@ fn main() {
     //     ThreadingPolicy::Adaptive,
     //     GaussianPreciseLevel::INTEGRAL,
     // );
-    bytes = dst_bytes;
+    // bytes = dst_bytes;
     // libblur::median_blur(
     //     &bytes,
     //     stride as u32,

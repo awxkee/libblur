@@ -31,6 +31,40 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
+    c.bench_function("libblur: RGBA box blur Single Thread", |b| {
+        let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
+        b.iter(|| {
+            libblur::box_blur(
+                src_bytes,
+                stride as u32,
+                &mut dst_bytes,
+                stride as u32,
+                dimensions.0,
+                dimensions.1,
+                15,
+                FastBlurChannels::Channels4,
+                ThreadingPolicy::Single,
+            );
+        })
+    });
+
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    c.bench_function("Apple Accelerate: RGBA box blur Single Thread", |b| {
+        use accelerate::acc_convenience::box_convolve;
+        let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
+        b.iter(|| {
+            box_convolve(
+                src_bytes,
+                stride,
+                &mut dst_bytes,
+                stride,
+                15,
+                dimensions.0 as usize,
+                dimensions.1 as usize,
+            );
+        })
+    });
+
     let src = imread(
         &find_file("assets/test_image_4.png", false, false).unwrap(),
         IMREAD_COLOR,

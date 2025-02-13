@@ -3,6 +3,13 @@
 version = 4
 
 [[package]]
+name = "accelerate"
+version = "0.1.0"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "adler"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -394,6 +401,7 @@ dependencies = [
 name = "fast-blur"
 version = "0.1.0"
 dependencies = [
+ "accelerate",
  "colorutils-rs",
  "criterion",
  "half",
@@ -623,7 +631,7 @@ checksum = "03087c2bad5e1034e8cace5926dec053fb3790248370865f5117a7d0213354c8"
 
 [[package]]
 name = "libblur"
-version = "0.15.1"
+version = "0.15.2"
 dependencies = [
  "colorutils-rs",
  "fast_transpose",

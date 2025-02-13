@@ -32,12 +32,12 @@ use std::arch::x86_64::*;
 
 use crate::reflect_101;
 use crate::reflect_index;
-use crate::sse::store_u8_u32;
 use crate::sse::utils::load_u8_s32_fast;
+use crate::sse::{_mm_mul_round_ps, store_u8_u32};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, EdgeMode};
 
-pub(crate) fn fast_gaussian_horizontal_pass_sse_u8<T, const CHANNELS_COUNT: usize>(
+pub(crate) fn fast_gaussian_horizontal_pass_sse_u8<T, const CN: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -48,22 +48,22 @@ pub(crate) fn fast_gaussian_horizontal_pass_sse_u8<T, const CHANNELS_COUNT: usiz
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        fast_gaussian_horizontal_pass_sse_u8_impl::<T, CHANNELS_COUNT>(
-            undefined_slice,
-            stride,
-            width,
-            height,
-            radius,
-            start,
-            end,
-            edge_mode,
-        );
+        let bytes: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_slice);
+        if std::arch::is_x86_feature_detected!("fma") {
+            fg_horizontal_pass_sse_u8_fma::<CN>(
+                bytes, stride, width, height, radius, start, end, edge_mode,
+            );
+        } else {
+            fg_horizontal_pass_sse_u8_def::<CN>(
+                bytes, stride, width, height, radius, start, end, edge_mode,
+            );
+        }
     }
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn fast_gaussian_horizontal_pass_sse_u8_impl<T, const CN: usize>(
-    undefined_slice: &UnsafeSlice<T>,
+unsafe fn fg_horizontal_pass_sse_u8_def<const CN: usize>(
+    bytes: &UnsafeSlice<u8>,
     stride: u32,
     width: u32,
     height: u32,
@@ -72,8 +72,38 @@ unsafe fn fast_gaussian_horizontal_pass_sse_u8_impl<T, const CN: usize>(
     end: u32,
     edge_mode: EdgeMode,
 ) {
-    let bytes: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(undefined_slice) };
+    fg_horizontal_pass_sse_u8_impl::<CN, false>(
+        bytes, stride, width, height, radius, start, end, edge_mode,
+    );
+}
 
+#[target_feature(enable = "sse4.1", enable = "fma")]
+unsafe fn fg_horizontal_pass_sse_u8_fma<const CN: usize>(
+    bytes: &UnsafeSlice<u8>,
+    stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    start: u32,
+    end: u32,
+    edge_mode: EdgeMode,
+) {
+    fg_horizontal_pass_sse_u8_impl::<CN, true>(
+        bytes, stride, width, height, radius, start, end, edge_mode,
+    );
+}
+
+#[inline(always)]
+unsafe fn fg_horizontal_pass_sse_u8_impl<const CN: usize, const FMA: bool>(
+    bytes: &UnsafeSlice<u8>,
+    stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    start: u32,
+    end: u32,
+    edge_mode: EdgeMode,
+) {
     let mut buffer0 = Box::new([[0i32; 4]; 1024]);
     let mut buffer1 = Box::new([[0i32; 4]; 1024]);
     let mut buffer2 = Box::new([[0i32; 4]; 1024]);
@@ -115,20 +145,29 @@ unsafe fn fast_gaussian_horizontal_pass_sse_u8_impl<T, const CN: usize>(
                 let ss2 = _mm_cvtepi32_ps(summs2);
                 let ss3 = _mm_cvtepi32_ps(summs3);
 
-                let ms0 = _mm_mul_ps(ss0, v_weight);
-                let ms1 = _mm_mul_ps(ss1, v_weight);
-                let ms2 = _mm_mul_ps(ss2, v_weight);
-                let ms3 = _mm_mul_ps(ss3, v_weight);
+                let (r0, r1, r2, r3);
 
-                let rs0 = _mm_round_ps::<ROUNDING_FLAGS>(ms0);
-                let rs1 = _mm_round_ps::<ROUNDING_FLAGS>(ms1);
-                let rs2 = _mm_round_ps::<ROUNDING_FLAGS>(ms2);
-                let rs3 = _mm_round_ps::<ROUNDING_FLAGS>(ms3);
+                if FMA {
+                    r0 = _mm_mul_round_ps(ss0, v_weight);
+                    r1 = _mm_mul_round_ps(ss1, v_weight);
+                    r2 = _mm_mul_round_ps(ss2, v_weight);
+                    r3 = _mm_mul_round_ps(ss3, v_weight);
+                } else {
+                    let ms0 = _mm_mul_ps(ss0, v_weight);
+                    let ms1 = _mm_mul_ps(ss1, v_weight);
+                    let ms2 = _mm_mul_ps(ss2, v_weight);
+                    let ms3 = _mm_mul_ps(ss3, v_weight);
 
-                let prepared_px0 = _mm_cvtps_epi32(rs0);
-                let prepared_px1 = _mm_cvtps_epi32(rs1);
-                let prepared_px2 = _mm_cvtps_epi32(rs2);
-                let prepared_px3 = _mm_cvtps_epi32(rs3);
+                    r0 = _mm_round_ps::<ROUNDING_FLAGS>(ms0);
+                    r1 = _mm_round_ps::<ROUNDING_FLAGS>(ms1);
+                    r2 = _mm_round_ps::<ROUNDING_FLAGS>(ms2);
+                    r3 = _mm_round_ps::<ROUNDING_FLAGS>(ms3);
+                }
+
+                let prepared_px0 = _mm_cvtps_epi32(r0);
+                let prepared_px1 = _mm_cvtps_epi32(r1);
+                let prepared_px2 = _mm_cvtps_epi32(r2);
+                let prepared_px3 = _mm_cvtps_epi32(r3);
 
                 let dst_ptr0 = (bytes.slice.as_ptr() as *mut u8).add(current_y0 + current_px);
                 let dst_ptr1 = (bytes.slice.as_ptr() as *mut u8).add(current_y1 + current_px);
@@ -253,8 +292,11 @@ unsafe fn fast_gaussian_horizontal_pass_sse_u8_impl<T, const CN: usize>(
             if x >= 0 {
                 let current_px = (x as u32 * CN as u32) as usize;
 
-                let pixel_f32 =
-                    _mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(_mm_cvtepi32_ps(summs), v_weight));
+                let pixel_f32 = if FMA {
+                    _mm_mul_round_ps(_mm_cvtepi32_ps(summs), v_weight)
+                } else {
+                    _mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(_mm_cvtepi32_ps(summs), v_weight))
+                };
                 let pixel_u32 = _mm_cvtps_epi32(pixel_f32);
 
                 let bytes_offset = current_y + current_px;
@@ -299,7 +341,7 @@ unsafe fn fast_gaussian_horizontal_pass_sse_u8_impl<T, const CN: usize>(
     }
 }
 
-pub(crate) fn fast_gaussian_vertical_pass_sse_u8<T, const CHANNELS_COUNT: usize>(
+pub(crate) fn fast_gaussian_vertical_pass_sse_u8<T, const CN: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -310,22 +352,22 @@ pub(crate) fn fast_gaussian_vertical_pass_sse_u8<T, const CHANNELS_COUNT: usize>
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        fast_gaussian_vertical_pass_sse_u8_impl::<T, CHANNELS_COUNT>(
-            undefined_slice,
-            stride,
-            width,
-            height,
-            radius,
-            start,
-            end,
-            edge_mode,
-        );
+        let bytes: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_slice);
+        if std::arch::is_x86_feature_detected!("fma") {
+            fg_vertical_pass_sse_u8_fma::<CN>(
+                bytes, stride, width, height, radius, start, end, edge_mode,
+            );
+        } else {
+            fg_vertical_pass_sse_u8_def::<CN>(
+                bytes, stride, width, height, radius, start, end, edge_mode,
+            );
+        }
     }
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn fast_gaussian_vertical_pass_sse_u8_impl<T, const CN: usize>(
-    undefined_slice: &UnsafeSlice<T>,
+unsafe fn fg_vertical_pass_sse_u8_def<const CN: usize>(
+    bytes: &UnsafeSlice<u8>,
     stride: u32,
     width: u32,
     height: u32,
@@ -334,7 +376,38 @@ unsafe fn fast_gaussian_vertical_pass_sse_u8_impl<T, const CN: usize>(
     end: u32,
     edge_mode: EdgeMode,
 ) {
-    let bytes: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_slice);
+    fg_vertical_pass_sse_u8_impl::<CN, false>(
+        bytes, stride, width, height, radius, start, end, edge_mode,
+    );
+}
+
+#[target_feature(enable = "sse4.1", enable = "fma")]
+unsafe fn fg_vertical_pass_sse_u8_fma<const CN: usize>(
+    bytes: &UnsafeSlice<u8>,
+    stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    start: u32,
+    end: u32,
+    edge_mode: EdgeMode,
+) {
+    fg_vertical_pass_sse_u8_impl::<CN, true>(
+        bytes, stride, width, height, radius, start, end, edge_mode,
+    );
+}
+
+#[inline(always)]
+unsafe fn fg_vertical_pass_sse_u8_impl<const CN: usize, const FMA: bool>(
+    bytes: &UnsafeSlice<u8>,
+    stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    start: u32,
+    end: u32,
+    edge_mode: EdgeMode,
+) {
     let mut buffer0 = Box::new([[0; 4]; 1024]);
     let mut buffer1 = Box::new([[0; 4]; 1024]);
     let mut buffer2 = Box::new([[0; 4]; 1024]);
@@ -376,20 +449,28 @@ unsafe fn fast_gaussian_vertical_pass_sse_u8_impl<T, const CN: usize>(
                 let ss2 = _mm_cvtepi32_ps(summs2);
                 let ss3 = _mm_cvtepi32_ps(summs3);
 
-                let ms0 = _mm_mul_ps(ss0, v_weight);
-                let ms1 = _mm_mul_ps(ss1, v_weight);
-                let ms2 = _mm_mul_ps(ss2, v_weight);
-                let ms3 = _mm_mul_ps(ss3, v_weight);
+                let (r0, r1, r2, r3);
+                if FMA {
+                    r0 = _mm_mul_round_ps(ss0, v_weight);
+                    r1 = _mm_mul_round_ps(ss1, v_weight);
+                    r2 = _mm_mul_round_ps(ss2, v_weight);
+                    r3 = _mm_mul_round_ps(ss3, v_weight);
+                } else {
+                    let ms0 = _mm_mul_ps(ss0, v_weight);
+                    let ms1 = _mm_mul_ps(ss1, v_weight);
+                    let ms2 = _mm_mul_ps(ss2, v_weight);
+                    let ms3 = _mm_mul_ps(ss3, v_weight);
 
-                let rs0 = _mm_round_ps::<ROUNDING_FLAGS>(ms0);
-                let rs1 = _mm_round_ps::<ROUNDING_FLAGS>(ms1);
-                let rs2 = _mm_round_ps::<ROUNDING_FLAGS>(ms2);
-                let rs3 = _mm_round_ps::<ROUNDING_FLAGS>(ms3);
+                    r0 = _mm_round_ps::<ROUNDING_FLAGS>(ms0);
+                    r1 = _mm_round_ps::<ROUNDING_FLAGS>(ms1);
+                    r2 = _mm_round_ps::<ROUNDING_FLAGS>(ms2);
+                    r3 = _mm_round_ps::<ROUNDING_FLAGS>(ms3);
+                }
 
-                let prepared_px0 = _mm_cvtps_epi32(rs0);
-                let prepared_px1 = _mm_cvtps_epi32(rs1);
-                let prepared_px2 = _mm_cvtps_epi32(rs2);
-                let prepared_px3 = _mm_cvtps_epi32(rs3);
+                let prepared_px0 = _mm_cvtps_epi32(r0);
+                let prepared_px1 = _mm_cvtps_epi32(r1);
+                let prepared_px2 = _mm_cvtps_epi32(r2);
+                let prepared_px3 = _mm_cvtps_epi32(r3);
 
                 let current_y = (y * (stride as i64)) as usize;
 
@@ -513,10 +594,13 @@ unsafe fn fast_gaussian_vertical_pass_sse_u8_impl<T, const CN: usize>(
         let start_y = 0 - 2 * radius as i64;
         for y in start_y..height_wide {
             if y >= 0 {
-                let current_px = ((std::cmp::max(x, 0)) * CN as u32) as usize;
+                let current_px = (x * CN as u32) as usize;
 
-                let pixel_f32 =
-                    _mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(_mm_cvtepi32_ps(summs), v_weight));
+                let pixel_f32 = if FMA {
+                    _mm_mul_round_ps(_mm_cvtepi32_ps(summs), v_weight)
+                } else {
+                    _mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(_mm_cvtepi32_ps(summs), v_weight))
+                };
 
                 let current_y = (y * (stride as i64)) as usize;
 

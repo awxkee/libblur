@@ -366,8 +366,8 @@ pub(crate) unsafe fn _mm256_interleave_rgba_epi32(
     let bgra3_ = _mm256_unpackhi_epi64(bg1, ra1);
 
     let v0 = _mm256_permute2x128_si256::<32>(bgra0_, bgra1_);
-    let v1 = _mm256_permute2x128_si256::<49>(bgra0_, bgra1_);
-    let v2 = _mm256_permute2x128_si256::<32>(bgra2_, bgra3_);
+    let v1 = _mm256_permute2x128_si256::<32>(bgra2_, bgra3_);
+    let v2 = _mm256_permute2x128_si256::<49>(bgra0_, bgra1_);
     let v3 = _mm256_permute2x128_si256::<49>(bgra2_, bgra3_);
 
     (v0, v1, v2, v3)

@@ -192,12 +192,11 @@ pub(crate) unsafe fn _mm256_mul_add_symm_epi8_by_ps_x4<const FMA: bool>(
 
 #[inline(always)]
 pub(crate) unsafe fn _mm256_pack_ps_x4_epi8(store: (__m256, __m256, __m256, __m256)) -> __m256i {
-    const ROUNDING_FLAGS: i32 = 0x0;
-
-    let l0 = _mm256_round_ps::<ROUNDING_FLAGS>(store.0);
-    let l1 = _mm256_round_ps::<ROUNDING_FLAGS>(store.1);
-    let l2 = _mm256_round_ps::<ROUNDING_FLAGS>(store.2);
-    let l3 = _mm256_round_ps::<ROUNDING_FLAGS>(store.3);
+    let rnd = _mm256_set1_ps(0.5f32);
+    let l0 = _mm256_add_ps(store.0, rnd);
+    let l1 = _mm256_add_ps(store.1, rnd);
+    let l2 = _mm256_add_ps(store.2, rnd);
+    let l3 = _mm256_add_ps(store.3, rnd);
 
     let v0 = _mm256_cvtps_epi32(l0);
     let v1 = _mm256_cvtps_epi32(l1);

@@ -26,13 +26,46 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#![deny(unreachable_pub)]
-mod pack;
-mod utils;
-mod v_load;
-mod v_store;
 
-pub(crate) use pack::*;
-pub(crate) use utils::*;
-pub(crate) use v_load::*;
-pub(crate) use v_store::*;
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+pub mod acc_convenience {
+    use crate::accelerate::*;
+    pub fn box_convolve(
+        src: &[u8],
+        src_stride: usize,
+        dst: &mut [u8],
+        dst_stride: usize,
+        kernel_size: usize,
+        width: usize,
+        height: usize,
+    ) {
+        let src_image = vImage_Buffer {
+            data: src.as_ptr() as *mut libc::c_void,
+            height,
+            width,
+            row_bytes: src_stride,
+        };
+        let mut dst_image = vImage_Buffer {
+            data: dst.as_mut_ptr() as *mut libc::c_void,
+            height,
+            width,
+            row_bytes: dst_stride,
+        };
+        unsafe {
+            let status = vImageBoxConvolve_ARGB8888(
+                &src_image,
+                &mut dst_image,
+                std::ptr::null_mut(),
+                0,
+                0,
+                kernel_size as libc::c_uint,
+                kernel_size as libc::c_uint,
+                std::ptr::null_mut(),
+                kvImageTruncateKernel | kvImageDoNotTile,
+            );
+            if status != 0 {
+                panic!("vImageBoxConvolve returned error: {}", status);
+            }
+        }
+    }
+}
