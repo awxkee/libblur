@@ -110,7 +110,7 @@ where
                 for i in 0..=radius {
                     let stack_ptr = stacks.as_mut_ptr().add(i as usize * 4);
                     vst1q_f32(stack_ptr, src_pixel);
-                    sums = prefer_vfmaq_f32(sums, src_pixel, vdupq_n_f32(i as f32 + 1f32));
+                    sums = prefer_vfmaq_f32(sums, src_pixel, vdupq_n_f32((i + 1) as f32));
                     sum_out = vaddq_f32(sum_out, src_pixel);
                 }
 
@@ -123,11 +123,7 @@ where
                     let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f32;
                     let src_pixel = load_f32_fast::<COMPONENTS>(src_ld);
                     vst1q_f32(stack_ptr, src_pixel);
-                    sums = prefer_vfmaq_f32(
-                        sums,
-                        src_pixel,
-                        vdupq_n_f32(radius as f32 + 1f32 - i as f32),
-                    );
+                    sums = prefer_vfmaq_f32(sums, src_pixel, vdupq_n_f32((radius + 1 - i) as f32));
 
                     sum_in = vaddq_f32(sum_in, src_pixel);
                 }

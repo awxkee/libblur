@@ -26,6 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::filter1d::sse::utils::_mm_opt_fmlaf_ps;
 use crate::sse::{load_f32, store_f32};
 use crate::stackblur::stack_blur_pass::StackBlurWorkingPass;
 use crate::unsafe_slice::UnsafeSlice;
@@ -51,137 +52,156 @@ impl<T, J, const COMPONENTS: usize> Default for VerticalSseStackBlurPassFloat32<
     }
 }
 
-impl<T, J, const COMPONENTS: usize> VerticalSseStackBlurPassFloat32<T, J, COMPONENTS>
-where
-    J: Copy
-        + 'static
-        + FromPrimitive
-        + AddAssign<J>
-        + Mul<Output = J>
-        + Sub<Output = J>
-        + AsPrimitive<f32>
-        + SubAssign
-        + AsPrimitive<T>
-        + Default,
-    T: Copy + AsPrimitive<J> + FromPrimitive,
-    i32: AsPrimitive<J>,
-    u32: AsPrimitive<J>,
-    f32: AsPrimitive<T>,
-    usize: AsPrimitive<J>,
-{
-    #[target_feature(enable = "sse4.1")]
-    unsafe fn pass_impl(
-        &self,
-        pixels: &UnsafeSlice<T>,
-        stride: u32,
-        width: u32,
-        height: u32,
-        radius: u32,
-        thread: usize,
-        total_threads: usize,
-    ) {
-        unsafe {
-            let pixels: &UnsafeSlice<f32> = std::mem::transmute(pixels);
-            let div = ((radius * 2) + 1) as usize;
-            let mut yp;
-            let mut sp;
-            let mut stack_start;
-            let mut stacks = vec![0.; 4 * div * total_threads];
+#[target_feature(enable = "sse4.1")]
+unsafe fn vertical_pass_stack_def<const CN: usize>(
+    pixels: &UnsafeSlice<f32>,
+    stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    thread: usize,
+    total_threads: usize,
+) {
+    stack_blur_pass_vert_sse::<CN, false>(
+        pixels,
+        stride,
+        width,
+        height,
+        radius,
+        thread,
+        total_threads,
+    );
+}
 
-            let v_mul_value = _mm_set1_ps(1. / ((radius as f32 + 1.) * (radius as f32 + 1.)));
+#[target_feature(enable = "sse4.1", enable = "fma")]
+unsafe fn vertical_pass_stack_fma<const CN: usize>(
+    pixels: &UnsafeSlice<f32>,
+    stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    thread: usize,
+    total_threads: usize,
+) {
+    stack_blur_pass_vert_sse::<CN, true>(
+        pixels,
+        stride,
+        width,
+        height,
+        radius,
+        thread,
+        total_threads,
+    );
+}
 
-            let hm = height - 1;
-            let div = (radius * 2) + 1;
+#[inline(always)]
+unsafe fn stack_blur_pass_vert_sse<const CN: usize, const FMA: bool>(
+    pixels: &UnsafeSlice<f32>,
+    stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    thread: usize,
+    total_threads: usize,
+) {
+    unsafe {
+        let div = ((radius * 2) + 1) as usize;
+        let mut yp;
+        let mut sp;
+        let mut stack_start;
+        let mut stacks = vec![0.; 4 * div * total_threads];
 
-            let mut src_ptr;
-            let mut dst_ptr;
+        let v_mul_value = _mm_set1_ps(1. / ((radius as f32 + 1.) * (radius as f32 + 1.)));
 
-            let min_x = thread * width as usize / total_threads;
-            let max_x = (thread + 1) * width as usize / total_threads;
+        let hm = height - 1;
+        let div = (radius * 2) + 1;
 
-            for x in min_x..max_x {
-                let mut sums = _mm_setzero_ps();
-                let mut sum_in = _mm_setzero_ps();
-                let mut sum_out = _mm_setzero_ps();
+        let mut src_ptr;
+        let mut dst_ptr;
 
-                src_ptr = COMPONENTS * x;
+        let min_x = thread * width as usize / total_threads;
+        let max_x = (thread + 1) * width as usize / total_threads;
 
+        for x in min_x..max_x {
+            let mut sums = _mm_setzero_ps();
+            let mut sum_in = _mm_setzero_ps();
+            let mut sum_out = _mm_setzero_ps();
+
+            src_ptr = CN * x;
+
+            let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f32;
+
+            let src_pixel = load_f32::<CN>(src_ld);
+
+            for i in 0..=radius {
+                let stack_ptr = stacks.as_mut_ptr().add(i as usize * 4);
+                _mm_storeu_ps(stack_ptr, src_pixel);
+                sums = _mm_opt_fmlaf_ps::<FMA>(sums, src_pixel, _mm_set1_ps((i + 1) as f32));
+                sum_out = _mm_add_ps(sum_out, src_pixel);
+            }
+
+            for i in 1..=radius {
+                if i <= hm {
+                    src_ptr += stride as usize;
+                }
+
+                let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4);
                 let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f32;
+                let src_pixel = load_f32::<CN>(src_ld);
+                _mm_storeu_ps(stack_ptr, src_pixel);
+                sums =
+                    _mm_opt_fmlaf_ps::<FMA>(sums, src_pixel, _mm_set1_ps((radius + 1 - i) as f32));
 
-                let src_pixel = load_f32::<COMPONENTS>(src_ld);
+                sum_in = _mm_add_ps(sum_in, src_pixel);
+            }
 
-                for i in 0..=radius {
-                    let stack_ptr = stacks.as_mut_ptr().add(i as usize * 4);
-                    _mm_storeu_ps(stack_ptr, src_pixel);
-                    sums = _mm_add_ps(sums, _mm_mul_ps(src_pixel, _mm_set1_ps(i as f32 + 1f32)));
-                    sum_out = _mm_add_ps(sum_out, src_pixel);
+            sp = radius;
+            yp = radius;
+            if yp > hm {
+                yp = hm;
+            }
+            src_ptr = CN * x + yp as usize * stride as usize;
+            dst_ptr = CN * x;
+            for _ in 0..height {
+                let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut f32;
+                let blurred = _mm_mul_ps(sums, v_mul_value);
+                store_f32::<CN>(store_ld, blurred);
+
+                dst_ptr += stride as usize;
+
+                sums = _mm_sub_ps(sums, sum_out);
+
+                stack_start = sp + div - radius;
+                if stack_start >= div {
+                    stack_start -= div;
                 }
 
-                for i in 1..=radius {
-                    if i <= hm {
-                        src_ptr += stride as usize;
-                    }
+                let stack_ptr = stacks.as_mut_ptr().add(stack_start as usize * 4);
+                let stack_val = _mm_loadu_ps(stack_ptr as *const f32);
+                sum_out = _mm_sub_ps(sum_out, stack_val);
 
-                    let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4);
-                    let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f32;
-                    let src_pixel = load_f32::<COMPONENTS>(src_ld);
-                    _mm_storeu_ps(stack_ptr, src_pixel);
-                    sums = _mm_add_ps(
-                        sums,
-                        _mm_mul_ps(src_pixel, _mm_set1_ps(radius as f32 + 1f32 - i as f32)),
-                    );
-
-                    sum_in = _mm_add_ps(sum_in, src_pixel);
+                if yp < hm {
+                    src_ptr += stride as usize; // stride
+                    yp += 1;
                 }
 
-                sp = radius;
-                yp = radius;
-                if yp > hm {
-                    yp = hm;
+                let src_ld = pixels.slice.as_ptr().add(src_ptr);
+                let src_pixel = load_f32::<CN>(src_ld as *const f32);
+                _mm_storeu_ps(stack_ptr, src_pixel);
+
+                sum_in = _mm_add_ps(sum_in, src_pixel);
+                sums = _mm_add_ps(sums, sum_in);
+
+                sp += 1;
+
+                if sp >= div {
+                    sp = 0;
                 }
-                src_ptr = COMPONENTS * x + yp as usize * stride as usize;
-                dst_ptr = COMPONENTS * x;
-                for _ in 0..height {
-                    let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut f32;
-                    let blurred = _mm_mul_ps(sums, v_mul_value);
-                    store_f32::<COMPONENTS>(store_ld, blurred);
+                let stack_ptr = stacks.as_mut_ptr().add(sp as usize * 4);
+                let stack_val = _mm_loadu_ps(stack_ptr as *const f32);
 
-                    dst_ptr += stride as usize;
-
-                    sums = _mm_sub_ps(sums, sum_out);
-
-                    stack_start = sp + div - radius;
-                    if stack_start >= div {
-                        stack_start -= div;
-                    }
-
-                    let stack_ptr = stacks.as_mut_ptr().add(stack_start as usize * 4);
-                    let stack_val = _mm_loadu_ps(stack_ptr as *const f32);
-                    sum_out = _mm_sub_ps(sum_out, stack_val);
-
-                    if yp < hm {
-                        src_ptr += stride as usize; // stride
-                        yp += 1;
-                    }
-
-                    let src_ld = pixels.slice.as_ptr().add(src_ptr);
-                    let src_pixel = load_f32::<COMPONENTS>(src_ld as *const f32);
-                    _mm_storeu_ps(stack_ptr, src_pixel);
-
-                    sum_in = _mm_add_ps(sum_in, src_pixel);
-                    sums = _mm_add_ps(sums, sum_in);
-
-                    sp += 1;
-
-                    if sp >= div {
-                        sp = 0;
-                    }
-                    let stack_ptr = stacks.as_mut_ptr().add(sp as usize * 4);
-                    let stack_val = _mm_loadu_ps(stack_ptr as *const f32);
-
-                    sum_out = _mm_add_ps(sum_out, stack_val);
-                    sum_in = _mm_sub_ps(sum_in, stack_val);
-                }
+                sum_out = _mm_add_ps(sum_out, stack_val);
+                sum_in = _mm_sub_ps(sum_in, stack_val);
             }
         }
     }
@@ -217,7 +237,28 @@ where
         total_threads: usize,
     ) {
         unsafe {
-            self.pass_impl(pixels, stride, width, height, radius, thread, total_threads);
+            let pixels: &UnsafeSlice<f32> = std::mem::transmute(pixels);
+            if std::arch::is_x86_feature_detected!("fma") {
+                vertical_pass_stack_fma::<COMPONENTS>(
+                    pixels,
+                    stride,
+                    width,
+                    height,
+                    radius,
+                    thread,
+                    total_threads,
+                );
+            } else {
+                vertical_pass_stack_def::<COMPONENTS>(
+                    pixels,
+                    stride,
+                    width,
+                    height,
+                    radius,
+                    thread,
+                    total_threads,
+                );
+            }
         }
     }
 }

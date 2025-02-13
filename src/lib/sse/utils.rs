@@ -36,19 +36,11 @@ pub(crate) unsafe fn load_f32<const CN: usize>(ptr: *const f32) -> __m128 {
     if CN == 4 {
         return _mm_loadu_ps(ptr);
     } else if CN == 3 {
-        return _mm_setr_ps(
-            ptr.read_unaligned(),
-            ptr.add(1).read_unaligned(),
-            ptr.add(2).read_unaligned(),
-            0f32,
-        );
+        let mut j = _mm_loadu_si64(ptr as *const _);
+        j = _mm_insert_epi32::<2>(j, ptr.add(2).read_unaligned().to_bits() as i32);
+        return _mm_castsi128_ps(j);
     } else if CN == 2 {
-        return _mm_setr_ps(
-            ptr.read_unaligned(),
-            ptr.add(1).read_unaligned(),
-            0f32,
-            0f32,
-        );
+        return _mm_castsi128_ps(_mm_loadu_si64(ptr as *const _));
     }
     _mm_setr_ps(ptr.read_unaligned(), 0f32, 0f32, 0f32)
 }

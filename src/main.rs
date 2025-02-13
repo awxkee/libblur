@@ -261,10 +261,19 @@ fn main() {
 
     let start = Instant::now();
 
-    // let img_f32 = dyn_image.to_rgba32f();
-    //
-    // let mut j_vet = vec![0f32; img_f32.len()];
-    //
+    let img_f32 = dyn_image.to_rgba32f();
+
+    let mut j_vet = img_f32.clone();
+
+    libblur::stack_blur_f32(
+        &mut j_vet,
+        dimensions.0,
+        dimensions.1,
+        25,
+        FastBlurChannels::Channels4,
+        ThreadingPolicy::Adaptive,
+    );
+
     // libblur::gaussian_blur_f32(
     //     &img_f32,
     //     &mut j_vet,
@@ -276,20 +285,20 @@ fn main() {
     //     EdgeMode::Clamp,
     //     ThreadingPolicy::Single,
     // );
-    //
-    // bytes = j_vet.iter().map(|&x| (x * 255f32).round() as u8).collect();
 
-    libblur::gaussian_box_blur(
-        &bytes,
-        dimensions.0 * 4,
-        &mut dst_bytes,
-        dimensions.0 * 4,
-        dimensions.0,
-        dimensions.1,
-        7f32,
-        FastBlurChannels::Channels4,
-        ThreadingPolicy::Single,
-    );
+    bytes = j_vet.iter().map(|&x| (x * 255f32).round() as u8).collect();
+    //
+    // libblur::gaussian_box_blur(
+    //     &bytes,
+    //     dimensions.0 * 4,
+    //     &mut dst_bytes,
+    //     dimensions.0 * 4,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     7f32,
+    //     FastBlurChannels::Channels4,
+    //     ThreadingPolicy::Single,
+    // );
     // accelerate::acc_convenience::box_convolve(
     //     &bytes,
     //     dimensions.0 as usize * 4,
@@ -479,7 +488,7 @@ fn main() {
     //     FastBlurChannels::Channels4,
     //     ThreadingPolicy::Adaptive,
     // );
-    bytes = dst_bytes;
+    // bytes = dst_bytes;
     // libblur::gaussian_box_blur(&bytes, stride as u32, &mut dst_bytes, stride as u32, dimensions.0, dimensions.1, 77,
     //                            FastBlurChannels::Channels3, ThreadingPolicy::Single);
     // bytes = dst_bytes;
