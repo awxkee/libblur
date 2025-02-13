@@ -40,7 +40,7 @@ pub fn get_gaussian_kernel_1d(width: u32, sigma: f32) -> Vec<f32> {
     if sum_norm != 0f32 {
         let sum_scale = 1f32 / sum_norm;
         for item in kernel.iter_mut() {
-            *item = (*item) * sum_scale;
+            *item *= sum_scale;
         }
     }
 
