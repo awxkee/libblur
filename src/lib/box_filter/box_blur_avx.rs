@@ -33,7 +33,7 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-pub(crate) fn box_blur_vertical_pass_avx2<T, const CHANNELS: usize>(
+pub(crate) fn box_blur_vertical_pass_avx2<T>(
     undefined_src: &[T],
     src_stride: u32,
     undefined_unsafe_dst: &UnsafeSlice<T>,
@@ -50,20 +50,20 @@ pub(crate) fn box_blur_vertical_pass_avx2<T, const CHANNELS: usize>(
     unsafe {
         if std::arch::is_x86_feature_detected!("fma") {
             if radius < 240 {
-                box_blur_vertical_pass_avx2_fma_lr::<CHANNELS>(
+                box_blur_vertical_pass_avx2_fma_lr(
                     src, src_stride, unsafe_dst, dst_stride, w, height, radius, start_x, end_x,
                 )
             } else {
-                box_blur_vertical_pass_avx2_fma::<CHANNELS>(
+                box_blur_vertical_pass_avx2_fma(
                     src, src_stride, unsafe_dst, dst_stride, w, height, radius, start_x, end_x,
                 )
             }
         } else if radius < 240 {
-            box_blur_vertical_pass_avx2_def_lr::<CHANNELS>(
+            box_blur_vertical_pass_avx2_def_lr(
                 src, src_stride, unsafe_dst, dst_stride, w, height, radius, start_x, end_x,
             )
         } else {
-            box_blur_vertical_pass_avx2_def::<CHANNELS>(
+            box_blur_vertical_pass_avx2_def(
                 src, src_stride, unsafe_dst, dst_stride, w, height, radius, start_x, end_x,
             )
         }
@@ -71,7 +71,7 @@ pub(crate) fn box_blur_vertical_pass_avx2<T, const CHANNELS: usize>(
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn box_blur_vertical_pass_avx2_def<const CHANNELS: usize>(
+unsafe fn box_blur_vertical_pass_avx2_def(
     undefined_src: &[u8],
     src_stride: u32,
     undefined_unsafe_dst: &UnsafeSlice<u8>,
@@ -82,7 +82,7 @@ unsafe fn box_blur_vertical_pass_avx2_def<const CHANNELS: usize>(
     start_x: u32,
     end_x: u32,
 ) {
-    box_blur_vertical_pass_avx2_impl::<CHANNELS, false>(
+    box_blur_vertical_pass_avx2_impl::<false>(
         undefined_src,
         src_stride,
         undefined_unsafe_dst,
@@ -96,7 +96,7 @@ unsafe fn box_blur_vertical_pass_avx2_def<const CHANNELS: usize>(
 }
 
 #[target_feature(enable = "avx2", enable = "fma")]
-unsafe fn box_blur_vertical_pass_avx2_fma<const CHANNELS: usize>(
+unsafe fn box_blur_vertical_pass_avx2_fma(
     undefined_src: &[u8],
     src_stride: u32,
     undefined_unsafe_dst: &UnsafeSlice<u8>,
@@ -107,7 +107,7 @@ unsafe fn box_blur_vertical_pass_avx2_fma<const CHANNELS: usize>(
     start_x: u32,
     end_x: u32,
 ) {
-    box_blur_vertical_pass_avx2_impl::<CHANNELS, true>(
+    box_blur_vertical_pass_avx2_impl::<true>(
         undefined_src,
         src_stride,
         undefined_unsafe_dst,
@@ -121,7 +121,7 @@ unsafe fn box_blur_vertical_pass_avx2_fma<const CHANNELS: usize>(
 }
 
 #[inline(always)]
-unsafe fn box_blur_vertical_pass_avx2_impl<const CHANNELS: usize, const FMA: bool>(
+unsafe fn box_blur_vertical_pass_avx2_impl<const FMA: bool>(
     src: &[u8],
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<u8>,
@@ -821,7 +821,7 @@ unsafe fn box_blur_vertical_pass_avx2_impl<const CHANNELS: usize, const FMA: boo
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn box_blur_vertical_pass_avx2_def_lr<const CHANNELS: usize>(
+unsafe fn box_blur_vertical_pass_avx2_def_lr(
     undefined_src: &[u8],
     src_stride: u32,
     undefined_unsafe_dst: &UnsafeSlice<u8>,
@@ -832,7 +832,7 @@ unsafe fn box_blur_vertical_pass_avx2_def_lr<const CHANNELS: usize>(
     start_x: u32,
     end_x: u32,
 ) {
-    box_blur_vertical_pass_avx2_impl_lr::<CHANNELS, false>(
+    box_blur_vertical_pass_avx2_impl_lr::<false>(
         undefined_src,
         src_stride,
         undefined_unsafe_dst,
@@ -846,7 +846,7 @@ unsafe fn box_blur_vertical_pass_avx2_def_lr<const CHANNELS: usize>(
 }
 
 #[target_feature(enable = "avx2", enable = "fma")]
-unsafe fn box_blur_vertical_pass_avx2_fma_lr<const CHANNELS: usize>(
+unsafe fn box_blur_vertical_pass_avx2_fma_lr(
     undefined_src: &[u8],
     src_stride: u32,
     undefined_unsafe_dst: &UnsafeSlice<u8>,
@@ -857,7 +857,7 @@ unsafe fn box_blur_vertical_pass_avx2_fma_lr<const CHANNELS: usize>(
     start_x: u32,
     end_x: u32,
 ) {
-    box_blur_vertical_pass_avx2_impl_lr::<CHANNELS, true>(
+    box_blur_vertical_pass_avx2_impl_lr::<true>(
         undefined_src,
         src_stride,
         undefined_unsafe_dst,
@@ -871,7 +871,7 @@ unsafe fn box_blur_vertical_pass_avx2_fma_lr<const CHANNELS: usize>(
 }
 
 #[inline(always)]
-unsafe fn box_blur_vertical_pass_avx2_impl_lr<const CHANNELS: usize, const FMA: bool>(
+unsafe fn box_blur_vertical_pass_avx2_impl_lr<const FMA: bool>(
     src: &[u8],
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<u8>,

@@ -85,7 +85,7 @@ pub(crate) unsafe fn load_u8_s16_fast<const CN: usize>(ptr: *const u8) -> __m128
         let v0 = _mm_loadu_si16(ptr);
         _mm_shuffle_epi8(v0, sh1)
     } else {
-        _mm_setr_epi16(ptr.read_unaligned() as i16, 0, 0, 0,0,0,0,0)
+        _mm_setr_epi16(ptr.read_unaligned() as i16, 0, 0, 0, 0, 0, 0, 0)
     }
 }
 

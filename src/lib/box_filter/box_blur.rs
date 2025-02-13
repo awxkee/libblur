@@ -480,8 +480,7 @@ impl BoxBlurVerticalPass<u8> for u8 {
                 let is_avx_available = std::arch::is_x86_feature_detected!("avx2");
                 if is_avx_available {
                     use crate::box_filter::box_blur_avx::box_blur_vertical_pass_avx2;
-                    _dispatcher_vertical =
-                        box_blur_vertical_pass_avx2::<u8, CHANNELS_CONFIGURATION>;
+                    _dispatcher_vertical = box_blur_vertical_pass_avx2::<u8>;
                 }
             }
         }
