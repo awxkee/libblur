@@ -33,7 +33,11 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
     c.bench_function("libblur: RGBA box blur f32", |b| {
         let mut dst_bytes: Vec<f32> = src_bytes.to_vec().iter().map(|v| *v as f32).collect();
-        let src_bytes = src_bytes.to_vec().iter().map(|v| *v as f32).collect::<Vec<f32>>();
+        let src_bytes = src_bytes
+            .to_vec()
+            .iter()
+            .map(|v| *v as f32)
+            .collect::<Vec<f32>>();
         b.iter(|| {
             libblur::box_blur_f32(
                 &src_bytes,
@@ -49,7 +53,11 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
     c.bench_function("libblur: RGBA box blur f32, Single", |b| {
         let mut dst_bytes: Vec<f32> = src_bytes.to_vec().iter().map(|v| *v as f32).collect();
-        let src_bytes = src_bytes.to_vec().iter().map(|v| *v as f32).collect::<Vec<f32>>();
+        let src_bytes = src_bytes
+            .to_vec()
+            .iter()
+            .map(|v| *v as f32)
+            .collect::<Vec<f32>>();
         b.iter(|| {
             libblur::box_blur_f32(
                 &src_bytes,

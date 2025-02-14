@@ -3,15 +3,15 @@ mod split;
 
 use crate::merge::merge_channels_3;
 use crate::split::split_channels_3;
+use colorutils_rs::TransferFunction;
 use fast_transpose::{transpose_rgba, FlipMode, FlopMode};
+use image::imageops::FilterType;
 use image::{DynamicImage, EncodableLayout, GenericImageView, ImageReader};
 use libblur::{
     fast_gaussian, filter_1d_exact, get_gaussian_kernel_1d, get_sigma_size, EdgeMode,
     FastBlurChannels, GaussianPreciseLevel, ImageSize, Scalar, ThreadingPolicy,
 };
 use std::time::Instant;
-use colorutils_rs::TransferFunction;
-use image::imageops::FilterType;
 
 #[allow(dead_code)]
 fn f32_to_f16(bytes: Vec<f32>) -> Vec<u16> {

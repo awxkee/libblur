@@ -317,7 +317,8 @@ fn box_blur_vertical_pass_impl<T, J>(
         + std::ops::Mul<Output = J>
         + std::ops::AddAssign
         + std::ops::SubAssign
-        + AsPrimitive<f32>,
+        + AsPrimitive<f32>
+        + Default,
     f32: ToStorage<T>,
 {
     let kernel_size = radius * 2 + 1;
@@ -327,16 +328,22 @@ fn box_blur_vertical_pass_impl<T, J>(
 
     let weight = 1f32 / (radius * 2) as f32;
 
-    let mut cx = start_x;
+    let buf_size = end_x - start_x;
 
-    while cx + 4 < end_x {
+    let buf_cap = buf_size as usize;
+    let mut buffer = vec![J::default(); buf_cap];
+
+    let mut cx = start_x as usize;
+    let mut buf_cx = 0usize;
+
+    while cx + 4 < end_x as usize {
         unsafe {
             let mut weight0;
             let mut weight1;
             let mut weight2;
             let mut weight3;
             // replicate edge
-            let px = cx as usize;
+            let px = cx;
             weight0 = (src.get_unchecked(px).as_()) * edge_count;
             weight1 = (src.get_unchecked(px + 1).as_()) * edge_count;
             weight2 = (src.get_unchecked(px + 2).as_()) * edge_count;
@@ -350,62 +357,64 @@ fn box_blur_vertical_pass_impl<T, J>(
                 weight3 += src.get_unchecked(y_src_shift + px + 3).as_();
             }
 
-            for y in 0..height {
-                let next = (y + half_kernel).min(height - 1) as usize * src_stride as usize;
-                let previous =
-                    (y as i64 - half_kernel as i64).max(0) as usize * src_stride as usize;
-                let y_dst_shift = dst_stride as usize * y as usize;
-                // Prune previous and add next and compute mean
-
-                weight0 += src.get_unchecked(next + px).as_();
-                weight1 += src.get_unchecked(next + px + 1).as_();
-                weight2 += src.get_unchecked(next + px + 2).as_();
-
-                weight0 -= src.get_unchecked(previous + px).as_();
-                weight1 -= src.get_unchecked(previous + px + 1).as_();
-                weight2 -= src.get_unchecked(previous + px + 2).as_();
-
-                weight3 += src.get_unchecked(next + px + 3).as_();
-                weight3 -= src.get_unchecked(previous + px + 3).as_();
-
-                let write_offset = y_dst_shift + px;
-                unsafe_dst.write(write_offset, (weight0.as_() * weight).to_());
-                unsafe_dst.write(write_offset + 1, (weight1.as_() * weight).to_());
-                unsafe_dst.write(write_offset + 2, (weight2.as_() * weight).to_());
-                unsafe_dst.write(write_offset + 3, (weight3.as_() * weight).to_());
-            }
+            *buffer.get_unchecked_mut(buf_cx) = weight0;
+            *buffer.get_unchecked_mut(buf_cx + 1) = weight1;
+            *buffer.get_unchecked_mut(buf_cx + 2) = weight2;
+            *buffer.get_unchecked_mut(buf_cx + 3) = weight3;
         }
         cx += 4;
+        buf_cx += 4;
     }
 
-    while cx < end_x {
-        let mut weight0;
-        // replicate edge
-        let px = cx as usize;
-        weight0 = (unsafe { *src.get_unchecked(px) }.as_()) * edge_count;
+    while cx < end_x as usize {
+        unsafe {
+            let px = cx;
+            let mut weight0 = src.get_unchecked(px).as_() * edge_count;
+            // replicate edge
 
-        for y in 1..half_kernel as usize {
-            let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
-            weight0 += unsafe { *src.get_unchecked(y_src_shift + px) }.as_();
-        }
-
-        for y in 0..height {
-            let next = (y + half_kernel).min(height - 1) as usize * src_stride as usize;
-            let previous =
-                std::cmp::max(y as i64 - half_kernel as i64, 0) as usize * src_stride as usize;
-            let y_dst_shift = dst_stride as usize * y as usize;
-            // Prune previous and add next and compute mean
-
-            weight0 += unsafe { *src.get_unchecked(next + px) }.as_();
-            weight0 -= unsafe { *src.get_unchecked(previous + px) }.as_();
-
-            let write_offset = y_dst_shift + px;
-            unsafe {
-                unsafe_dst.write(write_offset, (weight0.as_() * weight).to_());
+            for y in 1..half_kernel as usize {
+                let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
+                weight0 += src.get_unchecked(y_src_shift + px).as_();
             }
+
+            *buffer.get_unchecked_mut(buf_cx) = weight0;
         }
 
         cx += 1;
+        buf_cx += 1;
+    }
+
+    for y in 0..height {
+        let next = (y + half_kernel).min(height - 1) as usize * src_stride as usize;
+        let previous = (y as i64 - half_kernel as i64).max(0) as usize * src_stride as usize;
+        let y_dst_shift = dst_stride as usize * y as usize;
+
+        let next_row = unsafe { src.get_unchecked(next..next + end_x as usize) };
+
+        let previous_row = unsafe { src.get_unchecked(previous..previous + end_x as usize) };
+
+        let dst = unsafe {
+            std::slice::from_raw_parts_mut(
+                unsafe_dst.slice.as_ptr().add(y_dst_shift) as *mut T,
+                end_x as usize,
+            )
+        };
+
+        for (((src_next, src_previous), buffer), dst) in next_row
+            .iter()
+            .zip(previous_row.iter())
+            .zip(buffer.iter_mut())
+            .zip(dst.iter_mut())
+        {
+            let mut weight0 = *buffer;
+
+            weight0 += src_next.as_();
+            weight0 -= src_previous.as_();
+
+            *buffer = weight0;
+
+            *dst = (weight0.as_() * weight).to_();
+        }
     }
 }
 
