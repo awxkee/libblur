@@ -152,9 +152,8 @@ pub fn fg_horizontal_pass_neon_f32<T, const CN: usize>(
                 } else if x + radius_64 >= 0 {
                     let arr_index = (x & 1023) as usize;
                     let buf_ptr = buffer.as_mut_ptr().add(arr_index) as *mut f32;
-                    let mut stored = vld1q_f32(buf_ptr);
-                    stored = vmulq_n_f32(stored, 2f32);
-                    diffs = vsubq_f32(diffs, stored);
+                    let stored = vld1q_f32(buf_ptr);
+                    diffs = vfmaq_f32(diffs, stored, vdupq_n_f32(-2f32));
                 }
 
                 let next_row_y = (y as usize) * (stride as usize);

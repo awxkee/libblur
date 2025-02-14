@@ -5,6 +5,8 @@ use opencv::core::{find_file, Mat};
 use opencv::imgcodecs::{imread, IMREAD_COLOR};
 
 pub fn criterion_benchmark(c: &mut Criterion) {
+    let mut c = c.benchmark_group("Median");
+    c.sample_size(10);
     let img = ImageReader::open("assets/test_image_4.png")
         .unwrap()
         .decode()
@@ -23,7 +25,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 stride as u32,
                 dimensions.0,
                 dimensions.1,
-                35,
+                7,
                 FastBlurChannels::Channels4,
                 ThreadingPolicy::Adaptive,
             );
@@ -38,7 +40,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("OpenCV: RGBA median blur", |b| {
         b.iter(|| {
             let mut dst = Mat::default();
-            opencv::imgproc::median_blur(&src, &mut dst, 35).unwrap();
+            opencv::imgproc::median_blur(&src, &mut dst, 7).unwrap();
         })
     });
 
@@ -59,7 +61,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 rgb_img.dimensions().0 * 3,
                 rgb_img.dimensions().0,
                 rgb_img.dimensions().1,
-                35,
+                7,
                 FastBlurChannels::Channels3,
                 ThreadingPolicy::Adaptive,
             );
@@ -75,7 +77,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("OpenCV: RGB median blur", |b| {
         b.iter(|| {
             let mut dst = Mat::default();
-            opencv::imgproc::median_blur(&src_rgb, &mut dst, 35).unwrap();
+            opencv::imgproc::median_blur(&src_rgb, &mut dst, 7).unwrap();
         })
     });
 }

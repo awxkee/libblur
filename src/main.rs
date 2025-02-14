@@ -5,7 +5,7 @@ use crate::merge::merge_channels_3;
 use crate::split::split_channels_3;
 use image::{DynamicImage, EncodableLayout, GenericImageView, ImageReader};
 use libblur::{
-    fast_gaussian, fast_gaussian_next, filter_1d_exact, get_gaussian_kernel_1d, get_sigma_size,
+    fast_gaussian, filter_1d_exact, get_gaussian_kernel_1d, get_sigma_size,
     EdgeMode, FastBlurChannels, GaussianPreciseLevel, ImageSize, Scalar, ThreadingPolicy,
 };
 use std::time::Instant;
@@ -413,37 +413,8 @@ fn main() {
     // let blurred = dyn_image.blur(125f32);
     // println!("Gauss image: {:.2?}", start_time.elapsed());
     // blurred.save("dyn.jpg").unwrap();
-
-    // libblur::gaussian_blur(
-    //     &bytes,
-    //     stride as u32,
-    //     &mut dst_bytes,
-    //     stride as u32,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     25,
-    //     0.,
-    //     FastBlurChannels::Channels4,
-    //     EdgeMode::Reflect101,
-    //     ThreadingPolicy::Adaptive,
-    //     GaussianPreciseLevel::INTEGRAL,
-    // );
+    
     bytes = dst_bytes;
-    // libblur::median_blur(
-    //     &bytes,
-    //     stride as u32,
-    //     &mut dst_bytes,
-    //     stride as u32,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     35,
-    //     FastBlurChannels::Channels4,
-    //     ThreadingPolicy::Adaptive,
-    // );
-    // bytes = dst_bytes;
-    // libblur::gaussian_box_blur(&bytes, stride as u32, &mut dst_bytes, stride as u32, dimensions.0, dimensions.1, 77,
-    //                            FastBlurChannels::Channels3, ThreadingPolicy::Single);
-    // bytes = dst_bytes;
 
     if components == 3 {
         image::save_buffer(
