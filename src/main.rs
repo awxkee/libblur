@@ -285,7 +285,7 @@ fn main() {
         dimensions.0 * 4,
         dimensions.0,
         dimensions.1,
-        5f32,
+        10f32,
         FastBlurChannels::Channels4,
         ThreadingPolicy::Single,
     );

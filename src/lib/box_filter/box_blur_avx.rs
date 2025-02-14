@@ -25,7 +25,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::avx::{_mm256_mul_round_ps, _mm_mul_round_ps};
+use crate::avx::{_mm256_mul_round_ps, _mm_mul_round_ps, shuffle};
 use crate::sse::{load_u8_s16_fast, load_u8_s32_fast, store_u8_u32};
 use crate::unsafe_slice::UnsafeSlice;
 #[cfg(target_arch = "x86")]
@@ -421,7 +421,8 @@ unsafe fn box_blur_vertical_pass_avx2_impl<const FMA: bool>(
             for y in 0..height {
                 // preload edge pixels
                 let next = (y + half_kernel).min(height - 1) as usize * src_stride as usize;
-                let previous = (y as i64 - half_kernel as i64).max(0) as usize * src_stride as usize;
+                let previous =
+                    (y as i64 - half_kernel as i64).max(0) as usize * src_stride as usize;
                 let y_dst_shift = dst_stride as usize * y as usize;
 
                 // subtract previous
@@ -889,6 +890,18 @@ unsafe fn box_blur_vertical_pass_avx2_impl_lr<const FMA: bool>(
     let v_edge_count = unsafe { _mm256_set1_epi8(edge_count as i8) };
     let v_weight = unsafe { _mm256_set1_ps(1f32 / (radius * 2) as f32) };
 
+    assert!(end_x >= start_x);
+
+    let buf_size = end_x as usize - start_x as usize;
+
+    let buf_cap = buf_size.div_ceil(16) * 16 + 16;
+
+    let mut buffer = vec![0u16; buf_cap];
+
+    // Configure initial accumulator
+
+    let mut buf_cx = 0usize;
+
     while cx + 64 < end_x {
         let px = cx as usize;
 
@@ -897,8 +910,25 @@ unsafe fn box_blur_vertical_pass_avx2_impl_lr<const FMA: bool>(
         let mut store_2: __m256i;
         let mut store_3: __m256i;
 
-        unsafe {
-            let s_ptr = src.as_ptr().add(px);
+        let s_ptr = src.as_ptr().add(px);
+        let edge0 = _mm256_loadu_si256(s_ptr as *const _);
+        let edge1 = _mm256_loadu_si256(s_ptr.add(32) as *const _);
+        let lo0 = _mm256_unpacklo_epi8(edge0, _mm256_setzero_si256());
+        let hi0 = _mm256_unpackhi_epi8(edge0, _mm256_setzero_si256());
+
+        let lo1 = _mm256_unpacklo_epi8(edge1, _mm256_setzero_si256());
+        let hi1 = _mm256_unpackhi_epi8(edge1, _mm256_setzero_si256());
+
+        store_0 = _mm256_maddubs_epi16(lo0, v_edge_count);
+        store_1 = _mm256_maddubs_epi16(hi0, v_edge_count);
+
+        store_2 = _mm256_maddubs_epi16(lo1, v_edge_count);
+        store_3 = _mm256_maddubs_epi16(hi1, v_edge_count);
+
+        for y in 1..half_kernel as usize {
+            let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
+            let s_ptr = src.as_ptr().add(y_src_shift + px);
+
             let edge0 = _mm256_loadu_si256(s_ptr as *const _);
             let edge1 = _mm256_loadu_si256(s_ptr.add(32) as *const _);
             let lo0 = _mm256_unpacklo_epi8(edge0, _mm256_setzero_si256());
@@ -907,42 +937,194 @@ unsafe fn box_blur_vertical_pass_avx2_impl_lr<const FMA: bool>(
             let lo1 = _mm256_unpacklo_epi8(edge1, _mm256_setzero_si256());
             let hi1 = _mm256_unpackhi_epi8(edge1, _mm256_setzero_si256());
 
-            store_0 = _mm256_maddubs_epi16(lo0, v_edge_count);
-            store_1 = _mm256_maddubs_epi16(hi0, v_edge_count);
+            store_0 = _mm256_adds_epu16(store_0, lo0);
+            store_1 = _mm256_adds_epu16(store_1, hi0);
 
-            store_2 = _mm256_maddubs_epi16(lo1, v_edge_count);
-            store_3 = _mm256_maddubs_epi16(hi1, v_edge_count);
+            store_2 = _mm256_adds_epu16(store_2, lo1);
+            store_3 = _mm256_adds_epu16(store_3, hi1);
         }
 
-        unsafe {
-            for y in 1..half_kernel as usize {
-                let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
-                let s_ptr = src.as_ptr().add(y_src_shift + px);
+        _mm256_storeu_si256(
+            buffer.get_unchecked_mut(buf_cx..).as_mut_ptr() as *mut _,
+            store_0,
+        );
+        _mm256_storeu_si256(
+            buffer.get_unchecked_mut(buf_cx + 16..).as_mut_ptr() as *mut _,
+            store_1,
+        );
+        _mm256_storeu_si256(
+            buffer.get_unchecked_mut(buf_cx + 32..).as_mut_ptr() as *mut _,
+            store_2,
+        );
+        _mm256_storeu_si256(
+            buffer.get_unchecked_mut(buf_cx + 48..).as_mut_ptr() as *mut _,
+            store_3,
+        );
 
-                let edge0 = _mm256_loadu_si256(s_ptr as *const _);
-                let edge1 = _mm256_loadu_si256(s_ptr.add(32) as *const _);
-                let lo0 = _mm256_unpacklo_epi8(edge0, _mm256_setzero_si256());
-                let hi0 = _mm256_unpackhi_epi8(edge0, _mm256_setzero_si256());
+        buf_cx += 64;
+        cx += 64;
+    }
 
-                let lo1 = _mm256_unpacklo_epi8(edge1, _mm256_setzero_si256());
-                let hi1 = _mm256_unpackhi_epi8(edge1, _mm256_setzero_si256());
+    while cx + 32 < end_x {
+        let px = cx as usize;
 
-                store_0 = _mm256_adds_epu16(store_0, lo0);
-                store_1 = _mm256_adds_epu16(store_1, hi0);
+        let mut store_0: __m256i;
+        let mut store_1: __m256i;
 
-                store_2 = _mm256_adds_epu16(store_2, lo1);
-                store_3 = _mm256_adds_epu16(store_3, hi1);
-            }
+        let s_ptr = src.as_ptr().add(px);
+        let edge0 = _mm256_loadu_si256(s_ptr as *const _);
+        let lo0 = _mm256_unpacklo_epi8(edge0, _mm256_setzero_si256());
+        let hi0 = _mm256_unpackhi_epi8(edge0, _mm256_setzero_si256());
+
+        store_0 = _mm256_maddubs_epi16(lo0, v_edge_count);
+        store_1 = _mm256_maddubs_epi16(hi0, v_edge_count);
+
+        for y in 1..half_kernel as usize {
+            let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
+            let s_ptr = src.as_ptr().add(y_src_shift + px);
+
+            let edge0 = _mm256_loadu_si256(s_ptr as *const _);
+            let lo0 = _mm256_unpacklo_epi8(edge0, _mm256_setzero_si256());
+            let hi0 = _mm256_unpackhi_epi8(edge0, _mm256_setzero_si256());
+
+            store_0 = _mm256_adds_epu16(store_0, lo0);
+            store_1 = _mm256_adds_epu16(store_1, hi0);
         }
 
-        unsafe {
-            for y in 0..height {
-                // preload edge pixels
-                let next = (y + half_kernel).min(height - 1) as usize * src_stride as usize;
-                let previous =
-                    (y as i64 - half_kernel as i64).max(0) as usize * src_stride as usize;
-                let y_dst_shift = dst_stride as usize * y as usize;
+        _mm256_storeu_si256(
+            buffer.get_unchecked_mut(buf_cx..).as_mut_ptr() as *mut _,
+            store_0,
+        );
+        _mm256_storeu_si256(
+            buffer.get_unchecked_mut(buf_cx + 16..).as_mut_ptr() as *mut _,
+            store_1,
+        );
 
+        buf_cx += 32;
+        cx += 32;
+    }
+
+    while cx + 16 < end_x {
+        let px = cx as usize;
+
+        let mut store_0: __m256i;
+
+        let s_ptr = src.as_ptr().add(px);
+        let edge0 = _mm256_castsi128_si256(_mm_loadu_si128(s_ptr as *const _));
+
+        const MASK: i32 = shuffle(3, 1, 2, 0);
+
+        let lo0 = _mm256_unpacklo_epi8(
+            _mm256_permute4x64_epi64::<MASK>(edge0),
+            _mm256_setzero_si256(),
+        );
+
+        store_0 = _mm256_maddubs_epi16(lo0, v_edge_count);
+
+        for y in 1..half_kernel as usize {
+            let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
+            let s_ptr = src.as_ptr().add(y_src_shift + px);
+
+            let edge0 = _mm256_castsi128_si256(_mm_loadu_si128(s_ptr as *const _));
+            let lo0 = _mm256_unpacklo_epi8(
+                _mm256_permute4x64_epi64::<MASK>(edge0),
+                _mm256_setzero_si256(),
+            );
+
+            store_0 = _mm256_adds_epu16(store_0, lo0);
+        }
+
+        _mm256_storeu_si256(
+            buffer.get_unchecked_mut(buf_cx..).as_mut_ptr() as *mut _,
+            store_0,
+        );
+
+        buf_cx += 16;
+        cx += 16;
+    }
+
+    let v_edge_count = unsafe { _mm_set1_epi8(edge_count as i8) };
+
+    while cx + 8 < end_x {
+        let px = cx as usize;
+
+        let s_ptr = src.as_ptr().add(px);
+        let edge0 = _mm_loadu_si64(s_ptr as *const _);
+
+        let lo0 = _mm_unpacklo_epi8(edge0, _mm_setzero_si128());
+
+        let mut store_0 = _mm_maddubs_epi16(lo0, v_edge_count);
+
+        for y in 1..half_kernel as usize {
+            let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
+            let s_ptr = src.as_ptr().add(y_src_shift + px);
+
+            let edge0 = _mm_loadu_si64(s_ptr as *const _);
+            let lo0 = _mm_unpacklo_epi8(edge0, _mm_setzero_si128());
+
+            store_0 = _mm_adds_epu16(store_0, lo0);
+        }
+
+        _mm_storeu_si128(
+            buffer.get_unchecked_mut(buf_cx..).as_mut_ptr() as *mut _,
+            store_0,
+        );
+
+        buf_cx += 8;
+        cx += 8;
+    }
+
+    while cx < end_x {
+        let px = cx as usize;
+
+        let s_ptr = src.get_unchecked(px);
+        let edge0 = _mm_setr_epi16(*s_ptr as i16, 0, 0, 0, 0, 0, 0, 0);
+
+        let lo0 = _mm_unpacklo_epi8(edge0, _mm_setzero_si128());
+
+        let mut store_0 = _mm_maddubs_epi16(lo0, v_edge_count);
+
+        for y in 1..half_kernel as usize {
+            let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
+            let s_ptr = src.get_unchecked(y_src_shift + px);
+
+            let edge0 = _mm_setr_epi16(*s_ptr as i16, 0, 0, 0, 0, 0, 0, 0);
+            let lo0 = _mm_unpacklo_epi8(edge0, _mm_setzero_si128());
+
+            store_0 = _mm_adds_epu16(store_0, lo0);
+        }
+
+        _mm_storeu_si16(
+            buffer.get_unchecked_mut(buf_cx..).as_mut_ptr() as *mut _,
+            store_0,
+        );
+
+        buf_cx += 1;
+        cx += 1;
+    }
+
+    for y in 0..height as usize {
+        let mut buf_cx = 0usize;
+        let mut cx = start_x as usize;
+
+        // preload edge pixels
+        let next = (y + half_kernel as usize).min(height as usize - 1) * src_stride as usize;
+        let previous = (y as i64 - half_kernel as i64).max(0) as usize * src_stride as usize;
+        let y_dst_shift = dst_stride as usize * y;
+
+        while cx + 64 < end_x as usize {
+            let px = cx;
+
+            let mut store_0 =
+                _mm256_loadu_si256(buffer.get_unchecked(buf_cx..).as_ptr() as *const _);
+            let mut store_1 =
+                _mm256_loadu_si256(buffer.get_unchecked(buf_cx + 16..).as_ptr() as *const _);
+            let mut store_2 =
+                _mm256_loadu_si256(buffer.get_unchecked(buf_cx + 32..).as_ptr() as *const _);
+            let mut store_3 =
+                _mm256_loadu_si256(buffer.get_unchecked(buf_cx + 48..).as_ptr() as *const _);
+
+            unsafe {
                 // subtract previous
                 {
                     let s_ptr = src.as_ptr().add(previous + px);
@@ -979,7 +1161,21 @@ unsafe fn box_blur_vertical_pass_avx2_impl_lr<const FMA: bool>(
                     store_3 = _mm256_adds_epu16(store_3, hi1);
                 }
 
-                let px = cx as usize;
+                let px = cx;
+
+                _mm256_storeu_si256(buffer.get_unchecked(buf_cx..).as_ptr() as *mut _, store_0);
+                _mm256_storeu_si256(
+                    buffer.get_unchecked(buf_cx + 16..).as_ptr() as *mut _,
+                    store_1,
+                );
+                _mm256_storeu_si256(
+                    buffer.get_unchecked(buf_cx + 32..).as_ptr() as *mut _,
+                    store_2,
+                );
+                _mm256_storeu_si256(
+                    buffer.get_unchecked(buf_cx + 48..).as_ptr() as *mut _,
+                    store_3,
+                );
 
                 let jw0 = _mm256_unpacklo_epi16(store_0, _mm256_setzero_si256());
                 let jw1 = _mm256_unpackhi_epi16(store_0, _mm256_setzero_si256());
@@ -1052,354 +1248,239 @@ unsafe fn box_blur_vertical_pass_avx2_impl_lr<const FMA: bool>(
                 _mm256_storeu_si256(ptr as *mut _, full_set0);
                 _mm256_storeu_si256(ptr.add(32) as *mut _, full_set1);
             }
+
+            cx += 64;
+            buf_cx += 64;
         }
 
-        cx += 64;
-    }
+        while cx + 32 < end_x as usize {
+            let px = cx;
 
-    while cx + 32 < end_x {
-        let px = cx as usize;
+            let mut store_0 =
+                _mm256_loadu_si256(buffer.get_unchecked(buf_cx..).as_ptr() as *const _);
+            let mut store_1 =
+                _mm256_loadu_si256(buffer.get_unchecked(buf_cx + 16..).as_ptr() as *const _);
 
-        let mut store_0: __m256i;
-        let mut store_1: __m256i;
+            // subtract previous
+            {
+                let s_ptr = src.as_ptr().add(previous + px);
+                let edge0 = _mm256_loadu_si256(s_ptr as *const _);
+                let lo0 = _mm256_unpacklo_epi8(edge0, _mm256_setzero_si256());
+                let hi0 = _mm256_unpackhi_epi8(edge0, _mm256_setzero_si256());
 
-        unsafe {
-            let s_ptr = src.as_ptr().add(px);
-            let edge = _mm256_loadu_si256(s_ptr as *const _);
-            let lo0 = _mm256_unpacklo_epi8(edge, _mm256_setzero_si256());
-            let hi0 = _mm256_unpackhi_epi8(edge, _mm256_setzero_si256());
+                store_0 = _mm256_subs_epu16(store_0, lo0);
+                store_1 = _mm256_subs_epu16(store_1, hi0);
+            }
 
-            store_0 = _mm256_maddubs_epi16(lo0, v_edge_count);
-            store_1 = _mm256_maddubs_epi16(hi0, v_edge_count);
-        }
-
-        unsafe {
-            for y in 1..half_kernel as usize {
-                let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
-                let s_ptr = src.as_ptr().add(y_src_shift + px);
-
-                let edge = _mm256_loadu_si256(s_ptr as *const _);
-                let lo0 = _mm256_unpacklo_epi8(edge, _mm256_setzero_si256());
-                let hi0 = _mm256_unpackhi_epi8(edge, _mm256_setzero_si256());
+            // add next
+            {
+                let s_ptr = src.as_ptr().add(next + px);
+                let edge0 = _mm256_loadu_si256(s_ptr as *const _);
+                let lo0 = _mm256_unpacklo_epi8(edge0, _mm256_setzero_si256());
+                let hi0 = _mm256_unpackhi_epi8(edge0, _mm256_setzero_si256());
 
                 store_0 = _mm256_adds_epu16(store_0, lo0);
                 store_1 = _mm256_adds_epu16(store_1, hi0);
             }
-        }
 
-        unsafe {
-            for y in 0..height {
-                // preload edge pixels
-                let next = (y + half_kernel).min(height - 1) as usize * src_stride as usize;
-                let previous =
-                    (y as i64 - half_kernel as i64).max(0) as usize * src_stride as usize;
-                let y_dst_shift = dst_stride as usize * y as usize;
+            let px = cx;
 
-                // subtract previous
-                {
-                    let s_ptr = src.as_ptr().add(previous + px);
-                    let edge = _mm256_loadu_si256(s_ptr as *const _);
-                    let lo0 = _mm256_unpacklo_epi8(edge, _mm256_setzero_si256());
-                    let hi0 = _mm256_unpackhi_epi8(edge, _mm256_setzero_si256());
+            _mm256_storeu_si256(buffer.get_unchecked(buf_cx..).as_ptr() as *mut _, store_0);
+            _mm256_storeu_si256(
+                buffer.get_unchecked(buf_cx + 16..).as_ptr() as *mut _,
+                store_1,
+            );
 
-                    store_0 = _mm256_subs_epu16(store_0, lo0);
-                    store_1 = _mm256_subs_epu16(store_1, hi0);
-                }
+            let jw0 = _mm256_unpacklo_epi16(store_0, _mm256_setzero_si256());
+            let jw1 = _mm256_unpackhi_epi16(store_0, _mm256_setzero_si256());
+            let jw2 = _mm256_unpacklo_epi16(store_1, _mm256_setzero_si256());
+            let jw3 = _mm256_unpackhi_epi16(store_1, _mm256_setzero_si256());
 
-                // add next
-                {
-                    let s_ptr = src.as_ptr().add(next + px);
-                    let edge = _mm256_loadu_si256(s_ptr as *const _);
-                    let lo0 = _mm256_unpacklo_epi8(edge, _mm256_setzero_si256());
-                    let hi0 = _mm256_unpackhi_epi8(edge, _mm256_setzero_si256());
+            let store0_ps = _mm256_cvtepi32_ps(jw0);
+            let store1_ps = _mm256_cvtepi32_ps(jw1);
+            let store2_ps = _mm256_cvtepi32_ps(jw2);
+            let store3_ps = _mm256_cvtepi32_ps(jw3);
 
-                    store_0 = _mm256_adds_epu16(store_0, lo0);
-                    store_1 = _mm256_adds_epu16(store_1, hi0);
-                }
+            let (r0, r1, r2, r3);
 
-                let px = cx as usize;
+            if FMA {
+                r0 = _mm256_mul_round_ps(store0_ps, v_weight);
+                r1 = _mm256_mul_round_ps(store1_ps, v_weight);
+                r2 = _mm256_mul_round_ps(store2_ps, v_weight);
+                r3 = _mm256_mul_round_ps(store3_ps, v_weight);
+            } else {
+                let scale_store_0_ps = _mm256_mul_ps(store0_ps, v_weight);
+                let scale_store_1_ps = _mm256_mul_ps(store1_ps, v_weight);
+                let scale_store_2_ps = _mm256_mul_ps(store2_ps, v_weight);
+                let scale_store_3_ps = _mm256_mul_ps(store3_ps, v_weight);
 
-                let jw0 = _mm256_unpacklo_epi16(store_0, _mm256_setzero_si256());
-                let jw1 = _mm256_unpackhi_epi16(store_0, _mm256_setzero_si256());
-                let jw2 = _mm256_unpacklo_epi16(store_1, _mm256_setzero_si256());
-                let jw3 = _mm256_unpackhi_epi16(store_1, _mm256_setzero_si256());
-
-                let store0_ps = _mm256_cvtepi32_ps(jw0);
-                let store1_ps = _mm256_cvtepi32_ps(jw1);
-                let store2_ps = _mm256_cvtepi32_ps(jw2);
-                let store3_ps = _mm256_cvtepi32_ps(jw3);
-
-                let (r0, r1, r2, r3);
-
-                if FMA {
-                    r0 = _mm256_mul_round_ps(store0_ps, v_weight);
-                    r1 = _mm256_mul_round_ps(store1_ps, v_weight);
-                    r2 = _mm256_mul_round_ps(store2_ps, v_weight);
-                    r3 = _mm256_mul_round_ps(store3_ps, v_weight);
-                } else {
-                    let scale_store_0_ps = _mm256_mul_ps(store0_ps, v_weight);
-                    let scale_store_1_ps = _mm256_mul_ps(store1_ps, v_weight);
-                    let scale_store_2_ps = _mm256_mul_ps(store2_ps, v_weight);
-                    let scale_store_3_ps = _mm256_mul_ps(store3_ps, v_weight);
-
-                    r0 = _mm256_round_ps::<0x00>(scale_store_0_ps);
-                    r1 = _mm256_round_ps::<0x00>(scale_store_1_ps);
-                    r2 = _mm256_round_ps::<0x00>(scale_store_2_ps);
-                    r3 = _mm256_round_ps::<0x00>(scale_store_3_ps);
-                }
-
-                let scale_store_0 = _mm256_cvtps_epi32(r0);
-                let scale_store_1 = _mm256_cvtps_epi32(r1);
-                let scale_store_2 = _mm256_cvtps_epi32(r2);
-                let scale_store_3 = _mm256_cvtps_epi32(r3);
-
-                let offset = y_dst_shift + px;
-                let ptr = unsafe_dst.slice.get_unchecked(offset).get();
-
-                let set0 = _mm256_packus_epi32(scale_store_0, scale_store_1);
-                let set1 = _mm256_packus_epi32(scale_store_2, scale_store_3);
-
-                let full_set = _mm256_packus_epi16(set0, set1);
-                _mm256_storeu_si256(ptr as *mut _, full_set);
+                r0 = _mm256_round_ps::<0x00>(scale_store_0_ps);
+                r1 = _mm256_round_ps::<0x00>(scale_store_1_ps);
+                r2 = _mm256_round_ps::<0x00>(scale_store_2_ps);
+                r3 = _mm256_round_ps::<0x00>(scale_store_3_ps);
             }
+
+            let scale_store_0 = _mm256_cvtps_epi32(r0);
+            let scale_store_1 = _mm256_cvtps_epi32(r1);
+            let scale_store_2 = _mm256_cvtps_epi32(r2);
+            let scale_store_3 = _mm256_cvtps_epi32(r3);
+
+            let offset = y_dst_shift + px;
+            let ptr = unsafe_dst.slice.get_unchecked(offset).get();
+
+            let set0 = _mm256_packus_epi32(scale_store_0, scale_store_1);
+            let set1 = _mm256_packus_epi32(scale_store_2, scale_store_3);
+
+            let full_set0 = _mm256_packus_epi16(set0, set1);
+            _mm256_storeu_si256(ptr as *mut _, full_set0);
+
+            cx += 32;
+            buf_cx += 32;
         }
 
-        cx += 32;
-    }
+        while cx + 16 < end_x as usize {
+            let px = cx;
 
-    let v_edge_count = unsafe { _mm_set1_epi8(edge_count as i8) };
-    let v_weight = unsafe { _mm_set1_ps(1f32 / (radius * 2) as f32) };
+            let mut store_0 =
+                _mm256_loadu_si256(buffer.get_unchecked(buf_cx..).as_ptr() as *const _);
 
-    while cx + 16 < end_x {
-        let px = cx as usize;
+            const MASK: i32 = shuffle(3, 1, 2, 0);
 
-        let mut store_0: __m128i;
-        let mut store_1: __m128i;
+            // subtract previous
+            {
+                let s_ptr = src.as_ptr().add(previous + px);
+                let edge0 = _mm256_castsi128_si256(_mm_loadu_si128(s_ptr as *const _));
+                let lo0 = _mm256_unpacklo_epi8(
+                    _mm256_permute4x64_epi64::<MASK>(edge0),
+                    _mm256_setzero_si256(),
+                );
 
-        unsafe {
-            let s_ptr = src.as_ptr().add(px);
-            let edge = _mm_loadu_si128(s_ptr as *const _);
-            let lo0 = _mm_unpacklo_epi8(edge, _mm_setzero_si128());
-            let hi0 = _mm_unpackhi_epi8(edge, _mm_setzero_si128());
+                store_0 = _mm256_subs_epu16(store_0, lo0);
+            }
 
-            store_0 = _mm_maddubs_epi16(lo0, v_edge_count);
-            store_1 = _mm_maddubs_epi16(hi0, v_edge_count);
+            // add next
+            {
+                let s_ptr = src.as_ptr().add(next + px);
+                let edge0 = _mm256_castsi128_si256(_mm_loadu_si128(s_ptr as *const _));
+                let lo0 = _mm256_unpacklo_epi8(
+                    _mm256_permute4x64_epi64::<MASK>(edge0),
+                    _mm256_setzero_si256(),
+                );
+
+                store_0 = _mm256_adds_epu16(store_0, lo0);
+            }
+
+            let px = cx;
+
+            _mm256_storeu_si256(buffer.get_unchecked(buf_cx..).as_ptr() as *mut _, store_0);
+
+            let jw0 = _mm256_unpacklo_epi16(store_0, _mm256_setzero_si256());
+            let jw1 = _mm256_unpackhi_epi16(store_0, _mm256_setzero_si256());
+
+            let store0_ps = _mm256_cvtepi32_ps(jw0);
+            let store1_ps = _mm256_cvtepi32_ps(jw1);
+
+            let (r0, r1);
+
+            if FMA {
+                r0 = _mm256_mul_round_ps(store0_ps, v_weight);
+                r1 = _mm256_mul_round_ps(store1_ps, v_weight);
+            } else {
+                let scale_store_0_ps = _mm256_mul_ps(store0_ps, v_weight);
+                let scale_store_1_ps = _mm256_mul_ps(store1_ps, v_weight);
+
+                r0 = _mm256_round_ps::<0x00>(scale_store_0_ps);
+                r1 = _mm256_round_ps::<0x00>(scale_store_1_ps);
+            }
+
+            let scale_store_0 = _mm256_cvtps_epi32(r0);
+            let scale_store_1 = _mm256_cvtps_epi32(r1);
+
+            let offset = y_dst_shift + px;
+            let ptr = unsafe_dst.slice.get_unchecked(offset).get();
+
+            let set0 = _mm256_packus_epi32(scale_store_0, scale_store_1);
+
+            let full_set0 = _mm256_packus_epi16(set0, set0);
+            _mm_storeu_si128(ptr as *mut _, _mm256_castsi256_si128(full_set0));
+
+            cx += 16;
+            buf_cx += 16;
         }
 
-        unsafe {
-            for y in 1..half_kernel as usize {
-                let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
-                let s_ptr = src.as_ptr().add(y_src_shift + px);
+        let v_weight = unsafe { _mm_set1_ps(1f32 / (radius * 2) as f32) };
 
-                let edge = _mm_loadu_si128(s_ptr as *const _);
+        while cx + 8 < end_x as usize {
+            let px = cx;
+
+            let mut store_0 = _mm_loadu_si128(buffer.get_unchecked(buf_cx..).as_ptr() as *const _);
+
+            // subtract previous
+            {
+                let s_ptr = src.as_ptr().add(previous + px);
+                let edge = _mm_loadu_si64(s_ptr as *const _);
                 let lo0 = _mm_unpacklo_epi8(edge, _mm_setzero_si128());
-                let hi0 = _mm_unpackhi_epi8(edge, _mm_setzero_si128());
 
-                store_0 = _mm_adds_epu16(store_0, lo0);
-                store_1 = _mm_adds_epu16(store_1, hi0);
+                store_0 = _mm_subs_epu16(store_0, lo0);
             }
-        }
 
-        unsafe {
-            for y in 0..height {
-                // preload edge pixels
-                let next = (y + half_kernel).min(height - 1) as usize * src_stride as usize;
-                let previous =
-                    (y as i64 - half_kernel as i64).max(0) as usize * src_stride as usize;
-                let y_dst_shift = dst_stride as usize * y as usize;
-
-                // subtract previous
-                {
-                    let s_ptr = src.as_ptr().add(previous + px);
-                    let edge = _mm_loadu_si128(s_ptr as *const _);
-                    let lo0 = _mm_unpacklo_epi8(edge, _mm_setzero_si128());
-                    let hi0 = _mm_unpackhi_epi8(edge, _mm_setzero_si128());
-
-                    store_0 = _mm_subs_epu16(store_0, lo0);
-                    store_1 = _mm_subs_epu16(store_1, hi0);
-                }
-
-                // add next
-                {
-                    let s_ptr = src.as_ptr().add(next + px);
-                    let edge = _mm_loadu_si128(s_ptr as *const _);
-                    let lo0 = _mm_unpacklo_epi8(edge, _mm_setzero_si128());
-                    let hi0 = _mm_unpackhi_epi8(edge, _mm_setzero_si128());
-
-                    store_0 = _mm_adds_epu16(store_0, lo0);
-                    store_1 = _mm_adds_epu16(store_1, hi0);
-                }
-
-                let px = cx as usize;
-
-                let jw0 = _mm_unpacklo_epi16(store_0, _mm_setzero_si128());
-                let jw1 = _mm_unpackhi_epi16(store_0, _mm_setzero_si128());
-                let jw2 = _mm_unpacklo_epi16(store_1, _mm_setzero_si128());
-                let jw3 = _mm_unpackhi_epi16(store_1, _mm_setzero_si128());
-
-                let store0_ps = _mm_cvtepi32_ps(jw0);
-                let store1_ps = _mm_cvtepi32_ps(jw1);
-                let store2_ps = _mm_cvtepi32_ps(jw2);
-                let store3_ps = _mm_cvtepi32_ps(jw3);
-
-                let (r0, r1, r2, r3);
-
-                if FMA {
-                    r0 = _mm_mul_round_ps(store0_ps, v_weight);
-                    r1 = _mm_mul_round_ps(store1_ps, v_weight);
-                    r2 = _mm_mul_round_ps(store2_ps, v_weight);
-                    r3 = _mm_mul_round_ps(store3_ps, v_weight);
-                } else {
-                    let scale_store_0_ps = _mm_mul_ps(store0_ps, v_weight);
-                    let scale_store_1_ps = _mm_mul_ps(store1_ps, v_weight);
-                    let scale_store_2_ps = _mm_mul_ps(store2_ps, v_weight);
-                    let scale_store_3_ps = _mm_mul_ps(store3_ps, v_weight);
-
-                    const RND: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
-
-                    r0 = _mm_round_ps::<RND>(scale_store_0_ps);
-                    r1 = _mm_round_ps::<RND>(scale_store_1_ps);
-                    r2 = _mm_round_ps::<RND>(scale_store_2_ps);
-                    r3 = _mm_round_ps::<RND>(scale_store_3_ps);
-                }
-
-                let scale_store_0 = _mm_cvtps_epi32(r0);
-                let scale_store_1 = _mm_cvtps_epi32(r1);
-                let scale_store_2 = _mm_cvtps_epi32(r2);
-                let scale_store_3 = _mm_cvtps_epi32(r3);
-
-                let offset = y_dst_shift + px;
-                let ptr = unsafe_dst.slice.get_unchecked(offset).get();
-
-                let set0 = _mm_packus_epi32(scale_store_0, scale_store_1);
-                let set1 = _mm_packus_epi32(scale_store_2, scale_store_3);
-
-                let full_set = _mm_packus_epi16(set0, set1);
-                _mm_storeu_si128(ptr as *mut _, full_set);
-            }
-        }
-
-        cx += 16;
-    }
-
-    while cx + 8 < end_x {
-        let px = cx as usize;
-
-        let mut store_0: __m128i;
-
-        unsafe {
-            let s_ptr = src.as_ptr().add(px);
-            let edge = _mm_loadu_si64(s_ptr as *const _);
-            let lo0 = _mm_unpacklo_epi8(edge, _mm_setzero_si128());
-
-            store_0 = _mm_maddubs_epi16(lo0, v_edge_count);
-        }
-
-        unsafe {
-            for y in 1..half_kernel as usize {
-                let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
-                let s_ptr = src.as_ptr().add(y_src_shift + px);
-
+            // add next
+            {
+                let s_ptr = src.as_ptr().add(next + px);
                 let edge = _mm_loadu_si64(s_ptr as *const _);
                 let lo0 = _mm_unpacklo_epi8(edge, _mm_setzero_si128());
 
                 store_0 = _mm_adds_epu16(store_0, lo0);
             }
-        }
 
-        unsafe {
-            for y in 0..height {
-                // preload edge pixels
-                let next = (y + half_kernel).min(height - 1) as usize * src_stride as usize;
-                let previous =
-                    (y as i64 - half_kernel as i64).max(0) as usize * src_stride as usize;
-                let y_dst_shift = dst_stride as usize * y as usize;
+            let px = cx;
 
-                // subtract previous
-                {
-                    let s_ptr = src.as_ptr().add(previous + px);
-                    let edge = _mm_loadu_si64(s_ptr as *const _);
-                    let lo0 = _mm_unpacklo_epi8(edge, _mm_setzero_si128());
+            let jw = store_0;
 
-                    store_0 = _mm_subs_epu16(store_0, lo0);
-                }
+            _mm_storeu_si128(buffer.get_unchecked(buf_cx..).as_ptr() as *mut _, store_0);
 
-                // add next
-                {
-                    let s_ptr = src.as_ptr().add(next + px);
-                    let edge = _mm_loadu_si64(s_ptr as *const _);
-                    let lo0 = _mm_unpacklo_epi8(edge, _mm_setzero_si128());
+            let store_0 = _mm_unpacklo_epi16(jw, _mm_setzero_si128());
+            let store_1 = _mm_unpackhi_epi16(jw, _mm_setzero_si128());
 
-                    store_0 = _mm_adds_epu16(store_0, lo0);
-                }
+            let store0_ps = _mm_cvtepi32_ps(store_0);
+            let store1_ps = _mm_cvtepi32_ps(store_1);
 
-                let px = cx as usize;
+            let (r0, r1);
 
-                let jw = store_0;
+            if FMA {
+                r0 = _mm_mul_round_ps(store0_ps, v_weight);
+                r1 = _mm_mul_round_ps(store1_ps, v_weight);
+            } else {
+                let scale_store_0_ps = _mm_mul_ps(store0_ps, v_weight);
+                let scale_store_1_ps = _mm_mul_ps(store1_ps, v_weight);
 
-                let store_0 = _mm_unpacklo_epi16(jw, _mm_setzero_si128());
-                let store_1 = _mm_unpackhi_epi16(jw, _mm_setzero_si128());
+                const RND: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
 
-                let store0_ps = _mm_cvtepi32_ps(store_0);
-                let store1_ps = _mm_cvtepi32_ps(store_1);
-
-                let (r0, r1);
-
-                if FMA {
-                    r0 = _mm_mul_round_ps(store0_ps, v_weight);
-                    r1 = _mm_mul_round_ps(store1_ps, v_weight);
-                } else {
-                    let scale_store_0_ps = _mm_mul_ps(store0_ps, v_weight);
-                    let scale_store_1_ps = _mm_mul_ps(store1_ps, v_weight);
-
-                    const RND: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
-
-                    r0 = _mm_round_ps::<RND>(scale_store_0_ps);
-                    r1 = _mm_round_ps::<RND>(scale_store_1_ps);
-                }
-
-                let scale_store_0 = _mm_cvtps_epi32(r0);
-                let scale_store_1 = _mm_cvtps_epi32(r1);
-
-                let offset = y_dst_shift + px;
-                let ptr = unsafe_dst.slice.get_unchecked(offset).get();
-
-                let set0 = _mm_packus_epi32(scale_store_0, scale_store_1);
-
-                let full_set = _mm_packus_epi16(set0, _mm_setzero_si128());
-                _mm_storeu_si64(ptr as *mut _, full_set);
+                r0 = _mm_round_ps::<RND>(scale_store_0_ps);
+                r1 = _mm_round_ps::<RND>(scale_store_1_ps);
             }
+
+            let scale_store_0 = _mm_cvtps_epi32(r0);
+            let scale_store_1 = _mm_cvtps_epi32(r1);
+
+            let offset = y_dst_shift + px;
+            let ptr = unsafe_dst.slice.get_unchecked(offset).get();
+
+            let set0 = _mm_packus_epi32(scale_store_0, scale_store_1);
+
+            let full_set = _mm_packus_epi16(set0, _mm_setzero_si128());
+            _mm_storeu_si64(ptr as *mut _, full_set);
+
+            cx += 8;
+            buf_cx += 8;
         }
 
-        cx += 8;
-    }
+        const TAIL_CN: usize = 1;
 
-    const TAIL_CN: usize = 1;
+        for x in cx..end_x as usize {
+            let px = x * TAIL_CN;
 
-    for x in cx..end_x {
-        let px = x as usize * TAIL_CN;
-
-        let mut store;
-        unsafe {
-            let s_ptr = src.as_ptr().add(px);
-            let edge_colors = load_u8_s16_fast::<TAIL_CN>(s_ptr);
-            store = _mm_maddubs_epi16(edge_colors, v_edge_count);
-        }
-
-        unsafe {
-            for y in 1..half_kernel as usize {
-                let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
-                let s_ptr = src.as_ptr().add(y_src_shift + px);
-                let edge_colors = load_u8_s16_fast::<TAIL_CN>(s_ptr);
-                store = _mm_adds_epu16(store, edge_colors);
-            }
-        }
-
-        for y in 0..height {
-            // preload edge pixels
-            let next = (y + half_kernel).min(height - 1) as usize * src_stride as usize;
-            let previous = (y as i64 - half_kernel as i64).max(0) as usize * src_stride as usize;
-            let y_dst_shift = dst_stride as usize * y as usize;
+            let mut store = _mm_loadu_si16(buffer.get_unchecked(buf_cx..).as_ptr() as *const _);
 
             // subtract previous
             unsafe {
@@ -1415,22 +1496,26 @@ unsafe fn box_blur_vertical_pass_avx2_impl_lr<const FMA: bool>(
                 store = _mm_adds_epu16(store, edge_colors);
             }
 
-            let px = x as usize;
+            let px = x;
 
-            unsafe {
-                store = _mm_unpacklo_epi16(store, _mm_setzero_si128());
-                let r0 = if FMA {
-                    _mm_mul_round_ps(_mm_cvtepi32_ps(store), v_weight)
-                } else {
-                    let scale_store_0_ps = _mm_mul_ps(_mm_cvtepi32_ps(store), v_weight);
+            _mm_storeu_si16(buffer.get_unchecked(buf_cx..).as_ptr() as *mut _, store);
 
-                    const RND: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
+            let store = _mm_unpacklo_epi16(store, _mm_setzero_si128());
+            let r0 = if FMA {
+                _mm_mul_round_ps(
+                    _mm_cvtepi32_ps(_mm_unpacklo_epi16(store, _mm_setzero_si128())),
+                    v_weight,
+                )
+            } else {
+                let scale_store_0_ps = _mm_mul_ps(_mm_cvtepi32_ps(store), v_weight);
 
-                    _mm_round_ps::<RND>(scale_store_0_ps)
-                };
-                let ptr = unsafe_dst.slice.as_ptr().add(y_dst_shift + px) as *mut u8;
-                store_u8_u32::<TAIL_CN>(ptr, _mm_cvtps_epi32(r0));
-            }
+                const RND: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
+
+                _mm_round_ps::<RND>(scale_store_0_ps)
+            };
+            let ptr = unsafe_dst.slice.as_ptr().add(y_dst_shift + px) as *mut u8;
+            store_u8_u32::<TAIL_CN>(ptr, _mm_cvtps_epi32(r0));
+            buf_cx += 1;
         }
     }
 }
