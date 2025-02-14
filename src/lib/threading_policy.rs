@@ -73,6 +73,7 @@ impl ThreadingPolicy {
     }
 
     // Make always return at least some minimal amount of threads, if multi-threading were requested
+    // At least on single core CPU have 2 threads is beneficial
     fn available_parallelism(min: usize) -> usize {
         available_parallelism()
             .unwrap_or_else(|_| NonZeroUsize::new(1).unwrap())
