@@ -93,8 +93,8 @@ fn box_blur_horizontal_pass_impl<T, J, const CN: usize>(
             weight3 = (unsafe { *src.get_unchecked(y_src_shift + 3) }.as_()) * edge_count;
         }
 
-        for x in 1..half_kernel.min(width) {
-            let px = x as usize * CN;
+        for x in 1..half_kernel as usize {
+            let px = x.min(width as usize - 1) * CN;
             weight0 += unsafe { *src.get_unchecked(y_src_shift + px) }.as_();
             if CN > 1 {
                 weight1 += unsafe { *src.get_unchecked(y_src_shift + px + 1) }.as_();
@@ -293,7 +293,7 @@ fn box_blur_horizontal_pass<
     }
 }
 
-fn box_blur_vertical_pass_impl<T, J, const CHANNELS_CONFIGURATION: usize>(
+fn box_blur_vertical_pass_impl<T, J>(
     src: &[T],
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<T>,
@@ -342,8 +342,8 @@ fn box_blur_vertical_pass_impl<T, J, const CHANNELS_CONFIGURATION: usize>(
             weight2 = (src.get_unchecked(px + 2).as_()) * edge_count;
             weight3 = (src.get_unchecked(px + 3).as_()) * edge_count;
 
-            for y in 1..std::cmp::min(half_kernel, height) {
-                let y_src_shift = y as usize * src_stride as usize;
+            for y in 1..half_kernel as usize {
+                let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
                 weight0 += src.get_unchecked(y_src_shift + px).as_();
                 weight1 += src.get_unchecked(y_src_shift + px + 1).as_();
                 weight2 += src.get_unchecked(y_src_shift + px + 2).as_();
@@ -351,10 +351,9 @@ fn box_blur_vertical_pass_impl<T, J, const CHANNELS_CONFIGURATION: usize>(
             }
 
             for y in 0..height {
-                let next =
-                    std::cmp::min(y + half_kernel, height - 1) as usize * src_stride as usize;
+                let next = (y + half_kernel).min(height - 1) as usize * src_stride as usize;
                 let previous =
-                    std::cmp::max(y as i64 - half_kernel as i64, 0) as usize * src_stride as usize;
+                    (y as i64 - half_kernel as i64).max(0) as usize * src_stride as usize;
                 let y_dst_shift = dst_stride as usize * y as usize;
                 // Prune previous and add next and compute mean
 
@@ -385,8 +384,8 @@ fn box_blur_vertical_pass_impl<T, J, const CHANNELS_CONFIGURATION: usize>(
         let px = cx as usize;
         weight0 = (unsafe { *src.get_unchecked(px) }.as_()) * edge_count;
 
-        for y in 1..std::cmp::min(half_kernel, height) {
-            let y_src_shift = y as usize * src_stride as usize;
+        for y in 1..half_kernel as usize {
+            let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
             weight0 += unsafe { *src.get_unchecked(y_src_shift + px) }.as_();
         }
 
@@ -429,7 +428,7 @@ impl BoxBlurVerticalPass<f16> for f16 {
     #[allow(clippy::type_complexity)]
     fn get_box_vertical_pass<const CHANNELS_CONFIGURATION: usize>(
     ) -> fn(&[f16], u32, &UnsafeSlice<f16>, u32, u32, u32, u32, u32, u32) {
-        box_blur_vertical_pass_impl::<f16, f32, CHANNELS_CONFIGURATION>
+        box_blur_vertical_pass_impl::<f16, f32>
     }
 }
 
@@ -437,7 +436,7 @@ impl BoxBlurVerticalPass<f32> for f32 {
     #[allow(clippy::type_complexity)]
     fn get_box_vertical_pass<const CHANNELS_CONFIGURATION: usize>(
     ) -> fn(&[f32], u32, &UnsafeSlice<f32>, u32, u32, u32, u32, u32, u32) {
-        box_blur_vertical_pass_impl::<f32, f32, CHANNELS_CONFIGURATION>
+        box_blur_vertical_pass_impl::<f32, f32>
     }
 }
 
@@ -445,7 +444,7 @@ impl BoxBlurVerticalPass<u16> for u16 {
     #[allow(clippy::type_complexity)]
     fn get_box_vertical_pass<const CHANNELS_CONFIGURATION: usize>(
     ) -> fn(&[u16], u32, &UnsafeSlice<u16>, u32, u32, u32, u32, u32, u32) {
-        box_blur_vertical_pass_impl::<u16, u32, CHANNELS_CONFIGURATION>
+        box_blur_vertical_pass_impl::<u16, u32>
     }
 }
 
@@ -463,7 +462,7 @@ impl BoxBlurVerticalPass<u8> for u8 {
             radius: u32,
             start_x: u32,
             end_x: u32,
-        ) = box_blur_vertical_pass_impl::<u8, u32, CHANNELS_CONFIGURATION>;
+        ) = box_blur_vertical_pass_impl::<u8, u32>;
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
             #[cfg(feature = "sse")]

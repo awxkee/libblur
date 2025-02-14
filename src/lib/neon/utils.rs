@@ -212,6 +212,11 @@ pub unsafe fn load_u8_u16<const CHANNELS_COUNT: usize>(ptr: *const u8) -> uint16
 }
 
 #[inline(always)]
+pub(crate) unsafe fn vmulq_by_3_s32(k: int32x4_t) -> int32x4_t {
+    vaddq_s32(vshlq_n_s32::<1>(k), k)
+}
+
+#[inline(always)]
 pub unsafe fn load_u8<const CHANNELS_COUNT: usize>(ptr: *const u8) -> uint8x8_t {
     if CHANNELS_COUNT == 4 {
         vreinterpret_u8_u32(vld1_lane_u32::<0>(ptr as *mut u32, vdup_n_u32(0)))

@@ -25,7 +25,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::neon::{load_u8_s32_fast, store_u8_s32_x4, store_u8x8_m4};
+use crate::neon::{load_u8_s32_fast, store_u8_s32_x4, store_u8x8_m4, vmulq_by_3_s32};
 use crate::reflect_index;
 use crate::{clamp_edge, reflect_101, EdgeMode};
 use std::arch::aarch64::*;
@@ -142,10 +142,15 @@ pub fn fast_gaussian_next_vertical_pass_neon_u8<T, const CN: usize>(
                     let stored_23 =
                         vld1q_s32(buffer3.as_mut_ptr().add(d_arr_index_2) as *const i32);
 
-                    let new_diff0 = vmlaq_s32(stored_20, j0, vdupq_n_s32(-3));
-                    let new_diff1 = vmlaq_s32(stored_21, j1, vdupq_n_s32(-3));
-                    let new_diff2 = vmlaq_s32(stored_22, j2, vdupq_n_s32(-3));
-                    let new_diff3 = vmlaq_s32(stored_23, j3, vdupq_n_s32(-3));
+                    let k0 = vmulq_by_3_s32(j0);
+                    let k1 = vmulq_by_3_s32(j1);
+                    let k2 = vmulq_by_3_s32(j2);
+                    let k3 = vmulq_by_3_s32(j3);
+
+                    let new_diff0 = vsubq_s32(k0, stored_20);
+                    let new_diff1 = vsubq_s32(k1, stored_21);
+                    let new_diff2 = vsubq_s32(k2, stored_22);
+                    let new_diff3 = vsubq_s32(k3, stored_23);
 
                     diffs0 = vaddq_s32(diffs0, new_diff0);
                     diffs1 = vaddq_s32(diffs1, new_diff1);
@@ -260,9 +265,8 @@ pub fn fast_gaussian_next_vertical_pass_neon_u8<T, const CN: usize>(
 
                     let buf_ptr_2 = buffer0.as_mut_ptr().add(d_arr_index_2) as *const i32;
                     let stored_2 = vld1q_s32(buf_ptr_2);
-
-                    let new_diff =
-                        vmlaq_s32(stored_2, vsubq_s32(stored, stored_1), vdupq_n_s32(-3));
+                    
+                    let new_diff = vsubq_s32(vmulq_by_3_s32(vsubq_s32(stored, stored_1)), stored_2);
                     diffs = vaddq_s32(diffs, new_diff);
                 } else if y + radius_64 >= 0 {
                     let arr_index = (y & 1023) as usize;
@@ -410,10 +414,15 @@ pub(crate) fn fast_gaussian_next_horizontal_pass_neon_u8<T, const CHANNELS_COUNT
                     let stored_23 =
                         vld1q_s32(buffer3.as_mut_ptr().add(d_arr_index_2) as *const i32);
 
-                    let new_diff0 = vmlaq_s32(stored_20, j0, vdupq_n_s32(-3));
-                    let new_diff1 = vmlaq_s32(stored_21, j1, vdupq_n_s32(-3));
-                    let new_diff2 = vmlaq_s32(stored_22, j2, vdupq_n_s32(-3));
-                    let new_diff3 = vmlaq_s32(stored_23, j3, vdupq_n_s32(-3));
+                    let k0 = vmulq_by_3_s32(j0);
+                    let k1 = vmulq_by_3_s32(j1);
+                    let k2 = vmulq_by_3_s32(j2);
+                    let k3 = vmulq_by_3_s32(j3);
+
+                    let new_diff0 = vsubq_s32(k0, stored_20);
+                    let new_diff1 = vsubq_s32(k1, stored_21);
+                    let new_diff2 = vsubq_s32(k2, stored_22);
+                    let new_diff3 = vsubq_s32(k3, stored_23);
 
                     diffs0 = vaddq_s32(diffs0, new_diff0);
                     diffs1 = vaddq_s32(diffs1, new_diff1);
@@ -526,8 +535,7 @@ pub(crate) fn fast_gaussian_next_horizontal_pass_neon_u8<T, const CHANNELS_COUNT
                     let buf_ptr_2 = buffer0.get_unchecked_mut(d_arr_index_2).as_mut_ptr();
                     let stored_2 = vld1q_s32(buf_ptr_2);
 
-                    let new_diff =
-                        vmlaq_s32(stored_2, vsubq_s32(stored, stored_1), vdupq_n_s32(-3));
+                    let new_diff = vsubq_s32(vmulq_by_3_s32(vsubq_s32(stored, stored_1)), stored_2);
                     diffs = vaddq_s32(diffs, new_diff);
                 } else if x + radius_64 >= 0 {
                     let arr_index = (x & 1023) as usize;

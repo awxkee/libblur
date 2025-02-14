@@ -78,9 +78,9 @@ pub fn fgn_vertical_pass_neon_f32<T, const CHANNELS_COUNT: usize>(
 
                     let buf_ptr_2 = buffer.as_mut_ptr().add(d_arr_index_2) as *mut f32;
                     let stored_2 = vld1q_f32(buf_ptr_2);
-
+                    
                     let new_diff =
-                        vfmaq_f32(stored_2, vsubq_f32(stored, stored_1), vdupq_n_f32(-3f32));
+                        vsubq_f32(vmulq_n_f32(vsubq_f32(stored, stored_1), 3f32), stored_2);
                     diffs = vaddq_f32(diffs, new_diff);
                 } else if y + radius_64 >= 0 {
                     let arr_index = (y & 1023) as usize;
@@ -169,7 +169,7 @@ pub fn fgn_horizontal_pass_neon_f32<T, const CHANNELS_COUNT: usize>(
                     let stored_2 = vld1q_f32(buf_ptr_2);
 
                     let new_diff =
-                        vfmaq_f32(stored_2, vsubq_f32(stored, stored_1), vdupq_n_f32(-3f32));
+                        vsubq_f32(vmulq_n_f32(vsubq_f32(stored, stored_1), 3f32), stored_2);
                     diffs = vaddq_f32(diffs, new_diff);
                 } else if x + radius_64 >= 0 {
                     let arr_index = (x & 1023) as usize;
