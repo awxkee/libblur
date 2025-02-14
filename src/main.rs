@@ -219,16 +219,16 @@ fn main() {
     //     FastBlurChannels::Channels3,
     //     ThreadingPolicy::Adaptive,
     // );
-    libblur::fast_gaussian_next(
-        &mut dst_bytes,
-        stride as u32,
-        dimensions.0,
-        dimensions.1,
-        25,
-        FastBlurChannels::Channels4,
-        ThreadingPolicy::Single,
-        EdgeMode::Clamp,
-    );
+    // libblur::fast_gaussian_next(
+    //     &mut dst_bytes,
+    //     stride as u32,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     25,
+    //     FastBlurChannels::Channels4,
+    //     ThreadingPolicy::Single,
+    //     EdgeMode::Clamp,
+    // );
 
     // libblur::gaussian_blur(
     //     &bytes,
@@ -276,17 +276,17 @@ fn main() {
 
     // bytes = j_vet.iter().map(|&x| (x * 255f32).round() as u8).collect();
     //
-    // libblur::gaussian_box_blur(
-    //     &bytes,
-    //     dimensions.0 * 4,
-    //     &mut dst_bytes,
-    //     dimensions.0 * 4,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     10f32,
-    //     FastBlurChannels::Channels4,
-    //     ThreadingPolicy::Single,
-    // );
+    libblur::gaussian_box_blur(
+        &bytes,
+        dimensions.0 * 4,
+        &mut dst_bytes,
+        dimensions.0 * 4,
+        dimensions.0,
+        dimensions.1,
+        10f32,
+        FastBlurChannels::Channels4,
+        ThreadingPolicy::Single,
+    );
 
     // accelerate::acc_convenience::box_convolve(
     //     &bytes,

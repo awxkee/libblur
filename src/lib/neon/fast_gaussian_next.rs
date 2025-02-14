@@ -44,10 +44,10 @@ pub fn fast_gaussian_next_vertical_pass_neon_u8<T, const CN: usize>(
     unsafe {
         let bytes: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_slice);
 
-        let mut buffer0 = vec![[0i32; 4]; height as usize + 3 * radius as usize];
-        let mut buffer1 = vec![[0i32; 4]; height as usize + 3 * radius as usize];
-        let mut buffer2 = vec![[0i32; 4]; height as usize + 3 * radius as usize];
-        let mut buffer3 = vec![[0i32; 4]; height as usize + 3 * radius as usize];
+        let mut buffer0 = Box::new([[0i32; 4]; 1024]);
+        let mut buffer1 = Box::new([[0i32; 4]; 1024]);
+        let mut buffer2 = Box::new([[0i32; 4]; 1024]);
+        let mut buffer3 = Box::new([[0i32; 4]; 1024]);
 
         let height_wide = height as i64;
 
