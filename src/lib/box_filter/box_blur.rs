@@ -25,7 +25,6 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use std::time::Instant;
 use colorutils_rs::linear_to_planar::linear_to_plane;
 use colorutils_rs::planar_to_linear::plane_to_linear;
 use colorutils_rs::{
@@ -43,7 +42,7 @@ use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::ThreadingPolicy;
 
-fn box_blur_horizontal_pass_impl<T, J, const CHANNELS_CONFIGURATION: usize>(
+fn box_blur_horizontal_pass_impl<T, J, const CN: usize>(
     src: &[T],
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<T>,
@@ -84,54 +83,53 @@ fn box_blur_horizontal_pass_impl<T, J, const CHANNELS_CONFIGURATION: usize>(
         let y_dst_shift = (y * dst_stride) as usize;
         // replicate edge
         weight0 = (unsafe { *src.get_unchecked(y_src_shift) }.as_()) * edge_count;
-        if CHANNELS_CONFIGURATION > 1 {
+        if CN > 1 {
             weight1 = (unsafe { *src.get_unchecked(y_src_shift + 1) }.as_()) * edge_count;
         }
-        if CHANNELS_CONFIGURATION > 2 {
+        if CN > 2 {
             weight2 = (unsafe { *src.get_unchecked(y_src_shift + 2) }.as_()) * edge_count;
         }
-        if CHANNELS_CONFIGURATION == 4 {
+        if CN == 4 {
             weight3 = (unsafe { *src.get_unchecked(y_src_shift + 3) }.as_()) * edge_count;
         }
 
-        for x in 1..std::cmp::min(half_kernel, width) {
-            let px = x as usize * CHANNELS_CONFIGURATION;
+        for x in 1..half_kernel.min(width) {
+            let px = x as usize * CN;
             weight0 += unsafe { *src.get_unchecked(y_src_shift + px) }.as_();
-            if CHANNELS_CONFIGURATION > 1 {
+            if CN > 1 {
                 weight1 += unsafe { *src.get_unchecked(y_src_shift + px + 1) }.as_();
             }
-            if CHANNELS_CONFIGURATION > 2 {
+            if CN > 2 {
                 weight2 += unsafe { *src.get_unchecked(y_src_shift + px + 2) }.as_();
             }
-            if CHANNELS_CONFIGURATION == 4 {
+            if CN == 4 {
                 weight3 += unsafe { *src.get_unchecked(y_src_shift + px + 3) }.as_();
             }
         }
 
         for x in 0..width {
-            let next = std::cmp::min(x + half_kernel, width - 1) as usize * CHANNELS_CONFIGURATION;
-            let previous =
-                std::cmp::max(x as i64 - half_kernel as i64, 0) as usize * CHANNELS_CONFIGURATION;
-            let px = x as usize * CHANNELS_CONFIGURATION;
+            let next = std::cmp::min(x + half_kernel, width - 1) as usize * CN;
+            let previous = std::cmp::max(x as i64 - half_kernel as i64, 0) as usize * CN;
+            let px = x as usize * CN;
             // Prune previous and add next and compute mean
 
             weight0 += unsafe { *src.get_unchecked(y_src_shift + next) }.as_();
-            if CHANNELS_CONFIGURATION > 1 {
+            if CN > 1 {
                 weight1 += unsafe { *src.get_unchecked(y_src_shift + next + 1) }.as_();
             }
-            if CHANNELS_CONFIGURATION > 2 {
+            if CN > 2 {
                 weight2 += unsafe { *src.get_unchecked(y_src_shift + next + 2) }.as_();
             }
 
             weight0 -= unsafe { *src.get_unchecked(y_src_shift + previous) }.as_();
-            if CHANNELS_CONFIGURATION > 1 {
+            if CN > 1 {
                 weight1 -= unsafe { *src.get_unchecked(y_src_shift + previous + 1) }.as_();
             }
-            if CHANNELS_CONFIGURATION > 2 {
+            if CN > 2 {
                 weight2 -= unsafe { *src.get_unchecked(y_src_shift + previous + 2) }.as_();
             }
 
-            if CHANNELS_CONFIGURATION == 4 {
+            if CN == 4 {
                 weight3 += unsafe { *src.get_unchecked(y_src_shift + next + 3) }.as_();
                 weight3 -= unsafe { *src.get_unchecked(y_src_shift + previous + 3) }.as_();
             }
@@ -139,13 +137,13 @@ fn box_blur_horizontal_pass_impl<T, J, const CHANNELS_CONFIGURATION: usize>(
             let write_offset = y_dst_shift + px;
             unsafe {
                 unsafe_dst.write(write_offset, (weight0.as_() * weight).to_());
-                if CHANNELS_CONFIGURATION > 1 {
+                if CN > 1 {
                     unsafe_dst.write(write_offset + 1, (weight1.as_() * weight).to_());
                 }
-                if CHANNELS_CONFIGURATION > 2 {
+                if CN > 2 {
                     unsafe_dst.write(write_offset + 2, (weight2.as_() * weight).to_());
                 }
-                if CHANNELS_CONFIGURATION == 4 {
+                if CN == 4 {
                     unsafe_dst.write(write_offset + 3, (weight3.as_() * weight).to_());
                 }
             }
@@ -533,7 +531,7 @@ fn box_blur_vertical_pass<
                 let start_x = i * segment_size;
                 let mut end_x = (i + 1) * segment_size;
                 if i == thread_count as usize - 1 {
-                    end_x = width as usize;
+                    end_x = width as usize * CN;
                 }
 
                 scope.spawn(move |_| {
@@ -597,7 +595,6 @@ fn box_blur_impl<
     f32: ToStorage<T>,
 {
     let mut transient: Vec<T> = vec![T::default(); dst_stride as usize * height as usize];
-    let start = Instant::now();
     box_blur_horizontal_pass::<T, CN>(
         src,
         src_stride,
@@ -609,8 +606,6 @@ fn box_blur_impl<
         pool,
         thread_count,
     );
-    println!("Horiz time {:?}", start.elapsed());
-    let start = Instant::now();
     box_blur_vertical_pass::<T, CN>(
         &transient,
         src_stride,
@@ -622,7 +617,6 @@ fn box_blur_impl<
         pool,
         thread_count,
     );
-    println!("Vert time {:?}", start.elapsed());
 }
 
 /// Performs box blur on the image.
@@ -894,9 +888,17 @@ fn create_box_gauss(sigma: f32, n: usize) -> Vec<u32> {
 
     for i in 0..n {
         if i < m {
-            sizes.push(wl);
+            let mut new_val = wl / 2;
+            if new_val % 2 == 0 {
+                new_val = new_val + 1;
+            }
+            sizes.push(new_val);
         } else {
-            sizes.push(wu);
+            let mut new_val = wu / 2;
+            if new_val % 2 == 0 {
+                new_val = new_val + 1;
+            }
+            sizes.push(new_val);
         }
     }
 

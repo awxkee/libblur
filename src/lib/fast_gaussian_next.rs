@@ -29,9 +29,9 @@
 use crate::cpu_features::is_aarch_f16c_supported;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::{
-    fgn_horizontal_pass_neon_f16, fgn_horizontal_pass_neon_f32,
-    fast_gaussian_next_horizontal_pass_neon_u8, fgn_vertical_pass_neon_f16,
-    fgn_vertical_pass_neon_f32, fast_gaussian_next_vertical_pass_neon_u8,
+    fast_gaussian_next_horizontal_pass_neon_u8, fast_gaussian_next_vertical_pass_neon_u8,
+    fgn_horizontal_pass_neon_f16, fgn_horizontal_pass_neon_f32, fgn_vertical_pass_neon_f16,
+    fgn_vertical_pass_neon_f32,
 };
 use crate::reflect_index;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]

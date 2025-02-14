@@ -187,8 +187,8 @@ unsafe fn box_blur_vertical_pass_avx2_impl<const FMA: bool>(
         }
 
         unsafe {
-            for y in 1..std::cmp::min(half_kernel, height) {
-                let y_src_shift = y as usize * src_stride as usize;
+            for y in 1..half_kernel as usize {
+                let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
                 let s_ptr = src.as_ptr().add(y_src_shift + px);
 
                 let edge0 = _mm256_loadu_si256(s_ptr as *const _);
@@ -396,8 +396,8 @@ unsafe fn box_blur_vertical_pass_avx2_impl<const FMA: bool>(
         }
 
         unsafe {
-            for y in 1..std::cmp::min(half_kernel, height) {
-                let y_src_shift = y as usize * src_stride as usize;
+            for y in 1..half_kernel as usize {
+                let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
                 let s_ptr = src.as_ptr().add(y_src_shift + px);
 
                 let edge = _mm256_loadu_si256(s_ptr as *const _);
@@ -420,10 +420,8 @@ unsafe fn box_blur_vertical_pass_avx2_impl<const FMA: bool>(
         unsafe {
             for y in 0..height {
                 // preload edge pixels
-                let next =
-                    std::cmp::min(y + half_kernel, height - 1) as usize * src_stride as usize;
-                let previous =
-                    std::cmp::max(y as i64 - half_kernel as i64, 0) as usize * src_stride as usize;
+                let next = (y + half_kernel).min(height - 1) as usize * src_stride as usize;
+                let previous = (y as i64 - half_kernel as i64).max(0) as usize * src_stride as usize;
                 let y_dst_shift = dst_stride as usize * y as usize;
 
                 // subtract previous
@@ -539,8 +537,8 @@ unsafe fn box_blur_vertical_pass_avx2_impl<const FMA: bool>(
         }
 
         unsafe {
-            for y in 1..std::cmp::min(half_kernel, height) {
-                let y_src_shift = y as usize * src_stride as usize;
+            for y in 1..half_kernel as usize {
+                let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
                 let s_ptr = src.as_ptr().add(y_src_shift + px);
 
                 let edge = _mm_loadu_si128(s_ptr as *const _);
@@ -772,8 +770,8 @@ unsafe fn box_blur_vertical_pass_avx2_impl<const FMA: bool>(
         }
 
         unsafe {
-            for y in 1..std::cmp::min(half_kernel, height) {
-                let y_src_shift = y as usize * src_stride as usize;
+            for y in 1..half_kernel as usize {
+                let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
                 let s_ptr = src.as_ptr().add(y_src_shift + px);
                 let edge_colors = load_u8_s32_fast::<TAIL_CN>(s_ptr);
                 store = _mm_add_epi32(store, edge_colors);
@@ -917,8 +915,8 @@ unsafe fn box_blur_vertical_pass_avx2_impl_lr<const FMA: bool>(
         }
 
         unsafe {
-            for y in 1..half_kernel.min(height) {
-                let y_src_shift = y as usize * src_stride as usize;
+            for y in 1..half_kernel as usize {
+                let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
                 let s_ptr = src.as_ptr().add(y_src_shift + px);
 
                 let edge0 = _mm256_loadu_si256(s_ptr as *const _);
@@ -1076,8 +1074,8 @@ unsafe fn box_blur_vertical_pass_avx2_impl_lr<const FMA: bool>(
         }
 
         unsafe {
-            for y in 1..std::cmp::min(half_kernel, height) {
-                let y_src_shift = y as usize * src_stride as usize;
+            for y in 1..half_kernel as usize {
+                let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
                 let s_ptr = src.as_ptr().add(y_src_shift + px);
 
                 let edge = _mm256_loadu_si256(s_ptr as *const _);
@@ -1189,8 +1187,8 @@ unsafe fn box_blur_vertical_pass_avx2_impl_lr<const FMA: bool>(
         }
 
         unsafe {
-            for y in 1..half_kernel.min(height) {
-                let y_src_shift = y as usize * src_stride as usize;
+            for y in 1..half_kernel as usize {
+                let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
                 let s_ptr = src.as_ptr().add(y_src_shift + px);
 
                 let edge = _mm_loadu_si128(s_ptr as *const _);
@@ -1298,8 +1296,8 @@ unsafe fn box_blur_vertical_pass_avx2_impl_lr<const FMA: bool>(
         }
 
         unsafe {
-            for y in 1..half_kernel.min(height) {
-                let y_src_shift = y as usize * src_stride as usize;
+            for y in 1..half_kernel as usize {
+                let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
                 let s_ptr = src.as_ptr().add(y_src_shift + px);
 
                 let edge = _mm_loadu_si64(s_ptr as *const _);
@@ -1389,8 +1387,8 @@ unsafe fn box_blur_vertical_pass_avx2_impl_lr<const FMA: bool>(
         }
 
         unsafe {
-            for y in 1..half_kernel.min(height) {
-                let y_src_shift = y as usize * src_stride as usize;
+            for y in 1..half_kernel as usize {
+                let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
                 let s_ptr = src.as_ptr().add(y_src_shift + px);
                 let edge_colors = load_u8_s16_fast::<TAIL_CN>(s_ptr);
                 store = _mm_adds_epu16(store, edge_colors);

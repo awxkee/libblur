@@ -270,104 +270,104 @@ pub(crate) fn fg_vertical_pass_neon_u8<T, const CN: usize>(
             let mut diffs1 = vdupq_n_s32(0);
             let mut diffs2 = vdupq_n_s32(0);
             let mut diffs3 = vdupq_n_s32(0);
-        
+
             let mut summs0 = vdupq_n_s32(initial_sum);
             let mut summs1 = vdupq_n_s32(initial_sum);
             let mut summs2 = vdupq_n_s32(initial_sum);
             let mut summs3 = vdupq_n_s32(initial_sum);
-        
+
             let start_y = 0 - 2 * radius as i64;
-        
+
             let current_px0 = (xx * CN as u32) as usize;
             let current_px1 = ((xx + 1) * CN as u32) as usize;
             let current_px2 = ((xx + 2) * CN as u32) as usize;
             let current_px3 = ((xx + 3) * CN as u32) as usize;
-        
+
             for y in start_y..height_wide {
                 let current_y = (y * (stride as i64)) as usize;
-        
+
                 if y >= 0 {
                     let c0 = vcvtq_f32_s32(summs0);
                     let c1 = vcvtq_f32_s32(summs1);
                     let c2 = vcvtq_f32_s32(summs2);
                     let c3 = vcvtq_f32_s32(summs3);
-        
+
                     let p0 = vmulq_f32(c0, v_weight);
                     let p1 = vmulq_f32(c1, v_weight);
                     let p2 = vmulq_f32(c2, v_weight);
                     let p3 = vmulq_f32(c3, v_weight);
-        
+
                     let prepared_px0 = vcvtaq_s32_f32(p0);
                     let prepared_px1 = vcvtaq_s32_f32(p1);
                     let prepared_px2 = vcvtaq_s32_f32(p2);
                     let prepared_px3 = vcvtaq_s32_f32(p3);
-        
+
                     let dst_ptr0 = (bytes.slice.as_ptr() as *mut u8).add(current_y + current_px0);
                     let dst_ptr1 = (bytes.slice.as_ptr() as *mut u8).add(current_y + current_px1);
                     let dst_ptr2 = (bytes.slice.as_ptr() as *mut u8).add(current_y + current_px2);
                     let dst_ptr3 = (bytes.slice.as_ptr() as *mut u8).add(current_y + current_px3);
-        
+
                     store_u8_s32_x4::<CN>(
                         (dst_ptr0, dst_ptr1, dst_ptr2, dst_ptr3),
                         int32x4x4_t(prepared_px0, prepared_px1, prepared_px2, prepared_px3),
                     );
-        
+
                     let arr_index = ((y - radius_64) & 1023) as usize;
                     let d_arr_index = (y & 1023) as usize;
-        
+
                     let d_stored0 = vld1q_s32(buffer0.get_unchecked_mut(d_arr_index).as_mut_ptr());
                     let d_stored1 = vld1q_s32(buffer1.get_unchecked_mut(d_arr_index).as_mut_ptr());
                     let d_stored2 = vld1q_s32(buffer2.get_unchecked_mut(d_arr_index).as_mut_ptr());
                     let d_stored3 = vld1q_s32(buffer3.get_unchecked_mut(d_arr_index).as_mut_ptr());
-        
+
                     let a_stored0 = vld1q_s32(buffer0.get_unchecked_mut(arr_index).as_mut_ptr());
                     let a_stored1 = vld1q_s32(buffer1.get_unchecked_mut(arr_index).as_mut_ptr());
                     let a_stored2 = vld1q_s32(buffer2.get_unchecked_mut(arr_index).as_mut_ptr());
                     let a_stored3 = vld1q_s32(buffer3.get_unchecked_mut(arr_index).as_mut_ptr());
-        
+
                     diffs0 = vaddq_s32(diffs0, vmlaq_s32(a_stored0, d_stored0, vdupq_n_s32(-2)));
                     diffs1 = vaddq_s32(diffs1, vmlaq_s32(a_stored1, d_stored1, vdupq_n_s32(-2)));
                     diffs2 = vaddq_s32(diffs2, vmlaq_s32(a_stored2, d_stored2, vdupq_n_s32(-2)));
                     diffs3 = vaddq_s32(diffs3, vmlaq_s32(a_stored3, d_stored3, vdupq_n_s32(-2)));
                 } else if y + radius_64 >= 0 {
                     let arr_index = (y & 1023) as usize;
-        
+
                     let mut stored0 = vld1q_s32(buffer0.get_unchecked_mut(arr_index).as_mut_ptr());
                     let mut stored1 = vld1q_s32(buffer1.get_unchecked_mut(arr_index).as_mut_ptr());
                     let mut stored2 = vld1q_s32(buffer2.get_unchecked_mut(arr_index).as_mut_ptr());
                     let mut stored3 = vld1q_s32(buffer3.get_unchecked_mut(arr_index).as_mut_ptr());
-        
+
                     stored0 = vshlq_n_s32::<1>(stored0);
                     stored1 = vshlq_n_s32::<1>(stored1);
                     stored2 = vshlq_n_s32::<1>(stored2);
                     stored3 = vshlq_n_s32::<1>(stored3);
-        
+
                     diffs0 = vsubq_s32(diffs0, stored0);
                     diffs1 = vsubq_s32(diffs1, stored1);
                     diffs2 = vsubq_s32(diffs2, stored2);
                     diffs3 = vsubq_s32(diffs3, stored3);
                 }
-        
+
                 let next_row_y =
                     clamp_edge!(edge_mode, y + radius_64, 0, height_wide - 1) * (stride as usize);
-        
+
                 let s_ptr0 = bytes.slice.as_ptr().add(next_row_y + current_px0) as *mut u8;
                 let s_ptr1 = bytes.slice.as_ptr().add(next_row_y + current_px1) as *mut u8;
                 let s_ptr2 = bytes.slice.as_ptr().add(next_row_y + current_px2) as *mut u8;
                 let s_ptr3 = bytes.slice.as_ptr().add(next_row_y + current_px3) as *mut u8;
-        
+
                 let pixel_color0 = load_u8_s32_fast::<CN>(s_ptr0);
                 let pixel_color1 = load_u8_s32_fast::<CN>(s_ptr1);
                 let pixel_color2 = load_u8_s32_fast::<CN>(s_ptr2);
                 let pixel_color3 = load_u8_s32_fast::<CN>(s_ptr3);
-        
+
                 let arr_index = ((y + radius_64) & 1023) as usize;
-        
+
                 diffs0 = vaddq_s32(diffs0, pixel_color0);
                 diffs1 = vaddq_s32(diffs1, pixel_color1);
                 diffs2 = vaddq_s32(diffs2, pixel_color2);
                 diffs3 = vaddq_s32(diffs3, pixel_color3);
-        
+
                 vst1q_s32(
                     buffer0.get_unchecked_mut(arr_index).as_mut_ptr(),
                     pixel_color0,
@@ -384,13 +384,13 @@ pub(crate) fn fg_vertical_pass_neon_u8<T, const CN: usize>(
                     buffer3.get_unchecked_mut(arr_index).as_mut_ptr(),
                     pixel_color3,
                 );
-        
+
                 summs0 = vaddq_s32(summs0, diffs0);
                 summs1 = vaddq_s32(summs1, diffs1);
                 summs2 = vaddq_s32(summs2, diffs2);
                 summs3 = vaddq_s32(summs3, diffs3);
             }
-        
+
             xx += 4;
         }
 

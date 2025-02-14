@@ -35,15 +35,9 @@ mod packing;
 pub(crate) mod utils;
 mod v_load_store;
 
-pub(crate) use fast_gaussian::{
-    fg_horizontal_pass_sse_u8, fg_vertical_pass_sse_u8,
-};
-pub(crate) use fast_gaussian_f16::{
-    fg_horizontal_pass_sse_f16, fg_vertical_pass_sse_f16,
-};
-pub(crate) use fast_gaussian_f32::{
-    fg_horizontal_pass_sse_f32, fg_vertical_pass_sse_f32,
-};
+pub(crate) use fast_gaussian::{fg_horizontal_pass_sse_u8, fg_vertical_pass_sse_u8};
+pub(crate) use fast_gaussian_f16::{fg_horizontal_pass_sse_f16, fg_vertical_pass_sse_f16};
+pub(crate) use fast_gaussian_f32::{fg_horizontal_pass_sse_f32, fg_vertical_pass_sse_f32};
 pub(crate) use fast_gaussian_next::*;
 pub(crate) use fast_gaussian_next_f16::{
     fast_gaussian_next_horizontal_pass_sse_f16, fast_gaussian_next_vertical_pass_sse_f16,

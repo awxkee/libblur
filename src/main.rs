@@ -10,6 +10,7 @@ use libblur::{
     FastBlurChannels, GaussianPreciseLevel, ImageSize, Scalar, ThreadingPolicy,
 };
 use std::time::Instant;
+use image::imageops::FilterType;
 
 #[allow(dead_code)]
 fn f32_to_f16(bytes: Vec<f32>) -> Vec<u16> {
@@ -153,7 +154,7 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
 }
 
 fn main() {
-    let dyn_image = ImageReader::open("assets/test_image_1_eq.jpg")
+    let mut dyn_image = ImageReader::open("assets/test_image_2.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -284,11 +285,11 @@ fn main() {
         dimensions.0 * 4,
         dimensions.0,
         dimensions.1,
-        7f32,
+        5f32,
         FastBlurChannels::Channels4,
         ThreadingPolicy::Single,
     );
-    
+
     // accelerate::acc_convenience::box_convolve(
     //     &bytes,
     //     dimensions.0 as usize * 4,
