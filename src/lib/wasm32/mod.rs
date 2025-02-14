@@ -31,7 +31,7 @@ mod fast_gaussian_next;
 mod utils;
 
 pub use fast_gaussian::{
-    fast_gaussian_horizontal_pass_wasm_u8, fast_gaussian_vertical_pass_wasm_u8,
+    fg_horizontal_pass_wasm_u8, fg_vertical_pass_wasm_u8,
 };
 pub use fast_gaussian_next::{
     fast_gaussian_next_horizontal_pass_wasm_u8, fast_gaussian_next_vertical_pass_wasm_u8,

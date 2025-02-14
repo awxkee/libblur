@@ -257,7 +257,7 @@ fn box_blur_horizontal_pass<
     let _dispatcher_horizontal = T::get_horizontal_pass::<CHANNEL_CONFIGURATION>();
     let unsafe_dst = UnsafeSlice::new(dst);
     if let Some(pool) = pool {
-        pool.scope(|scope| {
+        rayon::scope(|scope| {
             let segment_size = height / thread_count;
             for i in 0..thread_count {
                 let start_y = i * segment_size;
@@ -525,7 +525,7 @@ fn box_blur_vertical_pass<
     let unsafe_dst = UnsafeSlice::new(dst);
 
     if let Some(pool) = pool {
-        pool.scope(|scope| {
+        rayon::scope(|scope| {
             let total_width = width as usize * CN;
             let segment_size = total_width / thread_count as usize;
             for i in 0..thread_count as usize {

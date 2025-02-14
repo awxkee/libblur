@@ -32,7 +32,7 @@ use crate::wasm32::utils::{
 use crate::{clamp_edge, reflect_101, reflect_index, EdgeMode};
 use std::arch::wasm32::*;
 
-pub fn fast_gaussian_horizontal_pass_wasm_u8<T, const CHANNELS_COUNT: usize>(
+pub fn fg_horizontal_pass_wasm_u8<T, const CHANNELS_COUNT: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -133,7 +133,7 @@ unsafe fn fast_gaussian_horizontal_pass_impl<T, const CHANNELS_COUNT: usize>(
     }
 }
 
-pub fn fast_gaussian_vertical_pass_wasm_u8<T, const CHANNELS_COUNT: usize>(
+pub fn fg_vertical_pass_wasm_u8<T, const CHANNELS_COUNT: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,

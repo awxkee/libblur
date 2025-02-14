@@ -31,7 +31,7 @@ use std::arch::aarch64::*;
 
 use crate::unsafe_slice::UnsafeSlice;
 
-pub fn fast_gaussian_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
+pub fn fg_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -238,7 +238,7 @@ pub fn fast_gaussian_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
     }
 }
 
-pub(crate) fn fast_gaussian_vertical_pass_neon_u8<T, const CN: usize>(
+pub(crate) fn fg_vertical_pass_neon_u8<T, const CN: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,

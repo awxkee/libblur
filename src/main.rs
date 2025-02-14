@@ -152,14 +152,6 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
 }
 
 fn main() {
-    // unsafe {
-    //     let v = vdupq_n_s64(2);
-    //     let v2 = vdupq_n_s64(3);
-    //     let mul = vmulq_s64(v, v2);
-    //     let mut t: [i64; 2] = [0i64; 2];
-    //     vst1q_s64(t.as_mut_ptr(), mul);
-    //     println!("{:?}", t);
-    // }
     let dyn_image = ImageReader::open("assets/test_image_2.png")
         .unwrap()
         .decode()
@@ -261,10 +253,6 @@ fn main() {
 
     let start = Instant::now();
 
-    // let img_f32 = dyn_image.to_rgba32f();
-    //
-    // let mut j_vet = img_f32.clone();
-
     // libblur::stack_blur_f32(
     //     &mut j_vet,
     //     dimensions.0,
@@ -299,6 +287,7 @@ fn main() {
     //     FastBlurChannels::Channels4,
     //     ThreadingPolicy::Single,
     // );
+
     // accelerate::acc_convenience::box_convolve(
     //     &bytes,
     //     dimensions.0 as usize * 4,
@@ -311,22 +300,6 @@ fn main() {
 
     println!("gaussian_blur {:?}", start.elapsed());
 
-    //
-    // //
-    // println!(
-    //     "pure gaussian_blur: {:?}",
-    //     start_time.elapsed()
-    // );
-
-    // stack_blur_f16(
-    //     &mut f16_bytes,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     50,
-    //     FastBlurChannels::Channels3,
-    //     ThreadingPolicy::Single,
-    // );
-
     fast_gaussian(
         &mut dst_bytes,
         dimensions.0 * components as u32,
@@ -337,17 +310,6 @@ fn main() {
         ThreadingPolicy::Single,
         EdgeMode::Clamp,
     );
-
-    // fast_bilateral_filter(
-    //     src_bytes,
-    //     &mut dst_bytes,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     75,
-    //     75f32,
-    //     755f32,
-    //     FastBlurChannels::Channels3,
-    // );
 
     // dst_bytes = f16_bytes
     //     .iter()
@@ -364,7 +326,7 @@ fn main() {
     //     EdgeMode::Reflect101,
     //     Scalar::default(),
     // );
-    //
+
     // image::save_buffer(
     //     "edges.jpg",
     //     &adaptive_blurred,
@@ -406,16 +368,6 @@ fn main() {
     //     ThreadingPolicy::Adaptive,
     // );
 
-    // laplacian(
-    //     &bytes,
-    //     &mut dst_bytes,
-    //     ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
-    //     EdgeMode::Clamp,
-    //     Scalar::default(),
-    //     FastBlurChannels::Channels3,
-    //     ThreadingPolicy::Adaptive,
-    // );
-    //
     // let motion_kernel = generate_motion_kernel(501, 15.);
 
     // motion_blur(

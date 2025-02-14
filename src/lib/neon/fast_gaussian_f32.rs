@@ -31,7 +31,7 @@ use crate::neon::{load_f32_fast, prefer_vfmaq_f32, store_f32};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, reflect_101, reflect_index, EdgeMode};
 
-pub fn fast_gaussian_vertical_pass_neon_f32<T, const CN: usize>(
+pub fn fg_vertical_pass_neon_f32<T, const CN: usize>(
     undef_bytes: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -103,7 +103,7 @@ pub fn fast_gaussian_vertical_pass_neon_f32<T, const CN: usize>(
     }
 }
 
-pub fn fast_gaussian_horizontal_pass_neon_f32<T, const CN: usize>(
+pub fn fg_horizontal_pass_neon_f32<T, const CN: usize>(
     undef_bytes: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
