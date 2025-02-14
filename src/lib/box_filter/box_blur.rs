@@ -390,7 +390,7 @@ fn box_blur_vertical_pass_impl<T, J>(
         }
 
         for y in 0..height {
-            let next = std::cmp::min(y + half_kernel, height - 1) as usize * src_stride as usize;
+            let next = (y + half_kernel).min(height - 1) as usize * src_stride as usize;
             let previous =
                 std::cmp::max(y as i64 - half_kernel as i64, 0) as usize * src_stride as usize;
             let y_dst_shift = dst_stride as usize * y as usize;

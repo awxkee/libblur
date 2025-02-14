@@ -219,7 +219,7 @@ fn main() {
     //     FastBlurChannels::Channels3,
     //     ThreadingPolicy::Adaptive,
     // );
-    libblur::fast_gaussian(
+    libblur::fast_gaussian_next(
         &mut dst_bytes,
         stride as u32,
         dimensions.0,
@@ -230,19 +230,17 @@ fn main() {
         EdgeMode::Clamp,
     );
 
-    // libblur::gaussian_blur_in_linear(
+    // libblur::gaussian_blur(
     //     &bytes,
-    //     stride as u32,
     //     &mut dst_bytes,
-    //     stride as u32,
     //     dimensions.0,
     //     dimensions.1,
-    //     67 * 2 + 1,
-    //     67. * 2f32 / 6f32,
+    //     0,
+    //     10f32,
     //     FastBlurChannels::Channels4,
-    //     EdgeMode::KernelClip,
+    //     EdgeMode::Clamp,
     //     ThreadingPolicy::Single,
-    //     TransferFunction::Srgb,
+    //     GaussianPreciseLevel::EXACT,
     // );
 
     // let mut f16_bytes: Vec<f16> = dst_bytes
