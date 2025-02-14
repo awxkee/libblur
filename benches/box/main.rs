@@ -24,7 +24,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 stride as u32,
                 dimensions.0,
                 dimensions.1,
-                77,
+                77 / 2,
                 FastBlurChannels::Channels4,
                 ThreadingPolicy::Adaptive,
             );
@@ -103,7 +103,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 rgb_img.dimensions().0 * 3,
                 rgb_img.dimensions().0,
                 rgb_img.dimensions().1,
-                35,
+                77 / 2,
                 FastBlurChannels::Channels3,
                 ThreadingPolicy::Adaptive,
             );

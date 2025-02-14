@@ -38,6 +38,7 @@ struct MedianHistogram {
 }
 
 #[allow(clippy::too_many_arguments)]
+#[inline(always)]
 fn add_rgb_pixels<const CN: usize>(
     src: &[u8],
     src_stride: u32,
@@ -62,38 +63,31 @@ fn add_rgb_pixels<const CN: usize>(
         let bytes_offset = y_shift + px;
         let v0 = unsafe { *src.get_unchecked(bytes_offset) };
         unsafe {
-            let k = histogram.r.get_unchecked_mut(v0 as usize);
-            let x = *k + 1;
-            *k = x;
+            *histogram.r.get_unchecked_mut(v0 as usize) += 1;
         }
         if CN > 1 {
             let v1 = unsafe { *src.get_unchecked(bytes_offset + 1) };
             unsafe {
-                let k = histogram.g.get_unchecked_mut(v1 as usize);
-                let x = *k + 1;
-                *k = x;
+                *histogram.g.get_unchecked_mut(v1 as usize) += 1;
             }
         }
         if CN > 2 {
             let v2 = unsafe { *src.get_unchecked(bytes_offset + 2) };
             unsafe {
-                let k = histogram.b.get_unchecked_mut(v2 as usize);
-                let x = *k + 1;
-                *k = x;
+                *histogram.b.get_unchecked_mut(v2 as usize) += 1;
             }
         }
         if CN == 4 {
             unsafe {
                 let v3 = *src.get_unchecked(bytes_offset + 3);
-                let k = histogram.a.get_unchecked_mut(v3 as usize);
-                let x = *k + 1;
-                *k = x;
+                *histogram.a.get_unchecked_mut(v3 as usize) += 1;
             }
         }
         histogram.n += 1;
     }
 }
 
+#[inline(always)]
 fn remove_rgb_pixels<const CN: usize>(
     src: &[u8],
     src_stride: u32,
@@ -125,24 +119,18 @@ fn remove_rgb_pixels<const CN: usize>(
         if CN > 1 {
             let v1 = unsafe { *src.get_unchecked(bytes_offset + 1) };
             unsafe {
-                let k = histogram.g.get_unchecked_mut(v1 as usize);
-                let x = *k - 1;
-                *k = x;
+                *histogram.g.get_unchecked_mut(v1 as usize) -= 1;
             }
         }
         if CN > 2 {
             let v2 = unsafe { *src.get_unchecked(bytes_offset + 2) };
             unsafe {
-                let k = histogram.b.get_unchecked_mut(v2 as usize);
-                let x = *k - 1;
-                *k = x;
+                *histogram.b.get_unchecked_mut(v2 as usize) -= 1;
             }
         }
         if CN == 4 {
             let v3 = unsafe { *src.get_unchecked(bytes_offset + 3) };
-            let k = unsafe { histogram.a.get_unchecked_mut(v3 as usize) };
-            let x = *k - 1;
-            *k = x;
+            *unsafe { histogram.a.get_unchecked_mut(v3 as usize) } -= 1;
         }
         histogram.n -= 1;
     }
