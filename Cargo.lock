@@ -404,6 +404,7 @@ dependencies = [
  "accelerate",
  "colorutils-rs",
  "criterion",
+ "fast_transpose",
  "half",
  "image",
  "libblur",

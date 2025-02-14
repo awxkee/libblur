@@ -38,6 +38,7 @@ pub mod acc_convenience {
         kernel_size: usize,
         width: usize,
         height: usize,
+        threading: bool,
     ) {
         let src_image = vImage_Buffer {
             data: src.as_ptr() as *mut libc::c_void,
@@ -52,6 +53,11 @@ pub mod acc_convenience {
             row_bytes: dst_stride,
         };
         unsafe {
+            let flags = if threading {
+                kvImageEdgeExtend
+            } else {
+                kvImageEdgeExtend | kvImageDoNotTile
+            };
             let status = vImageBoxConvolve_ARGB8888(
                 &src_image,
                 &mut dst_image,
@@ -61,7 +67,7 @@ pub mod acc_convenience {
                 kernel_size as libc::c_uint,
                 kernel_size as libc::c_uint,
                 std::ptr::null_mut(),
-                kvImageTruncateKernel | kvImageDoNotTile,
+                flags,
             );
             if status != 0 {
                 panic!("vImageBoxConvolve returned error: {}", status);

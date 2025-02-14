@@ -25,6 +25,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use std::time::Instant;
 use colorutils_rs::linear_to_planar::linear_to_plane;
 use colorutils_rs::planar_to_linear::plane_to_linear;
 use colorutils_rs::{
@@ -581,7 +582,7 @@ fn box_blur_impl<
         + AsPrimitive<f64>
         + BoxBlurHorizontalPass<T>
         + BoxBlurVerticalPass<T>,
-    const CHANNEL_CONFIGURATION: usize,
+    const CN: usize,
 >(
     src: &[T],
     src_stride: u32,
@@ -596,7 +597,8 @@ fn box_blur_impl<
     f32: ToStorage<T>,
 {
     let mut transient: Vec<T> = vec![T::default(); dst_stride as usize * height as usize];
-    box_blur_horizontal_pass::<T, CHANNEL_CONFIGURATION>(
+    let start = Instant::now();
+    box_blur_horizontal_pass::<T, CN>(
         src,
         src_stride,
         &mut transient,
@@ -607,7 +609,9 @@ fn box_blur_impl<
         pool,
         thread_count,
     );
-    box_blur_vertical_pass::<T, CHANNEL_CONFIGURATION>(
+    println!("Horiz time {:?}", start.elapsed());
+    let start = Instant::now();
+    box_blur_vertical_pass::<T, CN>(
         &transient,
         src_stride,
         dst,
@@ -618,6 +622,7 @@ fn box_blur_impl<
         pool,
         thread_count,
     );
+    println!("Vert time {:?}", start.elapsed());
 }
 
 /// Performs box blur on the image.

@@ -3,10 +3,11 @@ mod split;
 
 use crate::merge::merge_channels_3;
 use crate::split::split_channels_3;
+use fast_transpose::{transpose_rgba, FlipMode, FlopMode};
 use image::{DynamicImage, EncodableLayout, GenericImageView, ImageReader};
 use libblur::{
-    fast_gaussian, filter_1d_exact, get_gaussian_kernel_1d, get_sigma_size,
-    EdgeMode, FastBlurChannels, GaussianPreciseLevel, ImageSize, Scalar, ThreadingPolicy,
+    fast_gaussian, filter_1d_exact, get_gaussian_kernel_1d, get_sigma_size, EdgeMode,
+    FastBlurChannels, GaussianPreciseLevel, ImageSize, Scalar, ThreadingPolicy,
 };
 use std::time::Instant;
 
@@ -152,7 +153,7 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
 }
 
 fn main() {
-    let dyn_image = ImageReader::open("assets/test_image_2.png")
+    let dyn_image = ImageReader::open("assets/test_image_1_eq.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -276,18 +277,18 @@ fn main() {
 
     // bytes = j_vet.iter().map(|&x| (x * 255f32).round() as u8).collect();
     //
-    // libblur::gaussian_box_blur(
-    //     &bytes,
-    //     dimensions.0 * 4,
-    //     &mut dst_bytes,
-    //     dimensions.0 * 4,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     7f32,
-    //     FastBlurChannels::Channels4,
-    //     ThreadingPolicy::Single,
-    // );
-
+    libblur::gaussian_box_blur(
+        &bytes,
+        dimensions.0 * 4,
+        &mut dst_bytes,
+        dimensions.0 * 4,
+        dimensions.0,
+        dimensions.1,
+        7f32,
+        FastBlurChannels::Channels4,
+        ThreadingPolicy::Single,
+    );
+    
     // accelerate::acc_convenience::box_convolve(
     //     &bytes,
     //     dimensions.0 as usize * 4,
@@ -300,16 +301,16 @@ fn main() {
 
     println!("gaussian_blur {:?}", start.elapsed());
 
-    fast_gaussian(
-        &mut dst_bytes,
-        dimensions.0 * components as u32,
-        dimensions.0,
-        dimensions.1,
-        15,
-        FastBlurChannels::Channels4,
-        ThreadingPolicy::Single,
-        EdgeMode::Clamp,
-    );
+    // fast_gaussian(
+    //     &mut dst_bytes,
+    //     dimensions.0 * components as u32,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     15,
+    //     FastBlurChannels::Channels4,
+    //     ThreadingPolicy::Single,
+    //     EdgeMode::Clamp,
+    // );
 
     // dst_bytes = f16_bytes
     //     .iter()
@@ -413,7 +414,7 @@ fn main() {
     // let blurred = dyn_image.blur(125f32);
     // println!("Gauss image: {:.2?}", start_time.elapsed());
     // blurred.save("dyn.jpg").unwrap();
-    
+
     bytes = dst_bytes;
 
     if components == 3 {

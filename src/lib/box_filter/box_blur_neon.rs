@@ -158,7 +158,48 @@ fn box_blur_horizontal_pass_neon_impl_low_rad<const CN: usize>(
         }
 
         unsafe {
-            for x in 1..half_kernel.min(width) {
+            let mut xx = 1;
+
+            if CN == 4 {
+                let shuf1 = vcombine_u8(
+                    vcreate_u8(u64::from_ne_bytes([0, 4, 8, 12, 1, 5, 9, 13])),
+                    vcreate_u8(u64::from_ne_bytes([2, 6, 10, 14, 3, 7, 11, 15])),
+                );
+
+                while xx + 4 < half_kernel.min(width) {
+                    let px = xx as usize * CN;
+                    let s_ptr_0 = src.as_ptr().add(y_src_shift + px);
+                    let mut edge_colors_0 = vld1q_u8(s_ptr_0);
+
+                    let s_ptr_1 = src.as_ptr().add(y_src_shift + src_stride as usize + px);
+                    let mut edge_colors_1 = vld1q_u8(s_ptr_1);
+
+                    let s_ptr_2 = src.as_ptr().add(y_src_shift + src_stride as usize * 2 + px);
+                    let mut edge_colors_2 = vld1q_u8(s_ptr_2);
+
+                    let s_ptr_3 = src.as_ptr().add(y_src_shift + src_stride as usize * 3 + px);
+                    let mut edge_colors_3 = vld1q_u8(s_ptr_3);
+
+                    edge_colors_0 = vqtbl1q_u8(edge_colors_0, shuf1);
+                    edge_colors_1 = vqtbl1q_u8(edge_colors_1, shuf1);
+                    edge_colors_2 = vqtbl1q_u8(edge_colors_2, shuf1);
+                    edge_colors_3 = vqtbl1q_u8(edge_colors_3, shuf1);
+
+                    let v0 = vpaddlq_u8(edge_colors_0);
+                    let v1 = vpaddlq_u8(edge_colors_1);
+                    let v2 = vpaddlq_u8(edge_colors_2);
+                    let v3 = vpaddlq_u8(edge_colors_3);
+
+                    store_0 = vaddq_u16(store_0, vpaddq_u16(v0, v0));
+                    store_1 = vaddq_u16(store_1, vpaddq_u16(v1, v1));
+                    store_2 = vaddq_u16(store_2, vpaddq_u16(v2, v2));
+                    store_3 = vaddq_u16(store_3, vpaddq_u16(v3, v3));
+
+                    xx += 4;
+                }
+            }
+
+            for x in xx..half_kernel.min(width) {
                 let px = x as usize * CN;
 
                 let s_ptr_0 = src.as_ptr().add(y_src_shift + px);
@@ -644,7 +685,7 @@ fn box_blur_vertical_pass_neon_low_rad(
     let v_weight = unsafe { vdupq_n_f32(1f32 / (radius * 2) as f32) };
 
     let mut cx = start_x;
-
+    
     while cx + 32 < end_x {
         let px = cx;
 
