@@ -310,8 +310,3 @@ pub(crate) unsafe fn store_u8x8_m4<const CHANNELS_COUNT: usize>(
         vst1_lane_u8::<0>(dst_ptr, vreinterpret_u8_u32(casted_u32));
     }
 }
-
-#[inline]
-pub(crate) unsafe fn vmulq_by_3_s32(k: int32x4_t) -> int32x4_t {
-    vaddq_s32(vshlq_n_s32::<1>(k), k)
-}

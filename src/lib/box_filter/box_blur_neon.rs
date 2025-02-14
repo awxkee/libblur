@@ -595,7 +595,7 @@ fn box_blur_horizontal_pass_neon_impl<const CN: usize>(
     }
 }
 
-pub(crate) fn box_blur_vertical_pass_neon<T, const CN: usize>(
+pub(crate) fn box_blur_vertical_pass_neon<T>(
     undefined_src: &[T],
     src_stride: u32,
     undefined_unsafe_dst: &UnsafeSlice<T>,
@@ -610,18 +610,18 @@ pub(crate) fn box_blur_vertical_pass_neon<T, const CN: usize>(
         let src: &[u8] = std::mem::transmute(undefined_src);
         let unsafe_dst: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_unsafe_dst);
         if radius < 240 {
-            box_blur_vertical_pass_neon_low_rad::<CN>(
+            box_blur_vertical_pass_neon_low_rad(
                 src, src_stride, unsafe_dst, dst_stride, w, height, radius, start_x, end_x,
             );
         } else {
-            box_blur_vertical_pass_neon_any::<CN>(
+            box_blur_vertical_pass_neon_any(
                 src, src_stride, unsafe_dst, dst_stride, w, height, radius, start_x, end_x,
             );
         }
     }
 }
 
-fn box_blur_vertical_pass_neon_low_rad<const CN: usize>(
+fn box_blur_vertical_pass_neon_low_rad(
     src: &[u8],
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<u8>,
@@ -949,7 +949,7 @@ fn box_blur_vertical_pass_neon_low_rad<const CN: usize>(
     }
 }
 
-fn box_blur_vertical_pass_neon_any<const CN: usize>(
+fn box_blur_vertical_pass_neon_any(
     src: &[u8],
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<u8>,

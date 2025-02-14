@@ -481,7 +481,7 @@ unsafe fn box_blur_horizontal_pass_impl<const CHANNELS: usize, const FMA: bool>(
     }
 }
 
-pub(crate) fn box_blur_vertical_pass_sse<T, const CHANNELS: usize>(
+pub(crate) fn box_blur_vertical_pass_sse<T>(
     undefined_src: &[T],
     src_stride: u32,
     undefined_unsafe_dst: &UnsafeSlice<T>,
@@ -496,14 +496,14 @@ pub(crate) fn box_blur_vertical_pass_sse<T, const CHANNELS: usize>(
         let src: &[u8] = std::mem::transmute(undefined_src);
         let unsafe_dst: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_unsafe_dst);
 
-        box_blur_vertical_pass_sse_impl::<CHANNELS>(
+        box_blur_vertical_pass_sse_impl(
             src, src_stride, unsafe_dst, dst_stride, w, height, radius, start_x, end_x,
         )
     }
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn box_blur_vertical_pass_sse_impl<const CHANNELS: usize>(
+unsafe fn box_blur_vertical_pass_sse_impl(
     src: &[u8],
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<u8>,

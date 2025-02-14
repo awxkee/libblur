@@ -5,8 +5,8 @@ use crate::merge::merge_channels_3;
 use crate::split::split_channels_3;
 use image::{DynamicImage, EncodableLayout, GenericImageView, ImageReader};
 use libblur::{
-    filter_1d_exact, get_gaussian_kernel_1d, get_sigma_size, EdgeMode, FastBlurChannels,
-    GaussianPreciseLevel, ImageSize, Scalar, ThreadingPolicy,
+    fast_gaussian, fast_gaussian_next, filter_1d_exact, get_gaussian_kernel_1d, get_sigma_size,
+    EdgeMode, FastBlurChannels, GaussianPreciseLevel, ImageSize, Scalar, ThreadingPolicy,
 };
 use std::time::Instant;
 
@@ -261,18 +261,18 @@ fn main() {
 
     let start = Instant::now();
 
-    let img_f32 = dyn_image.to_rgba32f();
+    // let img_f32 = dyn_image.to_rgba32f();
+    //
+    // let mut j_vet = img_f32.clone();
 
-    let mut j_vet = img_f32.clone();
-
-    libblur::stack_blur_f32(
-        &mut j_vet,
-        dimensions.0,
-        dimensions.1,
-        25,
-        FastBlurChannels::Channels4,
-        ThreadingPolicy::Adaptive,
-    );
+    // libblur::stack_blur_f32(
+    //     &mut j_vet,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     25,
+    //     FastBlurChannels::Channels4,
+    //     ThreadingPolicy::Adaptive,
+    // );
 
     // libblur::gaussian_blur_f32(
     //     &img_f32,
@@ -286,7 +286,7 @@ fn main() {
     //     ThreadingPolicy::Single,
     // );
 
-    bytes = j_vet.iter().map(|&x| (x * 255f32).round() as u8).collect();
+    // bytes = j_vet.iter().map(|&x| (x * 255f32).round() as u8).collect();
     //
     // libblur::gaussian_box_blur(
     //     &bytes,
@@ -327,16 +327,16 @@ fn main() {
     //     ThreadingPolicy::Single,
     // );
 
-    // fast_gaussian(
-    //     &mut dst_bytes,
-    //     dimensions.0 * components as u32,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     125,
-    //     FastBlurChannels::Channels3,
-    //     ThreadingPolicy::Single,
-    //     EdgeMode::Clamp,
-    // );
+    fast_gaussian(
+        &mut dst_bytes,
+        dimensions.0 * components as u32,
+        dimensions.0,
+        dimensions.1,
+        15,
+        FastBlurChannels::Channels4,
+        ThreadingPolicy::Single,
+        EdgeMode::Clamp,
+    );
 
     // fast_bilateral_filter(
     //     src_bytes,
@@ -476,7 +476,7 @@ fn main() {
     //     ThreadingPolicy::Adaptive,
     //     GaussianPreciseLevel::INTEGRAL,
     // );
-    // bytes = dst_bytes;
+    bytes = dst_bytes;
     // libblur::median_blur(
     //     &bytes,
     //     stride as u32,

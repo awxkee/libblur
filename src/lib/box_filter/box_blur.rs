@@ -472,7 +472,7 @@ impl BoxBlurVerticalPass<u8> for u8 {
                 let is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
                 if is_sse_available {
                     use crate::box_filter::box_blur_sse::box_blur_vertical_pass_sse;
-                    _dispatcher_vertical = box_blur_vertical_pass_sse::<u8, CHANNELS_CONFIGURATION>;
+                    _dispatcher_vertical = box_blur_vertical_pass_sse::<u8>;
                 }
             }
             #[cfg(feature = "avx")]
@@ -486,7 +486,7 @@ impl BoxBlurVerticalPass<u8> for u8 {
         }
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
-            _dispatcher_vertical = box_blur_vertical_pass_neon::<u8, CHANNELS_CONFIGURATION>;
+            _dispatcher_vertical = box_blur_vertical_pass_neon::<u8>;
         }
         _dispatcher_vertical
     }
@@ -507,7 +507,7 @@ fn box_blur_vertical_pass<
         + AsPrimitive<f32>
         + AsPrimitive<f64>
         + BoxBlurVerticalPass<T>,
-    const CHANNEL_CONFIGURATION: usize,
+    const CN: usize,
 >(
     src: &[T],
     src_stride: u32,
@@ -521,12 +521,12 @@ fn box_blur_vertical_pass<
 ) where
     f32: ToStorage<T>,
 {
-    let _dispatcher_vertical = T::get_box_vertical_pass::<CHANNEL_CONFIGURATION>();
+    let _dispatcher_vertical = T::get_box_vertical_pass::<CN>();
     let unsafe_dst = UnsafeSlice::new(dst);
 
     if let Some(pool) = pool {
         pool.scope(|scope| {
-            let total_width = width as usize * CHANNEL_CONFIGURATION;
+            let total_width = width as usize * CN;
             let segment_size = total_width / thread_count as usize;
             for i in 0..thread_count as usize {
                 let start_x = i * segment_size;
@@ -551,7 +551,7 @@ fn box_blur_vertical_pass<
             }
         });
     } else {
-        let total_width = width as usize * CHANNEL_CONFIGURATION;
+        let total_width = width as usize * CN;
         _dispatcher_vertical(
             src,
             src_stride,

@@ -44,24 +44,23 @@ pub fn fast_gaussian_next_vertical_pass_neon_f32<T, const CHANNELS_COUNT: usize>
 ) {
     unsafe {
         let bytes: &UnsafeSlice<'_, f32> = std::mem::transmute(undef_bytes);
-        let mut buffer: [[f32; 4]; 1024] = [[0f32; 4]; 1024];
+        let mut buffer = Box::new([[0f32; 4]; 1024]);
 
         let height_wide = height as i64;
 
         let radius_64 = radius as i64;
         let weight = 1.0f32 / ((radius as f32) * (radius as f32) * (radius as f32));
         let f_weight = vdupq_n_f32(weight);
-        for x in start..std::cmp::min(width, end) {
+        for x in start..width.min(end) {
             let mut diffs: float32x4_t = vdupq_n_f32(0f32);
             let mut ders: float32x4_t = vdupq_n_f32(0f32);
             let mut summs: float32x4_t = vdupq_n_f32(0f32);
 
             let start_y = 0 - 3 * radius as i64;
             for y in start_y..height_wide {
-                let current_y = (y * (stride as i64)) as usize;
-
                 if y >= 0 {
-                    let current_px = (std::cmp::max(x, 0)) as usize * CHANNELS_COUNT;
+                    let current_y = (y * (stride as i64)) as usize;
+                    let current_px = x as usize * CHANNELS_COUNT;
 
                     let prepared_px = vmulq_f32(summs, f_weight);
                     let dst_ptr = bytes.slice.as_ptr().add(current_y + current_px) as *mut f32;
@@ -81,7 +80,7 @@ pub fn fast_gaussian_next_vertical_pass_neon_f32<T, const CHANNELS_COUNT: usize>
                     let stored_2 = vld1q_f32(buf_ptr_2);
 
                     let new_diff =
-                        vsubq_f32(vmulq_n_f32(vsubq_f32(stored, stored_1), 3f32), stored_2);
+                        vfmaq_f32(stored_2, vsubq_f32(stored, stored_1), vdupq_n_f32(-3f32));
                     diffs = vaddq_f32(diffs, new_diff);
                 } else if y + radius_64 >= 0 {
                     let arr_index = (y & 1023) as usize;
@@ -92,14 +91,12 @@ pub fn fast_gaussian_next_vertical_pass_neon_f32<T, const CHANNELS_COUNT: usize>
                     let buf_ptr_1 = buffer.as_mut_ptr().add(arr_index_1) as *mut f32;
                     let stored_1 = vld1q_f32(buf_ptr_1);
 
-                    let new_diff = vmulq_n_f32(vsubq_f32(stored, stored_1), 3f32);
-
-                    diffs = vaddq_f32(diffs, new_diff);
+                    diffs = vfmaq_f32(diffs, vsubq_f32(stored, stored_1), vdupq_n_f32(3f32));
                 } else if y + 2 * radius_64 >= 0 {
                     let arr_index = ((y + radius_64) & 1023) as usize;
                     let buf_ptr = buffer.as_mut_ptr().add(arr_index) as *mut f32;
                     let stored = vld1q_f32(buf_ptr);
-                    diffs = vsubq_f32(diffs, vmulq_n_f32(stored, 3f32));
+                    diffs = vfmaq_f32(diffs, stored, vdupq_n_f32(-3f32));
                 }
 
                 let next_row_y =
@@ -134,7 +131,7 @@ pub fn fast_gaussian_next_horizontal_pass_neon_f32<T, const CHANNELS_COUNT: usiz
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        let mut buffer: [[f32; 4]; 1024] = [[0f32; 4]; 1024];
+        let mut buffer = Box::new([[0f32; 4]; 1024]);
         let bytes: &UnsafeSlice<'_, f32> = std::mem::transmute(undef_bytes);
 
         let width_wide = width as i64;
@@ -143,15 +140,14 @@ pub fn fast_gaussian_next_horizontal_pass_neon_f32<T, const CHANNELS_COUNT: usiz
         let weight = 1.0f32 / ((radius as f32) * (radius as f32) * (radius as f32));
         let f_weight = vdupq_n_f32(weight);
 
-        for y in start..std::cmp::min(height, end) {
+        for y in start..height.min(end) {
             let mut diffs: float32x4_t = vdupq_n_f32(0f32);
             let mut ders: float32x4_t = vdupq_n_f32(0f32);
             let mut summs: float32x4_t = vdupq_n_f32(0f32);
 
-            let current_y = ((y as i64) * (stride as i64)) as usize;
-
             for x in (0 - 3 * radius_64)..(width as i64) {
                 if x >= 0 {
+                    let current_y = ((y as i64) * (stride as i64)) as usize;
                     let current_px = x as usize * CHANNELS_COUNT;
 
                     let prepared_px = vmulq_f32(summs, f_weight);
@@ -173,7 +169,7 @@ pub fn fast_gaussian_next_horizontal_pass_neon_f32<T, const CHANNELS_COUNT: usiz
                     let stored_2 = vld1q_f32(buf_ptr_2);
 
                     let new_diff =
-                        vsubq_f32(vmulq_n_f32(vsubq_f32(stored, stored_1), 3f32), stored_2);
+                        vfmaq_f32(stored_2, vsubq_f32(stored, stored_1), vdupq_n_f32(-3f32));
                     diffs = vaddq_f32(diffs, new_diff);
                 } else if x + radius_64 >= 0 {
                     let arr_index = (x & 1023) as usize;
@@ -184,14 +180,12 @@ pub fn fast_gaussian_next_horizontal_pass_neon_f32<T, const CHANNELS_COUNT: usiz
                     let buf_ptr_1 = buffer.as_mut_ptr().add(arr_index_1) as *mut f32;
                     let stored_1 = vld1q_f32(buf_ptr_1);
 
-                    let new_diff = vmulq_n_f32(vsubq_f32(stored, stored_1), 3f32);
-
-                    diffs = vaddq_f32(diffs, new_diff);
+                    diffs = vfmaq_f32(diffs, vsubq_f32(stored, stored_1), vdupq_n_f32(3f32));
                 } else if x + 2 * radius_64 >= 0 {
                     let arr_index = ((x + radius_64) & 1023) as usize;
                     let buf_ptr = buffer.as_mut_ptr().add(arr_index) as *mut f32;
                     let stored = vld1q_f32(buf_ptr);
-                    diffs = vsubq_f32(diffs, vmulq_n_f32(stored, 3f32));
+                    diffs = vfmaq_f32(diffs, stored, vdupq_n_f32(-3f32));
                 }
 
                 let next_row_y = (y as usize) * (stride as usize);

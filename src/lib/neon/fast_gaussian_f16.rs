@@ -45,7 +45,7 @@ pub fn fast_gaussian_vertical_pass_neon_f16<T, const CHANNELS_COUNT: usize>(
 ) {
     unsafe {
         let bytes: &UnsafeSlice<'_, f16> = std::mem::transmute(undef_bytes);
-        let mut buffer: [[f32; 4]; 1024] = [[0f32; 4]; 1024];
+        let mut buffer = Box::new([[0f32; 4]; 1024]);
 
         let height_wide = height as i64;
 
@@ -53,8 +53,8 @@ pub fn fast_gaussian_vertical_pass_neon_f16<T, const CHANNELS_COUNT: usize>(
         let weight = 1.0f32 / ((radius as f32) * (radius as f32));
         let f_weight = vdupq_n_f32(weight);
         for x in start..std::cmp::min(width, end) {
-            let mut diffs: float32x4_t = vdupq_n_f32(0f32);
-            let mut summs: float32x4_t = vdupq_n_f32(0f32);
+            let mut diffs = vdupq_n_f32(0f32);
+            let mut summs = vdupq_n_f32(0f32);
 
             let start_y = 0 - 2 * radius as i64;
             for y in start_y..height_wide {

@@ -302,7 +302,7 @@ fn fast_gaussian_next_horizontal_pass<
         + AsPrimitive<J>,
     J,
     M,
-    const CHANNEL_CONFIGURATION: usize,
+    const CN: usize,
 >(
     bytes: &UnsafeSlice<T>,
     stride: u32,
@@ -352,18 +352,18 @@ fn fast_gaussian_next_horizontal_pass<
 
         for x in (0 - 3 * radius_64)..(width as i64) {
             if x >= 0 {
-                let current_px = x as usize * CHANNEL_CONFIGURATION;
+                let current_px = x as usize * CN;
 
                 let bytes_offset = current_y + current_px;
 
                 write_out_blurred!(sum_r, weight, bytes, bytes_offset);
-                if CHANNEL_CONFIGURATION > 1 {
+                if CN > 1 {
                     write_out_blurred!(sum_g, weight, bytes, bytes_offset + 1);
                 }
-                if CHANNEL_CONFIGURATION > 2 {
+                if CN > 2 {
                     write_out_blurred!(sum_b, weight, bytes, bytes_offset + 2);
                 }
-                if CHANNEL_CONFIGURATION == 4 {
+                if CN == 4 {
                     write_out_blurred!(sum_a, weight, bytes, bytes_offset + 3);
                 }
 
@@ -371,58 +371,57 @@ fn fast_gaussian_next_horizontal_pass<
                 let d_idx_2 = ((x - radius_64) & 1023) as usize;
                 let d_idx = (x & 1023) as usize;
                 update_differences_inside!(dif_r, buffer_r, d_idx, d_idx_1, d_idx_2);
-                if CHANNEL_CONFIGURATION > 1 {
+                if CN > 1 {
                     update_differences_inside!(dif_g, buffer_g, d_idx, d_idx_1, d_idx_2);
                 }
-                if CHANNEL_CONFIGURATION > 2 {
+                if CN > 2 {
                     update_differences_inside!(dif_b, buffer_b, d_idx, d_idx_1, d_idx_2);
                 }
-                if CHANNEL_CONFIGURATION == 4 {
+                if CN == 4 {
                     update_differences_inside!(dif_a, buffer_a, d_idx, d_idx_1, d_idx_2);
                 }
             } else if x + radius_64 >= 0 {
                 let arr_index = (x & 1023) as usize;
                 let arr_index_1 = ((x + radius_64) & 1023) as usize;
                 update_differences_one_rad!(dif_r, buffer_r, arr_index, arr_index_1);
-                if CHANNEL_CONFIGURATION > 1 {
+                if CN > 1 {
                     update_differences_one_rad!(dif_g, buffer_g, arr_index, arr_index_1);
                 }
-                if CHANNEL_CONFIGURATION > 2 {
+                if CN > 2 {
                     update_differences_one_rad!(dif_b, buffer_b, arr_index, arr_index_1);
                 }
-                if CHANNEL_CONFIGURATION == 4 {
+                if CN == 4 {
                     update_differences_one_rad!(dif_a, buffer_a, arr_index, arr_index_1);
                 }
             } else if x + 2 * radius_64 >= 0 {
                 let arr_index = ((x + radius_64) & 1023) as usize;
                 update_differences_two_rad!(dif_r, buffer_r, arr_index);
-                if CHANNEL_CONFIGURATION > 1 {
+                if CN > 1 {
                     update_differences_two_rad!(dif_g, buffer_g, arr_index);
                 }
-                if CHANNEL_CONFIGURATION > 2 {
+                if CN > 2 {
                     update_differences_two_rad!(dif_b, buffer_b, arr_index);
                 }
-                if CHANNEL_CONFIGURATION == 4 {
+                if CN == 4 {
                     update_differences_two_rad!(dif_a, buffer_a, arr_index);
                 }
             }
 
             let next_row_y = (y as usize) * (stride as usize);
-            let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide - 1)
-                * CHANNEL_CONFIGURATION;
+            let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide - 1) * CN;
 
             let px_off = next_row_y + next_row_x;
 
             let arr_index = ((x + 2 * radius_64) & 1023) as usize;
 
             update_sum_in!(bytes, px_off, dif_r, der_r, sum_r, buffer_r, arr_index);
-            if CHANNEL_CONFIGURATION > 1 {
+            if CN > 1 {
                 update_sum_in!(bytes, px_off + 1, dif_g, der_g, sum_g, buffer_g, arr_index);
             }
-            if CHANNEL_CONFIGURATION > 2 {
+            if CN > 2 {
                 update_sum_in!(bytes, px_off + 2, dif_b, der_b, sum_b, buffer_b, arr_index);
             }
-            if CHANNEL_CONFIGURATION == 4 {
+            if CN == 4 {
                 update_sum_in!(bytes, px_off + 3, dif_a, der_a, sum_a, buffer_a, arr_index);
             }
         }
@@ -468,19 +467,19 @@ impl FastGaussianNextPassProvider<u16> for u16 {
         }
     }
 
-    fn get_vertical<const CHANNEL_CONFIGURATION: usize>(
+    fn get_vertical<const CN: usize>(
         radius: u32,
     ) -> fn(&UnsafeSlice<u16>, u32, u32, u32, u32, u32, u32, EdgeMode) {
         if BASE_RADIUS_I64_CUTOFF > radius {
-            fast_gaussian_next_vertical_pass::<u16, i32, f32, CHANNEL_CONFIGURATION>
+            fast_gaussian_next_vertical_pass::<u16, i32, f32, CN>
         } else {
-            fast_gaussian_next_vertical_pass::<u16, i64, f64, CHANNEL_CONFIGURATION>
+            fast_gaussian_next_vertical_pass::<u16, i64, f64, CN>
         }
     }
 }
 
 impl FastGaussianNextPassProvider<u8> for u8 {
-    fn get_horizontal<const CHANNEL_CONFIGURATION: usize>(
+    fn get_horizontal<const CN: usize>(
         radius: u32,
     ) -> fn(&UnsafeSlice<u8>, u32, u32, u32, u32, u32, u32, EdgeMode) {
         let mut _dispatcher_horizontal: fn(
@@ -493,9 +492,9 @@ impl FastGaussianNextPassProvider<u8> for u8 {
             end: u32,
             EdgeMode,
         ) = if BASE_RADIUS_I64_CUTOFF > radius {
-            fast_gaussian_next_horizontal_pass::<u8, i32, f32, CHANNEL_CONFIGURATION>
+            fast_gaussian_next_horizontal_pass::<u8, i32, f32, CN>
         } else {
-            fast_gaussian_next_horizontal_pass::<u8, i64, f64, CHANNEL_CONFIGURATION>
+            fast_gaussian_next_horizontal_pass::<u8, i64, f64, CN>
         };
 
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
@@ -503,31 +502,28 @@ impl FastGaussianNextPassProvider<u8> for u8 {
             let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
 
             if BASE_RADIUS_I64_CUTOFF > radius && _is_sse_available {
-                _dispatcher_horizontal =
-                    fast_gaussian_next_horizontal_pass_sse_u8::<u8, CHANNEL_CONFIGURATION>;
+                _dispatcher_horizontal = fast_gaussian_next_horizontal_pass_sse_u8::<u8, CN>;
             }
         }
 
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             if BASE_RADIUS_I64_CUTOFF > radius {
-                _dispatcher_horizontal =
-                    fast_gaussian_next_horizontal_pass_neon_u8::<u8, CHANNEL_CONFIGURATION>;
+                _dispatcher_horizontal = fast_gaussian_next_horizontal_pass_neon_u8::<u8, CN>;
             }
         }
 
         #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
         {
             if BASE_RADIUS_I64_CUTOFF > radius {
-                _dispatcher_horizontal =
-                    fast_gaussian_next_horizontal_pass_wasm_u8::<u8, CHANNEL_CONFIGURATION>;
+                _dispatcher_horizontal = fast_gaussian_next_horizontal_pass_wasm_u8::<u8, CN>;
             }
         }
 
         _dispatcher_horizontal
     }
 
-    fn get_vertical<const CHANNEL_CONFIGURATION: usize>(
+    fn get_vertical<const CN: usize>(
         radius: u32,
     ) -> fn(&UnsafeSlice<u8>, u32, u32, u32, u32, u32, u32, EdgeMode) {
         let mut _dispatcher_vertical: fn(
@@ -540,9 +536,9 @@ impl FastGaussianNextPassProvider<u8> for u8 {
             end: u32,
             EdgeMode,
         ) = if BASE_RADIUS_I64_CUTOFF > radius {
-            fast_gaussian_next_vertical_pass::<u8, i32, f32, CHANNEL_CONFIGURATION>
+            fast_gaussian_next_vertical_pass::<u8, i32, f32, CN>
         } else {
-            fast_gaussian_next_vertical_pass::<u8, i64, f64, CHANNEL_CONFIGURATION>
+            fast_gaussian_next_vertical_pass::<u8, i64, f64, CN>
         };
 
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
@@ -550,24 +546,21 @@ impl FastGaussianNextPassProvider<u8> for u8 {
             let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
 
             if BASE_RADIUS_I64_CUTOFF > radius && _is_sse_available {
-                _dispatcher_vertical =
-                    fast_gaussian_next_vertical_pass_sse_u8::<u8, CHANNEL_CONFIGURATION>;
+                _dispatcher_vertical = fast_gaussian_next_vertical_pass_sse_u8::<u8, CN>;
             }
         }
 
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             if BASE_RADIUS_I64_CUTOFF > radius {
-                _dispatcher_vertical =
-                    fast_gaussian_next_vertical_pass_neon_u8::<u8, CHANNEL_CONFIGURATION>;
+                _dispatcher_vertical = fast_gaussian_next_vertical_pass_neon_u8::<u8, CN>;
             }
         }
 
         #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
         {
             if BASE_RADIUS_I64_CUTOFF > radius {
-                _dispatcher_vertical =
-                    fast_gaussian_next_vertical_pass_wasm_u8::<u8, CHANNEL_CONFIGURATION>;
+                _dispatcher_vertical = fast_gaussian_next_vertical_pass_wasm_u8::<u8, CN>;
             }
         }
         _dispatcher_vertical
@@ -575,7 +568,7 @@ impl FastGaussianNextPassProvider<u8> for u8 {
 }
 
 impl FastGaussianNextPassProvider<f32> for f32 {
-    fn get_horizontal<const CHANNEL_CONFIGURATION: usize>(
+    fn get_horizontal<const CN: usize>(
         radius: u32,
     ) -> fn(&UnsafeSlice<f32>, u32, u32, u32, u32, u32, u32, EdgeMode) {
         let mut _dispatcher_horizontal: fn(
@@ -588,23 +581,21 @@ impl FastGaussianNextPassProvider<f32> for f32 {
             u32,
             EdgeMode,
         ) = if BASE_RADIUS_I64_CUTOFF > radius {
-            fast_gaussian_next_horizontal_pass::<f32, f32, f32, CHANNEL_CONFIGURATION>
+            fast_gaussian_next_horizontal_pass::<f32, f32, f32, CN>
         } else {
-            fast_gaussian_next_horizontal_pass::<f32, f64, f64, CHANNEL_CONFIGURATION>
+            fast_gaussian_next_horizontal_pass::<f32, f64, f64, CN>
         };
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
             let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
             if _is_sse_available {
-                _dispatcher_horizontal =
-                    fast_gaussian_next_horizontal_pass_sse_f32::<f32, CHANNEL_CONFIGURATION>;
+                _dispatcher_horizontal = fast_gaussian_next_horizontal_pass_sse_f32::<f32, CN>;
             }
         }
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             if BASE_RADIUS_I64_CUTOFF > radius {
-                _dispatcher_horizontal =
-                    fast_gaussian_next_horizontal_pass_neon_f32::<f32, CHANNEL_CONFIGURATION>;
+                _dispatcher_horizontal = fast_gaussian_next_horizontal_pass_neon_f32::<f32, CN>;
             }
         }
         _dispatcher_horizontal
