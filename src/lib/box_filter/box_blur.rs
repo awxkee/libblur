@@ -107,10 +107,10 @@ fn box_blur_horizontal_pass_impl<T, J, const CN: usize>(
             }
         }
 
-        for x in 0..width {
-            let next = std::cmp::min(x + half_kernel, width - 1) as usize * CN;
-            let previous = std::cmp::max(x as i64 - half_kernel as i64, 0) as usize * CN;
-            let px = x as usize * CN;
+        for x in 0..width as usize {
+            let next = (x + half_kernel as usize).min(width as usize - 1) * CN;
+            let previous = (x as i64 - half_kernel as i64).max(0) as usize * CN;
+            let px = x * CN;
             // Prune previous and add next and compute mean
 
             weight0 += unsafe { *src.get_unchecked(y_src_shift + next) }.as_();
