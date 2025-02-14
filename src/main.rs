@@ -154,7 +154,7 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
 }
 
 fn main() {
-    let mut dyn_image = ImageReader::open("assets/test_image_2.png")
+    let mut dyn_image = ImageReader::open("assets/test_image_2.jpg")
         .unwrap()
         .decode()
         .unwrap();

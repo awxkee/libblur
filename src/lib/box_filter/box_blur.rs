@@ -960,7 +960,7 @@ fn tent_blur_impl<
     );
     box_blur_impl::<T, CHANNEL_CONFIGURATION>(
         &transient,
-        src_stride,
+        dst_stride,
         dst,
         dst_stride,
         width,
@@ -1229,12 +1229,11 @@ fn gaussian_box_blur_impl<
         )
     };
     let mut transient: Vec<T> = vec![T::default(); dst_stride as usize * height as usize];
-    let mut transient2: Vec<T> = vec![T::default(); dst_stride as usize * height as usize];
     let boxes = create_box_gauss(sigma, 3);
     box_blur_impl::<T, CHANNEL_CONFIGURATION>(
         src,
         src_stride,
-        &mut transient,
+        dst,
         dst_stride,
         width,
         height,
@@ -1243,9 +1242,9 @@ fn gaussian_box_blur_impl<
         thread_count,
     );
     box_blur_impl::<T, CHANNEL_CONFIGURATION>(
-        &transient,
-        src_stride,
-        &mut transient2,
+        &dst,
+        dst_stride,
+        &mut transient,
         dst_stride,
         width,
         height,
@@ -1254,8 +1253,8 @@ fn gaussian_box_blur_impl<
         thread_count,
     );
     box_blur_impl::<T, CHANNEL_CONFIGURATION>(
-        &transient2,
-        src_stride,
+        &transient,
+        dst_stride,
         dst,
         dst_stride,
         width,
