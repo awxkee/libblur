@@ -50,7 +50,7 @@ impl ThreadingPolicy {
         match self {
             ThreadingPolicy::Single => 1,
             ThreadingPolicy::Adaptive => {
-                ((width * height / (256 * 256)) as usize).clamp(1, Self::available_parallelism(12))
+                ((width * height / (256 * 256)) as usize).clamp(1, Self::available_parallelism(4))
             }
             ThreadingPolicy::AdaptiveReserve(reserve) => {
                 let reserve = reserve.get();
