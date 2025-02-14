@@ -10,6 +10,7 @@ use libblur::{
     FastBlurChannels, GaussianPreciseLevel, ImageSize, Scalar, ThreadingPolicy,
 };
 use std::time::Instant;
+use colorutils_rs::TransferFunction;
 use image::imageops::FilterType;
 
 #[allow(dead_code)]
@@ -276,7 +277,7 @@ fn main() {
 
     // bytes = j_vet.iter().map(|&x| (x * 255f32).round() as u8).collect();
     //
-    libblur::gaussian_box_blur(
+    libblur::gaussian_box_blur_in_linear(
         &bytes,
         dimensions.0 * 4,
         &mut dst_bytes,
@@ -286,6 +287,7 @@ fn main() {
         10f32,
         FastBlurChannels::Channels4,
         ThreadingPolicy::Single,
+        TransferFunction::Rec709,
     );
 
     // accelerate::acc_convenience::box_convolve(
