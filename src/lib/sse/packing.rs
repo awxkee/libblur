@@ -27,7 +27,7 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-use crate::sse::shuffle;
+use crate::sse::_shuffle;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -156,20 +156,20 @@ pub(crate) unsafe fn _mm_deinterleave_rgb_ps(
     t1: __m128,
     t2: __m128,
 ) -> (__m128, __m128, __m128) {
-    const FLAG_1: i32 = shuffle(0, 1, 0, 2);
+    const FLAG_1: i32 = _shuffle(0, 1, 0, 2);
     let at12 = _mm_shuffle_ps::<FLAG_1>(t1, t2);
-    const FLAG_2: i32 = shuffle(2, 0, 3, 0);
+    const FLAG_2: i32 = _shuffle(2, 0, 3, 0);
     let v0 = _mm_shuffle_ps::<FLAG_2>(t0, at12);
-    const FLAG_3: i32 = shuffle(0, 0, 0, 1);
+    const FLAG_3: i32 = _shuffle(0, 0, 0, 1);
     let bt01 = _mm_shuffle_ps::<FLAG_3>(t0, t1);
-    const FLAG_4: i32 = shuffle(0, 2, 0, 3);
+    const FLAG_4: i32 = _shuffle(0, 2, 0, 3);
     let bt12 = _mm_shuffle_ps::<FLAG_4>(t1, t2);
-    const FLAG_5: i32 = shuffle(2, 0, 2, 0);
+    const FLAG_5: i32 = _shuffle(2, 0, 2, 0);
     let v1 = _mm_shuffle_ps::<FLAG_5>(bt01, bt12);
 
-    const FLAG_6: i32 = shuffle(0, 1, 0, 2);
+    const FLAG_6: i32 = _shuffle(0, 1, 0, 2);
     let ct01 = _mm_shuffle_ps::<FLAG_6>(t0, t1);
-    const FLAG_7: i32 = shuffle(3, 0, 2, 0);
+    const FLAG_7: i32 = _shuffle(3, 0, 2, 0);
     let v2 = _mm_shuffle_ps::<FLAG_7>(ct01, t2);
     (v0, v1, v2)
 }
@@ -180,23 +180,23 @@ pub(crate) unsafe fn _mm_interleave_rgb_ps(
     t1: __m128,
     t2: __m128,
 ) -> (__m128, __m128, __m128) {
-    const FLAG_1: i32 = shuffle(0, 0, 0, 0);
+    const FLAG_1: i32 = _shuffle(0, 0, 0, 0);
     let u0 = _mm_shuffle_ps::<FLAG_1>(t0, t1);
-    const FLAG_2: i32 = shuffle(1, 1, 0, 0);
+    const FLAG_2: i32 = _shuffle(1, 1, 0, 0);
     let u1 = _mm_shuffle_ps::<FLAG_2>(t2, t0);
-    const FLAG_3: i32 = shuffle(2, 0, 2, 0);
+    const FLAG_3: i32 = _shuffle(2, 0, 2, 0);
     let v0 = _mm_shuffle_ps::<FLAG_3>(u0, u1);
-    const FLAG_4: i32 = shuffle(1, 1, 1, 1);
+    const FLAG_4: i32 = _shuffle(1, 1, 1, 1);
     let u2 = _mm_shuffle_ps::<FLAG_4>(t1, t2);
-    const FLAG_5: i32 = shuffle(2, 2, 2, 2);
+    const FLAG_5: i32 = _shuffle(2, 2, 2, 2);
     let u3 = _mm_shuffle_ps::<FLAG_5>(t0, t1);
-    const FLAG_6: i32 = shuffle(2, 0, 2, 0);
+    const FLAG_6: i32 = _shuffle(2, 0, 2, 0);
     let v1 = _mm_shuffle_ps::<FLAG_6>(u2, u3);
-    const FLAG_7: i32 = shuffle(3, 3, 2, 2);
+    const FLAG_7: i32 = _shuffle(3, 3, 2, 2);
     let u4 = _mm_shuffle_ps::<FLAG_7>(t2, t0);
-    const FLAG_8: i32 = shuffle(3, 3, 3, 3);
+    const FLAG_8: i32 = _shuffle(3, 3, 3, 3);
     let u5 = _mm_shuffle_ps::<FLAG_8>(t1, t2);
-    const FLAG_9: i32 = shuffle(2, 0, 2, 0);
+    const FLAG_9: i32 = _shuffle(2, 0, 2, 0);
     let v2 = _mm_shuffle_ps::<FLAG_9>(u4, u5);
     (v0, v1, v2)
 }

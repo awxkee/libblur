@@ -27,10 +27,6 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter1d::arena::Arena;
-#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]
-use crate::filter1d::avx::{
-    filter_rgb_row_avx_f32_f32, filter_rgb_row_avx_symm_u8_f32, filter_rgb_row_avx_u8_f32,
-};
 use crate::filter1d::filter_row_cg::filter_color_group_row;
 use crate::filter1d::filter_row_cg_symmetric::filter_color_group_symmetrical_row;
 use crate::filter1d::filter_scan::ScanPoint1d;
@@ -39,8 +35,7 @@ use crate::filter1d::neon::{filter_rgb_row_neon_u8_i16, filter_rgb_row_symm_neon
 use crate::filter1d::region::FilterRegion;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::filter1d::sse::{
-    filter_rgb_row_sse_f32_f32, filter_rgb_row_sse_symm_u8_f32, filter_rgb_row_sse_symm_u8_i16,
-    filter_rgb_row_sse_u8_f32, filter_rgb_row_sse_u8_i16,
+    filter_rgb_row_sse_symm_u8_f32, filter_rgb_row_sse_symm_u8_i16, filter_rgb_row_sse_u8_i16,
 };
 use crate::unsafe_slice::UnsafeSlice;
 use crate::ImageSize;
@@ -117,15 +112,18 @@ impl Filter1DRgbRowHandler<u8, f32> for u8 {
         #[cfg(feature = "avx")]
         if std::arch::is_x86_feature_detected!("avx2") {
             if is_symmetric_kernel {
-                return filter_rgb_row_avx_symm_u8_f32;
+                use crate::filter1d::avx::filter_row_avx_symm_u8_f32;
+                return filter_row_avx_symm_u8_f32::<3>;
             }
-            return filter_rgb_row_avx_u8_f32;
+            use crate::filter1d::avx::filter_row_avx_u8_f32;
+            return filter_row_avx_u8_f32::<3>;
         }
         if std::arch::is_x86_feature_detected!("sse4.1") {
             if is_symmetric_kernel {
                 return filter_rgb_row_sse_symm_u8_f32;
             }
-            return filter_rgb_row_sse_u8_f32;
+            use crate::filter1d::sse::filter_row_sse_u8_f32;
+            return filter_row_sse_u8_f32::<3>;
         }
         if is_symmetric_kernel {
             filter_color_group_symmetrical_row::<u8, f32, 3>
@@ -169,10 +167,12 @@ impl Filter1DRgbRowHandler<f32, f32> for f32 {
     ) -> fn(Arena, &[f32], &UnsafeSlice<f32>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
         #[cfg(feature = "avx")]
         if std::arch::is_x86_feature_detected!("avx2") {
-            return filter_rgb_row_avx_f32_f32;
+            use crate::filter1d::avx::filter_row_avx_f32_f32;
+            return filter_row_avx_f32_f32::<3>;
         }
         if std::arch::is_x86_feature_detected!("sse4.1") {
-            return filter_rgb_row_sse_f32_f32;
+            use crate::filter1d::sse::filter_row_sse_f32_f32;
+            return filter_row_sse_f32_f32::<3>;
         }
         if is_symmetric_kernel {
             filter_color_group_symmetrical_row::<f32, f32, 3>

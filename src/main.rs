@@ -232,9 +232,11 @@ fn main() {
     //     EdgeMode::Clamp,
     // );
 
-    libblur::gaussian_blur(
+    libblur::gaussian_blur_in_linear(
         &bytes,
+        dimensions.0 * 3,
         &mut dst_bytes,
+        dimensions.0 * 3,
         dimensions.0,
         dimensions.1,
         0,
@@ -242,7 +244,7 @@ fn main() {
         FastBlurChannels::Channels3,
         EdgeMode::Clamp,
         ThreadingPolicy::Single,
-        GaussianPreciseLevel::INTEGRAL,
+        TransferFunction::Rec709,
     );
 
     // let mut f16_bytes: Vec<f16> = dst_bytes
