@@ -38,7 +38,8 @@ struct MedianHistogram {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn add_rgb_pixels<const CHANNEL_CONFIGURATION: usize>(
+#[inline(always)]
+fn add_rgb_pixels<const CN: usize>(
     src: &[u8],
     src_stride: u32,
     y: i64,
@@ -51,8 +52,8 @@ fn add_rgb_pixels<const CHANNEL_CONFIGURATION: usize>(
     if x < 0 || x >= width as i64 {
         return;
     }
-    let px = x as usize * CHANNEL_CONFIGURATION;
-    let cap = std::cmp::min(y + size as i64, height as i64 - 1);
+    let px = x as usize * CN;
+    let cap = (y + size as i64).min(height as i64 - 1);
     let start = y - size as i64;
     for i in start..=cap {
         if i < 0 {
@@ -62,39 +63,32 @@ fn add_rgb_pixels<const CHANNEL_CONFIGURATION: usize>(
         let bytes_offset = y_shift + px;
         let v0 = unsafe { *src.get_unchecked(bytes_offset) };
         unsafe {
-            let k = histogram.r.get_unchecked_mut(usize::from(v0));
-            let x = *k + 1;
-            *k = x;
+            *histogram.r.get_unchecked_mut(v0 as usize) += 1;
         }
-        if CHANNEL_CONFIGURATION > 1 {
+        if CN > 1 {
             let v1 = unsafe { *src.get_unchecked(bytes_offset + 1) };
             unsafe {
-                let k = histogram.g.get_unchecked_mut(usize::from(v1));
-                let x = *k + 1;
-                *k = x;
+                *histogram.g.get_unchecked_mut(v1 as usize) += 1;
             }
         }
-        if CHANNEL_CONFIGURATION > 2 {
+        if CN > 2 {
             let v2 = unsafe { *src.get_unchecked(bytes_offset + 2) };
             unsafe {
-                let k = histogram.b.get_unchecked_mut(usize::from(v2));
-                let x = *k + 1;
-                *k = x;
+                *histogram.b.get_unchecked_mut(v2 as usize) += 1;
             }
         }
-        if CHANNEL_CONFIGURATION == 4 {
+        if CN == 4 {
             unsafe {
                 let v3 = *src.get_unchecked(bytes_offset + 3);
-                let k = histogram.a.get_unchecked_mut(usize::from(v3));
-                let x = *k + 1;
-                *k = x;
+                *histogram.a.get_unchecked_mut(v3 as usize) += 1;
             }
         }
         histogram.n += 1;
     }
 }
 
-fn remove_rgb_pixels<const CHANNELS_CONFIGURATION: usize>(
+#[inline(always)]
+fn remove_rgb_pixels<const CN: usize>(
     src: &[u8],
     src_stride: u32,
     y: i64,
@@ -107,8 +101,8 @@ fn remove_rgb_pixels<const CHANNELS_CONFIGURATION: usize>(
     if x < 0 || x >= width as i64 {
         return;
     }
-    let px = x as usize * CHANNELS_CONFIGURATION;
-    let cap = std::cmp::min(y + size as i64, height as i64 - 1);
+    let px = x as usize * CN;
+    let cap = (y + size as i64).min(height as i64 - 1);
     let start = y - size as i64;
     for i in start..=cap {
         if i < 0 {
@@ -118,37 +112,32 @@ fn remove_rgb_pixels<const CHANNELS_CONFIGURATION: usize>(
         let bytes_offset = y_shift + px;
         let v0 = unsafe { *src.get_unchecked(bytes_offset) };
         unsafe {
-            let k = histogram.r.get_unchecked_mut(usize::from(v0));
+            let k = histogram.r.get_unchecked_mut(v0 as usize);
             let x = *k - 1;
             *k = x;
         }
-        if CHANNELS_CONFIGURATION > 1 {
+        if CN > 1 {
             let v1 = unsafe { *src.get_unchecked(bytes_offset + 1) };
             unsafe {
-                let k = histogram.g.get_unchecked_mut(usize::from(v1));
-                let x = *k - 1;
-                *k = x;
+                *histogram.g.get_unchecked_mut(v1 as usize) -= 1;
             }
         }
-        if CHANNELS_CONFIGURATION > 2 {
+        if CN > 2 {
             let v2 = unsafe { *src.get_unchecked(bytes_offset + 2) };
             unsafe {
-                let k = histogram.b.get_unchecked_mut(usize::from(v2));
-                let x = *k - 1;
-                *k = x;
+                *histogram.b.get_unchecked_mut(v2 as usize) -= 1;
             }
         }
-        if CHANNELS_CONFIGURATION == 4 {
+        if CN == 4 {
             let v3 = unsafe { *src.get_unchecked(bytes_offset + 3) };
-            let k = unsafe { histogram.a.get_unchecked_mut(usize::from(v3)) };
-            let x = *k - 1;
-            *k = x;
+            *unsafe { histogram.a.get_unchecked_mut(v3 as usize) } -= 1;
         }
         histogram.n -= 1;
     }
 }
 
-fn init_histogram<const CHANNELS_CONFIGURATION: usize>(
+#[inline]
+fn init_histogram<const CN: usize>(
     src: &[u8],
     src_stride: u32,
     y: u32,
@@ -163,13 +152,14 @@ fn init_histogram<const CHANNELS_CONFIGURATION: usize>(
     histogram.a = [0; 256];
     histogram.n = 0;
 
-    for j in 0..std::cmp::min(radius, width) {
-        add_rgb_pixels::<CHANNELS_CONFIGURATION>(
+    for j in 0..radius.min(width) {
+        add_rgb_pixels::<CN>(
             src, src_stride, y as i64, j as i64, width, height, radius, histogram,
         );
     }
 }
 
+#[inline(always)]
 fn median_filter(x: [i32; 256], n: i32) -> i32 {
     let mut n = n / 2;
     let mut i = 0i64;
@@ -187,7 +177,7 @@ fn median_filter(x: [i32; 256], n: i32) -> i32 {
     i as i32
 }
 
-fn median_blur_impl<const CHANNELS_CONFIGURATION: usize>(
+fn median_blur_impl<const CN: usize>(
     src: &[u8],
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<u8>,
@@ -199,8 +189,6 @@ fn median_blur_impl<const CHANNELS_CONFIGURATION: usize>(
     end_y: u32,
 ) {
     for y in start_y..end_y {
-        let y_src_offset = y as usize * src_stride as usize;
-        let y_dst_offset = y as usize * dst_stride as usize;
         let mut histogram = MedianHistogram {
             r: [0; 256],
             g: [0; 256],
@@ -209,19 +197,11 @@ fn median_blur_impl<const CHANNELS_CONFIGURATION: usize>(
             n: 0,
         };
         for x in 0..width {
-            let px = x as usize * CHANNELS_CONFIGURATION;
+            let px = x as usize * CN;
             if x == 0 {
-                init_histogram::<CHANNELS_CONFIGURATION>(
-                    src,
-                    src_stride,
-                    y,
-                    width,
-                    height,
-                    radius,
-                    &mut histogram,
-                );
+                init_histogram::<CN>(src, src_stride, y, width, height, radius, &mut histogram);
             } else {
-                remove_rgb_pixels::<CHANNELS_CONFIGURATION>(
+                remove_rgb_pixels::<CN>(
                     src,
                     src_stride,
                     y as i64,
@@ -231,7 +211,7 @@ fn median_blur_impl<const CHANNELS_CONFIGURATION: usize>(
                     radius,
                     &mut histogram,
                 );
-                add_rgb_pixels::<CHANNELS_CONFIGURATION>(
+                add_rgb_pixels::<CN>(
                     src,
                     src_stride,
                     y as i64,
@@ -243,44 +223,59 @@ fn median_blur_impl<const CHANNELS_CONFIGURATION: usize>(
                 );
             }
 
-            if histogram.n > 0 {
-                unsafe {
-                    let bytes_offset = y_dst_offset + px;
-                    unsafe_dst.write(bytes_offset, median_filter(histogram.r, histogram.n) as u8);
-                    if CHANNELS_CONFIGURATION > 1 {
-                        unsafe_dst.write(
-                            bytes_offset + 1,
-                            median_filter(histogram.g, histogram.n) as u8,
-                        );
-                    }
-                    if CHANNELS_CONFIGURATION > 2 {
-                        unsafe_dst.write(
-                            bytes_offset + 2,
-                            median_filter(histogram.b, histogram.n) as u8,
-                        );
-                    }
-                    if CHANNELS_CONFIGURATION == 4 {
-                        unsafe_dst.write(
-                            bytes_offset + 3,
-                            median_filter(histogram.a, histogram.n) as u8,
-                        );
-                    }
-                }
-            } else {
-                unsafe {
-                    let bytes_offset = y_dst_offset + px;
-                    let src_offset = y_src_offset + px;
-                    unsafe_dst.write(bytes_offset, *src.get_unchecked(src_offset));
-                    if CHANNELS_CONFIGURATION > 1 {
-                        unsafe_dst.write(bytes_offset + 1, *src.get_unchecked(src_offset + 1));
-                    }
-                    if CHANNELS_CONFIGURATION > 2 {
-                        unsafe_dst.write(bytes_offset + 2, *src.get_unchecked(src_offset + 2));
-                    }
-                    if CHANNELS_CONFIGURATION == 4 {
-                        unsafe_dst.write(bytes_offset + 3, *src.get_unchecked(src_offset + 3));
-                    }
-                }
+            let y_src_offset = y as usize * src_stride as usize;
+            let y_dst_offset = y as usize * dst_stride as usize;
+
+            push_hist::<CN>(src, unsafe_dst, y_src_offset, y_dst_offset, &histogram, px);
+        }
+    }
+}
+
+#[inline(always)]
+fn push_hist<const CN: usize>(
+    src: &[u8],
+    unsafe_dst: &UnsafeSlice<u8>,
+    y_src_offset: usize,
+    y_dst_offset: usize,
+    histogram: &MedianHistogram,
+    px: usize,
+) {
+    if histogram.n > 0 {
+        unsafe {
+            let bytes_offset = y_dst_offset + px;
+            unsafe_dst.write(bytes_offset, median_filter(histogram.r, histogram.n) as u8);
+            if CN > 1 {
+                unsafe_dst.write(
+                    bytes_offset + 1,
+                    median_filter(histogram.g, histogram.n) as u8,
+                );
+            }
+            if CN > 2 {
+                unsafe_dst.write(
+                    bytes_offset + 2,
+                    median_filter(histogram.b, histogram.n) as u8,
+                );
+            }
+            if CN == 4 {
+                unsafe_dst.write(
+                    bytes_offset + 3,
+                    median_filter(histogram.a, histogram.n) as u8,
+                );
+            }
+        }
+    } else {
+        unsafe {
+            let bytes_offset = y_dst_offset + px;
+            let src_offset = y_src_offset + px;
+            unsafe_dst.write(bytes_offset, *src.get_unchecked(src_offset));
+            if CN > 1 {
+                unsafe_dst.write(bytes_offset + 1, *src.get_unchecked(src_offset + 1));
+            }
+            if CN > 2 {
+                unsafe_dst.write(bytes_offset + 2, *src.get_unchecked(src_offset + 2));
+            }
+            if CN == 4 {
+                unsafe_dst.write(bytes_offset + 3, *src.get_unchecked(src_offset + 3));
             }
         }
     }

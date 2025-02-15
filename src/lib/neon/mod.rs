@@ -35,15 +35,11 @@ mod fast_gaussian_next_f32;
 mod utils;
 
 pub use fast_gaussian::*;
-pub use fast_gaussian_f16::{
-    fast_gaussian_horizontal_pass_neon_f16, fast_gaussian_vertical_pass_neon_f16,
-};
-pub use fast_gaussian_f32::fast_gaussian_horizontal_pass_neon_f32;
-pub use fast_gaussian_f32::fast_gaussian_vertical_pass_neon_f32;
+pub use fast_gaussian_f16::{fg_horizontal_pass_neon_f16, fg_vertical_pass_neon_f16};
+pub use fast_gaussian_f32::fg_horizontal_pass_neon_f32;
+pub use fast_gaussian_f32::fg_vertical_pass_neon_f32;
 pub use fast_gaussian_next::*;
-pub use fast_gaussian_next_f16::{
-    fast_gaussian_next_horizontal_pass_neon_f16, fast_gaussian_next_vertical_pass_neon_f16,
-};
-pub use fast_gaussian_next_f32::fast_gaussian_next_horizontal_pass_neon_f32;
-pub use fast_gaussian_next_f32::fast_gaussian_next_vertical_pass_neon_f32;
+pub use fast_gaussian_next_f16::{fgn_horizontal_pass_neon_f16, fgn_vertical_pass_neon_f16};
+pub use fast_gaussian_next_f32::fgn_horizontal_pass_neon_f32;
+pub use fast_gaussian_next_f32::fgn_vertical_pass_neon_f32;
 pub use utils::*;

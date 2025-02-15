@@ -142,8 +142,8 @@ unsafe fn box_blur_horizontal_pass_impl<const CHANNELS: usize, const FMA: bool>(
             let mut jx = 1usize;
 
             if CHANNELS == 4 {
-                while jx + 4 < half_kernel.min(width) as usize {
-                    let px = jx * CHANNELS;
+                while jx + 4 < half_kernel as usize && jx + 4 < width as usize {
+                    let px = jx.min(width as usize - 1) * CHANNELS;
 
                     let s_ptr_0 = src.as_ptr().add(y_src_shift + px);
                     let s_ptr_1 = src.as_ptr().add(y_src_shift + src_stride as usize + px);
@@ -180,8 +180,8 @@ unsafe fn box_blur_horizontal_pass_impl<const CHANNELS: usize, const FMA: bool>(
                     jx += 4;
                 }
 
-                while jx + 2 < half_kernel.min(width) as usize {
-                    let px = jx * CHANNELS;
+                while jx + 2 < half_kernel as usize && jx + 2 < width as usize {
+                    let px = jx.min(width as usize - 1) * CHANNELS;
 
                     let s_ptr_0 = src.as_ptr().add(y_src_shift + px);
                     let s_ptr_1 = src.as_ptr().add(y_src_shift + src_stride as usize + px);
@@ -219,8 +219,8 @@ unsafe fn box_blur_horizontal_pass_impl<const CHANNELS: usize, const FMA: bool>(
                 }
             }
 
-            for x in jx..half_kernel.min(width) as usize {
-                let px = x * CHANNELS;
+            for x in jx..half_kernel as usize {
+                let px = x.min(width as usize - 1) * CHANNELS;
 
                 let s_ptr_0 = src.as_ptr().add(y_src_shift + px);
                 let s_ptr_1 = src.as_ptr().add(y_src_shift + src_stride as usize + px);
@@ -244,7 +244,7 @@ unsafe fn box_blur_horizontal_pass_impl<const CHANNELS: usize, const FMA: bool>(
 
             // subtract previous
             unsafe {
-                let previous_x = std::cmp::max(x as i64 - half_kernel as i64, 0) as usize;
+                let previous_x = (x as i64 - half_kernel as i64).max(0) as usize;
                 let previous = previous_x * CHANNELS;
 
                 let s_ptr_0 = src.as_ptr().add(y_src_shift + previous);
@@ -390,8 +390,8 @@ unsafe fn box_blur_horizontal_pass_impl<const CHANNELS: usize, const FMA: bool>(
             let mut jx = 1usize;
 
             if CHANNELS == 4 {
-                while jx + 4 < half_kernel.min(width) as usize {
-                    let px = jx * CHANNELS;
+                while jx + 4 < half_kernel as usize && jx + 4 < width as usize {
+                    let px = jx.min(width as usize - 1) * CHANNELS;
 
                     let s_ptr_0 = src.as_ptr().add(y_src_shift + px);
 
@@ -409,8 +409,8 @@ unsafe fn box_blur_horizontal_pass_impl<const CHANNELS: usize, const FMA: bool>(
                     jx += 4;
                 }
 
-                while jx + 2 < half_kernel.min(width) as usize {
-                    let px = jx * CHANNELS;
+                while jx + 2 < half_kernel as usize && jx + 2 < width as usize {
+                    let px = jx.min(width as usize - 1) * CHANNELS;
 
                     let s_ptr_0 = src.as_ptr().add(y_src_shift + px);
 
@@ -427,8 +427,8 @@ unsafe fn box_blur_horizontal_pass_impl<const CHANNELS: usize, const FMA: bool>(
                 }
             }
 
-            for x in jx..half_kernel.min(width) as usize {
-                let px = x * CHANNELS;
+            for x in jx..half_kernel as usize {
+                let px = x.min(width as usize - 1) * CHANNELS;
                 let s_ptr = src.as_ptr().add(y_src_shift + px);
                 let edge_colors = load_u8_s32_fast::<CHANNELS>(s_ptr);
                 store = _mm_add_epi32(store, edge_colors);
@@ -440,7 +440,7 @@ unsafe fn box_blur_horizontal_pass_impl<const CHANNELS: usize, const FMA: bool>(
 
             // subtract previous
             unsafe {
-                let previous_x = std::cmp::max(x as i64 - half_kernel as i64, 0) as usize;
+                let previous_x = (x as i64 - half_kernel as i64).max(0) as usize;
                 let previous = previous_x * CHANNELS;
                 let s_ptr = src.as_ptr().add(y_src_shift + previous);
                 let edge_colors = load_u8_s32_fast::<CHANNELS>(s_ptr);
@@ -449,7 +449,7 @@ unsafe fn box_blur_horizontal_pass_impl<const CHANNELS: usize, const FMA: bool>(
 
             // add next
             unsafe {
-                let next_x = std::cmp::min(x + half_kernel, width - 1) as usize;
+                let next_x = (x + half_kernel).min(width - 1) as usize;
 
                 let next = next_x * CHANNELS;
 
@@ -481,7 +481,7 @@ unsafe fn box_blur_horizontal_pass_impl<const CHANNELS: usize, const FMA: bool>(
     }
 }
 
-pub(crate) fn box_blur_vertical_pass_sse<T, const CHANNELS: usize>(
+pub(crate) fn box_blur_vertical_pass_sse<T>(
     undefined_src: &[T],
     src_stride: u32,
     undefined_unsafe_dst: &UnsafeSlice<T>,
@@ -496,14 +496,14 @@ pub(crate) fn box_blur_vertical_pass_sse<T, const CHANNELS: usize>(
         let src: &[u8] = std::mem::transmute(undefined_src);
         let unsafe_dst: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_unsafe_dst);
 
-        box_blur_vertical_pass_sse_impl::<CHANNELS>(
+        box_blur_vertical_pass_sse_impl(
             src, src_stride, unsafe_dst, dst_stride, w, height, radius, start_x, end_x,
         )
     }
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn box_blur_vertical_pass_sse_impl<const CHANNELS: usize>(
+unsafe fn box_blur_vertical_pass_sse_impl(
     src: &[u8],
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<u8>,
@@ -575,10 +575,9 @@ unsafe fn box_blur_vertical_pass_sse_impl<const CHANNELS: usize>(
         unsafe {
             for y in 0..height {
                 // preload edge pixels
-                let next =
-                    std::cmp::min(y + half_kernel, height - 1) as usize * src_stride as usize;
+                let next = (y + half_kernel).min(height - 1) as usize * src_stride as usize;
                 let previous =
-                    std::cmp::max(y as i64 - half_kernel as i64, 0) as usize * src_stride as usize;
+                    (y as i64 - half_kernel as i64).max(0) as usize * src_stride as usize;
                 let y_dst_shift = dst_stride as usize * y as usize;
 
                 // subtract previous

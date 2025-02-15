@@ -37,7 +37,7 @@ use crate::sse::{_mm_mul_round_ps, store_u8_u32};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, EdgeMode};
 
-pub(crate) fn fast_gaussian_horizontal_pass_sse_u8<T, const CN: usize>(
+pub(crate) fn fg_horizontal_pass_sse_u8<T, const CN: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -341,7 +341,7 @@ unsafe fn fg_horizontal_pass_sse_u8_impl<const CN: usize, const FMA: bool>(
     }
 }
 
-pub(crate) fn fast_gaussian_vertical_pass_sse_u8<T, const CN: usize>(
+pub(crate) fn fg_vertical_pass_sse_u8<T, const CN: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,

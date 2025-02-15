@@ -24,14 +24,54 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 stride as u32,
                 dimensions.0,
                 dimensions.1,
-                77,
+                77 / 2,
                 FastBlurChannels::Channels4,
                 ThreadingPolicy::Adaptive,
             );
         })
     });
 
-    c.bench_function("libblur: RGBA box blur Single Thread", |b| {
+    c.bench_function("libblur: RGBA box blur f32", |b| {
+        let mut dst_bytes: Vec<f32> = src_bytes.to_vec().iter().map(|v| *v as f32).collect();
+        let src_bytes = src_bytes
+            .to_vec()
+            .iter()
+            .map(|v| *v as f32)
+            .collect::<Vec<f32>>();
+        b.iter(|| {
+            libblur::box_blur_f32(
+                &src_bytes,
+                &mut dst_bytes,
+                dimensions.0,
+                dimensions.1,
+                77 / 2,
+                FastBlurChannels::Channels4,
+                ThreadingPolicy::Adaptive,
+            );
+        })
+    });
+
+    c.bench_function("libblur: RGBA box blur f32, Single", |b| {
+        let mut dst_bytes: Vec<f32> = src_bytes.to_vec().iter().map(|v| *v as f32).collect();
+        let src_bytes = src_bytes
+            .to_vec()
+            .iter()
+            .map(|v| *v as f32)
+            .collect::<Vec<f32>>();
+        b.iter(|| {
+            libblur::box_blur_f32(
+                &src_bytes,
+                &mut dst_bytes,
+                dimensions.0,
+                dimensions.1,
+                77 / 2,
+                FastBlurChannels::Channels4,
+                ThreadingPolicy::Single,
+            );
+        })
+    });
+
+    c.bench_function("libblur: RGBA box blur (15) Single Thread", |b| {
         let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
         b.iter(|| {
             libblur::box_blur(
@@ -49,7 +89,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     });
 
     #[cfg(any(target_os = "macos", target_os = "ios"))]
-    c.bench_function("Apple Accelerate: RGBA box blur Single Thread", |b| {
+    c.bench_function("Apple Accelerate: RGBA box blur (15) Single Thread", |b| {
         use accelerate::acc_convenience::box_convolve;
         let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
         b.iter(|| {
@@ -58,9 +98,45 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 stride,
                 &mut dst_bytes,
                 stride,
-                15,
+                31,
                 dimensions.0 as usize,
                 dimensions.1 as usize,
+                false,
+            );
+        })
+    });
+
+    c.bench_function("libblur: RGBA box blur (15) MultiThreaded", |b| {
+        let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
+        b.iter(|| {
+            libblur::box_blur(
+                src_bytes,
+                stride as u32,
+                &mut dst_bytes,
+                stride as u32,
+                dimensions.0,
+                dimensions.1,
+                15,
+                FastBlurChannels::Channels4,
+                ThreadingPolicy::Adaptive,
+            );
+        })
+    });
+
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    c.bench_function("Apple Accelerate: RGBA box blur (15) MultiThreaded", |b| {
+        use accelerate::acc_convenience::box_convolve;
+        let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
+        b.iter(|| {
+            box_convolve(
+                src_bytes,
+                stride,
+                &mut dst_bytes,
+                stride,
+                31,
+                dimensions.0 as usize,
+                dimensions.1 as usize,
+                true,
             );
         })
     });
@@ -103,7 +179,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 rgb_img.dimensions().0 * 3,
                 rgb_img.dimensions().0,
                 rgb_img.dimensions().1,
-                35,
+                77 / 2,
                 FastBlurChannels::Channels3,
                 ThreadingPolicy::Adaptive,
             );

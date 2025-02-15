@@ -16,6 +16,7 @@ image = "0.25.5"
 libblur = {path = "src/lib", features = ["image", "fft", "sse", "nightly_avx512", "avx"], default-features = false}
 accelerate = {path = "src/accelerate"}
 rayon = "1.10.0"
+fast_transpose = "0.2.3"
 
 [dev-dependencies]
 criterion = "0.5.1"
