@@ -212,10 +212,19 @@ pub fn filter_row_symm_neon_u8_f32<const N: usize>(
                 );
             }
 
-            dst.write(y * dst_stride + cx, k0.max(0f32).min(255f32) as u8);
-            dst.write(y * dst_stride + cx + 1, k1.max(0f32).min(255f32) as u8);
-            dst.write(y * dst_stride + cx + 2, k2.max(0f32).min(255f32) as u8);
-            dst.write(y * dst_stride + cx + 3, k3.max(0f32).min(255f32) as u8);
+            dst.write(y * dst_stride + cx, k0.round().max(0f32).min(255f32) as u8);
+            dst.write(
+                y * dst_stride + cx + 1,
+                k1.round().max(0f32).min(255f32) as u8,
+            );
+            dst.write(
+                y * dst_stride + cx + 2,
+                k2.round().max(0f32).min(255f32) as u8,
+            );
+            dst.write(
+                y * dst_stride + cx + 3,
+                k3.round().max(0f32).min(255f32) as u8,
+            );
 
             cx += 4;
         }
@@ -237,7 +246,7 @@ pub fn filter_row_symm_neon_u8_f32<const N: usize>(
                 );
             }
 
-            dst.write(y * dst_stride + x, k0.max(0f32).min(255f32) as u8);
+            dst.write(y * dst_stride + x, k0.round().max(0f32).min(255f32) as u8);
         }
     }
 }

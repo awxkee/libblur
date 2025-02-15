@@ -27,7 +27,7 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter1d::arena::Arena;
-use crate::filter1d::filter_row_cg_symmetric::filter_color_group_symmetrical_row;
+use crate::filter1d::filter_row_symmetric::filter_row_symmetrical;
 use crate::filter1d::filter_scan::ScanPoint1d;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::filter1d::neon::filter_row_neon_f32_f32;
@@ -60,7 +60,7 @@ impl Filter1DRowHandler<u8, f32> for u8 {
         is_symmetric_kernel: bool,
     ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
         if is_symmetric_kernel {
-            filter_color_group_symmetrical_row::<u8, f32, 1>
+            filter_row_symmetrical::<u8, f32, 1>
         } else {
             use crate::filter1d::filter_row::filter_row;
             filter_row::<u8, f32, 1>
@@ -102,7 +102,7 @@ impl Filter1DRowHandler<u8, f32> for u8 {
             return filter_row_sse_u8_f32::<1>;
         }
         if is_symmetric_kernel {
-            filter_color_group_symmetrical_row::<u8, f32, 1>
+            filter_row_symmetrical::<u8, f32, 1>
         } else {
             use crate::filter1d::filter_row::filter_row;
             filter_row::<u8, f32, 1>
@@ -119,7 +119,7 @@ impl Filter1DRowHandler<f32, f32> for f32 {
         is_symmetric_kernel: bool,
     ) -> fn(Arena, &[f32], &UnsafeSlice<f32>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
         if is_symmetric_kernel {
-            filter_color_group_symmetrical_row::<f32, f32, 1>
+            filter_row_symmetrical::<f32, f32, 1>
         } else {
             use crate::filter1d::filter_row::filter_row;
             filter_row::<f32, f32, 1>
@@ -146,7 +146,7 @@ impl Filter1DRowHandler<f32, f32> for f32 {
             return filter_row_sse_f32_f32::<1>;
         }
         if is_symmetric_kernel {
-            filter_color_group_symmetrical_row::<f32, f32, 1>
+            filter_row_symmetrical::<f32, f32, 1>
         } else {
             use crate::filter1d::filter_row::filter_row;
             filter_row::<f32, f32, 1>
@@ -168,7 +168,7 @@ macro_rules! default_1d_row_handler {
                 &[ScanPoint1d<$intermediate>],
             ) {
                 if is_symmetric_kernel {
-                    filter_color_group_symmetrical_row::<$store, $intermediate, 1>
+                    filter_row_symmetrical::<$store, $intermediate, 1>
                 } else {
                     use crate::filter1d::filter_row::filter_row;
                     filter_row::<$store, $intermediate, 1>

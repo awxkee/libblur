@@ -142,10 +142,10 @@ unsafe fn filter_row_sse_symm_u8_f32_impl<const FMA: bool, const N: usize>(
         let shifted_src = local_src.get_unchecked(cx..);
 
         let source = _mm_load_pack_x4(shifted_src.get_unchecked(half_len..).as_ptr());
-        let mut k0 = _mm_mul_epi8_by_ps_x4(source.0, coeff);
-        let mut k1 = _mm_mul_epi8_by_ps_x4(source.1, coeff);
-        let mut k2 = _mm_mul_epi8_by_ps_x4(source.2, coeff);
-        let mut k3 = _mm_mul_epi8_by_ps_x4(source.3, coeff);
+        let mut k0 = _mm_mul_epi8_by_ps_x4::<FMA>(source.0, coeff);
+        let mut k1 = _mm_mul_epi8_by_ps_x4::<FMA>(source.1, coeff);
+        let mut k2 = _mm_mul_epi8_by_ps_x4::<FMA>(source.2, coeff);
+        let mut k3 = _mm_mul_epi8_by_ps_x4::<FMA>(source.3, coeff);
 
         for i in 0..half_len {
             let rollback = length - i - 1;
@@ -178,8 +178,8 @@ unsafe fn filter_row_sse_symm_u8_f32_impl<const FMA: bool, const N: usize>(
         let shifted_src = local_src.get_unchecked(cx..);
 
         let source = _mm_load_pack_x2(shifted_src.get_unchecked(half_len..).as_ptr());
-        let mut k0 = _mm_mul_epi8_by_ps_x4(source.0, coeff);
-        let mut k1 = _mm_mul_epi8_by_ps_x4(source.1, coeff);
+        let mut k0 = _mm_mul_epi8_by_ps_x4::<FMA>(source.0, coeff);
+        let mut k1 = _mm_mul_epi8_by_ps_x4::<FMA>(source.1, coeff);
 
         for i in 0..half_len {
             let rollback = length - i - 1;
@@ -202,7 +202,7 @@ unsafe fn filter_row_sse_symm_u8_f32_impl<const FMA: bool, const N: usize>(
         let shifted_src = local_src.get_unchecked(cx..);
 
         let source = _mm_loadu_si128(shifted_src.get_unchecked(half_len..).as_ptr() as *const _);
-        let mut k0 = _mm_mul_epi8_by_ps_x4(source, coeff);
+        let mut k0 = _mm_mul_epi8_by_ps_x4::<FMA>(source, coeff);
 
         for i in 0..half_len {
             let rollback = length - i - 1;
@@ -284,10 +284,19 @@ unsafe fn filter_row_sse_symm_u8_f32_impl<const FMA: bool, const N: usize>(
             );
         }
 
-        dst.write(y * dst_stride + cx, k0.max(0f32).min(255f32) as u8);
-        dst.write(y * dst_stride + cx + 1, k1.max(0f32).min(255f32) as u8);
-        dst.write(y * dst_stride + cx + 2, k2.max(0f32).min(255f32) as u8);
-        dst.write(y * dst_stride + cx + 3, k3.max(0f32).min(255f32) as u8);
+        dst.write(y * dst_stride + cx, k0.round().max(0f32).min(255f32) as u8);
+        dst.write(
+            y * dst_stride + cx + 1,
+            k1.round().max(0f32).min(255f32) as u8,
+        );
+        dst.write(
+            y * dst_stride + cx + 2,
+            k2.round().max(0f32).min(255f32) as u8,
+        );
+        dst.write(
+            y * dst_stride + cx + 3,
+            k3.round().max(0f32).min(255f32) as u8,
+        );
 
         cx += 4;
     }
@@ -309,6 +318,6 @@ unsafe fn filter_row_sse_symm_u8_f32_impl<const FMA: bool, const N: usize>(
             );
         }
 
-        dst.write(y * dst_stride + x, k0.max(0f32).min(255f32) as u8);
+        dst.write(y * dst_stride + x, k0.round().max(0f32).min(255f32) as u8);
     }
 }

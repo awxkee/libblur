@@ -26,11 +26,8 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::filter1d::to_approx_storage::ToApproxStorage;
 use crate::mlaf::mlaf;
-use crate::to_storage::ToStorage;
-use crate::unsafe_slice::UnsafeSlice;
-use num_traits::{AsPrimitive, FromPrimitive, MulAdd};
+use num_traits::{FromPrimitive, MulAdd};
 use std::ops::{Add, AddAssign, Mul, Shr, Sub, SubAssign};
 
 #[repr(C)]
@@ -59,129 +56,6 @@ where
     #[inline]
     pub fn from_components(r: J, g: J, b: J, a: J) -> ColorGroup<COMPS, J> {
         ColorGroup { r, g, b, a }
-    }
-}
-
-macro_rules! ld_group {
-    ($store: expr, $channels: expr, $offset: expr) => {{
-        if $channels == 1 {
-            ColorGroup {
-                r: $store[$offset].as_(),
-                g: 0.as_(),
-                b: 0.as_(),
-                a: 0.as_(),
-            }
-        } else if $channels == 2 {
-            ColorGroup {
-                r: $store[$offset].as_(),
-                g: $store[$offset + 1].as_(),
-                b: 0.as_(),
-                a: 0.as_(),
-            }
-        } else if $channels == 3 {
-            ColorGroup {
-                r: $store[$offset].as_(),
-                g: $store[$offset + 1].as_(),
-                b: $store[$offset + 2].as_(),
-                a: 0.as_(),
-            }
-        } else if $channels == 4 {
-            ColorGroup {
-                r: $store[$offset].as_(),
-                g: $store[$offset + 1].as_(),
-                b: $store[$offset + 2].as_(),
-                a: $store[$offset + 3].as_(),
-            }
-        } else {
-            panic!("Not implemented.")
-        }
-    }};
-}
-
-pub(crate) use ld_group;
-
-impl<const COMPS: usize, J> ColorGroup<COMPS, J>
-where
-    J: Copy + Default + 'static,
-{
-    #[inline]
-    pub fn from_slice<T>(store: &[T], offset: usize) -> ColorGroup<COMPS, J>
-    where
-        T: AsPrimitive<J>,
-    {
-        unsafe {
-            if COMPS == 1 {
-                ColorGroup {
-                    r: (*store.get_unchecked(offset)).as_(),
-                    g: J::default(),
-                    b: J::default(),
-                    a: J::default(),
-                }
-            } else if COMPS == 2 {
-                ColorGroup {
-                    r: (*store.get_unchecked(offset)).as_(),
-                    g: (*store.get_unchecked(offset + 1)).as_(),
-                    b: J::default(),
-                    a: J::default(),
-                }
-            } else if COMPS == 3 {
-                ColorGroup {
-                    r: (*store.get_unchecked(offset)).as_(),
-                    g: (*store.get_unchecked(offset + 1)).as_(),
-                    b: (*store.get_unchecked(offset + 2)).as_(),
-                    a: J::default(),
-                }
-            } else if COMPS == 4 {
-                ColorGroup {
-                    r: (*store.get_unchecked(offset)).as_(),
-                    g: (*store.get_unchecked(offset + 1)).as_(),
-                    b: (*store.get_unchecked(offset + 2)).as_(),
-                    a: (*store.get_unchecked(offset + 3)).as_(),
-                }
-            } else {
-                panic!("Not implemented.")
-            }
-        }
-    }
-
-    #[inline]
-    pub fn to_approx_store<T>(self, store: &UnsafeSlice<T>, offset: usize)
-    where
-        J: ToApproxStorage<T>,
-        T: Copy + 'static,
-    {
-        unsafe {
-            store.write(offset, self.r.to_approx_());
-            if COMPS > 1 {
-                store.write(offset + 1, self.g.to_approx_());
-            }
-            if COMPS > 2 {
-                store.write(offset + 2, self.b.to_approx_());
-            }
-            if COMPS == 4 {
-                store.write(offset + 3, self.a.to_approx_());
-            }
-        }
-    }
-
-    #[inline]
-    pub fn to_store<T>(self, store: &UnsafeSlice<T>, offset: usize)
-    where
-        J: ToStorage<T>,
-        T: Copy + 'static,
-    {
-        unsafe {
-            store.write(offset, self.r.to_());
-            if COMPS > 1 {
-                store.write(offset + 1, self.g.to_());
-            }
-            if COMPS > 2 {
-                store.write(offset + 2, self.b.to_());
-            }
-            if COMPS == 4 {
-                store.write(offset + 3, self.a.to_());
-            }
-        }
     }
 }
 

@@ -131,10 +131,10 @@ unsafe fn convolve_segment_2d_u8_f32_impl<const FMA: bool>(
     while _cx + 64 < width {
         let k_weight = _mm_set1_ps(prepared_kernel.get_unchecked(0).weight);
         let items0 = _mm_load_pack_x4(offsets.get_unchecked(0).get_unchecked(_cx..).as_ptr());
-        let mut k0 = _mm_mul_epi8_by_ps_x4(items0.0, k_weight);
-        let mut k1 = _mm_mul_epi8_by_ps_x4(items0.1, k_weight);
-        let mut k2 = _mm_mul_epi8_by_ps_x4(items0.2, k_weight);
-        let mut k3 = _mm_mul_epi8_by_ps_x4(items0.3, k_weight);
+        let mut k0 = _mm_mul_epi8_by_ps_x4::<FMA>(items0.0, k_weight);
+        let mut k1 = _mm_mul_epi8_by_ps_x4::<FMA>(items0.1, k_weight);
+        let mut k2 = _mm_mul_epi8_by_ps_x4::<FMA>(items0.2, k_weight);
+        let mut k3 = _mm_mul_epi8_by_ps_x4::<FMA>(items0.3, k_weight);
         for i in 1..length {
             let weight = _mm_set1_ps(prepared_kernel.get_unchecked(i).weight);
             let s_ptr = offsets.get_unchecked(i);
@@ -161,8 +161,8 @@ unsafe fn convolve_segment_2d_u8_f32_impl<const FMA: bool>(
     while _cx + 32 < width {
         let k_weight = _mm_set1_ps(prepared_kernel.get_unchecked(0).weight);
         let items0 = _mm_load_pack_x2(offsets.get_unchecked(0).get_unchecked(_cx..).as_ptr());
-        let mut k0 = _mm_mul_epi8_by_ps_x4(items0.0, k_weight);
-        let mut k1 = _mm_mul_epi8_by_ps_x4(items0.1, k_weight);
+        let mut k0 = _mm_mul_epi8_by_ps_x4::<FMA>(items0.0, k_weight);
+        let mut k1 = _mm_mul_epi8_by_ps_x4::<FMA>(items0.1, k_weight);
         for i in 1..length {
             let weight = _mm_set1_ps(prepared_kernel.get_unchecked(i).weight);
             let s_ptr = offsets.get_unchecked(i);
@@ -181,7 +181,7 @@ unsafe fn convolve_segment_2d_u8_f32_impl<const FMA: bool>(
         let items0 = _mm_loadu_si128(
             offsets.get_unchecked(0).get_unchecked(_cx..).as_ptr() as *const __m128i
         );
-        let mut k0 = _mm_mul_epi8_by_ps_x4(items0, k_weight);
+        let mut k0 = _mm_mul_epi8_by_ps_x4::<FMA>(items0, k_weight);
         for i in 1..length {
             let weight = _mm_set1_ps(prepared_kernel.get_unchecked(i).weight);
             let items0 = _mm_loadu_si128(

@@ -29,8 +29,8 @@
 use crate::filter1d::arena::Arena;
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]
 use crate::filter1d::avx::filter_row_avx_symm_u8_i32_app;
-use crate::filter1d::filter_row_cg_approx::filter_color_group_row_approx;
-use crate::filter1d::filter_row_cg_approx_symmetric::filter_color_group_row_symmetric_approx;
+use crate::filter1d::filter_row_approx::filter_row_approx;
+use crate::filter1d::filter_row_symmetric_approx::filter_row_symmetric_approx;
 use crate::filter1d::filter_scan::ScanPoint1d;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::filter1d::neon::filter_row_symm_neon_u8_i32;
@@ -65,9 +65,9 @@ macro_rules! default_1d_row_handler {
                 &[ScanPoint1d<$intermediate>],
             ) {
                 if is_kernel_symmetric {
-                    filter_color_group_row_symmetric_approx::<$store, $intermediate, 4>
+                    filter_row_symmetric_approx::<$store, $intermediate, 4>
                 } else {
-                    filter_color_group_row_approx::<$store, $intermediate, 4>
+                    filter_row_approx::<$store, $intermediate, 4>
                 }
             }
         }
@@ -83,9 +83,9 @@ impl Filter1DRgbaRowHandlerApprox<u8, i32> for u8 {
         is_kernel_symmetric: bool,
     ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<i32>]) {
         if is_kernel_symmetric {
-            filter_color_group_row_symmetric_approx::<u8, i32, 4>
+            filter_row_symmetric_approx::<u8, i32, 4>
         } else {
-            filter_color_group_row_approx::<u8, i32, 4>
+            filter_row_approx::<u8, i32, 4>
         }
     }
 
@@ -130,9 +130,9 @@ impl Filter1DRgbaRowHandlerApprox<u8, i32> for u8 {
             return filter_row_sse_u8_i32::<4>;
         }
         if is_kernel_symmetric {
-            filter_color_group_row_symmetric_approx::<u8, i32, 4>
+            filter_row_symmetric_approx::<u8, i32, 4>
         } else {
-            filter_color_group_row_approx::<u8, i32, 4>
+            filter_row_approx::<u8, i32, 4>
         }
     }
 }
