@@ -115,8 +115,7 @@ pub fn filter_column_neon_f32_f32(
 
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
-                let v_source_0 =
-                    vld1q_f32(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
+                let v_source_0 = vld1q_f32(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 k0 = prefer_vfmaq_f32(k0, v_source_0, vdupq_n_f32(coeff.weight));
             }
 

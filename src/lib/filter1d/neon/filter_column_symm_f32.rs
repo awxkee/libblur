@@ -132,8 +132,7 @@ pub fn filter_column_neon_symm_f32_f32(
             for i in 0..half_len {
                 let rollback = length - i - 1;
                 let coeff = *scanned_kernel.get_unchecked(i);
-                let v_source_0 =
-                    vld1q_f32(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
+                let v_source_0 = vld1q_f32(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 let v_source_1 = vld1q_f32(
                     arena_src
                         .get_unchecked(rollback)

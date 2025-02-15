@@ -65,11 +65,11 @@ pub fn filter_color_group_row_symmetric_approx<T, I, const N: usize>(
 
     let y = filter_region.start;
 
-    let mut _cx = 0usize;
+    let mut cx = 0usize;
 
-    while _cx + 8 < width {
-        let v_cx = _cx * N;
-        let src = &src[_cx * N..(v_cx + length * N + N * 8)];
+    while cx + 8 < width {
+        let v_cx = cx * N;
+        let src = &src[cx * N..(v_cx + length * N + N * 8)];
         let coeff = scanned_kernel[half_len];
 
         let mut k0: ColorGroup<N, I> = ld_group!(src, N, half_len * N).mul(coeff.weight);
@@ -119,7 +119,7 @@ pub fn filter_color_group_row_symmetric_approx<T, I, const N: usize>(
                 .add(k7);
         }
 
-        let dst_offset = y * dst_stride + _cx * N;
+        let dst_offset = y * dst_stride + cx * N;
 
         k0.to_approx_store(dst, dst_offset);
         k1.to_approx_store(dst, dst_offset + N);
@@ -129,12 +129,12 @@ pub fn filter_color_group_row_symmetric_approx<T, I, const N: usize>(
         k5.to_approx_store(dst, dst_offset + N * 5);
         k6.to_approx_store(dst, dst_offset + N * 6);
         k7.to_approx_store(dst, dst_offset + N * 7);
-        _cx += 8;
+        cx += 8;
     }
 
-    while _cx + 4 < width {
-        let v_cx = _cx * N;
-        let src = &src[_cx * N..(v_cx + length * N + N * 4)];
+    while cx + 4 < width {
+        let v_cx = cx * N;
+        let src = &src[cx * N..(v_cx + length * N + N * 4)];
         let coeff = scanned_kernel[half_len];
 
         let mut k0: ColorGroup<N, I> = ld_group!(src, N, half_len * N).mul(coeff.weight);
@@ -164,16 +164,16 @@ pub fn filter_color_group_row_symmetric_approx<T, I, const N: usize>(
                 .add(k3);
         }
 
-        let dst_offset = y * dst_stride + _cx * N;
+        let dst_offset = y * dst_stride + cx * N;
 
         k0.to_approx_store(dst, dst_offset);
         k1.to_approx_store(dst, dst_offset + N);
         k2.to_approx_store(dst, dst_offset + N * 2);
         k3.to_approx_store(dst, dst_offset + N * 3);
-        _cx += 4;
+        cx += 4;
     }
 
-    for x in _cx..width {
+    for x in cx..width {
         let v_cx = x * N;
         let src = &src[v_cx..(v_cx + length * N)];
         let coeff = scanned_kernel[half_len];

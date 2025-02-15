@@ -36,7 +36,7 @@ use crate::unsafe_slice::UnsafeSlice;
 use num_traits::{AsPrimitive, MulAdd};
 use std::ops::{Add, Mul};
 
-pub fn filter_row<T, F>(
+pub(crate) fn filter_row<T, F, const N: usize>(
     _: Arena,
     arena_src: &[T],
     dst: &UnsafeSlice<T>,
@@ -59,12 +59,14 @@ pub fn filter_row<T, F>(
 
         let length = scanned_kernel.iter().len();
 
-        let mut _cx = 0usize;
+        let mut cx = 0usize;
 
-        for x in (_cx..width.saturating_sub(4)).step_by(4) {
+        let max_width = width * N;
+
+        while cx + 4 < max_width {
             let coeff = *scanned_kernel.get_unchecked(0);
 
-            let shifted_src = local_src.get_unchecked(x..);
+            let shifted_src = local_src.get_unchecked(cx..);
 
             let mut k0 = (*shifted_src.get_unchecked(0)).as_().mul(coeff.weight);
             let mut k1 = (*shifted_src.get_unchecked(1)).as_().mul(coeff.weight);
@@ -73,29 +75,41 @@ pub fn filter_row<T, F>(
 
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
-                k0 = mlaf(k0, (*shifted_src.get_unchecked(i)).as_(), coeff.weight);
-                k1 = mlaf(k1, (*shifted_src.get_unchecked(i + 1)).as_(), coeff.weight);
-                k2 = mlaf(k2, (*shifted_src.get_unchecked(i + 2)).as_(), coeff.weight);
-                k3 = mlaf(k3, (*shifted_src.get_unchecked(i + 3)).as_(), coeff.weight);
+                k0 = mlaf(k0, (*shifted_src.get_unchecked(i * N)).as_(), coeff.weight);
+                k1 = mlaf(
+                    k1,
+                    (*shifted_src.get_unchecked(i * N + 1)).as_(),
+                    coeff.weight,
+                );
+                k2 = mlaf(
+                    k2,
+                    (*shifted_src.get_unchecked(i * N + 2)).as_(),
+                    coeff.weight,
+                );
+                k3 = mlaf(
+                    k3,
+                    (*shifted_src.get_unchecked(i * N + 3)).as_(),
+                    coeff.weight,
+                );
             }
 
-            let dst_offset = y * dst_stride + x;
+            let dst_offset = y * dst_stride + cx;
 
             dst.write(dst_offset, k0.to_());
             dst.write(dst_offset + 1, k1.to_());
             dst.write(dst_offset + 2, k2.to_());
             dst.write(dst_offset + 3, k3.to_());
-            _cx = x;
+            cx += 4;
         }
 
-        for x in _cx..width {
+        for x in cx..width {
             let coeff = *scanned_kernel.get_unchecked(0);
             let shifted_src = local_src.get_unchecked(x..);
             let mut k0 = (*shifted_src.get_unchecked(0)).as_().mul(coeff.weight);
 
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
-                k0 = mlaf(k0, (*shifted_src.get_unchecked(i)).as_(), coeff.weight);
+                k0 = mlaf(k0, (*shifted_src.get_unchecked(i * N)).as_(), coeff.weight);
             }
             dst.write(y * dst_stride + x, k0.to_());
         }

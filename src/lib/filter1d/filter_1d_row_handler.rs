@@ -27,7 +27,6 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter1d::arena::Arena;
-use crate::filter1d::filter_row::filter_row;
 use crate::filter1d::filter_row_cg_symmetric::filter_color_group_symmetrical_row;
 use crate::filter1d::filter_scan::ScanPoint1d;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
@@ -63,7 +62,8 @@ impl Filter1DRowHandler<u8, f32> for u8 {
         if is_symmetric_kernel {
             filter_color_group_symmetrical_row::<u8, f32, 1>
         } else {
-            filter_row
+            use crate::filter1d::filter_row::filter_row;
+            filter_row::<u8, f32, 1>
         }
     }
 
@@ -104,7 +104,8 @@ impl Filter1DRowHandler<u8, f32> for u8 {
         if is_symmetric_kernel {
             filter_color_group_symmetrical_row::<u8, f32, 1>
         } else {
-            filter_row
+            use crate::filter1d::filter_row::filter_row;
+            filter_row::<u8, f32, 1>
         }
     }
 }
@@ -120,7 +121,8 @@ impl Filter1DRowHandler<f32, f32> for f32 {
         if is_symmetric_kernel {
             filter_color_group_symmetrical_row::<f32, f32, 1>
         } else {
-            filter_row
+            use crate::filter1d::filter_row::filter_row;
+            filter_row::<f32, f32, 1>
         }
     }
 
@@ -146,7 +148,8 @@ impl Filter1DRowHandler<f32, f32> for f32 {
         if is_symmetric_kernel {
             filter_color_group_symmetrical_row::<f32, f32, 1>
         } else {
-            filter_row
+            use crate::filter1d::filter_row::filter_row;
+            filter_row::<f32, f32, 1>
         }
     }
 }
@@ -167,7 +170,8 @@ macro_rules! default_1d_row_handler {
                 if is_symmetric_kernel {
                     filter_color_group_symmetrical_row::<$store, $intermediate, 1>
                 } else {
-                    filter_row
+                    use crate::filter1d::filter_row::filter_row;
+                    filter_row::<$store, $intermediate, 1>
                 }
             }
         }

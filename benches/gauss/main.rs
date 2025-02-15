@@ -102,7 +102,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             .unwrap();
         })
     });
-    
+
     c.bench_function("RGBA gauss blur edge clamp: rad 151", |b| {
         let mut dst_bytes: Vec<u8> = vec![0u8; dimensions.1 as usize * stride];
         b.iter(|| {

@@ -232,28 +232,28 @@ fn main() {
     //     EdgeMode::Clamp,
     // );
 
-    // libblur::gaussian_blur(
-    //     &bytes,
-    //     &mut dst_bytes,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     0,
-    //     15.,
-    //     FastBlurChannels::Channels3,
-    //     EdgeMode::Clamp,
-    //     ThreadingPolicy::Single,
-    //     GaussianPreciseLevel::INTEGRAL,
-    // );
-
-    sobel(
+    libblur::gaussian_blur(
         &bytes,
         &mut dst_bytes,
-        ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
-        EdgeMode::Clamp,
-        Scalar::new(255.0, 0.0, 0.0, 255.0),
+        dimensions.0,
+        dimensions.1,
+        0,
+        2.,
         FastBlurChannels::Channels3,
+        EdgeMode::Clamp,
         ThreadingPolicy::Single,
+        GaussianPreciseLevel::EXACT,
     );
+
+    // sobel(
+    //     &bytes,
+    //     &mut dst_bytes,
+    //     ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
+    //     EdgeMode::Clamp,
+    //     Scalar::new(255.0, 0.0, 0.0, 255.0),
+    //     FastBlurChannels::Channels3,
+    //     ThreadingPolicy::Single,
+    // );
 
     // let mut f16_bytes: Vec<f16> = dst_bytes
     //     .iter()

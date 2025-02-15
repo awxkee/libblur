@@ -27,7 +27,6 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter1d::arena::Arena;
-use crate::filter1d::filter_row_cg::filter_color_group_row;
 use crate::filter1d::filter_row_cg_symmetric::filter_color_group_symmetrical_row;
 use crate::filter1d::filter_scan::ScanPoint1d;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
@@ -68,7 +67,8 @@ macro_rules! default_1d_row_handler {
                 if is_symmetric_kernel {
                     filter_color_group_symmetrical_row::<$store, $intermediate, 3>
                 } else {
-                    filter_color_group_row::<$store, $intermediate, 3>
+                    use crate::filter1d::filter_row::filter_row;
+                    filter_row::<$store, $intermediate, 3>
                 }
             }
         }
@@ -86,7 +86,8 @@ impl Filter1DRgbRowHandler<u8, f32> for u8 {
         if is_symmetric_kernel {
             filter_color_group_symmetrical_row::<u8, f32, 3>
         } else {
-            filter_color_group_row::<u8, f32, 3>
+            use crate::filter1d::filter_row::filter_row;
+            filter_row::<u8, f32, 3>
         }
     }
 
@@ -127,7 +128,8 @@ impl Filter1DRgbRowHandler<u8, f32> for u8 {
         if is_symmetric_kernel {
             filter_color_group_symmetrical_row::<u8, f32, 3>
         } else {
-            filter_color_group_row::<u8, f32, 3>
+            use crate::filter1d::filter_row::filter_row;
+            filter_row::<u8, f32, 3>
         }
     }
 }
@@ -143,7 +145,8 @@ impl Filter1DRgbRowHandler<f32, f32> for f32 {
         if is_symmetric_kernel {
             filter_color_group_symmetrical_row::<f32, f32, 3>
         } else {
-            filter_color_group_row::<f32, f32, 3>
+            use crate::filter1d::filter_row::filter_row;
+            filter_row::<f32, f32, 3>
         }
     }
 
@@ -176,7 +179,8 @@ impl Filter1DRgbRowHandler<f32, f32> for f32 {
         if is_symmetric_kernel {
             filter_color_group_symmetrical_row::<f32, f32, 3>
         } else {
-            filter_color_group_row::<f32, f32, 3>
+            use crate::filter1d::filter_row::filter_row;
+            filter_row::<f32, f32, 3>
         }
     }
 }
@@ -192,7 +196,8 @@ impl Filter1DRgbRowHandler<u8, i16> for u8 {
         if is_symmetric_kernel {
             filter_color_group_symmetrical_row::<u8, i16, 3>
         } else {
-            filter_color_group_row::<u8, i16, 3>
+            use crate::filter1d::filter_row::filter_row;
+            filter_row::<u8, i16, 3>
         }
     }
 
@@ -220,7 +225,8 @@ impl Filter1DRgbRowHandler<u8, i16> for u8 {
         if is_symmetric_kernel {
             filter_color_group_symmetrical_row::<u8, i16, 3>
         } else {
-            filter_color_group_row::<u8, i16, 3>
+            use crate::filter1d::filter_row::filter_row;
+            filter_row::<u8, i16, 3>
         }
     }
 }

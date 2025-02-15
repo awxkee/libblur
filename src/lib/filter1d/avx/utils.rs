@@ -26,7 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::avx::{_mm256_pack_u16, _mm256_packus_four_epi32};
+use crate::avx::_mm256_packus_four_epi32;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -37,13 +37,13 @@ pub(crate) unsafe fn _mm256_mul_epi8_by_ps_x4(
     input: __m256i,
     weight: __m256,
 ) -> (__m256, __m256, __m256, __m256) {
-    let lo_16 = _mm256_cvtepu8_epi16(_mm256_castsi256_si128(input));
-    let hi_16 = _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(input));
+    let lo_16 = _mm256_unpacklo_epi8(input, _mm256_setzero_si256());
+    let hi_16 = _mm256_unpackhi_epi8(input, _mm256_setzero_si256());
 
-    let j0 = _mm256_cvtepi16_epi32(_mm256_castsi256_si128(lo_16));
-    let j1 = _mm256_cvtepi16_epi32(_mm256_extracti128_si256::<1>(lo_16));
-    let j2 = _mm256_cvtepi16_epi32(_mm256_castsi256_si128(hi_16));
-    let j3 = _mm256_cvtepi16_epi32(_mm256_extracti128_si256::<1>(hi_16));
+    let j0 = _mm256_unpacklo_epi16(lo_16, _mm256_setzero_si256());
+    let j1 = _mm256_unpackhi_epi16(lo_16, _mm256_setzero_si256());
+    let j2 = _mm256_unpacklo_epi16(hi_16, _mm256_setzero_si256());
+    let j3 = _mm256_unpackhi_epi16(hi_16, _mm256_setzero_si256());
 
     let o0 = _mm256_cvtepi32_ps(j0);
     let o1 = _mm256_cvtepi32_ps(j1);
@@ -63,8 +63,8 @@ pub(crate) unsafe fn _mm256_mul_epi8_by_epi16_x4(
     input: __m256i,
     weight: __m256i,
 ) -> (__m256i, __m256i) {
-    let j0 = _mm256_cvtepu8_epi16(_mm256_castsi256_si128(input));
-    let j1 = _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(input));
+    let j0 = _mm256_unpacklo_epi8(input, _mm256_setzero_si256());
+    let j1 = _mm256_unpackhi_epi8(input, _mm256_setzero_si256());
 
     let lo_16 = _mm256_slli_epi16::<6>(j0);
     let hi_16 = _mm256_slli_epi16::<6>(j1);
@@ -81,8 +81,8 @@ pub(crate) unsafe fn _mm256_mul_add_epi8_by_epi16_x4(
     input: __m256i,
     weight: __m256i,
 ) -> (__m256i, __m256i) {
-    let j0 = _mm256_cvtepu8_epi16(_mm256_castsi256_si128(input));
-    let j1 = _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(input));
+    let j0 = _mm256_unpacklo_epi8(input, _mm256_setzero_si256());
+    let j1 = _mm256_unpackhi_epi8(input, _mm256_setzero_si256());
     let lo_16 = _mm256_slli_epi16::<6>(j0);
     let hi_16 = _mm256_slli_epi16::<6>(j1);
 
@@ -101,10 +101,10 @@ pub(crate) unsafe fn _mm256_mul_add_symm_epi8_by_epi16_x4(
     input1: __m256i,
     weight: __m256i,
 ) -> (__m256i, __m256i) {
-    let a0 = _mm256_cvtepu8_epi16(_mm256_castsi256_si128(input0));
-    let a1 = _mm256_cvtepu8_epi16(_mm256_castsi256_si128(input1));
-    let a2 = _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(input0));
-    let a3 = _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(input1));
+    let a0 = _mm256_unpacklo_epi8(input0, _mm256_setzero_si256());
+    let a1 = _mm256_unpacklo_epi8(input1, _mm256_setzero_si256());
+    let a2 = _mm256_unpackhi_epi8(input0, _mm256_setzero_si256());
+    let a3 = _mm256_unpackhi_epi8(input1, _mm256_setzero_si256());
 
     let lo_16 = _mm256_slli_epi16::<6>(_mm256_add_epi16(a0, a1));
     let hi_16 = _mm256_slli_epi16::<6>(_mm256_add_epi16(a2, a3));
@@ -137,13 +137,13 @@ pub(crate) unsafe fn _mm256_mul_add_epi8_by_ps_x4<const FMA: bool>(
     input: __m256i,
     weight: __m256,
 ) -> (__m256, __m256, __m256, __m256) {
-    let lo_16 = _mm256_cvtepu8_epi16(_mm256_castsi256_si128(input));
-    let hi_16 = _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(input));
+    let lo_16 = _mm256_unpacklo_epi8(input, _mm256_setzero_si256());
+    let hi_16 = _mm256_unpackhi_epi8(input, _mm256_setzero_si256());
 
-    let j0 = _mm256_cvtepi16_epi32(_mm256_castsi256_si128(lo_16));
-    let j1 = _mm256_cvtepi16_epi32(_mm256_extracti128_si256::<1>(lo_16));
-    let j2 = _mm256_cvtepi16_epi32(_mm256_castsi256_si128(hi_16));
-    let j3 = _mm256_cvtepi16_epi32(_mm256_extracti128_si256::<1>(hi_16));
+    let j0 = _mm256_unpacklo_epi16(lo_16, _mm256_setzero_si256());
+    let j1 = _mm256_unpackhi_epi16(lo_16, _mm256_setzero_si256());
+    let j2 = _mm256_unpacklo_epi16(hi_16, _mm256_setzero_si256());
+    let j3 = _mm256_unpackhi_epi16(hi_16, _mm256_setzero_si256());
 
     let a0 = _mm256_cvtepi32_ps(j0);
     let a1 = _mm256_cvtepi32_ps(j1);
@@ -165,17 +165,18 @@ pub(crate) unsafe fn _mm256_mul_add_symm_epi8_by_ps_x4<const FMA: bool>(
     input1: __m256i,
     weight: __m256,
 ) -> (__m256, __m256, __m256, __m256) {
-    let j0 = _mm256_cvtepu8_epi16(_mm256_castsi256_si128(input0));
-    let j1 = _mm256_cvtepu8_epi16(_mm256_castsi256_si128(input1));
-    let j2 = _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(input0));
-    let j3 = _mm256_cvtepu8_epi16(_mm256_extracti128_si256::<1>(input1));
+    let j0 = _mm256_unpacklo_epi8(input0, _mm256_setzero_si256());
+    let j1 = _mm256_unpacklo_epi8(input1, _mm256_setzero_si256());
+    let j2 = _mm256_unpackhi_epi8(input0, _mm256_setzero_si256());
+    let j3 = _mm256_unpackhi_epi8(input1, _mm256_setzero_si256());
+
     let lo_16 = _mm256_add_epi16(j0, j1);
     let hi_16 = _mm256_add_epi16(j2, j3);
 
-    let a0 = _mm256_cvtepi16_epi32(_mm256_castsi256_si128(lo_16));
-    let a1 = _mm256_cvtepi16_epi32(_mm256_extracti128_si256::<1>(lo_16));
-    let a2 = _mm256_cvtepi16_epi32(_mm256_castsi256_si128(hi_16));
-    let a3 = _mm256_cvtepi16_epi32(_mm256_extracti128_si256::<1>(hi_16));
+    let a0 = _mm256_unpacklo_epi16(lo_16, _mm256_setzero_si256());
+    let a1 = _mm256_unpackhi_epi16(lo_16, _mm256_setzero_si256());
+    let a2 = _mm256_unpacklo_epi16(hi_16, _mm256_setzero_si256());
+    let a3 = _mm256_unpackhi_epi16(hi_16, _mm256_setzero_si256());
 
     let v0 = _mm256_cvtepi32_ps(a0);
     let v1 = _mm256_cvtepi32_ps(a1);
@@ -209,7 +210,7 @@ pub(crate) unsafe fn _mm256_pack_ps_x4_epi8(store: (__m256, __m256, __m256, __m2
 #[inline(always)]
 pub(crate) unsafe fn _mm256_pack_epi32_x4_epi8(store: (__m256i, __m256i)) -> __m256i {
     let rounding_const = _mm256_set1_epi16(1 << 5);
-    _mm256_pack_u16(
+    _mm256_packus_epi16(
         _mm256_srai_epi16::<6>(_mm256_add_epi16(store.0, rounding_const)),
         _mm256_srai_epi16::<6>(_mm256_add_epi16(store.1, rounding_const)),
     )

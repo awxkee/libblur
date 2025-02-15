@@ -65,12 +65,12 @@ pub fn filter_color_group_row_approx<T, I, const N: usize>(
 
         let length = scanned_kernel.len();
 
-        let mut _cx = 0usize;
+        let mut cx = 0usize;
 
-        while _cx + 4 < width {
+        while cx + 4 < width {
             let coeff = *scanned_kernel.get_unchecked(0);
 
-            let shifted_src = local_src.get_unchecked((_cx * N)..);
+            let shifted_src = local_src.get_unchecked((cx * N)..);
 
             let mut k0 = ColorGroup::<N, I>::from_slice(shifted_src, 0).mul(coeff.weight);
             let mut k1 = ColorGroup::<N, I>::from_slice(shifted_src, N).mul(coeff.weight);
@@ -93,16 +93,16 @@ pub fn filter_color_group_row_approx<T, I, const N: usize>(
                     .add(k3);
             }
 
-            let dst_offset = y * dst_stride + _cx * N;
+            let dst_offset = y * dst_stride + cx * N;
 
             k0.to_approx_store(dst, dst_offset);
             k1.to_approx_store(dst, dst_offset + N);
             k2.to_approx_store(dst, dst_offset + N * 2);
             k3.to_approx_store(dst, dst_offset + N * 3);
-            _cx += 4;
+            cx += 4;
         }
 
-        for x in _cx..width {
+        for x in cx..width {
             let coeff = *scanned_kernel.get_unchecked(0);
             let shifted_src = local_src.get_unchecked((x * N)..);
             let mut k0 = ColorGroup::<N, I>::from_slice(shifted_src, 0).mul(coeff.weight);
