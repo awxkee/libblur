@@ -241,7 +241,7 @@ fn main() {
         FastBlurChannels::Channels4,
         EdgeMode::Clamp,
         ThreadingPolicy::Single,
-        GaussianPreciseLevel::EXACT,
+        GaussianPreciseLevel::INTEGRAL,
     );
 
     // let mut f16_bytes: Vec<f16> = dst_bytes

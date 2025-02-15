@@ -38,7 +38,6 @@ use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::neon::{
     filter_rgb_row_neon_f32_f32, filter_rgb_row_neon_u8_f32, filter_rgb_row_neon_u8_i16,
     filter_rgb_row_symm_neon_f32_f32, filter_rgb_row_symm_neon_u8_i16,
-    filter_rgb_symm_row_neon_u8_f32,
 };
 use crate::filter1d::region::FilterRegion;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
@@ -106,7 +105,8 @@ impl Filter1DRgbRowHandler<u8, f32> for u8 {
         is_symmetric_kernel: bool,
     ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
         if is_symmetric_kernel {
-            filter_rgb_symm_row_neon_u8_f32
+            use crate::filter1d::neon::filter_row_symm_neon_u8_f32;
+            filter_row_symm_neon_u8_f32::<3>
         } else {
             filter_rgb_row_neon_u8_f32
         }
