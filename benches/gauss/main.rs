@@ -34,6 +34,8 @@ pub(crate) fn split_channels_3<T: Copy>(
 }
 
 pub fn criterion_benchmark(c: &mut Criterion) {
+    let mut c = c.benchmark_group("Gauss");
+    c.sample_size(10);
     let img = ImageReader::open("assets/test_image_4.png")
         .unwrap()
         .decode()
@@ -100,24 +102,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             .unwrap();
         })
     });
-
-
-    c.bench_function("OpenCV RGBA Gaussian: 13 (Algo Approx)", |b| {
-        b.iter(|| {
-            let mut dst = Mat::default();
-            opencv::imgproc::gaussian_blur(
-                &src,
-                &mut dst,
-                Size::new(13, 13),
-                0.,
-                0.,
-                BORDER_DEFAULT,
-                AlgorithmHint::ALGO_HINT_APPROX,
-            )
-                .unwrap();
-        })
-    });
-
+    
     c.bench_function("RGBA gauss blur edge clamp: rad 151", |b| {
         let mut dst_bytes: Vec<u8> = vec![0u8; dimensions.1 as usize * stride];
         b.iter(|| {

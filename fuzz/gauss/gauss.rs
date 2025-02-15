@@ -29,11 +29,21 @@
 
 #![no_main]
 
-use libblur::{EdgeMode, FastBlurChannels, GaussianPreciseLevel, ThreadingPolicy};
+use libblur::{
+    filter_1d_approx, filter_1d_exact, filter_1d_rgb_approx, filter_1d_rgb_exact,
+    filter_1d_rgba_approx, filter_1d_rgba_exact, get_gaussian_kernel_1d, get_sigma_size, EdgeMode,
+    FastBlurChannels, GaussianPreciseLevel, ImageSize, Scalar, ThreadingPolicy,
+};
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: (u8, u8, u8)| {
     fuzz_8bit(
+        data.0 as usize,
+        data.1 as usize,
+        data.2 as usize,
+        FastBlurChannels::Channels4,
+    );
+    fuzz_8bit_non_symmetry(
         data.0 as usize,
         data.1 as usize,
         data.2 as usize,
@@ -45,7 +55,19 @@ fuzz_target!(|data: (u8, u8, u8)| {
         data.2 as usize,
         FastBlurChannels::Channels3,
     );
+    fuzz_8bit_non_symmetry(
+        data.0 as usize,
+        data.1 as usize,
+        data.2 as usize,
+        FastBlurChannels::Channels3,
+    );
     fuzz_8bit(
+        data.0 as usize,
+        data.1 as usize,
+        data.2 as usize,
+        FastBlurChannels::Plane,
+    );
+    fuzz_8bit_non_symmetry(
         data.0 as usize,
         data.1 as usize,
         data.2 as usize,
@@ -85,4 +107,91 @@ fn fuzz_8bit(width: usize, height: usize, radius: usize, channels: FastBlurChann
         ThreadingPolicy::Single,
         GaussianPreciseLevel::EXACT,
     );
+}
+
+fn fuzz_8bit_non_symmetry(width: usize, height: usize, radius: usize, channels: FastBlurChannels) {
+    if width == 0 || height == 0 || radius == 0 {
+        return;
+    }
+    let src_image = vec![15u8; width * height * channels.get_channels()];
+    let mut dst_image = vec![0u8; width * height * channels.get_channels()];
+
+    let kernel_size = radius * 2 + 1;
+
+    let kernel = get_gaussian_kernel_1d(kernel_size as u32, get_sigma_size(kernel_size));
+
+    match channels {
+        FastBlurChannels::Plane => {
+            filter_1d_exact(
+                &src_image,
+                &mut dst_image,
+                ImageSize::new(width, height),
+                &kernel,
+                &kernel,
+                EdgeMode::Clamp,
+                Scalar::default(),
+                ThreadingPolicy::Single,
+            )
+            .unwrap();
+            filter_1d_approx::<u8, f32, i32>(
+                &src_image,
+                &mut dst_image,
+                ImageSize::new(width, height),
+                &kernel,
+                &kernel,
+                EdgeMode::Clamp,
+                Scalar::default(),
+                ThreadingPolicy::Single,
+            )
+            .unwrap();
+        }
+        FastBlurChannels::Channels3 => {
+            filter_1d_rgb_exact(
+                &src_image,
+                &mut dst_image,
+                ImageSize::new(width, height),
+                &kernel,
+                &kernel,
+                EdgeMode::Clamp,
+                Scalar::default(),
+                ThreadingPolicy::Single,
+            )
+            .unwrap();
+            filter_1d_rgb_approx::<u8, f32, i32>(
+                &src_image,
+                &mut dst_image,
+                ImageSize::new(width, height),
+                &kernel,
+                &kernel,
+                EdgeMode::Clamp,
+                Scalar::default(),
+                ThreadingPolicy::Single,
+            )
+            .unwrap();
+        }
+        FastBlurChannels::Channels4 => {
+            filter_1d_rgba_exact(
+                &src_image,
+                &mut dst_image,
+                ImageSize::new(width, height),
+                &kernel,
+                &kernel,
+                EdgeMode::Clamp,
+                Scalar::default(),
+                ThreadingPolicy::Single,
+            )
+            .unwrap();
+            filter_1d_rgba_approx::<u8, f32, i32>(
+                &src_image,
+                &mut dst_image,
+                ImageSize::new(width, height),
+                &kernel,
+                &kernel,
+                EdgeMode::Clamp,
+                Scalar::default(),
+                ThreadingPolicy::Single,
+            )
+            .unwrap();
+        }
+    }
 }
