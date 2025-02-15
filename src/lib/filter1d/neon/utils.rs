@@ -152,15 +152,14 @@ pub(crate) unsafe fn vmulq_u8_by_f32(
     weight: float32x4_t,
 ) -> (float32x4_t, float32x4_t, float32x4_t, float32x4_t) {
     let lo_16 = vmovl_u8(vget_low_u8(input));
+    let hi_16 = vmovl_high_u8(input);
     let o0 = vmovl_u16(vget_low_u16(lo_16));
     let o1 = vmovl_high_u16(lo_16);
-    let lo_lo = vcvtq_f32_u32(o0);
-    let lo_hi = vcvtq_f32_u32(o1);
-    let hi_16 = vmovl_high_u8(input);
-
     let o2 = vmovl_u16(vget_low_u16(hi_16));
     let o3 = vmovl_high_u16(hi_16);
 
+    let lo_lo = vcvtq_f32_u32(o0);
+    let lo_hi = vcvtq_f32_u32(o1);
     let hi_lo = vcvtq_f32_u32(o2);
     let hi_hi = vcvtq_f32_u32(o3);
 
@@ -222,8 +221,8 @@ pub(crate) unsafe fn vfmlaq_symm_u8_f32(
     input1: uint8x16_t,
     weight: float32x4_t,
 ) -> (float32x4_t, float32x4_t, float32x4_t, float32x4_t) {
-    let lo_16 = vaddq_u16(vmovl_u8(vget_low_u8(input0)), vmovl_u8(vget_low_u8(input1)));
-    let hi_16 = vaddq_u16(vmovl_high_u8(input0), vmovl_high_u8(input1));
+    let lo_16 = vaddl_u8(vget_low_u8(input0), vget_low_u8(input1));
+    let hi_16 = vaddl_high_u8(input0, input1);
 
     let o0 = vmovl_u16(vget_low_u16(lo_16));
     let o1 = vmovl_high_u16(lo_16);
@@ -256,15 +255,6 @@ pub(crate) unsafe fn vdotq_exact_s16(
         vmlaq_s16(store.0, o0, weight),
         vmlaq_s16(store.1, o1, weight),
     )
-}
-
-#[inline(always)]
-pub(crate) unsafe fn vdot_exact_s16(
-    store: int16x8_t,
-    input: uint8x8_t,
-    weight: int16x8_t,
-) -> int16x8_t {
-    vmlaq_s16(store, vreinterpretq_s16_u16(vmovl_u8(input)), weight)
 }
 
 #[inline(always)]
@@ -370,7 +360,7 @@ pub(crate) unsafe fn vfmla_symm_u8_f32(
     input1: uint8x8_t,
     weight: float32x4_t,
 ) -> (float32x4_t, float32x4_t) {
-    let lo_16 = vaddq_u16(vmovl_u8(input0), vmovl_u8(input1));
+    let lo_16 = vaddl_u8(input0, input1);
 
     let a0 = vmovl_u16(vget_low_u16(lo_16));
     let a1 = vmovl_high_u16(lo_16);

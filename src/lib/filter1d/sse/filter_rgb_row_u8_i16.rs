@@ -134,6 +134,29 @@ unsafe fn filter_rgb_row_sse_u8_i16_impl<const N: usize>(
         cx += 16;
     }
 
+    while cx + 4 < width {
+        let coeff = *scanned_kernel.get_unchecked(0);
+        let shifted_src = local_src.get_unchecked(cx..);
+        let mut k0 = *shifted_src.get_unchecked(0) as i16 * coeff.weight;
+        let mut k1 = *shifted_src.get_unchecked(1) as i16 * coeff.weight;
+        let mut k2 = *shifted_src.get_unchecked(2) as i16 * coeff.weight;
+        let mut k3 = *shifted_src.get_unchecked(3) as i16 * coeff.weight;
+
+        for i in 1..length {
+            let coeff = *scanned_kernel.get_unchecked(i);
+            k0 += *shifted_src.get_unchecked(i * N) as i16 * coeff.weight;
+            k1 += *shifted_src.get_unchecked(i * N + 1) as i16 * coeff.weight;
+            k2 += *shifted_src.get_unchecked(i * N + 2) as i16 * coeff.weight;
+            k3 += *shifted_src.get_unchecked(i * N + 3) as i16 * coeff.weight;
+        }
+
+        dst.write(y * dst_stride + cx, k0.max(0).min(255) as u8);
+        dst.write(y * dst_stride + cx + 1, k1.max(0).min(255) as u8);
+        dst.write(y * dst_stride + cx + 2, k2.max(0).min(255) as u8);
+        dst.write(y * dst_stride + cx + 3, k3.max(0).min(255) as u8);
+        cx += 4;
+    }
+
     for x in cx..max_width {
         let coeff = *scanned_kernel.get_unchecked(0);
         let shifted_src = local_src.get_unchecked(x..);

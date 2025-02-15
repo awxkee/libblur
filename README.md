@@ -2,7 +2,7 @@
 
 There are some very good and blazing fast algorithms that do blurring images.
 Also providing convenient api for doing convolution and some edge detection filters.\
-Best optimized for NEON and SSE, partially AVX, partially done WASM.
+Best optimized for NEON, SSE and AVX, partially done WASM.
 
 You may receive gaussian blur in 100 FPS for 4K photo.
 
@@ -71,7 +71,7 @@ Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded
 
 |                   | time(NEON) | Time(AVX) |
 |-------------------|:----------:|:---------:|
-| libblur(Exact)    |  72.95ms   |  54.36ms  |
+| libblur(Exact)    |  70.45ms   |  54.36ms  |
 | libblur(Integral) |  40.13ms   |  38.91ms  |
 | OpenCV            |  177.46ms  | 185.30ms  |
 

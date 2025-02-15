@@ -56,14 +56,14 @@ pub fn filter_symm_column_neon_u8_f32(
         let length = scanned_kernel.len();
         let half_len = length / 2;
 
-        let mut _cx = 0usize;
+        let mut cx = 0usize;
 
         let y = filter_region.start;
 
-        while _cx + 64 < image_width {
+        while cx + 64 < image_width {
             let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(half_len).weight);
 
-            let shifted_src = brows.get_unchecked(half_len).get_unchecked(_cx..);
+            let shifted_src = brows.get_unchecked(half_len).get_unchecked(cx..);
 
             let source = xvld1q_u8_x4(shifted_src.as_ptr());
             let mut k0 = vmulq_u8_by_f32(source.0, coeff);
@@ -74,16 +74,16 @@ pub fn filter_symm_column_neon_u8_f32(
             for i in 0..half_len {
                 let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(i).weight);
                 let rollback = length - i - 1;
-                let v_source0 = xvld1q_u8_x4(brows.get_unchecked(i).get_unchecked(_cx..).as_ptr());
+                let v_source0 = xvld1q_u8_x4(brows.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 let v_source1 =
-                    xvld1q_u8_x4(brows.get_unchecked(rollback).get_unchecked(_cx..).as_ptr());
+                    xvld1q_u8_x4(brows.get_unchecked(rollback).get_unchecked(cx..).as_ptr());
                 k0 = vfmlaq_symm_u8_f32(k0, v_source0.0, v_source1.0, coeff);
                 k1 = vfmlaq_symm_u8_f32(k1, v_source0.1, v_source1.1, coeff);
                 k2 = vfmlaq_symm_u8_f32(k2, v_source0.2, v_source1.2, coeff);
                 k3 = vfmlaq_symm_u8_f32(k3, v_source0.3, v_source1.3, coeff);
             }
 
-            let dst_offset = y * dst_stride + _cx;
+            let dst_offset = y * dst_stride + cx;
             let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
             xvst1q_u8_x4(
                 dst_ptr0,
@@ -94,13 +94,13 @@ pub fn filter_symm_column_neon_u8_f32(
                     vqmovnq_f32_u8(k3),
                 ),
             );
-            _cx += 64;
+            cx += 64;
         }
 
-        while _cx + 48 < image_width {
+        while cx + 48 < image_width {
             let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(half_len).weight);
 
-            let shifted_src = brows.get_unchecked(half_len).get_unchecked(_cx..);
+            let shifted_src = brows.get_unchecked(half_len).get_unchecked(cx..);
 
             let source = xvld1q_u8_x3(shifted_src.as_ptr());
             let mut k0 = vmulq_u8_by_f32(source.0, coeff);
@@ -110,27 +110,27 @@ pub fn filter_symm_column_neon_u8_f32(
             for i in 0..half_len {
                 let rollback = length - i - 1;
                 let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(i).weight);
-                let v_source0 = xvld1q_u8_x3(brows.get_unchecked(i).get_unchecked(_cx..).as_ptr());
+                let v_source0 = xvld1q_u8_x3(brows.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 let v_source1 =
-                    xvld1q_u8_x3(brows.get_unchecked(rollback).get_unchecked(_cx..).as_ptr());
+                    xvld1q_u8_x3(brows.get_unchecked(rollback).get_unchecked(cx..).as_ptr());
                 k0 = vfmlaq_symm_u8_f32(k0, v_source0.0, v_source1.0, coeff);
                 k1 = vfmlaq_symm_u8_f32(k1, v_source0.1, v_source1.1, coeff);
                 k2 = vfmlaq_symm_u8_f32(k2, v_source0.2, v_source1.2, coeff);
             }
 
-            let dst_offset = y * dst_stride + _cx;
+            let dst_offset = y * dst_stride + cx;
             let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
             xvst1q_u8_x3(
                 dst_ptr0,
                 uint8x16x3_t(vqmovnq_f32_u8(k0), vqmovnq_f32_u8(k1), vqmovnq_f32_u8(k2)),
             );
-            _cx += 48;
+            cx += 48;
         }
 
-        while _cx + 32 < image_width {
+        while cx + 32 < image_width {
             let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(half_len).weight);
 
-            let shifted_src = brows.get_unchecked(half_len).get_unchecked(_cx..);
+            let shifted_src = brows.get_unchecked(half_len).get_unchecked(cx..);
 
             let source = xvld1q_u8_x2(shifted_src.as_ptr());
             let mut k0 = vmulq_u8_by_f32(source.0, coeff);
@@ -139,27 +139,27 @@ pub fn filter_symm_column_neon_u8_f32(
             for i in 0..half_len {
                 let rollback = length - i - 1;
                 let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(i).weight);
-                let v_source0 = xvld1q_u8_x2(brows.get_unchecked(i).get_unchecked(_cx..).as_ptr());
+                let v_source0 = xvld1q_u8_x2(brows.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 let v_source1 =
-                    xvld1q_u8_x2(brows.get_unchecked(rollback).get_unchecked(_cx..).as_ptr());
+                    xvld1q_u8_x2(brows.get_unchecked(rollback).get_unchecked(cx..).as_ptr());
                 k0 = vfmlaq_symm_u8_f32(k0, v_source0.0, v_source1.0, coeff);
                 k1 = vfmlaq_symm_u8_f32(k1, v_source0.1, v_source1.1, coeff);
             }
 
-            let dst_offset = y * dst_stride + _cx;
+            let dst_offset = y * dst_stride + cx;
             let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
             xvst1q_u8_x2(
                 dst_ptr0,
                 uint8x16x2_t(vqmovnq_f32_u8(k0), vqmovnq_f32_u8(k1)),
             );
 
-            _cx += 32;
+            cx += 32;
         }
 
-        while _cx + 16 < image_width {
+        while cx + 16 < image_width {
             let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(half_len).weight);
 
-            let shifted_src = brows.get_unchecked(half_len).get_unchecked(_cx..);
+            let shifted_src = brows.get_unchecked(half_len).get_unchecked(cx..);
 
             let source = vld1q_u8(shifted_src.as_ptr());
             let mut k0 = vmulq_u8_by_f32(source, coeff);
@@ -167,66 +167,66 @@ pub fn filter_symm_column_neon_u8_f32(
             for i in 0..half_len {
                 let rollback = length - i - 1;
                 let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(i).weight);
-                let v_source0 = vld1q_u8(brows.get_unchecked(i).get_unchecked(_cx..).as_ptr());
+                let v_source0 = vld1q_u8(brows.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 let v_source1 =
-                    vld1q_u8(brows.get_unchecked(rollback).get_unchecked(_cx..).as_ptr());
+                    vld1q_u8(brows.get_unchecked(rollback).get_unchecked(cx..).as_ptr());
                 k0 = vfmlaq_symm_u8_f32(k0, v_source0, v_source1, coeff);
             }
 
-            let dst_offset = y * dst_stride + _cx;
+            let dst_offset = y * dst_stride + cx;
             let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
             vst1q_u8(dst_ptr0, vqmovnq_f32_u8(k0));
 
-            _cx += 16;
+            cx += 16;
         }
 
-        while _cx + 4 < image_width {
+        while cx + 4 < image_width {
             let coeff = scanned_kernel.get_unchecked(half_len).weight;
 
-            let mut k0 = (*brows.get_unchecked(half_len).get_unchecked(_cx) as f32).mul(coeff);
-            let mut k1 = (*brows.get_unchecked(half_len).get_unchecked(_cx + 1) as f32).mul(coeff);
-            let mut k2 = (*brows.get_unchecked(half_len).get_unchecked(_cx + 2) as f32).mul(coeff);
-            let mut k3 = (*brows.get_unchecked(half_len).get_unchecked(_cx + 3) as f32).mul(coeff);
+            let mut k0 = (*brows.get_unchecked(half_len).get_unchecked(cx) as f32).mul(coeff);
+            let mut k1 = (*brows.get_unchecked(half_len).get_unchecked(cx + 1) as f32).mul(coeff);
+            let mut k2 = (*brows.get_unchecked(half_len).get_unchecked(cx + 2) as f32).mul(coeff);
+            let mut k3 = (*brows.get_unchecked(half_len).get_unchecked(cx + 3) as f32).mul(coeff);
 
             for i in 0..half_len {
                 let coeff = *scanned_kernel.get_unchecked(i);
                 let rollback = length - i - 1;
                 k0 = mlaf(
                     k0,
-                    ((*brows.get_unchecked(i).get_unchecked(_cx)) as f32)
-                        .add(*brows.get_unchecked(rollback).get_unchecked(_cx) as f32),
+                    ((*brows.get_unchecked(i).get_unchecked(cx)) as f32)
+                        .add(*brows.get_unchecked(rollback).get_unchecked(cx) as f32),
                     coeff.weight,
                 );
                 k1 = mlaf(
                     k1,
-                    ((*brows.get_unchecked(i).get_unchecked(_cx + 1)) as f32)
-                        .add((*brows.get_unchecked(rollback).get_unchecked(_cx + 1)) as f32),
+                    ((*brows.get_unchecked(i).get_unchecked(cx + 1)) as f32)
+                        .add((*brows.get_unchecked(rollback).get_unchecked(cx + 1)) as f32),
                     coeff.weight,
                 );
                 k2 = mlaf(
                     k2,
-                    ((*brows.get_unchecked(i).get_unchecked(_cx + 2)) as f32)
-                        .add((*brows.get_unchecked(rollback).get_unchecked(_cx + 2)) as f32),
+                    ((*brows.get_unchecked(i).get_unchecked(cx + 2)) as f32)
+                        .add((*brows.get_unchecked(rollback).get_unchecked(cx + 2)) as f32),
                     coeff.weight,
                 );
                 k3 = mlaf(
                     k3,
-                    ((*brows.get_unchecked(i).get_unchecked(_cx + 3)) as f32)
-                        .add((*brows.get_unchecked(rollback).get_unchecked(_cx + 3)) as f32),
+                    ((*brows.get_unchecked(i).get_unchecked(cx + 3)) as f32)
+                        .add((*brows.get_unchecked(rollback).get_unchecked(cx + 3)) as f32),
                     coeff.weight,
                 );
             }
 
-            let dst_offset = y * dst_stride + _cx;
+            let dst_offset = y * dst_stride + cx;
 
             dst.write(dst_offset, k0.to_());
             dst.write(dst_offset + 1, k1.to_());
             dst.write(dst_offset + 2, k2.to_());
             dst.write(dst_offset + 3, k3.to_());
-            _cx += 4;
+            cx += 4;
         }
 
-        for x in _cx..dst_stride {
+        for x in cx..dst_stride {
             let coeff = scanned_kernel.get_unchecked(half_len).weight;
 
             let mut k0 = (*brows.get_unchecked(half_len).get_unchecked(x) as f32).mul(coeff);

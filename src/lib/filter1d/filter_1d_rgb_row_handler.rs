@@ -203,7 +203,7 @@ impl Filter1DRgbRowHandler<u8, i16> for u8 {
         if is_symmetric_kernel {
             filter_rgb_row_symm_neon_u8_i16
         } else {
-            filter_rgb_row_neon_u8_i16
+            filter_rgb_row_neon_u8_i16::<3>
         }
     }
 

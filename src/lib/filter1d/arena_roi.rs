@@ -31,6 +31,7 @@
 
 /// Copies ROI from one image to another
 #[allow(clippy::type_complexity)]
+#[inline(always)]
 pub fn copy_roi<T>(arena: &mut [T], roi: &[T], arena_stride: usize, stride: usize)
 where
     T: Copy,

@@ -49,7 +49,7 @@ pub fn filter_column_neon_u8_i16(
     scanned_kernel: &[ScanPoint1d<i16>],
 ) {
     unsafe {
-        let image_width = image_size.width * arena.components;
+        let max_width = image_size.width * arena.components;
 
         let dst_stride = image_size.width * arena.components;
 
@@ -57,14 +57,12 @@ pub fn filter_column_neon_u8_i16(
 
         let y = filter_region.start;
 
-        let mut _cx = 0usize;
+        let mut cx = 0usize;
 
-        let zeros = vdupq_n_s16(0);
-
-        while _cx + 64 < image_width {
+        while cx + 64 < max_width {
             let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(0).weight);
 
-            let v_src = arena_src.get_unchecked(0).get_unchecked(_cx..);
+            let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let source = xvld1q_u8_x4(v_src.as_ptr());
             let mut k0 = vmulq_u8_by_i16(source.0, coeff);
@@ -75,43 +73,31 @@ pub fn filter_column_neon_u8_i16(
             for i in 1..length {
                 let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight);
                 let v_source =
-                    xvld1q_u8_x4(arena_src.get_unchecked(i).get_unchecked(_cx..).as_ptr());
+                    xvld1q_u8_x4(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 k0 = vdotq_exact_s16(k0, v_source.0, coeff);
                 k1 = vdotq_exact_s16(k1, v_source.1, coeff);
                 k2 = vdotq_exact_s16(k2, v_source.2, coeff);
                 k3 = vdotq_exact_s16(k3, v_source.3, coeff);
             }
 
-            let dst_offset = y * dst_stride + _cx;
+            let dst_offset = y * dst_stride + cx;
             let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
             xvst1q_u8_x4(
                 dst_ptr0,
                 uint8x16x4_t(
-                    vcombine_u8(
-                        vqmovun_s16(vmaxq_s16(k0.0, zeros)),
-                        vqmovun_s16(vmaxq_s16(k0.1, zeros)),
-                    ),
-                    vcombine_u8(
-                        vqmovun_s16(vmaxq_s16(k1.0, zeros)),
-                        vqmovun_s16(vmaxq_s16(k1.1, zeros)),
-                    ),
-                    vcombine_u8(
-                        vqmovun_s16(vmaxq_s16(k2.0, zeros)),
-                        vqmovun_s16(vmaxq_s16(k2.1, zeros)),
-                    ),
-                    vcombine_u8(
-                        vqmovun_s16(vmaxq_s16(k3.0, zeros)),
-                        vqmovun_s16(vmaxq_s16(k3.1, zeros)),
-                    ),
+                    vcombine_u8(vqmovun_s16(k0.0), vqmovun_s16(k0.1)),
+                    vcombine_u8(vqmovun_s16(k1.0), vqmovun_s16(k1.1)),
+                    vcombine_u8(vqmovun_s16(k2.0), vqmovun_s16(k2.1)),
+                    vcombine_u8(vqmovun_s16(k3.0), vqmovun_s16(k3.1)),
                 ),
             );
-            _cx += 64;
+            cx += 64;
         }
 
-        while _cx + 48 < image_width {
+        while cx + 48 < max_width {
             let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(0).weight);
 
-            let v_src = arena_src.get_unchecked(0).get_unchecked(_cx..);
+            let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let source = xvld1q_u8_x3(v_src.as_ptr());
             let mut k0 = vmulq_u8_by_i16(source.0, coeff);
@@ -121,38 +107,29 @@ pub fn filter_column_neon_u8_i16(
             for i in 1..length {
                 let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight);
                 let v_source =
-                    xvld1q_u8_x3(arena_src.get_unchecked(i).get_unchecked(_cx..).as_ptr());
+                    xvld1q_u8_x3(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 k0 = vdotq_exact_s16(k0, v_source.0, coeff);
                 k1 = vdotq_exact_s16(k1, v_source.1, coeff);
                 k2 = vdotq_exact_s16(k2, v_source.2, coeff);
             }
 
-            let dst_offset = y * dst_stride + _cx;
+            let dst_offset = y * dst_stride + cx;
             let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
             xvst1q_u8_x3(
                 dst_ptr0,
                 uint8x16x3_t(
-                    vcombine_u8(
-                        vqmovun_s16(vmaxq_s16(k0.0, zeros)),
-                        vqmovun_s16(vmaxq_s16(k0.1, zeros)),
-                    ),
-                    vcombine_u8(
-                        vqmovun_s16(vmaxq_s16(k1.0, zeros)),
-                        vqmovun_s16(vmaxq_s16(k1.1, zeros)),
-                    ),
-                    vcombine_u8(
-                        vqmovun_s16(vmaxq_s16(k2.0, zeros)),
-                        vqmovun_s16(vmaxq_s16(k2.1, zeros)),
-                    ),
+                    vcombine_u8(vqmovun_s16(k0.0), vqmovun_s16(k0.1)),
+                    vcombine_u8(vqmovun_s16(k1.0), vqmovun_s16(k1.1)),
+                    vcombine_u8(vqmovun_s16(k2.0), vqmovun_s16(k2.1)),
                 ),
             );
-            _cx += 48;
+            cx += 48;
         }
 
-        while _cx + 32 < image_width {
+        while cx + 32 < max_width {
             let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(0).weight);
 
-            let v_src = arena_src.get_unchecked(0).get_unchecked(_cx..);
+            let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let source = xvld1q_u8_x2(v_src.as_ptr());
             let mut k0 = vmulq_u8_by_i16(source.0, coeff);
@@ -161,60 +138,48 @@ pub fn filter_column_neon_u8_i16(
             for i in 1..length {
                 let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight);
                 let v_source =
-                    xvld1q_u8_x2(arena_src.get_unchecked(i).get_unchecked(_cx..).as_ptr());
+                    xvld1q_u8_x2(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 k0 = vdotq_exact_s16(k0, v_source.0, coeff);
                 k1 = vdotq_exact_s16(k1, v_source.1, coeff);
             }
 
-            let dst_offset = y * dst_stride + _cx;
+            let dst_offset = y * dst_stride + cx;
             let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
             xvst1q_u8_x2(
                 dst_ptr0,
                 uint8x16x2_t(
-                    vcombine_u8(
-                        vqmovun_s16(vmaxq_s16(k0.0, zeros)),
-                        vqmovun_s16(vmaxq_s16(k0.1, zeros)),
-                    ),
-                    vcombine_u8(
-                        vqmovun_s16(vmaxq_s16(k1.0, zeros)),
-                        vqmovun_s16(vmaxq_s16(k1.1, zeros)),
-                    ),
+                    vcombine_u8(vqmovun_s16(k0.0), vqmovun_s16(k0.1)),
+                    vcombine_u8(vqmovun_s16(k1.0), vqmovun_s16(k1.1)),
                 ),
             );
 
-            _cx += 32;
+            cx += 32;
         }
 
-        while _cx + 16 < image_width {
+        while cx + 16 < max_width {
             let coeff = *scanned_kernel.get_unchecked(0);
 
-            let v_src = arena_src.get_unchecked(0).get_unchecked(_cx..);
+            let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let source_0 = vld1q_u8(v_src.as_ptr());
             let mut k0 = vmulq_u8_by_i16(source_0, vdupq_n_s16(coeff.weight));
 
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
-                let v_source_0 = vld1q_u8(arena_src.get_unchecked(i).get_unchecked(_cx..).as_ptr());
+                let v_source_0 = vld1q_u8(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 k0 = vdotq_exact_s16(k0, v_source_0, vdupq_n_s16(coeff.weight));
             }
 
-            let dst_offset = y * dst_stride + _cx;
+            let dst_offset = y * dst_stride + cx;
             let dst_ptr = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
-            vst1q_u8(
-                dst_ptr,
-                vcombine_u8(
-                    vqmovun_s16(vmaxq_s16(k0.0, zeros)),
-                    vqmovun_s16(vmaxq_s16(k0.1, zeros)),
-                ),
-            );
-            _cx += 16;
+            vst1q_u8(dst_ptr, vcombine_u8(vqmovun_s16(k0.0), vqmovun_s16(k0.1)));
+            cx += 16;
         }
 
-        while _cx + 4 < image_width {
+        while cx + 4 < max_width {
             let coeff = *scanned_kernel.get_unchecked(0);
 
-            let v_src = arena_src.get_unchecked(0).get_unchecked(_cx..);
+            let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let mut k0 = (*v_src.get_unchecked(0) as i16).mul(coeff.weight);
             let mut k1 = (*v_src.get_unchecked(1) as i16).mul(coeff.weight);
@@ -224,37 +189,37 @@ pub fn filter_column_neon_u8_i16(
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
                 k0 = mlaf(
-                    (*arena_src.get_unchecked(i).get_unchecked(_cx)) as i16,
+                    (*arena_src.get_unchecked(i).get_unchecked(cx)) as i16,
                     coeff.weight,
                     k0,
                 );
                 k1 = mlaf(
-                    (*arena_src.get_unchecked(i).get_unchecked(_cx + 1)) as i16,
+                    (*arena_src.get_unchecked(i).get_unchecked(cx + 1)) as i16,
                     coeff.weight,
                     k1,
                 );
                 k2 = mlaf(
-                    (*arena_src.get_unchecked(i).get_unchecked(_cx + 2)) as i16,
+                    (*arena_src.get_unchecked(i).get_unchecked(cx + 2)) as i16,
                     coeff.weight,
                     k2,
                 );
                 k3 = mlaf(
-                    (*arena_src.get_unchecked(i).get_unchecked(_cx + 3)) as i16,
+                    (*arena_src.get_unchecked(i).get_unchecked(cx + 3)) as i16,
                     coeff.weight,
                     k3,
                 );
             }
 
-            let dst_offset = y * dst_stride + _cx;
+            let dst_offset = y * dst_stride + cx;
 
             dst.write(dst_offset, k0.to_());
             dst.write(dst_offset + 1, k1.to_());
             dst.write(dst_offset + 2, k2.to_());
             dst.write(dst_offset + 3, k3.to_());
-            _cx += 4;
+            cx += 4;
         }
 
-        for x in _cx..image_width {
+        for x in cx..max_width {
             let coeff = *scanned_kernel.get_unchecked(0);
 
             let v_src = arena_src.get_unchecked(0).get_unchecked(x..);
