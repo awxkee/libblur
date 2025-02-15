@@ -28,7 +28,10 @@
  */
 use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_scan::ScanPoint1d;
-use crate::filter1d::neon::utils::{vmlaq_symm_hi_u8_s16, vmullq_expand_i16, vqmovnq_s16x2_u8};
+use crate::filter1d::neon::utils::{
+    vmlaq_symm_hi_u8_s16, vmullq_expand_i16, vqmovnq_s16x2_u8, xvld1q_u8_x2, xvld1q_u8_x3,
+    xvld1q_u8_x4, xvst1q_u8_x2, xvst1q_u8_x3, xvst1q_u8_x4,
+};
 use crate::filter1d::region::FilterRegion;
 use crate::filter1d::to_approx_storage::ToApproxStorage;
 use crate::img_size::ImageSize;
@@ -64,7 +67,7 @@ pub(crate) fn filter_column_symm_neon_u8_i32_rdm(
 
             let v_src = arena_src.get_unchecked(half_len).get_unchecked(_cx..);
 
-            let source = vld1q_u8_x4(v_src.as_ptr());
+            let source = xvld1q_u8_x4(v_src.as_ptr());
             let mut k0 = vmullq_expand_i16::<EXPAND>(source.0, coeff);
             let mut k1 = vmullq_expand_i16::<EXPAND>(source.1, coeff);
             let mut k2 = vmullq_expand_i16::<EXPAND>(source.2, coeff);
@@ -74,8 +77,8 @@ pub(crate) fn filter_column_symm_neon_u8_i32_rdm(
                 let rollback = length - i - 1;
                 let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight as i16);
                 let v_source0 =
-                    vld1q_u8_x4(arena_src.get_unchecked(i).get_unchecked(_cx..).as_ptr());
-                let v_source1 = vld1q_u8_x4(
+                    xvld1q_u8_x4(arena_src.get_unchecked(i).get_unchecked(_cx..).as_ptr());
+                let v_source1 = xvld1q_u8_x4(
                     arena_src
                         .get_unchecked(rollback)
                         .get_unchecked(_cx..)
@@ -89,7 +92,7 @@ pub(crate) fn filter_column_symm_neon_u8_i32_rdm(
 
             let dst_offset = y * dst_stride + _cx;
             let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
-            vst1q_u8_x4(
+            xvst1q_u8_x4(
                 dst_ptr0,
                 uint8x16x4_t(
                     vqmovnq_s16x2_u8::<PRECISION>(k0),
@@ -106,7 +109,7 @@ pub(crate) fn filter_column_symm_neon_u8_i32_rdm(
 
             let v_src = arena_src.get_unchecked(half_len).get_unchecked(_cx..);
 
-            let source = vld1q_u8_x3(v_src.as_ptr());
+            let source = xvld1q_u8_x3(v_src.as_ptr());
             let mut k0 = vmullq_expand_i16::<EXPAND>(source.0, coeff);
             let mut k1 = vmullq_expand_i16::<EXPAND>(source.1, coeff);
             let mut k2 = vmullq_expand_i16::<EXPAND>(source.2, coeff);
@@ -115,8 +118,8 @@ pub(crate) fn filter_column_symm_neon_u8_i32_rdm(
                 let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight as i16);
                 let rollback = length - i - 1;
                 let v_source0 =
-                    vld1q_u8_x3(arena_src.get_unchecked(i).get_unchecked(_cx..).as_ptr());
-                let v_source1 = vld1q_u8_x3(
+                    xvld1q_u8_x3(arena_src.get_unchecked(i).get_unchecked(_cx..).as_ptr());
+                let v_source1 = xvld1q_u8_x3(
                     arena_src
                         .get_unchecked(rollback)
                         .get_unchecked(_cx..)
@@ -129,7 +132,7 @@ pub(crate) fn filter_column_symm_neon_u8_i32_rdm(
 
             let dst_offset = y * dst_stride + _cx;
             let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
-            vst1q_u8_x3(
+            xvst1q_u8_x3(
                 dst_ptr0,
                 uint8x16x3_t(
                     vqmovnq_s16x2_u8::<PRECISION>(k0),
@@ -145,7 +148,7 @@ pub(crate) fn filter_column_symm_neon_u8_i32_rdm(
 
             let v_src = arena_src.get_unchecked(half_len).get_unchecked(_cx..);
 
-            let source = vld1q_u8_x2(v_src.as_ptr());
+            let source = xvld1q_u8_x2(v_src.as_ptr());
             let mut k0 = vmullq_expand_i16::<EXPAND>(source.0, coeff);
             let mut k1 = vmullq_expand_i16::<EXPAND>(source.1, coeff);
 
@@ -153,8 +156,8 @@ pub(crate) fn filter_column_symm_neon_u8_i32_rdm(
                 let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight as i16);
                 let rollback = length - i - 1;
                 let v_source0 =
-                    vld1q_u8_x2(arena_src.get_unchecked(i).get_unchecked(_cx..).as_ptr());
-                let v_source1 = vld1q_u8_x2(
+                    xvld1q_u8_x2(arena_src.get_unchecked(i).get_unchecked(_cx..).as_ptr());
+                let v_source1 = xvld1q_u8_x2(
                     arena_src
                         .get_unchecked(rollback)
                         .get_unchecked(_cx..)
@@ -166,7 +169,7 @@ pub(crate) fn filter_column_symm_neon_u8_i32_rdm(
 
             let dst_offset = y * dst_stride + _cx;
             let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
-            vst1q_u8_x2(
+            xvst1q_u8_x2(
                 dst_ptr0,
                 uint8x16x2_t(
                     vqmovnq_s16x2_u8::<PRECISION>(k0),

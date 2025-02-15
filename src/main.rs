@@ -231,18 +231,18 @@ fn main() {
     //     EdgeMode::Clamp,
     // );
 
-    // libblur::gaussian_blur(
-    //     &bytes,
-    //     &mut dst_bytes,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     0,
-    //     10f32,
-    //     FastBlurChannels::Channels4,
-    //     EdgeMode::Clamp,
-    //     ThreadingPolicy::Single,
-    //     GaussianPreciseLevel::EXACT,
-    // );
+    libblur::gaussian_blur(
+        &bytes,
+        &mut dst_bytes,
+        dimensions.0,
+        dimensions.1,
+        0,
+        25f32,
+        FastBlurChannels::Channels4,
+        EdgeMode::Clamp,
+        ThreadingPolicy::Single,
+        GaussianPreciseLevel::EXACT,
+    );
 
     // let mut f16_bytes: Vec<f16> = dst_bytes
     //     .iter()
@@ -277,18 +277,18 @@ fn main() {
 
     // bytes = j_vet.iter().map(|&x| (x * 255f32).round() as u8).collect();
     //
-    libblur::gaussian_box_blur_in_linear(
-        &bytes,
-        dimensions.0 * 4,
-        &mut dst_bytes,
-        dimensions.0 * 4,
-        dimensions.0,
-        dimensions.1,
-        10f32,
-        FastBlurChannels::Channels4,
-        ThreadingPolicy::Single,
-        TransferFunction::Rec709,
-    );
+    // libblur::gaussian_box_blur_in_linear(
+    //     &bytes,
+    //     dimensions.0 * 4,
+    //     &mut dst_bytes,
+    //     dimensions.0 * 4,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     10f32,
+    //     FastBlurChannels::Channels4,
+    //     ThreadingPolicy::Single,
+    //     TransferFunction::Rec709,
+    // );
 
     // accelerate::acc_convenience::box_convolve(
     //     &bytes,

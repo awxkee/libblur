@@ -28,6 +28,7 @@
  */
 use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_scan::ScanPoint1d;
+use crate::filter1d::neon::utils::{xvld1q_f32_x2, xvld1q_f32_x4, xvst1q_f32_x2, xvst1q_f32_x4};
 use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
@@ -60,7 +61,7 @@ pub fn filter_column_neon_symm_f32_f32(
 
             let v_src = arena_src.get_unchecked(half_len).get_unchecked(_cx..);
 
-            let source = vld1q_f32_x4(v_src.as_ptr());
+            let source = xvld1q_f32_x4(v_src.as_ptr());
             let mut k0 = vmulq_f32(source.0, coeff);
             let mut k1 = vmulq_f32(source.1, coeff);
             let mut k2 = vmulq_f32(source.2, coeff);
@@ -70,8 +71,8 @@ pub fn filter_column_neon_symm_f32_f32(
                 let rollback = length - i - 1;
                 let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(i).weight);
                 let v_source0 =
-                    vld1q_f32_x4(arena_src.get_unchecked(i).get_unchecked(_cx..).as_ptr());
-                let v_source1 = vld1q_f32_x4(
+                    xvld1q_f32_x4(arena_src.get_unchecked(i).get_unchecked(_cx..).as_ptr());
+                let v_source1 = xvld1q_f32_x4(
                     arena_src
                         .get_unchecked(rollback)
                         .get_unchecked(_cx..)
@@ -85,7 +86,7 @@ pub fn filter_column_neon_symm_f32_f32(
 
             let dst_offset = y * dst_stride + _cx;
             let dst_ptr0 = (dst.slice.as_ptr() as *mut f32).add(dst_offset);
-            vst1q_f32_x4(dst_ptr0, float32x4x4_t(k0, k1, k2, k3));
+            xvst1q_f32_x4(dst_ptr0, float32x4x4_t(k0, k1, k2, k3));
             _cx += 16;
         }
 
@@ -94,7 +95,7 @@ pub fn filter_column_neon_symm_f32_f32(
 
             let v_src = arena_src.get_unchecked(half_len).get_unchecked(_cx..);
 
-            let source = vld1q_f32_x2(v_src.as_ptr());
+            let source = xvld1q_f32_x2(v_src.as_ptr());
             let mut k0 = vmulq_f32(source.0, coeff);
             let mut k1 = vmulq_f32(source.1, coeff);
 
@@ -102,8 +103,8 @@ pub fn filter_column_neon_symm_f32_f32(
                 let rollback = length - i - 1;
                 let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(i).weight);
                 let v_source0 =
-                    vld1q_f32_x2(arena_src.get_unchecked(i).get_unchecked(_cx..).as_ptr());
-                let v_source1 = vld1q_f32_x2(
+                    xvld1q_f32_x2(arena_src.get_unchecked(i).get_unchecked(_cx..).as_ptr());
+                let v_source1 = xvld1q_f32_x2(
                     arena_src
                         .get_unchecked(rollback)
                         .get_unchecked(_cx..)
@@ -115,7 +116,7 @@ pub fn filter_column_neon_symm_f32_f32(
 
             let dst_offset = y * dst_stride + _cx;
             let dst_ptr0 = (dst.slice.as_ptr() as *mut f32).add(dst_offset);
-            vst1q_f32_x2(dst_ptr0, float32x4x2_t(k0, k1));
+            xvst1q_f32_x2(dst_ptr0, float32x4x2_t(k0, k1));
 
             _cx += 8;
         }
