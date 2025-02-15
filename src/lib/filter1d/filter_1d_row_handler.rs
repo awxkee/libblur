@@ -32,9 +32,8 @@ use crate::filter1d::avx::{filter_row_avx_f32_f32, filter_row_avx_u8_f32};
 use crate::filter1d::filter_row::filter_row;
 use crate::filter1d::filter_row_cg_symmetric::filter_color_group_symmetrical_row;
 use crate::filter1d::filter_scan::ScanPoint1d;
-use crate::filter1d::neon::filter_rgba_row_neon_u8_f32;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use crate::filter1d::neon::{filter_row_neon_f32_f32, filter_row_neon_u8_f32};
+use crate::filter1d::neon::filter_row_neon_f32_f32;
 use crate::filter1d::region::FilterRegion;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::filter1d::sse::filter_row_sse_f32_f32;
@@ -80,7 +79,8 @@ impl Filter1DRowHandler<u8, f32> for u8 {
             use crate::filter1d::neon::filter_row_symm_neon_u8_f32;
             filter_row_symm_neon_u8_f32::<1>
         } else {
-            filter_row_neon_u8_f32
+            use crate::filter1d::neon::filter_row_neon_u8_f32;
+            filter_row_neon_u8_f32::<1>
         }
     }
 
@@ -122,7 +122,7 @@ impl Filter1DRowHandler<f32, f32> for f32 {
     fn get_row_handler(
         _: bool,
     ) -> fn(Arena, &[f32], &UnsafeSlice<f32>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
-        filter_row_neon_f32_f32
+        filter_row_neon_f32_f32::<1>
     }
 
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]

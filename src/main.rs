@@ -155,24 +155,25 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
 }
 
 fn main() {
-    let mut dyn_image = ImageReader::open("assets/test_image_2.jpg")
+    let mut dyn_image = ImageReader::open("assets/test_image_2.png")
         .unwrap()
         .decode()
         .unwrap();
+    
     let dimensions = dyn_image.dimensions();
     println!("dimensions {:?}", dyn_image.dimensions());
     println!("type {:?}", dyn_image.color());
-
+    
     // let vldg = dyn_image.to_rgb8();
     // let new_rgb = image::imageops::blur(&vldg, 66.);
-    let dyn_image = DynamicImage::ImageRgba8(dyn_image.to_rgba8());
+    // let dyn_image = DynamicImage::ImageRgb8(dyn_image.to_rgb8());
     // new_dyn.save("output.jpg").unwrap();
 
     println!("{:?}", dyn_image.color());
 
-    let img = dyn_image.to_rgba8();
+    let img = dyn_image.to_rgb8();
     let src_bytes = img.as_bytes();
-    let components = 4;
+    let components = 3;
     let stride = dimensions.0 as usize * components;
     let mut bytes: Vec<u8> = src_bytes.to_vec();
     let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
@@ -237,8 +238,8 @@ fn main() {
         dimensions.0,
         dimensions.1,
         0,
-        25f32,
-        FastBlurChannels::Channels4,
+        15.,
+        FastBlurChannels::Channels3,
         EdgeMode::Clamp,
         ThreadingPolicy::Single,
         GaussianPreciseLevel::INTEGRAL,

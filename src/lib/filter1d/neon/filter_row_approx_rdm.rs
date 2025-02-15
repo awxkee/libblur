@@ -47,8 +47,6 @@ pub(crate) fn filter_row_neon_u8_i32_rdm(
     unsafe {
         let src = arena_src;
 
-        let dst_stride = image_size.width * arena.components;
-
         const N: usize = 1;
 
         let y = filter_region.start;
@@ -56,15 +54,18 @@ pub(crate) fn filter_row_neon_u8_i32_rdm(
 
         let length = scanned_kernel.iter().len();
 
+        let max_width = N * image_size.width;
+        let dst_stride = arena.width * arena.components;
+
         const EXPAND: i32 = 6;
         const PRECISION: i32 = 6;
 
-        let mut _cx = 0usize;
+        let mut cx = 0usize;
 
-        while _cx + 64 < dst_stride {
+        while cx + 64 < max_width {
             let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(0).weight as i16);
 
-            let shifted_src = local_src.get_unchecked(_cx..);
+            let shifted_src = local_src.get_unchecked(cx..);
 
             let source = vld1q_u8_x4(shifted_src.as_ptr());
             let mut k0 = vmullq_expand_i16::<EXPAND>(source.0, coeff);
@@ -81,7 +82,7 @@ pub(crate) fn filter_row_neon_u8_i32_rdm(
                 k3 = vmlaq_hi_u8_s16::<EXPAND>(k3, v_source.3, coeff);
             }
 
-            let dst_offset = y * dst_stride + _cx;
+            let dst_offset = y * dst_stride + cx;
             let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
             vst1q_u8_x4(
                 dst_ptr0,
@@ -92,13 +93,13 @@ pub(crate) fn filter_row_neon_u8_i32_rdm(
                     vqmovnq_s16x2_u8::<PRECISION>(k3),
                 ),
             );
-            _cx += 64;
+            cx += 64;
         }
 
-        while _cx + 32 < dst_stride {
+        while cx + 32 < max_width {
             let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(0).weight as i16);
 
-            let shifted_src = local_src.get_unchecked(_cx..);
+            let shifted_src = local_src.get_unchecked(cx..);
 
             let source = vld1q_u8_x2(shifted_src.as_ptr());
             let mut k0 = vmullq_expand_i16::<EXPAND>(source.0, coeff);
@@ -111,7 +112,7 @@ pub(crate) fn filter_row_neon_u8_i32_rdm(
                 k1 = vmlaq_hi_u8_s16::<EXPAND>(k1, v_source.1, coeff);
             }
 
-            let dst_offset = y * dst_stride + _cx;
+            let dst_offset = y * dst_stride + cx;
             let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
             vst1q_u8_x2(
                 dst_ptr0,
@@ -120,13 +121,13 @@ pub(crate) fn filter_row_neon_u8_i32_rdm(
                     vqmovnq_s16x2_u8::<PRECISION>(k1),
                 ),
             );
-            _cx += 32;
+            cx += 32;
         }
 
-        while _cx + 16 < dst_stride {
+        while cx + 16 < max_width {
             let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(0).weight as i16);
 
-            let shifted_src = local_src.get_unchecked(_cx..);
+            let shifted_src = local_src.get_unchecked(cx..);
 
             let source = vld1q_u8(shifted_src.as_ptr());
             let mut k0 = vmullq_expand_i16::<EXPAND>(source, coeff);
@@ -137,16 +138,16 @@ pub(crate) fn filter_row_neon_u8_i32_rdm(
                 k0 = vmlaq_hi_u8_s16::<EXPAND>(k0, v_source, coeff);
             }
 
-            let dst_offset = y * dst_stride + _cx;
+            let dst_offset = y * dst_stride + cx;
             let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
             vst1q_u8(dst_ptr0, vqmovnq_s16x2_u8::<PRECISION>(k0));
-            _cx += 16;
+            cx += 16;
         }
 
-        while _cx + 4 < dst_stride {
+        while cx + 4 < max_width {
             let coeff = *scanned_kernel.get_unchecked(0);
 
-            let shifted_src = local_src.get_unchecked((_cx * N)..);
+            let shifted_src = local_src.get_unchecked((cx * N)..);
 
             let mut k0 = ColorGroup::<N, i32>::from_slice(shifted_src, 0).mul(coeff.weight);
             let mut k1 = ColorGroup::<N, i32>::from_slice(shifted_src, N).mul(coeff.weight);
@@ -169,16 +170,16 @@ pub(crate) fn filter_row_neon_u8_i32_rdm(
                     .add(k3);
             }
 
-            let dst_offset = y * dst_stride + _cx * N;
+            let dst_offset = y * dst_stride + cx * N;
 
             k0.to_approx_store(dst, dst_offset);
             k1.to_approx_store(dst, dst_offset + N);
             k2.to_approx_store(dst, dst_offset + N * 2);
             k3.to_approx_store(dst, dst_offset + N * 3);
-            _cx += 4;
+            cx += 4;
         }
 
-        for x in _cx..dst_stride {
+        for x in cx..max_width {
             let coeff = *scanned_kernel.get_unchecked(0);
             let shifted_src = local_src.get_unchecked((x * N)..);
             let mut k0 = ColorGroup::<N, i32>::from_slice(shifted_src, 0).mul(coeff.weight);
