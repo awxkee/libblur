@@ -8,7 +8,7 @@ use fast_transpose::{transpose_rgba, FlipMode, FlopMode};
 use image::imageops::FilterType;
 use image::{DynamicImage, EncodableLayout, GenericImageView, ImageReader};
 use libblur::{
-    fast_gaussian, filter_1d_exact, get_gaussian_kernel_1d, get_sigma_size, EdgeMode,
+    fast_gaussian, filter_1d_exact, get_gaussian_kernel_1d, get_sigma_size, sobel, EdgeMode,
     FastBlurChannels, GaussianPreciseLevel, ImageSize, Scalar, ThreadingPolicy,
 };
 use std::time::Instant;
@@ -232,19 +232,27 @@ fn main() {
     //     EdgeMode::Clamp,
     // );
 
-    libblur::gaussian_blur_in_linear(
+    // libblur::gaussian_blur(
+    //     &bytes,
+    //     &mut dst_bytes,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     0,
+    //     15.,
+    //     FastBlurChannels::Channels3,
+    //     EdgeMode::Clamp,
+    //     ThreadingPolicy::Single,
+    //     GaussianPreciseLevel::INTEGRAL,
+    // );
+
+    sobel(
         &bytes,
-        dimensions.0 * 3,
         &mut dst_bytes,
-        dimensions.0 * 3,
-        dimensions.0,
-        dimensions.1,
-        0,
-        15.,
-        FastBlurChannels::Channels3,
+        ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
         EdgeMode::Clamp,
+        Scalar::new(255.0, 0.0, 0.0, 255.0),
+        FastBlurChannels::Channels3,
         ThreadingPolicy::Single,
-        TransferFunction::Rec709,
     );
 
     // let mut f16_bytes: Vec<f16> = dst_bytes

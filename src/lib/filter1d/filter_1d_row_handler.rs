@@ -94,6 +94,10 @@ impl Filter1DRowHandler<u8, f32> for u8 {
             return filter_row_avx_u8_f32::<1>;
         }
         if std::arch::is_x86_feature_detected!("sse4.1") {
+            if is_symmetric_kernel {
+                use crate::filter1d::sse::filter_row_sse_symm_u8_f32;
+                return filter_row_sse_symm_u8_f32::<1>;
+            }
             use crate::filter1d::sse::filter_row_sse_u8_f32;
             return filter_row_sse_u8_f32::<1>;
         }

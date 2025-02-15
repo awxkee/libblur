@@ -35,8 +35,6 @@ use crate::filter1d::filter_scan::ScanPoint1d;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::filter1d::neon::filter_row_symm_neon_u8_i32;
 use crate::filter1d::region::FilterRegion;
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-use crate::filter1d::sse::{filter_rgba_row_sse_u8_i32_app, filter_rgba_row_symm_sse_u8_i32_app};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::ImageSize;
 
@@ -125,9 +123,11 @@ impl Filter1DRgbaRowHandlerApprox<u8, i32> for u8 {
         }
         if std::arch::is_x86_feature_detected!("sse4.1") {
             if is_kernel_symmetric {
-                return filter_rgba_row_symm_sse_u8_i32_app;
+                use crate::filter1d::sse::filter_row_symm_sse_u8_i32_app;
+                return filter_row_symm_sse_u8_i32_app::<4>;
             }
-            return filter_rgba_row_sse_u8_i32_app;
+            use crate::filter1d::sse::filter_row_sse_u8_i32;
+            return filter_row_sse_u8_i32::<4>;
         }
         if is_kernel_symmetric {
             filter_color_group_row_symmetric_approx::<u8, i32, 4>

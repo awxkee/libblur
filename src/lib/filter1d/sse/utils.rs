@@ -218,6 +218,62 @@ pub(crate) unsafe fn _mm_mull_add_symm_epi8_by_epi16_x4(
 }
 
 #[inline(always)]
+pub(crate) unsafe fn _mm_madd_symm_epi8_by_epi16_x4(
+    accumulator: (__m128i, __m128i),
+    input0: __m128i,
+    input1: __m128i,
+    weight: __m128i,
+) -> (__m128i, __m128i) {
+    let v0 = _mm_unpacklo_epi8(input0, _mm_setzero_si128());
+    let v1 = _mm_unpackhi_epi8(input0, _mm_setzero_si128());
+    let v2 = _mm_unpacklo_epi8(input1, _mm_setzero_si128());
+    let v3 = _mm_unpackhi_epi8(input1, _mm_setzero_si128());
+
+    let m0 = _mm_add_epi16(v0, v2);
+    let m1 = _mm_add_epi16(v1, v3);
+
+    let a0 = _mm_mullo_epi16(m0, weight);
+    let a1 = _mm_mullo_epi16(m1, weight);
+
+    (
+        _mm_add_epi16(accumulator.0, a0),
+        _mm_add_epi16(accumulator.1, a1),
+    )
+}
+
+#[inline(always)]
+pub(crate) unsafe fn _mm_madd_s_epi8_by_epi16_x4(
+    accumulator: (__m128i, __m128i),
+    input0: __m128i,
+    weight: __m128i,
+) -> (__m128i, __m128i) {
+    let v0 = _mm_unpacklo_epi8(input0, _mm_setzero_si128());
+    let v1 = _mm_unpackhi_epi8(input0, _mm_setzero_si128());
+
+    let a0 = _mm_mullo_epi16(v0, weight);
+    let a1 = _mm_mullo_epi16(v1, weight);
+
+    (
+        _mm_add_epi16(accumulator.0, a0),
+        _mm_add_epi16(accumulator.1, a1),
+    )
+}
+
+#[inline(always)]
+pub(crate) unsafe fn _mm_madd_epi8_by_epi16_x4(
+    input0: __m128i,
+    weight: __m128i,
+) -> (__m128i, __m128i) {
+    let v0 = _mm_unpacklo_epi8(input0, _mm_setzero_si128());
+    let v1 = _mm_unpackhi_epi8(input0, _mm_setzero_si128());
+
+    let a0 = _mm_mullo_epi16(v0, weight);
+    let a1 = _mm_mullo_epi16(v1, weight);
+
+    (a0, a1)
+}
+
+#[inline(always)]
 pub(crate) unsafe fn _mm_mul_add_symm_epi8_by_ps_x4<const FMA: bool>(
     accumulator: (__m128, __m128, __m128, __m128),
     input0: __m128i,

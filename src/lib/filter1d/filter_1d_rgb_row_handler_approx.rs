@@ -31,8 +31,6 @@ use crate::filter1d::filter_row_cg_approx::filter_color_group_row_approx;
 use crate::filter1d::filter_row_cg_approx_symmetric::filter_color_group_row_symmetric_approx;
 use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::region::FilterRegion;
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-use crate::filter1d::sse::{filter_rgb_row_sse_symm_u8_i32_app, filter_rgb_row_sse_u8_i32_app};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::ImageSize;
 
@@ -124,9 +122,11 @@ impl Filter1DRgbRowHandlerApprox<u8, i32> for u8 {
         }
         if std::arch::is_x86_feature_detected!("sse4.1") {
             if is_symmetrical_kernel {
-                return filter_rgb_row_sse_symm_u8_i32_app;
+                use crate::filter1d::sse::filter_row_symm_sse_u8_i32_app;
+                return filter_row_symm_sse_u8_i32_app::<3>;
             }
-            return filter_rgb_row_sse_u8_i32_app;
+            use crate::filter1d::sse::filter_row_sse_u8_i32;
+            return filter_row_sse_u8_i32::<3>;
         }
         if is_symmetrical_kernel {
             filter_color_group_row_symmetric_approx::<u8, i32, 3>

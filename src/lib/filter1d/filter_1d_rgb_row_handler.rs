@@ -34,9 +34,7 @@ use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::neon::{filter_rgb_row_neon_u8_i16, filter_rgb_row_symm_neon_u8_i16};
 use crate::filter1d::region::FilterRegion;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-use crate::filter1d::sse::{
-    filter_rgb_row_sse_symm_u8_f32, filter_rgb_row_sse_symm_u8_i16, filter_rgb_row_sse_u8_i16,
-};
+use crate::filter1d::sse::{filter_rgb_row_sse_u8_i16, filter_row_sse_symm_u8_i16};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::ImageSize;
 use half::f16;
@@ -120,7 +118,8 @@ impl Filter1DRgbRowHandler<u8, f32> for u8 {
         }
         if std::arch::is_x86_feature_detected!("sse4.1") {
             if is_symmetric_kernel {
-                return filter_rgb_row_sse_symm_u8_f32;
+                use crate::filter1d::sse::filter_row_sse_symm_u8_f32;
+                return filter_row_sse_symm_u8_f32::<3>;
             }
             use crate::filter1d::sse::filter_row_sse_u8_f32;
             return filter_row_sse_u8_f32::<3>;
@@ -214,9 +213,9 @@ impl Filter1DRgbRowHandler<u8, i16> for u8 {
     ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<i16>]) {
         if std::arch::is_x86_feature_detected!("sse4.1") {
             if is_symmetric_kernel {
-                return filter_rgb_row_sse_symm_u8_i16;
+                return filter_row_sse_symm_u8_i16::<3>;
             }
-            return filter_rgb_row_sse_u8_i16;
+            return filter_rgb_row_sse_u8_i16::<3>;
         }
         if is_symmetric_kernel {
             filter_color_group_symmetrical_row::<u8, i16, 3>

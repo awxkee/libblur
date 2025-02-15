@@ -898,13 +898,13 @@ fn create_box_gauss(sigma: f32, n: usize) -> Vec<u32> {
         if i < m {
             let mut new_val = wl / 2;
             if new_val % 2 == 0 {
-                new_val = new_val + 1;
+                new_val += 1;
             }
             sizes.push(new_val);
         } else {
             let mut new_val = wu / 2;
             if new_val % 2 == 0 {
-                new_val = new_val + 1;
+                new_val += 1;
             }
             sizes.push(new_val);
         }
@@ -1251,7 +1251,7 @@ fn gaussian_box_blur_impl<
         thread_count,
     );
     box_blur_impl::<T, CHANNEL_CONFIGURATION>(
-        &dst,
+        dst,
         dst_stride,
         &mut transient,
         dst_stride,

@@ -27,6 +27,7 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![deny(unreachable_pub)]
+#![allow(clippy::manual_clamp)]
 mod filter_column;
 mod filter_column_approx;
 mod filter_column_f32;
