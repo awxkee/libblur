@@ -63,24 +63,24 @@ Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded 
 
 |                   | Time(NEON) | Time(AVX) | 
 |-------------------|:----------:|:---------:| 
-| libblur(Exact)    |  53.83ms   |  52.50ms  | 
-| libblur(Integral) |  33.20ms   |  37.33ms  | 
+| libblur(Exact)    |  53.83ms   |  43.41ms  | 
+| libblur(Integral) |  33.20ms   |  30.72ms  | 
 | OpenCV            |  180.56ms  | 182.44ms  | 
 
 Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded mode with 151 kernel size.
 
 |                   | time(NEON) | Time(AVX) |
 |-------------------|:----------:|:---------:|
-| libblur(Exact)    |  72.95ms   |  67.26ms  |
-| libblur(Integral) |  40.13ms   |  48.94ms  |
+| libblur(Exact)    |  72.95ms   |  54.36ms  |
+| libblur(Integral) |  40.13ms   |  38.91ms  |
 | OpenCV            |  177.46ms  | 185.30ms  |
 
 Example comparison time for blurring image 3000x4000 single plane 8-bit in multithreaded mode with 151 kernel size.
 
 |                   | time(NEON) | Time(SSE/AVX) |
 |-------------------|:----------:|:-------------:|
-| libblur(Exact)    |  17.59ms   |    28.73ms    |
-| libblur(Integral) |   9.88ms   |    18.97ms    |
+| libblur(Exact)    |  17.59ms   |    15.51ms    |
+| libblur(Integral) |   9.88ms   |    11.45ms    |
 | OpenCV            |  74.73ms   |    64.20ms    |
 
 ### Stack blur
@@ -228,14 +228,14 @@ Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded 
 
 |         | time(NEON) | time(SSE) |
 |---------|:----------:|:---------:|
-| libblur |   6.21ms   |  11.24ms  |
+| libblur |   6.21ms   |  9.48ms   |
 | OpenCV  |  15.73ms   |  43.59ms  |
 
 Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded mode with 77 radius.
 
 |         | Time(NEON) | Time(SSE) |
 |---------|:----------:|:---------:|
-| libblur |   6.13ms   |  9.17ms   |
+| libblur |   6.13ms   |  7.99ms   |
 | OpenCV  |  15.77ms   |  31.29ms  |
 
 Example comparison time for blurring image 2828x4242 RGBA 8-bit in single-thread mode with 15 radius on MacOS.
