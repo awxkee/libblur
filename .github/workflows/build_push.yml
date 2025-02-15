@@ -81,9 +81,17 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo install cargo-fuzz
       - run: cargo fuzz run gauss -- -max_total_time=45
-      - run: cargo fuzz run gauss -- -max_total_time=45
       - run: cargo fuzz run gauss_u16 -- -max_total_time=45
       - run: cargo fuzz run gauss_f32 -- -max_total_time=45
+
+  fuzz_gauss_arm_rdm:
+    name: Fuzzing Gauss ARM RDM
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo install cargo-fuzz
+      - run: cargo fuzz run gauss --features rdm -- -max_total_time=45
 
   fuzz_gauss_x86:
     name: Fuzzing Gauss x86

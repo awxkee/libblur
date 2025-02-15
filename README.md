@@ -2,7 +2,7 @@
 
 There are some very good and blazing fast algorithms that do blurring images.
 Also providing convenient api for doing convolution and some edge detection filters.\
-Best optimized for NEON and SSE, partially AVX, partially done WASM.
+Best optimized for NEON, SSE and AVX, partially done WASM.
 
 You may receive gaussian blur in 100 FPS for 4K photo.
 
@@ -62,24 +62,24 @@ Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded 
 
 |                   | Time(NEON) | Time(AVX) | 
 |-------------------|:----------:|:---------:| 
-| libblur(Exact)    |  55.89ms   |  52.50ms  | 
-| libblur(Integral) |  33.20ms   |  37.33ms  | 
+| libblur(Exact)    |  53.83ms   |  43.41ms  | 
+| libblur(Integral) |  33.20ms   |  30.72ms  | 
 | OpenCV            |  180.56ms  | 182.44ms  | 
 
 Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded mode with 151 kernel size.
 
 |                   | time(NEON) | Time(AVX) |
 |-------------------|:----------:|:---------:|
-| libblur(Exact)    |  79.34ms   |  67.26ms  |
-| libblur(Integral) |  48.70ms   |  48.94ms  |
+| libblur(Exact)    |  70.45ms   |  54.36ms  |
+| libblur(Integral) |  40.13ms   |  38.91ms  |
 | OpenCV            |  177.46ms  | 185.30ms  |
 
 Example comparison time for blurring image 3000x4000 single plane 8-bit in multithreaded mode with 151 kernel size.
 
 |                   | time(NEON) | Time(SSE/AVX) |
 |-------------------|:----------:|:-------------:|
-| libblur(Exact)    |  24.19ms   |    28.73ms    |
-| libblur(Integral) |  11.49ms   |    18.97ms    |
+| libblur(Exact)    |  17.59ms   |    15.51ms    |
+| libblur(Integral) |   9.88ms   |    11.45ms    |
 | OpenCV            |  74.73ms   |    64.20ms    |
 
 ### Stack blur
@@ -225,14 +225,14 @@ Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded 
 
 |         | time(NEON) | time(SSE) |
 |---------|:----------:|:---------:|
-| libblur |   6.21ms   |  11.24ms  |
+| libblur |   6.21ms   |  9.48ms   |
 | OpenCV  |  15.73ms   |  43.59ms  |
 
 Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded mode with 77 radius.
 
 |         | Time(NEON) | Time(SSE) |
 |---------|:----------:|:---------:|
-| libblur |   6.13ms   |  9.17ms   |
+| libblur |   6.13ms   |  7.99ms   |
 | OpenCV  |  15.77ms   |  31.29ms  |
 
 Example comparison time for blurring image 2828x4242 RGBA 8-bit in single-thread mode with 15 radius on MacOS.

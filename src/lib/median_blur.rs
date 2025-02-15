@@ -136,7 +136,7 @@ fn remove_rgb_pixels<const CN: usize>(
     }
 }
 
-#[inline]
+#[inline(always)]
 fn init_histogram<const CN: usize>(
     src: &[u8],
     src_stride: u32,
@@ -178,6 +178,79 @@ fn median_filter(x: [i32; 256], n: i32) -> i32 {
 }
 
 fn median_blur_impl<const CN: usize>(
+    src: &[u8],
+    src_stride: u32,
+    unsafe_dst: &UnsafeSlice<u8>,
+    dst_stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    start_y: u32,
+    end_y: u32,
+) {
+    #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]
+    {
+        if std::arch::is_x86_feature_detected!("avx2") {
+            return unsafe {
+                median_blur_impl_avx2::<CN>(
+                    src, src_stride, unsafe_dst, dst_stride, width, height, radius, start_y, end_y,
+                )
+            };
+        }
+    }
+    #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
+    {
+        if std::arch::is_x86_feature_detected!("sse4.1") {
+            return unsafe {
+                median_blur_impl_sse_4_1::<CN>(
+                    src, src_stride, unsafe_dst, dst_stride, width, height, radius, start_y, end_y,
+                )
+            };
+        }
+    }
+    median_blur_impl_exec::<CN>(
+        src, src_stride, unsafe_dst, dst_stride, width, height, radius, start_y, end_y,
+    );
+}
+
+#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]
+#[target_feature(enable = "avx2")]
+unsafe fn median_blur_impl_avx2<const CN: usize>(
+    src: &[u8],
+    src_stride: u32,
+    unsafe_dst: &UnsafeSlice<u8>,
+    dst_stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    start_y: u32,
+    end_y: u32,
+) {
+    median_blur_impl_exec::<CN>(
+        src, src_stride, unsafe_dst, dst_stride, width, height, radius, start_y, end_y,
+    );
+}
+
+#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
+#[target_feature(enable = "sse4.1")]
+unsafe fn median_blur_impl_sse_4_1<const CN: usize>(
+    src: &[u8],
+    src_stride: u32,
+    unsafe_dst: &UnsafeSlice<u8>,
+    dst_stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    start_y: u32,
+    end_y: u32,
+) {
+    median_blur_impl_exec::<CN>(
+        src, src_stride, unsafe_dst, dst_stride, width, height, radius, start_y, end_y,
+    );
+}
+
+#[inline(always)]
+fn median_blur_impl_exec<const CN: usize>(
     src: &[u8],
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<u8>,

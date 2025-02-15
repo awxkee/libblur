@@ -34,6 +34,8 @@ pub(crate) fn split_channels_3<T: Copy>(
 }
 
 pub fn criterion_benchmark(c: &mut Criterion) {
+    let mut c = c.benchmark_group("Gauss");
+    c.sample_size(10);
     let img = ImageReader::open("assets/test_image_4.png")
         .unwrap()
         .decode()
@@ -100,7 +102,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             .unwrap();
         })
     });
-
+    
     c.bench_function("RGBA gauss blur edge clamp: rad 151", |b| {
         let mut dst_bytes: Vec<u8> = vec![0u8; dimensions.1 as usize * stride];
         b.iter(|| {

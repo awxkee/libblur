@@ -26,65 +26,54 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#![allow(clippy::manual_clamp)]
 mod filter_column;
 mod filter_column_approx;
+#[cfg(feature = "rdm")]
 mod filter_column_approx_rdm;
 mod filter_column_f32;
 mod filter_column_symm;
 mod filter_column_symm_approx;
+#[cfg(feature = "rdm")]
 mod filter_column_symm_approx_rdm;
 mod filter_column_symm_f32;
 mod filter_column_symm_u8_i16;
 mod filter_column_u8_i16;
-mod filter_rgb_row;
-mod filter_rgb_row_approx;
-mod filter_rgb_row_f32;
-mod filter_rgb_row_symm_approx;
-mod filter_rgb_row_symm_approx_rdm;
-mod filter_rgb_row_symm_f32;
 mod filter_rgb_row_symm_u8_i16;
 mod filter_rgb_row_u8_i16;
-mod filter_rgb_symm_row;
-mod filter_rgba_row;
-mod filter_rgba_row_approx;
-mod filter_rgba_row_f32;
-mod filter_rgba_row_symm_approx;
-mod filter_rgba_row_symm_approx_rdm;
-mod filter_rgba_row_symm_f32;
-mod filter_rgba_symm_row;
 mod filter_row;
 mod filter_row_approx;
+#[cfg(feature = "rdm")]
 mod filter_row_approx_rdm;
 mod filter_row_f32;
+mod filter_row_symm;
+mod filter_row_symm_approx;
+#[cfg(feature = "rdm")]
+mod filter_row_symm_approx_rdm;
+mod filter_row_symm_f32;
 pub mod utils;
 
 pub use filter_column::filter_column_neon_u8_f32;
 pub use filter_column_approx::filter_column_neon_u8_i32_app;
+#[cfg(feature = "rdm")]
 pub(crate) use filter_column_approx_rdm::filter_column_neon_u8_i32_i16_qrdm_app;
 pub use filter_column_f32::filter_column_neon_f32_f32;
 pub use filter_column_symm::filter_symm_column_neon_u8_f32;
 pub use filter_column_symm_approx::filter_column_symm_neon_u8_i32_app;
+#[cfg(feature = "rdm")]
 pub(crate) use filter_column_symm_approx_rdm::filter_column_symm_neon_u8_i32_rdm;
 pub use filter_column_symm_f32::filter_column_neon_symm_f32_f32;
 pub use filter_column_symm_u8_i16::filter_column_symm_neon_u8_i16;
 pub use filter_column_u8_i16::filter_column_neon_u8_i16;
-pub use filter_rgb_row::filter_rgb_row_neon_u8_f32;
-pub use filter_rgb_row_approx::filter_rgb_row_neon_u8_i32;
-pub use filter_rgb_row_f32::filter_rgb_row_neon_f32_f32;
-pub use filter_rgb_row_symm_approx::filter_rgb_row_symm_neon_u8_i32;
-pub(crate) use filter_rgb_row_symm_approx_rdm::filter_rgb_row_symm_neon_u8_i32_rdm;
-pub use filter_rgb_row_symm_f32::filter_rgb_row_symm_neon_f32_f32;
 pub use filter_rgb_row_symm_u8_i16::filter_rgb_row_symm_neon_u8_i16;
 pub use filter_rgb_row_u8_i16::filter_rgb_row_neon_u8_i16;
-pub use filter_rgb_symm_row::filter_rgb_symm_row_neon_u8_f32;
-pub use filter_rgba_row::filter_rgba_row_neon_u8_f32;
-pub use filter_rgba_row_approx::filter_rgba_row_neon_u8_i32;
-pub use filter_rgba_row_f32::filter_rgba_row_neon_f32_f32;
-pub use filter_rgba_row_symm_approx::filter_rgba_row_symm_neon_u8_i32;
-pub(crate) use filter_rgba_row_symm_approx_rdm::filter_rgba_row_symm_neon_u8_i32_rdm;
-pub use filter_rgba_row_symm_f32::filter_rgba_row_neon_symm_f32_f32;
-pub use filter_rgba_symm_row::filter_rgba_row_symm_neon_u8_f32;
 pub use filter_row::filter_row_neon_u8_f32;
 pub use filter_row_approx::filter_row_neon_u8_i32_app;
+#[cfg(feature = "rdm")]
 pub(crate) use filter_row_approx_rdm::filter_row_neon_u8_i32_rdm;
 pub use filter_row_f32::filter_row_neon_f32_f32;
+pub use filter_row_symm::filter_row_symm_neon_u8_f32;
+pub use filter_row_symm_approx::filter_row_symm_neon_u8_i32;
+#[cfg(feature = "rdm")]
+pub(crate) use filter_row_symm_approx_rdm::filter_row_symm_neon_u8_i32_rdm;
+pub use filter_row_symm_f32::filter_row_neon_symm_f32_f32;

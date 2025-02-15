@@ -27,19 +27,16 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter1d::arena::Arena;
-use crate::filter1d::color_group::ColorGroup;
 use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::neon::utils::{
-    vdot_exact_s16, vdotq_exact_s16, vmul_u8_by_i16, vmulq_u8_by_i16,
+    vdotq_exact_s16, vmulq_u8_by_i16, xvld1q_u8_x3, xvld1q_u8_x4, xvst1q_u8_x3, xvst1q_u8_x4,
 };
 use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
 use crate::unsafe_slice::UnsafeSlice;
-use num_traits::MulAdd;
 use std::arch::aarch64::*;
-use std::ops::Mul;
 
-pub fn filter_rgb_row_neon_u8_i16(
+pub fn filter_rgb_row_neon_u8_i16<const N: usize>(
     arena: Arena,
     arena_src: &[u8],
     dst: &UnsafeSlice<u8>,
@@ -50,8 +47,6 @@ pub fn filter_rgb_row_neon_u8_i16(
     unsafe {
         let width = image_size.width;
 
-        const N: usize = 3;
-
         let src = arena_src;
 
         let dst_stride = image_size.width * arena.components;
@@ -61,122 +56,129 @@ pub fn filter_rgb_row_neon_u8_i16(
         let y = filter_region.start;
         let local_src = src;
 
-        let mut _cx = 0usize;
+        let mut cx = 0usize;
 
-        let zeros = vdupq_n_s16(0);
+        let max_width = width * N;
 
-        while _cx + 16 < width {
+        while cx + 64 < max_width {
             let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(0).weight);
 
-            let shifted_src = local_src.get_unchecked((_cx * N)..);
+            let shifted_src = local_src.get_unchecked(cx..);
 
-            let source = vld3q_u8(shifted_src.as_ptr());
+            let source = xvld1q_u8_x4(shifted_src.as_ptr());
+            let mut k0 = vmulq_u8_by_i16(source.0, coeff);
+            let mut k1 = vmulq_u8_by_i16(source.1, coeff);
+            let mut k2 = vmulq_u8_by_i16(source.2, coeff);
+            let mut k3 = vmulq_u8_by_i16(source.3, coeff);
+
+            for i in 1..length {
+                let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight);
+                let v_source = xvld1q_u8_x4(shifted_src.get_unchecked((i * N)..).as_ptr());
+                k0 = vdotq_exact_s16(k0, v_source.0, coeff);
+                k1 = vdotq_exact_s16(k1, v_source.1, coeff);
+                k2 = vdotq_exact_s16(k2, v_source.2, coeff);
+                k3 = vdotq_exact_s16(k3, v_source.3, coeff);
+            }
+
+            let dst_offset = y * dst_stride + cx;
+            let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+            xvst1q_u8_x4(
+                dst_ptr0,
+                uint8x16x4_t(
+                    vcombine_u8(vqmovun_s16(k0.0), vqmovun_s16(k0.1)),
+                    vcombine_u8(vqmovun_s16(k1.0), vqmovun_s16(k1.1)),
+                    vcombine_u8(vqmovun_s16(k2.0), vqmovun_s16(k2.1)),
+                    vcombine_u8(vqmovun_s16(k3.0), vqmovun_s16(k3.1)),
+                ),
+            );
+            cx += 64;
+        }
+
+        while cx + 48 < max_width {
+            let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(0).weight);
+
+            let shifted_src = local_src.get_unchecked(cx..);
+
+            let source = xvld1q_u8_x3(shifted_src.as_ptr());
             let mut k0 = vmulq_u8_by_i16(source.0, coeff);
             let mut k1 = vmulq_u8_by_i16(source.1, coeff);
             let mut k2 = vmulq_u8_by_i16(source.2, coeff);
 
             for i in 1..length {
                 let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight);
-                let v_source = vld3q_u8(shifted_src.get_unchecked((i * N)..).as_ptr());
+                let v_source = xvld1q_u8_x3(shifted_src.get_unchecked((i * N)..).as_ptr());
                 k0 = vdotq_exact_s16(k0, v_source.0, coeff);
                 k1 = vdotq_exact_s16(k1, v_source.1, coeff);
                 k2 = vdotq_exact_s16(k2, v_source.2, coeff);
             }
 
-            let dst_offset = y * dst_stride + _cx * N;
+            let dst_offset = y * dst_stride + cx;
             let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
-            vst3q_u8(
+            xvst1q_u8_x3(
                 dst_ptr0,
                 uint8x16x3_t(
-                    vcombine_u8(
-                        vqmovun_s16(vmaxq_s16(k0.0, zeros)),
-                        vqmovun_s16(vmaxq_s16(k0.1, zeros)),
-                    ),
-                    vcombine_u8(
-                        vqmovun_s16(vmaxq_s16(k1.0, zeros)),
-                        vqmovun_s16(vmaxq_s16(k1.1, zeros)),
-                    ),
-                    vcombine_u8(
-                        vqmovun_s16(vmaxq_s16(k2.0, zeros)),
-                        vqmovun_s16(vmaxq_s16(k2.1, zeros)),
-                    ),
+                    vcombine_u8(vqmovun_s16(k0.0), vqmovun_s16(k0.1)),
+                    vcombine_u8(vqmovun_s16(k1.0), vqmovun_s16(k1.1)),
+                    vcombine_u8(vqmovun_s16(k2.0), vqmovun_s16(k2.1)),
                 ),
             );
-            _cx += 16;
+            cx += 48;
         }
 
-        while _cx + 8 < width {
+        while cx + 16 < max_width {
             let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(0).weight);
 
-            let shifted_src = local_src.get_unchecked((_cx * N)..);
+            let shifted_src = local_src.get_unchecked(cx..);
 
-            let source = vld3_u8(shifted_src.as_ptr());
-            let mut k0 = vmul_u8_by_i16(source.0, coeff);
-            let mut k1 = vmul_u8_by_i16(source.1, coeff);
-            let mut k2 = vmul_u8_by_i16(source.2, coeff);
+            let source = vld1q_u8(shifted_src.as_ptr());
+            let mut k0 = vmulq_u8_by_i16(source, coeff);
 
             for i in 1..length {
                 let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight);
-                let v_source = vld3_u8(shifted_src.get_unchecked((i * N)..).as_ptr());
-                k0 = vdot_exact_s16(k0, v_source.0, coeff);
-                k1 = vdot_exact_s16(k1, v_source.1, coeff);
-                k2 = vdot_exact_s16(k2, v_source.2, coeff);
+                let v_source = vld1q_u8(shifted_src.get_unchecked((i * N)..).as_ptr());
+                k0 = vdotq_exact_s16(k0, v_source, coeff);
             }
 
-            let dst_offset = y * dst_stride + _cx * N;
+            let dst_offset = y * dst_stride + cx;
             let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
-            vst3_u8(
-                dst_ptr0,
-                uint8x8x3_t(
-                    vqmovun_s16(vmaxq_s16(k0, zeros)),
-                    vqmovun_s16(vmaxq_s16(k1, zeros)),
-                    vqmovun_s16(vmaxq_s16(k2, zeros)),
-                ),
-            );
-            _cx += 8;
+            vst1q_u8(dst_ptr0, vcombine_u8(vqmovun_s16(k0.0), vqmovun_s16(k0.1)));
+            cx += 16;
         }
 
-        while _cx + 4 < width {
+        while cx + 4 < max_width {
             let coeff = *scanned_kernel.get_unchecked(0);
-
-            let shifted_src = local_src.get_unchecked((_cx * N)..);
-
-            let mut k0 = ColorGroup::<N, i16>::from_slice(shifted_src, 0).mul(coeff.weight);
-            let mut k1 = ColorGroup::<N, i16>::from_slice(shifted_src, N).mul(coeff.weight);
-            let mut k2 = ColorGroup::<N, i16>::from_slice(shifted_src, N * 2).mul(coeff.weight);
-            let mut k3 = ColorGroup::<N, i16>::from_slice(shifted_src, N * 3).mul(coeff.weight);
+            let shifted_src = local_src.get_unchecked(cx..);
+            let mut k0 = *shifted_src.get_unchecked(0) as i16 * coeff.weight;
+            let mut k1 = *shifted_src.get_unchecked(1) as i16 * coeff.weight;
+            let mut k2 = *shifted_src.get_unchecked(2) as i16 * coeff.weight;
+            let mut k3 = *shifted_src.get_unchecked(3) as i16 * coeff.weight;
 
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
-                k0 = ColorGroup::<N, i16>::from_slice(shifted_src, i * N).mul_add(k0, coeff.weight);
-                k1 = ColorGroup::<N, i16>::from_slice(shifted_src, (i + 1) * N)
-                    .mul_add(k1, coeff.weight);
-                k2 = ColorGroup::<N, i16>::from_slice(shifted_src, (i + 2) * N)
-                    .mul_add(k2, coeff.weight);
-                k3 = ColorGroup::<N, i16>::from_slice(shifted_src, (i + 3) * N)
-                    .mul_add(k3, coeff.weight);
+                k0 += *shifted_src.get_unchecked(i * N) as i16 * coeff.weight;
+                k1 += *shifted_src.get_unchecked(i * N + 1) as i16 * coeff.weight;
+                k2 += *shifted_src.get_unchecked(i * N + 2) as i16 * coeff.weight;
+                k3 += *shifted_src.get_unchecked(i * N + 3) as i16 * coeff.weight;
             }
 
-            let dst_offset = y * dst_stride + _cx * N;
-
-            k0.to_store(dst, dst_offset);
-            k1.to_store(dst, dst_offset + N);
-            k2.to_store(dst, dst_offset + N * 2);
-            k3.to_store(dst, dst_offset + N * 3);
-            _cx += 4;
+            dst.write(y * dst_stride + cx, k0.max(0).min(255) as u8);
+            dst.write(y * dst_stride + cx + 1, k1.max(0).min(255) as u8);
+            dst.write(y * dst_stride + cx + 2, k2.max(0).min(255) as u8);
+            dst.write(y * dst_stride + cx + 3, k3.max(0).min(255) as u8);
+            cx += 4;
         }
 
-        for x in _cx..width {
+        for x in cx..max_width {
             let coeff = *scanned_kernel.get_unchecked(0);
-            let shifted_src = local_src.get_unchecked((x * N)..);
-            let mut k0 = ColorGroup::<N, i16>::from_slice(shifted_src, 0).mul(coeff.weight);
+            let shifted_src = local_src.get_unchecked(x..);
+            let mut k0 = *shifted_src.get_unchecked(0) as i16 * coeff.weight;
 
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
-                k0 = ColorGroup::<N, i16>::from_slice(shifted_src, i * N).mul_add(k0, coeff.weight);
+                k0 += *shifted_src.get_unchecked(i * N) as i16 * coeff.weight;
             }
 
-            k0.to_store(dst, y * dst_stride + x * N);
+            dst.write(y * dst_stride + x, k0.max(0).min(255) as u8);
         }
     }
 }

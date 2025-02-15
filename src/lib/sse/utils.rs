@@ -98,14 +98,14 @@ pub(crate) unsafe fn _mm_blendv_epi32x(xmm0: __m128i, xmm1: __m128i, mask: __m12
     ))
 }
 
-pub(crate) const fn shuffle(z: u32, y: u32, x: u32, w: u32) -> i32 {
+pub(crate) const fn _shuffle(z: u32, y: u32, x: u32, w: u32) -> i32 {
     // Checked: we want to reinterpret the bits
     ((z << 6) | (y << 4) | (x << 2) | w) as i32
 }
 
 #[inline(always)]
 pub(crate) unsafe fn _mm_packus_epi64(a: __m128i, b: __m128i) -> __m128i {
-    const SHUFFLE_MASK: i32 = shuffle(3, 1, 2, 0);
+    const SHUFFLE_MASK: i32 = _shuffle(3, 1, 2, 0);
     let a = _mm_shuffle_epi32::<SHUFFLE_MASK>(a);
     let b1 = _mm_shuffle_epi32::<SHUFFLE_MASK>(b);
     _mm_castps_si128(_mm_movelh_ps(_mm_castsi128_ps(a), _mm_castsi128_ps(b1)))
@@ -264,25 +264,25 @@ pub(crate) unsafe fn _mm_split_rgb_5_ps(
 
 #[inline(always)]
 pub(crate) unsafe fn _mm_broadcast_first(item: __m128) -> __m128 {
-    const FLAG: i32 = shuffle(0, 0, 0, 0);
+    const FLAG: i32 = _shuffle(0, 0, 0, 0);
     _mm_shuffle_ps::<FLAG>(item, item)
 }
 
 #[inline(always)]
 pub(crate) unsafe fn _mm_broadcast_second(item: __m128) -> __m128 {
-    const FLAG: i32 = shuffle(1, 1, 1, 1);
+    const FLAG: i32 = _shuffle(1, 1, 1, 1);
     _mm_shuffle_ps::<FLAG>(item, item)
 }
 
 #[inline(always)]
 pub(crate) unsafe fn _mm_broadcast_third(item: __m128) -> __m128 {
-    const FLAG: i32 = shuffle(2, 2, 2, 2);
+    const FLAG: i32 = _shuffle(2, 2, 2, 2);
     _mm_shuffle_ps::<FLAG>(item, item)
 }
 
 #[inline(always)]
 pub(crate) unsafe fn _mm_broadcast_fourth(item: __m128) -> __m128 {
-    const FLAG: i32 = shuffle(3, 3, 3, 3);
+    const FLAG: i32 = _shuffle(3, 3, 3, 3);
     _mm_shuffle_ps::<FLAG>(item, item)
 }
 

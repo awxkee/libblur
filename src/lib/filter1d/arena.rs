@@ -26,7 +26,6 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#![forbid(unsafe_code)]
 use crate::edge_mode::{reflect_index, reflect_index_101};
 use crate::filter1d::arena_roi::copy_roi;
 use crate::filter1d::filter_element::KernelShape;
@@ -89,6 +88,70 @@ impl ArenaPads {
 
 /// Pads an image with chosen border strategy
 pub fn make_arena<T, const COMPONENTS: usize>(
+    image: &[T],
+    image_size: ImageSize,
+    pads: ArenaPads,
+    border_mode: EdgeMode,
+    scalar: Scalar,
+) -> Result<(Vec<T>, Arena), String>
+where
+    T: Default + Copy + Send + Sync + 'static,
+    f64: AsPrimitive<T>,
+{
+    #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]
+    {
+        if std::arch::is_x86_feature_detected!("avx2") {
+            return unsafe {
+                make_arena_avx2::<T, COMPONENTS>(image, image_size, pads, border_mode, scalar)
+            };
+        }
+    }
+    #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
+    {
+        if std::arch::is_x86_feature_detected!("sse4.1") {
+            return unsafe {
+                make_arena_sse4_1::<T, COMPONENTS>(image, image_size, pads, border_mode, scalar)
+            };
+        }
+    }
+    make_arena_exec::<T, COMPONENTS>(image, image_size, pads, border_mode, scalar)
+}
+
+#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]
+#[target_feature(enable = "avx2")]
+unsafe fn make_arena_avx2<T, const COMPONENTS: usize>(
+    image: &[T],
+    image_size: ImageSize,
+    pads: ArenaPads,
+    border_mode: EdgeMode,
+    scalar: Scalar,
+) -> Result<(Vec<T>, Arena), String>
+where
+    T: Default + Copy + Send + Sync + 'static,
+    f64: AsPrimitive<T>,
+{
+    make_arena_exec::<T, COMPONENTS>(image, image_size, pads, border_mode, scalar)
+}
+
+#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
+#[target_feature(enable = "sse4.1")]
+unsafe fn make_arena_sse4_1<T, const COMPONENTS: usize>(
+    image: &[T],
+    image_size: ImageSize,
+    pads: ArenaPads,
+    border_mode: EdgeMode,
+    scalar: Scalar,
+) -> Result<(Vec<T>, Arena), String>
+where
+    T: Default + Copy + Send + Sync + 'static,
+    f64: AsPrimitive<T>,
+{
+    make_arena_exec::<T, COMPONENTS>(image, image_size, pads, border_mode, scalar)
+}
+
+/// Pads an image with chosen border strategy
+#[inline(always)]
+fn make_arena_exec<T, const COMPONENTS: usize>(
     image: &[T],
     image_size: ImageSize,
     pads: ArenaPads,
@@ -407,6 +470,70 @@ where
 
 /// Pads a column image with chosen border strategy
 pub fn make_arena_columns<T, const COMPONENTS: usize>(
+    image: &[T],
+    image_size: ImageSize,
+    kernel_size: KernelShape,
+    border_mode: EdgeMode,
+    scalar: Scalar,
+) -> Result<ArenaColumns<T>, String>
+where
+    T: Default + Copy + Send + Sync + 'static,
+    f64: AsPrimitive<T>,
+{
+    #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]
+    {
+        if std::arch::is_x86_feature_detected!("avx2") {
+            return unsafe {
+                mac_avx2::<T, COMPONENTS>(image, image_size, kernel_size, border_mode, scalar)
+            };
+        }
+    }
+    #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
+    {
+        if std::arch::is_x86_feature_detected!("sse4.1") {
+            return unsafe {
+                mac_sse_4_1::<T, COMPONENTS>(image, image_size, kernel_size, border_mode, scalar)
+            };
+        }
+    }
+    make_arena_columns_exec::<T, COMPONENTS>(image, image_size, kernel_size, border_mode, scalar)
+}
+
+#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]
+#[target_feature(enable = "avx2")]
+unsafe fn mac_avx2<T, const COMPONENTS: usize>(
+    image: &[T],
+    image_size: ImageSize,
+    kernel_size: KernelShape,
+    border_mode: EdgeMode,
+    scalar: Scalar,
+) -> Result<ArenaColumns<T>, String>
+where
+    T: Default + Copy + Send + Sync + 'static,
+    f64: AsPrimitive<T>,
+{
+    make_arena_columns_exec::<T, COMPONENTS>(image, image_size, kernel_size, border_mode, scalar)
+}
+
+#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
+#[target_feature(enable = "sse4.1")]
+unsafe fn mac_sse_4_1<T, const COMPONENTS: usize>(
+    image: &[T],
+    image_size: ImageSize,
+    kernel_size: KernelShape,
+    border_mode: EdgeMode,
+    scalar: Scalar,
+) -> Result<ArenaColumns<T>, String>
+where
+    T: Default + Copy + Send + Sync + 'static,
+    f64: AsPrimitive<T>,
+{
+    make_arena_columns_exec::<T, COMPONENTS>(image, image_size, kernel_size, border_mode, scalar)
+}
+
+/// Pads a column image with chosen border strategy
+#[inline(always)]
+fn make_arena_columns_exec<T, const COMPONENTS: usize>(
     image: &[T],
     image_size: ImageSize,
     kernel_size: KernelShape,

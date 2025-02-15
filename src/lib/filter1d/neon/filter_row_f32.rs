@@ -28,6 +28,7 @@
  */
 use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_scan::ScanPoint1d;
+use crate::filter1d::neon::utils::{xvld1q_f32_x2, xvld1q_f32_x4};
 use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
@@ -37,7 +38,7 @@ use crate::unsafe_slice::UnsafeSlice;
 use std::arch::aarch64::*;
 use std::ops::Mul;
 
-pub fn filter_row_neon_f32_f32(
+pub fn filter_row_neon_f32_f32<const N: usize>(
     _: Arena,
     arena_src: &[f32],
     dst: &UnsafeSlice<f32>,
@@ -46,25 +47,25 @@ pub fn filter_row_neon_f32_f32(
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
     unsafe {
-        let width = image_size.width;
-
         let src = arena_src;
 
-        let dst_stride = image_size.width;
+        let dst_stride = image_size.width * N;
 
         let y = filter_region.start;
         let local_src = src;
 
         let length = scanned_kernel.len();
 
-        let mut _cx = 0usize;
+        let max_width = image_size.width * N;
 
-        while _cx + 16 < image_size.width {
+        let mut cx = 0usize;
+
+        while cx + 16 < max_width {
             let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(0).weight);
 
-            let shifted_src = local_src.get_unchecked(_cx..);
+            let shifted_src = local_src.get_unchecked(cx..);
 
-            let source = vld1q_f32_x4(shifted_src.as_ptr());
+            let source = xvld1q_f32_x4(shifted_src.as_ptr());
             let mut k0 = vmulq_f32(source.0, coeff);
             let mut k1 = vmulq_f32(source.1, coeff);
             let mut k2 = vmulq_f32(source.2, coeff);
@@ -72,89 +73,89 @@ pub fn filter_row_neon_f32_f32(
 
             for i in 1..length {
                 let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(i).weight);
-                let v_source = vld1q_f32_x4(shifted_src.get_unchecked(i..).as_ptr());
+                let v_source = xvld1q_f32_x4(shifted_src.get_unchecked(i * N..).as_ptr());
                 k0 = prefer_vfmaq_f32(k0, v_source.0, coeff);
                 k1 = prefer_vfmaq_f32(k1, v_source.1, coeff);
                 k2 = prefer_vfmaq_f32(k2, v_source.2, coeff);
                 k3 = prefer_vfmaq_f32(k3, v_source.3, coeff);
             }
 
-            let dst_offset = y * dst_stride + _cx;
+            let dst_offset = y * dst_stride + cx;
             let dst_ptr0 = (dst.slice.as_ptr() as *mut f32).add(dst_offset);
             vst1q_f32_x4(dst_ptr0, float32x4x4_t(k0, k1, k2, k3));
-            _cx += 16;
+            cx += 16;
         }
 
-        while _cx + 8 < image_size.width {
+        while cx + 8 < max_width {
             let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(0).weight);
 
-            let shifted_src = local_src.get_unchecked(_cx..);
+            let shifted_src = local_src.get_unchecked(cx..);
 
-            let source = vld1q_f32_x2(shifted_src.as_ptr());
+            let source = xvld1q_f32_x2(shifted_src.as_ptr());
             let mut k0 = vmulq_f32(source.0, coeff);
             let mut k1 = vmulq_f32(source.1, coeff);
 
             for i in 1..length {
                 let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(i).weight);
-                let v_source = vld1q_f32_x2(shifted_src.get_unchecked(i..).as_ptr());
+                let v_source = xvld1q_f32_x2(shifted_src.get_unchecked(i * N..).as_ptr());
                 k0 = prefer_vfmaq_f32(k0, v_source.0, coeff);
                 k1 = prefer_vfmaq_f32(k1, v_source.1, coeff);
             }
 
-            let dst_offset = y * dst_stride + _cx;
+            let dst_offset = y * dst_stride + cx;
             let dst_ptr0 = (dst.slice.as_ptr() as *mut f32).add(dst_offset);
             vst1q_f32_x2(dst_ptr0, float32x4x2_t(k0, k1));
-            _cx += 8;
+            cx += 8;
         }
 
-        while _cx + 4 < image_size.width {
+        while cx + 4 < max_width {
             let coeff = *scanned_kernel.get_unchecked(0);
 
-            let shifted_src = local_src.get_unchecked(_cx..);
+            let shifted_src = local_src.get_unchecked(cx..);
 
             let source_0 = vld1q_f32(shifted_src.as_ptr());
             let mut k0 = vmulq_f32(source_0, vdupq_n_f32(coeff.weight));
 
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
-                let v_source_0 = vld1q_f32(shifted_src.get_unchecked(i..).as_ptr());
+                let v_source_0 = vld1q_f32(shifted_src.get_unchecked(i * N..).as_ptr());
                 k0 = prefer_vfmaq_f32(k0, v_source_0, vdupq_n_f32(coeff.weight));
             }
 
-            let dst_offset = y * dst_stride + _cx;
+            let dst_offset = y * dst_stride + cx;
             let dst_ptr = (dst.slice.as_ptr() as *mut f32).add(dst_offset);
             vst1q_f32(dst_ptr, k0);
-            _cx += 4;
+            cx += 4;
         }
 
-        while _cx + 2 < image_size.width {
+        while cx + 2 < max_width {
             let coeff = *scanned_kernel.get_unchecked(0);
 
-            let shifted_src = local_src.get_unchecked(_cx..);
+            let shifted_src = local_src.get_unchecked(cx..);
 
             let source_0 = vld1_f32(shifted_src.as_ptr());
             let mut k0 = vmul_f32(source_0, vdup_n_f32(coeff.weight));
 
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
-                let v_source_0 = vld1_f32(shifted_src.get_unchecked(i..).as_ptr());
+                let v_source_0 = vld1_f32(shifted_src.get_unchecked(i * N..).as_ptr());
                 k0 = prefer_vfma_f32(k0, v_source_0, vdup_n_f32(coeff.weight));
             }
 
-            let dst_offset = y * dst_stride + _cx;
+            let dst_offset = y * dst_stride + cx;
             let dst_ptr = (dst.slice.as_ptr() as *mut f32).add(dst_offset);
             vst1_f32(dst_ptr, k0);
-            _cx += 2;
+            cx += 2;
         }
 
-        for x in _cx..width {
+        for x in cx..max_width {
             let coeff = *scanned_kernel.get_unchecked(0);
             let shifted_src = local_src.get_unchecked(x..);
             let mut k0 = (*shifted_src.get_unchecked(0)).mul(coeff.weight);
 
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
-                k0 = mlaf(k0, *shifted_src.get_unchecked(i), coeff.weight);
+                k0 = mlaf(k0, *shifted_src.get_unchecked(i * N), coeff.weight);
             }
             dst.write(y * dst_stride + x, k0.to_());
         }
