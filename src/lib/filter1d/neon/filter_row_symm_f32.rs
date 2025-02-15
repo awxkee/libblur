@@ -56,7 +56,7 @@ pub fn filter_row_neon_symm_f32_f32(
         let half_len = length / 2;
 
         let mut cx = 0usize;
-        
+
         let n = arena.components;
 
         let max_width = image_size.width * arena.components;

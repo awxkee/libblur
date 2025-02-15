@@ -35,7 +35,7 @@ use crate::filter1d::filter_row_cg::filter_color_group_row;
 use crate::filter1d::filter_row_cg_symmetric::filter_color_group_symmetrical_row;
 use crate::filter1d::filter_scan::ScanPoint1d;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use crate::filter1d::neon::{filter_row_neon_symm_f32_f32};
+use crate::filter1d::neon::filter_row_neon_symm_f32_f32;
 use crate::filter1d::region::FilterRegion;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::filter1d::sse::{

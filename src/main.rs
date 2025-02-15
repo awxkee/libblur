@@ -159,11 +159,11 @@ fn main() {
         .unwrap()
         .decode()
         .unwrap();
-    
+
     let dimensions = dyn_image.dimensions();
     println!("dimensions {:?}", dyn_image.dimensions());
     println!("type {:?}", dyn_image.color());
-    
+
     // let vldg = dyn_image.to_rgb8();
     // let new_rgb = image::imageops::blur(&vldg, 66.);
     // let dyn_image = DynamicImage::ImageRgb8(dyn_image.to_rgb8());

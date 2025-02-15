@@ -14,6 +14,7 @@ libblur = {path = "../src/lib", default-features = false}
 [features]
 avx = ["libblur/avx"]
 sse = ["libblur/sse"]
+rdm = ["libblur/rdm"]
 
 [[bin]]
 name = "gauss"

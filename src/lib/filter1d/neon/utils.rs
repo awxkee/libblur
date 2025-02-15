@@ -30,6 +30,7 @@ use crate::neon::prefer_vfmaq_f32;
 use std::arch::aarch64::*;
 
 #[inline(always)]
+#[cfg(feature = "rdm")]
 pub(crate) unsafe fn vmullq_expand_i16<const EXPAND: i32>(
     input: uint8x16_t,
     weight: int16x8_t,
@@ -41,6 +42,7 @@ pub(crate) unsafe fn vmullq_expand_i16<const EXPAND: i32>(
 }
 
 #[inline(always)]
+#[cfg(feature = "rdm")]
 pub(crate) unsafe fn vmull_expand_i16<const EXPAND: i32>(
     input: uint8x8_t,
     weight: int16x8_t,
@@ -50,6 +52,7 @@ pub(crate) unsafe fn vmull_expand_i16<const EXPAND: i32>(
 }
 
 #[inline(always)]
+#[cfg(feature = "rdm")]
 pub(crate) unsafe fn vmlaq_hi_u8_s16<const EXPAND: i32>(
     store: (int16x8_t, int16x8_t),
     input: uint8x16_t,
@@ -65,6 +68,7 @@ pub(crate) unsafe fn vmlaq_hi_u8_s16<const EXPAND: i32>(
 }
 
 #[inline(always)]
+#[cfg(feature = "rdm")]
 pub(crate) unsafe fn vmla_symm_hi_u8_s16<const EXPAND: i32>(
     store: int16x8_t,
     input0: uint8x8_t,
@@ -77,6 +81,7 @@ pub(crate) unsafe fn vmla_symm_hi_u8_s16<const EXPAND: i32>(
 }
 
 #[inline(always)]
+#[cfg(feature = "rdm")]
 pub(crate) unsafe fn vmlaq_symm_hi_u8_s16<const EXPAND: i32>(
     store: (int16x8_t, int16x8_t),
     input0: uint8x16_t,
@@ -359,22 +364,6 @@ pub(crate) unsafe fn vfmla_symm_u8_s16(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn vfmla_u8_f32(
-    store: (float32x4_t, float32x4_t),
-    input: uint8x8_t,
-    weight: float32x4_t,
-) -> (float32x4_t, float32x4_t) {
-    let lo_16 = vmovl_u8(input);
-    let lo_lo = vcvtq_f32_u32(vmovl_u16(vget_low_u16(lo_16)));
-    let lo_hi = vcvtq_f32_u32(vmovl_high_u16(lo_16));
-
-    (
-        prefer_vfmaq_f32(store.0, lo_lo, weight),
-        prefer_vfmaq_f32(store.1, lo_hi, weight),
-    )
-}
-
-#[inline(always)]
 pub(crate) unsafe fn vfmla_symm_u8_f32(
     store: (float32x4_t, float32x4_t),
     input0: uint8x8_t,
@@ -418,6 +407,7 @@ pub(crate) unsafe fn vqmovnq_s32_u8(
 }
 
 #[inline(always)]
+#[cfg(feature = "rdm")]
 pub(crate) unsafe fn vqmovnq_s16x2_u8<const PRECISION: i32>(
     store: (int16x8_t, int16x8_t),
 ) -> uint8x16_t {
@@ -434,6 +424,7 @@ pub(crate) unsafe fn vqmovn_s32_u8(store: (int32x4_t, int32x4_t)) -> uint8x8_t {
 }
 
 #[inline(always)]
+#[cfg(feature = "rdm")]
 pub(crate) unsafe fn vqmovn_s16_u8<const PRECISION: i32>(store: int16x8_t) -> uint8x8_t {
     vqrshrun_n_s16::<PRECISION>(store)
 }

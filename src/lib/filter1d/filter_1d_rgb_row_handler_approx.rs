@@ -26,16 +26,12 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use crate::cpu_features::is_aarch_rdm_supported;
 use crate::filter1d::arena::Arena;
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]
 use crate::filter1d::avx::{filter_rgb_row_avx_symm_u8_i32_approx, filter_rgb_row_avx_u8_i32_app};
 use crate::filter1d::filter_row_cg_approx::filter_color_group_row_approx;
 use crate::filter1d::filter_row_cg_approx_symmetric::filter_color_group_row_symmetric_approx;
 use crate::filter1d::filter_scan::ScanPoint1d;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use crate::filter1d::neon::filter_rgb_row_symm_neon_u8_i32;
 use crate::filter1d::region::FilterRegion;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::filter1d::sse::{filter_rgb_row_sse_symm_u8_i32_app, filter_rgb_row_sse_u8_i32_app};
@@ -98,11 +94,16 @@ impl Filter1DRgbRowHandlerApprox<u8, i32> for u8 {
         is_symmetrical_kernel: bool,
     ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<i32>]) {
         if is_symmetrical_kernel {
-            if is_aarch_rdm_supported() {
-                use crate::filter1d::neon::filter_row_symm_neon_u8_i32_rdm;
-                return filter_row_symm_neon_u8_i32_rdm::<3>;
+            #[cfg(feature = "rdm")]
+            {
+                use crate::cpu_features::is_aarch_rdm_supported;
+                if is_aarch_rdm_supported() {
+                    use crate::filter1d::neon::filter_row_symm_neon_u8_i32_rdm;
+                    return filter_row_symm_neon_u8_i32_rdm::<3>;
+                }
             }
-            filter_rgb_row_symm_neon_u8_i32
+            use crate::filter1d::neon::filter_row_symm_neon_u8_i32;
+            filter_row_symm_neon_u8_i32::<3>
         } else {
             use crate::filter1d::neon::filter_row_neon_u8_i32_app;
             filter_row_neon_u8_i32_app::<3>
