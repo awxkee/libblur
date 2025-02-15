@@ -30,7 +30,6 @@ use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_row_cg_approx::filter_color_group_row_approx;
 use crate::filter1d::filter_row_cg_approx_symmetric::filter_color_group_row_symmetric_approx;
 use crate::filter1d::filter_scan::ScanPoint1d;
-use crate::filter1d::neon::filter_row_symm_neon_u8_i32;
 use crate::filter1d::region::FilterRegion;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::ImageSize;
@@ -100,6 +99,7 @@ impl Filter1DRowHandlerApprox<u8, i32> for u8 {
                     return filter_row_symm_neon_u8_i32_rdm::<1>;
                 }
             }
+            use crate::filter1d::neon::filter_row_symm_neon_u8_i32;
             return filter_row_symm_neon_u8_i32::<1>;
         }
         #[cfg(feature = "rdm")]

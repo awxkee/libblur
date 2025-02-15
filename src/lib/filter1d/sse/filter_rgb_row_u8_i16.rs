@@ -134,7 +134,7 @@ unsafe fn filter_rgb_row_sse_u8_i16_impl<const N: usize>(
         cx += 16;
     }
 
-    while cx + 4 < width {
+    while cx + 4 < max_width {
         let coeff = *scanned_kernel.get_unchecked(0);
         let shifted_src = local_src.get_unchecked(cx..);
         let mut k0 = *shifted_src.get_unchecked(0) as i16 * coeff.weight;
