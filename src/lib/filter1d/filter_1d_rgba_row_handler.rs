@@ -194,7 +194,26 @@ impl Filter1DRgbaRowHandler<u16, f32> for u16 {
         }
     }
 
-    #[cfg(not(all(target_arch = "aarch64", target_feature = "neon")))]
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    fn get_rgba_row_handler(
+        is_kernel_symmetric: bool,
+    ) -> fn(Arena, &[u16], &UnsafeSlice<u16>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
+        if is_kernel_symmetric {
+            if std::arch::is_x86_feature_detected!("sse4.1") {
+                use crate::filter1d::sse::filter_row_sse_symm_u16_f32;
+                return filter_row_sse_symm_u16_f32::<4>;
+            }
+            filter_row_symmetrical::<u16, f32, 4>
+        } else {
+            use crate::filter1d::filter_row::filter_row;
+            filter_row::<u16, f32, 4>
+        }
+    }
+
+    #[cfg(not(any(
+        all(target_arch = "aarch64", target_feature = "neon"),
+        any(target_arch = "x86_64", target_arch = "x86")
+    )))]
     fn get_rgba_row_handler(
         is_kernel_symmetric: bool,
     ) -> fn(Arena, &[u16], &UnsafeSlice<u16>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
