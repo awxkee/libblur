@@ -60,11 +60,13 @@ fn fuzz_image(width: usize, height: usize, radius: usize, channels: FastBlurChan
     let mut dst_image = vec![1u16; width * height * channels.get_channels()];
     fast_gaussian_u16(
         &mut dst_image,
+        width as u32 * channels.get_channels() as u32,
         width as u32,
         height as u32,
         radius as u32,
         channels,
         ThreadingPolicy::Single,
         EdgeMode::Clamp,
-    );
+    )
+    .unwrap();
 }

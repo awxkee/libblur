@@ -174,6 +174,22 @@ pub unsafe fn load_u8_u32_fast<const CHANNELS_COUNT: usize>(ptr: *const u8) -> u
 }
 
 #[inline(always)]
+pub unsafe fn load_u16_s32_fast<const CN: usize>(ptr: *const u16) -> int32x4_t {
+    if CN == 4 {
+        vreinterpretq_s32_u32(vmovl_u16(vld1_u16(ptr)))
+    } else if CN == 3 {
+        let mut v0 = vreinterpret_u16_u32(vld1_lane_u32::<0>(ptr as *const u32, vdup_n_u32(0)));
+        v0 = vld1_lane_u16::<2>(ptr.add(2), v0);
+        vreinterpretq_s32_u32(vmovl_u16(v0))
+    } else if CN == 2 {
+        let v0 = vreinterpret_u16_u32(vld1_lane_u32::<0>(ptr as *const u32, vdup_n_u32(0)));
+        vreinterpretq_s32_u32(vmovl_u16(v0))
+    } else {
+        vreinterpretq_s32_u32(vmovl_u16(vld1_lane_u16::<0>(ptr, vdup_n_u16(0))))
+    }
+}
+
+#[inline(always)]
 pub(crate) unsafe fn vmulq_u32_f32(a: uint32x4_t, b: float32x4_t) -> uint32x4_t {
     let cvt = vcvtq_f32_u32(a);
     vcvtaq_u32_f32(vmulq_f32(cvt, b))
@@ -313,5 +329,56 @@ pub(crate) unsafe fn store_u8x8_m4<const CHANNELS_COUNT: usize>(
         vst1_lane_u16::<0>(dst_ptr as *mut _, vreinterpret_u16_u32(casted_u32));
     } else {
         vst1_lane_u8::<0>(dst_ptr, vreinterpret_u8_u32(casted_u32));
+    }
+}
+
+/// Stores up to 4 values from uint16x4_t
+#[inline(always)]
+pub(crate) unsafe fn store_u16x4<const CN: usize>(dst_ptr: *mut u16, a0: uint16x4_t) {
+    if CN == 4 {
+        vst1_u16(dst_ptr, a0);
+    } else if CN == 3 {
+        vst1_lane_u32::<0>(dst_ptr as *mut _, vreinterpret_u32_u16(a0));
+        vst1_lane_u16::<2>(dst_ptr.add(2) as *mut _, a0);
+    } else if CN == 2 {
+        vst1_lane_u32::<0>(dst_ptr as *mut _, vreinterpret_u32_u16(a0));
+    } else {
+        vst1_lane_u16::<0>(dst_ptr as *mut _, a0);
+    }
+}
+
+#[inline(always)]
+pub unsafe fn store_u16_s32_x4<const CN: usize>(
+    dst_ptr: (*mut u16, *mut u16, *mut u16, *mut u16),
+    regi: int32x4x4_t,
+) {
+    let a0 = vreinterpret_u16_s16(vqmovn_s32(regi.0));
+    let a1 = vreinterpret_u16_s16(vqmovn_s32(regi.1));
+    let a2 = vreinterpret_u16_s16(vqmovn_s32(regi.2));
+    let a3 = vreinterpret_u16_s16(vqmovn_s32(regi.3));
+    if CN == 4 {
+        vst1_u16(dst_ptr.0, a0);
+        vst1_u16(dst_ptr.1, a1);
+        vst1_u16(dst_ptr.2, a2);
+        vst1_u16(dst_ptr.3, a3);
+    } else if CN == 3 {
+        vst1_lane_u32::<0>(dst_ptr.0 as *mut _, vreinterpret_u32_u16(a0));
+        vst1_lane_u16::<2>(dst_ptr.0.add(2) as *mut _, a0);
+        vst1_lane_u32::<0>(dst_ptr.1 as *mut _, vreinterpret_u32_u16(a1));
+        vst1_lane_u16::<2>(dst_ptr.1.add(2) as *mut _, a1);
+        vst1_lane_u32::<0>(dst_ptr.2 as *mut _, vreinterpret_u32_u16(a2));
+        vst1_lane_u16::<2>(dst_ptr.2.add(2) as *mut _, a2);
+        vst1_lane_u32::<0>(dst_ptr.3 as *mut _, vreinterpret_u32_u16(a3));
+        vst1_lane_u16::<2>(dst_ptr.3.add(2) as *mut _, a3);
+    } else if CN == 2 {
+        vst1_lane_u32::<0>(dst_ptr.0 as *mut _, vreinterpret_u32_u16(a0));
+        vst1_lane_u32::<0>(dst_ptr.1 as *mut _, vreinterpret_u32_u16(a1));
+        vst1_lane_u32::<0>(dst_ptr.2 as *mut _, vreinterpret_u32_u16(a2));
+        vst1_lane_u32::<0>(dst_ptr.3 as *mut _, vreinterpret_u32_u16(a3));
+    } else {
+        vst1_lane_u16::<0>(dst_ptr.0 as *mut _, a0);
+        vst1_lane_u16::<0>(dst_ptr.1 as *mut _, a1);
+        vst1_lane_u16::<0>(dst_ptr.2 as *mut _, a2);
+        vst1_lane_u16::<0>(dst_ptr.3 as *mut _, a3);
     }
 }

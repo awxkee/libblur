@@ -67,5 +67,6 @@ fn fuzz_image(width: usize, height: usize, radius: usize, channels: FastBlurChan
         channels,
         ThreadingPolicy::Single,
         EdgeMode::Clamp,
-    );
+    )
+    .unwrap();
 }

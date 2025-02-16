@@ -24,7 +24,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 FastBlurChannels::Channels4,
                 ThreadingPolicy::Adaptive,
                 EdgeMode::Clamp,
-            );
+            )
+            .unwrap();
         })
     });
 
@@ -35,13 +36,34 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| {
             libblur::fast_gaussian_f32(
                 &mut dst_bytes,
+                dimensions.0 * 4,
                 dimensions.0,
                 dimensions.1,
                 77,
                 FastBlurChannels::Channels4,
                 ThreadingPolicy::Single,
                 EdgeMode::Clamp,
-            );
+            )
+            .unwrap();
+        })
+    });
+
+    let rgba_u16 = img.to_rgba16();
+
+    c.bench_function("RGBA16 fast gaussian (Single Thread)", |b| {
+        let mut dst_bytes: Vec<u16> = rgba_u16.to_vec();
+        b.iter(|| {
+            libblur::fast_gaussian_u16(
+                &mut dst_bytes,
+                dimensions.0 * 4,
+                dimensions.0,
+                dimensions.1,
+                77,
+                FastBlurChannels::Channels4,
+                ThreadingPolicy::Single,
+                EdgeMode::Clamp,
+            )
+            .unwrap();
         })
     });
 
@@ -65,7 +87,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 FastBlurChannels::Channels3,
                 ThreadingPolicy::Adaptive,
                 EdgeMode::Clamp,
-            );
+            )
+            .unwrap();
         })
     });
 }

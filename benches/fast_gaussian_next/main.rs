@@ -24,7 +24,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 FastBlurChannels::Channels4,
                 ThreadingPolicy::Adaptive,
                 EdgeMode::Clamp,
-            );
+            )
+            .unwrap();
         })
     });
 
@@ -35,13 +36,15 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| {
             libblur::fast_gaussian_next_f32(
                 &mut dst_bytes,
+                dimensions.0 * 4,
                 dimensions.0,
                 dimensions.1,
                 77,
                 FastBlurChannels::Channels4,
                 ThreadingPolicy::Single,
                 EdgeMode::Clamp,
-            );
+            )
+            .unwrap();
         })
     });
 
@@ -65,7 +68,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 FastBlurChannels::Channels3,
                 ThreadingPolicy::Adaptive,
                 EdgeMode::Clamp,
-            );
+            )
+            .unwrap();
         })
     });
 }

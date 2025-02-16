@@ -90,6 +90,7 @@ mod to_storage;
 mod unsafe_slice;
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 mod wasm32;
+mod util;
 
 #[cfg(feature = "fft")]
 pub use adaptive_blur::adaptive_blur;
@@ -160,3 +161,4 @@ pub use stackblur::stack_blur_f16::stack_blur_f16;
 pub use stackblur::stack_blur_f32::stack_blur_f32;
 pub use stackblur::stack_blur_u16;
 pub use threading_policy::ThreadingPolicy;
+pub use util::{BlurError, MismatchedSize};

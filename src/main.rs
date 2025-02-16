@@ -221,17 +221,20 @@ fn main() {
     //     FastBlurChannels::Channels3,
     //     ThreadingPolicy::Adaptive,
     // );
-    libblur::fast_gaussian_in_linear(
-        &mut dst_bytes,
+    let bytes_16 = bytes.iter().map(|&x| x as u16).collect::<Vec<u16>>();
+    let mut dst_16 = bytes_16.to_vec();
+
+    libblur::fast_gaussian_u16(
+        &mut dst_16,
         stride as u32,
         dimensions.0,
         dimensions.1,
         25,
         FastBlurChannels::Channels3,
         ThreadingPolicy::Single,
-        TransferFunction::Rec709,
         EdgeMode::Clamp,
-    );
+    ).unwrap();
+    dst_bytes = dst_16.iter().map(|&x| x as u8).collect();
 
     // let bytes_16 = bytes.iter().map(|&x| x as u16).collect::<Vec<u16>>();
     // let mut dst_16 = vec![0u16; bytes_16.len()];

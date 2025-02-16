@@ -31,7 +31,7 @@ use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, reflect_101, EdgeMode};
 use std::arch::aarch64::*;
 
-pub fn fast_gaussian_next_vertical_pass_neon_u8<T, const CN: usize>(
+pub(crate) fn fgn_vertical_pass_neon_u8<T, const CN: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -322,7 +322,7 @@ pub fn fast_gaussian_next_vertical_pass_neon_u8<T, const CN: usize>(
     }
 }
 
-pub(crate) fn fast_gaussian_next_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
+pub(crate) fn fgn_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
