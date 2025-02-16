@@ -372,7 +372,9 @@ unsafe fn fgn_horizontal_pass_sse_f32_impl<const CN: usize, const FMA: bool>(
     end: u32,
     edge_mode: EdgeMode,
 ) {
-    let mut buffer = Box::new([[0.; 4]; 1024]);
+    let mut bf0 = Box::new([[0f32; 4]; 1024]);
+    let mut bf1 = Box::new([[0f32; 4]; 1024]);
+    let mut bf2 = Box::new([[0f32; 4]; 1024]);
 
     let width_wide = width as i64;
 
@@ -381,7 +383,130 @@ unsafe fn fgn_horizontal_pass_sse_f32_impl<const CN: usize, const FMA: bool>(
     let radius_64 = radius as i64;
     let weight = 1.0f32 / ((radius as f32) * (radius as f32) * (radius as f32));
     let v_weight = _mm_set1_ps(weight);
-    for y in start..height.min(end) {
+
+    let mut yy = start as usize;
+
+    while yy + 3 < height.min(end) as usize {
+        let mut diffs0 = _mm_setzero_ps();
+        let mut diffs1 = _mm_setzero_ps();
+        let mut diffs2 = _mm_setzero_ps();
+
+        let mut ders0 = _mm_setzero_ps();
+        let mut ders1 = _mm_setzero_ps();
+        let mut ders2 = _mm_setzero_ps();
+
+        let mut summs0 = _mm_setzero_ps();
+        let mut summs1 = _mm_setzero_ps();
+        let mut summs2 = _mm_setzero_ps();
+
+        let start_x = 0 - 3 * radius_64;
+
+        let current_y0 = ((yy as i64) * (stride as i64)) as usize;
+        let current_y1 = (((yy + 1) as i64) * (stride as i64)) as usize;
+        let current_y2 = (((yy + 2) as i64) * (stride as i64)) as usize;
+
+        for x in start_x..(width as i64) {
+            if x >= 0 {
+                let current_px = x as usize * CN;
+
+                let prepared_px0 = _mm_mul_ps(summs0, v_weight);
+                let prepared_px1 = _mm_mul_ps(summs1, v_weight);
+                let prepared_px2 = _mm_mul_ps(summs2, v_weight);
+
+                let dst_ptr0 = bytes.slice.as_ptr().add(current_y0 + current_px) as *mut f32;
+                let dst_ptr1 = bytes.slice.as_ptr().add(current_y1 + current_px) as *mut f32;
+                let dst_ptr2 = bytes.slice.as_ptr().add(current_y2 + current_px) as *mut f32;
+
+                store_f32::<CN>(dst_ptr0, prepared_px0);
+                store_f32::<CN>(dst_ptr1, prepared_px1);
+                store_f32::<CN>(dst_ptr2, prepared_px2);
+
+                let d_a_1 = ((x + radius_64) & 1023) as usize;
+                let d_a_2 = ((x - radius_64) & 1023) as usize;
+                let d_i = (x & 1023) as usize;
+
+                let sd0 = _mm_loadu_ps(bf0.as_mut_ptr().add(d_i) as *mut f32);
+                let sd1 = _mm_loadu_ps(bf1.as_mut_ptr().add(d_i) as *mut f32);
+                let sd2 = _mm_loadu_ps(bf2.as_mut_ptr().add(d_i) as *mut f32);
+
+                let sd_1_0 = _mm_loadu_ps(bf0.as_mut_ptr().add(d_a_1) as *mut f32);
+                let sd_1_1 = _mm_loadu_ps(bf1.as_mut_ptr().add(d_a_1) as *mut f32);
+                let sd_1_2 = _mm_loadu_ps(bf2.as_mut_ptr().add(d_a_1) as *mut f32);
+
+                let j0 = _mm_sub_ps(sd0, sd_1_0);
+                let j1 = _mm_sub_ps(sd1, sd_1_1);
+                let j2 = _mm_sub_ps(sd2, sd_1_2);
+
+                let sd_2_0 = _mm_loadu_ps(bf0.as_mut_ptr().add(d_a_2) as *mut f32);
+                let sd_2_1 = _mm_loadu_ps(bf1.as_mut_ptr().add(d_a_2) as *mut f32);
+                let sd_2_2 = _mm_loadu_ps(bf2.as_mut_ptr().add(d_a_2) as *mut f32);
+
+                let new_diff0 = _mm_opt_fnmlsf_ps::<FMA>(sd_2_0, j0, threes);
+                let new_diff1 = _mm_opt_fnmlsf_ps::<FMA>(sd_2_1, j1, threes);
+                let new_diff2 = _mm_opt_fnmlsf_ps::<FMA>(sd_2_2, j2, threes);
+
+                diffs0 = _mm_add_ps(diffs0, new_diff0);
+                diffs1 = _mm_add_ps(diffs1, new_diff1);
+                diffs2 = _mm_add_ps(diffs2, new_diff2);
+            } else if x + radius_64 >= 0 {
+                let a_i = (x & 1023) as usize;
+                let a_i_1 = ((x + radius_64) & 1023) as usize;
+                let sd0 = _mm_loadu_ps(bf0.as_mut_ptr().add(a_i) as *mut f32);
+                let sd1 = _mm_loadu_ps(bf1.as_mut_ptr().add(a_i) as *mut f32);
+                let sd2 = _mm_loadu_ps(bf2.as_mut_ptr().add(a_i) as *mut f32);
+
+                let sd_1_0 = _mm_loadu_ps(bf0.as_mut_ptr().add(a_i_1) as *mut f32);
+                let sd_1_1 = _mm_loadu_ps(bf1.as_mut_ptr().add(a_i_1) as *mut f32);
+                let sd_1_2 = _mm_loadu_ps(bf2.as_mut_ptr().add(a_i_1) as *mut f32);
+
+                diffs0 = _mm_opt_fmlaf_ps::<FMA>(diffs0, _mm_sub_ps(sd0, sd_1_0), threes);
+                diffs1 = _mm_opt_fmlaf_ps::<FMA>(diffs1, _mm_sub_ps(sd1, sd_1_1), threes);
+                diffs2 = _mm_opt_fmlaf_ps::<FMA>(diffs2, _mm_sub_ps(sd2, sd_1_2), threes);
+            } else if x + 2 * radius_64 >= 0 {
+                let arr_index = ((x + radius_64) & 1023) as usize;
+                let sd0 = _mm_loadu_ps(bf0.as_mut_ptr().add(arr_index) as *mut f32);
+                let sd1 = _mm_loadu_ps(bf1.as_mut_ptr().add(arr_index) as *mut f32);
+                let sd2 = _mm_loadu_ps(bf2.as_mut_ptr().add(arr_index) as *mut f32);
+
+                diffs0 = _mm_opt_fnmlaf_ps::<FMA>(diffs0, sd0, threes);
+                diffs1 = _mm_opt_fnmlaf_ps::<FMA>(diffs1, sd1, threes);
+                diffs2 = _mm_opt_fnmlaf_ps::<FMA>(diffs2, sd2, threes);
+            }
+
+            let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide - 1);
+            let next_row_px = next_row_x * CN;
+
+            let s_ptr0 = bytes.slice.as_ptr().add(current_y0 + next_row_px) as *mut f32;
+            let s_ptr1 = bytes.slice.as_ptr().add(current_y1 + next_row_px) as *mut f32;
+            let s_ptr2 = bytes.slice.as_ptr().add(current_y2 + next_row_px) as *mut f32;
+
+            let pixel_color0 = load_f32::<CN>(s_ptr0);
+            let pixel_color1 = load_f32::<CN>(s_ptr1);
+            let pixel_color2 = load_f32::<CN>(s_ptr2);
+
+            let a_i = ((x + 2 * radius_64) & 1023) as usize;
+
+            _mm_storeu_ps(bf0.as_mut_ptr().add(a_i) as *mut f32, pixel_color0);
+            _mm_storeu_ps(bf1.as_mut_ptr().add(a_i) as *mut f32, pixel_color1);
+            _mm_storeu_ps(bf2.as_mut_ptr().add(a_i) as *mut f32, pixel_color2);
+
+            diffs0 = _mm_add_ps(diffs0, pixel_color0);
+            diffs1 = _mm_add_ps(diffs1, pixel_color1);
+            diffs2 = _mm_add_ps(diffs2, pixel_color2);
+
+            ders0 = _mm_add_ps(ders0, diffs0);
+            ders1 = _mm_add_ps(ders1, diffs1);
+            ders2 = _mm_add_ps(ders2, diffs2);
+
+            summs0 = _mm_add_ps(summs0, ders0);
+            summs1 = _mm_add_ps(summs1, ders1);
+            summs2 = _mm_add_ps(summs2, ders2);
+        }
+
+        yy += 3;
+    }
+
+    for y in yy..height.min(end) as usize {
         let mut diffs = _mm_setzero_ps();
         let mut ders = _mm_setzero_ps();
         let mut summs = _mm_setzero_ps();
@@ -402,13 +527,13 @@ unsafe fn fgn_horizontal_pass_sse_f32_impl<const CN: usize, const FMA: bool>(
                 let d_arr_index_2 = ((x - radius_64) & 1023) as usize;
                 let d_arr_index = (x & 1023) as usize;
 
-                let buf_ptr = buffer.get_unchecked_mut(d_arr_index).as_mut_ptr();
+                let buf_ptr = bf0.get_unchecked_mut(d_arr_index).as_mut_ptr();
                 let stored = _mm_loadu_ps(buf_ptr);
 
-                let buf_ptr_1 = buffer.get_unchecked_mut(d_arr_index_1).as_mut_ptr();
+                let buf_ptr_1 = bf0.get_unchecked_mut(d_arr_index_1).as_mut_ptr();
                 let stored_1 = _mm_loadu_ps(buf_ptr_1);
 
-                let buf_ptr_2 = buffer.get_unchecked_mut(d_arr_index_2).as_mut_ptr();
+                let buf_ptr_2 = bf0.get_unchecked_mut(d_arr_index_2).as_mut_ptr();
                 let stored_2 = _mm_loadu_ps(buf_ptr_2);
 
                 let new_diff =
@@ -417,21 +542,21 @@ unsafe fn fgn_horizontal_pass_sse_f32_impl<const CN: usize, const FMA: bool>(
             } else if x + radius_64 >= 0 {
                 let arr_index = (x & 1023) as usize;
                 let arr_index_1 = ((x + radius_64) & 1023) as usize;
-                let buf_ptr = buffer.as_mut_ptr().add(arr_index) as *mut f32;
+                let buf_ptr = bf0.as_mut_ptr().add(arr_index) as *mut f32;
                 let stored = _mm_loadu_ps(buf_ptr);
 
-                let buf_ptr_1 = buffer.as_mut_ptr().add(arr_index_1);
+                let buf_ptr_1 = bf0.as_mut_ptr().add(arr_index_1);
                 let stored_1 = _mm_loadu_ps(buf_ptr_1 as *const f32);
 
                 diffs = _mm_opt_fmlaf_ps::<FMA>(diffs, _mm_sub_ps(stored, stored_1), threes);
             } else if x + 2 * radius_64 >= 0 {
                 let arr_index = ((x + radius_64) & 1023) as usize;
-                let buf_ptr = buffer.as_mut_ptr().add(arr_index);
+                let buf_ptr = bf0.as_mut_ptr().add(arr_index);
                 let stored = _mm_loadu_ps(buf_ptr as *const f32);
                 diffs = _mm_opt_fnmlaf_ps::<FMA>(diffs, stored, threes);
             }
 
-            let next_row_y = (y as usize) * (stride as usize);
+            let next_row_y = y * (stride as usize);
             let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide - 1);
             let next_row_px = next_row_x * CN;
 
@@ -440,7 +565,7 @@ unsafe fn fgn_horizontal_pass_sse_f32_impl<const CN: usize, const FMA: bool>(
             let pixel_color = load_f32::<CN>(s_ptr);
 
             let arr_index = ((x + 2 * radius_64) & 1023) as usize;
-            let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr();
+            let buf_ptr = bf0.get_unchecked_mut(arr_index).as_mut_ptr();
 
             diffs = _mm_add_ps(diffs, pixel_color);
             ders = _mm_add_ps(ders, diffs);
