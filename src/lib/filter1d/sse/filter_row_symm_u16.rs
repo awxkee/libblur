@@ -30,9 +30,8 @@ use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::region::FilterRegion;
 use crate::filter1d::sse::utils::{
-    _mm_mul_add_symm_epi16_by_ps, _mm_mul_add_symm_epi16_by_ps_x4, _mm_mul_epi16_by_ps,
-    _mm_mul_epi16_by_ps_x4, _mm_mul_epi8_by_ps_x2, _mm_pack_ps_epi16, _mm_pack_ps_x2_epi16,
-    _mm_pack_ps_x2_epi8,
+    _mm_mul_add_symm_epi16_by_ps, _mm_mul_add_symm_epi16_by_ps_x2, _mm_mul_epi16_by_ps,
+    _mm_mul_epi16_by_ps_x2, _mm_pack_ps_epi16, _mm_pack_ps_x2_epi16,
 };
 use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
@@ -144,10 +143,10 @@ unsafe fn filter_row_sse_symm_u16_f32_impl<const FMA: bool, const N: usize>(
         let shifted_src = local_src.get_unchecked(cx..);
 
         let source = _mm_load_pack_x4(shifted_src.get_unchecked(half_len..).as_ptr() as *const _);
-        let mut k0 = _mm_mul_epi16_by_ps_x4::<FMA>(source.0, coeff);
-        let mut k1 = _mm_mul_epi16_by_ps_x4::<FMA>(source.1, coeff);
-        let mut k2 = _mm_mul_epi16_by_ps_x4::<FMA>(source.2, coeff);
-        let mut k3 = _mm_mul_epi16_by_ps_x4::<FMA>(source.3, coeff);
+        let mut k0 = _mm_mul_epi16_by_ps_x2::<FMA>(source.0, coeff);
+        let mut k1 = _mm_mul_epi16_by_ps_x2::<FMA>(source.1, coeff);
+        let mut k2 = _mm_mul_epi16_by_ps_x2::<FMA>(source.2, coeff);
+        let mut k3 = _mm_mul_epi16_by_ps_x2::<FMA>(source.3, coeff);
 
         for i in 0..half_len {
             let rollback = length - i - 1;
@@ -156,10 +155,10 @@ unsafe fn filter_row_sse_symm_u16_f32_impl<const FMA: bool, const N: usize>(
                 _mm_load_pack_x4(shifted_src.get_unchecked((i * N)..).as_ptr() as *const _);
             let v_source1 =
                 _mm_load_pack_x4(shifted_src.get_unchecked((rollback * N)..).as_ptr() as *const _);
-            k0 = _mm_mul_add_symm_epi16_by_ps_x4::<FMA>(k0, v_source0.0, v_source1.0, coeff);
-            k1 = _mm_mul_add_symm_epi16_by_ps_x4::<FMA>(k1, v_source0.1, v_source1.1, coeff);
-            k2 = _mm_mul_add_symm_epi16_by_ps_x4::<FMA>(k2, v_source0.2, v_source1.2, coeff);
-            k3 = _mm_mul_add_symm_epi16_by_ps_x4::<FMA>(k3, v_source0.3, v_source1.3, coeff);
+            k0 = _mm_mul_add_symm_epi16_by_ps_x2::<FMA>(k0, v_source0.0, v_source1.0, coeff);
+            k1 = _mm_mul_add_symm_epi16_by_ps_x2::<FMA>(k1, v_source0.1, v_source1.1, coeff);
+            k2 = _mm_mul_add_symm_epi16_by_ps_x2::<FMA>(k2, v_source0.2, v_source1.2, coeff);
+            k3 = _mm_mul_add_symm_epi16_by_ps_x2::<FMA>(k3, v_source0.3, v_source1.3, coeff);
         }
 
         let dst_offset = y * dst_stride + cx;
@@ -182,8 +181,8 @@ unsafe fn filter_row_sse_symm_u16_f32_impl<const FMA: bool, const N: usize>(
         let shifted_src = local_src.get_unchecked(cx..);
 
         let source = _mm_load_pack_x2(shifted_src.get_unchecked(half_len..).as_ptr() as *const _);
-        let mut k0 = _mm_mul_epi16_by_ps_x4::<FMA>(source.0, coeff);
-        let mut k1 = _mm_mul_epi16_by_ps_x4::<FMA>(source.1, coeff);
+        let mut k0 = _mm_mul_epi16_by_ps_x2::<FMA>(source.0, coeff);
+        let mut k1 = _mm_mul_epi16_by_ps_x2::<FMA>(source.1, coeff);
 
         for i in 0..half_len {
             let rollback = length - i - 1;
@@ -192,8 +191,8 @@ unsafe fn filter_row_sse_symm_u16_f32_impl<const FMA: bool, const N: usize>(
                 _mm_load_pack_x2(shifted_src.get_unchecked((i * N)..).as_ptr() as *const _);
             let v_source1 =
                 _mm_load_pack_x2(shifted_src.get_unchecked((rollback * N)..).as_ptr() as *const _);
-            k0 = _mm_mul_add_symm_epi16_by_ps_x4::<FMA>(k0, v_source0.0, v_source1.0, coeff);
-            k1 = _mm_mul_add_symm_epi16_by_ps_x4::<FMA>(k1, v_source0.1, v_source1.1, coeff);
+            k0 = _mm_mul_add_symm_epi16_by_ps_x2::<FMA>(k0, v_source0.0, v_source1.0, coeff);
+            k1 = _mm_mul_add_symm_epi16_by_ps_x2::<FMA>(k1, v_source0.1, v_source1.1, coeff);
         }
 
         let dst_offset = y * dst_stride + cx;
@@ -211,7 +210,7 @@ unsafe fn filter_row_sse_symm_u16_f32_impl<const FMA: bool, const N: usize>(
         let shifted_src = local_src.get_unchecked(cx..);
 
         let source = _mm_loadu_si128(shifted_src.get_unchecked(half_len..).as_ptr() as *const _);
-        let mut k0 = _mm_mul_epi16_by_ps_x4::<FMA>(source, coeff);
+        let mut k0 = _mm_mul_epi16_by_ps_x2::<FMA>(source, coeff);
 
         for i in 0..half_len {
             let rollback = length - i - 1;
@@ -220,7 +219,7 @@ unsafe fn filter_row_sse_symm_u16_f32_impl<const FMA: bool, const N: usize>(
                 _mm_loadu_si128(shifted_src.get_unchecked((i * N)..).as_ptr() as *const _);
             let v_source1 =
                 _mm_loadu_si128(shifted_src.get_unchecked((rollback * N)..).as_ptr() as *const _);
-            k0 = _mm_mul_add_symm_epi16_by_ps_x4::<FMA>(k0, v_source0, v_source1, coeff);
+            k0 = _mm_mul_add_symm_epi16_by_ps_x2::<FMA>(k0, v_source0, v_source1, coeff);
         }
 
         let dst_offset = y * dst_stride + cx;

@@ -92,7 +92,7 @@ pub(crate) unsafe fn _mm_mul_epi8_by_ps_x4<const FMA: bool>(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_mul_epi16_by_ps_x4<const FMA: bool>(
+pub(crate) unsafe fn _mm_mul_epi16_by_ps_x2<const FMA: bool>(
     input: __m128i,
     weight: __m128,
 ) -> (__m128, __m128) {
@@ -381,7 +381,7 @@ pub(crate) unsafe fn _mm_mul_add_symm_epi8_by_ps_x4<const FMA: bool>(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_mul_add_symm_epi16_by_ps_x4<const FMA: bool>(
+pub(crate) unsafe fn _mm_mul_add_symm_epi16_by_ps_x2<const FMA: bool>(
     accumulator: (__m128, __m128),
     input0: __m128i,
     input1: __m128i,

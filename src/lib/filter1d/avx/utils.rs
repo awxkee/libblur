@@ -74,6 +74,31 @@ pub(crate) unsafe fn _mm256_mul_epi8_by_ps_x4<const FMA: bool>(
 }
 
 #[inline(always)]
+pub(crate) unsafe fn _mm256_mul_epi16_by_ps_x2<const FMA: bool>(
+    input: __m256i,
+    weight: __m256,
+) -> (__m256, __m256) {
+    let j0 = _mm256_unpacklo_epi16(input, _mm256_setzero_si256());
+    let j1 = _mm256_unpackhi_epi16(input, _mm256_setzero_si256());
+
+    let o0 = _mm256_cvtepi32_ps(j0);
+    let o1 = _mm256_cvtepi32_ps(j1);
+
+    if FMA {
+        (
+            _mm256_opt_fmlaf_ps::<FMA>(_mm256_set1_ps(0.5f32), o0, weight),
+            _mm256_opt_fmlaf_ps::<FMA>(_mm256_set1_ps(0.5f32), o1, weight),
+        )
+    } else {
+        let kz = (_mm256_mul_ps(o0, weight), _mm256_mul_ps(o1, weight));
+        (
+            _mm256_add_ps(_mm256_set1_ps(0.5f32), kz.0),
+            _mm256_add_ps(_mm256_set1_ps(0.5f32), kz.1),
+        )
+    }
+}
+
+#[inline(always)]
 pub(crate) unsafe fn _mm256_mul_epi8_by_epi16_x4(
     input: __m256i,
     weight: __m256i,
@@ -207,6 +232,30 @@ pub(crate) unsafe fn _mm256_mul_add_symm_epi8_by_ps_x4<const FMA: bool>(
 }
 
 #[inline(always)]
+pub(crate) unsafe fn _mm256_mul_add_symm_epi16_by_ps_x2<const FMA: bool>(
+    accumulator: (__m256, __m256),
+    input0: __m256i,
+    input1: __m256i,
+    weight: __m256,
+) -> (__m256, __m256) {
+    let j0 = _mm256_unpacklo_epi16(input0, _mm256_setzero_si256());
+    let j1 = _mm256_unpacklo_epi16(input1, _mm256_setzero_si256());
+    let j2 = _mm256_unpackhi_epi16(input0, _mm256_setzero_si256());
+    let j3 = _mm256_unpackhi_epi16(input1, _mm256_setzero_si256());
+
+    let a0 = _mm256_add_epi32(j0, j1);
+    let a1 = _mm256_add_epi32(j2, j3);
+
+    let v0 = _mm256_cvtepi32_ps(a0);
+    let v1 = _mm256_cvtepi32_ps(a1);
+
+    (
+        _mm256_opt_fmlaf_ps::<FMA>(accumulator.0, v0, weight),
+        _mm256_opt_fmlaf_ps::<FMA>(accumulator.1, v1, weight),
+    )
+}
+
+#[inline(always)]
 pub(crate) unsafe fn _mm256_pack_ps_x4_epi8(store: (__m256, __m256, __m256, __m256)) -> __m256i {
     let v0 = _mm256_cvtps_epi32(store.0);
     let v1 = _mm256_cvtps_epi32(store.1);
@@ -214,6 +263,13 @@ pub(crate) unsafe fn _mm256_pack_ps_x4_epi8(store: (__m256, __m256, __m256, __m2
     let v3 = _mm256_cvtps_epi32(store.3);
 
     _mm256_packus_four_epi32(v0, v1, v2, v3)
+}
+
+#[inline(always)]
+pub(crate) unsafe fn _mm256_pack_ps_x2_epi16(store: (__m256, __m256)) -> __m256i {
+    let v0 = _mm256_cvtps_epi32(store.0);
+    let v1 = _mm256_cvtps_epi32(store.1);
+    _mm256_packus_epi32(v0, v1)
 }
 
 #[inline(always)]

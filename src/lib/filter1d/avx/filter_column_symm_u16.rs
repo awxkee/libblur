@@ -26,7 +26,14 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::avx::{
+    _mm256_load_pack_x2, _mm256_load_pack_x3, _mm256_load_pack_x4, _mm256_store_pack_x2,
+    _mm256_store_pack_x3, _mm256_store_pack_x4,
+};
 use crate::filter1d::arena::Arena;
+use crate::filter1d::avx::utils::{
+    _mm256_mul_add_symm_epi16_by_ps_x2, _mm256_mul_epi16_by_ps_x2, _mm256_pack_ps_x2_epi16,
+};
 use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::region::FilterRegion;
 use crate::filter1d::sse::utils::{
@@ -35,10 +42,6 @@ use crate::filter1d::sse::utils::{
 };
 use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
-use crate::sse::{
-    _mm_load_pack_x2, _mm_load_pack_x3, _mm_load_pack_x4, _mm_store_pack_x2, _mm_store_pack_x3,
-    _mm_store_pack_x4,
-};
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
 #[cfg(target_arch = "x86")]
@@ -47,7 +50,7 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 use std::ops::{Add, Mul};
 
-pub(crate) fn filter_column_symm_sse_u16_f32(
+pub(crate) fn filter_column_avx_symm_u16_f32(
     arena: Arena,
     arena_src: &[&[u16]],
     dst: &UnsafeSlice<u16>,
@@ -58,7 +61,7 @@ pub(crate) fn filter_column_symm_sse_u16_f32(
     let has_fma = std::arch::is_x86_feature_detected!("fma");
     unsafe {
         if has_fma {
-            filter_column_symm_sse_u16_f32_fma(
+            filter_column_avx_symm_u16_f32_impl_fma(
                 arena,
                 arena_src,
                 dst,
@@ -67,7 +70,7 @@ pub(crate) fn filter_column_symm_sse_u16_f32(
                 scanned_kernel,
             );
         } else {
-            filter_column_symm_sse_u16_f32_def(
+            filter_column_avx_symm_u16_f32_impl_def(
                 arena,
                 arena_src,
                 dst,
@@ -79,8 +82,8 @@ pub(crate) fn filter_column_symm_sse_u16_f32(
     }
 }
 
-#[target_feature(enable = "sse4.1", enable = "fma")]
-unsafe fn filter_column_symm_sse_u16_f32_fma(
+#[target_feature(enable = "avx2")]
+unsafe fn filter_column_avx_symm_u16_f32_impl_def(
     arena: Arena,
     arena_src: &[&[u16]],
     dst: &UnsafeSlice<u16>,
@@ -88,7 +91,7 @@ unsafe fn filter_column_symm_sse_u16_f32_fma(
     filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
-    filter_column_symm_sse_u16_f32_impl::<true>(
+    filter_column_avx_symm_u16_f32_impl::<false>(
         arena,
         arena_src,
         dst,
@@ -98,8 +101,8 @@ unsafe fn filter_column_symm_sse_u16_f32_fma(
     );
 }
 
-#[target_feature(enable = "sse4.1")]
-unsafe fn filter_column_symm_sse_u16_f32_def(
+#[target_feature(enable = "avx2", enable = "fma")]
+unsafe fn filter_column_avx_symm_u16_f32_impl_fma(
     arena: Arena,
     arena_src: &[&[u16]],
     dst: &UnsafeSlice<u16>,
@@ -107,7 +110,7 @@ unsafe fn filter_column_symm_sse_u16_f32_def(
     filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
-    filter_column_symm_sse_u16_f32_impl::<false>(
+    filter_column_avx_symm_u16_f32_impl::<true>(
         arena,
         arena_src,
         dst,
@@ -118,7 +121,7 @@ unsafe fn filter_column_symm_sse_u16_f32_def(
 }
 
 #[inline(always)]
-unsafe fn filter_column_symm_sse_u16_f32_impl<const FMA: bool>(
+unsafe fn filter_column_avx_symm_u16_f32_impl<const FMA: bool>(
     arena: Arena,
     arena_src: &[&[u16]],
     dst: &UnsafeSlice<u16>,
@@ -134,124 +137,151 @@ unsafe fn filter_column_symm_sse_u16_f32_impl<const FMA: bool>(
     let half_len = length / 2;
 
     let y = filter_region.start;
-
     let mut cx = 0usize;
 
-    while cx + 32 < image_width {
-        let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
+    while cx + 64 < image_width {
+        let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
 
         let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
 
-        let source = _mm_load_pack_x4(v_src.as_ptr() as *const _);
-        let mut k0 = _mm_mul_epi16_by_ps_x2::<FMA>(source.0, coeff);
-        let mut k1 = _mm_mul_epi16_by_ps_x2::<FMA>(source.1, coeff);
-        let mut k2 = _mm_mul_epi16_by_ps_x2::<FMA>(source.2, coeff);
-        let mut k3 = _mm_mul_epi16_by_ps_x2::<FMA>(source.3, coeff);
+        let source = _mm256_load_pack_x4(v_src.as_ptr() as *const _);
+        let mut k0 = _mm256_mul_epi16_by_ps_x2::<FMA>(source.0, coeff);
+        let mut k1 = _mm256_mul_epi16_by_ps_x2::<FMA>(source.1, coeff);
+        let mut k2 = _mm256_mul_epi16_by_ps_x2::<FMA>(source.2, coeff);
+        let mut k3 = _mm256_mul_epi16_by_ps_x2::<FMA>(source.3, coeff);
 
         for i in 0..half_len {
-            let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(i).weight);
             let rollback = length - i - 1;
-            let v_source0 = _mm_load_pack_x4(
+            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(i).weight);
+            let v_source0 = _mm256_load_pack_x4(
                 arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr() as *const _,
             );
-            let v_source1 = _mm_load_pack_x4(
+            let v_source1 = _mm256_load_pack_x4(
                 arena_src
                     .get_unchecked(rollback)
                     .get_unchecked(cx..)
                     .as_ptr() as *const _,
             );
-            k0 = _mm_mul_add_symm_epi16_by_ps_x2::<FMA>(k0, v_source0.0, v_source1.0, coeff);
-            k1 = _mm_mul_add_symm_epi16_by_ps_x2::<FMA>(k1, v_source0.1, v_source1.1, coeff);
-            k2 = _mm_mul_add_symm_epi16_by_ps_x2::<FMA>(k2, v_source0.2, v_source1.2, coeff);
-            k3 = _mm_mul_add_symm_epi16_by_ps_x2::<FMA>(k3, v_source0.3, v_source1.3, coeff);
+            k0 = _mm256_mul_add_symm_epi16_by_ps_x2::<FMA>(k0, v_source0.0, v_source1.0, coeff);
+            k1 = _mm256_mul_add_symm_epi16_by_ps_x2::<FMA>(k1, v_source0.1, v_source1.1, coeff);
+            k2 = _mm256_mul_add_symm_epi16_by_ps_x2::<FMA>(k2, v_source0.2, v_source1.2, coeff);
+            k3 = _mm256_mul_add_symm_epi16_by_ps_x2::<FMA>(k3, v_source0.3, v_source1.3, coeff);
         }
 
         let dst_offset = y * dst_stride + cx;
         let dst_ptr0 = (dst.slice.as_ptr() as *mut u16).add(dst_offset);
-        _mm_store_pack_x4(
+        _mm256_store_pack_x4(
             dst_ptr0 as *mut _,
             (
-                _mm_pack_ps_x2_epi16(k0),
-                _mm_pack_ps_x2_epi16(k1),
-                _mm_pack_ps_x2_epi16(k2),
-                _mm_pack_ps_x2_epi16(k3),
+                _mm256_pack_ps_x2_epi16(k0),
+                _mm256_pack_ps_x2_epi16(k1),
+                _mm256_pack_ps_x2_epi16(k2),
+                _mm256_pack_ps_x2_epi16(k3),
             ),
+        );
+        cx += 64;
+    }
+
+    while cx + 48 < image_width {
+        let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
+
+        let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
+
+        let source = _mm256_load_pack_x3(v_src.as_ptr() as *const _);
+        let mut k0 = _mm256_mul_epi16_by_ps_x2::<FMA>(source.0, coeff);
+        let mut k1 = _mm256_mul_epi16_by_ps_x2::<FMA>(source.1, coeff);
+        let mut k2 = _mm256_mul_epi16_by_ps_x2::<FMA>(source.2, coeff);
+
+        for i in 0..half_len {
+            let rollback = length - i - 1;
+            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(i).weight);
+            let v_source0 = _mm256_load_pack_x3(
+                arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr() as *const _,
+            );
+            let v_source1 = _mm256_load_pack_x3(
+                arena_src
+                    .get_unchecked(rollback)
+                    .get_unchecked(cx..)
+                    .as_ptr() as *const _,
+            );
+            k0 = _mm256_mul_add_symm_epi16_by_ps_x2::<FMA>(k0, v_source0.0, v_source1.0, coeff);
+            k1 = _mm256_mul_add_symm_epi16_by_ps_x2::<FMA>(k1, v_source0.1, v_source1.1, coeff);
+            k2 = _mm256_mul_add_symm_epi16_by_ps_x2::<FMA>(k2, v_source0.2, v_source1.2, coeff);
+        }
+
+        let dst_offset = y * dst_stride + cx;
+        let dst_ptr0 = (dst.slice.as_ptr() as *mut u16).add(dst_offset);
+        _mm256_store_pack_x3(
+            dst_ptr0 as *mut _,
+            (
+                _mm256_pack_ps_x2_epi16(k0),
+                _mm256_pack_ps_x2_epi16(k1),
+                _mm256_pack_ps_x2_epi16(k2),
+            ),
+        );
+        cx += 48;
+    }
+
+    while cx + 32 < image_width {
+        let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
+
+        let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
+
+        let source = _mm256_load_pack_x2(v_src.as_ptr() as *const _);
+        let mut k0 = _mm256_mul_epi16_by_ps_x2::<FMA>(source.0, coeff);
+        let mut k1 = _mm256_mul_epi16_by_ps_x2::<FMA>(source.1, coeff);
+
+        for i in 0..half_len {
+            let rollback = length - i - 1;
+            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(i).weight);
+            let v_source0 = _mm256_load_pack_x2(
+                arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr() as *const _,
+            );
+            let v_source1 = _mm256_load_pack_x2(
+                arena_src
+                    .get_unchecked(rollback)
+                    .get_unchecked(cx..)
+                    .as_ptr() as *const _,
+            );
+            k0 = _mm256_mul_add_symm_epi16_by_ps_x2::<FMA>(k0, v_source0.0, v_source1.0, coeff);
+            k1 = _mm256_mul_add_symm_epi16_by_ps_x2::<FMA>(k1, v_source0.1, v_source1.1, coeff);
+        }
+
+        let dst_offset = y * dst_stride + cx;
+        let dst_ptr0 = (dst.slice.as_ptr() as *mut u16).add(dst_offset);
+        _mm256_store_pack_x2(
+            dst_ptr0 as *mut _,
+            (_mm256_pack_ps_x2_epi16(k0), _mm256_pack_ps_x2_epi16(k1)),
         );
         cx += 32;
     }
 
-    while cx + 24 < image_width {
-        let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
-
-        let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
-
-        let source = _mm_load_pack_x3(v_src.as_ptr() as *const _);
-        let mut k0 = _mm_mul_epi16_by_ps_x2::<FMA>(source.0, coeff);
-        let mut k1 = _mm_mul_epi16_by_ps_x2::<FMA>(source.1, coeff);
-        let mut k2 = _mm_mul_epi16_by_ps_x2::<FMA>(source.2, coeff);
-
-        for i in 0..half_len {
-            let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(i).weight);
-            let rollback = length - i - 1;
-            let v_source0 = _mm_load_pack_x3(
-                arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr() as *const _,
-            );
-            let v_source1 = _mm_load_pack_x3(
-                arena_src
-                    .get_unchecked(rollback)
-                    .get_unchecked(cx..)
-                    .as_ptr() as *const _,
-            );
-            k0 = _mm_mul_add_symm_epi16_by_ps_x2::<FMA>(k0, v_source0.0, v_source1.0, coeff);
-            k1 = _mm_mul_add_symm_epi16_by_ps_x2::<FMA>(k1, v_source0.1, v_source1.1, coeff);
-            k2 = _mm_mul_add_symm_epi16_by_ps_x2::<FMA>(k2, v_source0.2, v_source1.2, coeff);
-        }
-
-        let dst_offset = y * dst_stride + cx;
-        let dst_ptr0 = (dst.slice.as_ptr() as *mut u16).add(dst_offset);
-        _mm_store_pack_x3(
-            dst_ptr0 as *mut _,
-            (
-                _mm_pack_ps_x2_epi16(k0),
-                _mm_pack_ps_x2_epi16(k1),
-                _mm_pack_ps_x2_epi16(k2),
-            ),
-        );
-        cx += 24;
-    }
-
     while cx + 16 < image_width {
-        let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
+        let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
 
         let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
 
-        let source = _mm_load_pack_x2(v_src.as_ptr() as *const _);
-        let mut k0 = _mm_mul_epi16_by_ps_x2::<FMA>(source.0, coeff);
-        let mut k1 = _mm_mul_epi16_by_ps_x2::<FMA>(source.1, coeff);
+        let source = _mm256_loadu_si256(v_src.as_ptr() as *const __m256i);
+        let mut k0 = _mm256_mul_epi16_by_ps_x2::<FMA>(source, coeff);
 
         for i in 0..half_len {
-            let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(i).weight);
             let rollback = length - i - 1;
-            let v_source0 = _mm_load_pack_x2(
-                arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr() as *const _,
+            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(i).weight);
+            let v_source0 = _mm256_loadu_si256(
+                arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr() as *const __m256i,
             );
-            let v_source1 = _mm_load_pack_x2(
+            let v_source1 = _mm256_loadu_si256(
                 arena_src
                     .get_unchecked(rollback)
                     .get_unchecked(cx..)
-                    .as_ptr() as *const _,
+                    .as_ptr() as *const __m256i,
             );
-            k0 = _mm_mul_add_symm_epi16_by_ps_x2::<FMA>(k0, v_source0.0, v_source1.0, coeff);
-            k1 = _mm_mul_add_symm_epi16_by_ps_x2::<FMA>(k1, v_source0.1, v_source1.1, coeff);
+            k0 = _mm256_mul_add_symm_epi16_by_ps_x2::<FMA>(k0, v_source0, v_source1, coeff);
         }
 
         let dst_offset = y * dst_stride + cx;
         let dst_ptr0 = (dst.slice.as_ptr() as *mut u16).add(dst_offset);
-        _mm_store_pack_x2(
-            dst_ptr0 as *mut _,
-            (_mm_pack_ps_x2_epi16(k0), _mm_pack_ps_x2_epi16(k1)),
-        );
-
+        _mm256_storeu_si256(dst_ptr0 as *mut __m256i, _mm256_pack_ps_x2_epi16(k0));
         cx += 16;
     }
 

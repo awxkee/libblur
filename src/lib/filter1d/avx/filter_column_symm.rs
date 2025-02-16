@@ -375,8 +375,8 @@ unsafe fn filter_column_avx_symm_u8_f32_impl<const FMA: bool>(
             let rollback = length - i - 1;
             k0 = mlaf(
                 k0,
-                ((*arena_src.get_unchecked(i).get_unchecked(cx)) as f32)
-                    .add(*arena_src.get_unchecked(rollback).get_unchecked(cx) as f32),
+                ((*arena_src.get_unchecked(i).get_unchecked(x)) as f32)
+                    .add(*arena_src.get_unchecked(rollback).get_unchecked(x) as f32),
                 coeff.weight,
             );
         }

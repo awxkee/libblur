@@ -212,6 +212,10 @@ impl Filter1DColumnHandler<u16, f32> for u16 {
         is_symmetric_kernel: bool,
     ) -> fn(Arena, &[&[u16]], &UnsafeSlice<u16>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
         if is_symmetric_kernel {
+            if std::arch::is_x86_feature_detected!("avx2") {
+                use crate::filter1d::avx::filter_column_avx_symm_u16_f32;
+                return filter_column_avx_symm_u16_f32;
+            }
             if std::arch::is_x86_feature_detected!("sse4.1") {
                 use crate::filter1d::sse::filter_column_symm_sse_u16_f32;
                 return filter_column_symm_sse_u16_f32;
