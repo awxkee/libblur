@@ -92,9 +92,8 @@ unsafe fn fast_gaussian_next_vertical_pass_sse_f16_impl<T, const CHANNELS_COUNT:
 
         let start_y = 0 - 3 * radius as i64;
         for y in start_y..height_wide {
-            let current_y = (y * (stride as i64)) as usize;
-
             if y >= 0 {
+                let current_y = (y * (stride as i64)) as usize;
                 let bytes_offset = current_y + current_px;
 
                 let pixel = _mm_mul_ps(summs, v_weight);

@@ -36,9 +36,9 @@ use crate::neon::{
 use crate::reflect_index;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse::{
-    fast_gaussian_next_horizontal_pass_sse_f16, fast_gaussian_next_horizontal_pass_sse_f32,
+    fast_gaussian_next_horizontal_pass_sse_f16, fgn_horizontal_pass_sse_f32,
     fast_gaussian_next_horizontal_pass_sse_u8, fast_gaussian_next_vertical_pass_sse_f16,
-    fast_gaussian_next_vertical_pass_sse_f32, fast_gaussian_next_vertical_pass_sse_u8,
+    fgn_vertical_pass_sse_f32, fast_gaussian_next_vertical_pass_sse_u8,
 };
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
@@ -589,7 +589,7 @@ impl FastGaussianNextPassProvider<f32> for f32 {
         {
             let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
             if _is_sse_available {
-                _dispatcher_horizontal = fast_gaussian_next_horizontal_pass_sse_f32::<f32, CN>;
+                _dispatcher_horizontal = fgn_horizontal_pass_sse_f32::<f32, CN>;
             }
         }
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
@@ -622,7 +622,7 @@ impl FastGaussianNextPassProvider<f32> for f32 {
         {
             let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
             if _is_sse_available {
-                _dispatcher_vertical = fast_gaussian_next_vertical_pass_sse_f32::<f32, CN>;
+                _dispatcher_vertical = fgn_vertical_pass_sse_f32::<f32, CN>;
             }
         }
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]

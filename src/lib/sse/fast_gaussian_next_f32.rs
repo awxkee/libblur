@@ -32,11 +32,11 @@ use std::arch::x86_64::*;
 
 use crate::reflect_101;
 use crate::reflect_index;
-use crate::sse::{load_f32, store_f32};
+use crate::sse::{_mm_opt_fmlaf_ps, _mm_opt_fnmlaf_ps, _mm_opt_fnmlsf_ps, load_f32, store_f32};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, EdgeMode};
 
-pub(crate) fn fast_gaussian_next_vertical_pass_sse_f32<T, const CHANNELS_COUNT: usize>(
+pub(crate) fn fgn_vertical_pass_sse_f32<T, const CHANNELS_COUNT: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -47,22 +47,22 @@ pub(crate) fn fast_gaussian_next_vertical_pass_sse_f32<T, const CHANNELS_COUNT: 
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        fast_gaussian_next_vertical_pass_sse_f32_impl::<T, CHANNELS_COUNT>(
-            undefined_slice,
-            stride,
-            width,
-            height,
-            radius,
-            start,
-            end,
-            edge_mode,
-        );
+        let bytes: &UnsafeSlice<'_, f32> = std::mem::transmute(undefined_slice);
+        if std::arch::is_x86_feature_detected!("fma") {
+            fgn_vertical_pass_sse_f32_fma::<CHANNELS_COUNT>(
+                bytes, stride, width, height, radius, start, end, edge_mode,
+            );
+        } else {
+            fgn_vertical_pass_sse_f32_def::<CHANNELS_COUNT>(
+                bytes, stride, width, height, radius, start, end, edge_mode,
+            );
+        }
     }
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn fast_gaussian_next_vertical_pass_sse_f32_impl<T, const CHANNELS_COUNT: usize>(
-    undefined_slice: &UnsafeSlice<T>,
+unsafe fn fgn_vertical_pass_sse_f32_def<const CHANNELS_COUNT: usize>(
+    bytes: &UnsafeSlice<f32>,
     stride: u32,
     width: u32,
     height: u32,
@@ -71,8 +71,39 @@ unsafe fn fast_gaussian_next_vertical_pass_sse_f32_impl<T, const CHANNELS_COUNT:
     end: u32,
     edge_mode: EdgeMode,
 ) {
-    let bytes: &UnsafeSlice<'_, f32> = std::mem::transmute(undefined_slice);
-    let mut buffer: [[f32; 4]; 1024] = [[0.; 4]; 1024];
+    fgn_vertical_pass_sse_f32_impl::<CHANNELS_COUNT, false>(
+        bytes, stride, width, height, radius, start, end, edge_mode,
+    );
+}
+
+#[target_feature(enable = "sse4.1", enable = "fma")]
+unsafe fn fgn_vertical_pass_sse_f32_fma<const CHANNELS_COUNT: usize>(
+    bytes: &UnsafeSlice<f32>,
+    stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    start: u32,
+    end: u32,
+    edge_mode: EdgeMode,
+) {
+    fgn_vertical_pass_sse_f32_impl::<CHANNELS_COUNT, true>(
+        bytes, stride, width, height, radius, start, end, edge_mode,
+    );
+}
+
+#[inline(always)]
+unsafe fn fgn_vertical_pass_sse_f32_impl<const CHANNELS_COUNT: usize, const FMA: bool>(
+    bytes: &UnsafeSlice<f32>,
+    stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    start: u32,
+    end: u32,
+    edge_mode: EdgeMode,
+) {
+    let mut buffer = Box::new([[0.; 4]; 1024]);
 
     let height_wide = height as i64;
 
@@ -81,7 +112,7 @@ unsafe fn fast_gaussian_next_vertical_pass_sse_f32_impl<T, const CHANNELS_COUNT:
     let radius_64 = radius as i64;
     let weight = 1.0f32 / ((radius as f32) * (radius as f32) * (radius as f32));
     let v_weight = _mm_set1_ps(weight);
-    for x in start..std::cmp::min(width, end) {
+    for x in start..width.min(end) {
         let mut diffs = _mm_setzero_ps();
         let mut ders = _mm_setzero_ps();
         let mut summs = _mm_setzero_ps();
@@ -90,9 +121,8 @@ unsafe fn fast_gaussian_next_vertical_pass_sse_f32_impl<T, const CHANNELS_COUNT:
 
         let start_y = 0 - 3 * radius as i64;
         for y in start_y..height_wide {
-            let current_y = (y * (stride as i64)) as usize;
-
             if y >= 0 {
+                let current_y = (y * (stride as i64)) as usize;
                 let bytes_offset = current_y + current_px;
 
                 let pixel = _mm_mul_ps(summs, v_weight);
@@ -113,7 +143,7 @@ unsafe fn fast_gaussian_next_vertical_pass_sse_f32_impl<T, const CHANNELS_COUNT:
                 let stored_2 = _mm_loadu_ps(buf_ptr_2);
 
                 let new_diff =
-                    _mm_sub_ps(_mm_mul_ps(_mm_sub_ps(stored, stored_1), threes), stored_2);
+                    _mm_opt_fnmlsf_ps::<FMA>(stored_2, _mm_sub_ps(stored, stored_1), threes);
                 diffs = _mm_add_ps(diffs, new_diff);
             } else if y + radius_64 >= 0 {
                 let arr_index = (y & 1023) as usize;
@@ -124,14 +154,12 @@ unsafe fn fast_gaussian_next_vertical_pass_sse_f32_impl<T, const CHANNELS_COUNT:
                 let buf_ptr_1 = buffer.get_unchecked_mut(arr_index_1).as_mut_ptr();
                 let stored_1 = _mm_loadu_ps(buf_ptr_1);
 
-                let new_diff = _mm_mul_ps(_mm_sub_ps(stored, stored_1), threes);
-
-                diffs = _mm_add_ps(diffs, new_diff);
+                diffs = _mm_opt_fmlaf_ps::<FMA>(diffs, _mm_sub_ps(stored, stored_1), threes);
             } else if y + 2 * radius_64 >= 0 {
                 let arr_index = ((y + radius_64) & 1023) as usize;
                 let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr();
                 let stored = _mm_loadu_ps(buf_ptr);
-                diffs = _mm_sub_ps(diffs, _mm_mul_ps(stored, threes));
+                diffs = _mm_opt_fnmlaf_ps::<FMA>(diffs, stored, threes);
             }
 
             let next_row_y = clamp_edge!(edge_mode, y + ((3 * radius_64) >> 1), 0, height_wide - 1)
@@ -153,7 +181,7 @@ unsafe fn fast_gaussian_next_vertical_pass_sse_f32_impl<T, const CHANNELS_COUNT:
     }
 }
 
-pub(crate) fn fast_gaussian_next_horizontal_pass_sse_f32<T, const CHANNELS_COUNT: usize>(
+pub(crate) fn fgn_horizontal_pass_sse_f32<T, const CHANNELS_COUNT: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -164,22 +192,22 @@ pub(crate) fn fast_gaussian_next_horizontal_pass_sse_f32<T, const CHANNELS_COUNT
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        fast_gaussian_next_horizontal_pass_sse_f32_impl::<T, CHANNELS_COUNT>(
-            undefined_slice,
-            stride,
-            width,
-            height,
-            radius,
-            start,
-            end,
-            edge_mode,
-        );
+        let bytes: &UnsafeSlice<'_, f32> = std::mem::transmute(undefined_slice);
+        if std::arch::is_x86_feature_detected!("fma") {
+            fgn_horizontal_pass_sse_f32_fma::<CHANNELS_COUNT>(
+                bytes, stride, width, height, radius, start, end, edge_mode,
+            );
+        } else {
+            fgn_horizontal_pass_sse_f32_def::<CHANNELS_COUNT>(
+                bytes, stride, width, height, radius, start, end, edge_mode,
+            );
+        }
     }
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn fast_gaussian_next_horizontal_pass_sse_f32_impl<T, const CHANNELS_COUNT: usize>(
-    undefined_slice: &UnsafeSlice<T>,
+unsafe fn fgn_horizontal_pass_sse_f32_def<const CHANNELS_COUNT: usize>(
+    bytes: &UnsafeSlice<f32>,
     stride: u32,
     width: u32,
     height: u32,
@@ -188,8 +216,39 @@ unsafe fn fast_gaussian_next_horizontal_pass_sse_f32_impl<T, const CHANNELS_COUN
     end: u32,
     edge_mode: EdgeMode,
 ) {
-    let bytes: &UnsafeSlice<'_, f32> = std::mem::transmute(undefined_slice);
-    let mut buffer: [[f32; 4]; 1024] = [[0.; 4]; 1024];
+    fgn_horizontal_pass_sse_f32_impl::<CHANNELS_COUNT, false>(
+        bytes, stride, width, height, radius, start, end, edge_mode,
+    );
+}
+
+#[target_feature(enable = "sse4.1", enable = "fma")]
+unsafe fn fgn_horizontal_pass_sse_f32_fma<const CHANNELS_COUNT: usize>(
+    bytes: &UnsafeSlice<f32>,
+    stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    start: u32,
+    end: u32,
+    edge_mode: EdgeMode,
+) {
+    fgn_horizontal_pass_sse_f32_impl::<CHANNELS_COUNT, true>(
+        bytes, stride, width, height, radius, start, end, edge_mode,
+    );
+}
+
+#[inline(always)]
+unsafe fn fgn_horizontal_pass_sse_f32_impl<const CN: usize, const FMA: bool>(
+    bytes: &UnsafeSlice<f32>,
+    stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    start: u32,
+    end: u32,
+    edge_mode: EdgeMode,
+) {
+    let mut buffer = Box::new([[0.; 4]; 1024]);
 
     let width_wide = width as i64;
 
@@ -198,7 +257,7 @@ unsafe fn fast_gaussian_next_horizontal_pass_sse_f32_impl<T, const CHANNELS_COUN
     let radius_64 = radius as i64;
     let weight = 1.0f32 / ((radius as f32) * (radius as f32) * (radius as f32));
     let v_weight = _mm_set1_ps(weight);
-    for y in start..std::cmp::min(height, end) {
+    for y in start..height.min(end) {
         let mut diffs = _mm_setzero_ps();
         let mut ders = _mm_setzero_ps();
         let mut summs = _mm_setzero_ps();
@@ -207,13 +266,13 @@ unsafe fn fast_gaussian_next_horizontal_pass_sse_f32_impl<T, const CHANNELS_COUN
 
         for x in (0 - 3 * radius_64)..(width as i64) {
             if x >= 0 {
-                let current_px = x as usize * CHANNELS_COUNT;
+                let current_px = x as usize * CN;
 
                 let bytes_offset = current_y + current_px;
 
                 let pixel = _mm_mul_ps(summs, v_weight);
                 let dst_ptr = bytes.slice.as_ptr().add(bytes_offset) as *mut f32;
-                store_f32::<CHANNELS_COUNT>(dst_ptr, pixel);
+                store_f32::<CN>(dst_ptr, pixel);
 
                 let d_arr_index_1 = ((x + radius_64) & 1023) as usize;
                 let d_arr_index_2 = ((x - radius_64) & 1023) as usize;
@@ -229,7 +288,7 @@ unsafe fn fast_gaussian_next_horizontal_pass_sse_f32_impl<T, const CHANNELS_COUN
                 let stored_2 = _mm_loadu_ps(buf_ptr_2);
 
                 let new_diff =
-                    _mm_sub_ps(_mm_mul_ps(_mm_sub_ps(stored, stored_1), threes), stored_2);
+                    _mm_opt_fnmlsf_ps::<FMA>(stored_2, _mm_sub_ps(stored, stored_1), threes);
                 diffs = _mm_add_ps(diffs, new_diff);
             } else if x + radius_64 >= 0 {
                 let arr_index = (x & 1023) as usize;
@@ -240,23 +299,21 @@ unsafe fn fast_gaussian_next_horizontal_pass_sse_f32_impl<T, const CHANNELS_COUN
                 let buf_ptr_1 = buffer.as_mut_ptr().add(arr_index_1);
                 let stored_1 = _mm_loadu_ps(buf_ptr_1 as *const f32);
 
-                let new_diff = _mm_mul_ps(_mm_sub_ps(stored, stored_1), threes);
-
-                diffs = _mm_add_ps(diffs, new_diff);
+                diffs = _mm_opt_fmlaf_ps::<FMA>(diffs, _mm_sub_ps(stored, stored_1), threes);
             } else if x + 2 * radius_64 >= 0 {
                 let arr_index = ((x + radius_64) & 1023) as usize;
                 let buf_ptr = buffer.as_mut_ptr().add(arr_index);
                 let stored = _mm_loadu_ps(buf_ptr as *const f32);
-                diffs = _mm_sub_ps(diffs, _mm_mul_ps(stored, threes));
+                diffs = _mm_opt_fnmlaf_ps::<FMA>(diffs, stored, threes);
             }
 
             let next_row_y = (y as usize) * (stride as usize);
             let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide - 1);
-            let next_row_px = next_row_x * CHANNELS_COUNT;
+            let next_row_px = next_row_x * CN;
 
             let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut f32;
 
-            let pixel_color = load_f32::<CHANNELS_COUNT>(s_ptr);
+            let pixel_color = load_f32::<CN>(s_ptr);
 
             let arr_index = ((x + 2 * radius_64) & 1023) as usize;
             let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr();
