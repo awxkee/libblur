@@ -28,6 +28,23 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
+    let rgba_f32 = img.to_rgba32f();
+
+    c.bench_function("RGBA f32 fast gaussian next (Single Thread)", |b| {
+        let mut dst_bytes: Vec<f32> = rgba_f32.to_vec();
+        b.iter(|| {
+            libblur::fast_gaussian_next_f32(
+                &mut dst_bytes,
+                dimensions.0,
+                dimensions.1,
+                77,
+                FastBlurChannels::Channels4,
+                ThreadingPolicy::Single,
+                EdgeMode::Clamp,
+            );
+        })
+    });
+
     let img = ImageReader::open("assets/test_image_1.jpg")
         .unwrap()
         .decode()
