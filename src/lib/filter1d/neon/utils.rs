@@ -142,11 +142,6 @@ pub(crate) unsafe fn vmulq_u8_by_i16(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn vmul_u8_by_i16(input: uint8x8_t, weight: int16x8_t) -> int16x8_t {
-    vmulq_s16(vreinterpretq_s16_u16(vmovl_u8(input)), weight)
-}
-
-#[inline(always)]
 pub(crate) unsafe fn vmulq_u8_by_f32(
     input: uint8x16_t,
     weight: float32x4_t,
@@ -169,6 +164,20 @@ pub(crate) unsafe fn vmulq_u8_by_f32(
         vmulq_f32(hi_lo, weight),
         vmulq_f32(hi_hi, weight),
     )
+}
+
+#[inline(always)]
+pub(crate) unsafe fn vmulq_u16_by_f32(
+    input: uint16x8_t,
+    weight: float32x4_t,
+) -> (float32x4_t, float32x4_t) {
+    let o0 = vmovl_u16(vget_low_u16(input));
+    let o1 = vmovl_high_u16(input);
+
+    let lo_lo = vcvtq_f32_u32(o0);
+    let lo_hi = vcvtq_f32_u32(o1);
+
+    (vmulq_f32(lo_lo, weight), vmulq_f32(lo_hi, weight))
 }
 
 #[inline(always)]
@@ -244,6 +253,24 @@ pub(crate) unsafe fn vfmlaq_symm_u8_f32(
 }
 
 #[inline(always)]
+pub(crate) unsafe fn vfmlaq_symm_u16_f32(
+    store: (float32x4_t, float32x4_t),
+    input0: uint16x8_t,
+    input1: uint16x8_t,
+    weight: float32x4_t,
+) -> (float32x4_t, float32x4_t) {
+    let lo_32 = vaddl_u16(vget_low_u16(input0), vget_low_u16(input1));
+    let hi_32 = vaddl_high_u16(input0, input1);
+
+    let ll = vcvtq_f32_u32(lo_32);
+    let hh = vcvtq_f32_u32(hi_32);
+    (
+        prefer_vfmaq_f32(store.0, ll, weight),
+        prefer_vfmaq_f32(store.1, hh, weight),
+    )
+}
+
+#[inline(always)]
 pub(crate) unsafe fn vdotq_exact_s16(
     store: (int16x8_t, int16x8_t),
     input: uint8x16_t,
@@ -254,20 +281,6 @@ pub(crate) unsafe fn vdotq_exact_s16(
     (
         vmlaq_s16(store.0, o0, weight),
         vmlaq_s16(store.1, o1, weight),
-    )
-}
-
-#[inline(always)]
-pub(crate) unsafe fn vdot_exact_symm_s16(
-    store: int16x8_t,
-    input0: uint8x8_t,
-    input1: uint8x8_t,
-    weight: int16x8_t,
-) -> int16x8_t {
-    vmlaq_s16(
-        store,
-        vreinterpretq_s16_u16(vaddq_u16(vmovl_u8(input0), vmovl_u8(input1))),
-        weight,
     )
 }
 
@@ -388,6 +401,13 @@ pub(crate) unsafe fn vqmovnq_f32_u8(
 }
 
 #[inline(always)]
+pub(crate) unsafe fn vqmovnq_f32_u16(store: (float32x4_t, float32x4_t)) -> uint16x8_t {
+    let a0 = vcvtaq_u32_f32(store.0);
+    let a1 = vcvtaq_u32_f32(store.1);
+    vcombine_u16(vqmovn_u32(a0), vqmovn_u32(a1))
+}
+
+#[inline(always)]
 pub(crate) unsafe fn vqmovnq_s32_u8(
     store: (int32x4_t, int32x4_t, int32x4_t, int32x4_t),
 ) -> uint8x16_t {
@@ -470,12 +490,20 @@ pub(crate) unsafe fn xvst1q_f32_x4(a: *mut f32, b: float32x4x4_t) {
     vst1q_f32(a.add(12), b.3);
 }
 
-// #[inline(always)]
-// pub(crate) unsafe fn xvst1q_f32_x3(a: *mut f32, b: float32x4x3_t) {
-//     vst1q_f32(a, b.0);
-//     vst1q_f32(a.add(4), b.1);
-//     vst1q_f32(a.add(8), b.2);
-// }
+#[inline(always)]
+pub(crate) unsafe fn xvld1q_u16_x4(a: *const u16) -> uint16x8x4_t {
+    uint16x8x4_t(
+        vld1q_u16(a),
+        vld1q_u16(a.add(8)),
+        vld1q_u16(a.add(16)),
+        vld1q_u16(a.add(24)),
+    )
+}
+
+#[inline(always)]
+pub(crate) unsafe fn xvld1q_u16_x2(a: *const u16) -> uint16x8x2_t {
+    uint16x8x2_t(vld1q_u16(a), vld1q_u16(a.add(8)))
+}
 
 #[inline(always)]
 pub(crate) unsafe fn xvst1q_f32_x2(a: *mut f32, b: float32x4x2_t) {
@@ -502,4 +530,18 @@ pub(crate) unsafe fn xvst1q_u8_x3(a: *mut u8, b: uint8x16x3_t) {
 pub(crate) unsafe fn xvst1q_u8_x2(a: *mut u8, b: uint8x16x2_t) {
     vst1q_u8(a, b.0);
     vst1q_u8(a.add(16), b.1);
+}
+
+#[inline(always)]
+pub(crate) unsafe fn xvst1q_u16_x4(a: *mut u16, b: uint16x8x4_t) {
+    vst1q_u16(a, b.0);
+    vst1q_u16(a.add(8), b.1);
+    vst1q_u16(a.add(16), b.2);
+    vst1q_u16(a.add(24), b.3);
+}
+
+#[inline(always)]
+pub(crate) unsafe fn xvst1q_u16_x2(a: *mut u16, b: uint16x8x2_t) {
+    vst1q_u16(a, b.0);
+    vst1q_u16(a.add(8), b.1);
 }

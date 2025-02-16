@@ -232,18 +232,22 @@ fn main() {
     //     EdgeMode::Clamp,
     // );
 
-    libblur::gaussian_blur(
-        &bytes,
-        &mut dst_bytes,
+    let bytes_16 = bytes.iter().map(|&x| x as u16).collect::<Vec<u16>>();
+    let mut dst_16 = vec![0u16; bytes_16.len()];
+
+    libblur::gaussian_blur_u16(
+        &bytes_16,
+        &mut dst_16,
         dimensions.0,
         dimensions.1,
         0,
-        2.,
+        12.,
         FastBlurChannels::Channels3,
         EdgeMode::Clamp,
         ThreadingPolicy::Single,
-        GaussianPreciseLevel::EXACT,
     );
+
+    dst_bytes = dst_16.iter().map(|&x| x as u8).collect();
 
     // sobel(
     //     &bytes,

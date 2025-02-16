@@ -27,14 +27,13 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter1d::arena::Arena;
-use crate::filter1d::color_group::ColorGroup;
 use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::neon::utils::{vmlaq_hi_u8_s16, vmullq_expand_i16, vqmovnq_s16x2_u8};
 use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
 use crate::unsafe_slice::UnsafeSlice;
 use std::arch::aarch64::*;
-use std::ops::{Add, Mul};
+use std::ops::Add;
 
 pub(crate) fn filter_row_neon_u8_i32_rdm(
     arena: Arena,
@@ -144,54 +143,65 @@ pub(crate) fn filter_row_neon_u8_i32_rdm(
             cx += 16;
         }
 
+        const K_PRECISION: i32 = 15;
+        const RND: i32 = 1 << (K_PRECISION - 1);
+
         while cx + 4 < max_width {
             let coeff = *scanned_kernel.get_unchecked(0);
-
-            let shifted_src = local_src.get_unchecked((cx * N)..);
-
-            let mut k0 = ColorGroup::<N, i32>::from_slice(shifted_src, 0).mul(coeff.weight);
-            let mut k1 = ColorGroup::<N, i32>::from_slice(shifted_src, N).mul(coeff.weight);
-            let mut k2 = ColorGroup::<N, i32>::from_slice(shifted_src, N * 2).mul(coeff.weight);
-            let mut k3 = ColorGroup::<N, i32>::from_slice(shifted_src, N * 3).mul(coeff.weight);
+            let shifted_src = local_src.get_unchecked(cx..);
+            let mut k0 = RND + *shifted_src.get_unchecked(0) as i32 * coeff.weight;
+            let mut k1 = RND + *shifted_src.get_unchecked(1) as i32 * coeff.weight;
+            let mut k2 = RND + *shifted_src.get_unchecked(2) as i32 * coeff.weight;
+            let mut k3 = RND + *shifted_src.get_unchecked(3) as i32 * coeff.weight;
 
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
-                k0 = ColorGroup::<N, i32>::from_slice(shifted_src, i * N)
-                    .mul(coeff.weight)
-                    .add(k0);
-                k1 = ColorGroup::<N, i32>::from_slice(shifted_src, (i + 1) * N)
-                    .mul(coeff.weight)
-                    .add(k1);
-                k2 = ColorGroup::<N, i32>::from_slice(shifted_src, (i + 2) * N)
-                    .mul(coeff.weight)
-                    .add(k2);
-                k3 = ColorGroup::<N, i32>::from_slice(shifted_src, (i + 3) * N)
-                    .mul(coeff.weight)
-                    .add(k3);
+                let rollback = length - i - 1;
+
+                k0 += *shifted_src.get_unchecked(i * N) as i32 * coeff.weight;
+
+                k1 += *shifted_src.get_unchecked(i * N + 1) as i32 * coeff.weight;
+
+                k2 += *shifted_src.get_unchecked(i * N + 2) as i32 * coeff.weight;
+
+                k3 += *shifted_src.get_unchecked(rollback * N + 3) as i32 * coeff.weight;
             }
 
-            let dst_offset = y * dst_stride + cx * N;
+            dst.write(
+                y * dst_stride + cx,
+                (k0 >> K_PRECISION).max(0).min(255) as u8,
+            );
+            dst.write(
+                y * dst_stride + cx + 1,
+                (k1 >> K_PRECISION).max(0).min(255) as u8,
+            );
+            dst.write(
+                y * dst_stride + cx + 2,
+                (k2 >> K_PRECISION).max(0).min(255) as u8,
+            );
+            dst.write(
+                y * dst_stride + cx + 3,
+                (k3 >> K_PRECISION).max(0).min(255) as u8,
+            );
 
-            k0.to_approx_store(dst, dst_offset);
-            k1.to_approx_store(dst, dst_offset + N);
-            k2.to_approx_store(dst, dst_offset + N * 2);
-            k3.to_approx_store(dst, dst_offset + N * 3);
             cx += 4;
         }
 
         for x in cx..max_width {
             let coeff = *scanned_kernel.get_unchecked(0);
-            let shifted_src = local_src.get_unchecked((x * N)..);
-            let mut k0 = ColorGroup::<N, i32>::from_slice(shifted_src, 0).mul(coeff.weight);
+            let shifted_src = local_src.get_unchecked(x..);
+            let mut k0 = RND + *shifted_src.get_unchecked(0) as i32 * coeff.weight;
 
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
-                k0 = ColorGroup::<N, i32>::from_slice(shifted_src, i * N)
-                    .mul(coeff.weight)
-                    .add(k0);
+
+                k0 += (*shifted_src.get_unchecked(i * N) as i32) * coeff.weight;
             }
 
-            k0.to_approx_store(dst, y * dst_stride + x * N);
+            dst.write(
+                y * dst_stride + x,
+                (k0 >> K_PRECISION).max(0).min(255) as u8,
+            );
         }
     }
 }

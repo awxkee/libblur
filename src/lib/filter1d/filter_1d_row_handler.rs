@@ -29,8 +29,6 @@
 use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_row_symmetric::filter_row_symmetrical;
 use crate::filter1d::filter_scan::ScanPoint1d;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-use crate::filter1d::neon::filter_row_neon_f32_f32;
 use crate::filter1d::region::FilterRegion;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::filter1d::sse::filter_row_sse_f32_f32;
@@ -128,9 +126,15 @@ impl Filter1DRowHandler<f32, f32> for f32 {
 
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     fn get_row_handler(
-        _: bool,
+        is_kernel_symmetric: bool,
     ) -> fn(Arena, &[f32], &UnsafeSlice<f32>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
-        filter_row_neon_f32_f32::<1>
+        if is_kernel_symmetric {
+            use crate::filter1d::neon::filter_row_neon_symm_f32_f32;
+            filter_row_neon_symm_f32_f32
+        } else {
+            use crate::filter1d::neon::filter_row_neon_f32_f32;
+            filter_row_neon_f32_f32::<1>
+        }
     }
 
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
@@ -150,6 +154,33 @@ impl Filter1DRowHandler<f32, f32> for f32 {
         } else {
             use crate::filter1d::filter_row::filter_row;
             filter_row::<f32, f32, 1>
+        }
+    }
+}
+
+impl Filter1DRowHandler<u16, f32> for f32 {
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    fn get_row_handler(
+        is_symmetric_kernel: bool,
+    ) -> fn(Arena, &[u16], &UnsafeSlice<u16>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
+        if is_symmetric_kernel {
+            use crate::filter1d::neon::filter_row_symm_neon_u16_f32;
+            filter_row_symm_neon_u16_f32::<1>
+        } else {
+            use crate::filter1d::filter_row::filter_row;
+            filter_row::<u16, f32, 1>
+        }
+    }
+
+    #[cfg(not(all(target_arch = "aarch64", target_feature = "neon")))]
+    fn get_row_handler(
+        is_symmetric_kernel: bool,
+    ) -> fn(Arena, &[u16], &UnsafeSlice<u16>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
+        if is_symmetric_kernel {
+            filter_row_symmetrical::<u16, f32, 1>
+        } else {
+            use crate::filter1d::filter_row::filter_row;
+            filter_row::<u16, f32, 1>
         }
     }
 }
