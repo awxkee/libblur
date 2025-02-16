@@ -221,33 +221,34 @@ fn main() {
     //     FastBlurChannels::Channels3,
     //     ThreadingPolicy::Adaptive,
     // );
-    // libblur::fast_gaussian_next(
-    //     &mut dst_bytes,
-    //     stride as u32,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     25,
-    //     FastBlurChannels::Channels4,
-    //     ThreadingPolicy::Single,
-    //     EdgeMode::Clamp,
-    // );
-
-    let bytes_16 = bytes.iter().map(|&x| x as u16).collect::<Vec<u16>>();
-    let mut dst_16 = vec![0u16; bytes_16.len()];
-
-    libblur::gaussian_blur_u16(
-        &bytes_16,
-        &mut dst_16,
+    libblur::fast_gaussian_in_linear(
+        &mut dst_bytes,
+        stride as u32,
         dimensions.0,
         dimensions.1,
-        0,
-        12.,
+        25,
         FastBlurChannels::Channels3,
-        EdgeMode::Clamp,
         ThreadingPolicy::Single,
+        TransferFunction::Rec709,
+        EdgeMode::Clamp,
     );
 
-    dst_bytes = dst_16.iter().map(|&x| x as u8).collect();
+    // let bytes_16 = bytes.iter().map(|&x| x as u16).collect::<Vec<u16>>();
+    // let mut dst_16 = vec![0u16; bytes_16.len()];
+    //
+    // libblur::gaussian_blur_u16(
+    //     &bytes_16,
+    //     &mut dst_16,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     0,
+    //     12.,
+    //     FastBlurChannels::Channels3,
+    //     EdgeMode::Clamp,
+    //     ThreadingPolicy::Single,
+    // );
+    //
+    // dst_bytes = dst_16.iter().map(|&x| x as u8).collect();
 
     // sobel(
     //     &bytes,

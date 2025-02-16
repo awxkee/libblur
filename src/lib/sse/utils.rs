@@ -42,7 +42,7 @@ pub(crate) unsafe fn load_f32<const CN: usize>(ptr: *const f32) -> __m128 {
     } else if CN == 2 {
         return _mm_castsi128_ps(_mm_loadu_si64(ptr as *const _));
     }
-    _mm_setr_ps(ptr.read_unaligned(), 0f32, 0f32, 0f32)
+    _mm_castsi128_ps(_mm_loadu_si32(ptr as *const _))
 }
 
 #[inline(always)]
@@ -343,4 +343,31 @@ pub(crate) unsafe fn store_f32_f16<const CN: usize>(dst_ptr: *mut f16, in_regi: 
 #[inline(always)]
 pub(crate) unsafe fn _mm_mul_by_3_epi32(v: __m128i) -> __m128i {
     _mm_add_epi32(_mm_slli_epi32::<1>(v), v)
+}
+
+#[inline(always)]
+pub(crate) unsafe fn _mm_opt_fnmlaf_ps<const FMA: bool>(a: __m128, b: __m128, c: __m128) -> __m128 {
+    if FMA {
+        _mm_fnmadd_ps(b, c, a)
+    } else {
+        _mm_sub_ps(a, _mm_mul_ps(b, c))
+    }
+}
+
+#[inline(always)]
+pub(crate) unsafe fn _mm_opt_fmlaf_ps<const FMA: bool>(a: __m128, b: __m128, c: __m128) -> __m128 {
+    if FMA {
+        _mm_fmadd_ps(b, c, a)
+    } else {
+        _mm_add_ps(a, _mm_mul_ps(b, c))
+    }
+}
+
+#[inline(always)]
+pub(crate) unsafe fn _mm_opt_fnmlsf_ps<const FMA: bool>(a: __m128, b: __m128, c: __m128) -> __m128 {
+    if FMA {
+        _mm_fmsub_ps(b, c, a)
+    } else {
+        _mm_sub_ps(_mm_mul_ps(b, c), a)
+    }
 }
