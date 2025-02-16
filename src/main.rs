@@ -221,7 +221,7 @@ fn main() {
     //     FastBlurChannels::Channels3,
     //     ThreadingPolicy::Adaptive,
     // );
-    libblur::fast_gaussian_next_in_linear(
+    libblur::fast_gaussian_in_linear(
         &mut dst_bytes,
         stride as u32,
         dimensions.0,

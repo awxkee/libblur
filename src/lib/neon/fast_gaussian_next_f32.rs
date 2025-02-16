@@ -491,7 +491,7 @@ pub fn fgn_horizontal_pass_neon_f32<T, const CHANNELS_COUNT: usize>(
                     diffs = vfmaq_f32(diffs, stored, vdupq_n_f32(-3f32));
                 }
 
-                let next_row_y = (y as usize) * (stride as usize);
+                let next_row_y = y * (stride as usize);
                 let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide - 1);
                 let next_row_px = next_row_x * CHANNELS_COUNT;
 
