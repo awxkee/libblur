@@ -33,7 +33,6 @@ use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
 use crate::unsafe_slice::UnsafeSlice;
 use std::arch::aarch64::*;
-use std::ops::Add;
 
 pub(crate) fn filter_row_neon_u8_i32_rdm(
     arena: Arena,

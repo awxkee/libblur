@@ -39,6 +39,7 @@ mod filter_row_approx;
 mod filter_row_f32;
 mod filter_row_symm;
 mod filter_row_symm_approx;
+mod filter_row_symm_u16;
 mod utils;
 
 pub(crate) use filter_column::filter_column_avx_u8_f32;
@@ -52,3 +53,4 @@ pub(crate) use filter_row_approx::filter_row_avx_u8_i32_app;
 pub(crate) use filter_row_f32::filter_row_avx_f32_f32;
 pub(crate) use filter_row_symm::filter_row_avx_symm_u8_f32;
 pub(crate) use filter_row_symm_approx::filter_row_avx_symm_u8_i32_app;
+pub(crate) use filter_row_symm_u16::filter_row_avx_symm_u16_f32;
