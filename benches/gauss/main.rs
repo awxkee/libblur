@@ -81,6 +81,24 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
+    c.bench_function("RGBA16 gauss blur edge clamp: rad 51", |b| {
+        let mut dst_bytes: Vec<u16> = vec![0u16; dimensions.1 as usize * stride];
+        let src_bytes = src_bytes.iter().map(|&v| v as u16).collect::<Vec<u16>>();
+        b.iter(|| {
+            libblur::gaussian_blur_u16(
+                &src_bytes,
+                &mut dst_bytes,
+                dimensions.0,
+                dimensions.1,
+                51 * 2 + 1,
+                0.,
+                FastBlurChannels::Channels4,
+                EdgeMode::Clamp,
+                ThreadingPolicy::Adaptive,
+            );
+        })
+    });
+
     let src = imread(
         &find_file(&"assets/test_image_4.png", false, false).unwrap(),
         IMREAD_COLOR,
@@ -102,7 +120,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             .unwrap();
         })
     });
-    
+
     c.bench_function("RGBA gauss blur edge clamp: rad 151", |b| {
         let mut dst_bytes: Vec<u8> = vec![0u8; dimensions.1 as usize * stride];
         b.iter(|| {

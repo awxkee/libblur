@@ -90,7 +90,7 @@ unsafe fn fast_gaussian_horizontal_pass_sse_f32_impl<T, const CHANNELS_COUNT: us
         let start_x = 0 - 2 * radius_64;
         for x in start_x..(width as i64) {
             if x >= 0 {
-                let current_px = ((std::cmp::max(x, 0) as u32) * CHANNELS_COUNT as u32) as usize;
+                let current_px = x as usize * CHANNELS_COUNT;
 
                 let pixel = _mm_mul_ps(summs, v_weight);
 

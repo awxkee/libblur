@@ -26,6 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::region::FilterRegion;
@@ -36,7 +37,7 @@ use crate::unsafe_slice::UnsafeSlice;
 use num_traits::{AsPrimitive, MulAdd};
 use std::ops::{Add, Mul};
 
-pub(crate) fn filter_row<T, F, const N: usize>(
+pub fn filter_row_symmetrical<T, F, const N: usize>(
     _: Arena,
     arena_src: &[T],
     dst: &UnsafeSlice<T>,
@@ -44,73 +45,87 @@ pub(crate) fn filter_row<T, F, const N: usize>(
     filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<F>],
 ) where
-    T: Copy + AsPrimitive<F>,
-    F: ToStorage<T> + Mul<Output = F> + MulAdd<F, Output = F> + Add<F, Output = F>,
+    T: Copy + AsPrimitive<F> + Default,
+    F: ToStorage<T> + Mul<Output = F> + MulAdd<F, Output = F> + Default + Add<F, Output = F>,
+    i32: AsPrimitive<F>,
 {
     unsafe {
         let width = image_size.width;
 
-        let src = arena_src;
+        let dst_stride = image_size.width * N;
 
-        let dst_stride = image_size.width;
-
+        let length = scanned_kernel.len();
+        let half_len = length / 2;
         let y = filter_region.start;
-        let local_src = src;
-
-        let length = scanned_kernel.iter().len();
 
         let mut cx = 0usize;
-
         let max_width = width * N;
 
         while cx + 4 < max_width {
-            let coeff = *scanned_kernel.get_unchecked(0);
+            let coeff = *scanned_kernel.get_unchecked(half_len);
+            let shifted_src = arena_src.get_unchecked(cx..);
+            let mut k0 = shifted_src.get_unchecked(0).as_() * coeff.weight;
+            let mut k1 = shifted_src.get_unchecked(1).as_() * coeff.weight;
+            let mut k2 = shifted_src.get_unchecked(2).as_() * coeff.weight;
+            let mut k3 = shifted_src.get_unchecked(3).as_() * coeff.weight;
 
-            let shifted_src = local_src.get_unchecked(cx..);
-
-            let mut k0 = (*shifted_src.get_unchecked(0)).as_().mul(coeff.weight);
-            let mut k1 = (*shifted_src.get_unchecked(1)).as_().mul(coeff.weight);
-            let mut k2 = (*shifted_src.get_unchecked(2)).as_().mul(coeff.weight);
-            let mut k3 = (*shifted_src.get_unchecked(3)).as_().mul(coeff.weight);
-
-            for i in 1..length {
+            for i in 0..half_len {
                 let coeff = *scanned_kernel.get_unchecked(i);
-                k0 = mlaf(k0, (*shifted_src.get_unchecked(i * N)).as_(), coeff.weight);
-                k1 = mlaf(
-                    k1,
-                    (*shifted_src.get_unchecked(i * N + 1)).as_(),
+                let rollback = length - i - 1;
+
+                k0 = mlaf(
+                    k0,
+                    shifted_src.get_unchecked(i * N).as_()
+                        + shifted_src.get_unchecked(rollback * N).as_(),
                     coeff.weight,
                 );
+
+                k1 = mlaf(
+                    k1,
+                    shifted_src.get_unchecked(i * N + 1).as_()
+                        + shifted_src.get_unchecked(rollback * N + 1).as_(),
+                    coeff.weight,
+                );
+
                 k2 = mlaf(
                     k2,
-                    (*shifted_src.get_unchecked(i * N + 2)).as_(),
+                    shifted_src.get_unchecked(i * N + 2).as_()
+                        + shifted_src.get_unchecked(rollback * N + 2).as_(),
                     coeff.weight,
                 );
                 k3 = mlaf(
                     k3,
-                    (*shifted_src.get_unchecked(i * N + 3)).as_(),
+                    shifted_src.get_unchecked(i * N + 3).as_()
+                        + shifted_src.get_unchecked(rollback * N + 3).as_(),
                     coeff.weight,
                 );
             }
 
-            let dst_offset = y * dst_stride + cx;
+            dst.write(y * dst_stride + cx, k0.to_());
+            dst.write(y * dst_stride + cx + 1, k1.to_());
+            dst.write(y * dst_stride + cx + 2, k2.to_());
+            dst.write(y * dst_stride + cx + 3, k3.to_());
 
-            dst.write(dst_offset, k0.to_());
-            dst.write(dst_offset + 1, k1.to_());
-            dst.write(dst_offset + 2, k2.to_());
-            dst.write(dst_offset + 3, k3.to_());
             cx += 4;
         }
 
-        for x in cx..width {
-            let coeff = *scanned_kernel.get_unchecked(0);
-            let shifted_src = local_src.get_unchecked(x..);
-            let mut k0 = (*shifted_src.get_unchecked(0)).as_().mul(coeff.weight);
+        for x in cx..max_width {
+            let coeff = *scanned_kernel.get_unchecked(half_len);
+            let shifted_src = arena_src.get_unchecked(x..);
+            let mut k0 = shifted_src.get_unchecked(0).as_() * coeff.weight;
 
-            for i in 1..length {
+            for i in 0..half_len {
                 let coeff = *scanned_kernel.get_unchecked(i);
-                k0 = mlaf(k0, (*shifted_src.get_unchecked(i * N)).as_(), coeff.weight);
+                let rollback = length - i - 1;
+
+                k0 = mlaf(
+                    k0,
+                    shifted_src.get_unchecked(i * N).as_()
+                        + shifted_src.get_unchecked(rollback * N).as_(),
+                    coeff.weight,
+                );
             }
+
             dst.write(y * dst_stride + x, k0.to_());
         }
     }

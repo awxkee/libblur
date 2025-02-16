@@ -141,10 +141,10 @@ unsafe fn filter_row_sse_u8_f32_impl<const FMA: bool, const N: usize>(
         let shifted_src = local_src.get_unchecked(cx..);
 
         let source = _mm_load_pack_x4(shifted_src.as_ptr());
-        let mut k0 = _mm_mul_epi8_by_ps_x4(source.0, coeff);
-        let mut k1 = _mm_mul_epi8_by_ps_x4(source.1, coeff);
-        let mut k2 = _mm_mul_epi8_by_ps_x4(source.2, coeff);
-        let mut k3 = _mm_mul_epi8_by_ps_x4(source.3, coeff);
+        let mut k0 = _mm_mul_epi8_by_ps_x4::<FMA>(source.0, coeff);
+        let mut k1 = _mm_mul_epi8_by_ps_x4::<FMA>(source.1, coeff);
+        let mut k2 = _mm_mul_epi8_by_ps_x4::<FMA>(source.2, coeff);
+        let mut k3 = _mm_mul_epi8_by_ps_x4::<FMA>(source.3, coeff);
 
         for i in 1..length {
             let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(i).weight);
@@ -175,8 +175,8 @@ unsafe fn filter_row_sse_u8_f32_impl<const FMA: bool, const N: usize>(
         let shifted_src = local_src.get_unchecked(cx..);
 
         let source = _mm_load_pack_x2(shifted_src.as_ptr());
-        let mut k0 = _mm_mul_epi8_by_ps_x4(source.0, coeff);
-        let mut k1 = _mm_mul_epi8_by_ps_x4(source.1, coeff);
+        let mut k0 = _mm_mul_epi8_by_ps_x4::<FMA>(source.0, coeff);
+        let mut k1 = _mm_mul_epi8_by_ps_x4::<FMA>(source.1, coeff);
 
         for i in 1..length {
             let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(i).weight);
@@ -197,7 +197,7 @@ unsafe fn filter_row_sse_u8_f32_impl<const FMA: bool, const N: usize>(
         let shifted_src = local_src.get_unchecked(cx..);
 
         let source_0 = _mm_loadu_si128(shifted_src.as_ptr() as *const __m128i);
-        let mut k0 = _mm_mul_epi8_by_ps_x4(source_0, _mm_set1_ps(coeff.weight));
+        let mut k0 = _mm_mul_epi8_by_ps_x4::<FMA>(source_0, _mm_set1_ps(coeff.weight));
 
         for i in 1..length {
             let coeff = *scanned_kernel.get_unchecked(i);

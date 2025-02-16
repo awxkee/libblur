@@ -194,6 +194,54 @@ impl Filter1DColumnHandler<f32, f32> for f32 {
     }
 }
 
+impl Filter1DColumnHandler<u16, f32> for u16 {
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    fn get_column_handler(
+        is_symmetric_kernel: bool,
+    ) -> fn(Arena, &[&[u16]], &UnsafeSlice<u16>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
+        if is_symmetric_kernel {
+            use crate::filter1d::neon::filter_symm_column_neon_u16_f32;
+            filter_symm_column_neon_u16_f32
+        } else {
+            filter_column
+        }
+    }
+
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    fn get_column_handler(
+        is_symmetric_kernel: bool,
+    ) -> fn(Arena, &[&[u16]], &UnsafeSlice<u16>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
+        if is_symmetric_kernel {
+            #[cfg(feature = "avx")]
+            if std::arch::is_x86_feature_detected!("avx2") {
+                use crate::filter1d::avx::filter_column_avx_symm_u16_f32;
+                return filter_column_avx_symm_u16_f32;
+            }
+            if std::arch::is_x86_feature_detected!("sse4.1") {
+                use crate::filter1d::sse::filter_column_symm_sse_u16_f32;
+                return filter_column_symm_sse_u16_f32;
+            }
+            filter_symmetric_column
+        } else {
+            filter_column
+        }
+    }
+
+    #[cfg(not(any(
+        all(target_arch = "aarch64", target_feature = "neon"),
+        any(target_arch = "x86_64", target_arch = "x86")
+    )))]
+    fn get_column_handler(
+        is_symmetric_kernel: bool,
+    ) -> fn(Arena, &[&[u16]], &UnsafeSlice<u16>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
+        if is_symmetric_kernel {
+            filter_symmetric_column
+        } else {
+            filter_column
+        }
+    }
+}
+
 macro_rules! default_1d_column_handler {
     ($store:ty, $intermediate:ty) => {
         impl Filter1DColumnHandler<$store, $intermediate> for $store {
@@ -223,7 +271,6 @@ default_1d_column_handler!(u8, f64);
 default_1d_column_handler!(u8, u16);
 default_1d_column_handler!(u8, i32);
 default_1d_column_handler!(u8, u32);
-default_1d_column_handler!(u16, f32);
 default_1d_column_handler!(u16, f64);
 default_1d_column_handler!(i16, f32);
 default_1d_column_handler!(i16, f64);
