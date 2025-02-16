@@ -141,7 +141,8 @@ impl Filter1DRgbaRowHandler<f32, f32> for f32 {
         if is_kernel_symmetric {
             filter_row_symmetrical::<f32, f32, 4>
         } else {
-            filter_color_group_row::<f32, f32, 4>
+            use crate::filter1d::filter_row::filter_row;
+            filter_row::<f32, f32, 4>
         }
     }
 
