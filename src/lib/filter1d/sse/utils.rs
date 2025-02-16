@@ -92,6 +92,32 @@ pub(crate) unsafe fn _mm_mul_epi8_by_ps_x4<const FMA: bool>(
 }
 
 #[inline(always)]
+pub(crate) unsafe fn _mm_mul_epi16_by_ps_x4<const FMA: bool>(
+    input: __m128i,
+    weight: __m128,
+) -> (__m128, __m128) {
+    let zeros = _mm_setzero_si128();
+    let a0 = _mm_unpacklo_epi16(input, zeros);
+    let a1 = _mm_unpackhi_epi16(input, zeros);
+
+    let v0 = _mm_cvtepi32_ps(a0);
+    let v1 = _mm_cvtepi32_ps(a1);
+
+    if FMA {
+        (
+            _mm_opt_fmlaf_ps::<FMA>(_mm_set1_ps(0.5f32), v0, weight),
+            _mm_opt_fmlaf_ps::<FMA>(_mm_set1_ps(0.5f32), v1, weight),
+        )
+    } else {
+        let kz = (_mm_mul_ps(v0, weight), _mm_mul_ps(v1, weight));
+        (
+            _mm_add_ps(_mm_set1_ps(0.5f32), kz.0),
+            _mm_add_ps(_mm_set1_ps(0.5f32), kz.1),
+        )
+    }
+}
+
+#[inline(always)]
 pub(crate) unsafe fn _mm_mull_epi8_by_epi16_x4(
     input: __m128i,
     weight: __m128i,
@@ -324,6 +350,32 @@ pub(crate) unsafe fn _mm_mul_add_symm_epi8_by_ps_x4<const FMA: bool>(
 }
 
 #[inline(always)]
+pub(crate) unsafe fn _mm_mul_add_symm_epi16_by_ps_x4<const FMA: bool>(
+    accumulator: (__m128, __m128),
+    input0: __m128i,
+    input1: __m128i,
+    weight: __m128,
+) -> (__m128, __m128) {
+    let zeros = _mm_setzero_si128();
+    let l32 = _mm_add_epi32(
+        _mm_unpacklo_epi16(input0, zeros),
+        _mm_unpacklo_epi16(input1, zeros),
+    );
+    let h32 = _mm_add_epi32(
+        _mm_unpackhi_epi16(input0, zeros),
+        _mm_unpackhi_epi16(input1, zeros),
+    );
+
+    let a0 = _mm_cvtepi32_ps(l32);
+    let a1 = _mm_cvtepi32_ps(h32);
+
+    (
+        _mm_opt_fmlaf_ps::<FMA>(accumulator.0, a0, weight),
+        _mm_opt_fmlaf_ps::<FMA>(accumulator.1, a1, weight),
+    )
+}
+
+#[inline(always)]
 pub(crate) unsafe fn _mm_mul_add_epi8_by_ps_x2<const FMA: bool>(
     accumulator: (__m128, __m128),
     input: __m128i,
@@ -486,6 +538,13 @@ pub(crate) unsafe fn _mm_pack_ps_x4_epi8(store: (__m128, __m128, __m128, __m128)
     let hi_s = _mm_packs_epi32(o2, o3);
     let lo_s = _mm_packs_epi32(o0, o1);
     _mm_packus_epi16(lo_s, hi_s)
+}
+
+#[inline(always)]
+pub(crate) unsafe fn _mm_pack_ps_x4_epi16(store: (__m128, __m128)) -> __m128i {
+    let o0 = _mm_cvtps_epi32(store.0);
+    let o1 = _mm_cvtps_epi32(store.1);
+    _mm_packus_epi32(o0, o1)
 }
 
 #[inline(always)]

@@ -43,6 +43,7 @@ mod filter_row_symm_approx;
 mod filter_row_symm_u8_i16;
 mod filter_row_u8_i16;
 pub(crate) mod utils;
+mod filter_column_symm_u16;
 
 pub(crate) use filter_column::filter_column_sse_u8_f32;
 pub(crate) use filter_column_approx::filter_column_sse_u8_i32_app;
@@ -58,3 +59,4 @@ pub(crate) use filter_row_symm::filter_row_sse_symm_u8_f32;
 pub(crate) use filter_row_symm_approx::filter_row_symm_sse_u8_i32_app;
 pub(crate) use filter_row_symm_u8_i16::filter_row_sse_symm_u8_i16;
 pub(crate) use filter_row_u8_i16::filter_rgb_row_sse_u8_i16;
+pub(crate) use filter_column_symm_u16::filter_column_symm_sse_u16_f32;
