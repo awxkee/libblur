@@ -375,7 +375,8 @@ unsafe fn fgn_horizontal_pass_sse_f32_impl<const CN: usize, const FMA: bool>(
     let mut bf0 = Box::new([[0f32; 4]; 1024]);
     let mut bf1 = Box::new([[0f32; 4]; 1024]);
     let mut bf2 = Box::new([[0f32; 4]; 1024]);
-
+    let mut bf3 = Box::new([[0f32; 4]; 1024]);
+    
     let width_wide = width as i64;
 
     let threes = _mm_set1_ps(3.);
@@ -386,24 +387,28 @@ unsafe fn fgn_horizontal_pass_sse_f32_impl<const CN: usize, const FMA: bool>(
 
     let mut yy = start as usize;
 
-    while yy + 3 < height.min(end) as usize {
+    while yy + 4 < height.min(end) as usize {
         let mut diffs0 = _mm_setzero_ps();
         let mut diffs1 = _mm_setzero_ps();
         let mut diffs2 = _mm_setzero_ps();
+        let mut diffs3 = _mm_setzero_ps();
 
         let mut ders0 = _mm_setzero_ps();
         let mut ders1 = _mm_setzero_ps();
         let mut ders2 = _mm_setzero_ps();
+        let mut ders3 = _mm_setzero_ps();
 
         let mut summs0 = _mm_setzero_ps();
         let mut summs1 = _mm_setzero_ps();
         let mut summs2 = _mm_setzero_ps();
-
+        let mut summs3 = _mm_setzero_ps();
+        
         let start_x = 0 - 3 * radius_64;
 
         let current_y0 = ((yy as i64) * (stride as i64)) as usize;
         let current_y1 = (((yy + 1) as i64) * (stride as i64)) as usize;
         let current_y2 = (((yy + 2) as i64) * (stride as i64)) as usize;
+        let current_y3 = (((yy + 3) as i64) * (stride as i64)) as usize;
 
         for x in start_x..(width as i64) {
             if x >= 0 {
@@ -412,14 +417,17 @@ unsafe fn fgn_horizontal_pass_sse_f32_impl<const CN: usize, const FMA: bool>(
                 let prepared_px0 = _mm_mul_ps(summs0, v_weight);
                 let prepared_px1 = _mm_mul_ps(summs1, v_weight);
                 let prepared_px2 = _mm_mul_ps(summs2, v_weight);
-
+                let prepared_px3 = _mm_mul_ps(summs3, v_weight);
+                
                 let dst_ptr0 = bytes.slice.as_ptr().add(current_y0 + current_px) as *mut f32;
                 let dst_ptr1 = bytes.slice.as_ptr().add(current_y1 + current_px) as *mut f32;
                 let dst_ptr2 = bytes.slice.as_ptr().add(current_y2 + current_px) as *mut f32;
+                let dst_ptr3 = bytes.slice.as_ptr().add(current_y3 + current_px) as *mut f32;
 
                 store_f32::<CN>(dst_ptr0, prepared_px0);
                 store_f32::<CN>(dst_ptr1, prepared_px1);
                 store_f32::<CN>(dst_ptr2, prepared_px2);
+                store_f32::<CN>(dst_ptr3, prepared_px3);
 
                 let d_a_1 = ((x + radius_64) & 1023) as usize;
                 let d_a_2 = ((x - radius_64) & 1023) as usize;
@@ -428,49 +436,60 @@ unsafe fn fgn_horizontal_pass_sse_f32_impl<const CN: usize, const FMA: bool>(
                 let sd0 = _mm_loadu_ps(bf0.as_mut_ptr().add(d_i) as *mut f32);
                 let sd1 = _mm_loadu_ps(bf1.as_mut_ptr().add(d_i) as *mut f32);
                 let sd2 = _mm_loadu_ps(bf2.as_mut_ptr().add(d_i) as *mut f32);
+                let sd3 = _mm_loadu_ps(bf3.as_mut_ptr().add(d_i) as *mut f32);
 
                 let sd_1_0 = _mm_loadu_ps(bf0.as_mut_ptr().add(d_a_1) as *mut f32);
                 let sd_1_1 = _mm_loadu_ps(bf1.as_mut_ptr().add(d_a_1) as *mut f32);
                 let sd_1_2 = _mm_loadu_ps(bf2.as_mut_ptr().add(d_a_1) as *mut f32);
+                let sd_1_3 = _mm_loadu_ps(bf3.as_mut_ptr().add(d_a_1) as *mut f32);
 
                 let j0 = _mm_sub_ps(sd0, sd_1_0);
                 let j1 = _mm_sub_ps(sd1, sd_1_1);
                 let j2 = _mm_sub_ps(sd2, sd_1_2);
+                let j3 = _mm_sub_ps(sd3, sd_1_3);
 
                 let sd_2_0 = _mm_loadu_ps(bf0.as_mut_ptr().add(d_a_2) as *mut f32);
                 let sd_2_1 = _mm_loadu_ps(bf1.as_mut_ptr().add(d_a_2) as *mut f32);
                 let sd_2_2 = _mm_loadu_ps(bf2.as_mut_ptr().add(d_a_2) as *mut f32);
+                let sd_2_3 = _mm_loadu_ps(bf3.as_mut_ptr().add(d_a_2) as *mut f32);
 
                 let new_diff0 = _mm_opt_fnmlsf_ps::<FMA>(sd_2_0, j0, threes);
                 let new_diff1 = _mm_opt_fnmlsf_ps::<FMA>(sd_2_1, j1, threes);
                 let new_diff2 = _mm_opt_fnmlsf_ps::<FMA>(sd_2_2, j2, threes);
+                let new_diff3 = _mm_opt_fnmlsf_ps::<FMA>(sd_2_3, j3, threes);
 
                 diffs0 = _mm_add_ps(diffs0, new_diff0);
                 diffs1 = _mm_add_ps(diffs1, new_diff1);
                 diffs2 = _mm_add_ps(diffs2, new_diff2);
+                diffs3 = _mm_add_ps(diffs3, new_diff3);
             } else if x + radius_64 >= 0 {
                 let a_i = (x & 1023) as usize;
                 let a_i_1 = ((x + radius_64) & 1023) as usize;
                 let sd0 = _mm_loadu_ps(bf0.as_mut_ptr().add(a_i) as *mut f32);
                 let sd1 = _mm_loadu_ps(bf1.as_mut_ptr().add(a_i) as *mut f32);
                 let sd2 = _mm_loadu_ps(bf2.as_mut_ptr().add(a_i) as *mut f32);
-
+                let sd3 = _mm_loadu_ps(bf3.as_mut_ptr().add(a_i) as *mut f32);
+                
                 let sd_1_0 = _mm_loadu_ps(bf0.as_mut_ptr().add(a_i_1) as *mut f32);
                 let sd_1_1 = _mm_loadu_ps(bf1.as_mut_ptr().add(a_i_1) as *mut f32);
                 let sd_1_2 = _mm_loadu_ps(bf2.as_mut_ptr().add(a_i_1) as *mut f32);
+                let sd_1_3 = _mm_loadu_ps(bf3.as_mut_ptr().add(a_i_1) as *mut f32);
 
                 diffs0 = _mm_opt_fmlaf_ps::<FMA>(diffs0, _mm_sub_ps(sd0, sd_1_0), threes);
                 diffs1 = _mm_opt_fmlaf_ps::<FMA>(diffs1, _mm_sub_ps(sd1, sd_1_1), threes);
                 diffs2 = _mm_opt_fmlaf_ps::<FMA>(diffs2, _mm_sub_ps(sd2, sd_1_2), threes);
+                diffs3 = _mm_opt_fmlaf_ps::<FMA>(diffs3, _mm_sub_ps(sd3, sd_1_3), threes);
             } else if x + 2 * radius_64 >= 0 {
                 let arr_index = ((x + radius_64) & 1023) as usize;
                 let sd0 = _mm_loadu_ps(bf0.as_mut_ptr().add(arr_index) as *mut f32);
                 let sd1 = _mm_loadu_ps(bf1.as_mut_ptr().add(arr_index) as *mut f32);
                 let sd2 = _mm_loadu_ps(bf2.as_mut_ptr().add(arr_index) as *mut f32);
+                let sd3 = _mm_loadu_ps(bf3.as_mut_ptr().add(arr_index) as *mut f32);
 
                 diffs0 = _mm_opt_fnmlaf_ps::<FMA>(diffs0, sd0, threes);
                 diffs1 = _mm_opt_fnmlaf_ps::<FMA>(diffs1, sd1, threes);
                 diffs2 = _mm_opt_fnmlaf_ps::<FMA>(diffs2, sd2, threes);
+                diffs3 = _mm_opt_fnmlaf_ps::<FMA>(diffs3, sd3, threes);
             }
 
             let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide - 1);
@@ -479,31 +498,37 @@ unsafe fn fgn_horizontal_pass_sse_f32_impl<const CN: usize, const FMA: bool>(
             let s_ptr0 = bytes.slice.as_ptr().add(current_y0 + next_row_px) as *mut f32;
             let s_ptr1 = bytes.slice.as_ptr().add(current_y1 + next_row_px) as *mut f32;
             let s_ptr2 = bytes.slice.as_ptr().add(current_y2 + next_row_px) as *mut f32;
+            let s_ptr3 = bytes.slice.as_ptr().add(current_y3 + next_row_px) as *mut f32;
 
             let pixel_color0 = load_f32::<CN>(s_ptr0);
             let pixel_color1 = load_f32::<CN>(s_ptr1);
             let pixel_color2 = load_f32::<CN>(s_ptr2);
+            let pixel_color3 = load_f32::<CN>(s_ptr3);
 
             let a_i = ((x + 2 * radius_64) & 1023) as usize;
 
             _mm_storeu_ps(bf0.as_mut_ptr().add(a_i) as *mut f32, pixel_color0);
             _mm_storeu_ps(bf1.as_mut_ptr().add(a_i) as *mut f32, pixel_color1);
             _mm_storeu_ps(bf2.as_mut_ptr().add(a_i) as *mut f32, pixel_color2);
+            _mm_storeu_ps(bf3.as_mut_ptr().add(a_i) as *mut f32, pixel_color3);
 
             diffs0 = _mm_add_ps(diffs0, pixel_color0);
             diffs1 = _mm_add_ps(diffs1, pixel_color1);
             diffs2 = _mm_add_ps(diffs2, pixel_color2);
+            diffs3 = _mm_add_ps(diffs3, pixel_color3);
 
             ders0 = _mm_add_ps(ders0, diffs0);
             ders1 = _mm_add_ps(ders1, diffs1);
             ders2 = _mm_add_ps(ders2, diffs2);
+            ders3 = _mm_add_ps(ders3, diffs3);
 
             summs0 = _mm_add_ps(summs0, ders0);
             summs1 = _mm_add_ps(summs1, ders1);
             summs2 = _mm_add_ps(summs2, ders2);
+            summs3 = _mm_add_ps(summs3, ders3);
         }
 
-        yy += 3;
+        yy += 4;
     }
 
     for y in yy..height.min(end) as usize {

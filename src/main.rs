@@ -235,7 +235,7 @@ fn main() {
 
     // let bytes_16 = bytes.iter().map(|&x| x as u16).collect::<Vec<u16>>();
     // let mut dst_16 = vec![0u16; bytes_16.len()];
-    // 
+    //
     // libblur::gaussian_blur_u16(
     //     &bytes_16,
     //     &mut dst_16,
@@ -247,7 +247,7 @@ fn main() {
     //     EdgeMode::Clamp,
     //     ThreadingPolicy::Single,
     // );
-    // 
+    //
     // dst_bytes = dst_16.iter().map(|&x| x as u8).collect();
 
     // sobel(

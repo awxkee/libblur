@@ -36,9 +36,9 @@ use crate::neon::{
 use crate::reflect_index;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse::{
-    fast_gaussian_next_horizontal_pass_sse_f16, fgn_horizontal_pass_sse_f32,
-    fast_gaussian_next_horizontal_pass_sse_u8, fast_gaussian_next_vertical_pass_sse_f16,
-    fgn_vertical_pass_sse_f32, fast_gaussian_next_vertical_pass_sse_u8,
+    fast_gaussian_next_horizontal_pass_sse_f16, fast_gaussian_next_horizontal_pass_sse_u8,
+    fast_gaussian_next_vertical_pass_sse_f16, fast_gaussian_next_vertical_pass_sse_u8,
+    fgn_horizontal_pass_sse_f32, fgn_vertical_pass_sse_f32,
 };
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
