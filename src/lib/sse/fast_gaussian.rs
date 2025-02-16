@@ -591,11 +591,11 @@ unsafe fn fg_vertical_pass_sse_u8_impl<const CN: usize, const FMA: bool>(
         let mut diffs = _mm_setzero_si128();
         let mut summs = _mm_set1_epi32(initial_sum);
 
+        let current_px = (x * CN as u32) as usize;
+
         let start_y = 0 - 2 * radius as i64;
         for y in start_y..height_wide {
             if y >= 0 {
-                let current_px = (x * CN as u32) as usize;
-
                 let pixel_f32 = if FMA {
                     _mm_mul_round_ps(_mm_cvtepi32_ps(summs), v_weight)
                 } else {

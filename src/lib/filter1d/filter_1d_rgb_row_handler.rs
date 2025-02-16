@@ -204,6 +204,7 @@ impl Filter1DRgbRowHandler<u16, f32> for u16 {
         is_kernel_symmetric: bool,
     ) -> fn(Arena, &[u16], &UnsafeSlice<u16>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
         if is_kernel_symmetric {
+            #[cfg(feature = "avx")]
             if std::arch::is_x86_feature_detected!("avx2") {
                 use crate::filter1d::avx::filter_row_avx_symm_u16_f32;
                 return filter_row_avx_symm_u16_f32::<3>;

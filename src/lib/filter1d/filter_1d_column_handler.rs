@@ -207,11 +207,12 @@ impl Filter1DColumnHandler<u16, f32> for u16 {
         }
     }
 
-    #[cfg(not(all(target_arch = "aarch64", target_feature = "neon")))]
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     fn get_column_handler(
         is_symmetric_kernel: bool,
     ) -> fn(Arena, &[&[u16]], &UnsafeSlice<u16>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
         if is_symmetric_kernel {
+            #[cfg(feature = "avx")]
             if std::arch::is_x86_feature_detected!("avx2") {
                 use crate::filter1d::avx::filter_column_avx_symm_u16_f32;
                 return filter_column_avx_symm_u16_f32;
