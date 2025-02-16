@@ -262,7 +262,7 @@ unsafe fn filter_row_avx_symm_u8_f32_impl<const FMA: bool, const N: usize>(
         let shifted_src = local_src.get_unchecked(cx..);
 
         let source = _mm_loadu_si64(shifted_src.get_unchecked(half_len..).as_ptr() as *const _);
-        let mut k0 = _mm_mul_epi8_by_ps_x2(source, coeff);
+        let mut k0 = _mm_mul_epi8_by_ps_x2::<FMA>(source, coeff);
 
         for i in 0..half_len {
             let rollback = length - i - 1;

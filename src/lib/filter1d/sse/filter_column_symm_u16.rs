@@ -30,7 +30,8 @@ use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::region::FilterRegion;
 use crate::filter1d::sse::utils::{
-    _mm_mul_add_symm_epi16_by_ps_x4, _mm_mul_epi16_by_ps_x4, _mm_pack_ps_x4_epi16,
+    _mm_mul_add_symm_epi16_by_ps, _mm_mul_add_symm_epi16_by_ps_x4, _mm_mul_epi16_by_ps,
+    _mm_mul_epi16_by_ps_x4, _mm_pack_ps_epi16, _mm_pack_ps_x2_epi16,
 };
 use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
@@ -170,10 +171,10 @@ unsafe fn filter_column_symm_sse_u16_f32_impl<const FMA: bool>(
         _mm_store_pack_x4(
             dst_ptr0 as *mut _,
             (
-                _mm_pack_ps_x4_epi16(k0),
-                _mm_pack_ps_x4_epi16(k1),
-                _mm_pack_ps_x4_epi16(k2),
-                _mm_pack_ps_x4_epi16(k3),
+                _mm_pack_ps_x2_epi16(k0),
+                _mm_pack_ps_x2_epi16(k1),
+                _mm_pack_ps_x2_epi16(k2),
+                _mm_pack_ps_x2_epi16(k3),
             ),
         );
         cx += 32;
@@ -211,9 +212,9 @@ unsafe fn filter_column_symm_sse_u16_f32_impl<const FMA: bool>(
         _mm_store_pack_x3(
             dst_ptr0 as *mut _,
             (
-                _mm_pack_ps_x4_epi16(k0),
-                _mm_pack_ps_x4_epi16(k1),
-                _mm_pack_ps_x4_epi16(k2),
+                _mm_pack_ps_x2_epi16(k0),
+                _mm_pack_ps_x2_epi16(k1),
+                _mm_pack_ps_x2_epi16(k2),
             ),
         );
         cx += 24;
@@ -248,7 +249,7 @@ unsafe fn filter_column_symm_sse_u16_f32_impl<const FMA: bool>(
         let dst_ptr0 = (dst.slice.as_ptr() as *mut u16).add(dst_offset);
         _mm_store_pack_x2(
             dst_ptr0 as *mut _,
-            (_mm_pack_ps_x4_epi16(k0), _mm_pack_ps_x4_epi16(k1)),
+            (_mm_pack_ps_x2_epi16(k0), _mm_pack_ps_x2_epi16(k1)),
         );
 
         cx += 16;
@@ -284,55 +285,40 @@ unsafe fn filter_column_symm_sse_u16_f32_impl<const FMA: bool>(
 
         let dst_offset = y * dst_stride + cx;
         let dst_ptr = (dst.slice.as_ptr() as *mut u16).add(dst_offset);
-        _mm_storeu_si128(dst_ptr as *mut __m128i, _mm_pack_ps_x4_epi16(k0));
+        _mm_storeu_si128(dst_ptr as *mut __m128i, _mm_pack_ps_x2_epi16(k0));
         cx += 8;
     }
 
     while cx + 4 < image_width {
-        let coeff = scanned_kernel.get_unchecked(half_len).weight;
+        let coeff = *scanned_kernel.get_unchecked(half_len);
 
         let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
 
-        let mut k0 = (*v_src.get_unchecked(0) as f32).mul(coeff);
-        let mut k1 = (*v_src.get_unchecked(1) as f32).mul(coeff);
-        let mut k2 = (*v_src.get_unchecked(2) as f32).mul(coeff);
-        let mut k3 = (*v_src.get_unchecked(3) as f32).mul(coeff);
+        let source_0 = _mm_loadu_si64(v_src.as_ptr() as *const _);
+        let mut k0 = _mm_mul_epi16_by_ps::<FMA>(source_0, _mm_set1_ps(coeff.weight));
 
         for i in 0..half_len {
             let coeff = *scanned_kernel.get_unchecked(i);
             let rollback = length - i - 1;
-            k0 = mlaf(
+            let v_source_0 =
+                _mm_loadu_si64(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr() as *const _);
+            let v_source_1 = _mm_loadu_si64(
+                arena_src
+                    .get_unchecked(rollback)
+                    .get_unchecked(cx..)
+                    .as_ptr() as *const _,
+            );
+            k0 = _mm_mul_add_symm_epi16_by_ps::<FMA>(
                 k0,
-                ((*arena_src.get_unchecked(i).get_unchecked(cx)) as f32)
-                    .add(*arena_src.get_unchecked(rollback).get_unchecked(cx) as f32),
-                coeff.weight,
-            );
-            k1 = mlaf(
-                k1,
-                ((*arena_src.get_unchecked(i).get_unchecked(cx + 1)) as f32)
-                    .add(*arena_src.get_unchecked(rollback).get_unchecked(cx + 1) as f32),
-                coeff.weight,
-            );
-            k2 = mlaf(
-                k2,
-                ((*arena_src.get_unchecked(i).get_unchecked(cx + 2)) as f32)
-                    .add(*arena_src.get_unchecked(rollback).get_unchecked(cx + 2) as f32),
-                coeff.weight,
-            );
-            k3 = mlaf(
-                k3,
-                ((*arena_src.get_unchecked(i).get_unchecked(cx + 3)) as f32)
-                    .add(*arena_src.get_unchecked(rollback).get_unchecked(cx + 3) as f32),
-                coeff.weight,
+                v_source_0,
+                v_source_1,
+                _mm_set1_ps(coeff.weight),
             );
         }
 
         let dst_offset = y * dst_stride + cx;
-
-        dst.write(dst_offset, k0.to_());
-        dst.write(dst_offset + 1, k1.to_());
-        dst.write(dst_offset + 2, k2.to_());
-        dst.write(dst_offset + 3, k3.to_());
+        let dst_ptr = (dst.slice.as_ptr() as *mut u16).add(dst_offset);
+        _mm_storeu_si64(dst_ptr as *mut _, _mm_pack_ps_epi16(k0));
         cx += 4;
     }
 

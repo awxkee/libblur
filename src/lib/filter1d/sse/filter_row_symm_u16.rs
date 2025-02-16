@@ -30,8 +30,9 @@ use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::region::FilterRegion;
 use crate::filter1d::sse::utils::{
-    _mm_mul_add_symm_epi16_by_ps_x4, _mm_mul_add_symm_epi8_by_ps_x2, _mm_mul_epi16_by_ps_x4,
-    _mm_mul_epi8_by_ps_x2, _mm_pack_ps_x2_epi8, _mm_pack_ps_x4_epi16,
+    _mm_mul_add_symm_epi16_by_ps, _mm_mul_add_symm_epi16_by_ps_x4, _mm_mul_epi16_by_ps,
+    _mm_mul_epi16_by_ps_x4, _mm_mul_epi8_by_ps_x2, _mm_pack_ps_epi16, _mm_pack_ps_x2_epi16,
+    _mm_pack_ps_x2_epi8,
 };
 use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
@@ -166,10 +167,10 @@ unsafe fn filter_row_sse_symm_u16_f32_impl<const FMA: bool, const N: usize>(
         _mm_store_pack_x4(
             dst_ptr0 as *mut _,
             (
-                _mm_pack_ps_x4_epi16(k0),
-                _mm_pack_ps_x4_epi16(k1),
-                _mm_pack_ps_x4_epi16(k2),
-                _mm_pack_ps_x4_epi16(k3),
+                _mm_pack_ps_x2_epi16(k0),
+                _mm_pack_ps_x2_epi16(k1),
+                _mm_pack_ps_x2_epi16(k2),
+                _mm_pack_ps_x2_epi16(k3),
             ),
         );
         cx += 32;
@@ -199,7 +200,7 @@ unsafe fn filter_row_sse_symm_u16_f32_impl<const FMA: bool, const N: usize>(
         let dst_ptr0 = (dst.slice.as_ptr() as *mut u16).add(dst_offset);
         _mm_store_pack_x2(
             dst_ptr0 as *mut _,
-            (_mm_pack_ps_x4_epi16(k0), _mm_pack_ps_x4_epi16(k1)),
+            (_mm_pack_ps_x2_epi16(k0), _mm_pack_ps_x2_epi16(k1)),
         );
         cx += 16;
     }
@@ -224,7 +225,7 @@ unsafe fn filter_row_sse_symm_u16_f32_impl<const FMA: bool, const N: usize>(
 
         let dst_offset = y * dst_stride + cx;
         let dst_ptr0 = (dst.slice.as_ptr() as *mut u16).add(dst_offset);
-        _mm_storeu_si128(dst_ptr0 as *mut _, _mm_pack_ps_x4_epi16(k0));
+        _mm_storeu_si128(dst_ptr0 as *mut _, _mm_pack_ps_x2_epi16(k0));
         cx += 8;
     }
 
@@ -234,7 +235,7 @@ unsafe fn filter_row_sse_symm_u16_f32_impl<const FMA: bool, const N: usize>(
         let shifted_src = local_src.get_unchecked(cx..);
 
         let source = _mm_loadu_si64(shifted_src.get_unchecked(half_len..).as_ptr() as *const _);
-        let mut k0 = _mm_mul_epi8_by_ps_x2(source, coeff);
+        let mut k0 = _mm_mul_epi16_by_ps::<FMA>(source, coeff);
 
         for i in 0..half_len {
             let rollback = length - i - 1;
@@ -243,12 +244,12 @@ unsafe fn filter_row_sse_symm_u16_f32_impl<const FMA: bool, const N: usize>(
                 _mm_loadu_si64(shifted_src.get_unchecked((i * N)..).as_ptr() as *const _);
             let v_source1 =
                 _mm_loadu_si64(shifted_src.get_unchecked((rollback * N)..).as_ptr() as *const _);
-            k0 = _mm_mul_add_symm_epi8_by_ps_x2::<FMA>(k0, v_source0, v_source1, coeff);
+            k0 = _mm_mul_add_symm_epi16_by_ps::<FMA>(k0, v_source0, v_source1, coeff);
         }
 
         let dst_offset = y * dst_stride + cx;
         let dst_ptr0 = (dst.slice.as_ptr() as *mut u16).add(dst_offset);
-        _mm_storeu_si64(dst_ptr0 as *mut _, _mm_pack_ps_x2_epi8(k0));
+        _mm_storeu_si64(dst_ptr0 as *mut _, _mm_pack_ps_epi16(k0));
         cx += 4;
     }
 
