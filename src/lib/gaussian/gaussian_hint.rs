@@ -30,7 +30,7 @@
 /// Declares requested precision level, this is supported only for *u8*
 #[repr(C)]
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Default)]
-pub enum AlgorithmHint {
+pub enum ConvolutionMode {
     /// Exact precision, f32 accumulator and weights will be used
     Exact = 0,
     /// Convolution in numerical approximation, this is faster than exact convolution but may change result. Estimated error not less than 1-2%

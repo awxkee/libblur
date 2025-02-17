@@ -73,14 +73,14 @@ where
 {
     check_slice_size(
         src,
-        image_size.width,
+        image_size.width * 4,
         image_size.width,
         image_size.height,
         4,
     )?;
     check_slice_size(
         dst,
-        image_size.width,
+        image_size.width * 4,
         image_size.width,
         image_size.height,
         4,

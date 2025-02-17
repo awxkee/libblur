@@ -145,7 +145,7 @@ pub use gaussian::gaussian_blur_in_linear;
 pub use gaussian::gaussian_blur_u16;
 pub use gaussian::get_gaussian_kernel_1d;
 pub use gaussian::get_sigma_size;
-pub use gaussian::AlgorithmHint;
+pub use gaussian::ConvolutionMode;
 #[cfg(feature = "image")]
 pub use gaussian_blur_image::gaussian_blur_image;
 pub use img_size::ImageSize;

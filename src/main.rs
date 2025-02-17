@@ -8,7 +8,7 @@ use fast_transpose::{transpose_rgba, FlipMode, FlopMode};
 use image::imageops::FilterType;
 use image::{DynamicImage, EncodableLayout, GenericImageView, ImageReader};
 use libblur::{
-    fast_gaussian, filter_1d_exact, get_gaussian_kernel_1d, get_sigma_size, sobel, AlgorithmHint,
+    fast_gaussian, filter_1d_exact, get_gaussian_kernel_1d, get_sigma_size, sobel, ConvolutionMode,
     EdgeMode, FastBlurChannels, ImageSize, Scalar, ThreadingPolicy,
 };
 use std::time::Instant;
@@ -88,7 +88,7 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
         FastBlurChannels::Plane,
         EdgeMode::Reflect,
         ThreadingPolicy::Adaptive,
-        AlgorithmHint::Exact,
+        ConvolutionMode::Exact,
     );
 
     println!("libblur::gaussian_blur: {:?}", start.elapsed());
@@ -138,7 +138,7 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
         FastBlurChannels::Plane,
         EdgeMode::Reflect,
         ThreadingPolicy::Adaptive,
-        AlgorithmHint::Exact,
+        ConvolutionMode::Exact,
     );
 
     println!("libblur::gaussian_blur: {:?}", start.elapsed());

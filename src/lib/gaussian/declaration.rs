@@ -32,7 +32,7 @@ use crate::gaussian::gaussian_util::get_kernel_size;
 use crate::util::check_slice_size;
 use crate::{
     filter_1d_approx, filter_1d_exact, filter_1d_rgb_approx, filter_1d_rgb_exact,
-    filter_1d_rgba_approx, filter_1d_rgba_exact, get_sigma_size, AlgorithmHint, BlurError,
+    filter_1d_rgba_approx, filter_1d_rgba_exact, get_sigma_size, BlurError, ConvolutionMode,
     ImageSize, Scalar, ThreadingPolicy,
 };
 use half::f16;
@@ -53,7 +53,7 @@ use half::f16;
 /// * `channels` - Count of channels in the image
 /// * `edge_mode` - Rule to handle edge mode
 /// * `threading_policy` - Threading policy according to *ThreadingPolicy*
-/// * `hint` - see [AlgorithmHint] for more info
+/// * `hint` - see [ConvolutionMode] for more info
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided.
@@ -69,7 +69,7 @@ pub fn gaussian_blur(
     channels: FastBlurChannels,
     edge_mode: EdgeMode,
     threading_policy: ThreadingPolicy,
-    hint: AlgorithmHint,
+    hint: ConvolutionMode,
 ) -> Result<(), BlurError> {
     check_slice_size(
         src,
@@ -104,7 +104,7 @@ pub fn gaussian_blur(
     };
     let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
     match hint {
-        AlgorithmHint::Exact => {
+        ConvolutionMode::Exact => {
             let _dispatcher = match channels {
                 FastBlurChannels::Plane => filter_1d_exact::<u8, f32>,
                 FastBlurChannels::Channels3 => filter_1d_rgb_exact::<u8, f32>,
@@ -122,7 +122,7 @@ pub fn gaussian_blur(
             )
             .unwrap();
         }
-        AlgorithmHint::FixedPoint => {
+        ConvolutionMode::FixedPoint => {
             let _dispatcher = match channels {
                 FastBlurChannels::Plane => filter_1d_approx::<u8, f32, i32>,
                 FastBlurChannels::Channels3 => filter_1d_rgb_approx::<u8, f32, i32>,

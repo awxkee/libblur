@@ -27,8 +27,8 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::{
-    gaussian_blur, gaussian_blur_f32, gaussian_blur_u16, AlgorithmHint, EdgeMode, FastBlurChannels,
-    ThreadingPolicy,
+    gaussian_blur, gaussian_blur_f32, gaussian_blur_u16, ConvolutionMode, EdgeMode,
+    FastBlurChannels, ThreadingPolicy,
 };
 use image::{
     DynamicImage, GrayAlphaImage, GrayImage, ImageBuffer, Luma, LumaA, Rgb, Rgb32FImage, RgbImage,
@@ -53,7 +53,7 @@ pub fn gaussian_blur_image(
     kernel_size: u32,
     sigma: f32,
     edge_mode: EdgeMode,
-    precise_level: AlgorithmHint,
+    precise_level: ConvolutionMode,
     threading_policy: ThreadingPolicy,
 ) -> Option<DynamicImage> {
     match image {
