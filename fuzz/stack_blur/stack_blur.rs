@@ -66,5 +66,5 @@ fn fuzz_image(width: usize, height: usize, radius: usize, channels: FastBlurChan
         radius as u32,
         channels,
         ThreadingPolicy::Single,
-    );
+    ).unwrap();
 }
