@@ -115,9 +115,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo install cargo-fuzz
-      - run: cargo fuzz run stack_blur -- build stack_blur -- -max_total_time=17
-      - run: cargo fuzz run stack_blur_u16 -- build stack_blur_u16 -- -max_total_time=17
-      - run: cargo fuzz run stack_blur_f32 -- build stack_blur_u16 -- -max_total_time=17
+      - run: cargo fuzz run stack_blur -- -max_total_time=17
+      - run: cargo fuzz run stack_blur_u16 -- -max_total_time=17
+      - run: cargo fuzz run stack_blur_f32 -- -max_total_time=17
 
   fuzz_stack_blur_x86:
     name: Fuzzing Stack Blur

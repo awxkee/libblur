@@ -27,8 +27,8 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::{
-    filter_1d_exact, filter_1d_rgb_exact, filter_1d_rgba_exact, EdgeMode, FastBlurChannels,
-    ImageSize, Scalar, ThreadingPolicy,
+    filter_1d_exact, filter_1d_rgb_exact, filter_1d_rgba_exact, BlurError, EdgeMode,
+    FastBlurChannels, ImageSize, Scalar, ThreadingPolicy,
 };
 
 /// Performs sobel operator on the image
@@ -53,7 +53,7 @@ pub fn sobel(
     border_constant: Scalar,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
-) {
+) -> Result<(), BlurError> {
     let sobel_horizontal: [i16; 3] = [-1, 0, 1];
     let sobel_vertical: [i16; 3] = [1, 2, 1];
     let _dispatcher = match channels {
@@ -71,5 +71,4 @@ pub fn sobel(
         border_constant,
         threading_policy,
     )
-    .unwrap();
 }
