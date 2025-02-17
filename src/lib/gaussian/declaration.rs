@@ -28,12 +28,12 @@
 use crate::channels_configuration::FastBlurChannels;
 use crate::edge_mode::EdgeMode;
 use crate::gaussian::gaussian_kernel::get_gaussian_kernel_1d;
-use crate::gaussian::gaussian_precise_level::GaussianPreciseLevel;
 use crate::gaussian::gaussian_util::get_kernel_size;
+use crate::util::check_slice_size;
 use crate::{
     filter_1d_approx, filter_1d_exact, filter_1d_rgb_approx, filter_1d_rgb_exact,
-    filter_1d_rgba_approx, filter_1d_rgba_exact, get_sigma_size, ImageSize, Scalar,
-    ThreadingPolicy,
+    filter_1d_rgba_approx, filter_1d_rgba_exact, get_sigma_size, AlgorithmHint, BlurError,
+    ImageSize, Scalar, ThreadingPolicy,
 };
 use half::f16;
 
@@ -53,7 +53,7 @@ use half::f16;
 /// * `channels` - Count of channels in the image
 /// * `edge_mode` - Rule to handle edge mode
 /// * `threading_policy` - Threading policy according to *ThreadingPolicy*
-/// * `precise_level` - Gaussian precise level
+/// * `hint` - see [AlgorithmHint] for more info
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided.
@@ -69,8 +69,22 @@ pub fn gaussian_blur(
     channels: FastBlurChannels,
     edge_mode: EdgeMode,
     threading_policy: ThreadingPolicy,
-    precise_level: GaussianPreciseLevel,
-) {
+    hint: AlgorithmHint,
+) -> Result<(), BlurError> {
+    check_slice_size(
+        src,
+        width as usize * channels.get_channels(),
+        width as usize,
+        height as usize,
+        channels.get_channels(),
+    )?;
+    check_slice_size(
+        dst,
+        width as usize * channels.get_channels(),
+        width as usize,
+        height as usize,
+        channels.get_channels(),
+    )?;
     assert!(
         kernel_size != 0 || sigma > 0.0,
         "Either sigma or kernel size must be set"
@@ -89,8 +103,8 @@ pub fn gaussian_blur(
         kernel_size
     };
     let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
-    match precise_level {
-        GaussianPreciseLevel::EXACT => {
+    match hint {
+        AlgorithmHint::Exact => {
             let _dispatcher = match channels {
                 FastBlurChannels::Plane => filter_1d_exact::<u8, f32>,
                 FastBlurChannels::Channels3 => filter_1d_rgb_exact::<u8, f32>,
@@ -108,7 +122,7 @@ pub fn gaussian_blur(
             )
             .unwrap();
         }
-        GaussianPreciseLevel::INTEGRAL => {
+        AlgorithmHint::FixedPoint => {
             let _dispatcher = match channels {
                 FastBlurChannels::Plane => filter_1d_approx::<u8, f32, i32>,
                 FastBlurChannels::Channels3 => filter_1d_rgb_approx::<u8, f32, i32>,
@@ -127,6 +141,7 @@ pub fn gaussian_blur(
             .unwrap();
         }
     }
+    Ok(())
 }
 
 /// Performs gaussian blur on the image.
@@ -158,7 +173,21 @@ pub fn gaussian_blur_u16(
     channels: FastBlurChannels,
     edge_mode: EdgeMode,
     threading_policy: ThreadingPolicy,
-) {
+) -> Result<(), BlurError> {
+    check_slice_size(
+        src,
+        width as usize * channels.get_channels(),
+        width as usize,
+        height as usize,
+        channels.get_channels(),
+    )?;
+    check_slice_size(
+        dst,
+        width as usize * channels.get_channels(),
+        width as usize,
+        height as usize,
+        channels.get_channels(),
+    )?;
     assert!(
         kernel_size != 0 || sigma > 0.0,
         "Either sigma or kernel size must be set"
@@ -192,7 +221,6 @@ pub fn gaussian_blur_u16(
         Scalar::default(),
         threading_policy,
     )
-    .unwrap();
 }
 
 /// Performs gaussian blur on the image.
@@ -225,7 +253,21 @@ pub fn gaussian_blur_f32(
     channels: FastBlurChannels,
     edge_mode: EdgeMode,
     threading_policy: ThreadingPolicy,
-) {
+) -> Result<(), BlurError> {
+    check_slice_size(
+        src,
+        width as usize * channels.get_channels(),
+        width as usize,
+        height as usize,
+        channels.get_channels(),
+    )?;
+    check_slice_size(
+        dst,
+        width as usize * channels.get_channels(),
+        width as usize,
+        height as usize,
+        channels.get_channels(),
+    )?;
     assert!(
         kernel_size != 0 || sigma > 0.0,
         "Either sigma or kernel size must be set"
@@ -259,7 +301,6 @@ pub fn gaussian_blur_f32(
         Scalar::default(),
         threading_policy,
     )
-    .unwrap();
 }
 
 /// Performs gaussian blur on the image.
@@ -291,7 +332,21 @@ pub fn gaussian_blur_f16(
     channels: FastBlurChannels,
     edge_mode: EdgeMode,
     threading_policy: ThreadingPolicy,
-) {
+) -> Result<(), BlurError> {
+    check_slice_size(
+        src,
+        width as usize * channels.get_channels(),
+        width as usize,
+        height as usize,
+        channels.get_channels(),
+    )?;
+    check_slice_size(
+        dst,
+        width as usize * channels.get_channels(),
+        width as usize,
+        height as usize,
+        channels.get_channels(),
+    )?;
     assert!(
         kernel_size != 0 || sigma > 0.0,
         "Either sigma or kernel size must be set"
@@ -325,5 +380,4 @@ pub fn gaussian_blur_f16(
         Scalar::default(),
         threading_policy,
     )
-    .unwrap();
 }

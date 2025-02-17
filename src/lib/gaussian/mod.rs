@@ -26,13 +26,13 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 mod declaration;
+mod gaussian_hint;
 mod gaussian_kernel;
 mod gaussian_linear;
-mod gaussian_precise_level;
 mod gaussian_util;
 
 pub use declaration::*;
+pub use gaussian_hint::AlgorithmHint;
 pub use gaussian_kernel::get_gaussian_kernel_1d;
 pub use gaussian_linear::gaussian_blur_in_linear;
-pub use gaussian_precise_level::GaussianPreciseLevel;
 pub use gaussian_util::get_sigma_size;

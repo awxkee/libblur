@@ -33,7 +33,8 @@ use crate::stackblur::sse::{HorizontalSseStackBlurPass, VerticalSseStackBlurPass
 use crate::stackblur::wasm::{HorizontalWasmStackBlurPass, VerticalWasmStackBlurPass};
 use crate::stackblur::*;
 use crate::unsafe_slice::UnsafeSlice;
-use crate::{FastBlurChannels, ThreadingPolicy};
+use crate::util::check_slice_size;
+use crate::{BlurError, FastBlurChannels, ThreadingPolicy};
 
 fn stack_blur_worker_horizontal(
     slice: &UnsafeSlice<u8>,
@@ -198,7 +199,15 @@ pub fn stack_blur(
     radius: u32,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
-) {
+) -> Result<(), BlurError> {
+    check_slice_size(
+        in_place,
+        stride as usize,
+        width as usize,
+        height as usize,
+        channels.get_channels(),
+    )?;
+
     #[allow(clippy::manual_clamp)]
     let radius = radius.max(1).min(1449);
     let thread_count = threading_policy.thread_count(width, height) as u32;
@@ -206,7 +215,7 @@ pub fn stack_blur(
         let slice = UnsafeSlice::new(in_place);
         stack_blur_worker_horizontal(&slice, stride, width, height, radius, channels, 0, 1);
         stack_blur_worker_vertical(&slice, stride, width, height, radius, channels, 0, 1);
-        return;
+        return Ok(());
     }
     let pool = rayon::ThreadPoolBuilder::new()
         .num_threads(thread_count as usize)
@@ -246,4 +255,5 @@ pub fn stack_blur(
             });
         }
     });
+    Ok(())
 }

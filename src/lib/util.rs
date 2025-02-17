@@ -40,6 +40,9 @@ pub enum BlurError {
     ZeroBaseSize,
     MinimumSliceSizeMismatch(MismatchedSize),
     MinimumStrideSizeMismatch(MismatchedSize),
+    OddKernel(usize),
+    KernelSizeMismatch(MismatchedSize),
+    ImagesMustMatch,
 }
 
 impl Error for BlurError {}
@@ -56,6 +59,17 @@ impl std::fmt::Display for BlurError {
                 size.expected, size.received
             )),
             BlurError::ZeroBaseSize => f.write_str("Image size must not be zero"),
+            BlurError::OddKernel(size) => f.write_fmt(format_args!(
+                "Kernel size must be odd, but received {}",
+                size
+            )),
+            BlurError::KernelSizeMismatch(size) => f.write_fmt(format_args!(
+                "Kernel size mismatch: expected={}, received={}",
+                size.expected, size.received
+            )),
+            BlurError::ImagesMustMatch => {
+                f.write_str("Source and destination images must match in their dimensions")
+            }
         }
     }
 }

@@ -33,7 +33,8 @@ use crate::stackblur::neon::{
 use crate::stackblur::sse::{HorizontalSseStackBlurPassFloat32, VerticalSseStackBlurPassFloat32};
 use crate::stackblur::*;
 use crate::unsafe_slice::UnsafeSlice;
-use crate::{FastBlurChannels, ThreadingPolicy};
+use crate::util::check_slice_size;
+use crate::{BlurError, FastBlurChannels, ThreadingPolicy};
 
 fn stack_blur_worker_horizontal(
     slice: &UnsafeSlice<f32>,
@@ -155,7 +156,8 @@ fn stack_blur_worker_vertical(
 /// Fast gaussian approximation using stack blur.
 ///
 /// # Arguments
-/// * `in_place` - mutable buffer contains image data that will be used as a source and destination
+/// * `in_place` - mutable buffer contains image data that will be used as a source and destination.
+/// * `stride` - Elements per row, lane length.
 /// * `width` - image width
 /// * `height` - image height
 /// * `radius` - radius almost is not limited, minimum is one
@@ -166,21 +168,27 @@ fn stack_blur_worker_vertical(
 /// O(1) complexity.
 pub fn stack_blur_f32(
     in_place: &mut [f32],
+    stride: u32,
     width: u32,
     height: u32,
     radius: u32,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
-) {
+) -> Result<(), BlurError> {
+    check_slice_size(
+        in_place,
+        stride as usize,
+        width as usize,
+        height as usize,
+        channels.get_channels(),
+    )?;
     let radius = radius.max(1);
-    let stride = width * channels.get_channels() as u32;
-    let radius = radius.max(2);
     let thread_count = threading_policy.thread_count(width, height) as u32;
     if thread_count == 1 {
         let slice = UnsafeSlice::new(in_place);
         stack_blur_worker_horizontal(&slice, stride, width, height, radius, channels, 0, 1);
         stack_blur_worker_vertical(&slice, stride, width, height, radius, channels, 0, 1);
-        return;
+        return Ok(());
     }
     let pool = rayon::ThreadPoolBuilder::new()
         .num_threads(thread_count as usize)
@@ -219,5 +227,6 @@ pub fn stack_blur_f32(
                 );
             });
         }
-    })
+    });
+    Ok(())
 }

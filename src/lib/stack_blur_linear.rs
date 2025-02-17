@@ -25,7 +25,8 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::{FastBlurChannels, ThreadingPolicy};
+use crate::util::check_slice_size;
+use crate::{BlurError, FastBlurChannels, ThreadingPolicy};
 use colorutils_rs::linear_to_planar::linear_to_plane;
 use colorutils_rs::planar_to_linear::plane_to_linear;
 use colorutils_rs::{
@@ -62,7 +63,14 @@ pub fn stack_blur_in_linear(
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
     transfer_function: TransferFunction,
-) {
+) -> Result<(), BlurError> {
+    check_slice_size(
+        in_place,
+        stride as usize,
+        width as usize,
+        height as usize,
+        channels.get_channels(),
+    )?;
     let mut linear_data: Vec<f32> =
         vec![0f32; width as usize * height as usize * channels.get_channels()];
 
@@ -90,12 +98,13 @@ pub fn stack_blur_in_linear(
 
     crate::stack_blur_f32(
         &mut linear_data,
+        width * channels.get_channels() as u32,
         width,
         height,
         radius,
         channels,
         threading_policy,
-    );
+    )?;
 
     inverse_transformer(
         &linear_data,
@@ -106,4 +115,5 @@ pub fn stack_blur_in_linear(
         height,
         transfer_function,
     );
+    Ok(())
 }

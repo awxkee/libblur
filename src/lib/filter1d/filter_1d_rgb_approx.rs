@@ -35,7 +35,8 @@ use crate::filter1d::region::FilterRegion;
 use crate::filter1d::to_approx_storage::{ApproxLevel, ToApproxStorage};
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
-use crate::{EdgeMode, ImageSize, Scalar, ThreadingPolicy};
+use crate::util::check_slice_size;
+use crate::{BlurError, EdgeMode, ImageSize, Scalar, ThreadingPolicy};
 use num_traits::{AsPrimitive, Float, MulAdd};
 use std::ops::{Add, Mul, Shl, Shr};
 
@@ -69,7 +70,7 @@ pub fn filter_1d_rgb_approx<T, F, I>(
     border_mode: EdgeMode,
     border_constant: Scalar,
     threading_policy: ThreadingPolicy,
-) -> Result<(), String>
+) -> Result<(), BlurError>
 where
     T: Copy
         + AsPrimitive<F>
@@ -96,25 +97,25 @@ where
     i64: AsPrimitive<I> + AsPrimitive<F>,
     f64: AsPrimitive<T>,
 {
-    if image.len() != 3 * image_size.width * image_size.height {
-        return Err(format!(
-            "Can't create arena, expected image with size {} but got {}",
-            3 * image_size.width * image_size.height,
-            image.len()
-        ));
-    }
-    if destination.len() != 3 * image_size.width * image_size.height {
-        return Err(format!(
-            "Can't create arena, expected image with size {} but got {}",
-            3 * image_size.width * image_size.height,
-            destination.len()
-        ));
-    }
+    check_slice_size(
+        image,
+        image_size.width,
+        image_size.width,
+        image_size.height,
+        3,
+    )?;
+    check_slice_size(
+        destination,
+        image_size.width,
+        image_size.width,
+        image_size.height,
+        3,
+    )?;
     if row_kernel.len() & 1 == 0 {
-        return Err(String::from("Row kernel length must be odd"));
+        return Err(BlurError::OddKernel(row_kernel.len()));
     }
     if column_kernel.len() & 1 == 0 {
-        return Err(String::from("Column kernel length must be odd"));
+        return Err(BlurError::OddKernel(column_kernel.len()));
     }
 
     let one_i: I = 1.as_();

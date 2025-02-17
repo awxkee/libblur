@@ -8,8 +8,8 @@ use fast_transpose::{transpose_rgba, FlipMode, FlopMode};
 use image::imageops::FilterType;
 use image::{DynamicImage, EncodableLayout, GenericImageView, ImageReader};
 use libblur::{
-    fast_gaussian, filter_1d_exact, get_gaussian_kernel_1d, get_sigma_size, sobel, EdgeMode,
-    FastBlurChannels, GaussianPreciseLevel, ImageSize, Scalar, ThreadingPolicy,
+    fast_gaussian, filter_1d_exact, get_gaussian_kernel_1d, get_sigma_size, sobel, AlgorithmHint,
+    EdgeMode, FastBlurChannels, ImageSize, Scalar, ThreadingPolicy,
 };
 use std::time::Instant;
 
@@ -88,7 +88,7 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
         FastBlurChannels::Plane,
         EdgeMode::Reflect,
         ThreadingPolicy::Adaptive,
-        GaussianPreciseLevel::EXACT,
+        AlgorithmHint::Exact,
     );
 
     println!("libblur::gaussian_blur: {:?}", start.elapsed());
@@ -138,7 +138,7 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
         FastBlurChannels::Plane,
         EdgeMode::Reflect,
         ThreadingPolicy::Adaptive,
-        GaussianPreciseLevel::EXACT,
+        AlgorithmHint::Exact,
     );
 
     println!("libblur::gaussian_blur: {:?}", start.elapsed());
@@ -233,7 +233,8 @@ fn main() {
         FastBlurChannels::Channels3,
         ThreadingPolicy::Single,
         EdgeMode::Clamp,
-    ).unwrap();
+    )
+    .unwrap();
     dst_bytes = dst_16.iter().map(|&x| x as u8).collect();
 
     // let bytes_16 = bytes.iter().map(|&x| x as u16).collect::<Vec<u16>>();

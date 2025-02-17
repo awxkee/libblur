@@ -31,7 +31,8 @@ use crate::filter2d::filter_2d_handler::Filter2dHandler;
 use crate::filter2d::scan_se_2d::scan_se_2d;
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
-use crate::{EdgeMode, ImageSize, Scalar, ThreadingPolicy};
+use crate::util::check_slice_size;
+use crate::{BlurError, EdgeMode, ImageSize, MismatchedSize, Scalar, ThreadingPolicy};
 use num_traits::{AsPrimitive, MulAdd};
 use std::ops::Mul;
 use std::sync::Arc;
@@ -64,39 +65,42 @@ pub fn filter_2d<T, F>(
     border_mode: EdgeMode,
     border_constant: Scalar,
     threading_policy: ThreadingPolicy,
-) -> Result<(), String>
+) -> Result<(), BlurError>
 where
     T: Copy + AsPrimitive<F> + Default + Send + Sync + Filter2dHandler<T, F>,
     F: ToStorage<T> + Mul<F> + MulAdd<F, Output = F> + Send + Sync + PartialEq,
     i32: AsPrimitive<F>,
     f64: AsPrimitive<T>,
 {
+    check_slice_size(
+        src,
+        image_size.width,
+        image_size.width,
+        image_size.height,
+        1,
+    )?;
+    check_slice_size(
+        dst,
+        image_size.width,
+        image_size.width,
+        image_size.height,
+        1,
+    )?;
+
     if src.len() != dst.len() {
-        return Err("Source slice size and destination must match"
-            .parse()
-            .unwrap());
+        return Err(BlurError::ImagesMustMatch);
     }
 
     let kernel_width = kernel_shape.width;
     let kernel_height = kernel_shape.height;
     if kernel_height * kernel_width != kernel.len() {
-        return Err(format!(
-            "Structuring element expected to be {} but it was {}",
-            kernel_height * kernel_width,
-            kernel.len()
-        ));
+        return Err(BlurError::KernelSizeMismatch(MismatchedSize {
+            expected: kernel_height * kernel_width,
+            received: kernel.len(),
+        }));
     }
 
-    let width = image_size.width;
     let height = image_size.height;
-
-    if src.len() != width * height {
-        return Err(format!(
-            "Image size expected to be {} but it was {}",
-            width * height,
-            src.len()
-        ));
-    }
 
     let analyzed_se = scan_se_2d(kernel, kernel_shape);
 

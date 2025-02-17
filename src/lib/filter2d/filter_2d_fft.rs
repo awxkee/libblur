@@ -31,7 +31,8 @@ use crate::filter1d::{make_arena, ArenaPads};
 use crate::filter2d::fft_utils::fft_next_good_size;
 use crate::filter2d::scan_se_2d::scan_se_2d;
 use crate::to_storage::ToStorage;
-use crate::{EdgeMode, ImageSize, KernelShape, Scalar};
+use crate::util::check_slice_size;
+use crate::{BlurError, EdgeMode, ImageSize, KernelShape, MismatchedSize, Scalar};
 use fast_transpose::{transpose_arbitrary, FlipMode, FlopMode};
 use num_traits::AsPrimitive;
 use rayon::iter::ParallelIterator;
@@ -110,7 +111,7 @@ pub fn filter_2d_fft<T, F, FftIntermediate>(
     kernel_shape: KernelShape,
     border_mode: EdgeMode,
     border_constant: Scalar,
-) -> Result<(), String>
+) -> Result<(), BlurError>
 where
     T: Copy + AsPrimitive<F> + Default + Send + Sync + AsPrimitive<FftIntermediate>,
     F: ToStorage<T> + Mul<F> + Send + Sync + PartialEq + AsPrimitive<FftIntermediate>,
@@ -118,34 +119,35 @@ where
     i32: AsPrimitive<F>,
     f64: AsPrimitive<T> + AsPrimitive<FftIntermediate>,
 {
+    check_slice_size(
+        src,
+        image_size.width,
+        image_size.width,
+        image_size.height,
+        1,
+    )?;
+    check_slice_size(
+        dst,
+        image_size.width,
+        image_size.width,
+        image_size.height,
+        1,
+    )?;
+
     if src.len() != dst.len() {
-        return Err("Source slice size and destination must match".to_string());
+        return Err(BlurError::ImagesMustMatch);
     }
 
     let kernel_width = kernel_shape.width;
     let kernel_height = kernel_shape.height;
     if kernel_height * kernel_width != kernel.len() {
-        return Err(format!(
-            "Kernel expected to be {} but it was {}",
-            kernel_height * kernel_width,
-            kernel.len()
-        ));
-    }
-
-    if kernel_shape.width & 1 == 0 || kernel_shape.height & 1 == 0 {
-        return Err("Kernel shape dimensions must be odd".to_string());
+        return Err(BlurError::KernelSizeMismatch(MismatchedSize {
+            expected: kernel_height * kernel_width,
+            received: kernel.len(),
+        }));
     }
 
     let width = image_size.width;
-    let height = image_size.height;
-
-    if src.len() != width * height {
-        return Err(format!(
-            "Image size expected to be {} but it was {}",
-            width * height,
-            src.len()
-        ));
-    }
 
     let analyzed_se = scan_se_2d(kernel, kernel_shape);
 

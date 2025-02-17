@@ -25,7 +25,10 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::{gaussian_blur_f32, get_sigma_size, EdgeMode, FastBlurChannels, ThreadingPolicy};
+use crate::util::check_slice_size;
+use crate::{
+    gaussian_blur_f32, get_sigma_size, BlurError, EdgeMode, FastBlurChannels, ThreadingPolicy,
+};
 use colorutils_rs::linear_to_planar::linear_to_plane;
 use colorutils_rs::planar_to_linear::plane_to_linear;
 use colorutils_rs::{
@@ -68,7 +71,21 @@ pub fn gaussian_blur_in_linear(
     edge_mode: EdgeMode,
     threading_policy: ThreadingPolicy,
     transfer_function: TransferFunction,
-) {
+) -> Result<(), BlurError> {
+    check_slice_size(
+        src,
+        width as usize * channels.get_channels(),
+        width as usize,
+        height as usize,
+        channels.get_channels(),
+    )?;
+    check_slice_size(
+        dst,
+        width as usize * channels.get_channels(),
+        width as usize,
+        height as usize,
+        channels.get_channels(),
+    )?;
     let mut linear_data: Vec<f32> =
         vec![0f32; width as usize * height as usize * channels.get_channels()];
     let mut linear_data_1: Vec<f32> =
@@ -112,7 +129,7 @@ pub fn gaussian_blur_in_linear(
         channels,
         edge_mode,
         threading_policy,
-    );
+    )?;
     inverse_transformer(
         &linear_data_1,
         width * size_of::<f32>() as u32 * channels.get_channels() as u32,
@@ -122,4 +139,5 @@ pub fn gaussian_blur_in_linear(
         height,
         transfer_function,
     );
+    Ok(())
 }

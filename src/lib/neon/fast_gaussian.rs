@@ -404,7 +404,7 @@ pub(crate) fn fg_vertical_pass_neon_u8<T, const CN: usize>(
             for y in start_y..height_wide {
                 if y >= 0 {
                     let current_y = (y * (stride as i64)) as usize;
-                    
+
                     let prepared_px_s32 = vreinterpretq_u32_s32(vmulq_s32_f32(summs, v_weight));
                     let prepared_u16 = vqmovn_u32(prepared_px_s32);
                     let prepared_u8 = vqmovn_u16(vcombine_u16(prepared_u16, prepared_u16));

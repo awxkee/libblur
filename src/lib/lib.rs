@@ -88,9 +88,9 @@ mod stackblur;
 mod threading_policy;
 mod to_storage;
 mod unsafe_slice;
+mod util;
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 mod wasm32;
-mod util;
 
 #[cfg(feature = "fft")]
 pub use adaptive_blur::adaptive_blur;
@@ -145,7 +145,7 @@ pub use gaussian::gaussian_blur_in_linear;
 pub use gaussian::gaussian_blur_u16;
 pub use gaussian::get_gaussian_kernel_1d;
 pub use gaussian::get_sigma_size;
-pub use gaussian::GaussianPreciseLevel;
+pub use gaussian::AlgorithmHint;
 #[cfg(feature = "image")]
 pub use gaussian_blur_image::gaussian_blur_image;
 pub use img_size::ImageSize;
