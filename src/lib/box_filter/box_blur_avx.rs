@@ -26,30 +26,12 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::avx::{_mm256_mul_round_ps, _mm_mul_round_ps, shuffle};
-use crate::sse::{load_u8_s32_fast, store_u8_u32};
+use crate::sse::{load_u8_s16_fast, load_u8_s32_fast, store_u8_s16, store_u8_u32};
 use crate::unsafe_slice::UnsafeSlice;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
-
-#[inline(always)]
-pub(crate) unsafe fn load_u8_s16_fast<const CN: usize>(ptr: *const u8) -> __m128i {
-    let sh1 = _mm_setr_epi8(0, -1, 1, -1, 2, -1, 3, -1, -1, -1, -1, -1, -1, -1, -1, -1);
-    if CN == 4 {
-        let v = _mm_loadu_si32(ptr);
-        _mm_shuffle_epi8(v, sh1)
-    } else if CN == 3 {
-        let mut v0 = _mm_loadu_si16(ptr);
-        v0 = _mm_insert_epi8::<2>(v0, ptr.add(2).read_unaligned() as i32);
-        _mm_shuffle_epi8(v0, sh1)
-    } else if CN == 2 {
-        let v0 = _mm_loadu_si16(ptr);
-        _mm_shuffle_epi8(v0, sh1)
-    } else {
-        _mm_setr_epi16(ptr.read_unaligned() as i16, 0, 0, 0, 0, 0, 0, 0)
-    }
-}
 
 pub(crate) fn box_blur_vertical_pass_avx2<T>(
     undefined_src: &[T],
@@ -1532,7 +1514,7 @@ unsafe fn box_blur_vertical_pass_avx2_impl_lr<const FMA: bool>(
                 _mm_round_ps::<RND>(scale_store_0_ps)
             };
             let ptr = unsafe_dst.slice.as_ptr().add(y_dst_shift + px) as *mut u8;
-            store_u8_u32::<TAIL_CN>(ptr, _mm_cvtps_epi32(r0));
+            store_u8_s16::<TAIL_CN>(ptr, _mm_cvtps_epi32(r0));
             buf_cx += 1;
         }
     }

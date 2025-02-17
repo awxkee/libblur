@@ -56,16 +56,16 @@ pub fn filter_symmetric_column<T, F>(
         let length = scanned_kernel.len();
         let half_len = length / 2;
 
-        let mut _cx = 0usize;
+        let mut cx = 0usize;
 
         let y = region.start;
 
-        while _cx + 32 < dst_stride {
+        while cx + 32 < dst_stride {
             let coeff = scanned_kernel[half_len].weight;
 
             let mut store: [F; 32] = [F::default(); 32];
 
-            let v_src = &arena_src[half_len][_cx..(_cx + 32)];
+            let v_src = &arena_src[half_len][cx..(cx + 32)];
 
             for (dst, src) in store.iter_mut().zip(v_src) {
                 *dst = src.as_().mul(coeff);
@@ -73,29 +73,29 @@ pub fn filter_symmetric_column<T, F>(
 
             for (i, coeff) in scanned_kernel.iter().take(half_len).enumerate() {
                 let rollback = length - i - 1;
-                let fw = &arena_src[i][_cx..(_cx + 32)];
-                let bw = &arena_src[rollback][_cx..(_cx + 32)];
+                let fw = &arena_src[i][cx..(cx + 32)];
+                let bw = &arena_src[rollback][cx..(cx + 32)];
 
                 for ((dst, fw), bw) in store.iter_mut().zip(fw).zip(bw) {
                     *dst = mlaf(*dst, fw.as_().add(bw.as_()), coeff.weight);
                 }
             }
 
-            let dst_offset = y * dst_stride + _cx;
+            let dst_offset = y * dst_stride + cx;
 
             for (y, src) in store.iter().enumerate() {
                 dst.write(dst_offset + y, src.to_());
             }
 
-            _cx += 32;
+            cx += 32;
         }
 
-        while _cx + 16 < dst_stride {
+        while cx + 16 < dst_stride {
             let coeff = scanned_kernel[half_len].weight;
 
             let mut store: [F; 16] = [F::default(); 16];
 
-            let v_src = &arena_src[half_len][_cx..(_cx + 16)];
+            let v_src = &arena_src[half_len][cx..(cx + 16)];
 
             for (dst, src) in store.iter_mut().zip(v_src) {
                 *dst = src.as_().mul(coeff);
@@ -103,27 +103,27 @@ pub fn filter_symmetric_column<T, F>(
 
             for (i, coeff) in scanned_kernel.iter().take(half_len).enumerate() {
                 let rollback = length - i - 1;
-                let fw = &arena_src[i][_cx..(_cx + 16)];
-                let bw = &arena_src[rollback][_cx..(_cx + 16)];
+                let fw = &arena_src[i][cx..(cx + 16)];
+                let bw = &arena_src[rollback][cx..(cx + 16)];
 
                 for ((dst, fw), bw) in store.iter_mut().zip(fw).zip(bw) {
                     *dst = mlaf(*dst, fw.as_().add(bw.as_()), coeff.weight);
                 }
             }
 
-            let dst_offset = y * dst_stride + _cx;
+            let dst_offset = y * dst_stride + cx;
 
             for (y, src) in store.iter().enumerate() {
                 dst.write(dst_offset + y, src.to_());
             }
 
-            _cx += 16;
+            cx += 16;
         }
 
-        while _cx + 4 < dst_stride {
+        while cx + 4 < dst_stride {
             let coeff = scanned_kernel[half_len].weight;
 
-            let v_src = &arena_src[half_len][_cx..(_cx + 4)];
+            let v_src = &arena_src[half_len][cx..(cx + 4)];
 
             let mut k0 = v_src[0].as_().mul(coeff);
             let mut k1 = v_src[1].as_().mul(coeff);
@@ -132,24 +132,24 @@ pub fn filter_symmetric_column<T, F>(
 
             for (i, coeff) in scanned_kernel.iter().take(half_len).enumerate() {
                 let rollback = length - i - 1;
-                let fw = &arena_src[i][_cx..(_cx + 4)];
-                let bw = &arena_src[rollback][_cx..(_cx + 4)];
+                let fw = &arena_src[i][cx..(cx + 4)];
+                let bw = &arena_src[rollback][cx..(cx + 4)];
                 k0 = mlaf(k0, fw[0].as_().add(bw[0].as_()), coeff.weight);
                 k1 = mlaf(k1, fw[1].as_().add(bw[1].as_()), coeff.weight);
                 k2 = mlaf(k2, fw[2].as_().add(bw[2].as_()), coeff.weight);
                 k3 = mlaf(k3, fw[3].as_().add(bw[3].as_()), coeff.weight);
             }
 
-            let dst_offset = y * dst_stride + _cx;
+            let dst_offset = y * dst_stride + cx;
 
             dst.write(dst_offset, k0.to_());
             dst.write(dst_offset + 1, k1.to_());
             dst.write(dst_offset + 2, k2.to_());
             dst.write(dst_offset + 3, k3.to_());
-            _cx += 4;
+            cx += 4;
         }
 
-        for x in _cx..dst_stride {
+        for x in cx..dst_stride {
             let coeff = scanned_kernel[half_len].weight;
 
             let v_src = &arena_src[half_len][x..(x + 1)];

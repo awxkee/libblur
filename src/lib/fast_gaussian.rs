@@ -470,6 +470,14 @@ impl FastGaussianDispatchProvider<u16> for u16 {
                 return fg_vertical_pass_neon_u16::<CN>;
             }
         }
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        {
+            let is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+            if is_sse_available && BASE_RADIUS_I64_CUTOFF > radius {
+                use crate::sse::fg_vertical_pass_sse_u16;
+                return fg_vertical_pass_sse_u16::<CN>;
+            }
+        }
         if BASE_RADIUS_I64_CUTOFF > radius {
             fg_vertical_pass::<u16, i32, f32, CN>
         } else {
@@ -485,6 +493,14 @@ impl FastGaussianDispatchProvider<u16> for u16 {
             if BASE_RADIUS_I64_CUTOFF > radius {
                 use crate::neon::fg_horizontal_pass_neon_u16;
                 return fg_horizontal_pass_neon_u16::<CN>;
+            }
+        }
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        {
+            let is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+            if is_sse_available && BASE_RADIUS_I64_CUTOFF > radius {
+                use crate::sse::fg_horizontal_pass_sse_u16;
+                return fg_horizontal_pass_sse_u16::<CN>;
             }
         }
         if BASE_RADIUS_I64_CUTOFF > radius {
@@ -527,8 +543,8 @@ impl FastGaussianDispatchProvider<u8> for u8 {
         }
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
-            let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
-            if _is_sse_available && BASE_RADIUS_I64_CUTOFF > radius {
+            let is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+            if is_sse_available && BASE_RADIUS_I64_CUTOFF > radius {
                 _dispatcher_horizontal = fg_horizontal_pass_sse_u8::<u8, CN>;
             }
         }

@@ -52,14 +52,14 @@ pub fn filter_column<T, F>(
 
         let length = scanned_kernel.len();
 
-        let mut _cx = 0usize;
+        let mut cx = 0usize;
 
         let y = region.start;
 
-        while _cx + 4 < dst_stride {
+        while cx + 4 < dst_stride {
             let coeff = *scanned_kernel.get_unchecked(0);
 
-            let v_src = arena_src.get_unchecked(0).get_unchecked(_cx..);
+            let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let mut k0 = v_src.get_unchecked(0).as_().mul(coeff.weight);
             let mut k1 = v_src.get_unchecked(1).as_().mul(coeff.weight);
@@ -70,36 +70,36 @@ pub fn filter_column<T, F>(
                 let coeff = *scanned_kernel.get_unchecked(i);
                 k0 = mlaf(
                     k0,
-                    arena_src.get_unchecked(i).get_unchecked(_cx).as_(),
+                    arena_src.get_unchecked(i).get_unchecked(cx).as_(),
                     coeff.weight,
                 );
                 k1 = mlaf(
                     k1,
-                    arena_src.get_unchecked(i).get_unchecked(_cx + 1).as_(),
+                    arena_src.get_unchecked(i).get_unchecked(cx + 1).as_(),
                     coeff.weight,
                 );
                 k2 = mlaf(
                     k2,
-                    arena_src.get_unchecked(i).get_unchecked(_cx + 2).as_(),
+                    arena_src.get_unchecked(i).get_unchecked(cx + 2).as_(),
                     coeff.weight,
                 );
                 k3 = mlaf(
                     k3,
-                    arena_src.get_unchecked(i).get_unchecked(_cx + 3).as_(),
+                    arena_src.get_unchecked(i).get_unchecked(cx + 3).as_(),
                     coeff.weight,
                 );
             }
 
-            let dst_offset = y * dst_stride + _cx;
+            let dst_offset = y * dst_stride + cx;
 
             dst.write(dst_offset, k0.to_());
             dst.write(dst_offset + 1, k1.to_());
             dst.write(dst_offset + 2, k2.to_());
             dst.write(dst_offset + 3, k3.to_());
-            _cx += 4;
+            cx += 4;
         }
 
-        for x in _cx..dst_stride {
+        for x in cx..dst_stride {
             let coeff = *scanned_kernel.get_unchecked(0);
 
             let v_src = arena_src.get_unchecked(0).get_unchecked(x..);
