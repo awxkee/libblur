@@ -119,8 +119,7 @@ pub fn gaussian_blur(
                 edge_mode,
                 Scalar::default(),
                 threading_policy,
-            )
-            .unwrap();
+            )?;
         }
         ConvolutionMode::FixedPoint => {
             let _dispatcher = match channels {
@@ -137,8 +136,7 @@ pub fn gaussian_blur(
                 edge_mode,
                 Scalar::default(),
                 threading_policy,
-            )
-            .unwrap();
+            )?;
         }
     }
     Ok(())

@@ -70,5 +70,6 @@ fn fuzz_f32(width: usize, height: usize, radius: usize, channels: FastBlurChanne
         channels,
         EdgeMode::Clamp,
         ThreadingPolicy::Single,
-    ).unwrap();
+    )
+    .unwrap();
 }

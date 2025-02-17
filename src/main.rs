@@ -89,7 +89,8 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
         EdgeMode::Reflect,
         ThreadingPolicy::Adaptive,
         ConvolutionMode::Exact,
-    ).unwrap();
+    )
+    .unwrap();
 
     println!("libblur::gaussian_blur: {:?}", start.elapsed());
 
@@ -139,7 +140,8 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
         EdgeMode::Reflect,
         ThreadingPolicy::Adaptive,
         ConvolutionMode::Exact,
-    ).unwrap();
+    )
+    .unwrap();
 
     println!("libblur::gaussian_blur: {:?}", start.elapsed());
 

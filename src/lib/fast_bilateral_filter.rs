@@ -27,7 +27,8 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::gaussian::get_gaussian_kernel_1d;
-use crate::FastBlurChannels;
+use crate::util::check_slice_size;
+use crate::{BlurError, FastBlurChannels};
 use num_traits::real::Real;
 use num_traits::AsPrimitive;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
@@ -681,7 +682,8 @@ pub(crate) fn fast_bilateral_filter_gray_alpha_impl<
     kernel_size: u32,
     spatial_sigma: f32,
     range_sigma: f32,
-) {
+) -> Result<(), BlurError> {
+    check_slice_size(img, width as usize, width as usize, height as usize, 1)?;
     assert_ne!(kernel_size & 1, 0, "kernel size must be odd");
     assert!(
         !(spatial_sigma <= 0. || range_sigma <= 0.0),
@@ -734,6 +736,7 @@ pub(crate) fn fast_bilateral_filter_gray_alpha_impl<
                 dst[1] = V::from_bi_linear_f32(*src1);
             }
         });
+    Ok(())
 }
 
 fn fast_bilateral_filter_rgb_impl<
@@ -982,7 +985,14 @@ pub fn fast_bilateral_filter(
     spatial_sigma: f32,
     range_sigma: f32,
     channels: FastBlurChannels,
-) {
+) -> Result<(), BlurError> {
+    check_slice_size(
+        img,
+        width as usize * channels.get_channels(),
+        width as usize,
+        height as usize,
+        channels.get_channels(),
+    )?;
     assert_ne!(kernel_size & 1, 0, "kernel_size must be odd");
     match channels {
         FastBlurChannels::Plane => {
@@ -1019,6 +1029,7 @@ pub fn fast_bilateral_filter(
             );
         }
     }
+    Ok(())
 }
 
 /// Performs fast bilateral filter on the up to 16-bit image
@@ -1047,7 +1058,14 @@ pub fn fast_bilateral_filter_u16(
     spatial_sigma: f32,
     range_sigma: f32,
     channels: FastBlurChannels,
-) {
+) -> Result<(), BlurError> {
+    check_slice_size(
+        img,
+        width as usize * channels.get_channels(),
+        width as usize,
+        height as usize,
+        channels.get_channels(),
+    )?;
     if kernel_size & 1 == 0 {
         panic!("kernel_size must be odd");
     }
@@ -1086,6 +1104,7 @@ pub fn fast_bilateral_filter_u16(
             );
         }
     }
+    Ok(())
 }
 
 /// Performs fast bilateral filter on the f32 image
@@ -1114,7 +1133,14 @@ pub fn fast_bilateral_filter_f32(
     spatial_sigma: f32,
     range_sigma: f32,
     channels: FastBlurChannels,
-) {
+) -> Result<(), BlurError> {
+    check_slice_size(
+        img,
+        width as usize * channels.get_channels(),
+        width as usize,
+        height as usize,
+        channels.get_channels(),
+    )?;
     if kernel_size & 1 == 0 {
         panic!("kernel_size must be odd");
     }
@@ -1153,4 +1179,5 @@ pub fn fast_bilateral_filter_f32(
             );
         }
     }
+    Ok(())
 }

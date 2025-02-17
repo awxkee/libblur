@@ -71,7 +71,8 @@ pub fn fast_bilateral_filter_image(
                 spatial_sigma,
                 range_sigma,
                 FastBlurChannels::Plane,
-            );
+            )
+            .unwrap();
             let new_gray_image = GrayImage::from_raw(gray.width(), gray.height(), new_image)?;
             Some(DynamicImage::ImageLuma8(new_gray_image))
         }
@@ -90,7 +91,8 @@ pub fn fast_bilateral_filter_image(
                 kernel_size,
                 spatial_sigma,
                 range_sigma,
-            );
+            )
+            .unwrap();
 
             let new_gray_image = GrayAlphaImage::from_raw(
                 luma_alpha_image.width(),
@@ -111,7 +113,8 @@ pub fn fast_bilateral_filter_image(
                 spatial_sigma,
                 range_sigma,
                 FastBlurChannels::Channels3,
-            );
+            )
+            .unwrap();
 
             let new_rgb_image =
                 RgbImage::from_raw(rgb_image.width(), rgb_image.height(), new_image)?;
@@ -128,7 +131,8 @@ pub fn fast_bilateral_filter_image(
                 spatial_sigma,
                 range_sigma,
                 FastBlurChannels::Channels4,
-            );
+            )
+            .unwrap();
             let new_rgba_image =
                 RgbaImage::from_raw(rgba_image.width(), rgba_image.height(), new_image)?;
             Some(DynamicImage::ImageRgba8(new_rgba_image))
@@ -145,7 +149,8 @@ pub fn fast_bilateral_filter_image(
                 spatial_sigma,
                 range_sigma,
                 FastBlurChannels::Plane,
-            );
+            )
+            .unwrap();
 
             let new_rgb_image = ImageBuffer::<Luma<u16>, Vec<u16>>::from_raw(
                 luma_16.width(),
@@ -166,7 +171,8 @@ pub fn fast_bilateral_filter_image(
                 kernel_size,
                 spatial_sigma,
                 range_sigma,
-            );
+            )
+            .unwrap();
 
             let new_gray_image = ImageBuffer::<LumaA<u16>, Vec<u16>>::from_raw(
                 gray_alpha_16.width(),
@@ -187,7 +193,8 @@ pub fn fast_bilateral_filter_image(
                 spatial_sigma,
                 range_sigma,
                 FastBlurChannels::Channels3,
-            );
+            )
+            .unwrap();
 
             let new_rgb_image = ImageBuffer::<Rgb<u16>, Vec<u16>>::from_raw(
                 rgb_16_image.width(),
@@ -208,7 +215,8 @@ pub fn fast_bilateral_filter_image(
                 spatial_sigma,
                 range_sigma,
                 FastBlurChannels::Channels4,
-            );
+            )
+            .unwrap();
 
             let new_rgb_image = ImageBuffer::<Rgba<u16>, Vec<u16>>::from_raw(
                 rgba_16_image.width(),
@@ -228,7 +236,8 @@ pub fn fast_bilateral_filter_image(
                 spatial_sigma,
                 range_sigma,
                 FastBlurChannels::Channels3,
-            );
+            )
+            .unwrap();
             let new_rgb_image =
                 Rgb32FImage::from_raw(rgb_image_f32.width(), rgb_image_f32.height(), new_image)?;
             Some(DynamicImage::ImageRgb32F(new_rgb_image))
@@ -244,7 +253,8 @@ pub fn fast_bilateral_filter_image(
                 spatial_sigma,
                 range_sigma,
                 FastBlurChannels::Channels4,
-            );
+            )
+            .unwrap();
             let new_rgb_image =
                 Rgba32FImage::from_raw(rgba_image_f32.width(), rgba_image_f32.height(), new_image)?;
             Some(DynamicImage::ImageRgba32F(new_rgb_image))
