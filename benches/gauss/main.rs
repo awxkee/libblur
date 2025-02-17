@@ -1,8 +1,8 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use image::{GenericImageView, ImageReader};
 use libblur::{
-    filter_1d_rgb_exact, get_gaussian_kernel_1d, get_sigma_size, EdgeMode, FastBlurChannels,
-    GaussianPreciseLevel, ImageSize, Scalar, ThreadingPolicy,
+    filter_1d_rgb_exact, get_gaussian_kernel_1d, get_sigma_size, ConvolutionMode, EdgeMode,
+    FastBlurChannels, ImageSize, Scalar, ThreadingPolicy,
 };
 use opencv::core::{find_file, split, AlgorithmHint, Mat, Size, Vector, BORDER_DEFAULT};
 use opencv::imgcodecs::{imread, IMREAD_COLOR};
@@ -58,8 +58,9 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 FastBlurChannels::Channels4,
                 EdgeMode::Clamp,
                 ThreadingPolicy::Adaptive,
-                GaussianPreciseLevel::EXACT,
-            );
+                ConvolutionMode::Exact,
+            )
+            .unwrap();
         })
     });
 
@@ -76,8 +77,9 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 FastBlurChannels::Channels4,
                 EdgeMode::Clamp,
                 ThreadingPolicy::Adaptive,
-                GaussianPreciseLevel::INTEGRAL,
-            );
+                ConvolutionMode::FixedPoint,
+            )
+            .unwrap();
         })
     });
 
@@ -95,7 +97,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 FastBlurChannels::Channels4,
                 EdgeMode::Clamp,
                 ThreadingPolicy::Adaptive,
-            );
+            )
+            .unwrap();
         })
     });
 
@@ -134,7 +137,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 FastBlurChannels::Channels4,
                 EdgeMode::Clamp,
                 ThreadingPolicy::Adaptive,
-                GaussianPreciseLevel::EXACT,
+                ConvolutionMode::Exact,
             );
         })
     });
@@ -152,8 +155,9 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 FastBlurChannels::Channels4,
                 EdgeMode::Clamp,
                 ThreadingPolicy::Adaptive,
-                GaussianPreciseLevel::INTEGRAL,
-            );
+                ConvolutionMode::FixedPoint,
+            )
+            .unwrap();
         })
     });
 
@@ -195,8 +199,9 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                     FastBlurChannels::Channels3,
                     EdgeMode::Clamp,
                     ThreadingPolicy::Adaptive,
-                    GaussianPreciseLevel::EXACT,
-                );
+                    ConvolutionMode::Exact,
+                )
+                .unwrap();
             })
         });
 
@@ -213,8 +218,9 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                     FastBlurChannels::Channels3,
                     EdgeMode::Clamp,
                     ThreadingPolicy::Adaptive,
-                    GaussianPreciseLevel::EXACT,
-                );
+                    ConvolutionMode::Exact,
+                )
+                .unwrap();
             })
         });
 
@@ -267,8 +273,9 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                     FastBlurChannels::Channels3,
                     EdgeMode::Clamp,
                     ThreadingPolicy::Adaptive,
-                    GaussianPreciseLevel::INTEGRAL,
-                );
+                    ConvolutionMode::FixedPoint,
+                )
+                .unwrap();
             })
         });
 
@@ -329,8 +336,9 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                     FastBlurChannels::Plane,
                     EdgeMode::Clamp,
                     ThreadingPolicy::Adaptive,
-                    GaussianPreciseLevel::EXACT,
-                );
+                    ConvolutionMode::Exact,
+                )
+                .unwrap();
             })
         });
 
@@ -347,8 +355,9 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                     FastBlurChannels::Plane,
                     EdgeMode::Clamp,
                     ThreadingPolicy::Adaptive,
-                    GaussianPreciseLevel::INTEGRAL,
-                );
+                    ConvolutionMode::FixedPoint,
+                )
+                .unwrap();
             })
         });
 

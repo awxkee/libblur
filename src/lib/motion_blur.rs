@@ -27,8 +27,8 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::{
-    filter_2d, filter_2d_rgb, filter_2d_rgba, EdgeMode, FastBlurChannels, ImageSize, KernelShape,
-    Scalar, ThreadingPolicy,
+    filter_2d, filter_2d_rgb, filter_2d_rgba, BlurError, EdgeMode, FastBlurChannels, ImageSize,
+    KernelShape, Scalar, ThreadingPolicy,
 };
 
 #[derive(Copy, Clone)]
@@ -150,7 +150,7 @@ pub fn motion_blur(
     border_constant: Scalar,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
-) {
+) -> Result<(), BlurError> {
     if kernel_size & 1 == 0 {
         panic!("Kernel size must be odd");
     }
@@ -170,5 +170,4 @@ pub fn motion_blur(
         border_constant,
         threading_policy,
     )
-    .unwrap();
 }

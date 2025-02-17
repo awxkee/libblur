@@ -70,5 +70,6 @@ fn fuzz_16bit(width: usize, height: usize, radius: usize, channels: FastBlurChan
         channels,
         EdgeMode::Clamp,
         ThreadingPolicy::Single,
-    );
+    )
+    .unwrap();
 }

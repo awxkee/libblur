@@ -60,18 +60,22 @@ fn fuzz_image(width: usize, height: usize, radius: usize, channels: FastBlurChan
     let mut dst_image = vec![15u16; width * height * channels.get_channels()];
     stack_blur_u16(
         &mut dst_image,
+        width as u32 * channels.get_channels() as u32,
         width as u32,
         height as u32,
         radius as u32,
         channels,
         ThreadingPolicy::Single,
-    );
+    )
+    .unwrap();
     stack_blur_u16(
         &mut dst_image,
+        width as u32 * channels.get_channels() as u32,
         width as u32,
         height as u32,
         radius as u32 + 500,
         channels,
         ThreadingPolicy::Single,
-    );
+    )
+    .unwrap();
 }

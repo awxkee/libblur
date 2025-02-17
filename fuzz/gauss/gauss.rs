@@ -31,8 +31,8 @@
 
 use libblur::{
     filter_1d_approx, filter_1d_exact, filter_1d_rgb_approx, filter_1d_rgb_exact,
-    filter_1d_rgba_approx, filter_1d_rgba_exact, get_gaussian_kernel_1d, get_sigma_size, EdgeMode,
-    FastBlurChannels, GaussianPreciseLevel, ImageSize, Scalar, ThreadingPolicy,
+    filter_1d_rgba_approx, filter_1d_rgba_exact, get_gaussian_kernel_1d, get_sigma_size,
+    ConvolutionMode, EdgeMode, FastBlurChannels, ImageSize, Scalar, ThreadingPolicy,
 };
 use libfuzzer_sys::fuzz_target;
 
@@ -92,8 +92,9 @@ fn fuzz_8bit(width: usize, height: usize, radius: usize, channels: FastBlurChann
         channels,
         EdgeMode::Clamp,
         ThreadingPolicy::Single,
-        GaussianPreciseLevel::INTEGRAL,
-    );
+        ConvolutionMode::FixedPoint,
+    )
+    .unwrap();
 
     libblur::gaussian_blur(
         &src_image,
@@ -105,8 +106,9 @@ fn fuzz_8bit(width: usize, height: usize, radius: usize, channels: FastBlurChann
         channels,
         EdgeMode::Clamp,
         ThreadingPolicy::Single,
-        GaussianPreciseLevel::EXACT,
-    );
+        ConvolutionMode::Exact,
+    )
+    .unwrap();
 }
 
 fn fuzz_8bit_non_symmetry(width: usize, height: usize, radius: usize, channels: FastBlurChannels) {

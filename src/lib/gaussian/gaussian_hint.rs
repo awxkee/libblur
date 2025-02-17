@@ -30,10 +30,10 @@
 /// Declares requested precision level, this is supported only for *u8*
 #[repr(C)]
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Default)]
-pub enum GaussianPreciseLevel {
+pub enum ConvolutionMode {
     /// Exact precision, f32 accumulator and weights will be used
-    EXACT = 0,
-    /// Convolution in integral approximation, this is faster than exact convolution but may change result. Estimated error not less than 1-2%
+    Exact = 0,
+    /// Convolution in numerical approximation, this is faster than exact convolution but may change result. Estimated error not less than 1-2%
     #[default]
-    INTEGRAL = 1,
+    FixedPoint = 1,
 }

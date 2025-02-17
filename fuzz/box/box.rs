@@ -70,5 +70,6 @@ fn fuzz_8bit(width: usize, height: usize, radius: usize, channels: FastBlurChann
         radius as u32 * 2 + 1,
         channels,
         ThreadingPolicy::Single,
-    );
+    )
+    .unwrap();
 }

@@ -29,7 +29,8 @@
 use crate::filter2d::filter_2d_fft::filter_2d_fft;
 use crate::filter2d::gather_channel::{gather_channel, squash_channel};
 use crate::to_storage::ToStorage;
-use crate::{EdgeMode, ImageSize, KernelShape, Scalar};
+use crate::util::check_slice_size;
+use crate::{BlurError, EdgeMode, ImageSize, KernelShape, Scalar};
 use num_traits::AsPrimitive;
 use rustfft::FftNum;
 use std::ops::Mul;
@@ -58,7 +59,7 @@ pub fn filter_2d_rgba_fft<T, F, FftIntermediate>(
     kernel_shape: KernelShape,
     border_mode: EdgeMode,
     border_constant: Scalar,
-) -> Result<(), String>
+) -> Result<(), BlurError>
 where
     T: Copy + AsPrimitive<F> + Default + Send + Sync + AsPrimitive<FftIntermediate>,
     F: ToStorage<T> + Mul<F> + Send + Sync + PartialEq + AsPrimitive<FftIntermediate>,
@@ -66,20 +67,20 @@ where
     i32: AsPrimitive<F>,
     f64: AsPrimitive<T> + AsPrimitive<FftIntermediate>,
 {
-    if src.len() != image_size.height * image_size.width * 4 {
-        return Err(format!(
-            "Image size expected to be {} but it was {}",
-            image_size.height * image_size.width * 4,
-            src.len()
-        ));
-    }
-    if dst.len() != image_size.height * image_size.width * 4 {
-        return Err(format!(
-            "Image size expected to be {} but it was {}",
-            image_size.height * image_size.width * 4,
-            src.len()
-        ));
-    }
+    check_slice_size(
+        src,
+        image_size.width * 4,
+        image_size.width,
+        image_size.height,
+        4,
+    )?;
+    check_slice_size(
+        dst,
+        image_size.width * 4,
+        image_size.width,
+        image_size.height,
+        4,
+    )?;
 
     let mut working_channel = vec![T::default(); image_size.width * image_size.height];
 

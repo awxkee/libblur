@@ -51,9 +51,10 @@ use crate::sse::{
 use crate::threading_policy::ThreadingPolicy;
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
+use crate::util::check_slice_size;
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 use crate::wasm32::{fg_horizontal_pass_wasm_u8, fg_vertical_pass_wasm_u8};
-use crate::{clamp_edge, reflect_101, EdgeMode};
+use crate::{clamp_edge, reflect_101, BlurError, EdgeMode};
 
 const BASE_RADIUS_I64_CUTOFF: u32 = 180;
 
@@ -462,6 +463,21 @@ impl FastGaussianDispatchProvider<u16> for u16 {
     fn get_vertical<const CN: usize>(
         radius: u32,
     ) -> fn(&UnsafeSlice<u16>, u32, u32, u32, u32, u32, u32, EdgeMode) {
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            use crate::neon::fg_vertical_pass_neon_u16;
+            if BASE_RADIUS_I64_CUTOFF > radius {
+                return fg_vertical_pass_neon_u16::<CN>;
+            }
+        }
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        {
+            let is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+            if is_sse_available && BASE_RADIUS_I64_CUTOFF > radius {
+                use crate::sse::fg_vertical_pass_sse_u16;
+                return fg_vertical_pass_sse_u16::<CN>;
+            }
+        }
         if BASE_RADIUS_I64_CUTOFF > radius {
             fg_vertical_pass::<u16, i32, f32, CN>
         } else {
@@ -472,6 +488,21 @@ impl FastGaussianDispatchProvider<u16> for u16 {
     fn get_horizontal<const CN: usize>(
         radius: u32,
     ) -> fn(&UnsafeSlice<u16>, u32, u32, u32, u32, u32, u32, EdgeMode) {
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            if BASE_RADIUS_I64_CUTOFF > radius {
+                use crate::neon::fg_horizontal_pass_neon_u16;
+                return fg_horizontal_pass_neon_u16::<CN>;
+            }
+        }
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        {
+            let is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+            if is_sse_available && BASE_RADIUS_I64_CUTOFF > radius {
+                use crate::sse::fg_horizontal_pass_sse_u16;
+                return fg_horizontal_pass_sse_u16::<CN>;
+            }
+        }
         if BASE_RADIUS_I64_CUTOFF > radius {
             fg_horizontal_pass::<u16, i32, f32, CN>
         } else {
@@ -512,8 +543,8 @@ impl FastGaussianDispatchProvider<u8> for u8 {
         }
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
-            let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
-            if _is_sse_available && BASE_RADIUS_I64_CUTOFF > radius {
+            let is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+            if is_sse_available && BASE_RADIUS_I64_CUTOFF > radius {
                 _dispatcher_horizontal = fg_horizontal_pass_sse_u8::<u8, CN>;
             }
         }
@@ -551,8 +582,8 @@ impl FastGaussianDispatchProvider<u8> for u8 {
         }
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
-            let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
-            if _is_sse_available && BASE_RADIUS_I64_CUTOFF > radius {
+            let is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+            if is_sse_available && BASE_RADIUS_I64_CUTOFF > radius {
                 _dispatcher_vertical = fg_vertical_pass_sse_u8::<u8, CN>;
             }
         }
@@ -580,8 +611,8 @@ impl FastGaussianDispatchProvider<f32> for f32 {
         };
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
-            let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
-            if _is_sse_available {
+            let is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+            if is_sse_available {
                 _dispatcher_vertical = fg_vertical_pass_sse_f32::<f32, CN>;
             }
         }
@@ -611,8 +642,8 @@ impl FastGaussianDispatchProvider<f32> for f32 {
         };
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
-            let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
-            if _is_sse_available {
+            let is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+            if is_sse_available {
                 _dispatcher_horizontal = fg_horizontal_pass_sse_f32::<f32, CN>;
             }
         }
@@ -840,7 +871,14 @@ pub fn fast_gaussian(
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
     edge_mode: EdgeMode,
-) {
+) -> Result<(), BlurError> {
+    check_slice_size(
+        bytes,
+        stride as usize,
+        width as usize,
+        height as usize,
+        channels.get_channels(),
+    )?;
     let radius = std::cmp::min(radius, 319);
     impl_margin_call!(
         u8,
@@ -853,6 +891,7 @@ pub fn fast_gaussian(
         radius,
         threading_policy
     );
+    Ok(())
 }
 
 /// Performs gaussian approximation on the image.
@@ -874,25 +913,34 @@ pub fn fast_gaussian(
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn fast_gaussian_u16(
     bytes: &mut [u16],
+    stride: u32,
     width: u32,
     height: u32,
     radius: u32,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
     edge_mode: EdgeMode,
-) {
+) -> Result<(), BlurError> {
+    check_slice_size(
+        bytes,
+        stride as usize,
+        width as usize,
+        height as usize,
+        channels.get_channels(),
+    )?;
     let radius = std::cmp::min(radius, 255);
     impl_margin_call!(
         u16,
         channels,
         edge_mode,
         bytes,
-        width * channels.get_channels() as u32,
+        stride,
         width,
         height,
         radius,
         threading_policy
     );
+    Ok(())
 }
 
 /// Performs gaussian approximation on the image.
@@ -903,6 +951,7 @@ pub fn fast_gaussian_u16(
 ///
 /// # Arguments
 ///
+/// * `stride` - Elements per row
 /// * `width` - Width of the image
 /// * `height` - Height of the image
 /// * `radius` - almost any radius is supported
@@ -914,24 +963,33 @@ pub fn fast_gaussian_u16(
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn fast_gaussian_f32(
     bytes: &mut [f32],
+    stride: u32,
     width: u32,
     height: u32,
     radius: u32,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
     edge_mode: EdgeMode,
-) {
+) -> Result<(), BlurError> {
+    check_slice_size(
+        bytes,
+        stride as usize,
+        width as usize,
+        height as usize,
+        channels.get_channels(),
+    )?;
     impl_margin_call!(
         f32,
         channels,
         edge_mode,
         bytes,
-        width * channels.get_channels() as u32,
+        stride,
         width,
         height,
         radius,
         threading_policy
     );
+    Ok(())
 }
 
 /// Performs gaussian approximation on the image in linear colorspace
@@ -963,7 +1021,14 @@ pub fn fast_gaussian_in_linear(
     threading_policy: ThreadingPolicy,
     transfer_function: TransferFunction,
     edge_mode: EdgeMode,
-) {
+) -> Result<(), BlurError> {
+    check_slice_size(
+        in_place,
+        stride as usize,
+        width as usize,
+        height as usize,
+        channels.get_channels(),
+    )?;
     let mut linear_data: Vec<f32> =
         vec![0f32; width as usize * height as usize * channels.get_channels()];
 
@@ -991,13 +1056,14 @@ pub fn fast_gaussian_in_linear(
 
     fast_gaussian_f32(
         &mut linear_data,
+        width * channels.get_channels() as u32,
         width,
         height,
         radius,
         channels,
         threading_policy,
         edge_mode,
-    );
+    )?;
 
     inverse_transformer(
         &linear_data,
@@ -1008,6 +1074,7 @@ pub fn fast_gaussian_in_linear(
         height,
         transfer_function,
     );
+    Ok(())
 }
 
 /// Performs gaussian approximation on the image.
@@ -1018,6 +1085,7 @@ pub fn fast_gaussian_in_linear(
 ///
 /// # Arguments
 ///
+/// * `stride` - ELements per row
 /// * `width` - Width of the image
 /// * `height` - Height of the image
 /// * `radius` - almost any radius is supported
@@ -1029,13 +1097,21 @@ pub fn fast_gaussian_in_linear(
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn fast_gaussian_f16(
     bytes: &mut [f16],
+    stride: u32,
     width: u32,
     height: u32,
     radius: u32,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
     edge_mode: EdgeMode,
-) {
+) -> Result<(), BlurError> {
+    check_slice_size(
+        bytes,
+        stride as usize,
+        width as usize,
+        height as usize,
+        channels.get_channels(),
+    )?;
     impl_margin_call!(
         half::f16,
         channels,
@@ -1047,6 +1123,7 @@ pub fn fast_gaussian_f16(
         radius,
         threading_policy
     );
+    Ok(())
 }
 
 /// Performs gaussian approximation on the plane.
@@ -1077,7 +1154,8 @@ pub fn fast_gaussian_plane(
     radius: u32,
     threading_policy: ThreadingPolicy,
     edge_mode: EdgeMode,
-) {
+) -> Result<(), BlurError> {
+    check_slice_size(bytes, stride as usize, width as usize, height as usize, 1)?;
     let radius = std::cmp::min(radius, 319);
     impl_margin_call_plane!(
         u8,
@@ -1090,6 +1168,7 @@ pub fn fast_gaussian_plane(
         radius,
         threading_policy
     );
+    Ok(())
 }
 
 /// Performs gaussian approximation on the f32 plane.
@@ -1100,6 +1179,7 @@ pub fn fast_gaussian_plane(
 ///
 /// # Arguments
 ///
+/// * `stride` - Lane length
 /// * `width` - Width of the image
 /// * `height` - Height of the image
 /// * `radius` - almost any radius is supported
@@ -1111,12 +1191,14 @@ pub fn fast_gaussian_plane(
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn fast_gaussian_plane_f32(
     bytes: &mut [f32],
+    stride: u32,
     width: u32,
     height: u32,
     radius: u32,
     threading_policy: ThreadingPolicy,
     edge_mode: EdgeMode,
-) {
+) -> Result<(), BlurError> {
+    check_slice_size(bytes, stride as usize, width as usize, height as usize, 1)?;
     impl_margin_call_plane!(
         f32,
         1,
@@ -1128,4 +1210,5 @@ pub fn fast_gaussian_plane_f32(
         radius,
         threading_policy
     );
+    Ok(())
 }

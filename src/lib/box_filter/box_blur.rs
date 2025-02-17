@@ -40,7 +40,8 @@ use crate::box_filter::box_blur_neon::*;
 use crate::channels_configuration::FastBlurChannels;
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
-use crate::ThreadingPolicy;
+use crate::util::check_slice_size;
+use crate::{BlurError, ThreadingPolicy};
 
 fn box_blur_horizontal_pass_impl<T, J, const CN: usize>(
     src: &[T],
@@ -599,9 +600,24 @@ fn box_blur_impl<
     radius: u32,
     pool: &Option<ThreadPool>,
     thread_count: u32,
-) where
+) -> Result<(), BlurError>
+where
     f32: ToStorage<T>,
 {
+    check_slice_size(
+        src,
+        src_stride as usize,
+        width as usize,
+        height as usize,
+        CN,
+    )?;
+    check_slice_size(
+        dst,
+        dst_stride as usize,
+        width as usize,
+        height as usize,
+        CN,
+    )?;
     let mut transient: Vec<T> = vec![T::default(); dst_stride as usize * height as usize];
     box_blur_horizontal_pass::<T, CN>(
         src,
@@ -625,6 +641,7 @@ fn box_blur_impl<
         pool,
         thread_count,
     );
+    Ok(())
 }
 
 /// Performs box blur on the image.
@@ -653,7 +670,7 @@ pub fn box_blur(
     radius: u32,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
-) {
+) -> Result<(), BlurError> {
     let thread_count = threading_policy.thread_count(width, height) as u32;
     let _dispatcher = match channels {
         FastBlurChannels::Plane => box_blur_impl::<u8, 1>,
@@ -680,7 +697,8 @@ pub fn box_blur(
         radius,
         &pool,
         thread_count,
-    );
+    )?;
+    Ok(())
 }
 
 /// Performs box blur on the image.
@@ -691,7 +709,10 @@ pub fn box_blur(
 ///
 /// # Arguments
 ///
-/// * `stride` - Lane length, default is width * channels_count if not aligned
+/// * `src` - Src image
+/// * `src_stride` - Lane length, default is width * channels_count if not changed
+/// * `dst` - Dst image
+/// * `dst_stride` - Lane length, default is width * channels_count if not changed
 /// * `width` - Width of the image
 /// * `height` - Height of the image
 /// * `radius` - almost any radius is supported
@@ -701,14 +722,15 @@ pub fn box_blur(
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn box_blur_u16(
     src: &[u16],
+    src_stride: u32,
     dst: &mut [u16],
+    dst_stride: u32,
     width: u32,
     height: u32,
     radius: u32,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
-) {
-    let stride = width * channels.get_channels() as u32;
+) -> Result<(), BlurError> {
     let thread_count = threading_policy.thread_count(width, height) as u32;
     let pool = if thread_count == 1 {
         None
@@ -727,15 +749,15 @@ pub fn box_blur_u16(
     };
     _dispatcher(
         src,
-        stride,
+        src_stride,
         dst,
-        stride,
+        dst_stride,
         width,
         height,
         radius,
         &pool,
         thread_count,
-    );
+    )
 }
 
 /// Performs box blur on the image.
@@ -746,6 +768,10 @@ pub fn box_blur_u16(
 ///
 /// # Arguments
 ///
+/// * `src` - Src image
+/// * `src_stride` - Lane length, default is width * channels_count if not changed
+/// * `dst` - Dst image
+/// * `dst_stride` - Lane length, default is width * channels_count if not changed
 /// * `width` - Width of the image
 /// * `height` - Height of the image
 /// * `radius` - almost any radius is supported
@@ -755,14 +781,15 @@ pub fn box_blur_u16(
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn box_blur_f32(
     src: &[f32],
+    src_stride: u32,
     dst: &mut [f32],
+    dst_stride: u32,
     width: u32,
     height: u32,
     radius: u32,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
-) {
-    let stride = width * channels.get_channels() as u32;
+) -> Result<(), BlurError> {
     let thread_count = threading_policy.thread_count(width, height) as u32;
     let pool = if thread_count == 1 {
         None
@@ -781,15 +808,15 @@ pub fn box_blur_f32(
     };
     _dispatcher(
         src,
-        stride,
+        src_stride,
         dst,
-        stride,
+        dst_stride,
         width,
         height,
         radius,
         &pool,
         thread_count,
-    );
+    )
 }
 
 /// Performs box blur on the image in linear colorspace
@@ -800,7 +827,10 @@ pub fn box_blur_f32(
 ///
 /// # Arguments
 ///
-/// * `stride` - Lane length, default is width * channels_count if not aligned
+/// * `src` - Src image
+/// * `src_stride` - Lane length, default is width * channels_count if not changed
+/// * `dst` - Dst image
+/// * `dst_stride` - Lane length, default is width * channels_count if not changed
 /// * `width` - Width of the image
 /// * `height` - Height of the image
 /// * `radius` - almost any radius is supported
@@ -821,7 +851,21 @@ pub fn box_blur_in_linear(
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
     transfer_function: TransferFunction,
-) {
+) -> Result<(), BlurError> {
+    check_slice_size(
+        src,
+        src_stride as usize,
+        width as usize,
+        height as usize,
+        channels.get_channels(),
+    )?;
+    check_slice_size(
+        dst,
+        dst_stride as usize,
+        width as usize,
+        height as usize,
+        channels.get_channels(),
+    )?;
     let mut linear_data: Vec<f32> =
         vec![0f32; width as usize * height as usize * channels.get_channels()];
     let mut linear_data_2: Vec<f32> =
@@ -851,13 +895,15 @@ pub fn box_blur_in_linear(
 
     box_blur_f32(
         &linear_data,
+        width * channels.get_channels() as u32,
         &mut linear_data_2,
+        width * channels.get_channels() as u32,
         width,
         height,
         radius,
         channels,
         threading_policy,
-    );
+    )?;
 
     inverse_transformer(
         &linear_data_2,
@@ -868,6 +914,7 @@ pub fn box_blur_in_linear(
         height,
         transfer_function,
     );
+    Ok(())
 }
 
 #[inline]
@@ -928,7 +975,7 @@ fn tent_blur_impl<
         + AsPrimitive<f64>
         + BoxBlurHorizontalPass<T>
         + BoxBlurVerticalPass<T>,
-    const CHANNEL_CONFIGURATION: usize,
+    const CN: usize,
 >(
     src: &[T],
     src_stride: u32,
@@ -938,7 +985,8 @@ fn tent_blur_impl<
     height: u32,
     sigma: f32,
     threading_policy: ThreadingPolicy,
-) where
+) -> Result<(), BlurError>
+where
     f32: ToStorage<T>,
 {
     assert!(sigma > 0.0, "Sigma can't be 0");
@@ -954,22 +1002,22 @@ fn tent_blur_impl<
         )
     };
     let mut transient: Vec<T> =
-        vec![T::from_u32(0).unwrap_or_default(); dst_stride as usize * height as usize];
+        vec![T::from_u32(0).unwrap_or_default(); width as usize * height as usize * CN];
     let boxes = create_box_gauss(sigma, 2);
-    box_blur_impl::<T, CHANNEL_CONFIGURATION>(
+    box_blur_impl::<T, CN>(
         src,
         src_stride,
         &mut transient,
-        dst_stride,
+        width * CN as u32,
         width,
         height,
         boxes[0],
         &pool,
         thread_count,
-    );
-    box_blur_impl::<T, CHANNEL_CONFIGURATION>(
+    )?;
+    box_blur_impl::<T, CN>(
         &transient,
-        dst_stride,
+        width * CN as u32,
         dst,
         dst_stride,
         width,
@@ -977,13 +1025,14 @@ fn tent_blur_impl<
         boxes[1],
         &pool,
         thread_count,
-    );
+    )?;
+    Ok(())
 }
 
 /// Performs tent blur on the image.
 ///
 /// Tent blur just makes a two passes box blur on the image since two times box it is almost equal to tent filter.
-/// https://en.wikipedia.org/wiki/Central_limit_theorem
+/// <https://en.wikipedia.org/wiki/Central_limit_theorem>
 ///
 /// Convergence of this function is very high so strong effect applies very fast
 ///
@@ -991,7 +1040,10 @@ fn tent_blur_impl<
 ///
 /// # Arguments
 ///
-/// * `stride` - Lane length, default is width * channels_count if not aligned
+/// * `src` - Src image
+/// * `src_stride` - Lane length, default is width * channels_count if not changed
+/// * `dst` - Dst image
+/// * `dst_stride` - Lane length, default is width * channels_count if not changed
 /// * `width` - Width of the image
 /// * `height` - Height of the image
 /// * `sigma` - gaussian flattening level
@@ -1009,7 +1061,7 @@ pub fn tent_blur(
     sigma: f32,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
-) {
+) -> Result<(), BlurError> {
     let _dispatcher = match channels {
         FastBlurChannels::Plane => tent_blur_impl::<u8, 1>,
         FastBlurChannels::Channels3 => tent_blur_impl::<u8, 3>,
@@ -1024,13 +1076,13 @@ pub fn tent_blur(
         height,
         sigma,
         threading_policy,
-    );
+    )
 }
 
 /// Performs tent blur on the image.
 ///
 /// Tent blur just makes a two passes box blur on the image since two times box it is almost equal to tent filter.
-/// https://en.wikipedia.org/wiki/Central_limit_theorem
+/// <https://en.wikipedia.org/wiki/Central_limit_theorem>
 ///
 /// Convergence of this function is very high so strong effect applies very fast
 ///
@@ -1038,7 +1090,10 @@ pub fn tent_blur(
 ///
 /// # Arguments
 ///
-/// * `stride` - Lane length, default is width * channels_count if not aligned.
+/// * `src` - Src image
+/// * `src_stride` - Lane length, default is width * channels_count if not changed
+/// * `dst` - Dst image
+/// * `dst_stride` - Lane length, default is width * channels_count if not changed
 /// * `width` - Width of the image.
 /// * `height` - Height of the image.
 /// * `sigma` - gaussian flattening level.
@@ -1048,14 +1103,15 @@ pub fn tent_blur(
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn tent_blur_u16(
     src: &[u16],
+    src_stride: u32,
     dst: &mut [u16],
+    dst_stride: u32,
     width: u32,
     height: u32,
     sigma: f32,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
-) {
-    let stride = width * channels.get_channels() as u32;
+) -> Result<(), BlurError> {
     let _dispatcher = match channels {
         FastBlurChannels::Plane => tent_blur_impl::<u16, 1>,
         FastBlurChannels::Channels3 => tent_blur_impl::<u16, 3>,
@@ -1063,25 +1119,29 @@ pub fn tent_blur_u16(
     };
     _dispatcher(
         src,
-        stride,
+        src_stride,
         dst,
-        stride,
+        dst_stride,
         width,
         height,
         sigma,
         threading_policy,
-    );
+    )
 }
 
 /// Performs tent blur on the image.
 ///
 /// Tent blur just makes a two passes box blur on the image since two times box it is almost equal to tent filter.
-/// https://en.wikipedia.org/wiki/Central_limit_theorem
+/// <https://en.wikipedia.org/wiki/Central_limit_theorem>
 ///
 /// O(1) complexity.
 ///
 /// # Arguments
 ///
+/// * `src` - Src image.
+/// * `src_stride` - Lane length, default is width * channels_count if not changed.
+/// * `dst` - Dst image.
+/// * `dst_stride` - Lane length, default is width * channels_count if not changed.
 /// * `width` - Width of the image
 /// * `height` - Height of the image
 /// * `sigma` - gaussian flattening level.
@@ -1091,14 +1151,15 @@ pub fn tent_blur_u16(
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn tent_blur_f32(
     src: &[f32],
+    src_stride: u32,
     dst: &mut [f32],
+    dst_stride: u32,
     width: u32,
     height: u32,
     sigma: f32,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
-) {
-    let stride = width * channels.get_channels() as u32;
+) -> Result<(), BlurError> {
     let _dispatcher = match channels {
         FastBlurChannels::Plane => tent_blur_impl::<f32, 1>,
         FastBlurChannels::Channels3 => tent_blur_impl::<f32, 3>,
@@ -1106,20 +1167,20 @@ pub fn tent_blur_f32(
     };
     _dispatcher(
         src,
-        stride,
+        src_stride,
         dst,
-        stride,
+        dst_stride,
         width,
         height,
         sigma,
         threading_policy,
-    );
+    )
 }
 
 /// Performs tent blur on the image in linear colorspace
 ///
 /// Tent blur just makes a two passes box blur on the image since two times box it is almost equal to tent filter.
-/// https://en.wikipedia.org/wiki/Central_limit_theorem
+/// <https://en.wikipedia.org/wiki/Central_limit_theorem>
 ///
 /// Convergence of this function is very high so strong effect applies very fast
 ///
@@ -1127,7 +1188,10 @@ pub fn tent_blur_f32(
 ///
 /// # Arguments
 ///
-/// * `stride` - Lane length, default is width * channels_count if not aligned.
+/// * `src` - Src image.
+/// * `src_stride` - Lane length, default is width * channels_count if not changed.
+/// * `dst` - Dst image.
+/// * `dst_stride` - Lane length, default is width * channels_count if not changed.
 /// * `width` - Width of the image.
 /// * `height` - Height of the image.
 /// * `sigma` - gaussian flattening level.
@@ -1148,7 +1212,21 @@ pub fn tent_blur_in_linear(
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
     transfer_function: TransferFunction,
-) {
+) -> Result<(), BlurError> {
+    check_slice_size(
+        src,
+        src_stride as usize,
+        width as usize,
+        height as usize,
+        channels.get_channels(),
+    )?;
+    check_slice_size(
+        dst,
+        dst_stride as usize,
+        width as usize,
+        height as usize,
+        channels.get_channels(),
+    )?;
     let mut linear_data: Vec<f32> =
         vec![0f32; width as usize * height as usize * channels.get_channels()];
     let mut linear_data_2: Vec<f32> =
@@ -1178,13 +1256,15 @@ pub fn tent_blur_in_linear(
 
     tent_blur_f32(
         &linear_data,
+        width * channels.get_channels() as u32,
         &mut linear_data_2,
+        width * channels.get_channels() as u32,
         width,
         height,
         sigma,
         channels,
         threading_policy,
-    );
+    )?;
 
     inverse_transformer(
         &linear_data_2,
@@ -1195,6 +1275,7 @@ pub fn tent_blur_in_linear(
         height,
         transfer_function,
     );
+    Ok(())
 }
 
 fn gaussian_box_blur_impl<
@@ -1222,7 +1303,8 @@ fn gaussian_box_blur_impl<
     height: u32,
     sigma: f32,
     threading_policy: ThreadingPolicy,
-) where
+) -> Result<(), BlurError>
+where
     f32: ToStorage<T>,
 {
     assert!(sigma > 0.0, "Sigma can't be 0");
@@ -1249,7 +1331,7 @@ fn gaussian_box_blur_impl<
         boxes[0],
         &pool,
         thread_count,
-    );
+    )?;
     box_blur_impl::<T, CHANNEL_CONFIGURATION>(
         dst,
         dst_stride,
@@ -1260,7 +1342,7 @@ fn gaussian_box_blur_impl<
         boxes[1],
         &pool,
         thread_count,
-    );
+    )?;
     box_blur_impl::<T, CHANNEL_CONFIGURATION>(
         &transient,
         dst_stride,
@@ -1271,13 +1353,14 @@ fn gaussian_box_blur_impl<
         boxes[2],
         &pool,
         thread_count,
-    );
+    )?;
+    Ok(())
 }
 
 /// Performs gaussian box blur approximation on the image.
 ///
 /// This method launches three times box blur on the image since 2 passes box filter it is a tent filter and 3 passes of box blur it is almost gaussian filter.
-/// https://en.wikipedia.org/wiki/Central_limit_theorem
+/// <https://en.wikipedia.org/wiki/Central_limit_theorem>
 ///
 /// Convergence of this function is very high so strong effect applies very fast
 ///
@@ -1286,7 +1369,10 @@ fn gaussian_box_blur_impl<
 ///
 /// # Arguments
 ///
-/// * `stride` - Lane length, default is width * channels_count if not aligned.
+/// * `src` - Src image.
+/// * `src_stride` - Lane length, default is width * channels_count if not changed.
+/// * `dst` - Dst image.
+/// * `dst_stride` - Lane length, default is width * channels_count if not changed.
 /// * `width` - Width of the image.
 /// * `height` - Height of the image.
 /// * `sigma` - gaussian flattening level.
@@ -1304,7 +1390,7 @@ pub fn gaussian_box_blur(
     sigma: f32,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
-) {
+) -> Result<(), BlurError> {
     let _dispatcher = match channels {
         FastBlurChannels::Plane => gaussian_box_blur_impl::<u8, 1>,
         FastBlurChannels::Channels3 => gaussian_box_blur_impl::<u8, 3>,
@@ -1319,13 +1405,13 @@ pub fn gaussian_box_blur(
         height,
         sigma,
         threading_policy,
-    );
+    )
 }
 
 /// Performs gaussian box blur approximation on the image.
 ///
 /// This method launches three times box blur on the image since 2 passes box filter it is a tent filter and 3 passes of box blur it is almost gaussian filter.
-/// https://en.wikipedia.org/wiki/Central_limit_theorem
+/// <https://en.wikipedia.org/wiki/Central_limit_theorem>
 ///
 /// Convergence of this function is very high so strong effect applies very fast
 ///
@@ -1334,7 +1420,10 @@ pub fn gaussian_box_blur(
 ///
 /// # Arguments
 ///
-/// * `stride` - Lane length, default is width * channels_count if not aligned.
+/// * `src` - Src image.
+/// * `src_stride` - Lane length, default is width * channels_count if not changed.
+/// * `dst` - Dst image.
+/// * `dst_stride` - Lane length, default is width * channels_count if not changed.
 /// * `width` - Width of the image.
 /// * `height` - Height of the image.
 /// * `sigma` - gaussian flattening level.
@@ -1344,14 +1433,15 @@ pub fn gaussian_box_blur(
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn gaussian_box_blur_u16(
     src: &[u16],
+    src_stride: u32,
     dst: &mut [u16],
+    dst_stride: u32,
     width: u32,
     height: u32,
     sigma: f32,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
-) {
-    let stride = width * channels.get_channels() as u32;
+) -> Result<(), BlurError> {
     let _dispatcher = match channels {
         FastBlurChannels::Plane => gaussian_box_blur_impl::<u16, 1>,
         FastBlurChannels::Channels3 => gaussian_box_blur_impl::<u16, 3>,
@@ -1359,20 +1449,20 @@ pub fn gaussian_box_blur_u16(
     };
     _dispatcher(
         src,
-        stride,
+        src_stride,
         dst,
-        stride,
+        dst_stride,
         width,
         height,
         sigma,
         threading_policy,
-    );
+    )
 }
 
 /// Performs gaussian box blur approximation on the image.
 ///
 /// This method launches three times box blur on the image since 2 passes box filter it is a tent filter and 3 passes of box blur it is almost gaussian filter.
-/// https://en.wikipedia.org/wiki/Central_limit_theorem
+/// <https://en.wikipedia.org/wiki/Central_limit_theorem>
 ///
 /// Convergence of this function is very high so strong effect applies very fast
 ///
@@ -1381,6 +1471,10 @@ pub fn gaussian_box_blur_u16(
 ///
 /// # Arguments
 ///
+/// * `src` - Src image.
+/// * `src_stride` - Lane length, default is width * channels_count if not changed.
+/// * `dst` - Dst image.
+/// * `dst_stride` - Lane length, default is width * channels_count if not changed.
 /// * `width` - Width of the image.
 /// * `height` - Height of the image.
 /// * `sigma` - gaussian flattening level.
@@ -1390,14 +1484,15 @@ pub fn gaussian_box_blur_u16(
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn gaussian_box_blur_f32(
     src: &[f32],
+    src_stride: u32,
     dst: &mut [f32],
+    dst_stride: u32,
     width: u32,
     height: u32,
     sigma: f32,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
-) {
-    let stride = width * channels.get_channels() as u32;
+) -> Result<(), BlurError> {
     let _dispatcher = match channels {
         FastBlurChannels::Plane => gaussian_box_blur_impl::<f32, 1>,
         FastBlurChannels::Channels3 => gaussian_box_blur_impl::<f32, 3>,
@@ -1405,20 +1500,20 @@ pub fn gaussian_box_blur_f32(
     };
     _dispatcher(
         src,
-        stride,
+        src_stride,
         dst,
-        stride,
+        dst_stride,
         width,
         height,
         sigma,
         threading_policy,
-    );
+    )
 }
 
 /// Performs gaussian box blur approximation on the image.
 ///
 /// This method launches three times box blur on the image since 2 passes box filter it is a tent filter and 3 passes of box blur it is almost gaussian filter.
-/// https://en.wikipedia.org/wiki/Central_limit_theorem
+/// <https://en.wikipedia.org/wiki/Central_limit_theorem>
 ///
 /// Convergence of this function is very high so strong effect applies very fast
 ///
@@ -1426,7 +1521,10 @@ pub fn gaussian_box_blur_f32(
 ///
 /// # Arguments
 ///
-/// * `stride` - Lane length, default is width * channels_count if not aligned.
+/// * `src` - Src image.
+/// * `src_stride` - Lane length, default is width * channels_count if not changed.
+/// * `dst` - Dst image.
+/// * `dst_stride` - Lane length, default is width * channels_count if not changed.
 /// * `width` - Width of the image.
 /// * `height` - Height of the image.
 /// * `sigma` - gaussian flattening level.
@@ -1447,7 +1545,21 @@ pub fn gaussian_box_blur_in_linear(
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
     transfer_function: TransferFunction,
-) {
+) -> Result<(), BlurError> {
+    check_slice_size(
+        src,
+        src_stride as usize,
+        width as usize,
+        height as usize,
+        channels.get_channels(),
+    )?;
+    check_slice_size(
+        dst,
+        dst_stride as usize,
+        width as usize,
+        height as usize,
+        channels.get_channels(),
+    )?;
     let mut linear_data: Vec<f32> =
         vec![0f32; width as usize * height as usize * channels.get_channels()];
     let mut linear_data_2: Vec<f32> =
@@ -1477,13 +1589,15 @@ pub fn gaussian_box_blur_in_linear(
 
     gaussian_box_blur_f32(
         &linear_data,
+        width * channels.get_channels() as u32,
         &mut linear_data_2,
+        width * channels.get_channels() as u32,
         width,
         height,
         sigma,
         channels,
         threading_policy,
-    );
+    )?;
 
     inverse_transformer(
         &linear_data_2,
@@ -1494,4 +1608,5 @@ pub fn gaussian_box_blur_in_linear(
         height,
         transfer_function,
     );
+    Ok(())
 }

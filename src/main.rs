@@ -8,8 +8,8 @@ use fast_transpose::{transpose_rgba, FlipMode, FlopMode};
 use image::imageops::FilterType;
 use image::{DynamicImage, EncodableLayout, GenericImageView, ImageReader};
 use libblur::{
-    fast_gaussian, filter_1d_exact, get_gaussian_kernel_1d, get_sigma_size, sobel, EdgeMode,
-    FastBlurChannels, GaussianPreciseLevel, ImageSize, Scalar, ThreadingPolicy,
+    fast_gaussian, filter_1d_exact, get_gaussian_kernel_1d, get_sigma_size, sobel, ConvolutionMode,
+    EdgeMode, FastBlurChannels, ImageSize, Scalar, ThreadingPolicy,
 };
 use std::time::Instant;
 
@@ -88,8 +88,9 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
         FastBlurChannels::Plane,
         EdgeMode::Reflect,
         ThreadingPolicy::Adaptive,
-        GaussianPreciseLevel::EXACT,
-    );
+        ConvolutionMode::Exact,
+    )
+    .unwrap();
 
     println!("libblur::gaussian_blur: {:?}", start.elapsed());
 
@@ -138,8 +139,9 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
         FastBlurChannels::Plane,
         EdgeMode::Reflect,
         ThreadingPolicy::Adaptive,
-        GaussianPreciseLevel::EXACT,
-    );
+        ConvolutionMode::Exact,
+    )
+    .unwrap();
 
     println!("libblur::gaussian_blur: {:?}", start.elapsed());
 
@@ -221,17 +223,21 @@ fn main() {
     //     FastBlurChannels::Channels3,
     //     ThreadingPolicy::Adaptive,
     // );
-    libblur::fast_gaussian_in_linear(
-        &mut dst_bytes,
+    let bytes_16 = bytes.iter().map(|&x| x as u16).collect::<Vec<u16>>();
+    let mut dst_16 = bytes_16.to_vec();
+
+    libblur::fast_gaussian_u16(
+        &mut dst_16,
         stride as u32,
         dimensions.0,
         dimensions.1,
         25,
         FastBlurChannels::Channels3,
         ThreadingPolicy::Single,
-        TransferFunction::Rec709,
         EdgeMode::Clamp,
-    );
+    )
+    .unwrap();
+    dst_bytes = dst_16.iter().map(|&x| x as u8).collect();
 
     // let bytes_16 = bytes.iter().map(|&x| x as u16).collect::<Vec<u16>>();
     // let mut dst_16 = vec![0u16; bytes_16.len()];

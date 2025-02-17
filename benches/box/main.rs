@@ -27,7 +27,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 77 / 2,
                 FastBlurChannels::Channels4,
                 ThreadingPolicy::Adaptive,
-            );
+            )
+            .unwrap();
         })
     });
 
@@ -41,13 +42,16 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| {
             libblur::box_blur_f32(
                 &src_bytes,
+                dimensions.0 * 4,
                 &mut dst_bytes,
+                dimensions.0 * 4,
                 dimensions.0,
                 dimensions.1,
                 77 / 2,
                 FastBlurChannels::Channels4,
                 ThreadingPolicy::Adaptive,
-            );
+            )
+            .unwrap();
         })
     });
 
@@ -61,13 +65,16 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| {
             libblur::box_blur_f32(
                 &src_bytes,
+                dimensions.0 * 4,
                 &mut dst_bytes,
+                dimensions.0 * 4,
                 dimensions.0,
                 dimensions.1,
                 77 / 2,
                 FastBlurChannels::Channels4,
                 ThreadingPolicy::Single,
-            );
+            )
+            .unwrap();
         })
     });
 
@@ -84,7 +91,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 15,
                 FastBlurChannels::Channels4,
                 ThreadingPolicy::Single,
-            );
+            )
+            .unwrap();
         })
     });
 
@@ -119,7 +127,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 15,
                 FastBlurChannels::Channels4,
                 ThreadingPolicy::Adaptive,
-            );
+            )
+            .unwrap();
         })
     });
 
@@ -182,7 +191,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 77 / 2,
                 FastBlurChannels::Channels3,
                 ThreadingPolicy::Adaptive,
-            );
+            )
+            .unwrap();
         })
     });
 

@@ -28,9 +28,10 @@
  */
 #![allow(clippy::manual_clamp)]
 
+use crate::util::check_slice_size;
 use crate::{
-    filter_2d, filter_2d_fft, gaussian_blur, stack_blur, EdgeMode, FastBlurChannels,
-    GaussianPreciseLevel, ImageSize, KernelShape, Scalar, ThreadingPolicy,
+    filter_2d, filter_2d_fft, gaussian_blur, stack_blur, BlurError, ConvolutionMode, EdgeMode,
+    FastBlurChannels, ImageSize, KernelShape, Scalar, ThreadingPolicy,
 };
 use colorutils_rs::TransferFunction;
 use num_traits::AsPrimitive;
@@ -98,7 +99,8 @@ impl BlurEdges<u8> for u8 {
             radius,
             FastBlurChannels::Plane,
             ThreadingPolicy::Adaptive,
-        );
+        )
+        .unwrap();
     }
 }
 
@@ -135,8 +137,9 @@ impl Blur<u8> for u8 {
             channels,
             EdgeMode::Clamp,
             ThreadingPolicy::Adaptive,
-            GaussianPreciseLevel::INTEGRAL,
-        );
+            ConvolutionMode::FixedPoint,
+        )
+        .unwrap();
         dst
     }
 }
@@ -428,7 +431,14 @@ pub fn adaptive_blur(
     transfer_function: TransferFunction,
     border_mode: EdgeMode,
     border_constant: Scalar,
-) -> Vec<u8> {
+) -> Result<(), BlurError> {
+    check_slice_size(
+        image,
+        width * channels.get_channels(),
+        width,
+        height,
+        channels.get_channels(),
+    )?;
     adaptive_blur_impl(
         image,
         width,
@@ -438,5 +448,6 @@ pub fn adaptive_blur(
         transfer_function,
         border_mode,
         border_constant,
-    )
+    );
+    Ok(())
 }

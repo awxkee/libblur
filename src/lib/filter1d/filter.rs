@@ -35,7 +35,8 @@ use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
-use crate::{EdgeMode, Scalar, ThreadingPolicy};
+use crate::util::check_slice_size;
+use crate::{BlurError, EdgeMode, Scalar, ThreadingPolicy};
 use num_traits::{AsPrimitive, MulAdd};
 use std::ops::Mul;
 
@@ -70,7 +71,7 @@ pub fn filter_1d_exact<T, F>(
     border_mode: EdgeMode,
     border_constant: Scalar,
     threading_policy: ThreadingPolicy,
-) -> Result<(), String>
+) -> Result<(), BlurError>
 where
     T: Copy
         + AsPrimitive<F>
@@ -83,25 +84,25 @@ where
     i32: AsPrimitive<F>,
     f64: AsPrimitive<T>,
 {
-    if image.len() != image_size.width * image_size.height {
-        return Err(format!(
-            "Can't create arena, expected image with size {} but got {}",
-            image_size.width * image_size.height,
-            image.len()
-        ));
-    }
-    if destination.len() != image_size.width * image_size.height {
-        return Err(format!(
-            "Can't create arena, expected image with size {} but got {}",
-            image_size.width * image_size.height,
-            destination.len()
-        ));
-    }
+    check_slice_size(
+        image,
+        image_size.width,
+        image_size.width,
+        image_size.height,
+        1,
+    )?;
+    check_slice_size(
+        destination,
+        image_size.width,
+        image_size.width,
+        image_size.height,
+        1,
+    )?;
     if row_kernel.len() & 1 == 0 {
-        return Err(String::from("Row kernel length must be odd"));
+        return Err(BlurError::OddKernel(row_kernel.len()));
     }
     if column_kernel.len() & 1 == 0 {
-        return Err(String::from("Column kernel length must be odd"));
+        return Err(BlurError::OddKernel(column_kernel.len()));
     }
 
     let scanned_row_kernel = scan_se_1d(row_kernel);

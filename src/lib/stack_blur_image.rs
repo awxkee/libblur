@@ -59,7 +59,8 @@ pub fn stack_blur_image(
                 radius,
                 FastBlurChannels::Plane,
                 threading_policy,
-            );
+            )
+            .unwrap();
             let new_gray_image = GrayImage::from_raw(gray.width(), gray.height(), new_image)?;
             Some(DynamicImage::ImageLuma8(new_gray_image))
         }
@@ -87,7 +88,8 @@ pub fn stack_blur_image(
                 radius,
                 FastBlurChannels::Plane,
                 threading_policy,
-            );
+            )
+            .unwrap();
 
             stack_blur(
                 &mut alpha_plane,
@@ -97,7 +99,8 @@ pub fn stack_blur_image(
                 radius,
                 FastBlurChannels::Plane,
                 threading_policy,
-            );
+            )
+            .unwrap();
 
             let mut new_raw_buffer =
                 vec![
@@ -131,7 +134,8 @@ pub fn stack_blur_image(
                 radius,
                 FastBlurChannels::Channels3,
                 threading_policy,
-            );
+            )
+            .unwrap();
             let new_rgb_image =
                 RgbImage::from_raw(rgb_image.width(), rgb_image.height(), new_image)?;
             Some(DynamicImage::ImageRgb8(new_rgb_image))
@@ -146,7 +150,8 @@ pub fn stack_blur_image(
                 radius,
                 FastBlurChannels::Channels4,
                 threading_policy,
-            );
+            )
+            .unwrap();
             let new_rgba_image =
                 RgbaImage::from_raw(rgba_image.width(), rgba_image.height(), new_image)?;
             Some(DynamicImage::ImageRgba8(new_rgba_image))
@@ -160,11 +165,13 @@ pub fn stack_blur_image(
             stack_blur_f32(
                 &mut new_image,
                 luma_16.width(),
+                luma_16.width(),
                 luma_16.height(),
                 radius,
                 FastBlurChannels::Plane,
                 threading_policy,
-            );
+            )
+            .unwrap();
             let rolled_back_image = new_image
                 .iter()
                 .map(|&x| (x * (u16::MAX as f32)).round().min(u16::MAX as f32) as u16)
@@ -195,20 +202,24 @@ pub fn stack_blur_image(
             stack_blur_f32(
                 &mut intensity_plane,
                 gray_alpha_16.width(),
-                gray_alpha_16.height(),
-                radius,
-                FastBlurChannels::Plane,
-                threading_policy,
-            );
-
-            stack_blur_f32(
-                &mut alpha_plane,
                 gray_alpha_16.width(),
                 gray_alpha_16.height(),
                 radius,
                 FastBlurChannels::Plane,
                 threading_policy,
-            );
+            )
+            .unwrap();
+
+            stack_blur_f32(
+                &mut alpha_plane,
+                gray_alpha_16.width(),
+                gray_alpha_16.width(),
+                gray_alpha_16.height(),
+                radius,
+                FastBlurChannels::Plane,
+                threading_policy,
+            )
+            .unwrap();
 
             let mut new_raw_buffer =
                 vec![0u16; gray_alpha_16.width() as usize * gray_alpha_16.height() as usize * 2];
@@ -239,12 +250,14 @@ pub fn stack_blur_image(
                 .collect::<Vec<_>>();
             stack_blur_f32(
                 &mut new_image,
+                rgb_16_image.width() * 3,
                 rgb_16_image.width(),
                 rgb_16_image.height(),
                 radius,
                 FastBlurChannels::Channels3,
                 threading_policy,
-            );
+            )
+            .unwrap();
             let rolled_back_image = new_image
                 .iter()
                 .map(|&x| (x * (u16::MAX as f32)).round().min(u16::MAX as f32) as u16)
@@ -264,12 +277,14 @@ pub fn stack_blur_image(
                 .collect::<Vec<_>>();
             stack_blur_f32(
                 &mut new_image,
+                rgba_16_image.width() * 4,
                 rgba_16_image.width(),
                 rgba_16_image.height(),
                 radius,
                 FastBlurChannels::Channels3,
                 threading_policy,
-            );
+            )
+            .unwrap();
             let rolled_back_image = new_image
                 .iter()
                 .map(|&x| (x * (u16::MAX as f32)).round().min(u16::MAX as f32) as u16)
@@ -285,12 +300,14 @@ pub fn stack_blur_image(
             let mut new_image = rgb_image_f32.as_raw().to_vec();
             stack_blur_f32(
                 &mut new_image,
+                rgb_image_f32.width() * 3,
                 rgb_image_f32.width(),
                 rgb_image_f32.height(),
                 radius,
                 FastBlurChannels::Channels3,
                 threading_policy,
-            );
+            )
+            .unwrap();
             let new_rgb_image =
                 Rgb32FImage::from_raw(rgb_image_f32.width(), rgb_image_f32.height(), new_image)?;
             Some(DynamicImage::ImageRgb32F(new_rgb_image))
@@ -299,12 +316,14 @@ pub fn stack_blur_image(
             let mut new_image = rgba_image_f32.as_raw().to_vec();
             stack_blur_f32(
                 &mut new_image,
+                rgba_image_f32.width() * 4,
                 rgba_image_f32.width(),
                 rgba_image_f32.height(),
                 radius,
                 FastBlurChannels::Channels4,
                 threading_policy,
-            );
+            )
+            .unwrap();
             let new_rgb_image =
                 Rgba32FImage::from_raw(rgba_image_f32.width(), rgba_image_f32.height(), new_image)?;
             Some(DynamicImage::ImageRgba32F(new_rgb_image))

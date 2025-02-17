@@ -27,8 +27,8 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::{
-    filter_2d, filter_2d_rgb, filter_2d_rgba, get_sigma_size, EdgeMode, FastBlurChannels,
-    ImageSize, KernelShape, Scalar, ThreadingPolicy,
+    filter_2d, filter_2d_rgb, filter_2d_rgba, get_sigma_size, BlurError, EdgeMode,
+    FastBlurChannels, ImageSize, KernelShape, Scalar, ThreadingPolicy,
 };
 
 pub fn get_laplacian_kernel(size: usize) -> Vec<f32> {
@@ -90,7 +90,7 @@ pub fn laplacian(
     border_constant: Scalar,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
-) {
+) -> Result<(), BlurError> {
     let _dispatcher = match channels {
         FastBlurChannels::Plane => filter_2d::<u8, i16>,
         FastBlurChannels::Channels3 => filter_2d_rgb::<u8, i16>,
@@ -107,5 +107,4 @@ pub fn laplacian(
         border_constant,
         threading_policy,
     )
-    .unwrap();
 }

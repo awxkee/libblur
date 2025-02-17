@@ -26,7 +26,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::avx::{_mm256_mul_round_ps, _mm_mul_round_ps, shuffle};
-use crate::sse::{load_u8_s16_fast, load_u8_s32_fast, store_u8_u32};
+use crate::sse::{load_u8_s16_fast, load_u8_s32_fast, store_u8_s16, store_u8_u32};
 use crate::unsafe_slice::UnsafeSlice;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
@@ -1514,7 +1514,7 @@ unsafe fn box_blur_vertical_pass_avx2_impl_lr<const FMA: bool>(
                 _mm_round_ps::<RND>(scale_store_0_ps)
             };
             let ptr = unsafe_dst.slice.as_ptr().add(y_dst_shift + px) as *mut u8;
-            store_u8_u32::<TAIL_CN>(ptr, _mm_cvtps_epi32(r0));
+            store_u8_s16::<TAIL_CN>(ptr, _mm_cvtps_epi32(r0));
             buf_cx += 1;
         }
     }

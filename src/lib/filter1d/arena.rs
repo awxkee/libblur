@@ -30,7 +30,8 @@ use crate::edge_mode::{reflect_index, reflect_index_101};
 use crate::filter1d::arena_roi::copy_roi;
 use crate::filter1d::filter_element::KernelShape;
 use crate::img_size::ImageSize;
-use crate::{EdgeMode, Scalar};
+use crate::util::check_slice_size;
+use crate::{BlurError, EdgeMode, Scalar};
 use num_traits::AsPrimitive;
 
 #[derive(Copy, Clone)]
@@ -93,7 +94,7 @@ pub fn make_arena<T, const COMPONENTS: usize>(
     pads: ArenaPads,
     border_mode: EdgeMode,
     scalar: Scalar,
-) -> Result<(Vec<T>, Arena), String>
+) -> Result<(Vec<T>, Arena), BlurError>
 where
     T: Default + Copy + Send + Sync + 'static,
     f64: AsPrimitive<T>,
@@ -125,7 +126,7 @@ unsafe fn make_arena_avx2<T, const COMPONENTS: usize>(
     pads: ArenaPads,
     border_mode: EdgeMode,
     scalar: Scalar,
-) -> Result<(Vec<T>, Arena), String>
+) -> Result<(Vec<T>, Arena), BlurError>
 where
     T: Default + Copy + Send + Sync + 'static,
     f64: AsPrimitive<T>,
@@ -141,7 +142,7 @@ unsafe fn make_arena_sse4_1<T, const COMPONENTS: usize>(
     pads: ArenaPads,
     border_mode: EdgeMode,
     scalar: Scalar,
-) -> Result<(Vec<T>, Arena), String>
+) -> Result<(Vec<T>, Arena), BlurError>
 where
     T: Default + Copy + Send + Sync + 'static,
     f64: AsPrimitive<T>,
@@ -157,18 +158,18 @@ fn make_arena_exec<T, const COMPONENTS: usize>(
     pads: ArenaPads,
     border_mode: EdgeMode,
     scalar: Scalar,
-) -> Result<(Vec<T>, Arena), String>
+) -> Result<(Vec<T>, Arena), BlurError>
 where
     T: Default + Copy + Send + Sync + 'static,
     f64: AsPrimitive<T>,
 {
-    if image.len() != COMPONENTS * image_size.width * image_size.height {
-        return Err(format!(
-            "Can't create arena, expected image with size {} but got {}",
-            COMPONENTS * image_size.width * image_size.height,
-            image.len()
-        ));
-    }
+    check_slice_size(
+        image,
+        image_size.width * COMPONENTS,
+        image_size.width,
+        image_size.height,
+        COMPONENTS,
+    )?;
 
     let new_height = image_size.height + pads.pad_top + pads.pad_bottom;
     let new_width = image_size.width + pads.pad_left + pads.pad_right;
@@ -328,18 +329,18 @@ pub fn make_arena_row<T, const COMPONENTS: usize>(
     kernel_size: KernelShape,
     border_mode: EdgeMode,
     scalar: Scalar,
-) -> Result<(Vec<T>, usize), String>
+) -> Result<(Vec<T>, usize), BlurError>
 where
     T: Default + Copy + Send + Sync + 'static,
     f64: AsPrimitive<T>,
 {
-    if image.len() != COMPONENTS * image_size.width * image_size.height {
-        return Err(format!(
-            "Can't create arena, expected image with size {} but got {}",
-            COMPONENTS * image_size.width * image_size.height,
-            image.len()
-        ));
-    }
+    check_slice_size(
+        image,
+        image_size.width * COMPONENTS,
+        image_size.width,
+        image_size.height,
+        COMPONENTS,
+    )?;
 
     let pad_w = kernel_size.width / 2;
 
@@ -475,7 +476,7 @@ pub fn make_arena_columns<T, const COMPONENTS: usize>(
     kernel_size: KernelShape,
     border_mode: EdgeMode,
     scalar: Scalar,
-) -> Result<ArenaColumns<T>, String>
+) -> Result<ArenaColumns<T>, BlurError>
 where
     T: Default + Copy + Send + Sync + 'static,
     f64: AsPrimitive<T>,
@@ -507,7 +508,7 @@ unsafe fn mac_avx2<T, const COMPONENTS: usize>(
     kernel_size: KernelShape,
     border_mode: EdgeMode,
     scalar: Scalar,
-) -> Result<ArenaColumns<T>, String>
+) -> Result<ArenaColumns<T>, BlurError>
 where
     T: Default + Copy + Send + Sync + 'static,
     f64: AsPrimitive<T>,
@@ -523,7 +524,7 @@ unsafe fn mac_sse_4_1<T, const COMPONENTS: usize>(
     kernel_size: KernelShape,
     border_mode: EdgeMode,
     scalar: Scalar,
-) -> Result<ArenaColumns<T>, String>
+) -> Result<ArenaColumns<T>, BlurError>
 where
     T: Default + Copy + Send + Sync + 'static,
     f64: AsPrimitive<T>,
@@ -539,18 +540,18 @@ fn make_arena_columns_exec<T, const COMPONENTS: usize>(
     kernel_size: KernelShape,
     border_mode: EdgeMode,
     scalar: Scalar,
-) -> Result<ArenaColumns<T>, String>
+) -> Result<ArenaColumns<T>, BlurError>
 where
     T: Default + Copy + Send + Sync + 'static,
     f64: AsPrimitive<T>,
 {
-    if image.len() != COMPONENTS * image_size.width * image_size.height {
-        return Err(format!(
-            "Can't create arena, expected image with size {} but got {}",
-            COMPONENTS * image_size.width * image_size.height,
-            image.len()
-        ));
-    }
+    check_slice_size(
+        image,
+        image_size.width * COMPONENTS,
+        image_size.width,
+        image_size.height,
+        COMPONENTS,
+    )?;
     let pad_h = kernel_size.height / 2;
 
     let mut top_pad = vec![T::default(); pad_h * image_size.width * COMPONENTS];

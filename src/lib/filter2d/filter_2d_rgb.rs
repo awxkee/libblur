@@ -30,7 +30,8 @@ use crate::filter1d::KernelShape;
 use crate::filter2d::filter_2d_handler::Filter2dHandler;
 use crate::filter2d::gather_channel::{gather_channel, squash_channel};
 use crate::to_storage::ToStorage;
-use crate::{filter_2d, EdgeMode, ImageSize, Scalar, ThreadingPolicy};
+use crate::util::check_slice_size;
+use crate::{filter_2d, BlurError, EdgeMode, ImageSize, Scalar, ThreadingPolicy};
 use num_traits::{AsPrimitive, MulAdd};
 use std::ops::Mul;
 
@@ -62,27 +63,27 @@ pub fn filter_2d_rgb<T, F>(
     border_mode: EdgeMode,
     border_constant: Scalar,
     threading_policy: ThreadingPolicy,
-) -> Result<(), String>
+) -> Result<(), BlurError>
 where
     T: Copy + AsPrimitive<F> + Default + Send + Sync + Filter2dHandler<T, F>,
     F: ToStorage<T> + Mul<F> + MulAdd<F, Output = F> + Send + Sync + PartialEq,
     i32: AsPrimitive<F>,
     f64: AsPrimitive<T>,
 {
-    if src.len() != image_size.height * image_size.width * 3 {
-        return Err(format!(
-            "Image size expected to be {} but it was {}",
-            image_size.height * image_size.width * 3,
-            src.len()
-        ));
-    }
-    if dst.len() != image_size.height * image_size.width * 3 {
-        return Err(format!(
-            "Image size expected to be {} but it was {}",
-            image_size.height * image_size.width * 3,
-            src.len()
-        ));
-    }
+    check_slice_size(
+        src,
+        image_size.width * 3,
+        image_size.width,
+        image_size.height,
+        3,
+    )?;
+    check_slice_size(
+        dst,
+        image_size.width * 3,
+        image_size.width,
+        image_size.height,
+        3,
+    )?;
 
     let mut working_channel = vec![T::default(); image_size.width * image_size.height];
 

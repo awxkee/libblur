@@ -30,6 +30,7 @@
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 pub mod acc_convenience {
     use crate::accelerate::*;
+    #[allow(clippy::too_many_arguments)]
     pub fn box_convolve(
         src: &[u8],
         src_stride: usize,

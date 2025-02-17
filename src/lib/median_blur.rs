@@ -27,7 +27,8 @@
 
 use crate::channels_configuration::FastBlurChannels;
 use crate::unsafe_slice::UnsafeSlice;
-use crate::ThreadingPolicy;
+use crate::util::check_slice_size;
+use crate::{BlurError, ThreadingPolicy};
 
 struct MedianHistogram {
     r: [i32; 256],
@@ -381,7 +382,21 @@ pub fn median_blur(
     radius: u32,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
-) {
+) -> Result<(), BlurError> {
+    check_slice_size(
+        src,
+        src_stride as usize,
+        width as usize,
+        height as usize,
+        channels.get_channels(),
+    )?;
+    check_slice_size(
+        dst,
+        dst_stride as usize,
+        width as usize,
+        height as usize,
+        channels.get_channels(),
+    )?;
     let unsafe_dst = UnsafeSlice::new(dst);
     let _dispatcher = match channels {
         FastBlurChannels::Plane => median_blur_impl::<1>,
@@ -430,4 +445,5 @@ pub fn median_blur(
             }
         });
     }
+    Ok(())
 }

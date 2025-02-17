@@ -45,24 +45,7 @@ pub(crate) unsafe fn load_f32<const CN: usize>(ptr: *const f32) -> __m128 {
     _mm_castsi128_ps(_mm_loadu_si32(ptr as *const _))
 }
 
-#[inline(always)]
-pub(crate) unsafe fn load_u8_s32_fast<const CN: usize>(ptr: *const u8) -> __m128i {
-    let sh1 = _mm_setr_epi8(0, -1, -1, -1, 1, -1, -1, -1, 2, -1, -1, -1, 3, -1, -1, -1);
-    if CN == 4 {
-        let v = _mm_loadu_si32(ptr);
-        _mm_shuffle_epi8(v, sh1)
-    } else if CN == 3 {
-        let mut v0 = _mm_loadu_si16(ptr);
-        v0 = _mm_insert_epi8::<2>(v0, ptr.add(2).read_unaligned() as i32);
-        _mm_shuffle_epi8(v0, sh1)
-    } else if CN == 2 {
-        let v0 = _mm_loadu_si16(ptr);
-        _mm_shuffle_epi8(v0, sh1)
-    } else {
-        _mm_setr_epi32(ptr.read_unaligned() as i32, 0, 0, 0)
-    }
-}
-
+#[allow(dead_code)]
 #[inline(always)]
 pub(crate) unsafe fn load_u8_s16_fast<const CN: usize>(ptr: *const u8) -> __m128i {
     let sh1 = _mm_setr_epi8(0, -1, 1, -1, 2, -1, 3, -1, -1, -1, -1, -1, -1, -1, -1, -1);
@@ -78,6 +61,42 @@ pub(crate) unsafe fn load_u8_s16_fast<const CN: usize>(ptr: *const u8) -> __m128
         _mm_shuffle_epi8(v0, sh1)
     } else {
         _mm_setr_epi16(ptr.read_unaligned() as i16, 0, 0, 0, 0, 0, 0, 0)
+    }
+}
+
+#[inline(always)]
+pub(crate) unsafe fn load_u16_s32_fast<const CN: usize>(ptr: *const u16) -> __m128i {
+    let sh1 = _mm_setr_epi8(0, 1, -1, -1, 2, 3, -1, -1, 4, 5, -1, -1, 6, 7, -1, -1);
+    if CN == 4 {
+        let v = _mm_loadu_si64(ptr as *const _);
+        _mm_shuffle_epi8(v, sh1)
+    } else if CN == 3 {
+        let mut v0 = _mm_loadu_si32(ptr as *const _);
+        v0 = _mm_insert_epi16::<2>(v0, ptr.add(2).read_unaligned() as i32);
+        _mm_shuffle_epi8(v0, sh1)
+    } else if CN == 2 {
+        let v0 = _mm_loadu_si32(ptr as *const _);
+        _mm_shuffle_epi8(v0, sh1)
+    } else {
+        _mm_shuffle_epi8(_mm_loadu_si16(ptr as *const _), sh1)
+    }
+}
+
+#[inline(always)]
+pub(crate) unsafe fn load_u8_s32_fast<const CN: usize>(ptr: *const u8) -> __m128i {
+    let sh1 = _mm_setr_epi8(0, -1, -1, -1, 1, -1, -1, -1, 2, -1, -1, -1, 3, -1, -1, -1);
+    if CN == 4 {
+        let v = _mm_loadu_si32(ptr);
+        _mm_shuffle_epi8(v, sh1)
+    } else if CN == 3 {
+        let mut v0 = _mm_loadu_si16(ptr);
+        v0 = _mm_insert_epi8::<2>(v0, ptr.add(2).read_unaligned() as i32);
+        _mm_shuffle_epi8(v0, sh1)
+    } else if CN == 2 {
+        let v0 = _mm_loadu_si16(ptr);
+        _mm_shuffle_epi8(v0, sh1)
+    } else {
+        _mm_setr_epi32(ptr.read_unaligned() as i32, 0, 0, 0)
     }
 }
 
@@ -170,6 +189,43 @@ pub(crate) unsafe fn store_u8_u32<const CN: usize>(dst_ptr: *mut u8, regi: __m12
         let pixel_s32 = _mm_extract_epi32::<0>(v8);
         let pixel_bytes = pixel_s32.to_le_bytes();
         dst_ptr.write_unaligned(pixel_bytes[0]);
+    }
+}
+
+/// Stores u32 up to x4 as u8 up to x4 based on channels count
+#[inline(always)]
+#[allow(dead_code)]
+pub(crate) unsafe fn store_u8_s16<const CN: usize>(dst_ptr: *mut u8, regi: __m128i) {
+    let v8 = _mm_packus_epi16(regi, regi);
+    if CN == 4 {
+        _mm_storeu_si32(dst_ptr, v8);
+    } else if CN == 3 {
+        let pixel_3 = _mm_extract_epi8::<2>(v8);
+        _mm_storeu_si16(dst_ptr, v8);
+        dst_ptr.add(2).write_unaligned(pixel_3 as u8);
+    } else if CN == 2 {
+        _mm_storeu_si16(dst_ptr, v8);
+    } else {
+        let pixel_s32 = _mm_extract_epi32::<0>(v8);
+        let pixel_bytes = pixel_s32.to_le_bytes();
+        dst_ptr.write_unaligned(pixel_bytes[0]);
+    }
+}
+
+#[allow(dead_code)]
+#[inline(always)]
+pub(crate) unsafe fn store_u16_u32<const CN: usize>(dst_ptr: *mut u16, regi: __m128i) {
+    let v0 = _mm_packus_epi32(regi, regi);
+    if CN == 4 {
+        _mm_storeu_si64(dst_ptr as *mut _, v0);
+    } else if CN == 3 {
+        _mm_storeu_si32(dst_ptr as *mut _, v0);
+        let val = _mm_extract_epi16::<2>(v0);
+        dst_ptr.add(2).write_unaligned(val as u16);
+    } else if CN == 2 {
+        _mm_storeu_si32(dst_ptr as *mut _, v0);
+    } else {
+        _mm_storeu_si16(dst_ptr as *mut _, v0);
     }
 }
 

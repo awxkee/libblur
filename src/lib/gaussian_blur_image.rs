@@ -27,8 +27,8 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::{
-    gaussian_blur, gaussian_blur_f32, gaussian_blur_u16, EdgeMode, FastBlurChannels,
-    GaussianPreciseLevel, ThreadingPolicy,
+    gaussian_blur, gaussian_blur_f32, gaussian_blur_u16, ConvolutionMode, EdgeMode,
+    FastBlurChannels, ThreadingPolicy,
 };
 use image::{
     DynamicImage, GrayAlphaImage, GrayImage, ImageBuffer, Luma, LumaA, Rgb, Rgb32FImage, RgbImage,
@@ -53,7 +53,7 @@ pub fn gaussian_blur_image(
     kernel_size: u32,
     sigma: f32,
     edge_mode: EdgeMode,
-    precise_level: GaussianPreciseLevel,
+    precise_level: ConvolutionMode,
     threading_policy: ThreadingPolicy,
 ) -> Option<DynamicImage> {
     match image {
@@ -70,7 +70,8 @@ pub fn gaussian_blur_image(
                 edge_mode,
                 threading_policy,
                 precise_level,
-            );
+            )
+            .unwrap();
             let new_gray_image = GrayImage::from_raw(gray.width(), gray.height(), new_image)?;
             Some(DynamicImage::ImageLuma8(new_gray_image))
         }
@@ -106,7 +107,8 @@ pub fn gaussian_blur_image(
                 edge_mode,
                 threading_policy,
                 precise_level,
-            );
+            )
+            .unwrap();
 
             gaussian_blur(
                 &alpha_plane,
@@ -119,7 +121,8 @@ pub fn gaussian_blur_image(
                 edge_mode,
                 threading_policy,
                 precise_level,
-            );
+            )
+            .unwrap();
 
             let mut new_raw_buffer =
                 vec![
@@ -157,7 +160,8 @@ pub fn gaussian_blur_image(
                 edge_mode,
                 threading_policy,
                 precise_level,
-            );
+            )
+            .unwrap();
 
             let new_rgb_image =
                 RgbImage::from_raw(rgb_image.width(), rgb_image.height(), new_image)?;
@@ -176,7 +180,8 @@ pub fn gaussian_blur_image(
                 edge_mode,
                 threading_policy,
                 precise_level,
-            );
+            )
+            .unwrap();
             let new_rgba_image =
                 RgbaImage::from_raw(rgba_image.width(), rgba_image.height(), new_image)?;
             Some(DynamicImage::ImageRgba8(new_rgba_image))
@@ -194,7 +199,8 @@ pub fn gaussian_blur_image(
                 FastBlurChannels::Plane,
                 edge_mode,
                 threading_policy,
-            );
+            )
+            .unwrap();
 
             let new_rgb_image = ImageBuffer::<Luma<u16>, Vec<u16>>::from_raw(
                 luma_16.width(),
@@ -234,7 +240,8 @@ pub fn gaussian_blur_image(
                 FastBlurChannels::Plane,
                 edge_mode,
                 threading_policy,
-            );
+            )
+            .unwrap();
 
             gaussian_blur_u16(
                 &alpha_plane,
@@ -246,7 +253,8 @@ pub fn gaussian_blur_image(
                 FastBlurChannels::Plane,
                 edge_mode,
                 threading_policy,
-            );
+            )
+            .unwrap();
 
             let mut new_raw_buffer =
                 vec![0u16; gray_alpha_16.width() as usize * gray_alpha_16.height() as usize * 2];
@@ -280,7 +288,8 @@ pub fn gaussian_blur_image(
                 FastBlurChannels::Channels3,
                 edge_mode,
                 threading_policy,
-            );
+            )
+            .unwrap();
 
             let new_rgb_image = ImageBuffer::<Rgb<u16>, Vec<u16>>::from_raw(
                 rgb_16_image.width(),
@@ -302,7 +311,8 @@ pub fn gaussian_blur_image(
                 FastBlurChannels::Channels4,
                 edge_mode,
                 threading_policy,
-            );
+            )
+            .unwrap();
 
             let new_rgb_image = ImageBuffer::<Rgba<u16>, Vec<u16>>::from_raw(
                 rgba_16_image.width(),
@@ -323,7 +333,8 @@ pub fn gaussian_blur_image(
                 FastBlurChannels::Channels3,
                 edge_mode,
                 threading_policy,
-            );
+            )
+            .unwrap();
             let new_rgb_image =
                 Rgb32FImage::from_raw(rgb_image_f32.width(), rgb_image_f32.height(), new_image)?;
             Some(DynamicImage::ImageRgb32F(new_rgb_image))
@@ -340,7 +351,8 @@ pub fn gaussian_blur_image(
                 FastBlurChannels::Channels4,
                 edge_mode,
                 threading_policy,
-            );
+            )
+            .unwrap();
             let new_rgb_image =
                 Rgba32FImage::from_raw(rgba_image_f32.width(), rgba_image_f32.height(), new_image)?;
             Some(DynamicImage::ImageRgba32F(new_rgb_image))

@@ -29,11 +29,9 @@
 use crate::cpu_features::is_aarch_f16c_supported;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::neon::{
-    fast_gaussian_next_horizontal_pass_neon_u8, fast_gaussian_next_vertical_pass_neon_u8,
-    fgn_horizontal_pass_neon_f16, fgn_horizontal_pass_neon_f32, fgn_vertical_pass_neon_f16,
-    fgn_vertical_pass_neon_f32,
+    fgn_horizontal_pass_neon_f16, fgn_horizontal_pass_neon_f32, fgn_horizontal_pass_neon_u8,
+    fgn_vertical_pass_neon_f16, fgn_vertical_pass_neon_f32, fgn_vertical_pass_neon_u8,
 };
-use crate::reflect_index;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::sse::{
     fast_gaussian_next_horizontal_pass_sse_f16, fast_gaussian_next_horizontal_pass_sse_u8,
@@ -42,11 +40,13 @@ use crate::sse::{
 };
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
+use crate::util::check_slice_size;
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 use crate::wasm32::{
     fast_gaussian_next_horizontal_pass_wasm_u8, fast_gaussian_next_vertical_pass_wasm_u8,
 };
 use crate::{clamp_edge, reflect_101, EdgeMode, FastBlurChannels, ThreadingPolicy};
+use crate::{reflect_index, BlurError};
 use colorutils_rs::linear_to_planar::linear_to_plane;
 use colorutils_rs::planar_to_linear::plane_to_linear;
 use colorutils_rs::{
@@ -509,7 +509,7 @@ impl FastGaussianNextPassProvider<u8> for u8 {
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             if BASE_RADIUS_I64_CUTOFF > radius {
-                _dispatcher_horizontal = fast_gaussian_next_horizontal_pass_neon_u8::<u8, CN>;
+                _dispatcher_horizontal = fgn_horizontal_pass_neon_u8::<u8, CN>;
             }
         }
 
@@ -553,7 +553,7 @@ impl FastGaussianNextPassProvider<u8> for u8 {
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             if BASE_RADIUS_I64_CUTOFF > radius {
-                _dispatcher_vertical = fast_gaussian_next_vertical_pass_neon_u8::<u8, CN>;
+                _dispatcher_vertical = fgn_vertical_pass_neon_u8::<u8, CN>;
             }
         }
 
@@ -859,7 +859,14 @@ pub fn fast_gaussian_next(
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
     edge_mode: EdgeMode,
-) {
+) -> Result<(), BlurError> {
+    check_slice_size(
+        bytes,
+        stride as usize,
+        width as usize,
+        height as usize,
+        channels.get_channels(),
+    )?;
     let radius = std::cmp::min(radius, 280);
     impl_margin_call!(
         u8,
@@ -872,6 +879,7 @@ pub fn fast_gaussian_next(
         radius,
         threading_policy
     );
+    Ok(())
 }
 
 /// Performs gaussian approximation on the image.
@@ -894,25 +902,34 @@ pub fn fast_gaussian_next(
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn fast_gaussian_next_u16(
     bytes: &mut [u16],
+    stride: u32,
     width: u32,
     height: u32,
     radius: u32,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
     edge_mode: EdgeMode,
-) {
+) -> Result<(), BlurError> {
+    check_slice_size(
+        bytes,
+        stride as usize,
+        width as usize,
+        height as usize,
+        channels.get_channels(),
+    )?;
     let acq_radius = std::cmp::min(radius, 152);
     impl_margin_call!(
         u16,
         channels,
         edge_mode,
         bytes,
-        width * channels.get_channels() as u32,
+        stride,
         width,
         height,
         acq_radius,
         threading_policy
     );
+    Ok(())
 }
 
 /// Performs gaussian approximation on the image.
@@ -934,24 +951,33 @@ pub fn fast_gaussian_next_u16(
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn fast_gaussian_next_f32(
     bytes: &mut [f32],
+    stride: u32,
     width: u32,
     height: u32,
     radius: u32,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
     edge_mode: EdgeMode,
-) {
+) -> Result<(), BlurError> {
+    check_slice_size(
+        bytes,
+        stride as usize,
+        width as usize,
+        height as usize,
+        channels.get_channels(),
+    )?;
     impl_margin_call!(
         f32,
         channels,
         edge_mode,
         bytes,
-        width * channels.get_channels() as u32,
+        stride,
         width,
         height,
         radius,
         threading_policy
     );
+    Ok(())
 }
 
 /// Performs gaussian approximation on the image.
@@ -973,24 +999,33 @@ pub fn fast_gaussian_next_f32(
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn fast_gaussian_next_f16(
     bytes: &mut [f16],
+    stride: u32,
     width: u32,
     height: u32,
     radius: u32,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
     edge_mode: EdgeMode,
-) {
+) -> Result<(), BlurError> {
+    check_slice_size(
+        bytes,
+        stride as usize,
+        width as usize,
+        height as usize,
+        channels.get_channels(),
+    )?;
     impl_margin_call!(
         half::f16,
         channels,
         edge_mode,
         unsafe { std::mem::transmute::<&mut [half::f16], &mut [half::f16]>(bytes) },
-        width * channels.get_channels() as u32,
+        stride,
         width,
         height,
         radius,
         threading_policy
     );
+    Ok(())
 }
 
 /// Performs gaussian approximation on the image in linear color space
@@ -1021,7 +1056,14 @@ pub fn fast_gaussian_next_in_linear(
     threading_policy: ThreadingPolicy,
     transfer_function: TransferFunction,
     edge_mode: EdgeMode,
-) {
+) -> Result<(), BlurError> {
+    check_slice_size(
+        in_place,
+        stride as usize,
+        width as usize,
+        height as usize,
+        channels.get_channels(),
+    )?;
     let mut linear_data: Vec<f32> =
         vec![0f32; width as usize * height as usize * channels.get_channels()];
 
@@ -1049,13 +1091,14 @@ pub fn fast_gaussian_next_in_linear(
 
     fast_gaussian_next_f32(
         &mut linear_data,
+        width * channels.get_channels() as u32,
         width,
         height,
         radius,
         channels,
         threading_policy,
         edge_mode,
-    );
+    )?;
 
     inverse_transformer(
         &linear_data,
@@ -1066,4 +1109,5 @@ pub fn fast_gaussian_next_in_linear(
         height,
         transfer_function,
     );
+    Ok(())
 }
