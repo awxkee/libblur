@@ -226,7 +226,7 @@ fn main() {
     let bytes_16 = bytes.iter().map(|&x| x as u16).collect::<Vec<u16>>();
     let mut dst_16 = bytes_16.to_vec();
 
-    libblur::fast_gaussian_u16(
+    libblur::fast_gaussian_next_u16(
         &mut dst_16,
         stride as u32,
         dimensions.0,

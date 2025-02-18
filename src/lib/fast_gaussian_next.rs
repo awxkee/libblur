@@ -460,6 +460,22 @@ impl FastGaussianNextPassProvider<u16> for u16 {
     fn get_horizontal<const CN: usize>(
         radius: u32,
     ) -> fn(&UnsafeSlice<u16>, u32, u32, u32, u32, u32, u32, EdgeMode) {
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            if BASE_RADIUS_I64_CUTOFF > radius {
+                use crate::neon::fgn_horizontal_pass_neon_u16;
+                return fgn_horizontal_pass_neon_u16::<CN>;
+            }
+        }
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        {
+            let is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+
+            if BASE_RADIUS_I64_CUTOFF > radius && is_sse_available {
+                use crate::sse::fgn_horizontal_pass_sse_u16;
+                return fgn_horizontal_pass_sse_u16::<CN>;
+            }
+        }
         if BASE_RADIUS_I64_CUTOFF > radius {
             fgn_horizontal_pass::<u16, i32, f32, CN>
         } else {
@@ -470,6 +486,22 @@ impl FastGaussianNextPassProvider<u16> for u16 {
     fn get_vertical<const CN: usize>(
         radius: u32,
     ) -> fn(&UnsafeSlice<u16>, u32, u32, u32, u32, u32, u32, EdgeMode) {
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        {
+            if BASE_RADIUS_I64_CUTOFF > radius {
+                use crate::neon::fgn_vertical_pass_neon_u16;
+                return fgn_vertical_pass_neon_u16::<CN>;
+            }
+        }
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        {
+            let is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+
+            if BASE_RADIUS_I64_CUTOFF > radius && is_sse_available {
+                use crate::sse::fgn_vertical_pass_sse_u16;
+                return fgn_vertical_pass_sse_u16::<CN>;
+            }
+        }
         if BASE_RADIUS_I64_CUTOFF > radius {
             fgn_vertical_pass::<u16, i32, f32, CN>
         } else {
