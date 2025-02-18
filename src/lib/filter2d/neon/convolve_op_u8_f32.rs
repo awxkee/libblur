@@ -43,13 +43,13 @@ pub fn convolve_segment_neon_2d_u8_f32(
     arena: Arena,
     arena_source: &[u8],
     dst: &UnsafeSlice<u8>,
+    dst_stride: usize,
     image_size: ImageSize,
     prepared_kernel: &[ScanPoint2d<f32>],
     y: usize,
 ) {
     unsafe {
         let width = image_size.width;
-        let stride = image_size.width * arena.components;
 
         let dx = arena.pad_w as i64;
         let dy = arena.pad_h as i64;
@@ -88,7 +88,7 @@ pub fn convolve_segment_neon_2d_u8_f32(
                 k2 = vfmlaq_u8_f32(k2, items0.2, weight);
                 k3 = vfmlaq_u8_f32(k3, items0.3, weight);
             }
-            let dst_offset = y * stride + cx;
+            let dst_offset = y * dst_stride + cx;
             let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
             xvst1q_u8_x4(
                 dst_ptr0,
@@ -114,7 +114,7 @@ pub fn convolve_segment_neon_2d_u8_f32(
                 k0 = vfmlaq_u8_f32(k0, items0.0, weight);
                 k1 = vfmlaq_u8_f32(k1, items0.1, weight);
             }
-            let dst_offset = y * stride + cx;
+            let dst_offset = y * dst_stride + cx;
             let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
             xvst1q_u8_x2(
                 dst_ptr0,
@@ -132,7 +132,7 @@ pub fn convolve_segment_neon_2d_u8_f32(
                 let items0 = vld1q_u8(offsets.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 k0 = vfmlaq_u8_f32(k0, items0, weight);
             }
-            let dst_offset = y * stride + cx;
+            let dst_offset = y * dst_stride + cx;
             let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
             vst1q_u8(dst_ptr0, vqmovnq_f32_u8(k0));
             cx += 16;
@@ -170,7 +170,7 @@ pub fn convolve_segment_neon_2d_u8_f32(
                 );
             }
 
-            let dst_offset = y * stride + cx;
+            let dst_offset = y * dst_stride + cx;
 
             dst.write(dst_offset, k0.to_());
             dst.write(dst_offset + 1, k1.to_());
@@ -192,7 +192,7 @@ pub fn convolve_segment_neon_2d_u8_f32(
                     k_weight,
                 );
             }
-            dst.write(y * stride + x, k0.to_());
+            dst.write(y * dst_stride + x, k0.to_());
         }
     }
 }

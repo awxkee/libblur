@@ -112,11 +112,18 @@ where
     {
         if std::arch::is_x86_feature_detected!("sse4.1") {
             return unsafe {
-                make_arena_sse4_1::<T, CN>(image, image_stride, image_size, pads, border_mode, scalar)
+                make_arena_sse4_1::<T, CN>(
+                    image,
+                    image_stride,
+                    image_size,
+                    pads,
+                    border_mode,
+                    scalar,
+                )
             };
         }
     }
-    make_arena_exec::<T, CN>(image,image_stride, image_size, pads, border_mode, scalar)
+    make_arena_exec::<T, CN>(image, image_stride, image_size, pads, border_mode, scalar)
 }
 
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]
@@ -133,7 +140,7 @@ where
     T: Default + Copy + Send + Sync + 'static,
     f64: AsPrimitive<T>,
 {
-    make_arena_exec::<T, COMPONENTS>(image,image_stride, image_size, pads, border_mode, scalar)
+    make_arena_exec::<T, COMPONENTS>(image, image_stride, image_size, pads, border_mode, scalar)
 }
 
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]

@@ -43,7 +43,9 @@ use std::sync::Arc;
 ///
 /// * `CN`: channels count
 /// * `src`: Source planar image
+/// * `src_stride`: Source image stride
 /// * `dst`: Destination image
+/// * `dst_stride`: Destination image stride
 /// * `image_size`: Image size
 /// * `kernel`: Kernel
 /// * `kernel_shape`: Kernel size, see [KernelShape] for more info
@@ -59,7 +61,9 @@ use std::sync::Arc;
 ///
 pub fn filter_2d<T, F, const CN: usize>(
     src: &[T],
+    src_stride: usize,
     dst: &mut [T],
+    dst_stride: usize,
     image_size: ImageSize,
     kernel: &[F],
     kernel_shape: KernelShape,
@@ -73,20 +77,8 @@ where
     i32: AsPrimitive<F>,
     f64: AsPrimitive<T>,
 {
-    check_slice_size(
-        src,
-        image_size.width * CN,
-        image_size.width,
-        image_size.height,
-        CN,
-    )?;
-    check_slice_size(
-        dst,
-        image_size.width * CN,
-        image_size.width,
-        image_size.height,
-        CN,
-    )?;
+    check_slice_size(src, src_stride, image_size.width, image_size.height, CN)?;
+    check_slice_size(dst, dst_stride, image_size.width, image_size.height, CN)?;
 
     if src.len() != dst.len() {
         return Err(BlurError::ImagesMustMatch);
@@ -116,7 +108,7 @@ where
 
     let (arena_source, arena) = make_arena::<T, CN>(
         src,
-        image_size.width * CN,
+        src_stride,
         image_size,
         ArenaPads::from_kernel_shape(kernel_shape),
         border_mode,
@@ -149,6 +141,7 @@ where
                         arena,
                         arena_source_slice,
                         &unsafe_slice,
+                        dst_stride,
                         image_size,
                         kernel_slice,
                         y,
@@ -163,6 +156,7 @@ where
                 arena,
                 arena_source_slice,
                 &unsafe_slice,
+                dst_stride,
                 image_size,
                 kernel_slice,
                 y,

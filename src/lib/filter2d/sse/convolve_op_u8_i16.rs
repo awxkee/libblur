@@ -44,6 +44,7 @@ pub fn convolve_segment_sse_2d_u8_i16(
     arena: Arena,
     arena_source: &[u8],
     dst: &UnsafeSlice<u8>,
+    dst_stride: usize,
     image_size: ImageSize,
     prepared_kernel: &[ScanPoint2d<i16>],
     y: usize,
@@ -53,6 +54,7 @@ pub fn convolve_segment_sse_2d_u8_i16(
             arena,
             arena_source,
             dst,
+            dst_stride,
             image_size,
             prepared_kernel,
             y,
@@ -65,13 +67,13 @@ unsafe fn convolve_segment_sse_2d_u8_i16_impl(
     arena: Arena,
     arena_source: &[u8],
     dst: &UnsafeSlice<u8>,
+    dst_stride: usize,
     image_size: ImageSize,
     prepared_kernel: &[ScanPoint2d<i16>],
     y: usize,
 ) {
     unsafe {
         let width = image_size.width;
-        let stride = image_size.width * arena.components;
 
         let dx = arena.pad_w as i64;
         let dy = arena.pad_h as i64;
@@ -110,7 +112,7 @@ unsafe fn convolve_segment_sse_2d_u8_i16_impl(
                 k2 = _mm_mull_add_epi8_by_epi16_x4(k2, items0.2, weight);
                 k3 = _mm_mull_add_epi8_by_epi16_x4(k3, items0.3, weight);
             }
-            let dst_offset = y * stride + cx;
+            let dst_offset = y * dst_stride + cx;
             let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
             _mm_store_pack_x4(
                 dst_ptr0,
@@ -136,7 +138,7 @@ unsafe fn convolve_segment_sse_2d_u8_i16_impl(
                 k0 = _mm_mull_add_epi8_by_epi16_x4(k0, items0.0, weight);
                 k1 = _mm_mull_add_epi8_by_epi16_x4(k1, items0.1, weight);
             }
-            let dst_offset = y * stride + cx;
+            let dst_offset = y * dst_stride + cx;
             let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
             _mm_store_pack_x2(
                 dst_ptr0,
@@ -158,7 +160,7 @@ unsafe fn convolve_segment_sse_2d_u8_i16_impl(
                 );
                 k0 = _mm_mull_add_epi8_by_epi16_x4(k0, items0, weight);
             }
-            let dst_offset = y * stride + cx;
+            let dst_offset = y * dst_stride + cx;
             let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
             _mm_storeu_si128(dst_ptr0 as *mut __m128i, _mm_packus_epi16(k0.0, k0.1));
             cx += 16;
@@ -180,7 +182,7 @@ unsafe fn convolve_segment_sse_2d_u8_i16_impl(
                 k3 = ((*offsets.get_unchecked(i).get_unchecked(cx + 3)) as i16).mul_add(weight, k3);
             }
 
-            let dst_offset = y * stride + cx;
+            let dst_offset = y * dst_stride + cx;
 
             dst.write(dst_offset, k0.to_());
             dst.write(dst_offset + 1, k1.to_());
@@ -198,7 +200,7 @@ unsafe fn convolve_segment_sse_2d_u8_i16_impl(
                 let k_weight = prepared_kernel.get_unchecked(i).weight;
                 k0 = ((*offsets.get_unchecked(i).get_unchecked(x)) as i16).mul_add(k_weight, k0);
             }
-            dst.write(y * stride + x, k0.to_());
+            dst.write(y * dst_stride + x, k0.to_());
         }
     }
 }

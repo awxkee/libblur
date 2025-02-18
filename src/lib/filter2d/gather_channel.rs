@@ -43,6 +43,7 @@ pub fn gather_channel<T: Copy + Default, const CHANNELS: usize>(
     channel
 }
 
+#[cfg(feature = "fft")]
 pub fn squash_channel<T: Copy + Default, const CHANNELS: usize>(
     image: &mut [T],
     source: &[T],

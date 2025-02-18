@@ -72,8 +72,10 @@ pub fn get_laplacian_kernel(size: usize) -> Vec<f32> {
 ///
 /// # Arguments
 ///
-/// * `image`: Source image
-/// * `destination`: Destination image
+/// * `image`: Source image.
+/// * `image_stride`: Source image stride.
+/// * `destination`: Destination image.
+/// * `destination_stride`: Destination image stride.
 /// * `image_size`: Image size, see [ImageSize]
 /// * `border_mode`: See [EdgeMode] for more info
 /// * `border_constant`: If [EdgeMode::Constant] border will be replaced with this provided [Scalar] value
@@ -84,7 +86,9 @@ pub fn get_laplacian_kernel(size: usize) -> Vec<f32> {
 ///
 pub fn laplacian(
     image: &[u8],
+    image_stride: usize,
     destination: &mut [u8],
+    destination_stride: usize,
     image_size: ImageSize,
     border_mode: EdgeMode,
     border_constant: Scalar,
@@ -99,7 +103,9 @@ pub fn laplacian(
     let kernel = [-1, -1, -1, -1, 8, -1, -1, -1, -1];
     _dispatcher(
         image,
+        image_stride,
         destination,
+        destination_stride,
         image_size,
         &kernel,
         KernelShape::new(3, 3),

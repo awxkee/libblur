@@ -7,7 +7,11 @@ use colorutils_rs::TransferFunction;
 use fast_transpose::{transpose_rgba, FlipMode, FlopMode};
 use image::imageops::FilterType;
 use image::{DynamicImage, EncodableLayout, GenericImageView, ImageReader};
-use libblur::{fast_gaussian, filter_1d_exact, filter_2d_rgb_fft, generate_motion_kernel, get_gaussian_kernel_1d, get_sigma_size, laplacian, motion_blur, sobel, ConvolutionMode, EdgeMode, FastBlurChannels, ImageSize, KernelShape, Scalar, ThreadingPolicy};
+use libblur::{
+    fast_gaussian, filter_1d_exact, filter_2d_rgb_fft, generate_motion_kernel,
+    get_gaussian_kernel_1d, get_sigma_size, laplacian, motion_blur, sobel, ConvolutionMode,
+    EdgeMode, FastBlurChannels, ImageSize, KernelShape, Scalar, ThreadingPolicy,
+};
 use std::time::Instant;
 
 #[allow(dead_code)]
@@ -353,17 +357,20 @@ fn main() {
     // )
     // .unwrap();
 
-    // motion_blur(
-    //     &bytes,
-    //     &mut dst_bytes,
-    //     ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
-    //     90f32,
-    //     35,
-    //     EdgeMode::Clamp,
-    //     Scalar::new(255.0, 0.0, 0.0, 255.0),
-    //     FastBlurChannels::Channels3,
-    //     ThreadingPolicy::Adaptive,
-    // ).unwrap();
+    motion_blur(
+        &bytes,
+        dimensions.0 as usize * 3,
+        &mut dst_bytes,
+        dimensions.0 as usize * 3,
+        ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
+        90f32,
+        35,
+        EdgeMode::Clamp,
+        Scalar::new(255.0, 0.0, 0.0, 255.0),
+        FastBlurChannels::Channels3,
+        ThreadingPolicy::Adaptive,
+    )
+    .unwrap();
 
     let motion_kernel = generate_motion_kernel(51, 18.);
 
@@ -378,16 +385,16 @@ fn main() {
     // )
     // .unwrap();
 
-    filter_2d_rgb_fft::<u8, f32, f32>(
-        &bytes,
-        &mut dst_bytes,
-        ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
-        &motion_kernel,
-        KernelShape::new(51, 51),
-        EdgeMode::Clamp,
-        Scalar::new(255.0, 0., 0., 255.0),
-    )
-    .unwrap();
+    // filter_2d_rgb_fft::<u8, f32, f32>(
+    //     &bytes,
+    //     &mut dst_bytes,
+    //     ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
+    //     &motion_kernel,
+    //     KernelShape::new(51, 51),
+    //     EdgeMode::Clamp,
+    //     Scalar::new(255.0, 0., 0., 255.0),
+    // )
+    // .unwrap();
 
     //
     // filter_2d_rgba_approx::<u8, f32, i32>(

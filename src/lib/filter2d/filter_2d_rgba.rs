@@ -38,9 +38,11 @@ use std::ops::Mul;
 ///
 /// # Arguments
 ///
-/// * `src`: Source RGBA image
-/// * `dst`: Destination RGBA image
-/// * `image_size`: Image size
+/// * `src`: Source RGBA image.
+/// * `src_stride`: Source image stride
+/// * `dst`: Destination RGBA image.
+/// * `dst_stride`: Destination image stride.
+/// * `image_size`: Image size.
 /// * `kernel`: Kernel
 /// * `kernel_shape`: Kernel size, see [KernelShape] for more info
 /// * `border_mode`: Border handling mode see [EdgeMode] for more info
@@ -55,7 +57,9 @@ use std::ops::Mul;
 ///
 pub fn filter_2d_rgba<T, F>(
     src: &[T],
+    src_stride: usize,
     dst: &mut [T],
+    dst_stride: usize,
     image_size: ImageSize,
     kernel: &[F],
     kernel_shape: KernelShape,
@@ -71,7 +75,9 @@ where
 {
     filter_2d::<T, F, 4>(
         src,
+        src_stride,
         dst,
+        dst_stride,
         image_size,
         kernel,
         kernel_shape,

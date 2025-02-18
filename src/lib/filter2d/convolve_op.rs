@@ -39,6 +39,7 @@ pub(crate) fn convolve_segment_2d<T, F>(
     arena: Arena,
     arena_source: &[T],
     dst: &UnsafeSlice<T>,
+    dst_stride: usize,
     image_size: ImageSize,
     prepared_kernel: &[ScanPoint2d<F>],
     y: usize,
@@ -48,7 +49,6 @@ pub(crate) fn convolve_segment_2d<T, F>(
 {
     unsafe {
         let width = image_size.width;
-        let stride = image_size.width * arena.components;
 
         let dx = arena.pad_w as i64;
         let dy = arena.pad_h as i64;
@@ -109,7 +109,7 @@ pub(crate) fn convolve_segment_2d<T, F>(
                 );
             }
 
-            let dst_offset = y * stride + cx;
+            let dst_offset = y * dst_stride + cx;
 
             dst.write(dst_offset, k0.to_());
             dst.write(dst_offset + 1, k1.to_());
@@ -134,7 +134,7 @@ pub(crate) fn convolve_segment_2d<T, F>(
                     k_weight,
                 );
             }
-            dst.write(y * stride + x, k0.to_());
+            dst.write(y * dst_stride + x, k0.to_());
         }
     }
 }
