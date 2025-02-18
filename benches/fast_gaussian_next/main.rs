@@ -29,6 +29,25 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
+    let rgba_u16 = img.to_rgba16();
+
+    c.bench_function("RGBA16 fast gaussian next (Single Thread)", |b| {
+        let mut dst_bytes: Vec<u16> = rgba_u16.to_vec();
+        b.iter(|| {
+            libblur::fast_gaussian_next_u16(
+                &mut dst_bytes,
+                dimensions.0 * 4,
+                dimensions.0,
+                dimensions.1,
+                77,
+                FastBlurChannels::Channels4,
+                ThreadingPolicy::Single,
+                EdgeMode::Clamp,
+            )
+            .unwrap();
+        })
+    });
+
     let rgba_f32 = img.to_rgba32f();
 
     c.bench_function("RGBA f32 fast gaussian next (Single Thread)", |b| {
