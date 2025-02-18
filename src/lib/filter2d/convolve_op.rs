@@ -48,75 +48,77 @@ pub(crate) fn convolve_segment_2d<T, F>(
 {
     unsafe {
         let width = image_size.width;
-        let stride = image_size.width;
+        let stride = image_size.width * arena.components;
 
         let dx = arena.pad_w as i64;
         let dy = arena.pad_h as i64;
 
-        let arena_width = arena.width;
+        let arena_stride = arena.width * arena.components;
 
         let offsets = prepared_kernel
             .iter()
             .map(|&x| {
                 arena_source.get_unchecked(
-                    ((x.y + dy + y as i64) as usize * arena_width + (x.x + dx) as usize)..,
+                    ((x.y + dy + y as i64) as usize * arena_stride
+                        + (x.x + dx) as usize * arena.components)..,
                 )
             })
             .collect::<Vec<_>>();
 
         let length = prepared_kernel.len();
+        let total_width = width * arena.components;
 
-        let mut _cx = 0usize;
+        let mut cx = 0usize;
 
-        for x in (_cx..width.saturating_sub(4)).step_by(4) {
+        while cx + 4 < total_width {
             let k_weight = prepared_kernel.get_unchecked(0).weight;
 
             let mut k0 = (*offsets.get_unchecked(0))
-                .get_unchecked(x)
+                .get_unchecked(cx)
                 .as_()
                 .mul(k_weight);
             let mut k1 = (*offsets.get_unchecked(0))
-                .get_unchecked(x + 1)
+                .get_unchecked(cx + 1)
                 .as_()
                 .mul(k_weight);
             let mut k2 = (*offsets.get_unchecked(0))
-                .get_unchecked(x + 2)
+                .get_unchecked(cx + 2)
                 .as_()
                 .mul(k_weight);
-            let mut k3 = (*offsets.get_unchecked(0).get_unchecked(x + 3))
+            let mut k3 = (*offsets.get_unchecked(0).get_unchecked(cx + 3))
                 .as_()
                 .mul(k_weight);
 
             for i in 1..length {
                 let weight = prepared_kernel.get_unchecked(i).weight;
-                k0 = mlaf(k0, offsets.get_unchecked(i).get_unchecked(x).as_(), weight);
+                k0 = mlaf(k0, offsets.get_unchecked(i).get_unchecked(cx).as_(), weight);
                 k1 = mlaf(
                     k1,
-                    offsets.get_unchecked(i).get_unchecked(x + 1).as_(),
+                    offsets.get_unchecked(i).get_unchecked(cx + 1).as_(),
                     weight,
                 );
                 k2 = mlaf(
                     k2,
-                    offsets.get_unchecked(i).get_unchecked(x + 2).as_(),
+                    offsets.get_unchecked(i).get_unchecked(cx + 2).as_(),
                     weight,
                 );
                 k3 = mlaf(
                     k3,
-                    offsets.get_unchecked(i).get_unchecked(x + 3).as_(),
+                    offsets.get_unchecked(i).get_unchecked(cx + 3).as_(),
                     weight,
                 );
             }
 
-            let dst_offset = y * stride + x;
+            let dst_offset = y * stride + cx;
 
             dst.write(dst_offset, k0.to_());
             dst.write(dst_offset + 1, k1.to_());
             dst.write(dst_offset + 2, k2.to_());
             dst.write(dst_offset + 3, k3.to_());
-            _cx = x;
+            cx += 4;
         }
 
-        for x in _cx..width {
+        for x in cx..total_width {
             let k_weight = prepared_kernel.get_unchecked(0).weight;
 
             let mut k0 = (*offsets.get_unchecked(0))

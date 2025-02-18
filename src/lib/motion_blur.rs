@@ -27,8 +27,8 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::{
-    filter_2d, filter_2d_rgb, filter_2d_rgba, BlurError, EdgeMode, FastBlurChannels, ImageSize,
-    KernelShape, Scalar, ThreadingPolicy,
+    filter_2d, BlurError, EdgeMode, FastBlurChannels, ImageSize, KernelShape, Scalar,
+    ThreadingPolicy,
 };
 
 #[derive(Copy, Clone)]
@@ -156,9 +156,9 @@ pub fn motion_blur(
     }
     let kernel = generate_motion_kernel(kernel_size, angle);
     let executor = match channels {
-        FastBlurChannels::Plane => filter_2d,
-        FastBlurChannels::Channels3 => filter_2d_rgb,
-        FastBlurChannels::Channels4 => filter_2d_rgba,
+        FastBlurChannels::Plane => filter_2d::<u8, f32, 1>,
+        FastBlurChannels::Channels3 => filter_2d::<u8, f32, 3>,
+        FastBlurChannels::Channels4 => filter_2d::<u8, f32, 4>,
     };
     executor(
         image,

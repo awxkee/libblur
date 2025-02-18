@@ -108,27 +108,30 @@ unsafe fn convolve_segment_2d_u8_f32_impl<const FMA: bool>(
     y: usize,
 ) {
     let width = image_size.width;
-    let stride = image_size.width;
+    let stride = image_size.width * arena.components;
 
     let dx = arena.pad_w as i64;
     let dy = arena.pad_h as i64;
 
-    let arena_width = arena.width;
+    let arena_stride = arena.width * arena.components;
 
     let offsets = prepared_kernel
         .iter()
         .map(|&x| {
             arena_source.get_unchecked(
-                ((x.y + dy + y as i64) as usize * arena_width + (x.x + dx) as usize)..,
+                ((x.y + dy + y as i64) as usize * arena_stride
+                    + (x.x + dx) as usize * arena.components)..,
             )
         })
         .collect::<Vec<_>>();
 
     let length = prepared_kernel.len();
 
+    let total_width = width * arena.components;
+
     let mut cx = 0usize;
 
-    while cx + 64 < width {
+    while cx + 64 < total_width {
         let k_weight = _mm_set1_ps(prepared_kernel.get_unchecked(0).weight);
         let items0 = _mm_load_pack_x4(offsets.get_unchecked(0).get_unchecked(cx..).as_ptr());
         let mut k0 = _mm_mul_epi8_by_ps_x4::<FMA>(items0.0, k_weight);
@@ -158,7 +161,7 @@ unsafe fn convolve_segment_2d_u8_f32_impl<const FMA: bool>(
         cx += 64;
     }
 
-    while cx + 32 < width {
+    while cx + 32 < total_width {
         let k_weight = _mm_set1_ps(prepared_kernel.get_unchecked(0).weight);
         let items0 = _mm_load_pack_x2(offsets.get_unchecked(0).get_unchecked(cx..).as_ptr());
         let mut k0 = _mm_mul_epi8_by_ps_x4::<FMA>(items0.0, k_weight);
@@ -176,7 +179,7 @@ unsafe fn convolve_segment_2d_u8_f32_impl<const FMA: bool>(
         cx += 32;
     }
 
-    while cx + 16 < width {
+    while cx + 16 < total_width {
         let k_weight = _mm_set1_ps(prepared_kernel.get_unchecked(0).weight);
         let items0 = _mm_loadu_si128(
             offsets.get_unchecked(0).get_unchecked(cx..).as_ptr() as *const __m128i
@@ -195,7 +198,7 @@ unsafe fn convolve_segment_2d_u8_f32_impl<const FMA: bool>(
         cx += 16;
     }
 
-    while cx + 4 < width {
+    while cx + 4 < total_width {
         let k_weight = prepared_kernel.get_unchecked(0).weight;
 
         let mut k0 = ((*offsets.get_unchecked(0).get_unchecked(cx)) as f32).mul(k_weight);
@@ -236,7 +239,7 @@ unsafe fn convolve_segment_2d_u8_f32_impl<const FMA: bool>(
         cx += 4;
     }
 
-    for x in cx..width {
+    for x in cx..total_width {
         let k_weight = prepared_kernel.get_unchecked(0).weight;
 
         let mut k0 = ((*(*offsets.get_unchecked(0)).get_unchecked(x)) as f32).mul(k_weight);

@@ -45,28 +45,29 @@ pub fn convolve_segment_neon_2d_u8_i16(
     y: usize,
 ) {
     unsafe {
-        let width = image_size.width;
-        let stride = image_size.width;
+        let stride = image_size.width * arena.components;
 
         let dx = arena.pad_w as i64;
         let dy = arena.pad_h as i64;
 
-        let arena_width = arena.width;
+        let arena_stride = arena.width * arena.components;
 
         let offsets = prepared_kernel
             .iter()
             .map(|&x| {
                 arena_source.get_unchecked(
-                    ((x.y + dy + y as i64) as usize * arena_width + (x.x + dx) as usize)..,
+                    ((x.y + dy + y as i64) as usize * arena_stride
+                        + (x.x + dx) as usize * arena.components)..,
                 )
             })
             .collect::<Vec<_>>();
 
         let length = prepared_kernel.len();
+        let total_width = image_size.width * arena.components;
 
         let mut cx = 0usize;
 
-        while cx + 64 < width {
+        while cx + 64 < total_width {
             let k_weight = vdupq_n_s16(prepared_kernel.get_unchecked(0).weight);
             let items0 = vld1q_u8_x4(offsets.get_unchecked(0).get_unchecked(cx..).as_ptr());
             let mut k0 = vmulq_u8_by_i16(items0.0, k_weight);
@@ -96,7 +97,7 @@ pub fn convolve_segment_neon_2d_u8_i16(
             cx += 64;
         }
 
-        while cx + 32 < width {
+        while cx + 32 < total_width {
             let k_weight = vdupq_n_s16(prepared_kernel.get_unchecked(0).weight);
             let items0 = vld1q_u8_x2(offsets.get_unchecked(0).get_unchecked(cx..).as_ptr());
             let mut k0 = vmulq_u8_by_i16(items0.0, k_weight);
@@ -120,7 +121,7 @@ pub fn convolve_segment_neon_2d_u8_i16(
             cx += 32;
         }
 
-        while cx + 16 < width {
+        while cx + 16 < total_width {
             let k_weight = vdupq_n_s16(prepared_kernel.get_unchecked(0).weight);
             let items0 = vld1q_u8(offsets.get_unchecked(0).get_unchecked(cx..).as_ptr());
             let mut k0 = vmulq_u8_by_i16(items0, k_weight);
@@ -135,7 +136,7 @@ pub fn convolve_segment_neon_2d_u8_i16(
             cx += 16;
         }
 
-        while cx + 4 < width {
+        while cx + 4 < total_width {
             let k_weight = prepared_kernel.get_unchecked(0).weight;
 
             let mut k0 = ((*offsets.get_unchecked(0).get_unchecked(cx)) as i16).mul(k_weight);
@@ -160,7 +161,7 @@ pub fn convolve_segment_neon_2d_u8_i16(
             cx += 4;
         }
 
-        for x in cx..width {
+        for x in cx..total_width {
             let k_weight = prepared_kernel.get_unchecked(0).weight;
 
             let mut k0 = ((*(*offsets.get_unchecked(0)).get_unchecked(x)) as i16).mul(k_weight);

@@ -92,7 +92,7 @@ pub fn laplacian(
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
     let _dispatcher = match channels {
-        FastBlurChannels::Plane => filter_2d::<u8, i16>,
+        FastBlurChannels::Plane => filter_2d::<u8, i16, 1>,
         FastBlurChannels::Channels3 => filter_2d_rgb::<u8, i16>,
         FastBlurChannels::Channels4 => filter_2d_rgba::<u8, i16>,
     };

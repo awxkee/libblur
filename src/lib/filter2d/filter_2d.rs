@@ -41,6 +41,7 @@ use std::sync::Arc;
 ///
 /// # Arguments
 ///
+/// * `CN`: channels count
 /// * `src`: Source planar image
 /// * `dst`: Destination image
 /// * `image_size`: Image size
@@ -56,7 +57,7 @@ use std::sync::Arc;
 ///
 /// See [crate::motion_blur] for example
 ///
-pub fn filter_2d<T, F>(
+pub fn filter_2d<T, F, const CN: usize>(
     src: &[T],
     dst: &mut [T],
     image_size: ImageSize,
@@ -74,17 +75,17 @@ where
 {
     check_slice_size(
         src,
-        image_size.width,
+        image_size.width * CN,
         image_size.width,
         image_size.height,
-        1,
+        CN,
     )?;
     check_slice_size(
         dst,
-        image_size.width,
+        image_size.width * CN,
         image_size.width,
         image_size.height,
-        1,
+        CN,
     )?;
 
     if src.len() != dst.len() {
@@ -113,8 +114,9 @@ where
 
     let filter = Arc::new(T::get_executor());
 
-    let (arena_source, arena) = make_arena::<T, 1>(
+    let (arena_source, arena) = make_arena::<T, CN>(
         src,
+        image_size.width * CN,
         image_size,
         ArenaPads::from_kernel_shape(kernel_shape),
         border_mode,

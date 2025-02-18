@@ -168,6 +168,7 @@ where
 
     let (arena_v_src, _) = make_arena::<T, 1>(
         src,
+        image_size.width,
         image_size,
         ArenaPads::new(
             arena_pad_left,
