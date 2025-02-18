@@ -531,9 +531,9 @@ impl FastGaussianNextPassProvider<u8> for u8 {
 
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
-            let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+            let is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
 
-            if BASE_RADIUS_I64_CUTOFF > radius && _is_sse_available {
+            if BASE_RADIUS_I64_CUTOFF > radius && is_sse_available {
                 _dispatcher_horizontal = fast_gaussian_next_horizontal_pass_sse_u8::<u8, CN>;
             }
         }
@@ -652,8 +652,8 @@ impl FastGaussianNextPassProvider<f32> for f32 {
         };
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         {
-            let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
-            if _is_sse_available {
+            let is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+            if is_sse_available {
                 _dispatcher_vertical = fgn_vertical_pass_sse_f32::<f32, CN>;
             }
         }

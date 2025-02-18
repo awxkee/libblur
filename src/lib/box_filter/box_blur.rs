@@ -213,8 +213,8 @@ impl BoxBlurHorizontalPass<u8> for u8 {
             {
                 #[cfg(feature = "sse")]
                 {
-                    let _is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
-                    if _is_sse_available {
+                    let is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
+                    if is_sse_available {
                         use crate::box_filter::box_blur_sse::box_blur_horizontal_pass_sse;
                         _dispatcher_horizontal =
                             box_blur_horizontal_pass_sse::<u8, { CHANNEL_CONFIGURATION }>;
@@ -334,55 +334,17 @@ fn box_blur_vertical_pass_impl<T, J>(
     let buf_cap = buf_size as usize;
     let mut buffer = vec![J::default(); buf_cap];
 
-    let mut cx = start_x as usize;
-    let mut buf_cx = 0usize;
+    let src_lane = &src[start_x as usize..end_x as usize];
 
-    while cx + 4 < end_x as usize {
-        unsafe {
-            let mut weight0;
-            let mut weight1;
-            let mut weight2;
-            let mut weight3;
-            // replicate edge
-            let px = cx;
-            weight0 = (src.get_unchecked(px).as_()) * edge_count;
-            weight1 = (src.get_unchecked(px + 1).as_()) * edge_count;
-            weight2 = (src.get_unchecked(px + 2).as_()) * edge_count;
-            weight3 = (src.get_unchecked(px + 3).as_()) * edge_count;
-
-            for y in 1..half_kernel as usize {
-                let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
-                weight0 += src.get_unchecked(y_src_shift + px).as_();
-                weight1 += src.get_unchecked(y_src_shift + px + 1).as_();
-                weight2 += src.get_unchecked(y_src_shift + px + 2).as_();
-                weight3 += src.get_unchecked(y_src_shift + px + 3).as_();
+    for (x, (v, bf)) in src_lane.iter().zip(buffer.iter_mut()).enumerate() {
+        let mut w = v.as_() * edge_count;
+        for y in 1..half_kernel as usize {
+            let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
+            unsafe {
+                w += src.get_unchecked(y_src_shift + x).as_();
             }
-
-            *buffer.get_unchecked_mut(buf_cx) = weight0;
-            *buffer.get_unchecked_mut(buf_cx + 1) = weight1;
-            *buffer.get_unchecked_mut(buf_cx + 2) = weight2;
-            *buffer.get_unchecked_mut(buf_cx + 3) = weight3;
         }
-        cx += 4;
-        buf_cx += 4;
-    }
-
-    while cx < end_x as usize {
-        unsafe {
-            let px = cx;
-            let mut weight0 = src.get_unchecked(px).as_() * edge_count;
-            // replicate edge
-
-            for y in 1..half_kernel as usize {
-                let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
-                weight0 += src.get_unchecked(y_src_shift + px).as_();
-            }
-
-            *buffer.get_unchecked_mut(buf_cx) = weight0;
-        }
-
-        cx += 1;
-        buf_cx += 1;
+        *bf = w;
     }
 
     for y in 0..height {
@@ -1442,12 +1404,12 @@ pub fn gaussian_box_blur_u16(
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
-    let _dispatcher = match channels {
+    let executor = match channels {
         FastBlurChannels::Plane => gaussian_box_blur_impl::<u16, 1>,
         FastBlurChannels::Channels3 => gaussian_box_blur_impl::<u16, 3>,
         FastBlurChannels::Channels4 => gaussian_box_blur_impl::<u16, 4>,
     };
-    _dispatcher(
+    executor(
         src,
         src_stride,
         dst,

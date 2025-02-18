@@ -226,17 +226,29 @@ fn main() {
     let bytes_16 = bytes.iter().map(|&x| x as u16).collect::<Vec<u16>>();
     let mut dst_16 = bytes_16.to_vec();
 
-    libblur::fast_gaussian_next_u16(
+    libblur::gaussian_box_blur_u16(
+        &bytes_16,
+        stride as u32,
         &mut dst_16,
         stride as u32,
         dimensions.0,
         dimensions.1,
-        25,
+        12f32,
         FastBlurChannels::Channels3,
         ThreadingPolicy::Single,
-        EdgeMode::Clamp,
-    )
-    .unwrap();
+    ).unwrap();
+
+    // libblur::fast_gaussian_next_u16(
+    //     &mut dst_16,
+    //     stride as u32,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     25,
+    //     FastBlurChannels::Channels3,
+    //     ThreadingPolicy::Single,
+    //     EdgeMode::Clamp,
+    // )
+    // .unwrap();
     dst_bytes = dst_16.iter().map(|&x| x as u8).collect();
 
     // let bytes_16 = bytes.iter().map(|&x| x as u16).collect::<Vec<u16>>();

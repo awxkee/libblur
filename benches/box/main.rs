@@ -32,6 +32,25 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
+    c.bench_function("libblur: RGBA16 box blur", |b| {
+        let src_bytes: Vec<u16> = src_bytes.to_vec().iter().map(|v| *v as u16).collect();
+        let mut dst_bytes: Vec<u16> = src_bytes.to_vec().iter().map(|v| *v).collect();
+        b.iter(|| {
+            libblur::box_blur_u16(
+                &src_bytes,
+                stride as u32,
+                &mut dst_bytes,
+                stride as u32,
+                dimensions.0,
+                dimensions.1,
+                77 / 2,
+                FastBlurChannels::Channels4,
+                ThreadingPolicy::Adaptive,
+            )
+                .unwrap();
+        })
+    });
+
     c.bench_function("libblur: RGBA box blur f32", |b| {
         let mut dst_bytes: Vec<f32> = src_bytes.to_vec().iter().map(|v| *v as f32).collect();
         let src_bytes = src_bytes

@@ -64,11 +64,11 @@ pub fn convolve_segment_neon_2d_u8_f32(
 
         let length = prepared_kernel.len();
 
-        let mut _cx = 0usize;
+        let mut cx = 0usize;
 
-        while _cx + 64 < width {
+        while cx + 64 < width {
             let k_weight = vdupq_n_f32(prepared_kernel.get_unchecked(0).weight);
-            let items0 = vld1q_u8_x4(offsets.get_unchecked(0).get_unchecked(_cx..).as_ptr());
+            let items0 = vld1q_u8_x4(offsets.get_unchecked(0).get_unchecked(cx..).as_ptr());
             let mut k0 = vmulq_u8_by_f32(items0.0, k_weight);
             let mut k1 = vmulq_u8_by_f32(items0.1, k_weight);
             let mut k2 = vmulq_u8_by_f32(items0.2, k_weight);
@@ -76,13 +76,13 @@ pub fn convolve_segment_neon_2d_u8_f32(
             for i in 1..length {
                 let weight = vdupq_n_f32(prepared_kernel.get_unchecked(i).weight);
                 let s_ptr = offsets.get_unchecked(i);
-                let items0 = vld1q_u8_x4(s_ptr.get_unchecked(_cx..).as_ptr());
+                let items0 = vld1q_u8_x4(s_ptr.get_unchecked(cx..).as_ptr());
                 k0 = vfmlaq_u8_f32(k0, items0.0, weight);
                 k1 = vfmlaq_u8_f32(k1, items0.1, weight);
                 k2 = vfmlaq_u8_f32(k2, items0.2, weight);
                 k3 = vfmlaq_u8_f32(k3, items0.3, weight);
             }
-            let dst_offset = y * stride + _cx;
+            let dst_offset = y * stride + cx;
             let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
             vst1q_u8_x4(
                 dst_ptr0,
@@ -93,87 +93,87 @@ pub fn convolve_segment_neon_2d_u8_f32(
                     vqmovnq_f32_u8(k3),
                 ),
             );
-            _cx += 64;
+            cx += 64;
         }
 
-        while _cx + 32 < width {
+        while cx + 32 < width {
             let k_weight = vdupq_n_f32(prepared_kernel.get_unchecked(0).weight);
-            let items0 = vld1q_u8_x2(offsets.get_unchecked(0).get_unchecked(_cx..).as_ptr());
+            let items0 = vld1q_u8_x2(offsets.get_unchecked(0).get_unchecked(cx..).as_ptr());
             let mut k0 = vmulq_u8_by_f32(items0.0, k_weight);
             let mut k1 = vmulq_u8_by_f32(items0.1, k_weight);
             for i in 1..length {
                 let weight = vdupq_n_f32(prepared_kernel.get_unchecked(i).weight);
                 let s_ptr = offsets.get_unchecked(i);
-                let items0 = vld1q_u8_x2(s_ptr.get_unchecked(_cx..).as_ptr());
+                let items0 = vld1q_u8_x2(s_ptr.get_unchecked(cx..).as_ptr());
                 k0 = vfmlaq_u8_f32(k0, items0.0, weight);
                 k1 = vfmlaq_u8_f32(k1, items0.1, weight);
             }
-            let dst_offset = y * stride + _cx;
+            let dst_offset = y * stride + cx;
             let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
             vst1q_u8_x2(
                 dst_ptr0,
                 uint8x16x2_t(vqmovnq_f32_u8(k0), vqmovnq_f32_u8(k1)),
             );
-            _cx += 32;
+            cx += 32;
         }
 
-        while _cx + 16 < width {
+        while cx + 16 < width {
             let k_weight = vdupq_n_f32(prepared_kernel.get_unchecked(0).weight);
-            let items0 = vld1q_u8(offsets.get_unchecked(0).get_unchecked(_cx..).as_ptr());
+            let items0 = vld1q_u8(offsets.get_unchecked(0).get_unchecked(cx..).as_ptr());
             let mut k0 = vmulq_u8_by_f32(items0, k_weight);
             for i in 1..length {
                 let weight = vdupq_n_f32(prepared_kernel.get_unchecked(i).weight);
-                let items0 = vld1q_u8(offsets.get_unchecked(i).get_unchecked(_cx..).as_ptr());
+                let items0 = vld1q_u8(offsets.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 k0 = vfmlaq_u8_f32(k0, items0, weight);
             }
-            let dst_offset = y * stride + _cx;
+            let dst_offset = y * stride + cx;
             let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
             vst1q_u8(dst_ptr0, vqmovnq_f32_u8(k0));
-            _cx += 16;
+            cx += 16;
         }
 
-        while _cx + 4 < width {
+        while cx + 4 < width {
             let k_weight = prepared_kernel.get_unchecked(0).weight;
 
-            let mut k0 = ((*offsets.get_unchecked(0).get_unchecked(_cx)) as f32).mul(k_weight);
-            let mut k1 = ((*offsets.get_unchecked(0).get_unchecked(_cx + 1)) as f32).mul(k_weight);
-            let mut k2 = ((*offsets.get_unchecked(0).get_unchecked(_cx + 2)) as f32).mul(k_weight);
-            let mut k3 = ((*offsets.get_unchecked(0).get_unchecked(_cx + 3)) as f32).mul(k_weight);
+            let mut k0 = ((*offsets.get_unchecked(0).get_unchecked(cx)) as f32).mul(k_weight);
+            let mut k1 = ((*offsets.get_unchecked(0).get_unchecked(cx + 1)) as f32).mul(k_weight);
+            let mut k2 = ((*offsets.get_unchecked(0).get_unchecked(cx + 2)) as f32).mul(k_weight);
+            let mut k3 = ((*offsets.get_unchecked(0).get_unchecked(cx + 3)) as f32).mul(k_weight);
 
             for i in 1..length {
                 let weight = prepared_kernel.get_unchecked(i).weight;
                 k0 = mlaf(
                     k0,
-                    (*offsets.get_unchecked(i).get_unchecked(_cx)) as f32,
+                    (*offsets.get_unchecked(i).get_unchecked(cx)) as f32,
                     weight,
                 );
                 k1 = mlaf(
                     k1,
-                    (*offsets.get_unchecked(i).get_unchecked(_cx + 1)) as f32,
+                    (*offsets.get_unchecked(i).get_unchecked(cx + 1)) as f32,
                     weight,
                 );
                 k2 = mlaf(
                     k2,
-                    (*offsets.get_unchecked(i).get_unchecked(_cx + 2)) as f32,
+                    (*offsets.get_unchecked(i).get_unchecked(cx + 2)) as f32,
                     weight,
                 );
                 k3 = mlaf(
                     k3,
-                    (*offsets.get_unchecked(i).get_unchecked(_cx + 3)) as f32,
+                    (*offsets.get_unchecked(i).get_unchecked(cx + 3)) as f32,
                     weight,
                 );
             }
 
-            let dst_offset = y * stride + _cx;
+            let dst_offset = y * stride + cx;
 
             dst.write(dst_offset, k0.to_());
             dst.write(dst_offset + 1, k1.to_());
             dst.write(dst_offset + 2, k2.to_());
             dst.write(dst_offset + 3, k3.to_());
-            _cx += 4;
+            cx += 4;
         }
 
-        for x in _cx..width {
+        for x in cx..width {
             let k_weight = prepared_kernel.get_unchecked(0).weight;
 
             let mut k0 = ((*(*offsets.get_unchecked(0)).get_unchecked(x)) as f32).mul(k_weight);

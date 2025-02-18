@@ -28,7 +28,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 7,
                 FastBlurChannels::Channels4,
                 ThreadingPolicy::Adaptive,
-            );
+            )
+            .unwrap();
         })
     });
 
@@ -64,7 +65,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 7,
                 FastBlurChannels::Channels3,
                 ThreadingPolicy::Adaptive,
-            );
+            )
+            .unwrap();
         })
     });
 
