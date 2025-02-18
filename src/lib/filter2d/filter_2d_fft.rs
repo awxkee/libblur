@@ -29,6 +29,7 @@
 #![forbid(unsafe_code)]
 use crate::filter1d::{make_arena, ArenaPads};
 use crate::filter2d::fft_utils::fft_next_good_size;
+use crate::filter2d::mul_spectrum::mul_spectrum_in_place;
 use crate::filter2d::scan_se_2d::scan_se_2d;
 use crate::to_storage::ToStorage;
 use crate::util::check_slice_size;
@@ -66,25 +67,6 @@ fn transpose<T: Copy + Default>(
     .unwrap();
 
     transposed
-}
-
-fn mul_spectrum_in_place<V: FftNum + Mul<V>>(
-    value1: &mut [Complex<V>],
-    other: &[Complex<V>],
-    width: usize,
-    height: usize,
-) where
-    f64: AsPrimitive<V>,
-{
-    let normalization_factor = (1f64 / (width * height) as f64).as_();
-    let complex_size = height * width;
-    for (dst, kernel) in value1
-        .iter_mut()
-        .take(complex_size)
-        .zip(other.iter().take(complex_size))
-    {
-        *dst = (*dst) * (*kernel) * normalization_factor;
-    }
 }
 
 /// Performs 2D separable approximated convolution on single plane image

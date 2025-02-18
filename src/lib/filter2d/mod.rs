@@ -40,6 +40,8 @@ mod filter_2d_rgba;
 #[cfg(feature = "fft")]
 mod filter_2d_rgba_fft;
 mod gather_channel;
+#[cfg(feature = "fft")]
+mod mul_spectrum;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 mod neon;
 mod scan_point_2d;

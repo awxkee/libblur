@@ -27,6 +27,7 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![forbid(unsafe_code)]
+#[cfg(feature = "fft")]
 use crate::ImageSize;
 
 #[cfg(feature = "fft")]
