@@ -33,7 +33,6 @@ use crate::filter2d::neon::{convolve_segment_neon_2d_u8_f32, convolve_segment_ne
 use crate::filter2d::scan_point_2d::ScanPoint2d;
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 use crate::filter2d::sse::{convolve_segment_sse_2d_u8_f32, convolve_segment_sse_2d_u8_i16};
-use crate::unsafe_slice::UnsafeSlice;
 use crate::ImageSize;
 
 #[allow(clippy::type_complexity)]
@@ -41,8 +40,7 @@ pub trait Filter2dHandler<T, F> {
     fn get_executor() -> fn(
         arena: Arena,
         arena_source: &[T],
-        dst: &UnsafeSlice<T>,
-        dst_stride: usize,
+        dst: &mut [T],
         image_size: ImageSize,
         prepared_kernel: &[ScanPoint2d<F>],
         y: usize,
@@ -55,8 +53,7 @@ macro_rules! default_2d_column_handler {
             fn get_executor() -> fn(
                 arena: Arena,
                 arena_source: &[$store],
-                dst: &UnsafeSlice<$store>,
-                dst_stride: usize,
+                dst: &mut [$store],
                 image_size: ImageSize,
                 prepared_kernel: &[ScanPoint2d<$intermediate>],
                 y: usize,
@@ -72,20 +69,17 @@ impl Filter2dHandler<u8, f32> for u8 {
         all(target_arch = "aarch64", target_feature = "neon"),
         any(target_arch = "x86_64", target_arch = "x86")
     )))]
-    fn get_executor(
-    ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, usize, ImageSize, &[ScanPoint2d<f32>], usize) {
+    fn get_executor() -> fn(Arena, &[u8], &mut [u8], ImageSize, &[ScanPoint2d<f32>], usize) {
         convolve_segment_2d
     }
 
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-    fn get_executor(
-    ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, usize, ImageSize, &[ScanPoint2d<f32>], usize) {
+    fn get_executor() -> fn(Arena, &[u8], &mut [u8], ImageSize, &[ScanPoint2d<f32>], usize) {
         convolve_segment_neon_2d_u8_f32
     }
 
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-    fn get_executor(
-    ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, usize, ImageSize, &[ScanPoint2d<f32>], usize) {
+    fn get_executor() -> fn(Arena, &[u8], &mut [u8], ImageSize, &[ScanPoint2d<f32>], usize) {
         #[cfg(feature = "sse")]
         if std::arch::is_x86_feature_detected!("sse4.1") {
             return convolve_segment_sse_2d_u8_f32;
@@ -99,20 +93,17 @@ impl Filter2dHandler<u8, i16> for i16 {
         all(target_arch = "aarch64", target_feature = "neon"),
         any(target_arch = "x86_64", target_arch = "x86")
     )))]
-    fn get_executor(
-    ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, usize, ImageSize, &[ScanPoint2d<i16>], usize) {
+    fn get_executor() -> fn(Arena, &[u8], &mut [u8], ImageSize, &[ScanPoint2d<i16>], usize) {
         convolve_segment_2d
     }
 
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-    fn get_executor(
-    ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, usize, ImageSize, &[ScanPoint2d<i16>], usize) {
+    fn get_executor() -> fn(Arena, &[u8], &mut [u8], ImageSize, &[ScanPoint2d<i16>], usize) {
         convolve_segment_neon_2d_u8_i16
     }
 
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-    fn get_executor(
-    ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, usize, ImageSize, &[ScanPoint2d<i16>], usize) {
+    fn get_executor() -> fn(Arena, &[u8], &mut [u8], ImageSize, &[ScanPoint2d<i16>], usize) {
         #[cfg(feature = "sse")]
         if std::arch::is_x86_feature_detected!("sse4.1") {
             return convolve_segment_sse_2d_u8_i16;

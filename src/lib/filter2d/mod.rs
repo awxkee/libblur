@@ -39,6 +39,7 @@ mod filter_2d_rgb_fft;
 mod filter_2d_rgba;
 #[cfg(feature = "fft")]
 mod filter_2d_rgba_fft;
+#[cfg(feature = "fft")]
 mod gather_channel;
 #[cfg(feature = "fft")]
 mod mul_spectrum;

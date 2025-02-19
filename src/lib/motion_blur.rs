@@ -156,7 +156,7 @@ pub fn motion_blur(
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
     if kernel_size & 1 == 0 {
-        panic!("Kernel size must be odd");
+        return Err(BlurError::OddKernel(kernel_size));
     }
     let kernel = generate_motion_kernel(kernel_size, angle);
     let executor = match channels {

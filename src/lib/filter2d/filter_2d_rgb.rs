@@ -33,20 +33,20 @@ use crate::{filter_2d, BlurError, EdgeMode, ImageSize, Scalar, ThreadingPolicy};
 use num_traits::{AsPrimitive, MulAdd};
 use std::ops::Mul;
 
-/// This performs direct 2D convolution on RGB image
+/// This performs direct 2D convolution on RGB image.
 ///
 /// # Arguments
 ///
-/// * `src`: Source RGG image
-/// * `src_stride`: Source image stride
-/// * `dst`: Destination RGB image
-/// * `dst_stride`: Destination image stride
-/// * `image_size`: Image size
-/// * `kernel`: Kernel
-/// * `kernel_shape`: Kernel size, see [KernelShape] for more info
-/// * `border_mode`: Border handling mode see [EdgeMode] for more info
-/// * `border_constant`: If [EdgeMode::Constant] border will be replaced with this provided [Scalar] value
-/// * `threading_policy`: See [ThreadingPolicy] for more info
+/// * `src`: Source RGG image.
+/// * `src_stride`: Source image stride.
+/// * `dst`: Destination RGB image.
+/// * `dst_stride`: Destination image stride.
+/// * `image_size`: Image size.
+/// * `kernel`: Kernel.
+/// * `kernel_shape`: Kernel size, see [KernelShape] for more info.
+/// * `border_mode`: Border handling mode see [EdgeMode] for more info.
+/// * `border_constant`: If [EdgeMode::Constant] border will be replaced with this provided [Scalar] value.
+/// * `threading_policy`: See [ThreadingPolicy] for more info.
 ///
 /// returns: Result<(), String>
 ///

@@ -30,7 +30,6 @@ use crate::filter1d::Arena;
 use crate::filter2d::scan_point_2d::ScanPoint2d;
 use crate::mlaf::mlaf;
 use crate::to_storage::ToStorage;
-use crate::unsafe_slice::UnsafeSlice;
 use crate::ImageSize;
 use num_traits::{AsPrimitive, MulAdd};
 use std::ops::{Add, Mul};
@@ -38,8 +37,7 @@ use std::ops::{Add, Mul};
 pub(crate) fn convolve_segment_2d<T, F>(
     arena: Arena,
     arena_source: &[T],
-    dst: &UnsafeSlice<T>,
-    dst_stride: usize,
+    dst: &mut [T],
     image_size: ImageSize,
     prepared_kernel: &[ScanPoint2d<F>],
     y: usize,
@@ -109,12 +107,10 @@ pub(crate) fn convolve_segment_2d<T, F>(
                 );
             }
 
-            let dst_offset = y * dst_stride + cx;
-
-            dst.write(dst_offset, k0.to_());
-            dst.write(dst_offset + 1, k1.to_());
-            dst.write(dst_offset + 2, k2.to_());
-            dst.write(dst_offset + 3, k3.to_());
+            *dst.get_unchecked_mut(cx) = k0.to_();
+            *dst.get_unchecked_mut(cx + 1) = k1.to_();
+            *dst.get_unchecked_mut(cx + 2) = k2.to_();
+            *dst.get_unchecked_mut(cx + 3) = k3.to_();
             cx += 4;
         }
 
@@ -134,7 +130,7 @@ pub(crate) fn convolve_segment_2d<T, F>(
                     k_weight,
                 );
             }
-            dst.write(y * dst_stride + x, k0.to_());
+            *dst.get_unchecked_mut(cx) = k0.to_();
         }
     }
 }

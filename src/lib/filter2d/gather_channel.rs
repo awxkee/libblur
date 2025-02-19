@@ -27,10 +27,8 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![forbid(unsafe_code)]
-#[cfg(feature = "fft")]
 use crate::ImageSize;
 
-#[cfg(feature = "fft")]
 pub fn gather_channel<T: Copy + Default, const CN: usize>(
     image: &[T],
     image_size: ImageSize,
@@ -45,7 +43,6 @@ pub fn gather_channel<T: Copy + Default, const CN: usize>(
     channel
 }
 
-#[cfg(feature = "fft")]
 pub fn squash_channel<T: Copy + Default, const CN: usize>(
     image: &mut [T],
     source: &[T],

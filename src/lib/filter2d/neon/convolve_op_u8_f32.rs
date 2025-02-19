@@ -34,7 +34,6 @@ use crate::filter1d::Arena;
 use crate::filter2d::scan_point_2d::ScanPoint2d;
 use crate::mlaf::mlaf;
 use crate::to_storage::ToStorage;
-use crate::unsafe_slice::UnsafeSlice;
 use crate::ImageSize;
 use std::arch::aarch64::*;
 use std::ops::Mul;
@@ -42,8 +41,7 @@ use std::ops::Mul;
 pub fn convolve_segment_neon_2d_u8_f32(
     arena: Arena,
     arena_source: &[u8],
-    dst: &UnsafeSlice<u8>,
-    dst_stride: usize,
+    dst: &mut [u8],
     image_size: ImageSize,
     prepared_kernel: &[ScanPoint2d<f32>],
     y: usize,
@@ -88,8 +86,7 @@ pub fn convolve_segment_neon_2d_u8_f32(
                 k2 = vfmlaq_u8_f32(k2, items0.2, weight);
                 k3 = vfmlaq_u8_f32(k3, items0.3, weight);
             }
-            let dst_offset = y * dst_stride + cx;
-            let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
             xvst1q_u8_x4(
                 dst_ptr0,
                 uint8x16x4_t(
@@ -114,8 +111,7 @@ pub fn convolve_segment_neon_2d_u8_f32(
                 k0 = vfmlaq_u8_f32(k0, items0.0, weight);
                 k1 = vfmlaq_u8_f32(k1, items0.1, weight);
             }
-            let dst_offset = y * dst_stride + cx;
-            let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
             xvst1q_u8_x2(
                 dst_ptr0,
                 uint8x16x2_t(vqmovnq_f32_u8(k0), vqmovnq_f32_u8(k1)),
@@ -132,8 +128,7 @@ pub fn convolve_segment_neon_2d_u8_f32(
                 let items0 = vld1q_u8(offsets.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 k0 = vfmlaq_u8_f32(k0, items0, weight);
             }
-            let dst_offset = y * dst_stride + cx;
-            let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
             vst1q_u8(dst_ptr0, vqmovnq_f32_u8(k0));
             cx += 16;
         }
@@ -170,12 +165,10 @@ pub fn convolve_segment_neon_2d_u8_f32(
                 );
             }
 
-            let dst_offset = y * dst_stride + cx;
-
-            dst.write(dst_offset, k0.to_());
-            dst.write(dst_offset + 1, k1.to_());
-            dst.write(dst_offset + 2, k2.to_());
-            dst.write(dst_offset + 3, k3.to_());
+            *dst.get_unchecked_mut(cx) = k0.to_();
+            *dst.get_unchecked_mut(cx + 1) = k1.to_();
+            *dst.get_unchecked_mut(cx + 2) = k2.to_();
+            *dst.get_unchecked_mut(cx + 3) = k3.to_();
             cx += 4;
         }
 
@@ -192,7 +185,7 @@ pub fn convolve_segment_neon_2d_u8_f32(
                     k_weight,
                 );
             }
-            dst.write(y * dst_stride + x, k0.to_());
+            *dst.get_unchecked_mut(cx) = k0.to_();
         }
     }
 }

@@ -363,7 +363,7 @@ fn main() {
         &mut dst_bytes,
         dimensions.0 as usize * 3,
         ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
-        90f32,
+        120f32,
         35,
         EdgeMode::Clamp,
         Scalar::new(255.0, 0.0, 0.0, 255.0),

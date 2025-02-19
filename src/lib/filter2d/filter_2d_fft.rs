@@ -69,19 +69,20 @@ fn transpose<T: Copy + Default>(
     transposed
 }
 
-/// Performs 2D separable approximated convolution on single plane image
+/// Performs 2D separable approximated convolution on single plane image.
 ///
 /// This method does convolution using spectrum multiplication via fft.
 ///
 /// # Arguments
 ///
-/// * `image`: Single plane image
-/// * `destination`: Destination image
-/// * `image_size`: Image size see [ImageSize]
-/// * `kernel_shape`: Kernel size, see [KernelShape] for more info
-/// * `border_mode`: See [EdgeMode] for more info
-/// * `border_constant`: If [EdgeMode::Constant] border will be replaced with this provided [Scalar] value
-/// * `FftIntermediate`: Intermediate internal type for fft, only `f32` and `f64` is supported
+/// * `image`: Single plane image.
+/// * `destination`: Destination image.
+/// * `image_size`: Image size see [ImageSize].
+/// * `kernel`: Kernel.
+/// * `kernel_shape`: Kernel size, see [KernelShape] for more info.
+/// * `border_mode`: See [EdgeMode] for more info.
+/// * `border_constant`: If [EdgeMode::Constant] border will be replaced with this provided [Scalar] value.
+/// * `FftIntermediate`: Intermediate internal type for fft, only `f32` and `f64` is supported.
 ///
 /// returns: Result<(), String>
 ///
