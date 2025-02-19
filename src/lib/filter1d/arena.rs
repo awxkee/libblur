@@ -88,8 +88,9 @@ impl ArenaPads {
 }
 
 /// Pads an image with chosen border strategy
-pub fn make_arena<T, const COMPONENTS: usize>(
+pub fn make_arena<T, const CN: usize>(
     image: &[T],
+    image_stride: usize,
     image_size: ImageSize,
     pads: ArenaPads,
     border_mode: EdgeMode,
@@ -103,7 +104,7 @@ where
     {
         if std::arch::is_x86_feature_detected!("avx2") {
             return unsafe {
-                make_arena_avx2::<T, COMPONENTS>(image, image_size, pads, border_mode, scalar)
+                make_arena_avx2::<T, CN>(image, image_stride, image_size, pads, border_mode, scalar)
             };
         }
     }
@@ -111,17 +112,25 @@ where
     {
         if std::arch::is_x86_feature_detected!("sse4.1") {
             return unsafe {
-                make_arena_sse4_1::<T, COMPONENTS>(image, image_size, pads, border_mode, scalar)
+                make_arena_sse4_1::<T, CN>(
+                    image,
+                    image_stride,
+                    image_size,
+                    pads,
+                    border_mode,
+                    scalar,
+                )
             };
         }
     }
-    make_arena_exec::<T, COMPONENTS>(image, image_size, pads, border_mode, scalar)
+    make_arena_exec::<T, CN>(image, image_stride, image_size, pads, border_mode, scalar)
 }
 
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]
 #[target_feature(enable = "avx2")]
 unsafe fn make_arena_avx2<T, const COMPONENTS: usize>(
     image: &[T],
+    image_stride: usize,
     image_size: ImageSize,
     pads: ArenaPads,
     border_mode: EdgeMode,
@@ -131,13 +140,14 @@ where
     T: Default + Copy + Send + Sync + 'static,
     f64: AsPrimitive<T>,
 {
-    make_arena_exec::<T, COMPONENTS>(image, image_size, pads, border_mode, scalar)
+    make_arena_exec::<T, COMPONENTS>(image, image_stride, image_size, pads, border_mode, scalar)
 }
 
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 #[target_feature(enable = "sse4.1")]
 unsafe fn make_arena_sse4_1<T, const COMPONENTS: usize>(
     image: &[T],
+    image_stride: usize,
     image_size: ImageSize,
     pads: ArenaPads,
     border_mode: EdgeMode,
@@ -147,13 +157,14 @@ where
     T: Default + Copy + Send + Sync + 'static,
     f64: AsPrimitive<T>,
 {
-    make_arena_exec::<T, COMPONENTS>(image, image_size, pads, border_mode, scalar)
+    make_arena_exec::<T, COMPONENTS>(image, image_stride, image_size, pads, border_mode, scalar)
 }
 
 /// Pads an image with chosen border strategy
 #[inline(always)]
-fn make_arena_exec<T, const COMPONENTS: usize>(
+fn make_arena_exec<T, const CN: usize>(
     image: &[T],
+    image_stride: usize,
     image_size: ImageSize,
     pads: ArenaPads,
     border_mode: EdgeMode,
@@ -163,13 +174,7 @@ where
     T: Default + Copy + Send + Sync + 'static,
     f64: AsPrimitive<T>,
 {
-    check_slice_size(
-        image,
-        image_size.width * COMPONENTS,
-        image_size.width,
-        image_size.height,
-        COMPONENTS,
-    )?;
+    check_slice_size(image, image_stride, image_size.width, image_size.height, CN)?;
 
     let new_height = image_size.height + pads.pad_top + pads.pad_bottom;
     let new_width = image_size.width + pads.pad_left + pads.pad_right;
@@ -177,12 +182,12 @@ where
     let height = image_size.height;
     let width = image_size.width;
 
-    let mut padded_image = vec![T::default(); new_height * new_width * COMPONENTS];
+    let mut padded_image = vec![T::default(); new_height * new_width * CN];
 
-    let old_stride = image_size.width * COMPONENTS;
-    let new_stride = new_width * COMPONENTS;
+    let old_stride = image_stride;
+    let new_stride = new_width * CN;
 
-    let offset = pads.pad_top * new_stride + pads.pad_left * COMPONENTS;
+    let offset = pads.pad_top * new_stride + pads.pad_left * CN;
     copy_roi(&mut padded_image[offset..], image, new_stride, old_stride);
 
     let filling_ranges = [
@@ -212,13 +217,13 @@ where
                     for (j, dst) in ranges
                         .1
                         .clone()
-                        .zip(dst.chunks_exact_mut(COMPONENTS).skip(ranges.1.start))
+                        .zip(dst.chunks_exact_mut(CN).skip(ranges.1.start))
                     {
                         let y = i.saturating_sub(pad_h).min(height - 1);
                         let x = j.saturating_sub(pad_w).min(width - 1);
 
-                        let v_src = y * old_stride + x * COMPONENTS;
-                        let src_iter = &image[v_src..(v_src + COMPONENTS)];
+                        let v_src = y * old_stride + x * CN;
+                        let src_iter = &image[v_src..(v_src + CN)];
                         for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
                             *dst = *src;
                         }
@@ -236,12 +241,12 @@ where
                     for (j, dst) in ranges
                         .1
                         .clone()
-                        .zip(dst.chunks_exact_mut(COMPONENTS).skip(ranges.1.start))
+                        .zip(dst.chunks_exact_mut(CN).skip(ranges.1.start))
                     {
                         let y = (i as i64 - pad_h as i64).rem_euclid(height as i64 - 1) as usize;
                         let x = (j as i64 - pad_w as i64).rem_euclid(width as i64 - 1) as usize;
-                        let v_src = y * old_stride + x * COMPONENTS;
-                        let src_iter = &image[v_src..(v_src + COMPONENTS)];
+                        let v_src = y * old_stride + x * CN;
+                        let src_iter = &image[v_src..(v_src + CN)];
                         for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
                             *dst = *src;
                         }
@@ -259,12 +264,12 @@ where
                     for (j, dst) in ranges
                         .1
                         .clone()
-                        .zip(dst.chunks_exact_mut(COMPONENTS).skip(ranges.1.start))
+                        .zip(dst.chunks_exact_mut(CN).skip(ranges.1.start))
                     {
                         let y = reflect_index(i as i64 - pad_h as i64, height as i64 - 1);
                         let x = reflect_index(j as i64 - pad_w as i64, width as i64 - 1);
-                        let v_src = y * old_stride + x * COMPONENTS;
-                        let src_iter = &image[v_src..(v_src + COMPONENTS)];
+                        let v_src = y * old_stride + x * CN;
+                        let src_iter = &image[v_src..(v_src + CN)];
                         for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
                             *dst = *src;
                         }
@@ -282,12 +287,12 @@ where
                     for (j, dst) in ranges
                         .1
                         .clone()
-                        .zip(dst.chunks_exact_mut(COMPONENTS).skip(ranges.1.start))
+                        .zip(dst.chunks_exact_mut(CN).skip(ranges.1.start))
                     {
                         let y = reflect_index_101(i as i64 - pad_h as i64, height as i64 - 1);
                         let x = reflect_index_101(j as i64 - pad_w as i64, width as i64 - 1);
-                        let v_src = y * old_stride + x * COMPONENTS;
-                        let src_iter = &image[v_src..(v_src + COMPONENTS)];
+                        let v_src = y * old_stride + x * CN;
+                        let src_iter = &image[v_src..(v_src + CN)];
                         for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
                             *dst = *src;
                         }
@@ -305,7 +310,7 @@ where
                     for (_, dst) in ranges
                         .1
                         .clone()
-                        .zip(dst.chunks_exact_mut(COMPONENTS).skip(ranges.1.start))
+                        .zip(dst.chunks_exact_mut(CN).skip(ranges.1.start))
                     {
                         for (y, dst) in dst.iter_mut().enumerate() {
                             *dst = scalar[y].as_();
@@ -317,7 +322,7 @@ where
     }
     Ok((
         padded_image,
-        Arena::new(new_width, new_height, pad_w, pad_h, COMPONENTS),
+        Arena::new(new_width, new_height, pad_w, pad_h, CN),
     ))
 }
 

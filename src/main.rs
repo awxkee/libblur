@@ -8,8 +8,9 @@ use fast_transpose::{transpose_rgba, FlipMode, FlopMode};
 use image::imageops::FilterType;
 use image::{DynamicImage, EncodableLayout, GenericImageView, ImageReader};
 use libblur::{
-    fast_gaussian, filter_1d_exact, get_gaussian_kernel_1d, get_sigma_size, sobel, ConvolutionMode,
-    EdgeMode, FastBlurChannels, ImageSize, Scalar, ThreadingPolicy,
+    fast_gaussian, filter_1d_exact, filter_2d_rgb_fft, generate_motion_kernel,
+    get_gaussian_kernel_1d, get_sigma_size, laplacian, motion_blur, sobel, ConvolutionMode,
+    EdgeMode, FastBlurChannels, ImageSize, KernelShape, Scalar, ThreadingPolicy,
 };
 use std::time::Instant;
 
@@ -214,42 +215,6 @@ fn main() {
     // // bytes = dst_bytes;
 
     let start_time = Instant::now();
-    // libblur::stack_blur(
-    //     &mut dst_bytes,
-    //     stride as u32,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     125,
-    //     FastBlurChannels::Channels3,
-    //     ThreadingPolicy::Adaptive,
-    // );
-    let bytes_16 = bytes.iter().map(|&x| x as u16).collect::<Vec<u16>>();
-    let mut dst_16 = bytes_16.to_vec();
-
-    libblur::gaussian_box_blur_u16(
-        &bytes_16,
-        stride as u32,
-        &mut dst_16,
-        stride as u32,
-        dimensions.0,
-        dimensions.1,
-        12f32,
-        FastBlurChannels::Channels3,
-        ThreadingPolicy::Single,
-    ).unwrap();
-
-    // libblur::fast_gaussian_next_u16(
-    //     &mut dst_16,
-    //     stride as u32,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     25,
-    //     FastBlurChannels::Channels3,
-    //     ThreadingPolicy::Single,
-    //     EdgeMode::Clamp,
-    // )
-    // .unwrap();
-    dst_bytes = dst_16.iter().map(|&x| x as u8).collect();
 
     // let bytes_16 = bytes.iter().map(|&x| x as u16).collect::<Vec<u16>>();
     // let mut dst_16 = vec![0u16; bytes_16.len()];
@@ -392,38 +357,40 @@ fn main() {
     // )
     // .unwrap();
 
-    // motion_blur(
+    motion_blur(
+        &bytes,
+        dimensions.0 as usize * 3,
+        &mut dst_bytes,
+        dimensions.0 as usize * 3,
+        ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
+        120f32,
+        35,
+        EdgeMode::Clamp,
+        Scalar::new(255.0, 0.0, 0.0, 255.0),
+        FastBlurChannels::Channels3,
+        ThreadingPolicy::Adaptive,
+    )
+    .unwrap();
+
+    let motion_kernel = generate_motion_kernel(51, 18.);
+
+    // laplacian(
     //     &bytes,
     //     &mut dst_bytes,
     //     ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
-    //     90f32,
-    //     35,
-    //     EdgeMode::Wrap,
-    //     Scalar::new(255.0, 0.0, 0.0, 255.0),
-    //     FastBlurChannels::Channels3,
-    //     ThreadingPolicy::Adaptive,
-    // );
-
-    // let motion_kernel = generate_motion_kernel(501, 15.);
-
-    // motion_blur(
-    //     &bytes,
-    //     &mut dst_bytes,
-    //     ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
-    //     15.,
-    //     225,
     //     EdgeMode::Clamp,
     //     Scalar::new(255.0, 0.0, 0.0, 255.0),
     //     FastBlurChannels::Channels3,
     //     ThreadingPolicy::Adaptive,
-    // );
+    // )
+    // .unwrap();
 
     // filter_2d_rgb_fft::<u8, f32, f32>(
     //     &bytes,
     //     &mut dst_bytes,
     //     ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
     //     &motion_kernel,
-    //     KernelShape::new(501, 501),
+    //     KernelShape::new(51, 51),
     //     EdgeMode::Clamp,
     //     Scalar::new(255.0, 0., 0., 255.0),
     // )

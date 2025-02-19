@@ -272,9 +272,11 @@ impl Edges<u8> for u8 {
             )
             .unwrap();
         } else {
-            filter_2d(
+            filter_2d::<u8, f32, 1>(
                 source,
+                width,
                 &mut dst,
+                width,
                 ImageSize::new(width, height),
                 &edge_filter,
                 KernelShape::new(radius, radius),

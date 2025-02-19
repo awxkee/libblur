@@ -29,24 +29,24 @@
 
 use crate::filter1d::KernelShape;
 use crate::filter2d::filter_2d_handler::Filter2dHandler;
-use crate::filter2d::gather_channel::{gather_channel, squash_channel};
 use crate::to_storage::ToStorage;
-use crate::util::check_slice_size;
 use crate::{filter_2d, BlurError, EdgeMode, ImageSize, Scalar, ThreadingPolicy};
 use num_traits::{AsPrimitive, MulAdd};
 use std::ops::Mul;
 
-/// This performs direct 2D convolution on RGBA image
+/// This performs direct 2D convolution on RGBA image.
 ///
 /// # Arguments
 ///
-/// * `src`: Source RGBA image
-/// * `dst`: Destination RGBA image
-/// * `image_size`: Image size
-/// * `kernel`: Kernel
-/// * `kernel_shape`: Kernel size, see [KernelShape] for more info
-/// * `border_mode`: Border handling mode see [EdgeMode] for more info
-/// * `border_constant`: If [EdgeMode::Constant] border will be replaced with this provided [Scalar] value
+/// * `src`: Source RGBA image.
+/// * `src_stride`: Source image stride.
+/// * `dst`: Destination RGBA image.
+/// * `dst_stride`: Destination image stride.
+/// * `image_size`: Image size.
+/// * `kernel`: Kernel.
+/// * `kernel_shape`: Kernel size, see [KernelShape] for more info.
+/// * `border_mode`: Border handling mode see [EdgeMode] for more info.
+/// * `border_constant`: If [EdgeMode::Constant] border will be replaced with this provided [Scalar] value.
 /// * `threading_policy`: See [ThreadingPolicy] for more info
 ///
 /// returns: Result<(), String>
@@ -57,7 +57,9 @@ use std::ops::Mul;
 ///
 pub fn filter_2d_rgba<T, F>(
     src: &[T],
+    src_stride: usize,
     dst: &mut [T],
+    dst_stride: usize,
     image_size: ImageSize,
     kernel: &[F],
     kernel_shape: KernelShape,
@@ -71,78 +73,16 @@ where
     i32: AsPrimitive<F>,
     f64: AsPrimitive<T>,
 {
-    check_slice_size(
+    filter_2d::<T, F, 4>(
         src,
-        image_size.width * 4,
-        image_size.width,
-        image_size.height,
-        4,
-    )?;
-    check_slice_size(
+        src_stride,
         dst,
-        image_size.width * 4,
-        image_size.width,
-        image_size.height,
-        4,
-    )?;
-
-    let mut working_channel = vec![T::default(); image_size.width * image_size.height];
-
-    let mut chanel_first = gather_channel::<T, 4>(src, image_size, 0);
-    filter_2d(
-        &chanel_first,
-        &mut working_channel,
+        dst_stride,
         image_size,
         kernel,
         kernel_shape,
         border_mode,
-        Scalar::dup(border_constant[0]),
+        border_constant,
         threading_policy,
-    )?;
-    squash_channel::<T, 4>(dst, &working_channel, 0);
-    chanel_first.resize(0, T::default());
-
-    let mut chanel_second = gather_channel::<T, 4>(src, image_size, 1);
-    filter_2d(
-        &chanel_second,
-        &mut working_channel,
-        image_size,
-        kernel,
-        kernel_shape,
-        border_mode,
-        Scalar::dup(border_constant[1]),
-        threading_policy,
-    )?;
-    squash_channel::<T, 4>(dst, &working_channel, 1);
-    chanel_second.resize(0, T::default());
-
-    let mut chanel_third = gather_channel::<T, 4>(src, image_size, 2);
-    filter_2d(
-        &chanel_third,
-        &mut working_channel,
-        image_size,
-        kernel,
-        kernel_shape,
-        border_mode,
-        Scalar::dup(border_constant[2]),
-        threading_policy,
-    )?;
-    squash_channel::<T, 4>(dst, &working_channel, 2);
-    chanel_third.resize(0, T::default());
-
-    let mut chanel_fourth = gather_channel::<T, 4>(src, image_size, 3);
-    filter_2d(
-        &chanel_fourth,
-        &mut working_channel,
-        image_size,
-        kernel,
-        kernel_shape,
-        border_mode,
-        Scalar::dup(border_constant[3]),
-        threading_policy,
-    )?;
-    squash_channel::<T, 4>(dst, &working_channel, 3);
-    chanel_fourth.resize(0, T::default());
-
-    Ok(())
+    )
 }

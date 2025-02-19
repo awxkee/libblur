@@ -47,7 +47,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 FastBlurChannels::Channels4,
                 ThreadingPolicy::Adaptive,
             )
-                .unwrap();
+            .unwrap();
         })
     });
 

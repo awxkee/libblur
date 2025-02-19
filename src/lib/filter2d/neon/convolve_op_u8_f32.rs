@@ -26,12 +26,14 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::filter1d::neon::utils::{vfmlaq_u8_f32, vmulq_u8_by_f32, vqmovnq_f32_u8};
+use crate::filter1d::neon::utils::{
+    vfmlaq_u8_f32, vmulq_u8_by_f32, vqmovnq_f32_u8, xvld1q_u8_x2, xvld1q_u8_x4, xvst1q_u8_x2,
+    xvst1q_u8_x4,
+};
 use crate::filter1d::Arena;
 use crate::filter2d::scan_point_2d::ScanPoint2d;
 use crate::mlaf::mlaf;
 use crate::to_storage::ToStorage;
-use crate::unsafe_slice::UnsafeSlice;
 use crate::ImageSize;
 use std::arch::aarch64::*;
 use std::ops::Mul;
@@ -39,36 +41,38 @@ use std::ops::Mul;
 pub fn convolve_segment_neon_2d_u8_f32(
     arena: Arena,
     arena_source: &[u8],
-    dst: &UnsafeSlice<u8>,
+    dst: &mut [u8],
     image_size: ImageSize,
     prepared_kernel: &[ScanPoint2d<f32>],
     y: usize,
 ) {
     unsafe {
         let width = image_size.width;
-        let stride = image_size.width;
 
         let dx = arena.pad_w as i64;
         let dy = arena.pad_h as i64;
 
-        let arena_width = arena.width;
+        let arena_stride = arena.width * arena.components;
 
         let offsets = prepared_kernel
             .iter()
             .map(|&x| {
                 arena_source.get_unchecked(
-                    ((x.y + dy + y as i64) as usize * arena_width + (x.x + dx) as usize)..,
+                    ((x.y + dy + y as i64) as usize * arena_stride
+                        + (x.x + dx) as usize * arena.components)..,
                 )
             })
             .collect::<Vec<_>>();
 
         let length = prepared_kernel.len();
 
+        let total_width = width * arena.components;
+
         let mut cx = 0usize;
 
-        while cx + 64 < width {
+        while cx + 64 < total_width {
             let k_weight = vdupq_n_f32(prepared_kernel.get_unchecked(0).weight);
-            let items0 = vld1q_u8_x4(offsets.get_unchecked(0).get_unchecked(cx..).as_ptr());
+            let items0 = xvld1q_u8_x4(offsets.get_unchecked(0).get_unchecked(cx..).as_ptr());
             let mut k0 = vmulq_u8_by_f32(items0.0, k_weight);
             let mut k1 = vmulq_u8_by_f32(items0.1, k_weight);
             let mut k2 = vmulq_u8_by_f32(items0.2, k_weight);
@@ -76,15 +80,14 @@ pub fn convolve_segment_neon_2d_u8_f32(
             for i in 1..length {
                 let weight = vdupq_n_f32(prepared_kernel.get_unchecked(i).weight);
                 let s_ptr = offsets.get_unchecked(i);
-                let items0 = vld1q_u8_x4(s_ptr.get_unchecked(cx..).as_ptr());
+                let items0 = xvld1q_u8_x4(s_ptr.get_unchecked(cx..).as_ptr());
                 k0 = vfmlaq_u8_f32(k0, items0.0, weight);
                 k1 = vfmlaq_u8_f32(k1, items0.1, weight);
                 k2 = vfmlaq_u8_f32(k2, items0.2, weight);
                 k3 = vfmlaq_u8_f32(k3, items0.3, weight);
             }
-            let dst_offset = y * stride + cx;
-            let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
-            vst1q_u8_x4(
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
+            xvst1q_u8_x4(
                 dst_ptr0,
                 uint8x16x4_t(
                     vqmovnq_f32_u8(k0),
@@ -96,28 +99,27 @@ pub fn convolve_segment_neon_2d_u8_f32(
             cx += 64;
         }
 
-        while cx + 32 < width {
+        while cx + 32 < total_width {
             let k_weight = vdupq_n_f32(prepared_kernel.get_unchecked(0).weight);
-            let items0 = vld1q_u8_x2(offsets.get_unchecked(0).get_unchecked(cx..).as_ptr());
+            let items0 = xvld1q_u8_x2(offsets.get_unchecked(0).get_unchecked(cx..).as_ptr());
             let mut k0 = vmulq_u8_by_f32(items0.0, k_weight);
             let mut k1 = vmulq_u8_by_f32(items0.1, k_weight);
             for i in 1..length {
                 let weight = vdupq_n_f32(prepared_kernel.get_unchecked(i).weight);
                 let s_ptr = offsets.get_unchecked(i);
-                let items0 = vld1q_u8_x2(s_ptr.get_unchecked(cx..).as_ptr());
+                let items0 = xvld1q_u8_x2(s_ptr.get_unchecked(cx..).as_ptr());
                 k0 = vfmlaq_u8_f32(k0, items0.0, weight);
                 k1 = vfmlaq_u8_f32(k1, items0.1, weight);
             }
-            let dst_offset = y * stride + cx;
-            let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
-            vst1q_u8_x2(
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
+            xvst1q_u8_x2(
                 dst_ptr0,
                 uint8x16x2_t(vqmovnq_f32_u8(k0), vqmovnq_f32_u8(k1)),
             );
             cx += 32;
         }
 
-        while cx + 16 < width {
+        while cx + 16 < total_width {
             let k_weight = vdupq_n_f32(prepared_kernel.get_unchecked(0).weight);
             let items0 = vld1q_u8(offsets.get_unchecked(0).get_unchecked(cx..).as_ptr());
             let mut k0 = vmulq_u8_by_f32(items0, k_weight);
@@ -126,13 +128,12 @@ pub fn convolve_segment_neon_2d_u8_f32(
                 let items0 = vld1q_u8(offsets.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 k0 = vfmlaq_u8_f32(k0, items0, weight);
             }
-            let dst_offset = y * stride + cx;
-            let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
             vst1q_u8(dst_ptr0, vqmovnq_f32_u8(k0));
             cx += 16;
         }
 
-        while cx + 4 < width {
+        while cx + 4 < total_width {
             let k_weight = prepared_kernel.get_unchecked(0).weight;
 
             let mut k0 = ((*offsets.get_unchecked(0).get_unchecked(cx)) as f32).mul(k_weight);
@@ -164,16 +165,14 @@ pub fn convolve_segment_neon_2d_u8_f32(
                 );
             }
 
-            let dst_offset = y * stride + cx;
-
-            dst.write(dst_offset, k0.to_());
-            dst.write(dst_offset + 1, k1.to_());
-            dst.write(dst_offset + 2, k2.to_());
-            dst.write(dst_offset + 3, k3.to_());
+            *dst.get_unchecked_mut(cx) = k0.to_();
+            *dst.get_unchecked_mut(cx + 1) = k1.to_();
+            *dst.get_unchecked_mut(cx + 2) = k2.to_();
+            *dst.get_unchecked_mut(cx + 3) = k3.to_();
             cx += 4;
         }
 
-        for x in cx..width {
+        for x in cx..total_width {
             let k_weight = prepared_kernel.get_unchecked(0).weight;
 
             let mut k0 = ((*(*offsets.get_unchecked(0)).get_unchecked(x)) as f32).mul(k_weight);
@@ -186,7 +185,7 @@ pub fn convolve_segment_neon_2d_u8_f32(
                     k_weight,
                 );
             }
-            dst.write(y * stride + x, k0.to_());
+            *dst.get_unchecked_mut(cx) = k0.to_();
         }
     }
 }
