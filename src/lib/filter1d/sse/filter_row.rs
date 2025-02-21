@@ -36,7 +36,6 @@ use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
 use crate::sse::{_mm_load_pack_x2, _mm_load_pack_x4, _mm_store_pack_x2, _mm_store_pack_x4};
 use crate::to_storage::ToStorage;
-use crate::unsafe_slice::UnsafeSlice;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -46,7 +45,7 @@ use std::ops::Mul;
 pub(crate) fn filter_row_sse_u8_f32<const N: usize>(
     arena: Arena,
     arena_src: &[u8],
-    dst: &UnsafeSlice<u8>,
+    dst: &mut [u8],
     image_size: ImageSize,
     filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
@@ -79,7 +78,7 @@ pub(crate) fn filter_row_sse_u8_f32<const N: usize>(
 unsafe fn filter_row_sse_u8_f32_fma<const N: usize>(
     arena: Arena,
     arena_src: &[u8],
-    dst: &UnsafeSlice<u8>,
+    dst: &mut [u8],
     image_size: ImageSize,
     filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
@@ -98,7 +97,7 @@ unsafe fn filter_row_sse_u8_f32_fma<const N: usize>(
 unsafe fn filter_row_sse_u8_f32_def<const N: usize>(
     arena: Arena,
     arena_src: &[u8],
-    dst: &UnsafeSlice<u8>,
+    dst: &mut [u8],
     image_size: ImageSize,
     filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
@@ -117,16 +116,13 @@ unsafe fn filter_row_sse_u8_f32_def<const N: usize>(
 unsafe fn filter_row_sse_u8_f32_impl<const FMA: bool, const N: usize>(
     _: Arena,
     arena_src: &[u8],
-    dst: &UnsafeSlice<u8>,
+    dst: &mut [u8],
     image_size: ImageSize,
-    filter_region: FilterRegion,
+    _: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
     let src = arena_src;
-
-    let dst_stride = image_size.width * N;
-
-    let y = filter_region.start;
+    
     let local_src = src;
 
     let length = scanned_kernel.len();
@@ -155,8 +151,7 @@ unsafe fn filter_row_sse_u8_f32_impl<const FMA: bool, const N: usize>(
             k3 = _mm_mul_add_epi8_by_ps_x4::<FMA>(k3, v_source.3, coeff);
         }
 
-        let dst_offset = y * dst_stride + cx;
-        let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
         _mm_store_pack_x4(
             dst_ptr0,
             (
@@ -185,8 +180,7 @@ unsafe fn filter_row_sse_u8_f32_impl<const FMA: bool, const N: usize>(
             k1 = _mm_mul_add_epi8_by_ps_x4::<FMA>(k1, v_source.1, coeff);
         }
 
-        let dst_offset = y * dst_stride + cx;
-        let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
         _mm_store_pack_x2(dst_ptr0, (_mm_pack_ps_x4_epi8(k0), _mm_pack_ps_x4_epi8(k1)));
         cx += 32;
     }
@@ -206,9 +200,8 @@ unsafe fn filter_row_sse_u8_f32_impl<const FMA: bool, const N: usize>(
             k0 = _mm_mul_add_epi8_by_ps_x4::<FMA>(k0, v_source_0, _mm_set1_ps(coeff.weight));
         }
 
-        let dst_offset = y * dst_stride + cx;
-        let dst_ptr = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
-        _mm_storeu_si128(dst_ptr as *mut __m128i, _mm_pack_ps_x4_epi8(k0));
+        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
+        _mm_storeu_si128(dst_ptr0 as *mut __m128i, _mm_pack_ps_x4_epi8(k0));
         cx += 16;
     }
 
@@ -242,12 +235,10 @@ unsafe fn filter_row_sse_u8_f32_impl<const FMA: bool, const N: usize>(
             );
         }
 
-        let dst_offset = y * dst_stride + cx;
-
-        dst.write(dst_offset, k0.to_());
-        dst.write(dst_offset + 1, k1.to_());
-        dst.write(dst_offset + 2, k2.to_());
-        dst.write(dst_offset + 3, k3.to_());
+        *dst.get_unchecked_mut(cx) = k0.to_();
+        *dst.get_unchecked_mut(cx + 1) = k1.to_();
+        *dst.get_unchecked_mut(cx + 2) = k2.to_();
+        *dst.get_unchecked_mut(cx + 3) = k3.to_();
         cx += 4;
     }
 
@@ -260,6 +251,6 @@ unsafe fn filter_row_sse_u8_f32_impl<const FMA: bool, const N: usize>(
             let coeff = *scanned_kernel.get_unchecked(i);
             k0 = mlaf(k0, (*shifted_src.get_unchecked(i * N)) as f32, coeff.weight);
         }
-        dst.write(y * dst_stride + x, k0.to_());
+        *dst.get_unchecked_mut(x) = k0.to_();
     }
 }

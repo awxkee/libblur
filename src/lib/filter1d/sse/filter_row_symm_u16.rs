@@ -37,7 +37,6 @@ use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
 use crate::sse::{_mm_load_pack_x2, _mm_load_pack_x4, _mm_store_pack_x2, _mm_store_pack_x4};
 use crate::to_storage::ToStorage;
-use crate::unsafe_slice::UnsafeSlice;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -46,7 +45,7 @@ use std::arch::x86_64::*;
 pub(crate) fn filter_row_sse_symm_u16_f32<const N: usize>(
     arena: Arena,
     arena_src: &[u16],
-    dst: &UnsafeSlice<u16>,
+    dst: &mut [u16],
     image_size: ImageSize,
     filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
@@ -79,7 +78,7 @@ pub(crate) fn filter_row_sse_symm_u16_f32<const N: usize>(
 unsafe fn filter_row_sse_symm_u16_f32_fma<const N: usize>(
     arena: Arena,
     arena_src: &[u16],
-    dst: &UnsafeSlice<u16>,
+    dst: &mut [u16],
     image_size: ImageSize,
     filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
@@ -98,7 +97,7 @@ unsafe fn filter_row_sse_symm_u16_f32_fma<const N: usize>(
 unsafe fn filter_row_sse_symm_u16_f32_def<const N: usize>(
     arena: Arena,
     arena_src: &[u16],
-    dst: &UnsafeSlice<u16>,
+    dst: &mut [u16],
     image_size: ImageSize,
     filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
@@ -115,23 +114,20 @@ unsafe fn filter_row_sse_symm_u16_f32_def<const N: usize>(
 
 #[inline(always)]
 unsafe fn filter_row_sse_symm_u16_f32_impl<const FMA: bool, const N: usize>(
-    arena: Arena,
+    _: Arena,
     arena_src: &[u16],
-    dst: &UnsafeSlice<u16>,
+    dst: &mut [u16],
     image_size: ImageSize,
-    filter_region: FilterRegion,
+    _: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
     let width = image_size.width;
 
     let src = arena_src;
 
-    let dst_stride = image_size.width * arena.components;
-
     let length = scanned_kernel.len();
     let half_len = length / 2;
 
-    let y = filter_region.start;
     let local_src = src;
     let mut cx = 0usize;
 
@@ -161,8 +157,7 @@ unsafe fn filter_row_sse_symm_u16_f32_impl<const FMA: bool, const N: usize>(
             k3 = _mm_mul_add_symm_epi16_by_ps_x2::<FMA>(k3, v_source0.3, v_source1.3, coeff);
         }
 
-        let dst_offset = y * dst_stride + cx;
-        let dst_ptr0 = (dst.slice.as_ptr() as *mut u16).add(dst_offset);
+        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
         _mm_store_pack_x4(
             dst_ptr0 as *mut _,
             (
@@ -195,8 +190,7 @@ unsafe fn filter_row_sse_symm_u16_f32_impl<const FMA: bool, const N: usize>(
             k1 = _mm_mul_add_symm_epi16_by_ps_x2::<FMA>(k1, v_source0.1, v_source1.1, coeff);
         }
 
-        let dst_offset = y * dst_stride + cx;
-        let dst_ptr0 = (dst.slice.as_ptr() as *mut u16).add(dst_offset);
+        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
         _mm_store_pack_x2(
             dst_ptr0 as *mut _,
             (_mm_pack_ps_x2_epi16(k0), _mm_pack_ps_x2_epi16(k1)),
@@ -222,8 +216,7 @@ unsafe fn filter_row_sse_symm_u16_f32_impl<const FMA: bool, const N: usize>(
             k0 = _mm_mul_add_symm_epi16_by_ps_x2::<FMA>(k0, v_source0, v_source1, coeff);
         }
 
-        let dst_offset = y * dst_stride + cx;
-        let dst_ptr0 = (dst.slice.as_ptr() as *mut u16).add(dst_offset);
+        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
         _mm_storeu_si128(dst_ptr0 as *mut _, _mm_pack_ps_x2_epi16(k0));
         cx += 8;
     }
@@ -246,8 +239,7 @@ unsafe fn filter_row_sse_symm_u16_f32_impl<const FMA: bool, const N: usize>(
             k0 = _mm_mul_add_symm_epi16_by_ps::<FMA>(k0, v_source0, v_source1, coeff);
         }
 
-        let dst_offset = y * dst_stride + cx;
-        let dst_ptr0 = (dst.slice.as_ptr() as *mut u16).add(dst_offset);
+        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
         _mm_storeu_si64(dst_ptr0 as *mut _, _mm_pack_ps_epi16(k0));
         cx += 4;
     }
@@ -269,6 +261,6 @@ unsafe fn filter_row_sse_symm_u16_f32_impl<const FMA: bool, const N: usize>(
             );
         }
 
-        dst.write(y * dst_stride + x, k0.to_());
+        *dst.get_unchecked_mut(x) = k0.to_();
     }
 }

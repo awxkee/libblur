@@ -32,16 +32,15 @@ use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
 use crate::to_storage::ToStorage;
-use crate::unsafe_slice::UnsafeSlice;
 use num_traits::{AsPrimitive, MulAdd};
 use std::ops::{Add, Mul};
 
 pub(crate) fn filter_row<T, F, const N: usize>(
     _: Arena,
     arena_src: &[T],
-    dst: &UnsafeSlice<T>,
+    dst: &mut [T],
     image_size: ImageSize,
-    filter_region: FilterRegion,
+    _: FilterRegion,
     scanned_kernel: &[ScanPoint1d<F>],
 ) where
     T: Copy + AsPrimitive<F>,
@@ -52,12 +51,9 @@ pub(crate) fn filter_row<T, F, const N: usize>(
 
         let src = arena_src;
 
-        let dst_stride = image_size.width;
-
-        let y = filter_region.start;
         let local_src = src;
 
-        let length = scanned_kernel.iter().len();
+        let length = scanned_kernel.len();
 
         let mut cx = 0usize;
 
@@ -93,12 +89,10 @@ pub(crate) fn filter_row<T, F, const N: usize>(
                 );
             }
 
-            let dst_offset = y * dst_stride + cx;
-
-            dst.write(dst_offset, k0.to_());
-            dst.write(dst_offset + 1, k1.to_());
-            dst.write(dst_offset + 2, k2.to_());
-            dst.write(dst_offset + 3, k3.to_());
+            *dst.get_unchecked_mut(cx) = k0.to_();
+            *dst.get_unchecked_mut(cx + 1) = k1.to_();
+            *dst.get_unchecked_mut(cx + 2) = k2.to_();
+            *dst.get_unchecked_mut(cx + 3) = k3.to_();
             cx += 4;
         }
 
@@ -111,7 +105,7 @@ pub(crate) fn filter_row<T, F, const N: usize>(
                 let coeff = *scanned_kernel.get_unchecked(i);
                 k0 = mlaf(k0, (*shifted_src.get_unchecked(i * N)).as_(), coeff.weight);
             }
-            dst.write(y * dst_stride + x, k0.to_());
+            *dst.get_unchecked_mut(x) = k0.to_();
         }
     }
 }

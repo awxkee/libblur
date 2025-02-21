@@ -36,7 +36,6 @@ use crate::sse::{
     _mm_load_pack_ps_x2, _mm_load_pack_ps_x4, _mm_store_pack_ps_x2, _mm_store_pack_ps_x4,
 };
 use crate::to_storage::ToStorage;
-use crate::unsafe_slice::UnsafeSlice;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -46,7 +45,7 @@ use std::ops::Mul;
 pub(crate) fn filter_row_sse_f32_f32<const N: usize>(
     arena: Arena,
     arena_src: &[f32],
-    dst: &UnsafeSlice<f32>,
+    dst: &mut [f32],
     image_size: ImageSize,
     filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
@@ -79,7 +78,7 @@ pub(crate) fn filter_row_sse_f32_f32<const N: usize>(
 unsafe fn filter_row_sse_f32_f32_def<const N: usize>(
     arena: Arena,
     arena_src: &[f32],
-    dst: &UnsafeSlice<f32>,
+    dst: &mut [f32],
     image_size: ImageSize,
     filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
@@ -100,7 +99,7 @@ unsafe fn filter_row_sse_f32_f32_def<const N: usize>(
 unsafe fn filter_row_sse_f32_f32_fma<const N: usize>(
     arena: Arena,
     arena_src: &[f32],
-    dst: &UnsafeSlice<f32>,
+    dst: &mut [f32],
     image_size: ImageSize,
     filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
@@ -121,16 +120,13 @@ unsafe fn filter_row_sse_f32_f32_fma<const N: usize>(
 unsafe fn filter_row_sse_f32_f32_impl<const FMA: bool, const N: usize>(
     _: Arena,
     arena_src: &[f32],
-    dst: &UnsafeSlice<f32>,
+    dst: &mut [f32],
     image_size: ImageSize,
-    filter_region: FilterRegion,
+    _: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
     let src = arena_src;
-
-    let dst_stride = image_size.width * N;
-
-    let y = filter_region.start;
+    
     let local_src = src;
 
     let length = scanned_kernel.len();
@@ -159,8 +155,7 @@ unsafe fn filter_row_sse_f32_f32_impl<const FMA: bool, const N: usize>(
             k3 = _mm_opt_fmlaf_ps::<FMA>(k3, v_source.3, coeff);
         }
 
-        let dst_offset = y * dst_stride + cx;
-        let dst_ptr0 = (dst.slice.as_ptr() as *mut f32).add(dst_offset);
+        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
         _mm_store_pack_ps_x4(dst_ptr0, (k0, k1, k2, k3));
         cx += 16;
     }
@@ -181,8 +176,7 @@ unsafe fn filter_row_sse_f32_f32_impl<const FMA: bool, const N: usize>(
             k1 = _mm_opt_fmlaf_ps::<FMA>(k1, v_source.1, coeff);
         }
 
-        let dst_offset = y * dst_stride + cx;
-        let dst_ptr0 = (dst.slice.as_ptr() as *mut f32).add(dst_offset);
+        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
         _mm_store_pack_ps_x2(dst_ptr0, (k0, k1));
         cx += 8;
     }
@@ -201,9 +195,8 @@ unsafe fn filter_row_sse_f32_f32_impl<const FMA: bool, const N: usize>(
             k0 = _mm_opt_fmlaf_ps::<FMA>(k0, v_source_0, _mm_set1_ps(coeff.weight));
         }
 
-        let dst_offset = y * dst_stride + cx;
-        let dst_ptr = (dst.slice.as_ptr() as *mut f32).add(dst_offset);
-        _mm_storeu_ps(dst_ptr, k0);
+        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
+        _mm_storeu_ps(dst_ptr0, k0);
         cx += 4;
     }
 
@@ -216,6 +209,6 @@ unsafe fn filter_row_sse_f32_f32_impl<const FMA: bool, const N: usize>(
             let coeff = *scanned_kernel.get_unchecked(i);
             k0 = mlaf(k0, *shifted_src.get_unchecked(i * N), coeff.weight);
         }
-        dst.write(y * dst_stride + x, k0.to_());
+        *dst.get_unchecked_mut(x) = k0.to_();
     }
 }

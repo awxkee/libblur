@@ -34,7 +34,6 @@ use crate::filter1d::filter_element::KernelShape;
 use crate::filter1d::filter_scan::{is_symmetric_1d, scan_se_1d};
 use crate::filter1d::region::FilterRegion;
 use crate::to_storage::ToStorage;
-use crate::unsafe_slice::UnsafeSlice;
 use crate::util::check_slice_size;
 use crate::{BlurError, EdgeMode, ImageSize, Scalar, ThreadingPolicy};
 use num_traits::{AsPrimitive, MulAdd};
@@ -132,13 +131,12 @@ where
 
     if let Some(pool) = &pool {
         let row_handler = T::get_rgb_row_handler(is_row_kernel_symmetrical);
-        pool.scope(|scope| {
-            let transient_cell = UnsafeSlice::new(transient_image.as_mut_slice());
-
-            let pad_w = scanned_row_kernel.len() / 2;
-
-            for y in 0..image_size.height {
-                scope.spawn(move |_| {
+        pool.install(|| {
+            transient_image
+                .par_chunks_exact_mut(image_size.width * N)
+                .enumerate()
+                .for_each(|(y, dst_row)| {
+                    let pad_w = scanned_row_kernel.len() / 2;
                     let (row, arena_width) = make_arena_row::<T, N>(
                         image,
                         y,
@@ -152,38 +150,39 @@ where
                     row_handler(
                         Arena::new(arena_width, 1, pad_w, 0, N),
                         &row,
-                        &transient_cell,
+                        dst_row,
                         image_size,
                         FilterRegion::new(y, y + 1),
                         scanned_row_kernel_slice,
                     );
                 });
-            }
         });
     } else {
         let row_handler = T::get_rgb_row_handler(is_row_kernel_symmetrical);
-        let transient_cell = UnsafeSlice::new(transient_image.as_mut_slice());
+        transient_image
+            .chunks_exact_mut(image_size.width * N)
+            .enumerate()
+            .for_each(|(y, dst_row)| {
+                let pad_w = scanned_row_kernel.len() / 2;
+                let (row, arena_width) = make_arena_row::<T, N>(
+                    image,
+                    y,
+                    image_size,
+                    KernelShape::new(row_kernel.len(), 0),
+                    border_mode,
+                    border_constant,
+                )
+                    .unwrap();
 
-        let pad_w = scanned_row_kernel.len() / 2;
-
-        for y in 0..image_size.height {
-            let (row, arena_width) = make_arena_row::<T, N>(
-                image,
-                y,
-                image_size,
-                KernelShape::new(row_kernel.len(), 0),
-                border_mode,
-                border_constant,
-            )?;
-            row_handler(
-                Arena::new(arena_width, 1, pad_w, 0, N),
-                &row,
-                &transient_cell,
-                image_size,
-                FilterRegion::new(y, y + 1),
-                scanned_row_kernel_slice,
-            );
-        }
+                row_handler(
+                    Arena::new(arena_width, 1, pad_w, 0, N),
+                    &row,
+                    dst_row,
+                    image_size,
+                    FilterRegion::new(y, y + 1),
+                    scanned_row_kernel_slice,
+                );
+            });
     }
 
     let column_kernel_shape = KernelShape::new(0, scanned_column_kernel_slice.len());

@@ -34,7 +34,6 @@ use crate::filter1d::neon::{filter_rgb_row_neon_u8_i16, filter_rgb_row_symm_neon
 use crate::filter1d::region::FilterRegion;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 use crate::filter1d::sse::{filter_rgb_row_sse_u8_i16, filter_row_sse_symm_u8_i16};
-use crate::unsafe_slice::UnsafeSlice;
 use crate::ImageSize;
 use half::f16;
 
@@ -44,7 +43,7 @@ pub trait Filter1DRgbRowHandler<T, F> {
     ) -> fn(
         arena: Arena,
         arena_src: &[T],
-        dst: &UnsafeSlice<T>,
+        dst: &mut [T],
         image_size: ImageSize,
         filter_region: FilterRegion,
         scanned_kernel: &[ScanPoint1d<F>],
@@ -59,7 +58,7 @@ macro_rules! default_1d_row_handler {
             ) -> fn(
                 Arena,
                 &[$store],
-                &UnsafeSlice<$store>,
+                &mut [$store],
                 ImageSize,
                 FilterRegion,
                 &[ScanPoint1d<$intermediate>],
@@ -82,7 +81,7 @@ impl Filter1DRgbRowHandler<u8, f32> for u8 {
     )))]
     fn get_rgb_row_handler(
         is_symmetric_kernel: bool,
-    ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
+    ) -> fn(Arena, &[u8], &mut [u8], ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
         if is_symmetric_kernel {
             filter_row_symmetrical::<u8, f32, 3>
         } else {
@@ -94,7 +93,7 @@ impl Filter1DRgbRowHandler<u8, f32> for u8 {
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     fn get_rgb_row_handler(
         is_symmetric_kernel: bool,
-    ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
+    ) -> fn(Arena, &[u8], &mut [u8], ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
         if is_symmetric_kernel {
             use crate::filter1d::neon::filter_row_symm_neon_u8_f32;
             filter_row_symm_neon_u8_f32::<3>
@@ -107,7 +106,7 @@ impl Filter1DRgbRowHandler<u8, f32> for u8 {
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     fn get_rgb_row_handler(
         is_symmetric_kernel: bool,
-    ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
+    ) -> fn(Arena, &[u8], &mut [u8], ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
         #[cfg(feature = "avx")]
         if std::arch::is_x86_feature_detected!("avx2") {
             if is_symmetric_kernel {
@@ -141,7 +140,7 @@ impl Filter1DRgbRowHandler<f32, f32> for f32 {
     )))]
     fn get_rgb_row_handler(
         is_symmetric_kernel: bool,
-    ) -> fn(Arena, &[f32], &UnsafeSlice<f32>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
+    ) -> fn(Arena, &[f32], &mut [f32], ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
         if is_symmetric_kernel {
             filter_row_symmetrical::<f32, f32, 3>
         } else {
@@ -153,7 +152,7 @@ impl Filter1DRgbRowHandler<f32, f32> for f32 {
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     fn get_rgb_row_handler(
         is_symmetric_kernel: bool,
-    ) -> fn(Arena, &[f32], &UnsafeSlice<f32>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
+    ) -> fn(Arena, &[f32], &mut [f32], ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
         if is_symmetric_kernel {
             use crate::filter1d::neon::filter_row_neon_symm_f32_f32;
             filter_row_neon_symm_f32_f32
@@ -166,7 +165,7 @@ impl Filter1DRgbRowHandler<f32, f32> for f32 {
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     fn get_rgb_row_handler(
         is_symmetric_kernel: bool,
-    ) -> fn(Arena, &[f32], &UnsafeSlice<f32>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
+    ) -> fn(Arena, &[f32], &mut [f32], ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
         #[cfg(feature = "avx")]
         if std::arch::is_x86_feature_detected!("avx2") {
             use crate::filter1d::avx::filter_row_avx_f32_f32;
@@ -189,7 +188,7 @@ impl Filter1DRgbRowHandler<u16, f32> for u16 {
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     fn get_rgb_row_handler(
         is_symmetric_kernel: bool,
-    ) -> fn(Arena, &[u16], &UnsafeSlice<u16>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
+    ) -> fn(Arena, &[u16], &mut [u16], ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
         if is_symmetric_kernel {
             use crate::filter1d::neon::filter_row_symm_neon_u16_f32;
             filter_row_symm_neon_u16_f32::<3>
@@ -202,7 +201,7 @@ impl Filter1DRgbRowHandler<u16, f32> for u16 {
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     fn get_rgb_row_handler(
         is_kernel_symmetric: bool,
-    ) -> fn(Arena, &[u16], &UnsafeSlice<u16>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
+    ) -> fn(Arena, &[u16], &mut [u16], ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
         if is_kernel_symmetric {
             #[cfg(feature = "avx")]
             if std::arch::is_x86_feature_detected!("avx2") {
@@ -226,7 +225,7 @@ impl Filter1DRgbRowHandler<u16, f32> for u16 {
     )))]
     fn get_rgb_row_handler(
         is_symmetric_kernel: bool,
-    ) -> fn(Arena, &[u16], &UnsafeSlice<u16>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
+    ) -> fn(Arena, &[u16], &mut [u16], ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
         if is_symmetric_kernel {
             filter_row_symmetrical::<u16, f32, 3>
         } else {
@@ -243,7 +242,7 @@ impl Filter1DRgbRowHandler<u8, i16> for u8 {
     )))]
     fn get_rgb_row_handler(
         is_symmetric_kernel: bool,
-    ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<i16>]) {
+    ) -> fn(Arena, &[u8], &mut [u8], ImageSize, FilterRegion, &[ScanPoint1d<i16>]) {
         if is_symmetric_kernel {
             filter_row_symmetrical::<u8, i16, 3>
         } else {
@@ -255,7 +254,7 @@ impl Filter1DRgbRowHandler<u8, i16> for u8 {
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     fn get_rgb_row_handler(
         is_symmetric_kernel: bool,
-    ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<i16>]) {
+    ) -> fn(Arena, &[u8], &mut [u8], ImageSize, FilterRegion, &[ScanPoint1d<i16>]) {
         if is_symmetric_kernel {
             filter_rgb_row_symm_neon_u8_i16::<3>
         } else {
@@ -266,7 +265,7 @@ impl Filter1DRgbRowHandler<u8, i16> for u8 {
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     fn get_rgb_row_handler(
         is_symmetric_kernel: bool,
-    ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<i16>]) {
+    ) -> fn(Arena, &[u8], &mut [u8], ImageSize, FilterRegion, &[ScanPoint1d<i16>]) {
         if std::arch::is_x86_feature_detected!("sse4.1") {
             if is_symmetric_kernel {
                 return filter_row_sse_symm_u8_i16::<3>;
