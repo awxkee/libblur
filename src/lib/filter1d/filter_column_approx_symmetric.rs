@@ -32,16 +32,15 @@ use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::region::FilterRegion;
 use crate::filter1d::to_approx_storage::ToApproxStorage;
 use crate::img_size::ImageSize;
-use crate::unsafe_slice::UnsafeSlice;
 use num_traits::AsPrimitive;
 use std::ops::{Add, Mul, Shr};
 
 pub fn filter_column_symmetric_approx<T, I>(
     arena: Arena,
     arena_src: &[&[T]],
-    dst: &UnsafeSlice<T>,
+    dst: &mut [T],
     image_size: ImageSize,
-    region: FilterRegion,
+    _: FilterRegion,
     scanned_kernel: &[ScanPoint1d<I>],
 ) where
     T: Copy + AsPrimitive<I> + Default,
@@ -58,8 +57,6 @@ pub fn filter_column_symmetric_approx<T, I>(
 
         let length = scanned_kernel.len();
         let half_len = length / 2;
-
-        let y = region.start;
 
         let mut cx = 0usize;
 
@@ -84,10 +81,8 @@ pub fn filter_column_symmetric_approx<T, I>(
                 }
             }
 
-            let dst_offset = y * dst_stride + cx;
-
             for (y, src) in store.iter().enumerate() {
-                dst.write(dst_offset + y, src.to_approx_());
+                *dst.get_unchecked_mut(cx + y) = src.to_approx_();
             }
 
             cx += 32;
@@ -114,10 +109,8 @@ pub fn filter_column_symmetric_approx<T, I>(
                 }
             }
 
-            let dst_offset = y * dst_stride + cx;
-
             for (y, src) in store.iter().enumerate() {
-                dst.write(dst_offset + y, src.to_approx_());
+                *dst.get_unchecked_mut(cx + y) = src.to_approx_();
             }
 
             cx += 16;
@@ -143,12 +136,10 @@ pub fn filter_column_symmetric_approx<T, I>(
                 k3 = fw[3].as_().add(bw[3].as_()).mul(coeff.weight).add(k3);
             }
 
-            let dst_offset = y * dst_stride + cx;
-
-            dst.write(dst_offset, k0.to_approx_());
-            dst.write(dst_offset + 1, k1.to_approx_());
-            dst.write(dst_offset + 2, k2.to_approx_());
-            dst.write(dst_offset + 3, k3.to_approx_());
+            *dst.get_unchecked_mut(cx) = k0.to_approx_();
+            *dst.get_unchecked_mut(cx + 1) = k1.to_approx_();
+            *dst.get_unchecked_mut(cx + 2) = k2.to_approx_();
+            *dst.get_unchecked_mut(cx + 3) = k3.to_approx_();
             cx += 4;
         }
 
@@ -166,7 +157,7 @@ pub fn filter_column_symmetric_approx<T, I>(
                 k0 = fw[0].as_().add(bw[0].as_()).mul(coeff.weight).add(k0);
             }
 
-            dst.write(y * dst_stride + x, k0.to_approx_());
+            *dst.get_unchecked_mut(x) = k0.to_approx_();
         }
     }
 }

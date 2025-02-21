@@ -35,8 +35,8 @@ use crate::filter1d::neon::utils::{
 use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
-use std::arch::aarch64::*;
 use crate::to_storage::ToStorage;
+use std::arch::aarch64::*;
 
 pub fn filter_row_symm_neon_u8_f32<const N: usize>(
     _: Arena,
@@ -50,7 +50,7 @@ pub fn filter_row_symm_neon_u8_f32<const N: usize>(
         let width = image_size.width;
 
         let src = arena_src;
-        
+
         let length = scanned_kernel.len();
         let half_len = length / 2;
 
@@ -228,7 +228,7 @@ pub fn filter_row_symm_neon_u8_f32<const N: usize>(
                     coeff.weight,
                 );
             }
-            
+
             *dst.get_unchecked_mut(x) = k0.to_();
         }
     }

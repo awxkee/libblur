@@ -146,7 +146,7 @@ where
                         border_mode,
                         border_constant,
                     )
-                        .unwrap();
+                    .unwrap();
 
                     row_handler(
                         Arena::new(arena_width, 1, pad_w, 0, N),
@@ -173,7 +173,7 @@ where
                     border_mode,
                     border_constant,
                 )
-                    .unwrap();
+                .unwrap();
 
                 row_handler(
                     Arena::new(arena_width, 1, pad_w, 0, N),

@@ -50,7 +50,7 @@ pub fn filter_rgb_row_neon_u8_i16<const N: usize>(
         let src = arena_src;
 
         let length = scanned_kernel.len();
-        
+
         let local_src = src;
 
         let mut cx = 0usize;

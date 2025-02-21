@@ -70,7 +70,7 @@ unsafe fn filter_rgb_row_sse_u8_i16_impl<const N: usize>(
     const N: usize = 3;
 
     let src = arena_src;
-    
+
     let length = scanned_kernel.len();
 
     let local_src = src;

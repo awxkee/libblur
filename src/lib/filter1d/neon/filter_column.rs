@@ -194,12 +194,10 @@ pub fn filter_column_neon_u8_f32(
                 );
             }
 
-            let dst_offset = cx;
-
-            *dst.get_unchecked_mut(dst_offset) = k0.to_();
-            *dst.get_unchecked_mut(dst_offset + 1) = k1.to_();
-            *dst.get_unchecked_mut(dst_offset + 2) = k2.to_();
-            *dst.get_unchecked_mut(dst_offset + 3) = k3.to_();
+            *dst.get_unchecked_mut(cx) = k0.to_();
+            *dst.get_unchecked_mut(cx + 1) = k1.to_();
+            *dst.get_unchecked_mut(cx + 2) = k2.to_();
+            *dst.get_unchecked_mut(cx + 3) = k3.to_();
             cx += 4;
         }
 

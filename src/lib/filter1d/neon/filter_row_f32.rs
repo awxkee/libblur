@@ -47,7 +47,7 @@ pub fn filter_row_neon_f32_f32<const N: usize>(
 ) {
     unsafe {
         let src = arena_src;
-        
+
         let local_src = src;
 
         let length = scanned_kernel.len();

@@ -50,7 +50,7 @@ pub fn filter_row_symmetrical<T, F, const N: usize>(
 {
     unsafe {
         let width = image_size.width;
-        
+
         let length = scanned_kernel.len();
         let half_len = length / 2;
 

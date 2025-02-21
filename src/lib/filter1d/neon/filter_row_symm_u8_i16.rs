@@ -46,10 +46,10 @@ pub(crate) fn filter_rgb_row_symm_neon_u8_i16<const N: usize>(
 ) {
     unsafe {
         let width = image_size.width;
-        
+
         let length = scanned_kernel.len();
         let half_len = length / 2;
-        
+
         let local_src = arena_src;
 
         let mut cx = 0usize;

@@ -126,7 +126,7 @@ unsafe fn filter_row_sse_f32_f32_impl<const FMA: bool, const N: usize>(
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
     let src = arena_src;
-    
+
     let local_src = src;
 
     let length = scanned_kernel.len();

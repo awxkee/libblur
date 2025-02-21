@@ -36,11 +36,11 @@ use crate::filter1d::sse::utils::{
 use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
 use crate::sse::{_mm_load_pack_x2, _mm_load_pack_x4, _mm_store_pack_x2, _mm_store_pack_x4};
+use crate::to_storage::ToStorage;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
-use crate::to_storage::ToStorage;
 
 pub(crate) fn filter_row_sse_symm_u8_f32<const N: usize>(
     arena: Arena,
@@ -124,7 +124,7 @@ unsafe fn filter_row_sse_symm_u8_f32_impl<const FMA: bool, const N: usize>(
     let width = image_size.width;
 
     let src = arena_src;
-    
+
     let length = scanned_kernel.len();
     let half_len = length / 2;
 
@@ -154,7 +154,7 @@ unsafe fn filter_row_sse_symm_u8_f32_impl<const FMA: bool, const N: usize>(
             k2 = _mm_mul_add_symm_epi8_by_ps_x4::<FMA>(k2, v_source0.2, v_source1.2, coeff);
             k3 = _mm_mul_add_symm_epi8_by_ps_x4::<FMA>(k3, v_source0.3, v_source1.3, coeff);
         }
-        
+
         let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
         _mm_store_pack_x4(
             dst_ptr0,

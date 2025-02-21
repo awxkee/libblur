@@ -232,7 +232,7 @@ impl Filter1DColumnHandler<u16, f32> for u16 {
     )))]
     fn get_column_handler(
         is_symmetric_kernel: bool,
-    ) -> fn(Arena, &[&[u16]], &UnsafeSlice<u16>, ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
+    ) -> fn(Arena, &[&[u16]], &mut [u16], ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
         if is_symmetric_kernel {
             filter_symmetric_column
         } else {
