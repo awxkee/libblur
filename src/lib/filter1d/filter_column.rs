@@ -32,31 +32,28 @@ use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
 use crate::to_storage::ToStorage;
-use crate::unsafe_slice::UnsafeSlice;
 use num_traits::{AsPrimitive, MulAdd};
 use std::ops::{Add, Mul};
 
 pub fn filter_column<T, F>(
     arena: Arena,
     arena_src: &[&[T]],
-    dst: &UnsafeSlice<T>,
+    dst: &mut [T],
     image_size: ImageSize,
-    region: FilterRegion,
+    _: FilterRegion,
     scanned_kernel: &[ScanPoint1d<F>],
 ) where
     T: Copy + AsPrimitive<F>,
     F: ToStorage<T> + Mul<F, Output = F> + MulAdd<F, Output = F> + Add<F, Output = F>,
 {
     unsafe {
-        let dst_stride = image_size.width * arena.components;
+        let full_width = image_size.width * arena.components;
 
         let length = scanned_kernel.len();
 
         let mut cx = 0usize;
 
-        let y = region.start;
-
-        while cx + 4 < dst_stride {
+        while cx + 4 < full_width {
             let coeff = *scanned_kernel.get_unchecked(0);
 
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
@@ -90,16 +87,14 @@ pub fn filter_column<T, F>(
                 );
             }
 
-            let dst_offset = y * dst_stride + cx;
-
-            dst.write(dst_offset, k0.to_());
-            dst.write(dst_offset + 1, k1.to_());
-            dst.write(dst_offset + 2, k2.to_());
-            dst.write(dst_offset + 3, k3.to_());
+            *dst.get_unchecked_mut(cx) = k0.to_();
+            *dst.get_unchecked_mut(cx + 1) = k1.to_();
+            *dst.get_unchecked_mut(cx + 2) = k2.to_();
+            *dst.get_unchecked_mut(cx + 3) = k3.to_();
             cx += 4;
         }
 
-        for x in cx..dst_stride {
+        for x in cx..full_width {
             let coeff = *scanned_kernel.get_unchecked(0);
 
             let v_src = arena_src.get_unchecked(0).get_unchecked(x..);
@@ -115,7 +110,7 @@ pub fn filter_column<T, F>(
                 );
             }
 
-            dst.write(y * dst_stride + x, k0.to_());
+            *dst.get_unchecked_mut(x) = k0.to_();
         }
     }
 }

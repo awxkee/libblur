@@ -42,7 +42,6 @@ use crate::filter1d::sse::utils::{
 use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
 use crate::to_storage::ToStorage;
-use crate::unsafe_slice::UnsafeSlice;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -52,7 +51,7 @@ use std::ops::Mul;
 pub(crate) fn filter_column_avx_u8_f32(
     arena: Arena,
     arena_src: &[&[u8]],
-    dst: &UnsafeSlice<u8>,
+    dst: &mut [u8],
     image_size: ImageSize,
     filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
@@ -85,7 +84,7 @@ pub(crate) fn filter_column_avx_u8_f32(
 unsafe fn filter_column_avx_u8_f32_impl_def(
     arena: Arena,
     arena_src: &[&[u8]],
-    dst: &UnsafeSlice<u8>,
+    dst: &mut [u8],
     image_size: ImageSize,
     filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
@@ -104,7 +103,7 @@ unsafe fn filter_column_avx_u8_f32_impl_def(
 unsafe fn filter_column_avx_u8_f32_impl_fma(
     arena: Arena,
     arena_src: &[&[u8]],
-    dst: &UnsafeSlice<u8>,
+    dst: &mut [u8],
     image_size: ImageSize,
     filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
@@ -123,25 +122,21 @@ unsafe fn filter_column_avx_u8_f32_impl_fma(
 unsafe fn filter_column_avx_u8_f32_impl<const FMA: bool>(
     arena: Arena,
     arena_src: &[&[u8]],
-    dst: &UnsafeSlice<u8>,
+    dst: &mut [u8],
     image_size: ImageSize,
-    filter_region: FilterRegion,
+    _: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
     let image_width = image_size.width * arena.components;
 
-    let dst_stride = image_size.width * arena.components;
-
     let length = scanned_kernel.len();
 
-    let y = filter_region.start;
+    let mut cx = 0usize;
 
-    let mut _cx = 0usize;
-
-    while _cx + 128 < image_width {
+    while cx + 128 < image_width {
         let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(0).weight);
 
-        let v_src = arena_src.get_unchecked(0).get_unchecked(_cx..);
+        let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
         let source = _mm256_load_pack_x4(v_src.as_ptr());
         let mut k0 = _mm256_mul_epi8_by_ps_x4::<FMA>(source.0, coeff);
@@ -152,15 +147,14 @@ unsafe fn filter_column_avx_u8_f32_impl<const FMA: bool>(
         for i in 1..length {
             let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(i).weight);
             let v_source =
-                _mm256_load_pack_x4(arena_src.get_unchecked(i).get_unchecked(_cx..).as_ptr());
+                _mm256_load_pack_x4(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
             k0 = _mm256_mul_add_epi8_by_ps_x4::<FMA>(k0, v_source.0, coeff);
             k1 = _mm256_mul_add_epi8_by_ps_x4::<FMA>(k1, v_source.1, coeff);
             k2 = _mm256_mul_add_epi8_by_ps_x4::<FMA>(k2, v_source.2, coeff);
             k3 = _mm256_mul_add_epi8_by_ps_x4::<FMA>(k3, v_source.3, coeff);
         }
 
-        let dst_offset = y * dst_stride + _cx;
-        let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
         _mm256_store_pack_x4(
             dst_ptr0,
             (
@@ -170,13 +164,13 @@ unsafe fn filter_column_avx_u8_f32_impl<const FMA: bool>(
                 _mm256_pack_ps_x4_epi8(k3),
             ),
         );
-        _cx += 128;
+        cx += 128;
     }
 
-    while _cx + 96 < image_width {
+    while cx + 96 < image_width {
         let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(0).weight);
 
-        let v_src = arena_src.get_unchecked(0).get_unchecked(_cx..);
+        let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
         let source = _mm256_load_pack_x3(v_src.as_ptr());
         let mut k0 = _mm256_mul_epi8_by_ps_x4::<FMA>(source.0, coeff);
@@ -186,14 +180,13 @@ unsafe fn filter_column_avx_u8_f32_impl<const FMA: bool>(
         for i in 1..length {
             let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(i).weight);
             let v_source =
-                _mm256_load_pack_x3(arena_src.get_unchecked(i).get_unchecked(_cx..).as_ptr());
+                _mm256_load_pack_x3(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
             k0 = _mm256_mul_add_epi8_by_ps_x4::<FMA>(k0, v_source.0, coeff);
             k1 = _mm256_mul_add_epi8_by_ps_x4::<FMA>(k1, v_source.1, coeff);
             k2 = _mm256_mul_add_epi8_by_ps_x4::<FMA>(k2, v_source.2, coeff);
         }
 
-        let dst_offset = y * dst_stride + _cx;
-        let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
         _mm256_store_pack_x3(
             dst_ptr0,
             (
@@ -202,13 +195,13 @@ unsafe fn filter_column_avx_u8_f32_impl<const FMA: bool>(
                 _mm256_pack_ps_x4_epi8(k2),
             ),
         );
-        _cx += 96;
+        cx += 96;
     }
 
-    while _cx + 64 < image_width {
+    while cx + 64 < image_width {
         let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(0).weight);
 
-        let v_src = arena_src.get_unchecked(0).get_unchecked(_cx..);
+        let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
         let source = _mm256_load_pack_x2(v_src.as_ptr());
         let mut k0 = _mm256_mul_epi8_by_ps_x4::<FMA>(source.0, coeff);
@@ -217,24 +210,23 @@ unsafe fn filter_column_avx_u8_f32_impl<const FMA: bool>(
         for i in 1..length {
             let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(i).weight);
             let v_source =
-                _mm256_load_pack_x2(arena_src.get_unchecked(i).get_unchecked(_cx..).as_ptr());
+                _mm256_load_pack_x2(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
             k0 = _mm256_mul_add_epi8_by_ps_x4::<FMA>(k0, v_source.0, coeff);
             k1 = _mm256_mul_add_epi8_by_ps_x4::<FMA>(k1, v_source.1, coeff);
         }
 
-        let dst_offset = y * dst_stride + _cx;
-        let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
         _mm256_store_pack_x2(
             dst_ptr0,
             (_mm256_pack_ps_x4_epi8(k0), _mm256_pack_ps_x4_epi8(k1)),
         );
-        _cx += 64;
+        cx += 64;
     }
 
-    while _cx + 32 < image_width {
+    while cx + 32 < image_width {
         let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(0).weight);
 
-        let v_src = arena_src.get_unchecked(0).get_unchecked(_cx..);
+        let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
         let source = _mm256_loadu_si256(v_src.as_ptr() as *const __m256i);
         let mut k0 = _mm256_mul_epi8_by_ps_x4::<FMA>(source, coeff);
@@ -242,21 +234,20 @@ unsafe fn filter_column_avx_u8_f32_impl<const FMA: bool>(
         for i in 1..length {
             let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(i).weight);
             let v_source = _mm256_loadu_si256(
-                arena_src.get_unchecked(i).get_unchecked(_cx..).as_ptr() as *const __m256i,
+                arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr() as *const __m256i,
             );
             k0 = _mm256_mul_add_epi8_by_ps_x4::<FMA>(k0, v_source, coeff);
         }
 
-        let dst_offset = y * dst_stride + _cx;
-        let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
         _mm256_storeu_si256(dst_ptr0 as *mut __m256i, _mm256_pack_ps_x4_epi8(k0));
-        _cx += 32;
+        cx += 32;
     }
 
-    while _cx + 16 < image_width {
+    while cx + 16 < image_width {
         let coeff = *scanned_kernel.get_unchecked(0);
 
-        let v_src = arena_src.get_unchecked(0).get_unchecked(_cx..);
+        let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
         let source_0 = _mm_loadu_si128(v_src.as_ptr() as *const __m128i);
         let mut k0 = _mm_mul_epi8_by_ps_x4::<FMA>(source_0, _mm_set1_ps(coeff.weight));
@@ -264,21 +255,20 @@ unsafe fn filter_column_avx_u8_f32_impl<const FMA: bool>(
         for i in 1..length {
             let coeff = *scanned_kernel.get_unchecked(i);
             let v_source_0 = _mm_loadu_si128(
-                arena_src.get_unchecked(i).get_unchecked(_cx..).as_ptr() as *const __m128i,
+                arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr() as *const __m128i,
             );
             k0 = _mm_mul_add_epi8_by_ps_x4::<FMA>(k0, v_source_0, _mm_set1_ps(coeff.weight));
         }
 
-        let dst_offset = y * dst_stride + _cx;
-        let dst_ptr = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+        let dst_ptr = dst.get_unchecked_mut(cx..).as_mut_ptr();
         _mm_storeu_si128(dst_ptr as *mut __m128i, _mm_pack_ps_x4_epi8(k0));
-        _cx += 16;
+        cx += 16;
     }
 
-    while _cx + 4 < image_width {
+    while cx + 4 < image_width {
         let coeff = *scanned_kernel.get_unchecked(0);
 
-        let v_src = arena_src.get_unchecked(0).get_unchecked(_cx..);
+        let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
         let mut k0 = (*v_src.get_unchecked(0) as f32).mul(coeff.weight);
         let mut k1 = (*v_src.get_unchecked(1) as f32).mul(coeff.weight);
@@ -289,36 +279,34 @@ unsafe fn filter_column_avx_u8_f32_impl<const FMA: bool>(
             let coeff = *scanned_kernel.get_unchecked(i);
             k0 = mlaf(
                 k0,
-                (*arena_src.get_unchecked(i).get_unchecked(_cx)) as f32,
+                (*arena_src.get_unchecked(i).get_unchecked(cx)) as f32,
                 coeff.weight,
             );
             k1 = mlaf(
                 k1,
-                (*arena_src.get_unchecked(i).get_unchecked(_cx + 1)) as f32,
+                (*arena_src.get_unchecked(i).get_unchecked(cx + 1)) as f32,
                 coeff.weight,
             );
             k2 = mlaf(
                 k2,
-                (*arena_src.get_unchecked(i).get_unchecked(_cx + 2)) as f32,
+                (*arena_src.get_unchecked(i).get_unchecked(cx + 2)) as f32,
                 coeff.weight,
             );
             k3 = mlaf(
                 k3,
-                (*arena_src.get_unchecked(i).get_unchecked(_cx + 3)) as f32,
+                (*arena_src.get_unchecked(i).get_unchecked(cx + 3)) as f32,
                 coeff.weight,
             );
         }
 
-        let dst_offset = y * dst_stride + _cx;
-
-        dst.write(dst_offset, k0.to_());
-        dst.write(dst_offset + 1, k1.to_());
-        dst.write(dst_offset + 2, k2.to_());
-        dst.write(dst_offset + 3, k3.to_());
-        _cx += 4;
+        *dst.get_unchecked_mut(cx) = k0.to_();
+        *dst.get_unchecked_mut(cx + 1) = k1.to_();
+        *dst.get_unchecked_mut(cx + 2) = k2.to_();
+        *dst.get_unchecked_mut(cx + 3) = k3.to_();
+        cx += 4;
     }
 
-    for x in _cx..image_width {
+    for x in cx..image_width {
         let coeff = *scanned_kernel.get_unchecked(0);
 
         let v_src = arena_src.get_unchecked(0).get_unchecked(x..);
@@ -334,6 +322,6 @@ unsafe fn filter_column_avx_u8_f32_impl<const FMA: bool>(
             );
         }
 
-        dst.write(y * dst_stride + x, k0.to_());
+        *dst.get_unchecked_mut(x) = k0.to_();
     }
 }

@@ -42,7 +42,6 @@ use crate::filter1d::sse::utils::{
 use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
 use crate::to_storage::ToStorage;
-use crate::unsafe_slice::UnsafeSlice;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -52,7 +51,7 @@ use std::ops::{Add, Mul};
 pub(crate) fn filter_column_avx_symm_u8_f32(
     arena: Arena,
     arena_src: &[&[u8]],
-    dst: &UnsafeSlice<u8>,
+    dst: &mut [u8],
     image_size: ImageSize,
     filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
@@ -85,7 +84,7 @@ pub(crate) fn filter_column_avx_symm_u8_f32(
 unsafe fn filter_column_avx_symm_u8_f32_impl_def(
     arena: Arena,
     arena_src: &[&[u8]],
-    dst: &UnsafeSlice<u8>,
+    dst: &mut [u8],
     image_size: ImageSize,
     filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
@@ -104,7 +103,7 @@ unsafe fn filter_column_avx_symm_u8_f32_impl_def(
 unsafe fn filter_column_avx_symm_u8_f32_impl_fma(
     arena: Arena,
     arena_src: &[&[u8]],
-    dst: &UnsafeSlice<u8>,
+    dst: &mut [u8],
     image_size: ImageSize,
     filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
@@ -123,19 +122,16 @@ unsafe fn filter_column_avx_symm_u8_f32_impl_fma(
 unsafe fn filter_column_avx_symm_u8_f32_impl<const FMA: bool>(
     arena: Arena,
     arena_src: &[&[u8]],
-    dst: &UnsafeSlice<u8>,
+    dst: &mut [u8],
     image_size: ImageSize,
-    filter_region: FilterRegion,
+    _: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
     let image_width = image_size.width * arena.components;
 
-    let dst_stride = image_size.width * arena.components;
-
     let length = scanned_kernel.len();
     let half_len = length / 2;
 
-    let y = filter_region.start;
     let mut cx = 0usize;
 
     while cx + 128 < image_width {
@@ -166,8 +162,7 @@ unsafe fn filter_column_avx_symm_u8_f32_impl<const FMA: bool>(
             k3 = _mm256_mul_add_symm_epi8_by_ps_x4::<FMA>(k3, v_source0.3, v_source1.3, coeff);
         }
 
-        let dst_offset = y * dst_stride + cx;
-        let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
         _mm256_store_pack_x4(
             dst_ptr0,
             (
@@ -206,8 +201,7 @@ unsafe fn filter_column_avx_symm_u8_f32_impl<const FMA: bool>(
             k2 = _mm256_mul_add_symm_epi8_by_ps_x4::<FMA>(k2, v_source0.2, v_source1.2, coeff);
         }
 
-        let dst_offset = y * dst_stride + cx;
-        let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
         _mm256_store_pack_x3(
             dst_ptr0,
             (
@@ -243,8 +237,7 @@ unsafe fn filter_column_avx_symm_u8_f32_impl<const FMA: bool>(
             k1 = _mm256_mul_add_symm_epi8_by_ps_x4::<FMA>(k1, v_source0.1, v_source1.1, coeff);
         }
 
-        let dst_offset = y * dst_stride + cx;
-        let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
         _mm256_store_pack_x2(
             dst_ptr0,
             (_mm256_pack_ps_x4_epi8(k0), _mm256_pack_ps_x4_epi8(k1)),
@@ -275,8 +268,7 @@ unsafe fn filter_column_avx_symm_u8_f32_impl<const FMA: bool>(
             k0 = _mm256_mul_add_symm_epi8_by_ps_x4::<FMA>(k0, v_source0, v_source1, coeff);
         }
 
-        let dst_offset = y * dst_stride + cx;
-        let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
         _mm256_storeu_si256(dst_ptr0 as *mut __m256i, _mm256_pack_ps_x4_epi8(k0));
         cx += 32;
     }
@@ -309,8 +301,7 @@ unsafe fn filter_column_avx_symm_u8_f32_impl<const FMA: bool>(
             );
         }
 
-        let dst_offset = y * dst_stride + cx;
-        let dst_ptr = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+        let dst_ptr = dst.get_unchecked_mut(cx..).as_mut_ptr();
         _mm_storeu_si128(dst_ptr as *mut __m128i, _mm_pack_ps_x4_epi8(k0));
         cx += 16;
     }
@@ -354,12 +345,10 @@ unsafe fn filter_column_avx_symm_u8_f32_impl<const FMA: bool>(
             );
         }
 
-        let dst_offset = y * dst_stride + cx;
-
-        dst.write(dst_offset, k0.to_());
-        dst.write(dst_offset + 1, k1.to_());
-        dst.write(dst_offset + 2, k2.to_());
-        dst.write(dst_offset + 3, k3.to_());
+        *dst.get_unchecked_mut(cx) = k0.to_();
+        *dst.get_unchecked_mut(cx + 1) = k1.to_();
+        *dst.get_unchecked_mut(cx + 2) = k2.to_();
+        *dst.get_unchecked_mut(cx + 3) = k3.to_();
         cx += 4;
     }
 
@@ -381,6 +370,6 @@ unsafe fn filter_column_avx_symm_u8_f32_impl<const FMA: bool>(
             );
         }
 
-        dst.write(y * dst_stride + x, k0.to_());
+        *dst.get_unchecked_mut(x) = k0.to_();
     }
 }

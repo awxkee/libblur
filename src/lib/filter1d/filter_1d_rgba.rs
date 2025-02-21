@@ -38,6 +38,8 @@ use crate::unsafe_slice::UnsafeSlice;
 use crate::util::check_slice_size;
 use crate::{BlurError, EdgeMode, ImageSize, Scalar, ThreadingPolicy};
 use num_traits::{AsPrimitive, MulAdd};
+use rayon::iter::{IndexedParallelIterator, ParallelIterator};
+use rayon::prelude::ParallelSliceMut;
 use std::ops::Mul;
 
 /// Performs 2D separable convolution on RGBA image
@@ -204,14 +206,16 @@ where
     let transient_image_slice = transient_image.as_slice();
 
     if let Some(pool) = &pool {
-        pool.scope(|scope| {
-            let transient_cell_0 = UnsafeSlice::new(destination);
+        pool.install(|| {
             let column_handler = T::get_column_handler(is_column_kernel_symmetrical);
 
             let src_stride = image_size.width * N;
+            let dst_stride = image_size.width * N;
 
-            for y in 0..image_size.height {
-                scope.spawn(move |_| {
+            destination
+                .par_chunks_exact_mut(dst_stride)
+                .enumerate()
+                .for_each(|(y, row)| {
                     let mut brows: Vec<&[T]> = vec![&image[0..]; column_kernel_shape.height];
 
                     for (k, row) in (0..column_kernel_shape.height).zip(brows.iter_mut()) {
@@ -233,44 +237,48 @@ where
                     column_handler(
                         Arena::new(image_size.width, pad_h, 0, pad_h, N),
                         brows_slice,
-                        &transient_cell_0,
+                        row,
                         image_size,
                         FilterRegion::new(y, y + 1),
                         scanned_column_kernel_slice,
                     );
                 });
-            }
         });
     } else {
         let column_handler = T::get_column_handler(is_column_kernel_symmetrical);
-        let final_cell_0 = UnsafeSlice::new(destination);
+
         let src_stride = image_size.width * N;
-        for y in 0..image_size.height {
-            let mut brows: Vec<&[T]> = vec![&image[0..]; column_kernel_shape.height];
+        let dst_stride = image_size.width * N;
 
-            for (k, row) in (0..column_kernel_shape.height).zip(brows.iter_mut()) {
-                if (y as i64 - pad_h as i64 + k as i64) < 0 {
-                    *row = &top_pad[(pad_h - k - 1) * src_stride..];
-                } else if (y as i64 - pad_h as i64 + k as i64) as usize >= image_size.height {
-                    *row = &bottom_pad[(k - pad_h - 1) * src_stride..];
-                } else {
-                    let fy = (y as i64 + k as i64 - pad_h as i64) as usize;
-                    let start_offset = src_stride * fy;
-                    *row = &transient_image_slice[start_offset..(start_offset + src_stride)];
+        destination
+            .chunks_exact_mut(dst_stride)
+            .enumerate()
+            .for_each(|(y, row)| {
+                let mut brows: Vec<&[T]> = vec![&image[0..]; column_kernel_shape.height];
+
+                for (k, row) in (0..column_kernel_shape.height).zip(brows.iter_mut()) {
+                    if (y as i64 - pad_h as i64 + k as i64) < 0 {
+                        *row = &top_pad[(pad_h - k - 1) * src_stride..];
+                    } else if (y as i64 - pad_h as i64 + k as i64) as usize >= image_size.height {
+                        *row = &bottom_pad[(k - pad_h - 1) * src_stride..];
+                    } else {
+                        let fy = (y as i64 + k as i64 - pad_h as i64) as usize;
+                        let start_offset = src_stride * fy;
+                        *row = &transient_image_slice[start_offset..(start_offset + src_stride)];
+                    }
                 }
-            }
 
-            let brows_slice = brows.as_slice();
+                let brows_slice = brows.as_slice();
 
-            column_handler(
-                Arena::new(image_size.width, pad_h, 0, pad_h, N),
-                brows_slice,
-                &final_cell_0,
-                image_size,
-                FilterRegion::new(y, y + 1),
-                scanned_column_kernel_slice,
-            );
-        }
+                column_handler(
+                    Arena::new(image_size.width, pad_h, 0, pad_h, N),
+                    brows_slice,
+                    row,
+                    image_size,
+                    FilterRegion::new(y, y + 1),
+                    scanned_column_kernel_slice,
+                );
+            });
     }
 
     Ok(())

@@ -33,14 +33,13 @@ use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
 use crate::to_storage::ToStorage;
-use crate::unsafe_slice::UnsafeSlice;
 use num_traits::{AsPrimitive, MulAdd};
 use std::ops::{Add, Mul};
 
 pub fn filter_symmetric_column<T, F>(
     arena: Arena,
     arena_src: &[&[T]],
-    dst: &UnsafeSlice<T>,
+    dst: &mut [T],
     image_size: ImageSize,
     region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<F>],
@@ -57,8 +56,6 @@ pub fn filter_symmetric_column<T, F>(
         let half_len = length / 2;
 
         let mut cx = 0usize;
-
-        let y = region.start;
 
         while cx + 32 < dst_stride {
             let coeff = scanned_kernel[half_len].weight;
@@ -81,10 +78,8 @@ pub fn filter_symmetric_column<T, F>(
                 }
             }
 
-            let dst_offset = y * dst_stride + cx;
-
             for (y, src) in store.iter().enumerate() {
-                dst.write(dst_offset + y, src.to_());
+                *dst.get_unchecked_mut(cx + y) = src.to_();
             }
 
             cx += 32;
@@ -111,10 +106,8 @@ pub fn filter_symmetric_column<T, F>(
                 }
             }
 
-            let dst_offset = y * dst_stride + cx;
-
             for (y, src) in store.iter().enumerate() {
-                dst.write(dst_offset + y, src.to_());
+                *dst.get_unchecked_mut(cx + y) = src.to_();
             }
 
             cx += 16;
@@ -140,12 +133,10 @@ pub fn filter_symmetric_column<T, F>(
                 k3 = mlaf(k3, fw[3].as_().add(bw[3].as_()), coeff.weight);
             }
 
-            let dst_offset = y * dst_stride + cx;
-
-            dst.write(dst_offset, k0.to_());
-            dst.write(dst_offset + 1, k1.to_());
-            dst.write(dst_offset + 2, k2.to_());
-            dst.write(dst_offset + 3, k3.to_());
+            *dst.get_unchecked_mut(cx) = k0.to_();
+            *dst.get_unchecked_mut(cx + 1) = k1.to_();
+            *dst.get_unchecked_mut(cx + 2) = k2.to_();
+            *dst.get_unchecked_mut(cx + 3) = k3.to_();
             cx += 4;
         }
 
@@ -163,7 +154,7 @@ pub fn filter_symmetric_column<T, F>(
                 k0 = mlaf(k0, fw[0].as_().add(bw[0].as_()), coeff.weight);
             }
 
-            dst.write(y * dst_stride + x, k0.to_());
+            *dst.get_unchecked_mut(x) = k0.to_();
         }
     }
 }

@@ -60,8 +60,6 @@ pub(crate) fn filter_rgb_row_symm_neon_u8_i16<const N: usize>(
 
         let max_width = N * width;
 
-        let zeros = vdupq_n_s16(0);
-
         while cx + 48 < max_width {
             let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(half_len).weight);
 
@@ -87,18 +85,9 @@ pub(crate) fn filter_rgb_row_symm_neon_u8_i16<const N: usize>(
             xvst1q_u8_x3(
                 dst_ptr0,
                 uint8x16x3_t(
-                    vcombine_u8(
-                        vqmovun_s16(vmaxq_s16(k0.0, zeros)),
-                        vqmovun_s16(vmaxq_s16(k0.1, zeros)),
-                    ),
-                    vcombine_u8(
-                        vqmovun_s16(vmaxq_s16(k1.0, zeros)),
-                        vqmovun_s16(vmaxq_s16(k1.1, zeros)),
-                    ),
-                    vcombine_u8(
-                        vqmovun_s16(vmaxq_s16(k2.0, zeros)),
-                        vqmovun_s16(vmaxq_s16(k2.1, zeros)),
-                    ),
+                    vcombine_u8(vqmovun_s16(k0.0), vqmovun_s16(k0.1)),
+                    vcombine_u8(vqmovun_s16(k1.0), vqmovun_s16(k1.1)),
+                    vcombine_u8(vqmovun_s16(k2.0), vqmovun_s16(k2.1)),
                 ),
             );
             cx += 48;
@@ -122,13 +111,7 @@ pub(crate) fn filter_rgb_row_symm_neon_u8_i16<const N: usize>(
 
             let dst_offset = y * dst_stride + cx;
             let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
-            vst1q_u8(
-                dst_ptr0,
-                vcombine_u8(
-                    vqmovun_s16(vmaxq_s16(k0.0, zeros)),
-                    vqmovun_s16(vmaxq_s16(k0.1, zeros)),
-                ),
-            );
+            vst1q_u8(dst_ptr0, vcombine_u8(vqmovun_s16(k0.0), vqmovun_s16(k0.1)));
             cx += 16;
         }
 
