@@ -35,7 +35,6 @@ use crate::filter1d::filter_scan::ScanPoint1d;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::filter1d::neon::filter_row_symm_neon_u8_i32;
 use crate::filter1d::region::FilterRegion;
-use crate::unsafe_slice::UnsafeSlice;
 use crate::ImageSize;
 
 pub trait Filter1DRgbaRowHandlerApprox<T, F> {
@@ -44,7 +43,7 @@ pub trait Filter1DRgbaRowHandlerApprox<T, F> {
     ) -> fn(
         arena: Arena,
         arena_src: &[T],
-        dst: &UnsafeSlice<T>,
+        dst: &mut [T],
         image_size: ImageSize,
         filter_region: FilterRegion,
         scanned_kernel: &[ScanPoint1d<F>],
@@ -59,7 +58,7 @@ macro_rules! default_1d_row_handler {
             ) -> fn(
                 Arena,
                 &[$store],
-                &UnsafeSlice<$store>,
+                &mut [$store],
                 ImageSize,
                 FilterRegion,
                 &[ScanPoint1d<$intermediate>],
@@ -81,7 +80,7 @@ impl Filter1DRgbaRowHandlerApprox<u8, i32> for u8 {
     )))]
     fn get_rgba_row_handler(
         is_kernel_symmetric: bool,
-    ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<i32>]) {
+    ) -> fn(Arena, &[u8], &mut [u8], ImageSize, FilterRegion, &[ScanPoint1d<i32>]) {
         if is_kernel_symmetric {
             filter_row_symmetric_approx::<u8, i32, 4>
         } else {
@@ -92,7 +91,7 @@ impl Filter1DRgbaRowHandlerApprox<u8, i32> for u8 {
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
     fn get_rgba_row_handler(
         is_kernel_symmetric: bool,
-    ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<i32>]) {
+    ) -> fn(Arena, &[u8], &mut [u8], ImageSize, FilterRegion, &[ScanPoint1d<i32>]) {
         if is_kernel_symmetric {
             #[cfg(feature = "rdm")]
             {
@@ -112,7 +111,7 @@ impl Filter1DRgbaRowHandlerApprox<u8, i32> for u8 {
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     fn get_rgba_row_handler(
         is_kernel_symmetric: bool,
-    ) -> fn(Arena, &[u8], &UnsafeSlice<u8>, ImageSize, FilterRegion, &[ScanPoint1d<i32>]) {
+    ) -> fn(Arena, &[u8], &mut [u8], ImageSize, FilterRegion, &[ScanPoint1d<i32>]) {
         #[cfg(feature = "avx")]
         if std::arch::is_x86_feature_detected!("avx2") {
             if is_kernel_symmetric {

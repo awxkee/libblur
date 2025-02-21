@@ -13,7 +13,7 @@ path = "src/main.rs"
 colorutils-rs = "0.7.0"
 half = "2.4.1"
 image = "0.25.5"
-libblur = {path = "src/lib", features = ["image", "fft", "sse", "nightly_avx512", "avx"], default-features = false}
+libblur = {path = "src/lib", features = ["image", "fft", "sse", "nightly_avx512", "avx", "rdm"], default-features = false}
 accelerate = {path = "src/accelerate"}
 rayon = "1.10.0"
 fast_transpose = "0.2.3"

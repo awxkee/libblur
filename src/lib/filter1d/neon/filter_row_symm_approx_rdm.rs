@@ -33,16 +33,16 @@ use crate::filter1d::neon::utils::{
     vqmovnq_s16x2_u8, xvld1q_u8_x3, xvld1q_u8_x4, xvst1q_u8_x3, xvst1q_u8_x4,
 };
 use crate::filter1d::region::FilterRegion;
+use crate::filter1d::to_approx_storage::ToApproxStorage;
 use crate::img_size::ImageSize;
-use crate::unsafe_slice::UnsafeSlice;
 use std::arch::aarch64::*;
 
 pub(crate) fn filter_row_symm_neon_u8_i32_rdm<const N: usize>(
-    arena: Arena,
+    _: Arena,
     arena_src: &[u8],
-    dst: &UnsafeSlice<u8>,
+    dst: &mut [u8],
     image_size: ImageSize,
-    filter_region: FilterRegion,
+    _: FilterRegion,
     scanned_kernel: &[ScanPoint1d<i32>],
 ) {
     unsafe {
@@ -50,12 +50,9 @@ pub(crate) fn filter_row_symm_neon_u8_i32_rdm<const N: usize>(
 
         let src = arena_src;
 
-        let dst_stride = image_size.width * arena.components;
-
         let length = scanned_kernel.len();
         let half_len = length / 2;
 
-        let y = filter_region.start;
         let local_src = src;
 
         let mut cx = 0usize;
@@ -87,8 +84,7 @@ pub(crate) fn filter_row_symm_neon_u8_i32_rdm<const N: usize>(
                 k3 = vmlaq_symm_hi_u8_s16::<EXPAND>(k3, v_source0.3, v_source1.3, coeff);
             }
 
-            let dst_offset = y * dst_stride + cx;
-            let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
             xvst1q_u8_x4(
                 dst_ptr0,
                 uint8x16x4_t(
@@ -121,8 +117,7 @@ pub(crate) fn filter_row_symm_neon_u8_i32_rdm<const N: usize>(
                 k2 = vmlaq_symm_hi_u8_s16::<EXPAND>(k2, v_source0.2, v_source1.2, coeff);
             }
 
-            let dst_offset = y * dst_stride + cx;
-            let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
             xvst1q_u8_x3(
                 dst_ptr0,
                 uint8x16x3_t(
@@ -150,8 +145,7 @@ pub(crate) fn filter_row_symm_neon_u8_i32_rdm<const N: usize>(
                 k0 = vmlaq_symm_hi_u8_s16::<EXPAND>(k0, v_source0, v_source1, coeff);
             }
 
-            let dst_offset = y * dst_stride + cx;
-            let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
             vst1q_u8(dst_ptr0, vqmovnq_s16x2_u8::<PRECISION>(k0));
             cx += 16;
         }
@@ -172,8 +166,7 @@ pub(crate) fn filter_row_symm_neon_u8_i32_rdm<const N: usize>(
                 k0 = vmla_symm_hi_u8_s16::<EXPAND>(k0, v_source0, v_source1, coeff);
             }
 
-            let dst_offset = y * dst_stride + cx;
-            let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
             vst1_u8(dst_ptr0, vqmovn_s16_u8::<PRECISION>(k0));
             cx += 8;
         }
@@ -213,23 +206,10 @@ pub(crate) fn filter_row_symm_neon_u8_i32_rdm<const N: usize>(
                     * coeff.weight;
             }
 
-            dst.write(
-                y * dst_stride + cx,
-                (k0 >> K_PRECISION).max(0).min(255) as u8,
-            );
-            dst.write(
-                y * dst_stride + cx + 1,
-                (k1 >> K_PRECISION).max(0).min(255) as u8,
-            );
-            dst.write(
-                y * dst_stride + cx + 2,
-                (k2 >> K_PRECISION).max(0).min(255) as u8,
-            );
-            dst.write(
-                y * dst_stride + cx + 3,
-                (k3 >> K_PRECISION).max(0).min(255) as u8,
-            );
-
+            *dst.get_unchecked_mut(cx) = k0.to_approx_();
+            *dst.get_unchecked_mut(cx + 1) = k1.to_approx_();
+            *dst.get_unchecked_mut(cx + 2) = k2.to_approx_();
+            *dst.get_unchecked_mut(cx + 3) = k3.to_approx_();
             cx += 4;
         }
 
@@ -247,10 +227,7 @@ pub(crate) fn filter_row_symm_neon_u8_i32_rdm<const N: usize>(
                     * coeff.weight;
             }
 
-            dst.write(
-                y * dst_stride + x,
-                (k0 >> K_PRECISION).max(0).min(255) as u8,
-            );
+            *dst.get_unchecked_mut(x) = k0.to_approx_();
         }
     }
 }

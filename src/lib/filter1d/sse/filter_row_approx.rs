@@ -32,9 +32,9 @@ use crate::filter1d::region::FilterRegion;
 use crate::filter1d::sse::utils::{
     _mm_mul_add_epi8_by_epi16_x4, _mm_mul_epi8_by_epi16_x4, _mm_pack_epi32_x2_epi8,
 };
+use crate::filter1d::to_approx_storage::ToApproxStorage;
 use crate::img_size::ImageSize;
 use crate::sse::{_mm_load_pack_x2, _mm_load_pack_x4, _mm_store_pack_x2, _mm_store_pack_x4};
-use crate::unsafe_slice::UnsafeSlice;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -43,7 +43,7 @@ use std::arch::x86_64::*;
 pub(crate) fn filter_row_sse_u8_i32<const N: usize>(
     arena: Arena,
     arena_src: &[u8],
-    dst: &UnsafeSlice<u8>,
+    dst: &mut [u8],
     image_size: ImageSize,
     filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<i32>],
@@ -62,18 +62,15 @@ pub(crate) fn filter_row_sse_u8_i32<const N: usize>(
 
 #[target_feature(enable = "sse4.1")]
 unsafe fn filter_row_sse_u8_i32_impl<const N: usize>(
-    arena: Arena,
+    _: Arena,
     arena_src: &[u8],
-    dst: &UnsafeSlice<u8>,
+    dst: &mut [u8],
     image_size: ImageSize,
-    filter_region: FilterRegion,
+    _: FilterRegion,
     scanned_kernel: &[ScanPoint1d<i32>],
 ) {
     let src = arena_src;
 
-    let dst_stride = image_size.width * arena.components;
-
-    let y = filter_region.start;
     let local_src = src;
 
     let length = scanned_kernel.iter().len();
@@ -102,8 +99,7 @@ unsafe fn filter_row_sse_u8_i32_impl<const N: usize>(
             k3 = _mm_mul_add_epi8_by_epi16_x4(k3, v_source.3, coeff);
         }
 
-        let dst_offset = y * dst_stride + cx;
-        let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
         _mm_store_pack_x4(
             dst_ptr0,
             (
@@ -132,8 +128,7 @@ unsafe fn filter_row_sse_u8_i32_impl<const N: usize>(
             k1 = _mm_mul_add_epi8_by_epi16_x4(k1, v_source.1, coeff);
         }
 
-        let dst_offset = y * dst_stride + cx;
-        let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
         _mm_store_pack_x2(
             dst_ptr0,
             (_mm_pack_epi32_x2_epi8(k0), _mm_pack_epi32_x2_epi8(k1)),
@@ -156,8 +151,7 @@ unsafe fn filter_row_sse_u8_i32_impl<const N: usize>(
             k0 = _mm_mul_add_epi8_by_epi16_x4(k0, v_source, coeff);
         }
 
-        let dst_offset = y * dst_stride + cx;
-        let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
         _mm_storeu_si128(dst_ptr0 as *mut __m128i, _mm_pack_epi32_x2_epi8(k0));
         cx += 16;
     }
@@ -186,23 +180,10 @@ unsafe fn filter_row_sse_u8_i32_impl<const N: usize>(
             k3 += *shifted_src.get_unchecked(rollback * N + 3) as i32 * coeff.weight;
         }
 
-        dst.write(
-            y * dst_stride + cx,
-            (k0 >> K_PRECISION).max(0).min(255) as u8,
-        );
-        dst.write(
-            y * dst_stride + cx + 1,
-            (k1 >> K_PRECISION).max(0).min(255) as u8,
-        );
-        dst.write(
-            y * dst_stride + cx + 2,
-            (k2 >> K_PRECISION).max(0).min(255) as u8,
-        );
-        dst.write(
-            y * dst_stride + cx + 3,
-            (k3 >> K_PRECISION).max(0).min(255) as u8,
-        );
-
+        *dst.get_unchecked_mut(cx) = k0.to_approx_();
+        *dst.get_unchecked_mut(cx + 1) = k1.to_approx_();
+        *dst.get_unchecked_mut(cx + 2) = k2.to_approx_();
+        *dst.get_unchecked_mut(cx + 3) = k3.to_approx_();
         cx += 4;
     }
 
@@ -217,9 +198,6 @@ unsafe fn filter_row_sse_u8_i32_impl<const N: usize>(
             k0 += (*shifted_src.get_unchecked(i * N) as i32) * coeff.weight;
         }
 
-        dst.write(
-            y * dst_stride + x,
-            (k0 >> K_PRECISION).max(0).min(255) as u8,
-        );
+        *dst.get_unchecked_mut(x) = k0.to_approx_();
     }
 }
