@@ -33,16 +33,15 @@ use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
 use crate::to_storage::ToStorage;
-use crate::unsafe_slice::UnsafeSlice;
 use num_traits::{AsPrimitive, MulAdd};
 use std::ops::{Add, Mul};
 
 pub fn filter_row_symmetrical<T, F, const N: usize>(
     _: Arena,
     arena_src: &[T],
-    dst: &UnsafeSlice<T>,
+    dst: &mut [T],
     image_size: ImageSize,
-    filter_region: FilterRegion,
+    _: FilterRegion,
     scanned_kernel: &[ScanPoint1d<F>],
 ) where
     T: Copy + AsPrimitive<F> + Default,
@@ -52,11 +51,8 @@ pub fn filter_row_symmetrical<T, F, const N: usize>(
     unsafe {
         let width = image_size.width;
 
-        let dst_stride = image_size.width * N;
-
         let length = scanned_kernel.len();
         let half_len = length / 2;
-        let y = filter_region.start;
 
         let mut cx = 0usize;
         let max_width = width * N;
@@ -101,11 +97,10 @@ pub fn filter_row_symmetrical<T, F, const N: usize>(
                 );
             }
 
-            dst.write(y * dst_stride + cx, k0.to_());
-            dst.write(y * dst_stride + cx + 1, k1.to_());
-            dst.write(y * dst_stride + cx + 2, k2.to_());
-            dst.write(y * dst_stride + cx + 3, k3.to_());
-
+            *dst.get_unchecked_mut(cx) = k0.to_();
+            *dst.get_unchecked_mut(cx + 1) = k1.to_();
+            *dst.get_unchecked_mut(cx + 2) = k2.to_();
+            *dst.get_unchecked_mut(cx + 3) = k3.to_();
             cx += 4;
         }
 
@@ -126,7 +121,7 @@ pub fn filter_row_symmetrical<T, F, const N: usize>(
                 );
             }
 
-            dst.write(y * dst_stride + x, k0.to_());
+            *dst.get_unchecked_mut(x) = k0.to_();
         }
     }
 }

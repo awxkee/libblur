@@ -35,27 +35,22 @@ use crate::filter1d::neon::utils::{
 use crate::filter1d::region::FilterRegion;
 use crate::filter1d::to_approx_storage::ToApproxStorage;
 use crate::img_size::ImageSize;
-use crate::unsafe_slice::UnsafeSlice;
 use std::arch::aarch64::*;
 use std::ops::{Add, Mul};
 
 pub(crate) fn filter_column_symm_neon_u8_i32_rdm(
     arena: Arena,
     arena_src: &[&[u8]],
-    dst: &UnsafeSlice<u8>,
+    dst: &mut [u8],
     image_size: ImageSize,
-    filter_region: FilterRegion,
+    _: FilterRegion,
     scanned_kernel: &[ScanPoint1d<i32>],
 ) {
     unsafe {
         let image_width = image_size.width * arena.components;
 
-        let dst_stride = image_size.width * arena.components;
-
         let length = scanned_kernel.len();
         let half_len = length / 2;
-
-        let y = filter_region.start;
 
         let mut cx = 0usize;
 
@@ -90,8 +85,7 @@ pub(crate) fn filter_column_symm_neon_u8_i32_rdm(
                 k3 = vmlaq_symm_hi_u8_s16::<EXPAND>(k3, v_source0.3, v_source1.3, coeff);
             }
 
-            let dst_offset = y * dst_stride + cx;
-            let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
             xvst1q_u8_x4(
                 dst_ptr0,
                 uint8x16x4_t(
@@ -130,8 +124,7 @@ pub(crate) fn filter_column_symm_neon_u8_i32_rdm(
                 k2 = vmlaq_symm_hi_u8_s16::<EXPAND>(k2, v_source0.2, v_source1.2, coeff);
             }
 
-            let dst_offset = y * dst_stride + cx;
-            let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
             xvst1q_u8_x3(
                 dst_ptr0,
                 uint8x16x3_t(
@@ -167,8 +160,7 @@ pub(crate) fn filter_column_symm_neon_u8_i32_rdm(
                 k1 = vmlaq_symm_hi_u8_s16::<EXPAND>(k1, v_source0.1, v_source1.1, coeff);
             }
 
-            let dst_offset = y * dst_stride + cx;
-            let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
             xvst1q_u8_x2(
                 dst_ptr0,
                 uint8x16x2_t(
@@ -200,8 +192,7 @@ pub(crate) fn filter_column_symm_neon_u8_i32_rdm(
                 k0 = vmlaq_symm_hi_u8_s16::<EXPAND>(k0, v_source0, v_source1, coeff);
             }
 
-            let dst_offset = y * dst_stride + cx;
-            let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
             vst1q_u8(dst_ptr0, vqmovnq_s16x2_u8::<PRECISION>(k0));
             cx += 16;
         }
@@ -237,12 +228,10 @@ pub(crate) fn filter_column_symm_neon_u8_i32_rdm(
                     .add(k3);
             }
 
-            let dst_offset = y * dst_stride + cx;
-
-            dst.write(dst_offset, k0.to_approx_());
-            dst.write(dst_offset + 1, k1.to_approx_());
-            dst.write(dst_offset + 2, k2.to_approx_());
-            dst.write(dst_offset + 3, k3.to_approx_());
+            *dst.get_unchecked_mut(cx) = k0.to_approx_();
+            *dst.get_unchecked_mut(cx + 1) = k1.to_approx_();
+            *dst.get_unchecked_mut(cx + 2) = k2.to_approx_();
+            *dst.get_unchecked_mut(cx + 3) = k3.to_approx_();
             cx += 4;
         }
 
@@ -262,7 +251,7 @@ pub(crate) fn filter_column_symm_neon_u8_i32_rdm(
                     .add(k0);
             }
 
-            dst.write(y * dst_stride + x, k0.to_approx_());
+            *dst.get_unchecked_mut(x) = k0.to_approx_();
         }
     }
 }

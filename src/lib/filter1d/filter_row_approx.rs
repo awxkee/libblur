@@ -31,16 +31,15 @@ use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::region::FilterRegion;
 use crate::filter1d::to_approx_storage::ToApproxStorage;
 use crate::img_size::ImageSize;
-use crate::unsafe_slice::UnsafeSlice;
 use num_traits::AsPrimitive;
 use std::ops::{Add, Mul, Shr};
 
 pub fn filter_row_approx<T, I, const N: usize>(
     _: Arena,
     arena_src: &[T],
-    dst: &UnsafeSlice<T>,
+    dst: &mut [T],
     image_size: ImageSize,
-    filter_region: FilterRegion,
+    _: FilterRegion,
     scanned_kernel: &[ScanPoint1d<I>],
 ) where
     T: Copy + AsPrimitive<I> + Default,
@@ -57,11 +56,8 @@ pub fn filter_row_approx<T, I, const N: usize>(
 
         let src = arena_src;
 
-        let dst_stride = image_size.width * N;
-
         let max_width = width * N;
 
-        let y = filter_region.start;
         let local_src = src;
 
         let length = scanned_kernel.len();
@@ -84,11 +80,10 @@ pub fn filter_row_approx<T, I, const N: usize>(
                 k3 = k3 + shifted_src.get_unchecked(i * N + 3).as_() * coeff.weight;
             }
 
-            dst.write(y * dst_stride + cx, k0.to_approx_());
-            dst.write(y * dst_stride + cx + 1, k1.to_approx_());
-            dst.write(y * dst_stride + cx + 2, k2.to_approx_());
-            dst.write(y * dst_stride + cx + 3, k3.to_approx_());
-
+            *dst.get_unchecked_mut(cx) = k0.to_approx_();
+            *dst.get_unchecked_mut(cx + 1) = k1.to_approx_();
+            *dst.get_unchecked_mut(cx + 2) = k2.to_approx_();
+            *dst.get_unchecked_mut(cx + 3) = k3.to_approx_();
             cx += 4;
         }
 
@@ -102,7 +97,7 @@ pub fn filter_row_approx<T, I, const N: usize>(
                 k0 = k0 + shifted_src.get_unchecked(i * N).as_() * coeff.weight;
             }
 
-            dst.write(y * dst_stride + x, k0.to_approx_());
+            *dst.get_unchecked_mut(x) = k0.to_approx_();
         }
     }
 }

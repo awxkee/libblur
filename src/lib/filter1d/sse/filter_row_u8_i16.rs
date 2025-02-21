@@ -32,7 +32,7 @@ use crate::filter1d::region::FilterRegion;
 use crate::filter1d::sse::utils::{_mm_madd_epi8_by_epi16_x4, _mm_madd_s_epi8_by_epi16_x4};
 use crate::img_size::ImageSize;
 use crate::sse::{_mm_load_pack_x3, _mm_store_pack_x3};
-use crate::unsafe_slice::UnsafeSlice;
+use crate::to_storage::ToStorage;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -41,7 +41,7 @@ use std::arch::x86_64::*;
 pub(crate) fn filter_rgb_row_sse_u8_i16<const N: usize>(
     arena: Arena,
     arena_src: &[u8],
-    dst: &UnsafeSlice<u8>,
+    dst: &mut [u8],
     image_size: ImageSize,
     filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<i16>],
@@ -60,22 +60,19 @@ pub(crate) fn filter_rgb_row_sse_u8_i16<const N: usize>(
 
 #[target_feature(enable = "sse4.1")]
 unsafe fn filter_rgb_row_sse_u8_i16_impl<const N: usize>(
-    arena: Arena,
+    _: Arena,
     arena_src: &[u8],
-    dst: &UnsafeSlice<u8>,
+    dst: &mut [u8],
     image_size: ImageSize,
-    filter_region: FilterRegion,
+    _: FilterRegion,
     scanned_kernel: &[ScanPoint1d<i16>],
 ) {
     const N: usize = 3;
 
-    let src = &arena_src;
-
-    let dst_stride = image_size.width * arena.components;
+    let src = arena_src;
 
     let length = scanned_kernel.len();
 
-    let y = filter_region.start;
     let local_src = src;
 
     let mut cx = 0usize;
@@ -100,8 +97,7 @@ unsafe fn filter_rgb_row_sse_u8_i16_impl<const N: usize>(
             k2 = _mm_madd_s_epi8_by_epi16_x4(k2, v_source.2, coeff);
         }
 
-        let dst_offset = y * dst_stride + cx;
-        let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
         _mm_store_pack_x3(
             dst_ptr0,
             (
@@ -128,8 +124,7 @@ unsafe fn filter_rgb_row_sse_u8_i16_impl<const N: usize>(
             k0 = _mm_madd_s_epi8_by_epi16_x4(k0, v_source, coeff);
         }
 
-        let dst_offset = y * dst_stride + cx;
-        let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
         _mm_storeu_si128(dst_ptr0 as *mut _, _mm_packus_epi16(k0.0, k0.1));
         cx += 16;
     }
@@ -150,10 +145,10 @@ unsafe fn filter_rgb_row_sse_u8_i16_impl<const N: usize>(
             k3 += *shifted_src.get_unchecked(i * N + 3) as i16 * coeff.weight;
         }
 
-        dst.write(y * dst_stride + cx, k0.max(0).min(255) as u8);
-        dst.write(y * dst_stride + cx + 1, k1.max(0).min(255) as u8);
-        dst.write(y * dst_stride + cx + 2, k2.max(0).min(255) as u8);
-        dst.write(y * dst_stride + cx + 3, k3.max(0).min(255) as u8);
+        *dst.get_unchecked_mut(cx) = k0.to_();
+        *dst.get_unchecked_mut(cx + 1) = k1.to_();
+        *dst.get_unchecked_mut(cx + 2) = k2.to_();
+        *dst.get_unchecked_mut(cx + 3) = k3.to_();
         cx += 4;
     }
 
@@ -167,6 +162,6 @@ unsafe fn filter_rgb_row_sse_u8_i16_impl<const N: usize>(
             k0 += *shifted_src.get_unchecked(i * N) as i16 * coeff.weight;
         }
 
-        dst.write(y * dst_stride + x, k0.max(0).min(255) as u8);
+        *dst.get_unchecked_mut(x) = k0.to_();
     }
 }

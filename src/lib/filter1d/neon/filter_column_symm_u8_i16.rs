@@ -36,34 +36,29 @@ use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
 use crate::to_storage::ToStorage;
-use crate::unsafe_slice::UnsafeSlice;
 use std::arch::aarch64::*;
 use std::ops::{Add, Mul};
 
 pub fn filter_column_symm_neon_u8_i16(
     arena: Arena,
     arena_src: &[&[u8]],
-    dst: &UnsafeSlice<u8>,
+    dst: &mut [u8],
     image_size: ImageSize,
-    filter_region: FilterRegion,
+    _: FilterRegion,
     scanned_kernel: &[ScanPoint1d<i16>],
 ) {
     unsafe {
         let max_width = image_size.width * arena.components;
 
-        let dst_stride = image_size.width * arena.components;
-
-        let y = filter_region.start;
-
         let length = scanned_kernel.len();
         let half_len = length / 2;
 
-        let mut _cx = 0usize;
+        let mut cx = 0usize;
 
-        while _cx + 64 < max_width {
+        while cx + 64 < max_width {
             let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(half_len).weight);
 
-            let v_src = arena_src.get_unchecked(half_len).get_unchecked(_cx..);
+            let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
 
             let source = xvld1q_u8_x4(v_src.as_ptr());
             let mut k0 = vmulq_u8_by_i16(source.0, coeff);
@@ -75,11 +70,11 @@ pub fn filter_column_symm_neon_u8_i16(
                 let rollback = length - i - 1;
                 let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight);
                 let v_source0 =
-                    xvld1q_u8_x4(arena_src.get_unchecked(i).get_unchecked(_cx..).as_ptr());
+                    xvld1q_u8_x4(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 let v_source1 = xvld1q_u8_x4(
                     arena_src
                         .get_unchecked(rollback)
-                        .get_unchecked(_cx..)
+                        .get_unchecked(cx..)
                         .as_ptr(),
                 );
                 k0 = vdotq_exact_symm_s16(k0, v_source0.0, v_source1.0, coeff);
@@ -88,8 +83,7 @@ pub fn filter_column_symm_neon_u8_i16(
                 k3 = vdotq_exact_symm_s16(k3, v_source0.3, v_source1.3, coeff);
             }
 
-            let dst_offset = y * dst_stride + _cx;
-            let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
             xvst1q_u8_x4(
                 dst_ptr0,
                 uint8x16x4_t(
@@ -99,13 +93,13 @@ pub fn filter_column_symm_neon_u8_i16(
                     vcombine_u8(vqmovun_s16(k3.0), vqmovun_s16(k3.1)),
                 ),
             );
-            _cx += 64;
+            cx += 64;
         }
 
-        while _cx + 48 < max_width {
+        while cx + 48 < max_width {
             let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(half_len).weight);
 
-            let v_src = arena_src.get_unchecked(half_len).get_unchecked(_cx..);
+            let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
 
             let source = xvld1q_u8_x3(v_src.as_ptr());
             let mut k0 = vmulq_u8_by_i16(source.0, coeff);
@@ -116,11 +110,11 @@ pub fn filter_column_symm_neon_u8_i16(
                 let rollback = length - i - 1;
                 let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight);
                 let v_source0 =
-                    xvld1q_u8_x3(arena_src.get_unchecked(i).get_unchecked(_cx..).as_ptr());
+                    xvld1q_u8_x3(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 let v_source1 = xvld1q_u8_x3(
                     arena_src
                         .get_unchecked(rollback)
-                        .get_unchecked(_cx..)
+                        .get_unchecked(cx..)
                         .as_ptr(),
                 );
                 k0 = vdotq_exact_symm_s16(k0, v_source0.0, v_source1.0, coeff);
@@ -128,8 +122,7 @@ pub fn filter_column_symm_neon_u8_i16(
                 k2 = vdotq_exact_symm_s16(k2, v_source0.2, v_source1.2, coeff);
             }
 
-            let dst_offset = y * dst_stride + _cx;
-            let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
             xvst1q_u8_x3(
                 dst_ptr0,
                 uint8x16x3_t(
@@ -138,13 +131,13 @@ pub fn filter_column_symm_neon_u8_i16(
                     vcombine_u8(vqmovun_s16(k2.0), vqmovun_s16(k2.1)),
                 ),
             );
-            _cx += 48;
+            cx += 48;
         }
 
-        while _cx + 32 < max_width {
+        while cx + 32 < max_width {
             let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(half_len).weight);
 
-            let v_src = arena_src.get_unchecked(half_len).get_unchecked(_cx..);
+            let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
 
             let source = xvld1q_u8_x2(v_src.as_ptr());
             let mut k0 = vmulq_u8_by_i16(source.0, coeff);
@@ -154,19 +147,18 @@ pub fn filter_column_symm_neon_u8_i16(
                 let rollback = length - i - 1;
                 let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight);
                 let v_source0 =
-                    xvld1q_u8_x2(arena_src.get_unchecked(i).get_unchecked(_cx..).as_ptr());
+                    xvld1q_u8_x2(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 let v_source1 = xvld1q_u8_x2(
                     arena_src
                         .get_unchecked(rollback)
-                        .get_unchecked(_cx..)
+                        .get_unchecked(cx..)
                         .as_ptr(),
                 );
                 k0 = vdotq_exact_symm_s16(k0, v_source0.0, v_source1.0, coeff);
                 k1 = vdotq_exact_symm_s16(k1, v_source0.1, v_source1.1, coeff);
             }
 
-            let dst_offset = y * dst_stride + _cx;
-            let dst_ptr0 = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
             xvst1q_u8_x2(
                 dst_ptr0,
                 uint8x16x2_t(
@@ -175,13 +167,13 @@ pub fn filter_column_symm_neon_u8_i16(
                 ),
             );
 
-            _cx += 32;
+            cx += 32;
         }
 
-        while _cx + 16 < max_width {
+        while cx + 16 < max_width {
             let coeff = *scanned_kernel.get_unchecked(half_len);
 
-            let v_src = arena_src.get_unchecked(half_len).get_unchecked(_cx..);
+            let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
 
             let source_0 = vld1q_u8(v_src.as_ptr());
             let mut k0 = vmulq_u8_by_i16(source_0, vdupq_n_s16(coeff.weight));
@@ -189,26 +181,25 @@ pub fn filter_column_symm_neon_u8_i16(
             for i in 0..half_len {
                 let rollback = length - i - 1;
                 let coeff = *scanned_kernel.get_unchecked(i);
-                let v_source0 = vld1q_u8(arena_src.get_unchecked(i).get_unchecked(_cx..).as_ptr());
+                let v_source0 = vld1q_u8(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 let v_source1 = vld1q_u8(
                     arena_src
                         .get_unchecked(rollback)
-                        .get_unchecked(_cx..)
+                        .get_unchecked(cx..)
                         .as_ptr(),
                 );
                 k0 = vdotq_exact_symm_s16(k0, v_source0, v_source1, vdupq_n_s16(coeff.weight));
             }
 
-            let dst_offset = y * dst_stride + _cx;
-            let dst_ptr = (dst.slice.as_ptr() as *mut u8).add(dst_offset);
+            let dst_ptr = dst.get_unchecked_mut(cx..).as_mut_ptr();
             vst1q_u8(dst_ptr, vcombine_u8(vqmovun_s16(k0.0), vqmovun_s16(k0.1)));
-            _cx += 16;
+            cx += 16;
         }
 
-        while _cx + 4 < max_width {
+        while cx + 4 < max_width {
             let coeff = *scanned_kernel.get_unchecked(half_len);
 
-            let v_src = arena_src.get_unchecked(half_len).get_unchecked(_cx..);
+            let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
 
             let mut k0 = (*v_src.get_unchecked(0) as i16).mul(coeff.weight);
             let mut k1 = (*v_src.get_unchecked(1) as i16).mul(coeff.weight);
@@ -220,40 +211,38 @@ pub fn filter_column_symm_neon_u8_i16(
                 let coeff = *scanned_kernel.get_unchecked(i);
                 k0 = mlaf(
                     k0,
-                    ((*arena_src.get_unchecked(i).get_unchecked(_cx)) as i16)
-                        .add((*arena_src.get_unchecked(rollback).get_unchecked(_cx)) as i16),
+                    ((*arena_src.get_unchecked(i).get_unchecked(cx)) as i16)
+                        .add((*arena_src.get_unchecked(rollback).get_unchecked(cx)) as i16),
                     coeff.weight,
                 );
                 k1 = mlaf(
                     k1,
-                    ((*arena_src.get_unchecked(i).get_unchecked(_cx + 1)) as i16)
-                        .add((*arena_src.get_unchecked(rollback).get_unchecked(_cx + 1)) as i16),
+                    ((*arena_src.get_unchecked(i).get_unchecked(cx + 1)) as i16)
+                        .add((*arena_src.get_unchecked(rollback).get_unchecked(cx + 1)) as i16),
                     coeff.weight,
                 );
                 k2 = mlaf(
                     k2,
-                    ((*arena_src.get_unchecked(i).get_unchecked(_cx + 2)) as i16)
-                        .add((*arena_src.get_unchecked(rollback).get_unchecked(_cx + 2)) as i16),
+                    ((*arena_src.get_unchecked(i).get_unchecked(cx + 2)) as i16)
+                        .add((*arena_src.get_unchecked(rollback).get_unchecked(cx + 2)) as i16),
                     coeff.weight,
                 );
                 k3 = mlaf(
                     k3,
-                    ((*arena_src.get_unchecked(i).get_unchecked(_cx + 3)) as i16)
-                        .add((*arena_src.get_unchecked(rollback).get_unchecked(_cx + 3)) as i16),
+                    ((*arena_src.get_unchecked(i).get_unchecked(cx + 3)) as i16)
+                        .add((*arena_src.get_unchecked(rollback).get_unchecked(cx + 3)) as i16),
                     coeff.weight,
                 );
             }
 
-            let dst_offset = y * dst_stride + _cx;
-
-            dst.write(dst_offset, k0.to_());
-            dst.write(dst_offset + 1, k1.to_());
-            dst.write(dst_offset + 2, k2.to_());
-            dst.write(dst_offset + 3, k3.to_());
-            _cx += 4;
+            *dst.get_unchecked_mut(cx) = k0.to_();
+            *dst.get_unchecked_mut(cx + 1) = k1.to_();
+            *dst.get_unchecked_mut(cx + 2) = k2.to_();
+            *dst.get_unchecked_mut(cx + 3) = k3.to_();
+            cx += 4;
         }
 
-        for x in _cx..max_width {
+        for x in cx..max_width {
             let coeff = *scanned_kernel.get_unchecked(half_len);
 
             let v_src = arena_src.get_unchecked(half_len).get_unchecked(x..);
@@ -271,7 +260,7 @@ pub fn filter_column_symm_neon_u8_i16(
                 );
             }
 
-            dst.write(y * dst_stride + x, k0.to_());
+            *dst.get_unchecked_mut(x) = k0.to_();
         }
     }
 }

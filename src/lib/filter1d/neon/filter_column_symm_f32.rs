@@ -34,22 +34,19 @@ use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
 use crate::neon::{prefer_vfma_f32, prefer_vfmaq_f32};
 use crate::to_storage::ToStorage;
-use crate::unsafe_slice::UnsafeSlice;
 use std::arch::aarch64::*;
 use std::ops::{Add, Mul};
 
 pub fn filter_column_neon_symm_f32_f32(
     arena: Arena,
     arena_src: &[&[f32]],
-    dst: &UnsafeSlice<f32>,
+    dst: &mut [f32],
     image_size: ImageSize,
-    filter_region: FilterRegion,
+    _: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
     unsafe {
         let dst_stride = image_size.width * arena.components;
-
-        let y = filter_region.start;
 
         let length = scanned_kernel.len();
         let half_len = length / 2;
@@ -84,8 +81,7 @@ pub fn filter_column_neon_symm_f32_f32(
                 k3 = prefer_vfmaq_f32(k3, vaddq_f32(v_source0.3, v_source1.3), coeff);
             }
 
-            let dst_offset = y * dst_stride + cx;
-            let dst_ptr0 = (dst.slice.as_ptr() as *mut f32).add(dst_offset);
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
             xvst1q_f32_x4(dst_ptr0, float32x4x4_t(k0, k1, k2, k3));
             cx += 16;
         }
@@ -114,8 +110,7 @@ pub fn filter_column_neon_symm_f32_f32(
                 k1 = prefer_vfmaq_f32(k1, vaddq_f32(v_source0.1, v_source1.1), coeff);
             }
 
-            let dst_offset = y * dst_stride + cx;
-            let dst_ptr0 = (dst.slice.as_ptr() as *mut f32).add(dst_offset);
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
             xvst1q_f32_x2(dst_ptr0, float32x4x2_t(k0, k1));
 
             cx += 8;
@@ -146,8 +141,7 @@ pub fn filter_column_neon_symm_f32_f32(
                 );
             }
 
-            let dst_offset = y * dst_stride + cx;
-            let dst_ptr = (dst.slice.as_ptr() as *mut f32).add(dst_offset);
+            let dst_ptr = dst.get_unchecked_mut(cx..).as_mut_ptr();
             vst1q_f32(dst_ptr, k0);
             cx += 4;
         }
@@ -177,8 +171,7 @@ pub fn filter_column_neon_symm_f32_f32(
                 );
             }
 
-            let dst_offset = y * dst_stride + cx;
-            let dst_ptr = (dst.slice.as_ptr() as *mut f32).add(dst_offset);
+            let dst_ptr = dst.get_unchecked_mut(cx..).as_mut_ptr();
             vst1_f32(dst_ptr, k0);
             cx += 2;
         }
@@ -203,7 +196,7 @@ pub fn filter_column_neon_symm_f32_f32(
                 );
             }
 
-            dst.write(y * dst_stride + x, k0.to_());
+            *dst.get_unchecked_mut(x) = k0.to_();
         }
     }
 }
