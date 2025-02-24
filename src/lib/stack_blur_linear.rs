@@ -69,10 +69,10 @@ pub fn stack_blur_in_linear(
         stride as usize,
         width as usize,
         height as usize,
-        channels.get_channels(),
+        channels.channels(),
     )?;
     let mut linear_data: Vec<f32> =
-        vec![0f32; width as usize * height as usize * channels.get_channels()];
+        vec![0f32; width as usize * height as usize * channels.channels()];
 
     let forward_transformer = match channels {
         FastBlurChannels::Plane => plane_to_linear,
@@ -90,7 +90,7 @@ pub fn stack_blur_in_linear(
         in_place,
         stride,
         &mut linear_data,
-        width * size_of::<f32>() as u32 * channels.get_channels() as u32,
+        width * size_of::<f32>() as u32 * channels.channels() as u32,
         width,
         height,
         transfer_function,
@@ -98,7 +98,7 @@ pub fn stack_blur_in_linear(
 
     crate::stack_blur_f32(
         &mut linear_data,
-        width * channels.get_channels() as u32,
+        width * channels.channels() as u32,
         width,
         height,
         radius,
@@ -108,7 +108,7 @@ pub fn stack_blur_in_linear(
 
     inverse_transformer(
         &linear_data,
-        width * size_of::<f32>() as u32 * channels.get_channels() as u32,
+        width * size_of::<f32>() as u32 * channels.channels() as u32,
         in_place,
         stride,
         width,

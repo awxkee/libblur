@@ -205,7 +205,7 @@ pub fn stack_blur(
         stride as usize,
         width as usize,
         height as usize,
-        channels.get_channels(),
+        channels.channels(),
     )?;
 
     #[allow(clippy::manual_clamp)]

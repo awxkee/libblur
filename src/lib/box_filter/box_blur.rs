@@ -819,19 +819,19 @@ pub fn box_blur_in_linear(
         src_stride as usize,
         width as usize,
         height as usize,
-        channels.get_channels(),
+        channels.channels(),
     )?;
     check_slice_size(
         dst,
         dst_stride as usize,
         width as usize,
         height as usize,
-        channels.get_channels(),
+        channels.channels(),
     )?;
     let mut linear_data: Vec<f32> =
-        vec![0f32; width as usize * height as usize * channels.get_channels()];
+        vec![0f32; width as usize * height as usize * channels.channels()];
     let mut linear_data_2: Vec<f32> =
-        vec![0f32; width as usize * height as usize * channels.get_channels()];
+        vec![0f32; width as usize * height as usize * channels.channels()];
 
     let forward_transformer = match channels {
         FastBlurChannels::Plane => plane_to_linear,
@@ -849,7 +849,7 @@ pub fn box_blur_in_linear(
         src,
         src_stride,
         &mut linear_data,
-        width * std::mem::size_of::<f32>() as u32 * channels.get_channels() as u32,
+        width * std::mem::size_of::<f32>() as u32 * channels.channels() as u32,
         width,
         height,
         transfer_function,
@@ -857,9 +857,9 @@ pub fn box_blur_in_linear(
 
     box_blur_f32(
         &linear_data,
-        width * channels.get_channels() as u32,
+        width * channels.channels() as u32,
         &mut linear_data_2,
-        width * channels.get_channels() as u32,
+        width * channels.channels() as u32,
         width,
         height,
         radius,
@@ -869,7 +869,7 @@ pub fn box_blur_in_linear(
 
     inverse_transformer(
         &linear_data_2,
-        width * std::mem::size_of::<f32>() as u32 * channels.get_channels() as u32,
+        width * std::mem::size_of::<f32>() as u32 * channels.channels() as u32,
         dst,
         dst_stride,
         width,
@@ -1180,19 +1180,19 @@ pub fn tent_blur_in_linear(
         src_stride as usize,
         width as usize,
         height as usize,
-        channels.get_channels(),
+        channels.channels(),
     )?;
     check_slice_size(
         dst,
         dst_stride as usize,
         width as usize,
         height as usize,
-        channels.get_channels(),
+        channels.channels(),
     )?;
     let mut linear_data: Vec<f32> =
-        vec![0f32; width as usize * height as usize * channels.get_channels()];
+        vec![0f32; width as usize * height as usize * channels.channels()];
     let mut linear_data_2: Vec<f32> =
-        vec![0f32; width as usize * height as usize * channels.get_channels()];
+        vec![0f32; width as usize * height as usize * channels.channels()];
 
     let forward_transformer = match channels {
         FastBlurChannels::Plane => plane_to_linear,
@@ -1210,7 +1210,7 @@ pub fn tent_blur_in_linear(
         src,
         src_stride,
         &mut linear_data,
-        width * std::mem::size_of::<f32>() as u32 * channels.get_channels() as u32,
+        width * std::mem::size_of::<f32>() as u32 * channels.channels() as u32,
         width,
         height,
         transfer_function,
@@ -1218,9 +1218,9 @@ pub fn tent_blur_in_linear(
 
     tent_blur_f32(
         &linear_data,
-        width * channels.get_channels() as u32,
+        width * channels.channels() as u32,
         &mut linear_data_2,
-        width * channels.get_channels() as u32,
+        width * channels.channels() as u32,
         width,
         height,
         sigma,
@@ -1230,7 +1230,7 @@ pub fn tent_blur_in_linear(
 
     inverse_transformer(
         &linear_data_2,
-        width * std::mem::size_of::<f32>() as u32 * channels.get_channels() as u32,
+        width * std::mem::size_of::<f32>() as u32 * channels.channels() as u32,
         dst,
         dst_stride,
         width,
@@ -1513,19 +1513,19 @@ pub fn gaussian_box_blur_in_linear(
         src_stride as usize,
         width as usize,
         height as usize,
-        channels.get_channels(),
+        channels.channels(),
     )?;
     check_slice_size(
         dst,
         dst_stride as usize,
         width as usize,
         height as usize,
-        channels.get_channels(),
+        channels.channels(),
     )?;
     let mut linear_data: Vec<f32> =
-        vec![0f32; width as usize * height as usize * channels.get_channels()];
+        vec![0f32; width as usize * height as usize * channels.channels()];
     let mut linear_data_2: Vec<f32> =
-        vec![0f32; width as usize * height as usize * channels.get_channels()];
+        vec![0f32; width as usize * height as usize * channels.channels()];
 
     let forward_transformer = match channels {
         FastBlurChannels::Plane => plane_to_linear,
@@ -1543,7 +1543,7 @@ pub fn gaussian_box_blur_in_linear(
         src,
         src_stride,
         &mut linear_data,
-        width * std::mem::size_of::<f32>() as u32 * channels.get_channels() as u32,
+        width * std::mem::size_of::<f32>() as u32 * channels.channels() as u32,
         width,
         height,
         transfer_function,
@@ -1551,9 +1551,9 @@ pub fn gaussian_box_blur_in_linear(
 
     gaussian_box_blur_f32(
         &linear_data,
-        width * channels.get_channels() as u32,
+        width * channels.channels() as u32,
         &mut linear_data_2,
-        width * channels.get_channels() as u32,
+        width * channels.channels() as u32,
         width,
         height,
         sigma,
@@ -1563,7 +1563,7 @@ pub fn gaussian_box_blur_in_linear(
 
     inverse_transformer(
         &linear_data_2,
-        width * std::mem::size_of::<f32>() as u32 * channels.get_channels() as u32,
+        width * std::mem::size_of::<f32>() as u32 * channels.channels() as u32,
         dst,
         dst_stride,
         width,

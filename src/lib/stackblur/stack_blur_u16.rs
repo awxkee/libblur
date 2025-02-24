@@ -143,7 +143,7 @@ pub fn stack_blur_u16(
         stride as usize,
         width as usize,
         height as usize,
-        channels.get_channels(),
+        channels.channels(),
     )?;
     #[allow(clippy::manual_clamp)]
     let radius = radius.max(1).min(2000);

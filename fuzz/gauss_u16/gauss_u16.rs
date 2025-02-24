@@ -57,8 +57,8 @@ fn fuzz_16bit(width: usize, height: usize, radius: usize, channels: FastBlurChan
     if width == 0 || height == 0 || radius == 0 {
         return;
     }
-    let src_image = vec![15u16; width * height * channels.get_channels()];
-    let mut dst_image = vec![0u16; width * height * channels.get_channels()];
+    let src_image = vec![15u16; width * height * channels.channels()];
+    let mut dst_image = vec![0u16; width * height * channels.channels()];
 
     libblur::gaussian_blur_u16(
         &src_image,

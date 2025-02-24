@@ -27,13 +27,13 @@
 
 use crate::channels_configuration::FastBlurChannels;
 use crate::edge_mode::EdgeMode;
-use crate::gaussian::gaussian_kernel::get_gaussian_kernel_1d;
-use crate::gaussian::gaussian_util::get_kernel_size;
+use crate::gaussian::gaussian_kernel::gaussian_kernel_1d;
+use crate::gaussian::gaussian_util::kernel_size as get_kernel_size;
 use crate::util::check_slice_size;
 use crate::{
     filter_1d_approx, filter_1d_exact, filter_1d_rgb_approx, filter_1d_rgb_exact,
-    filter_1d_rgba_approx, filter_1d_rgba_exact, get_sigma_size, BlurError, ConvolutionMode,
-    ImageSize, Scalar, ThreadingPolicy,
+    filter_1d_rgba_approx, filter_1d_rgba_exact, sigma_size, BlurError, ConvolutionMode, ImageSize,
+    Scalar, ThreadingPolicy,
 };
 use half::f16;
 
@@ -73,17 +73,17 @@ pub fn gaussian_blur(
 ) -> Result<(), BlurError> {
     check_slice_size(
         src,
-        width as usize * channels.get_channels(),
+        width as usize * channels.channels(),
         width as usize,
         height as usize,
-        channels.get_channels(),
+        channels.channels(),
     )?;
     check_slice_size(
         dst,
-        width as usize * channels.get_channels(),
+        width as usize * channels.channels(),
         width as usize,
         height as usize,
-        channels.get_channels(),
+        channels.channels(),
     )?;
     assert!(
         kernel_size != 0 || sigma > 0.0,
@@ -93,7 +93,7 @@ pub fn gaussian_blur(
         assert_ne!(kernel_size % 2, 0, "Kernel size must be odd");
     }
     let sigma = if sigma <= 0. {
-        get_sigma_size(kernel_size as usize)
+        sigma_size(kernel_size as usize)
     } else {
         sigma
     };
@@ -102,7 +102,7 @@ pub fn gaussian_blur(
     } else {
         kernel_size
     };
-    let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
+    let kernel = gaussian_kernel_1d(kernel_size, sigma);
     match hint {
         ConvolutionMode::Exact => {
             let _dispatcher = match channels {
@@ -174,17 +174,17 @@ pub fn gaussian_blur_u16(
 ) -> Result<(), BlurError> {
     check_slice_size(
         src,
-        width as usize * channels.get_channels(),
+        width as usize * channels.channels(),
         width as usize,
         height as usize,
-        channels.get_channels(),
+        channels.channels(),
     )?;
     check_slice_size(
         dst,
-        width as usize * channels.get_channels(),
+        width as usize * channels.channels(),
         width as usize,
         height as usize,
-        channels.get_channels(),
+        channels.channels(),
     )?;
     assert!(
         kernel_size != 0 || sigma > 0.0,
@@ -194,7 +194,7 @@ pub fn gaussian_blur_u16(
         assert_ne!(kernel_size % 2, 0, "Kernel size must be odd");
     }
     let sigma = if sigma <= 0. {
-        get_sigma_size(kernel_size as usize)
+        sigma_size(kernel_size as usize)
     } else {
         sigma
     };
@@ -203,7 +203,7 @@ pub fn gaussian_blur_u16(
     } else {
         kernel_size
     };
-    let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
+    let kernel = gaussian_kernel_1d(kernel_size, sigma);
     let _dispatcher = match channels {
         FastBlurChannels::Plane => filter_1d_exact::<u16, f32>,
         FastBlurChannels::Channels3 => filter_1d_rgb_exact::<u16, f32>,
@@ -254,17 +254,17 @@ pub fn gaussian_blur_f32(
 ) -> Result<(), BlurError> {
     check_slice_size(
         src,
-        width as usize * channels.get_channels(),
+        width as usize * channels.channels(),
         width as usize,
         height as usize,
-        channels.get_channels(),
+        channels.channels(),
     )?;
     check_slice_size(
         dst,
-        width as usize * channels.get_channels(),
+        width as usize * channels.channels(),
         width as usize,
         height as usize,
-        channels.get_channels(),
+        channels.channels(),
     )?;
     assert!(
         kernel_size != 0 || sigma > 0.0,
@@ -274,7 +274,7 @@ pub fn gaussian_blur_f32(
         assert_ne!(kernel_size % 2, 0, "Kernel size must be odd");
     }
     let sigma = if sigma <= 0. {
-        get_sigma_size(kernel_size as usize)
+        sigma_size(kernel_size as usize)
     } else {
         sigma
     };
@@ -283,7 +283,7 @@ pub fn gaussian_blur_f32(
     } else {
         kernel_size
     };
-    let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
+    let kernel = gaussian_kernel_1d(kernel_size, sigma);
     let _dispatcher = match channels {
         FastBlurChannels::Plane => filter_1d_exact::<f32, f32>,
         FastBlurChannels::Channels3 => filter_1d_rgb_exact::<f32, f32>,
@@ -333,17 +333,17 @@ pub fn gaussian_blur_f16(
 ) -> Result<(), BlurError> {
     check_slice_size(
         src,
-        width as usize * channels.get_channels(),
+        width as usize * channels.channels(),
         width as usize,
         height as usize,
-        channels.get_channels(),
+        channels.channels(),
     )?;
     check_slice_size(
         dst,
-        width as usize * channels.get_channels(),
+        width as usize * channels.channels(),
         width as usize,
         height as usize,
-        channels.get_channels(),
+        channels.channels(),
     )?;
     assert!(
         kernel_size != 0 || sigma > 0.0,
@@ -353,7 +353,7 @@ pub fn gaussian_blur_f16(
         assert_ne!(kernel_size % 2, 0, "Kernel size must be odd");
     }
     let sigma = if sigma <= 0. {
-        get_sigma_size(kernel_size as usize)
+        sigma_size(kernel_size as usize)
     } else {
         sigma
     };
@@ -362,7 +362,7 @@ pub fn gaussian_blur_f16(
     } else {
         kernel_size
     };
-    let kernel = get_gaussian_kernel_1d(kernel_size, sigma);
+    let kernel = gaussian_kernel_1d(kernel_size, sigma);
     let _dispatcher = match channels {
         FastBlurChannels::Plane => filter_1d_exact::<f16, f32>,
         FastBlurChannels::Channels3 => filter_1d_rgb_exact::<f16, f32>,

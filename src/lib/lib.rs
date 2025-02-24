@@ -143,13 +143,13 @@ pub use gaussian::gaussian_blur_f16;
 pub use gaussian::gaussian_blur_f32;
 pub use gaussian::gaussian_blur_in_linear;
 pub use gaussian::gaussian_blur_u16;
-pub use gaussian::get_gaussian_kernel_1d;
-pub use gaussian::get_sigma_size;
+pub use gaussian::gaussian_kernel_1d;
+pub use gaussian::sigma_size;
 pub use gaussian::ConvolutionMode;
 #[cfg(feature = "image")]
 pub use gaussian_blur_image::gaussian_blur_image;
 pub use img_size::ImageSize;
-pub use laplacian::{get_laplacian_kernel, laplacian};
+pub use laplacian::{laplacian, laplacian_kernel};
 pub use median_blur::median_blur;
 pub use motion_blur::{generate_motion_kernel, motion_blur};
 pub use sobel::sobel;

@@ -26,7 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::gaussian::get_gaussian_kernel_1d;
+use crate::gaussian::gaussian_kernel_1d;
 use crate::util::check_slice_size;
 use crate::{BlurError, FastBlurChannels};
 use num_traits::real::Real;
@@ -384,7 +384,7 @@ fn fast_bilateral_filter_impl<
 
     let preferred_sigma = (spatial_sigma * spatial_sigma + range_sigma * range_sigma).sqrt();
 
-    let gaussian_kernel = get_gaussian_kernel_1d(kernel_size, preferred_sigma);
+    let gaussian_kernel = gaussian_kernel_1d(kernel_size, preferred_sigma);
     let half_kernel = gaussian_kernel.len() / 2;
 
     // Unrolled 3D convolution
@@ -988,10 +988,10 @@ pub fn fast_bilateral_filter(
 ) -> Result<(), BlurError> {
     check_slice_size(
         img,
-        width as usize * channels.get_channels(),
+        width as usize * channels.channels(),
         width as usize,
         height as usize,
-        channels.get_channels(),
+        channels.channels(),
     )?;
     assert_ne!(kernel_size & 1, 0, "kernel_size must be odd");
     match channels {
@@ -1061,10 +1061,10 @@ pub fn fast_bilateral_filter_u16(
 ) -> Result<(), BlurError> {
     check_slice_size(
         img,
-        width as usize * channels.get_channels(),
+        width as usize * channels.channels(),
         width as usize,
         height as usize,
-        channels.get_channels(),
+        channels.channels(),
     )?;
     if kernel_size & 1 == 0 {
         panic!("kernel_size must be odd");
@@ -1136,10 +1136,10 @@ pub fn fast_bilateral_filter_f32(
 ) -> Result<(), BlurError> {
     check_slice_size(
         img,
-        width as usize * channels.get_channels(),
+        width as usize * channels.channels(),
         width as usize,
         height as usize,
-        channels.get_channels(),
+        channels.channels(),
     )?;
     if kernel_size & 1 == 0 {
         panic!("kernel_size must be odd");

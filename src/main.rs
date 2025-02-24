@@ -8,9 +8,9 @@ use fast_transpose::{transpose_rgba, FlipMode, FlopMode};
 use image::imageops::FilterType;
 use image::{DynamicImage, EncodableLayout, GenericImageView, ImageReader};
 use libblur::{
-    fast_gaussian, filter_1d_exact, filter_2d_rgb_fft, generate_motion_kernel,
-    get_gaussian_kernel_1d, get_sigma_size, laplacian, motion_blur, sobel, ConvolutionMode,
-    EdgeMode, FastBlurChannels, ImageSize, KernelShape, Scalar, ThreadingPolicy,
+    fast_gaussian, filter_1d_exact, filter_2d_rgb_fft, gaussian_kernel_1d, generate_motion_kernel,
+    laplacian, motion_blur, sigma_size, sobel, ConvolutionMode, EdgeMode, FastBlurChannels,
+    ImageSize, KernelShape, Scalar, ThreadingPolicy,
 };
 use std::time::Instant;
 
@@ -95,7 +95,7 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
 
     println!("libblur::gaussian_blur: {:?}", start.elapsed());
 
-    let kernel = get_gaussian_kernel_1d(kernel_size, get_sigma_size(kernel_size as usize));
+    let kernel = gaussian_kernel_1d(kernel_size, sigma_size(kernel_size as usize));
 
     let start = Instant::now();
 
@@ -158,7 +158,7 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
 }
 
 fn main() {
-    let mut dyn_image = ImageReader::open("assets/test_image_2.png")
+    let dyn_image = ImageReader::open("assets/test_image_2.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -339,7 +339,7 @@ fn main() {
 
     // dst_bytes = perform_planar_pass_3(&bytes, dimensions.0 as usize, dimensions.1 as usize);
 
-    // let kernel = get_gaussian_kernel_1d(51, get_sigma_size(51));
+    // let kernel = gaussian_kernel_1d(51, get_sigma_size(51));
     // // // dst_bytes.fill(0);
     // //
     // // let sobel_horizontal: [i16; 3] = [-1, 0, 1];

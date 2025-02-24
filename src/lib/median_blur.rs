@@ -388,14 +388,14 @@ pub fn median_blur(
         src_stride as usize,
         width as usize,
         height as usize,
-        channels.get_channels(),
+        channels.channels(),
     )?;
     check_slice_size(
         dst,
         dst_stride as usize,
         width as usize,
         height as usize,
-        channels.get_channels(),
+        channels.channels(),
     )?;
     let unsafe_dst = UnsafeSlice::new(dst);
     let _dispatcher = match channels {
