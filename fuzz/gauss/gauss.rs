@@ -31,8 +31,8 @@
 
 use libblur::{
     filter_1d_approx, filter_1d_exact, filter_1d_rgb_approx, filter_1d_rgb_exact,
-    filter_1d_rgba_approx, filter_1d_rgba_exact, gaussian_kernel_1d, get_sigma_size,
-    ConvolutionMode, EdgeMode, FastBlurChannels, ImageSize, Scalar, ThreadingPolicy,
+    filter_1d_rgba_approx, filter_1d_rgba_exact, gaussian_kernel_1d, sigma_size, ConvolutionMode,
+    EdgeMode, FastBlurChannels, ImageSize, Scalar, ThreadingPolicy,
 };
 use libfuzzer_sys::fuzz_target;
 
@@ -120,7 +120,7 @@ fn fuzz_8bit_non_symmetry(width: usize, height: usize, radius: usize, channels: 
 
     let kernel_size = radius * 2 + 1;
 
-    let kernel = gaussian_kernel_1d(kernel_size as u32, get_sigma_size(kernel_size));
+    let kernel = gaussian_kernel_1d(kernel_size as u32, sigma_size(kernel_size));
 
     match channels {
         FastBlurChannels::Plane => {
