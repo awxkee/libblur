@@ -57,14 +57,14 @@ fn fuzz_8bit(width: usize, height: usize, radius: usize, channels: FastBlurChann
     if width == 0 || height == 0 || radius == 0 {
         return;
     }
-    let src_image = vec![15u8; width * height * channels.get_channels()];
-    let mut dst_image = vec![0u8; width * height * channels.get_channels()];
+    let src_image = vec![15u8; width * height * channels.channels()];
+    let mut dst_image = vec![0u8; width * height * channels.channels()];
 
     libblur::box_blur(
         &src_image,
-        width as u32 * channels.get_channels() as u32,
+        width as u32 * channels.channels() as u32,
         &mut dst_image,
-        width as u32 * channels.get_channels() as u32,
+        width as u32 * channels.channels() as u32,
         width as u32,
         height as u32,
         radius as u32 * 2 + 1,

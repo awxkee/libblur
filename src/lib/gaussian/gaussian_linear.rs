@@ -27,7 +27,7 @@
 
 use crate::util::check_slice_size;
 use crate::{
-    gaussian_blur_f32, get_sigma_size, BlurError, EdgeMode, FastBlurChannels, ThreadingPolicy,
+    gaussian_blur_f32, sigma_size, BlurError, EdgeMode, FastBlurChannels, ThreadingPolicy,
 };
 use colorutils_rs::linear_to_planar::linear_to_plane;
 use colorutils_rs::planar_to_linear::plane_to_linear;
@@ -74,22 +74,22 @@ pub fn gaussian_blur_in_linear(
 ) -> Result<(), BlurError> {
     check_slice_size(
         src,
-        width as usize * channels.get_channels(),
+        width as usize * channels.channels(),
         width as usize,
         height as usize,
-        channels.get_channels(),
+        channels.channels(),
     )?;
     check_slice_size(
         dst,
-        width as usize * channels.get_channels(),
+        width as usize * channels.channels(),
         width as usize,
         height as usize,
-        channels.get_channels(),
+        channels.channels(),
     )?;
     let mut linear_data: Vec<f32> =
-        vec![0f32; width as usize * height as usize * channels.get_channels()];
+        vec![0f32; width as usize * height as usize * channels.channels()];
     let mut linear_data_1: Vec<f32> =
-        vec![0f32; width as usize * height as usize * channels.get_channels()];
+        vec![0f32; width as usize * height as usize * channels.channels()];
 
     let forward_transformer = match channels {
         FastBlurChannels::Plane => plane_to_linear,
@@ -107,14 +107,14 @@ pub fn gaussian_blur_in_linear(
         src,
         src_stride,
         &mut linear_data,
-        width * size_of::<f32>() as u32 * channels.get_channels() as u32,
+        width * size_of::<f32>() as u32 * channels.channels() as u32,
         width,
         height,
         transfer_function,
     );
 
     let sigma = if sigma <= 0. {
-        get_sigma_size(kernel_size as usize)
+        sigma_size(kernel_size as usize)
     } else {
         sigma
     };
@@ -132,7 +132,7 @@ pub fn gaussian_blur_in_linear(
     )?;
     inverse_transformer(
         &linear_data_1,
-        width * size_of::<f32>() as u32 * channels.get_channels() as u32,
+        width * size_of::<f32>() as u32 * channels.channels() as u32,
         dst,
         dst_stride,
         width,

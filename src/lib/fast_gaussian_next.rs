@@ -897,7 +897,7 @@ pub fn fast_gaussian_next(
         stride as usize,
         width as usize,
         height as usize,
-        channels.get_channels(),
+        channels.channels(),
     )?;
     let radius = std::cmp::min(radius, 280);
     impl_margin_call!(
@@ -947,7 +947,7 @@ pub fn fast_gaussian_next_u16(
         stride as usize,
         width as usize,
         height as usize,
-        channels.get_channels(),
+        channels.channels(),
     )?;
     let acq_radius = std::cmp::min(radius, 152);
     impl_margin_call!(
@@ -996,7 +996,7 @@ pub fn fast_gaussian_next_f32(
         stride as usize,
         width as usize,
         height as usize,
-        channels.get_channels(),
+        channels.channels(),
     )?;
     impl_margin_call!(
         f32,
@@ -1044,7 +1044,7 @@ pub fn fast_gaussian_next_f16(
         stride as usize,
         width as usize,
         height as usize,
-        channels.get_channels(),
+        channels.channels(),
     )?;
     impl_margin_call!(
         half::f16,
@@ -1094,10 +1094,10 @@ pub fn fast_gaussian_next_in_linear(
         stride as usize,
         width as usize,
         height as usize,
-        channels.get_channels(),
+        channels.channels(),
     )?;
     let mut linear_data: Vec<f32> =
-        vec![0f32; width as usize * height as usize * channels.get_channels()];
+        vec![0f32; width as usize * height as usize * channels.channels()];
 
     let forward_transformer = match channels {
         FastBlurChannels::Plane => plane_to_linear,
@@ -1115,7 +1115,7 @@ pub fn fast_gaussian_next_in_linear(
         in_place,
         stride,
         &mut linear_data,
-        width * size_of::<f32>() as u32 * channels.get_channels() as u32,
+        width * size_of::<f32>() as u32 * channels.channels() as u32,
         width,
         height,
         transfer_function,
@@ -1123,7 +1123,7 @@ pub fn fast_gaussian_next_in_linear(
 
     fast_gaussian_next_f32(
         &mut linear_data,
-        width * channels.get_channels() as u32,
+        width * channels.channels() as u32,
         width,
         height,
         radius,
@@ -1134,7 +1134,7 @@ pub fn fast_gaussian_next_in_linear(
 
     inverse_transformer(
         &linear_data,
-        width * size_of::<f32>() as u32 * channels.get_channels() as u32,
+        width * size_of::<f32>() as u32 * channels.channels() as u32,
         in_place,
         stride,
         width,

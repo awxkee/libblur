@@ -56,7 +56,7 @@ impl Blend<u8> for u8 {
         _: usize,
         fast_blur_channels: FastBlurChannels,
     ) {
-        let channels = fast_blur_channels.get_channels();
+        let channels = fast_blur_channels.channels();
         match fast_blur_channels {
             FastBlurChannels::Plane => {
                 for ((dst, src), mask) in destination.iter_mut().zip(source.iter()).zip(mask.iter())
@@ -209,13 +209,13 @@ impl Gamma<u8> for u8 {
             FastBlurChannels::Plane => gamma.iter_mut().for_each(|dst| {
                 *dst = lut_table[*dst as usize];
             }),
-            FastBlurChannels::Channels3 | FastBlurChannels::Channels4 => gamma
-                .chunks_exact_mut(channels.get_channels())
-                .for_each(|dst| {
+            FastBlurChannels::Channels3 | FastBlurChannels::Channels4 => {
+                gamma.chunks_exact_mut(channels.channels()).for_each(|dst| {
                     dst[0] = lut_table[dst[0] as usize];
                     dst[1] = lut_table[dst[1] as usize];
                     dst[2] = lut_table[dst[2] as usize];
-                }),
+                })
+            }
         }
     }
 }
@@ -303,7 +303,7 @@ impl Linearize<u8> for u8 {
             *item = (transfer_function.linearize(i as f32 * (1. / 255.0)) * 255.).min(255.) as u8;
         }
 
-        let mut dst = vec![0u8; width * height * channels.get_channels()];
+        let mut dst = vec![0u8; width * height * channels.channels()];
 
         match channels {
             FastBlurChannels::Plane => dst.iter_mut().zip(source).for_each(|(dst, src)| {
@@ -353,7 +353,7 @@ impl Grayscale<u8> for u8 {
                 let mut dest = vec![0u8; width * height];
 
                 for (src, dst) in source
-                    .chunks_exact(channels.get_channels())
+                    .chunks_exact(channels.channels())
                     .zip(dest.iter_mut())
                 {
                     *dst =
@@ -436,10 +436,10 @@ pub fn adaptive_blur(
 ) -> Result<(), BlurError> {
     check_slice_size(
         image,
-        width * channels.get_channels(),
+        width * channels.channels(),
         width,
         height,
-        channels.get_channels(),
+        channels.channels(),
     )?;
     adaptive_blur_impl(
         image,

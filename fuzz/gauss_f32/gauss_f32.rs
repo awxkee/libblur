@@ -57,8 +57,8 @@ fn fuzz_f32(width: usize, height: usize, radius: usize, channels: FastBlurChanne
     if width == 0 || height == 0 || radius == 0 {
         return;
     }
-    let src_image = vec![0.5f32; width * height * channels.get_channels()];
-    let mut dst_image = vec![0f32; width * height * channels.get_channels()];
+    let src_image = vec![0.5f32; width * height * channels.channels()];
+    let mut dst_image = vec![0f32; width * height * channels.channels()];
 
     libblur::gaussian_blur_f32(
         &src_image,

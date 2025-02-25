@@ -45,7 +45,7 @@ pub enum FastBlurChannels {
 }
 
 impl FastBlurChannels {
-    pub const fn get_channels(&self) -> usize {
+    pub const fn channels(&self) -> usize {
         match self {
             FastBlurChannels::Plane => 1,
             FastBlurChannels::Channels3 => 3,

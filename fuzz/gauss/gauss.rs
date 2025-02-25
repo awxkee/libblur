@@ -31,7 +31,7 @@
 
 use libblur::{
     filter_1d_approx, filter_1d_exact, filter_1d_rgb_approx, filter_1d_rgb_exact,
-    filter_1d_rgba_approx, filter_1d_rgba_exact, get_gaussian_kernel_1d, get_sigma_size,
+    filter_1d_rgba_approx, filter_1d_rgba_exact, gaussian_kernel_1d, get_sigma_size,
     ConvolutionMode, EdgeMode, FastBlurChannels, ImageSize, Scalar, ThreadingPolicy,
 };
 use libfuzzer_sys::fuzz_target;
@@ -79,8 +79,8 @@ fn fuzz_8bit(width: usize, height: usize, radius: usize, channels: FastBlurChann
     if width == 0 || height == 0 || radius == 0 {
         return;
     }
-    let src_image = vec![15u8; width * height * channels.get_channels()];
-    let mut dst_image = vec![0u8; width * height * channels.get_channels()];
+    let src_image = vec![15u8; width * height * channels.channels()];
+    let mut dst_image = vec![0u8; width * height * channels.channels()];
 
     libblur::gaussian_blur(
         &src_image,
@@ -115,12 +115,12 @@ fn fuzz_8bit_non_symmetry(width: usize, height: usize, radius: usize, channels: 
     if width == 0 || height == 0 || radius == 0 {
         return;
     }
-    let src_image = vec![15u8; width * height * channels.get_channels()];
-    let mut dst_image = vec![0u8; width * height * channels.get_channels()];
+    let src_image = vec![15u8; width * height * channels.channels()];
+    let mut dst_image = vec![0u8; width * height * channels.channels()];
 
     let kernel_size = radius * 2 + 1;
 
-    let kernel = get_gaussian_kernel_1d(kernel_size as u32, get_sigma_size(kernel_size));
+    let kernel = gaussian_kernel_1d(kernel_size as u32, get_sigma_size(kernel_size));
 
     match channels {
         FastBlurChannels::Plane => {

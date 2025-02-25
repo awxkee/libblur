@@ -180,7 +180,7 @@ pub fn stack_blur_f32(
         stride as usize,
         width as usize,
         height as usize,
-        channels.get_channels(),
+        channels.channels(),
     )?;
     let radius = radius.max(1);
     let thread_count = threading_policy.thread_count(width, height) as u32;
