@@ -120,7 +120,7 @@ fn fuzz_8bit_non_symmetry(width: usize, height: usize, radius: usize, channels: 
 
     let kernel_size = radius * 2 + 1;
 
-    let kernel = gaussian_kernel_1d(kernel_size as u32, sigma_size(kernel_size));
+    let kernel = gaussian_kernel_1d(kernel_size as u32, sigma_size(kernel_size as f32));
 
     match channels {
         FastBlurChannels::Plane => {

@@ -93,7 +93,7 @@ pub fn gaussian_blur(
         assert_ne!(kernel_size % 2, 0, "Kernel size must be odd");
     }
     let sigma = if sigma <= 0. {
-        sigma_size(kernel_size as usize)
+        sigma_size(kernel_size as f32)
     } else {
         sigma
     };
@@ -194,7 +194,7 @@ pub fn gaussian_blur_u16(
         assert_ne!(kernel_size % 2, 0, "Kernel size must be odd");
     }
     let sigma = if sigma <= 0. {
-        sigma_size(kernel_size as usize)
+        sigma_size(kernel_size as f32)
     } else {
         sigma
     };
@@ -274,7 +274,7 @@ pub fn gaussian_blur_f32(
         assert_ne!(kernel_size % 2, 0, "Kernel size must be odd");
     }
     let sigma = if sigma <= 0. {
-        sigma_size(kernel_size as usize)
+        sigma_size(kernel_size as f32)
     } else {
         sigma
     };
@@ -353,7 +353,7 @@ pub fn gaussian_blur_f16(
         assert_ne!(kernel_size % 2, 0, "Kernel size must be odd");
     }
     let sigma = if sigma <= 0. {
-        sigma_size(kernel_size as usize)
+        sigma_size(kernel_size as f32)
     } else {
         sigma
     };

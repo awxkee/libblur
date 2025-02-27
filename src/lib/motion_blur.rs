@@ -26,10 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::{
-    filter_2d, BlurError, EdgeMode, FastBlurChannels, ImageSize, KernelShape, Scalar,
-    ThreadingPolicy,
-};
+use crate::{filter_2d, BlurError, BlurImage, BlurImageMut, EdgeMode, KernelShape, Scalar, ThreadingPolicy};
 
 #[derive(Copy, Clone)]
 pub struct BresenhamPoint {
@@ -129,47 +126,35 @@ pub fn generate_motion_kernel(size: usize, angle_deg: f32) -> Vec<f32> {
 /// # Arguments
 ///
 /// * `image`: Source image.
-/// * `image_stride`: Source image stride.
 /// * `destination`: Destination image.
-/// * `destination_stride`: Destination image stride.
 /// * `image_size`: [ImageSize] of the images.
 /// * `angle`: Degree of acceleration, in degrees.
 /// * `kernel_size`: Convolve kernel size, must be odd!
 /// * `border_mode`: See [EdgeMode] for more info.
 /// * `border_constant`: If [EdgeMode::Constant] border will be replaced with this provided [Scalar] value.
-/// * `channels`: see [FastBlurChannels] for more info.
 /// * `threading_policy`: see [ThreadingPolicy] for more info.
 ///
 /// returns: ()
 ///
 pub fn motion_blur(
-    image: &[u8],
-    image_stride: usize,
-    destination: &mut [u8],
-    destination_stride: usize,
-    image_size: ImageSize,
+    image: &BlurImage<u8>,
+    destination: &mut BlurImageMut<u8>,
     angle: f32,
     kernel_size: usize,
     border_mode: EdgeMode,
     border_constant: Scalar,
-    channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
+    image.check_layout()?;
+    destination.check_layout()?;
+    image.size_matches_mut(&destination)?;
     if kernel_size & 1 == 0 {
         return Err(BlurError::OddKernel(kernel_size));
     }
     let kernel = generate_motion_kernel(kernel_size, angle);
-    let executor = match channels {
-        FastBlurChannels::Plane => filter_2d::<u8, f32, 1>,
-        FastBlurChannels::Channels3 => filter_2d::<u8, f32, 3>,
-        FastBlurChannels::Channels4 => filter_2d::<u8, f32, 4>,
-    };
-    executor(
+    filter_2d::<u8, f32>(
         image,
-        image_stride,
         destination,
-        destination_stride,
-        image_size,
         &kernel,
         KernelShape::new(kernel_size, kernel_size),
         border_mode,

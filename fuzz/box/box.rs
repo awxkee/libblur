@@ -29,7 +29,7 @@
 
 #![no_main]
 
-use libblur::{FastBlurChannels, ThreadingPolicy};
+use libblur::{BlurImage, BlurImageMut, FastBlurChannels, ThreadingPolicy};
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: (u8, u8, u8)| {
@@ -57,18 +57,13 @@ fn fuzz_8bit(width: usize, height: usize, radius: usize, channels: FastBlurChann
     if width == 0 || height == 0 || radius == 0 {
         return;
     }
-    let src_image = vec![15u8; width * height * channels.channels()];
-    let mut dst_image = vec![0u8; width * height * channels.channels()];
+    let mut dst_image = BlurImageMut::alloc(width as u32, height as u32, channels);
+    let src_image = BlurImage::alloc(width as u32, height as u32, channels);
 
     libblur::box_blur(
         &src_image,
-        width as u32 * channels.channels() as u32,
         &mut dst_image,
-        width as u32 * channels.channels() as u32,
-        width as u32,
-        height as u32,
         radius as u32 * 2 + 1,
-        channels,
         ThreadingPolicy::Single,
     )
     .unwrap();

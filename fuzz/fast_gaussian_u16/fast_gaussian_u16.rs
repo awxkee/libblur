@@ -29,7 +29,7 @@
 
 #![no_main]
 
-use libblur::{fast_gaussian_u16, EdgeMode, FastBlurChannels, ThreadingPolicy};
+use libblur::{fast_gaussian_u16, BlurImageMut, EdgeMode, FastBlurChannels, ThreadingPolicy};
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: (u8, u8, u8)| {
@@ -57,14 +57,11 @@ fn fuzz_image(width: usize, height: usize, radius: usize, channels: FastBlurChan
     if width == 0 || height == 0 || radius == 0 {
         return;
     }
-    let mut dst_image = vec![1u16; width * height * channels.channels()];
+    let mut dst_image = BlurImageMut::alloc(width as u32, height as u32, channels);
+
     fast_gaussian_u16(
         &mut dst_image,
-        width as u32 * channels.channels() as u32,
-        width as u32,
-        height as u32,
         radius as u32,
-        channels,
         ThreadingPolicy::Single,
         EdgeMode::Clamp,
     )

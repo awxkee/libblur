@@ -1,6 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use image::{EncodableLayout, GenericImageView, ImageReader};
-use libblur::{FastBlurChannels, ThreadingPolicy};
+use libblur::{BlurImage, BlurImageMut, FastBlurChannels, ThreadingPolicy};
 use opencv::core::{find_file, Mat};
 use opencv::imgcodecs::{imread, IMREAD_COLOR};
 
@@ -12,24 +12,23 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         .decode()
         .unwrap();
     let dimensions = img.dimensions();
-    let components = 4;
-    let stride = dimensions.0 as usize * components;
     let src_bytes = img.as_bytes();
+    let src_image = BlurImage::borrow(
+        src_bytes,
+        dimensions.0,
+        dimensions.1,
+        FastBlurChannels::Channels4,
+    );
     c.bench_function("libblur: RGBA median blur", |b| {
         let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
+        let mut dst_image = BlurImageMut::borrow(
+            &mut dst_bytes,
+            dimensions.0,
+            dimensions.1,
+            FastBlurChannels::Channels4,
+        );
         b.iter(|| {
-            libblur::median_blur(
-                src_bytes,
-                stride as u32,
-                &mut dst_bytes,
-                stride as u32,
-                dimensions.0,
-                dimensions.1,
-                7,
-                FastBlurChannels::Channels4,
-                ThreadingPolicy::Adaptive,
-            )
-            .unwrap();
+            libblur::median_blur(&src_image, &mut dst_image, 7, ThreadingPolicy::Adaptive).unwrap();
         })
     });
 
@@ -52,21 +51,23 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let rgb_img = img.to_rgb8();
     let rgb_image = rgb_img.as_bytes();
 
+    let rgb_image = BlurImage::borrow(
+        rgb_image,
+        dimensions.0,
+        dimensions.1,
+        FastBlurChannels::Channels4,
+    );
+
     c.bench_function("libblur: RGB median blur", |b| {
-        let mut dst_bytes: Vec<u8> = rgb_image.to_vec();
+        let mut dst_bytes: Vec<u8> = rgb_image.data.as_ref().to_vec();
+        let mut dst_image = BlurImageMut::borrow(
+            &mut dst_bytes,
+            dimensions.0,
+            dimensions.1,
+            FastBlurChannels::Channels3,
+        );
         b.iter(|| {
-            libblur::median_blur(
-                rgb_image,
-                rgb_img.dimensions().0 * 3,
-                &mut dst_bytes,
-                rgb_img.dimensions().0 * 3,
-                rgb_img.dimensions().0,
-                rgb_img.dimensions().1,
-                7,
-                FastBlurChannels::Channels3,
-                ThreadingPolicy::Adaptive,
-            )
-            .unwrap();
+            libblur::median_blur(&rgb_image, &mut dst_image, 7, ThreadingPolicy::Adaptive).unwrap();
         })
     });
 

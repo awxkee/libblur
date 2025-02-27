@@ -114,7 +114,7 @@ pub fn gaussian_blur_in_linear(
     );
 
     let sigma = if sigma <= 0. {
-        sigma_size(kernel_size as usize)
+        sigma_size(kernel_size as f32)
     } else {
         sigma
     };
