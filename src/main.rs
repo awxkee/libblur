@@ -3,14 +3,11 @@ mod split;
 
 use crate::merge::merge_channels_3;
 use crate::split::split_channels_3;
-use colorutils_rs::TransferFunction;
-use fast_transpose::{transpose_rgba, FlipMode, FlopMode};
-use image::imageops::FilterType;
-use image::{DynamicImage, EncodableLayout, GenericImageView, ImageReader};
+use image::{EncodableLayout, GenericImageView, ImageReader};
 use libblur::{
-    fast_gaussian, filter_1d_exact, filter_2d_rgb_fft, gaussian_kernel_1d, generate_motion_kernel,
-    laplacian, motion_blur, sigma_size, sobel, ConvolutionMode, EdgeMode, FastBlurChannels,
-    ImageSize, KernelShape, Scalar, ThreadingPolicy,
+    filter_1d_exact, gaussian_kernel_1d, generate_motion_kernel, motion_blur, sigma_size,
+    BlurImage, BlurImageMut, ConvolutionMode, EdgeMode, FastBlurChannels, ImageSize, Scalar,
+    ThreadingPolicy,
 };
 use std::time::Instant;
 
@@ -357,17 +354,26 @@ fn main() {
     // )
     // .unwrap();
 
-    motion_blur(
+    let src_image = BlurImage::borrow(
         &bytes,
-        dimensions.0 as usize * 3,
+        dimensions.0,
+        dimensions.1,
+        FastBlurChannels::Channels3,
+    );
+    let mut dst_image = BlurImageMut::borrow(
         &mut dst_bytes,
-        dimensions.0 as usize * 3,
-        ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
+        dimensions.0,
+        dimensions.1,
+        FastBlurChannels::Channels3,
+    );
+
+    motion_blur(
+        &src_image,
+        &mut dst_image,
         120f32,
         35,
         EdgeMode::Clamp,
         Scalar::new(255.0, 0.0, 0.0, 255.0),
-        FastBlurChannels::Channels3,
         ThreadingPolicy::Adaptive,
     )
     .unwrap();

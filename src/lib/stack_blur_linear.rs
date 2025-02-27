@@ -25,8 +25,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::util::check_slice_size;
-use crate::{BlurError, FastBlurChannels, ThreadingPolicy};
+use crate::{BlurError, BlurImageMut, FastBlurChannels, ThreadingPolicy};
 use colorutils_rs::linear_to_planar::linear_to_plane;
 use colorutils_rs::planar_to_linear::plane_to_linear;
 use colorutils_rs::{
@@ -42,37 +41,28 @@ use std::mem::size_of;
 /// after it to avoid overflowing fallback to f64 accumulator will be used with some computational slowdown with factor ~1.5-2
 ///
 /// # Arguments
-/// * `in_place` - mutable buffer contains image data that will be used as a source and destination
-/// * `stride` - Bytes per lane, default is width * channels_count if not aligned
-/// * `width` - image width
-/// * `height` - image height
-/// * `radius` - since f32 accumulator is used under the hood radius almost is not limited
-/// * `channels` - Count of channels of the image, only 3 and 4 is supported, alpha position, and channels order does not matter
-/// * `threading_policy` - Threads usage policy
-/// * `transfer_function` - Transfer function in linear colorspace
+/// * `image` - mutable buffer contains image data that will be used as a source and destination.
+/// * `radius` - since f32 accumulator is used under the hood radius almost is not limited.
+/// * `threading_policy` - Threads usage policy.
+/// * `transfer_function` - Transfer function in linear colorspace.
 ///
 /// # Complexity
 /// O(1) complexity.
 #[allow(clippy::too_many_arguments)]
 pub fn stack_blur_in_linear(
-    in_place: &mut [u8],
-    stride: u32,
-    width: u32,
-    height: u32,
+    image: &mut BlurImageMut<u8>,
     radius: u32,
-    channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
     transfer_function: TransferFunction,
 ) -> Result<(), BlurError> {
-    check_slice_size(
-        in_place,
-        stride as usize,
-        width as usize,
-        height as usize,
-        channels.channels(),
-    )?;
-    let mut linear_data: Vec<f32> =
-        vec![0f32; width as usize * height as usize * channels.channels()];
+    image.check_layout()?;
+    let radius = radius.max(1);
+    let stride = image.row_stride();
+    let width = image.width;
+    let height = image.height;
+    let channels = image.channels;
+
+    let mut linear_image = BlurImageMut::<f32>::alloc(width, height, channels);
 
     let forward_transformer = match channels {
         FastBlurChannels::Plane => plane_to_linear,
@@ -87,29 +77,21 @@ pub fn stack_blur_in_linear(
     };
 
     forward_transformer(
-        in_place,
+        image.data.borrow_mut(),
         stride,
-        &mut linear_data,
+        linear_image.data.borrow_mut(),
         width * size_of::<f32>() as u32 * channels.channels() as u32,
         width,
         height,
         transfer_function,
     );
 
-    crate::stack_blur_f32(
-        &mut linear_data,
-        width * channels.channels() as u32,
-        width,
-        height,
-        radius,
-        channels,
-        threading_policy,
-    )?;
+    crate::stack_blur_f32(&mut linear_image, radius, threading_policy)?;
 
     inverse_transformer(
-        &linear_data,
+        linear_image.data.borrow(),
         width * size_of::<f32>() as u32 * channels.channels() as u32,
-        in_place,
+        image.data.borrow_mut(),
         stride,
         width,
         height,

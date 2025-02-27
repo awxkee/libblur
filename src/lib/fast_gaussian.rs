@@ -51,10 +51,9 @@ use crate::sse::{
 use crate::threading_policy::ThreadingPolicy;
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
-use crate::util::check_slice_size;
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 use crate::wasm32::{fg_horizontal_pass_wasm_u8, fg_vertical_pass_wasm_u8};
-use crate::{clamp_edge, reflect_101, BlurError, EdgeMode};
+use crate::{clamp_edge, reflect_101, BlurError, BlurImageMut, EdgeMode};
 
 const BASE_RADIUS_I64_CUTOFF: u32 = 180;
 
@@ -115,45 +114,11 @@ macro_rules! impl_generic_call {
     };
 }
 
-macro_rules! impl_generic_call_plane_count {
-    ($store_type:ty, $channels_type:expr, $edge_mode:expr,
-        $bytes:expr, $stride:expr, $width:expr, $height:expr,
-        $radius:expr, $threading_policy:expr) => {
-        fast_gaussian_impl::<$store_type, $channels_type>(
-            $bytes,
-            $stride,
-            $width,
-            $height,
-            $radius,
-            $threading_policy,
-            $edge_mode,
-        );
-    };
-}
-
 macro_rules! impl_margin_call {
     ($store_type:ty, $channels_type:expr, $edge_mode:expr,
         $bytes:expr, $stride:expr, $width:expr, $height:expr,
         $radius:expr, $threading_policy:expr) => {
         impl_generic_call!(
-            $store_type,
-            $channels_type,
-            $edge_mode,
-            $bytes,
-            $stride,
-            $width,
-            $height,
-            $radius,
-            $threading_policy
-        );
-    };
-}
-
-macro_rules! impl_margin_call_plane {
-    ($store_type:ty, $channels_type:expr, $edge_mode:expr,
-        $bytes:expr, $stride:expr, $width:expr, $height:expr,
-        $radius:expr, $threading_policy:expr) => {
-        impl_generic_call_plane_count!(
             $store_type,
             $channels_type,
             $edge_mode,
@@ -852,39 +817,30 @@ fn fast_gaussian_impl<
 ///
 /// # Arguments
 ///
-/// * `stride` - Lane length, default is width * channels_count if not aligned
-/// * `width` - Width of the image
-/// * `height` - Height of the image
-/// * `radius` - Radius more than 319 is not supported. To use larger radius convert image to f32 and use function for f32
-/// * `channels` - Count of channels of the image, see [FastBlurChannels] for more info
-/// * `threading_policy` - Threads usage policy
+/// * `image` - Image to work in place, see [BlurImageMut] for more info.
+/// * `radius` - Radius more than 319 is not supported. To use larger radius convert image to f32 and use function for f32.
+/// * `threading_policy` - Threads usage policy.
 /// * `edge_mode` - Edge handling mode, *Kernel clip* is not supported!
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn fast_gaussian(
-    bytes: &mut [u8],
-    stride: u32,
-    width: u32,
-    height: u32,
+    image: &mut BlurImageMut<u8>,
     radius: u32,
-    channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
     edge_mode: EdgeMode,
 ) -> Result<(), BlurError> {
-    check_slice_size(
-        bytes,
-        stride as usize,
-        width as usize,
-        height as usize,
-        channels.channels(),
-    )?;
+    image.check_layout()?;
     let radius = std::cmp::min(radius, 319);
+    let stride = image.row_stride();
+    let width = image.width;
+    let height = image.height;
+    let data = image.data.borrow_mut();
     impl_margin_call!(
         u8,
-        channels,
+        image.channels,
         edge_mode,
-        bytes,
+        data,
         stride,
         width,
         height,
@@ -902,38 +858,30 @@ pub fn fast_gaussian(
 ///
 /// # Arguments
 ///
-/// * `stride` - Lane length, default is width * channels_count if not aligned
-/// * `width` - Width of the image
-/// * `height` - Height of the image
-/// * `radius` - Radius more than 255 is not supported. To use larger radius convert image to f32 and use function for f32
-/// * `channels` - Count of channels in the image, see [FastBlurChannels] for more info
+/// * `image` - Image to work in place, see [BlurImageMut] for more info.
+/// * `radius` - Radius more than 255 is not supported. To use larger radius convert image to f32 and use function for f32.
 /// * `edge_mode` - Edge handling mode, *Kernel clip* is not supported!
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn fast_gaussian_u16(
-    bytes: &mut [u16],
-    stride: u32,
-    width: u32,
-    height: u32,
+    image: &mut BlurImageMut<u16>,
     radius: u32,
-    channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
     edge_mode: EdgeMode,
 ) -> Result<(), BlurError> {
-    check_slice_size(
-        bytes,
-        stride as usize,
-        width as usize,
-        height as usize,
-        channels.channels(),
-    )?;
+    image.check_layout()?;
+    let stride = image.row_stride();
+    let width = image.width;
+    let height = image.height;
+    let channels = image.channels;
+    let data = image.data.borrow_mut();
     let radius = std::cmp::min(radius, 255);
     impl_margin_call!(
         u16,
         channels,
         edge_mode,
-        bytes,
+        data,
         stride,
         width,
         height,
@@ -951,38 +899,30 @@ pub fn fast_gaussian_u16(
 ///
 /// # Arguments
 ///
-/// * `stride` - Elements per row
-/// * `width` - Width of the image
-/// * `height` - Height of the image
-/// * `radius` - almost any radius is supported
-/// * `channels` - Count of channels in the image, see [FastBlurChannels] for more info
-/// * `transfer_function` - Transfer function in linear colorspace
+/// * `image` - Image to work in place, see [BlurImageMut] for more info.
+/// * `radius` - almost any radius is supported.
+/// * `transfer_function` - Transfer function in linear colorspace.
 /// * `edge_mode` - Edge handling mode, *Kernel clip* is not supported!
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn fast_gaussian_f32(
-    bytes: &mut [f32],
-    stride: u32,
-    width: u32,
-    height: u32,
+    image: &mut BlurImageMut<f32>,
     radius: u32,
-    channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
     edge_mode: EdgeMode,
 ) -> Result<(), BlurError> {
-    check_slice_size(
-        bytes,
-        stride as usize,
-        width as usize,
-        height as usize,
-        channels.channels(),
-    )?;
+    image.check_layout()?;
+    let stride = image.row_stride();
+    let width = image.width;
+    let height = image.height;
+    let channels = image.channels;
+    let data = image.data.borrow_mut();
     impl_margin_call!(
         f32,
         channels,
         edge_mode,
-        bytes,
+        data,
         stride,
         width,
         height,
@@ -1000,37 +940,24 @@ pub fn fast_gaussian_f32(
 ///
 /// # Arguments
 ///
-/// * `stride` - Lane length, default is width * channels_count if not aligned
-/// * `width` - Width of the image
-/// * `height` - Height of the image
-/// * `radius` - Almost any reasonable radius is supported
-/// * `channels` - Count of channels of the image, see [FastBlurChannels] for more info
-/// * `threading_policy` - Threads usage policy
-/// * `transfer_function` - Transfer function in linear colorspace
+/// * `image` - Image to work in place, see [BlurImageMut] for more info.
+/// * `radius` - Almost any reasonable radius is supported.
+/// * `threading_policy` - Threads usage policy.
+/// * `transfer_function` - Transfer function in linear colorspace.
 /// * `edge_mode` - Edge handling mode, *Kernel clip* is not supported!
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn fast_gaussian_in_linear(
-    in_place: &mut [u8],
-    stride: u32,
-    width: u32,
-    height: u32,
+    image: &mut BlurImageMut<u8>,
     radius: u32,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
     transfer_function: TransferFunction,
     edge_mode: EdgeMode,
 ) -> Result<(), BlurError> {
-    check_slice_size(
-        in_place,
-        stride as usize,
-        width as usize,
-        height as usize,
-        channels.channels(),
-    )?;
-    let mut linear_data: Vec<f32> =
-        vec![0f32; width as usize * height as usize * channels.channels()];
+    image.check_layout()?;
+    let mut linear_data = BlurImageMut::alloc(image.width, image.height, image.channels);
 
     let forward_transformer = match channels {
         FastBlurChannels::Plane => plane_to_linear,
@@ -1044,31 +971,26 @@ pub fn fast_gaussian_in_linear(
         FastBlurChannels::Channels4 => linear_to_rgba,
     };
 
+    let width = image.width;
+    let height = image.height;
+    let stride = image.row_stride();
+
     forward_transformer(
-        in_place,
+        image.data.borrow(),
         stride,
-        &mut linear_data,
+        linear_data.data.borrow_mut(),
         width * std::mem::size_of::<f32>() as u32 * channels.channels() as u32,
         width,
         height,
         transfer_function,
     );
 
-    fast_gaussian_f32(
-        &mut linear_data,
-        width * channels.channels() as u32,
-        width,
-        height,
-        radius,
-        channels,
-        threading_policy,
-        edge_mode,
-    )?;
+    fast_gaussian_f32(&mut linear_data, radius, threading_policy, edge_mode)?;
 
     inverse_transformer(
-        &linear_data,
+        linear_data.data.borrow(),
         width * std::mem::size_of::<f32>() as u32 * channels.channels() as u32,
-        in_place,
+        image.data.borrow_mut(),
         stride,
         width,
         height,
@@ -1085,126 +1007,31 @@ pub fn fast_gaussian_in_linear(
 ///
 /// # Arguments
 ///
-/// * `stride` - ELements per row
-/// * `width` - Width of the image
-/// * `height` - Height of the image
-/// * `radius` - almost any radius is supported
-/// * `channels` - Count of channels of the image, see [FastBlurChannels] for more info
-/// * `threading_policy` - Threads usage policy
+/// * `image` - Image to work in place, see [BlurImageMut] for more info.
+/// * `radius` - almost any radius is supported.
+/// * `threading_policy` - Threads usage policy.
 /// * `edge_mode` - Edge handling mode, *Kernel clip* is not supported!
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn fast_gaussian_f16(
-    bytes: &mut [f16],
-    stride: u32,
-    width: u32,
-    height: u32,
+    image: &mut BlurImageMut<f16>,
     radius: u32,
-    channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
     edge_mode: EdgeMode,
 ) -> Result<(), BlurError> {
-    check_slice_size(
-        bytes,
-        stride as usize,
-        width as usize,
-        height as usize,
-        channels.channels(),
-    )?;
+    image.check_layout()?;
+    let stride = image.row_stride();
+    let width = image.width;
+    let height = image.height;
+    let channels = image.channels;
+    let data = image.data.borrow_mut();
     impl_margin_call!(
         half::f16,
         channels,
         edge_mode,
-        bytes,
-        width * channels.channels() as u32,
-        width,
-        height,
-        radius,
-        threading_policy
-    );
-    Ok(())
-}
-
-/// Performs gaussian approximation on the plane.
-///
-/// Fast gaussian approximation for u8 plane, limited to 319 radius, sometimes on the very bright images may start ringing on a very large radius.
-/// Approximation based on binomial filter. Algorithm is close to stack blur with better results and a little slower speed
-/// Results better than in stack blur however this a little slower.
-/// This is a very fast approximation using i32 accumulator size with radius less that *BASE_RADIUS_I64_CUTOFF*,
-/// after it to avoid overflowing fallback to i64 accumulator will be used with some computational slowdown with factor ~2.
-/// O(1) complexity.
-///
-/// # Arguments
-///
-/// * `stride` - Lane length, default is width if not aligned
-/// * `width` - Width of the image
-/// * `height` - Height of the image
-/// * `radius` - Radius more than 319 is not supported. To use larger radius convert image to f32 and use function for f32
-/// * `threading_policy` - Threads usage policy
-/// * `edge_mode` - Edge handling mode, *Kernel clip* is not supported!
-///
-/// # Panics
-/// Panic is stride/width/height/channel configuration do not match provided
-pub fn fast_gaussian_plane(
-    bytes: &mut [u8],
-    stride: u32,
-    width: u32,
-    height: u32,
-    radius: u32,
-    threading_policy: ThreadingPolicy,
-    edge_mode: EdgeMode,
-) -> Result<(), BlurError> {
-    check_slice_size(bytes, stride as usize, width as usize, height as usize, 1)?;
-    let radius = std::cmp::min(radius, 319);
-    impl_margin_call_plane!(
-        u8,
-        1,
-        edge_mode,
-        bytes,
+        data,
         stride,
-        width,
-        height,
-        radius,
-        threading_policy
-    );
-    Ok(())
-}
-
-/// Performs gaussian approximation on the f32 plane.
-///
-/// Fast gaussian approximation for f32 plane. No limitations are expected.
-/// Approximation based on binomial filter. Algorithm is close to stack blur with better results and a little slower speed.
-/// O(1) complexity.
-///
-/// # Arguments
-///
-/// * `stride` - Lane length
-/// * `width` - Width of the image
-/// * `height` - Height of the image
-/// * `radius` - almost any radius is supported
-/// * `channels` - Count of channels in the image
-/// * `transfer_function` - Transfer function in linear colorspace
-/// * `edge_mode` - Edge handling mode, *Kernel clip* is not supported!
-///
-/// # Panics
-/// Panic is stride/width/height/channel configuration do not match provided
-pub fn fast_gaussian_plane_f32(
-    bytes: &mut [f32],
-    stride: u32,
-    width: u32,
-    height: u32,
-    radius: u32,
-    threading_policy: ThreadingPolicy,
-    edge_mode: EdgeMode,
-) -> Result<(), BlurError> {
-    check_slice_size(bytes, stride as usize, width as usize, height as usize, 1)?;
-    impl_margin_call_plane!(
-        f32,
-        1,
-        edge_mode,
-        bytes,
-        width,
         width,
         height,
         radius,

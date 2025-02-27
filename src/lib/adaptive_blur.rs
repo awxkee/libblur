@@ -30,8 +30,8 @@
 
 use crate::util::check_slice_size;
 use crate::{
-    filter_2d, filter_2d_fft, gaussian_blur, stack_blur, BlurError, ConvolutionMode, EdgeMode,
-    FastBlurChannels, ImageSize, KernelShape, Scalar, ThreadingPolicy,
+    filter_2d, filter_2d_fft, gaussian_blur, stack_blur, BlurError, BlurImage, BlurImageMut,
+    ConvolutionMode, EdgeMode, FastBlurChannels, ImageSize, KernelShape, Scalar, ThreadingPolicy,
 };
 use colorutils_rs::TransferFunction;
 use num_traits::AsPrimitive;
@@ -91,16 +91,9 @@ trait BlurEdges<T> {
 
 impl BlurEdges<u8> for u8 {
     fn blur_edges(image: &mut [u8], width: usize, height: usize, radius: u32) {
-        stack_blur(
-            image,
-            width as u32,
-            width as u32,
-            height as u32,
-            radius,
-            FastBlurChannels::Plane,
-            ThreadingPolicy::Adaptive,
-        )
-        .unwrap();
+        let mut blur_img =
+            BlurImageMut::borrow(image, width as u32, height as u32, FastBlurChannels::Plane);
+        stack_blur(&mut blur_img, radius, ThreadingPolicy::Adaptive).unwrap();
     }
 }
 
@@ -272,12 +265,17 @@ impl Edges<u8> for u8 {
             )
             .unwrap();
         } else {
-            filter_2d::<u8, f32, 1>(
-                source,
-                width,
+            let src_image =
+                BlurImage::borrow(source, width as u32, height as u32, FastBlurChannels::Plane);
+            let mut dst_image = BlurImageMut::borrow(
                 &mut dst,
-                width,
-                ImageSize::new(width, height),
+                width as u32,
+                height as u32,
+                FastBlurChannels::Plane,
+            );
+            filter_2d::<u8, f32>(
+                &src_image,
+                &mut dst_image,
                 &edge_filter,
                 KernelShape::new(radius, radius),
                 border_mode,

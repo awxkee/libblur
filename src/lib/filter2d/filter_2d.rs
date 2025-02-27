@@ -30,15 +30,18 @@ use crate::filter1d::{make_arena, ArenaPads, KernelShape};
 use crate::filter2d::filter_2d_handler::Filter2dHandler;
 use crate::filter2d::scan_se_2d::scan_se_2d;
 use crate::to_storage::ToStorage;
-use crate::util::check_slice_size;
-use crate::{BlurError, EdgeMode, ImageSize, MismatchedSize, Scalar, ThreadingPolicy};
+use crate::{
+    BlurError, BlurImage, BlurImageMut, EdgeMode, FastBlurChannels, ImageSize, MismatchedSize,
+    Scalar, ThreadingPolicy,
+};
 use num_traits::{AsPrimitive, MulAdd};
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::ParallelSliceMut;
+use std::fmt::Debug;
 use std::ops::Mul;
 use std::sync::Arc;
 
-/// This performs direct 2D convolution on planar image.
+/// This performs direct 2D convolution on image.
 ///
 /// # Arguments
 ///
@@ -60,12 +63,9 @@ use std::sync::Arc;
 ///
 /// See [crate::motion_blur] for example
 ///
-pub fn filter_2d<T, F, const CN: usize>(
-    src: &[T],
-    src_stride: usize,
-    dst: &mut [T],
-    dst_stride: usize,
-    image_size: ImageSize,
+pub fn filter_2d<T, F>(
+    src: &BlurImage<T>,
+    dst: &mut BlurImageMut<T>,
     kernel: &[F],
     kernel_shape: KernelShape,
     border_mode: EdgeMode,
@@ -73,14 +73,85 @@ pub fn filter_2d<T, F, const CN: usize>(
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError>
 where
-    T: Copy + AsPrimitive<F> + Default + Send + Sync + Filter2dHandler<T, F>,
+    T: Copy + AsPrimitive<F> + Default + Send + Sync + Filter2dHandler<T, F> + Debug,
     F: ToStorage<T> + Mul<F> + MulAdd<F, Output = F> + Send + Sync + PartialEq,
     i32: AsPrimitive<F>,
     f64: AsPrimitive<T>,
 {
-    check_slice_size(src, src_stride, image_size.width, image_size.height, CN)?;
-    check_slice_size(dst, dst_stride, image_size.width, image_size.height, CN)?;
+    src.check_layout()?;
+    dst.check_layout()?;
+    src.size_matches_mut(&dst)?;
+    let channels = src.channels;
+    match channels {
+        FastBlurChannels::Plane => filter_2d_arbitrary::<T, F, 1>(
+            src,
+            dst,
+            kernel,
+            kernel_shape,
+            border_mode,
+            border_constant,
+            threading_policy,
+        ),
+        FastBlurChannels::Channels3 => filter_2d_arbitrary::<T, F, 3>(
+            src,
+            dst,
+            kernel,
+            kernel_shape,
+            border_mode,
+            border_constant,
+            threading_policy,
+        ),
+        FastBlurChannels::Channels4 => filter_2d_arbitrary::<T, F, 4>(
+            src,
+            dst,
+            kernel,
+            kernel_shape,
+            border_mode,
+            border_constant,
+            threading_policy,
+        ),
+    }
+}
 
+/// This performs direct 2D convolution on image.
+///
+/// # Arguments
+///
+/// * `CN`: channels count.
+/// * `src`: Source planar image.
+/// * `src_stride`: Source image stride.
+/// * `dst`: Destination image.
+/// * `dst_stride`: Destination image stride.
+/// * `image_size`: Image size.
+/// * `kernel`: Kernel.
+/// * `kernel_shape`: Kernel size, see [KernelShape] for more info.
+/// * `border_mode`: Border handling mode see [EdgeMode] for more info.
+/// * `border_constant`: If [EdgeMode::Constant] border will be replaced with this provided [Scalar] value.
+/// * `threading_policy`: See [ThreadingPolicy] for more info.
+///
+/// returns: Result<(), String>
+///
+/// # Examples
+///
+/// See [crate::motion_blur] for example
+///
+pub fn filter_2d_arbitrary<T, F, const CN: usize>(
+    src: &BlurImage<T>,
+    dst: &mut BlurImageMut<T>,
+    kernel: &[F],
+    kernel_shape: KernelShape,
+    border_mode: EdgeMode,
+    border_constant: Scalar,
+    threading_policy: ThreadingPolicy,
+) -> Result<(), BlurError>
+where
+    T: Copy + AsPrimitive<F> + Default + Send + Sync + Filter2dHandler<T, F> + Debug,
+    F: ToStorage<T> + Mul<F> + MulAdd<F, Output = F> + Send + Sync + PartialEq,
+    i32: AsPrimitive<F>,
+    f64: AsPrimitive<T>,
+{
+    src.check_layout_channels(CN)?;
+    dst.check_layout_channels(CN)?;
     let kernel_width = kernel_shape.width;
     let kernel_height = kernel_shape.height;
     if kernel_height * kernel_width != kernel.len() {
@@ -92,18 +163,28 @@ where
 
     let analyzed_se = scan_se_2d(kernel, kernel_shape);
 
+    let dst_stride = dst.stride as usize;
+
     if analyzed_se.is_empty() {
-        for (src, dst) in src.iter().zip(dst.iter_mut()) {
-            *dst = *src;
+        for (src, dst) in src
+            .data
+            .chunks_exact(src.row_stride() as usize)
+            .zip(dst.data.borrow_mut().chunks_exact_mut(dst_stride))
+        {
+            for (src, dst) in src.iter().zip(dst.iter_mut()) {
+                *dst = *src;
+            }
         }
         return Ok(());
     }
 
+    let image_size = ImageSize::new(src.width as usize, src.height as usize);
+
     let filter = Arc::new(T::get_executor());
 
     let (arena_source, arena) = make_arena::<T, CN>(
-        src,
-        src_stride,
+        src.data.as_ref(),
+        src.row_stride() as usize,
         image_size,
         ArenaPads::from_kernel_shape(kernel_shape),
         border_mode,
@@ -127,7 +208,9 @@ where
 
     if let Some(pool) = &pool {
         pool.install(|| {
-            dst.par_chunks_exact_mut(dst_stride)
+            dst.data
+                .borrow_mut()
+                .par_chunks_exact_mut(dst_stride)
                 .enumerate()
                 .for_each(|(y, row)| {
                     let row = &mut row[..image_size.width * CN];
@@ -135,7 +218,9 @@ where
                 });
         })
     } else {
-        dst.chunks_exact_mut(dst_stride)
+        dst.data
+            .borrow_mut()
+            .chunks_exact_mut(dst_stride)
             .enumerate()
             .for_each(|(y, row)| {
                 let row = &mut row[..image_size.width * CN];

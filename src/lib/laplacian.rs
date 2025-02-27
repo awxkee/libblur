@@ -29,8 +29,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::{
-    filter_2d, filter_2d_rgb, filter_2d_rgba, sigma_size, BlurError, EdgeMode, FastBlurChannels,
-    ImageSize, KernelShape, Scalar, ThreadingPolicy,
+    filter_2d, sigma_size, BlurError, BlurImage, BlurImageMut, EdgeMode, KernelShape, Scalar,
+    ThreadingPolicy,
 };
 
 pub fn laplacian_kernel(size: usize) -> Vec<f32> {
@@ -75,40 +75,27 @@ pub fn laplacian_kernel(size: usize) -> Vec<f32> {
 /// # Arguments
 ///
 /// * `image`: Source image.
-/// * `image_stride`: Source image stride.
 /// * `destination`: Destination image.
-/// * `destination_stride`: Destination image stride.
-/// * `image_size`: Image size, see [ImageSize]
 /// * `border_mode`: See [EdgeMode] for more info
 /// * `border_constant`: If [EdgeMode::Constant] border will be replaced with
 ///   this provided [Scalar] value
-/// * `channels`: see [FastBlurChannels] for more info
 /// * `threading_policy`: see [ThreadingPolicy] for more info
 ///
 /// returns: ()
 pub fn laplacian(
-    image: &[u8],
-    image_stride: usize,
-    destination: &mut [u8],
-    destination_stride: usize,
-    image_size: ImageSize,
+    image: &BlurImage<u8>,
+    destination: &mut BlurImageMut<u8>,
     border_mode: EdgeMode,
     border_constant: Scalar,
-    channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
-    let _dispatcher = match channels {
-        FastBlurChannels::Plane => filter_2d::<u8, i16, 1>,
-        FastBlurChannels::Channels3 => filter_2d_rgb::<u8, i16>,
-        FastBlurChannels::Channels4 => filter_2d_rgba::<u8, i16>,
-    };
+    image.check_layout()?;
+    destination.check_layout()?;
+    image.size_matches_mut(destination)?;
     let kernel = [-1, -1, -1, -1, 8, -1, -1, -1, -1];
-    _dispatcher(
+    filter_2d::<u8, i16>(
         image,
-        image_stride,
         destination,
-        destination_stride,
-        image_size,
         &kernel,
         KernelShape::new(3, 3),
         border_mode,
