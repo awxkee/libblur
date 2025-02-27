@@ -39,7 +39,7 @@ pub fn laplacian_kernel(size: usize) -> Vec<f32> {
     }
     let center_x = (size / 2) as f32;
     let center_y = (size / 2) as f32;
-    let sigma = sigma_size(size);
+    let sigma = sigma_size(size as f32);
 
     let mut kernel = vec![f32::default(); size * size];
 

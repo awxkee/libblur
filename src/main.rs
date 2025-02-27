@@ -92,7 +92,7 @@ fn perform_planar_pass_3(img: &[u8], width: usize, height: usize) -> Vec<u8> {
 
     println!("libblur::gaussian_blur: {:?}", start.elapsed());
 
-    let kernel = gaussian_kernel_1d(kernel_size, sigma_size(kernel_size as usize));
+    let kernel = gaussian_kernel_1d(kernel_size, sigma_size(kernel_size as f32));
 
     let start = Instant::now();
 

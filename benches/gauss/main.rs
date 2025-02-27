@@ -226,7 +226,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
         c.bench_function("Filter 2D Rgb Blur Clamp: 25", |b| {
             let mut dst_bytes: Vec<u8> = vec![0u8; dimensions.1 as usize * stride];
-            let kernel = gaussian_kernel_1d(25, sigma_size(25));
+            let kernel = gaussian_kernel_1d(25, sigma_size(25f32));
             b.iter(|| {
                 filter_1d_rgb_exact(
                     src_bytes,
@@ -244,7 +244,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
         c.bench_function("Filter 2D Rgb Blur Clamp: 151", |b| {
             let mut dst_bytes: Vec<u8> = vec![0u8; dimensions.1 as usize * stride];
-            let kernel = gaussian_kernel_1d(151, sigma_size(151));
+            let kernel = gaussian_kernel_1d(151, sigma_size(151f32));
             b.iter(|| {
                 filter_1d_rgb_exact(
                     src_bytes,
