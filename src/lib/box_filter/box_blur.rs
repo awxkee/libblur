@@ -41,7 +41,7 @@ use crate::channels_configuration::FastBlurChannels;
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::util::check_slice_size;
-use crate::{BlurError, ThreadingPolicy};
+use crate::{BlurError, BlurImage, BlurImageMut, ThreadingPolicy};
 
 fn box_blur_horizontal_pass_impl<T, J, const CN: usize>(
     src: &[T],
@@ -341,7 +341,7 @@ fn box_blur_vertical_pass_impl<T, J>(
         for y in 1..half_kernel as usize {
             let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
             unsafe {
-                w += src.get_unchecked(y_src_shift + x).as_();
+                w += src.get_unchecked(y_src_shift + x + start_x as usize).as_();
             }
         }
         *bf = w;
@@ -358,10 +358,16 @@ fn box_blur_vertical_pass_impl<T, J>(
 
         let dst = unsafe {
             std::slice::from_raw_parts_mut(
-                unsafe_dst.slice.as_ptr().add(y_dst_shift) as *mut T,
-                end_x as usize,
+                unsafe_dst
+                    .slice
+                    .as_ptr()
+                    .add(y_dst_shift + start_x as usize) as *mut T,
+                end_x as usize - start_x as usize,
             )
         };
+
+        let previous_row = &previous_row[start_x as usize..];
+        let next_row = &next_row[start_x as usize..];
 
         for (((src_next, src_previous), buffer), dst) in next_row
             .iter()
@@ -502,7 +508,7 @@ fn box_blur_vertical_pass<
                 let start_x = i * segment_size;
                 let mut end_x = (i + 1) * segment_size;
                 if i == thread_count as usize - 1 {
-                    end_x = width as usize * CN;
+                    end_x = total_width;
                 }
 
                 scope.spawn(move |_| {
@@ -614,27 +620,25 @@ where
 ///
 /// # Arguments
 ///
-/// * `stride` - Lane length, default is width * channels_count if not aligned
-/// * `width` - Width of the image
-/// * `height` - Height of the image
-/// * `radius` - almost any radius is supported
-/// * `channels` - Count of channels in the image
+/// * `image` - Source immutable image, see [BlurImage] for more info.
+/// * `dst_image` - Destination mutable image, see [BlurImageMut] for more info.
+/// * `radius` - almost any radius is supported.
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn box_blur(
-    src: &[u8],
-    src_stride: u32,
-    dst: &mut [u8],
-    dst_stride: u32,
-    width: u32,
-    height: u32,
+    image: &BlurImage<u8>,
+    dst_image: &mut BlurImageMut<u8>,
     radius: u32,
-    channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
+    image.check_layout()?;
+    dst_image.check_layout()?;
+    image.size_matches_mut(dst_image)?;
+    let width = image.width;
+    let height = image.height;
     let thread_count = threading_policy.thread_count(width, height) as u32;
-    let _dispatcher = match channels {
+    let _dispatcher = match image.channels {
         FastBlurChannels::Plane => box_blur_impl::<u8, 1>,
         FastBlurChannels::Channels3 => box_blur_impl::<u8, 3>,
         FastBlurChannels::Channels4 => box_blur_impl::<u8, 4>,
@@ -649,9 +653,11 @@ pub fn box_blur(
                 .unwrap(),
         )
     };
+    let dst_stride = dst_image.row_stride();
+    let dst = dst_image.data.borrow_mut();
     _dispatcher(
-        src,
-        src_stride,
+        image.data.as_ref(),
+        image.row_stride(),
         dst,
         dst_stride,
         width,
@@ -671,28 +677,23 @@ pub fn box_blur(
 ///
 /// # Arguments
 ///
-/// * `src` - Src image
-/// * `src_stride` - Lane length, default is width * channels_count if not changed
-/// * `dst` - Dst image
-/// * `dst_stride` - Lane length, default is width * channels_count if not changed
-/// * `width` - Width of the image
-/// * `height` - Height of the image
-/// * `radius` - almost any radius is supported
-/// * `channels` - Count of channels in the image
+/// * `image` - Source immutable image, see [BlurImage] for more info.
+/// * `dst_image` - Destination mutable image, see [BlurImageMut] for more info.
+/// * `radius` - almost any radius is supported.
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn box_blur_u16(
-    src: &[u16],
-    src_stride: u32,
-    dst: &mut [u16],
-    dst_stride: u32,
-    width: u32,
-    height: u32,
+    image: &BlurImage<u16>,
+    dst_image: &mut BlurImageMut<u16>,
     radius: u32,
-    channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
+    image.check_layout()?;
+    dst_image.check_layout()?;
+    image.size_matches_mut(dst_image)?;
+    let width = image.width;
+    let height = image.height;
     let thread_count = threading_policy.thread_count(width, height) as u32;
     let pool = if thread_count == 1 {
         None
@@ -704,14 +705,16 @@ pub fn box_blur_u16(
                 .unwrap(),
         )
     };
-    let _dispatcher = match channels {
+    let dispatcher = match image.channels {
         FastBlurChannels::Plane => box_blur_impl::<u16, 1>,
         FastBlurChannels::Channels3 => box_blur_impl::<u16, 3>,
         FastBlurChannels::Channels4 => box_blur_impl::<u16, 4>,
     };
-    _dispatcher(
-        src,
-        src_stride,
+    let dst_stride = dst_image.row_stride();
+    let dst = dst_image.data.borrow_mut();
+    dispatcher(
+        image.data.as_ref(),
+        image.row_stride(),
         dst,
         dst_stride,
         width,
@@ -719,7 +722,8 @@ pub fn box_blur_u16(
         radius,
         &pool,
         thread_count,
-    )
+    )?;
+    Ok(())
 }
 
 /// Performs box blur on the image.
@@ -730,28 +734,23 @@ pub fn box_blur_u16(
 ///
 /// # Arguments
 ///
-/// * `src` - Src image
-/// * `src_stride` - Lane length, default is width * channels_count if not changed
-/// * `dst` - Dst image
-/// * `dst_stride` - Lane length, default is width * channels_count if not changed
-/// * `width` - Width of the image
-/// * `height` - Height of the image
-/// * `radius` - almost any radius is supported
-/// * `channels` - Count of channels in the image
+/// * `image` - Source immutable image, see [BlurImage] for more info.
+/// * `dst_image` - Destination mutable image, see [BlurImageMut] for more info.
+/// * `radius` - almost any radius is supported.
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn box_blur_f32(
-    src: &[f32],
-    src_stride: u32,
-    dst: &mut [f32],
-    dst_stride: u32,
-    width: u32,
-    height: u32,
+    image: &BlurImage<f32>,
+    dst_image: &mut BlurImageMut<f32>,
     radius: u32,
-    channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
+    image.check_layout()?;
+    dst_image.check_layout()?;
+    image.size_matches_mut(dst_image)?;
+    let width = image.width;
+    let height = image.height;
     let thread_count = threading_policy.thread_count(width, height) as u32;
     let pool = if thread_count == 1 {
         None
@@ -763,14 +762,16 @@ pub fn box_blur_f32(
                 .unwrap(),
         )
     };
-    let _dispatcher = match channels {
+    let dispatcher = match image.channels {
         FastBlurChannels::Plane => box_blur_impl::<f32, 1>,
         FastBlurChannels::Channels3 => box_blur_impl::<f32, 3>,
         FastBlurChannels::Channels4 => box_blur_impl::<f32, 4>,
     };
-    _dispatcher(
-        src,
-        src_stride,
+    let dst_stride = dst_image.row_stride();
+    let dst = dst_image.data.borrow_mut();
+    dispatcher(
+        image.data.as_ref(),
+        image.row_stride(),
         dst,
         dst_stride,
         width,
@@ -789,88 +790,63 @@ pub fn box_blur_f32(
 ///
 /// # Arguments
 ///
-/// * `src` - Src image
-/// * `src_stride` - Lane length, default is width * channels_count if not changed
-/// * `dst` - Dst image
-/// * `dst_stride` - Lane length, default is width * channels_count if not changed
-/// * `width` - Width of the image
-/// * `height` - Height of the image
-/// * `radius` - almost any radius is supported
-/// * `channels` - Count of channels of the image, only 3 and 4 is supported, alpha position, and channels order does not matter
-/// * `threading_policy` - Threads usage policy
-/// * `transfer_function` - Transfer function in linear colorspace
+/// * `image` - Source immutable image, see [BlurImage] for more info.
+/// * `dst_image` - Destination mutable image, see [BlurImageMut] for more info.
+/// * `radius` - almost any radius is supported.
+/// * `threading_policy` - Threads usage policy.
+/// * `transfer_function` - Transfer function in linear colorspace.
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn box_blur_in_linear(
-    src: &[u8],
-    src_stride: u32,
-    dst: &mut [u8],
-    dst_stride: u32,
-    width: u32,
-    height: u32,
+    image: &BlurImage<u8>,
+    dst_image: &mut BlurImageMut<u8>,
     radius: u32,
-    channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
     transfer_function: TransferFunction,
 ) -> Result<(), BlurError> {
-    check_slice_size(
-        src,
-        src_stride as usize,
-        width as usize,
-        height as usize,
-        channels.channels(),
-    )?;
-    check_slice_size(
-        dst,
-        dst_stride as usize,
-        width as usize,
-        height as usize,
-        channels.channels(),
-    )?;
-    let mut linear_data: Vec<f32> =
-        vec![0f32; width as usize * height as usize * channels.channels()];
-    let mut linear_data_2: Vec<f32> =
-        vec![0f32; width as usize * height as usize * channels.channels()];
+    image.check_layout()?;
+    dst_image.check_layout()?;
+    image.size_matches_mut(dst_image)?;
 
-    let forward_transformer = match channels {
+    let mut linear_data = BlurImageMut::alloc(image.width, image.height, image.channels);
+    let mut linear_data_2 = BlurImageMut::alloc(image.width, image.height, image.channels);
+
+    let forward_transformer = match image.channels {
         FastBlurChannels::Plane => plane_to_linear,
         FastBlurChannels::Channels3 => rgb_to_linear,
         FastBlurChannels::Channels4 => rgba_to_linear,
     };
 
-    let inverse_transformer = match channels {
+    let inverse_transformer = match image.channels {
         FastBlurChannels::Plane => linear_to_plane,
         FastBlurChannels::Channels3 => linear_to_rgb,
         FastBlurChannels::Channels4 => linear_to_rgba,
     };
 
+    let width = image.width;
+    let height = image.height;
+    let channels = image.channels;
+    let dst_stride = dst_image.row_stride();
+
     forward_transformer(
-        src,
-        src_stride,
-        &mut linear_data,
-        width * std::mem::size_of::<f32>() as u32 * channels.channels() as u32,
+        image.data.as_ref(),
+        image.row_stride(),
+        linear_data.data.borrow_mut(),
+        width * size_of::<f32>() as u32 * channels.channels() as u32,
         width,
         height,
         transfer_function,
     );
 
-    box_blur_f32(
-        &linear_data,
-        width * channels.channels() as u32,
-        &mut linear_data_2,
-        width * channels.channels() as u32,
-        width,
-        height,
-        radius,
-        channels,
-        threading_policy,
-    )?;
+    let linear_close = linear_data.to_immutable_ref();
+
+    box_blur_f32(&linear_close, &mut linear_data_2, radius, threading_policy)?;
 
     inverse_transformer(
-        &linear_data_2,
-        width * std::mem::size_of::<f32>() as u32 * channels.channels() as u32,
-        dst,
+        linear_data_2.data.borrow_mut(),
+        width * size_of::<f32>() as u32 * channels.channels() as u32,
+        dst_image.data.borrow_mut(),
         dst_stride,
         width,
         height,
@@ -1002,34 +978,33 @@ where
 ///
 /// # Arguments
 ///
-/// * `src` - Src image
-/// * `src_stride` - Lane length, default is width * channels_count if not changed
-/// * `dst` - Dst image
-/// * `dst_stride` - Lane length, default is width * channels_count if not changed
-/// * `width` - Width of the image
-/// * `height` - Height of the image
-/// * `sigma` - gaussian flattening level
-/// * `channels` - Count of channels in the image
+/// * `image` - Source immutable image, see [BlurImage] for more info.
+/// * `dst_image` - Destination mutable image, see [BlurImageMut] for more info.
+/// * `radius` - almost any radius is supported.
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn tent_blur(
-    src: &[u8],
-    src_stride: u32,
-    dst: &mut [u8],
-    dst_stride: u32,
-    width: u32,
-    height: u32,
+    image: &BlurImage<u8>,
+    dst_image: &mut BlurImageMut<u8>,
     sigma: f32,
-    channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
-    let _dispatcher = match channels {
+    image.check_layout()?;
+    dst_image.check_layout()?;
+    image.size_matches_mut(dst_image)?;
+    let dispatcher = match image.channels {
         FastBlurChannels::Plane => tent_blur_impl::<u8, 1>,
         FastBlurChannels::Channels3 => tent_blur_impl::<u8, 3>,
         FastBlurChannels::Channels4 => tent_blur_impl::<u8, 4>,
     };
-    _dispatcher(
+    let src = image.data.as_ref();
+    let src_stride = image.row_stride();
+    let dst_stride = dst_image.row_stride();
+    let dst = dst_image.data.borrow_mut();
+    let width = image.width;
+    let height = image.height;
+    dispatcher(
         src,
         src_stride,
         dst,
@@ -1052,34 +1027,33 @@ pub fn tent_blur(
 ///
 /// # Arguments
 ///
-/// * `src` - Src image
-/// * `src_stride` - Lane length, default is width * channels_count if not changed
-/// * `dst` - Dst image
-/// * `dst_stride` - Lane length, default is width * channels_count if not changed
-/// * `width` - Width of the image.
-/// * `height` - Height of the image.
-/// * `sigma` - gaussian flattening level.
-/// * `channels` - Count of channels in the image.
+/// * `image` - Source immutable image, see [BlurImage] for more info.
+/// * `dst_image` - Destination mutable image, see [BlurImageMut] for more info.
+/// * `radius` - almost any radius is supported.
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn tent_blur_u16(
-    src: &[u16],
-    src_stride: u32,
-    dst: &mut [u16],
-    dst_stride: u32,
-    width: u32,
-    height: u32,
+    image: &BlurImage<u16>,
+    dst_image: &mut BlurImageMut<u16>,
     sigma: f32,
-    channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
-    let _dispatcher = match channels {
+    image.check_layout()?;
+    dst_image.check_layout()?;
+    image.size_matches_mut(dst_image)?;
+    let dispatcher = match image.channels {
         FastBlurChannels::Plane => tent_blur_impl::<u16, 1>,
         FastBlurChannels::Channels3 => tent_blur_impl::<u16, 3>,
         FastBlurChannels::Channels4 => tent_blur_impl::<u16, 4>,
     };
-    _dispatcher(
+    let src = image.data.as_ref();
+    let src_stride = image.row_stride();
+    let dst_stride = dst_image.row_stride();
+    let dst = dst_image.data.borrow_mut();
+    let width = image.width;
+    let height = image.height;
+    dispatcher(
         src,
         src_stride,
         dst,
@@ -1100,34 +1074,33 @@ pub fn tent_blur_u16(
 ///
 /// # Arguments
 ///
-/// * `src` - Src image.
-/// * `src_stride` - Lane length, default is width * channels_count if not changed.
-/// * `dst` - Dst image.
-/// * `dst_stride` - Lane length, default is width * channels_count if not changed.
-/// * `width` - Width of the image
-/// * `height` - Height of the image
-/// * `sigma` - gaussian flattening level.
-/// * `channels` - Count of channels in the image
+/// * `image` - Source immutable image, see [BlurImage] for more info.
+/// * `dst_image` - Destination mutable image, see [BlurImageMut] for more info.
+/// * `radius` - almost any radius is supported.
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn tent_blur_f32(
-    src: &[f32],
-    src_stride: u32,
-    dst: &mut [f32],
-    dst_stride: u32,
-    width: u32,
-    height: u32,
+    image: &BlurImage<f32>,
+    dst_image: &mut BlurImageMut<f32>,
     sigma: f32,
-    channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
-    let _dispatcher = match channels {
+    image.check_layout()?;
+    dst_image.check_layout()?;
+    image.size_matches_mut(dst_image)?;
+    let dispatcher = match image.channels {
         FastBlurChannels::Plane => tent_blur_impl::<f32, 1>,
         FastBlurChannels::Channels3 => tent_blur_impl::<f32, 3>,
         FastBlurChannels::Channels4 => tent_blur_impl::<f32, 4>,
     };
-    _dispatcher(
+    let src = image.data.as_ref();
+    let src_stride = image.row_stride();
+    let dst_stride = dst_image.row_stride();
+    let dst = dst_image.data.borrow_mut();
+    let width = image.width;
+    let height = image.height;
+    dispatcher(
         src,
         src_stride,
         dst,
@@ -1150,88 +1123,67 @@ pub fn tent_blur_f32(
 ///
 /// # Arguments
 ///
-/// * `src` - Src image.
-/// * `src_stride` - Lane length, default is width * channels_count if not changed.
-/// * `dst` - Dst image.
-/// * `dst_stride` - Lane length, default is width * channels_count if not changed.
-/// * `width` - Width of the image.
-/// * `height` - Height of the image.
-/// * `sigma` - gaussian flattening level.
-/// * `channels` - Count of channels of the image, only 3 and 4 is supported, alpha position, and channels order does not matter.
-/// * `threading_policy` - Threads usage policy.
-/// * `transfer_function` - Transfer function in linear colorspace.
+/// * `image` - Source immutable image, see [BlurImage] for more info.
+/// * `dst_image` - Destination mutable image, see [BlurImageMut] for more info.
+/// * `radius` - almost any radius is supported.
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn tent_blur_in_linear(
-    src: &[u8],
-    src_stride: u32,
-    dst: &mut [u8],
-    dst_stride: u32,
-    width: u32,
-    height: u32,
+    image: &BlurImage<u8>,
+    dst_image: &mut BlurImageMut<u8>,
     sigma: f32,
-    channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
     transfer_function: TransferFunction,
 ) -> Result<(), BlurError> {
-    check_slice_size(
-        src,
-        src_stride as usize,
-        width as usize,
-        height as usize,
-        channels.channels(),
-    )?;
-    check_slice_size(
-        dst,
-        dst_stride as usize,
-        width as usize,
-        height as usize,
-        channels.channels(),
-    )?;
-    let mut linear_data: Vec<f32> =
-        vec![0f32; width as usize * height as usize * channels.channels()];
-    let mut linear_data_2: Vec<f32> =
-        vec![0f32; width as usize * height as usize * channels.channels()];
+    image.check_layout()?;
+    dst_image.check_layout()?;
+    image.size_matches_mut(dst_image)?;
 
-    let forward_transformer = match channels {
+    let mut linear_data = BlurImageMut::alloc(image.width, image.height, image.channels);
+    let mut linear_data_2 = BlurImageMut::alloc(image.width, image.height, image.channels);
+
+    let forward_transformer = match image.channels {
         FastBlurChannels::Plane => plane_to_linear,
         FastBlurChannels::Channels3 => rgb_to_linear,
         FastBlurChannels::Channels4 => rgba_to_linear,
     };
 
-    let inverse_transformer = match channels {
+    let inverse_transformer = match image.channels {
         FastBlurChannels::Plane => linear_to_plane,
         FastBlurChannels::Channels3 => linear_to_rgb,
         FastBlurChannels::Channels4 => linear_to_rgba,
     };
 
+    let channels = image.channels;
+    let width = image.width;
+
     forward_transformer(
-        src,
-        src_stride,
-        &mut linear_data,
-        width * std::mem::size_of::<f32>() as u32 * channels.channels() as u32,
+        image.data.as_ref(),
+        image.row_stride(),
+        linear_data.data.borrow_mut(),
+        width * size_of::<f32>() as u32 * channels.channels() as u32,
         width,
-        height,
+        image.height,
         transfer_function,
     );
 
+    let immutable_linear_ref = linear_data.to_immutable_ref();
+
     tent_blur_f32(
-        &linear_data,
-        width * channels.channels() as u32,
+        &immutable_linear_ref,
         &mut linear_data_2,
-        width * channels.channels() as u32,
-        width,
-        height,
         sigma,
-        channels,
         threading_policy,
     )?;
 
+    let height = image.height;
+    let dst_stride = dst_image.row_stride();
+
     inverse_transformer(
-        &linear_data_2,
-        width * std::mem::size_of::<f32>() as u32 * channels.channels() as u32,
-        dst,
+        linear_data_2.data.borrow_mut(),
+        width * size_of::<f32>() as u32 * channels.channels() as u32,
+        dst_image.data.borrow_mut(),
         dst_stride,
         width,
         height,
@@ -1331,34 +1283,31 @@ where
 ///
 /// # Arguments
 ///
-/// * `src` - Src image.
-/// * `src_stride` - Lane length, default is width * channels_count if not changed.
-/// * `dst` - Dst image.
-/// * `dst_stride` - Lane length, default is width * channels_count if not changed.
-/// * `width` - Width of the image.
-/// * `height` - Height of the image.
-/// * `sigma` - gaussian flattening level.
-/// * `channels` - Count of channels in the image.
+/// * `image` - Source immutable image, see [BlurImage] for more info.
+/// * `dst_image` - Destination mutable image, see [BlurImageMut] for more info.
+/// * `sigma` - Flattening level.
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn gaussian_box_blur(
-    src: &[u8],
-    src_stride: u32,
-    dst: &mut [u8],
-    dst_stride: u32,
-    width: u32,
-    height: u32,
+    image: &BlurImage<u8>,
+    dst_image: &mut BlurImageMut<u8>,
     sigma: f32,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
-    let _dispatcher = match channels {
+    let dispatcher = match channels {
         FastBlurChannels::Plane => gaussian_box_blur_impl::<u8, 1>,
         FastBlurChannels::Channels3 => gaussian_box_blur_impl::<u8, 3>,
         FastBlurChannels::Channels4 => gaussian_box_blur_impl::<u8, 4>,
     };
-    _dispatcher(
+    let src = image.data.as_ref();
+    let src_stride = image.row_stride();
+    let dst_stride = dst_image.row_stride();
+    let dst = dst_image.data.borrow_mut();
+    let width = image.width;
+    let height = image.height;
+    dispatcher(
         src,
         src_stride,
         dst,
@@ -1382,33 +1331,31 @@ pub fn gaussian_box_blur(
 ///
 /// # Arguments
 ///
-/// * `src` - Src image.
-/// * `src_stride` - Lane length, default is width * channels_count if not changed.
-/// * `dst` - Dst image.
-/// * `dst_stride` - Lane length, default is width * channels_count if not changed.
-/// * `width` - Width of the image.
-/// * `height` - Height of the image.
-/// * `sigma` - gaussian flattening level.
-/// * `channels` - Count of channels in the image.
+/// * `image` - Source immutable image, see [BlurImage] for more info.
+/// * `dst_image` - Destination mutable image, see [BlurImageMut] for more info.
+/// * `sigma` - Flattening level.
+/// * `threading_policy` - Threading policy, see [ThreadingPolicy] for more info.
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn gaussian_box_blur_u16(
-    src: &[u16],
-    src_stride: u32,
-    dst: &mut [u16],
-    dst_stride: u32,
-    width: u32,
-    height: u32,
+    image: &BlurImage<u16>,
+    dst_image: &mut BlurImageMut<u16>,
     sigma: f32,
-    channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
+    let channels = image.channels;
     let executor = match channels {
         FastBlurChannels::Plane => gaussian_box_blur_impl::<u16, 1>,
         FastBlurChannels::Channels3 => gaussian_box_blur_impl::<u16, 3>,
         FastBlurChannels::Channels4 => gaussian_box_blur_impl::<u16, 4>,
     };
+    let src = image.data.as_ref();
+    let src_stride = image.row_stride();
+    let dst_stride = dst_image.row_stride();
+    let dst = dst_image.data.borrow_mut();
+    let width = image.width;
+    let height = image.height;
     executor(
         src,
         src_stride,
@@ -1433,34 +1380,32 @@ pub fn gaussian_box_blur_u16(
 ///
 /// # Arguments
 ///
-/// * `src` - Src image.
-/// * `src_stride` - Lane length, default is width * channels_count if not changed.
-/// * `dst` - Dst image.
-/// * `dst_stride` - Lane length, default is width * channels_count if not changed.
-/// * `width` - Width of the image.
-/// * `height` - Height of the image.
-/// * `sigma` - gaussian flattening level.
-/// * `channels` - Count of channels in the image.
+/// * `image` - Source immutable image, see [BlurImage] for more info.
+/// * `dst_image` - Destination mutable image, see [BlurImageMut] for more info.
+/// * `sigma` - Flattening level.
+/// * `threading_policy` - Threading policy, see [ThreadingPolicy] for more info.
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn gaussian_box_blur_f32(
-    src: &[f32],
-    src_stride: u32,
-    dst: &mut [f32],
-    dst_stride: u32,
-    width: u32,
-    height: u32,
+    image: &BlurImage<f32>,
+    dst_image: &mut BlurImageMut<f32>,
     sigma: f32,
-    channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
-    let _dispatcher = match channels {
+    let channels = image.channels;
+    let dispatcher = match channels {
         FastBlurChannels::Plane => gaussian_box_blur_impl::<f32, 1>,
         FastBlurChannels::Channels3 => gaussian_box_blur_impl::<f32, 3>,
         FastBlurChannels::Channels4 => gaussian_box_blur_impl::<f32, 4>,
     };
-    _dispatcher(
+    let src = image.data.as_ref();
+    let src_stride = image.row_stride();
+    let dst_stride = dst_image.row_stride();
+    let dst = dst_image.data.borrow_mut();
+    let width = image.width;
+    let height = image.height;
+    dispatcher(
         src,
         src_stride,
         dst,
@@ -1483,88 +1428,62 @@ pub fn gaussian_box_blur_f32(
 ///
 /// # Arguments
 ///
-/// * `src` - Src image.
-/// * `src_stride` - Lane length, default is width * channels_count if not changed.
-/// * `dst` - Dst image.
-/// * `dst_stride` - Lane length, default is width * channels_count if not changed.
-/// * `width` - Width of the image.
-/// * `height` - Height of the image.
-/// * `sigma` - gaussian flattening level.
-/// * `channels` - Count of channels of the image, only 3 and 4 is supported, alpha position, and channels order does not matter.
-/// * `threading_policy` - Threads usage policy
-/// * `transfer_function` - Transfer function in linear colorspace.
+/// * `image` - Source immutable image, see [BlurImage] for more info.
+/// * `dst_image` - Destination mutable image, see [BlurImageMut] for more info.
+/// * `sigma` - Flattening level.
+/// * `threading_policy` - Threading policy, see [ThreadingPolicy] for more info.
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn gaussian_box_blur_in_linear(
-    src: &[u8],
-    src_stride: u32,
-    dst: &mut [u8],
-    dst_stride: u32,
-    width: u32,
-    height: u32,
+    image: &BlurImage<u8>,
+    dst_image: &mut BlurImageMut<u8>,
     sigma: f32,
-    channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
     transfer_function: TransferFunction,
 ) -> Result<(), BlurError> {
-    check_slice_size(
-        src,
-        src_stride as usize,
-        width as usize,
-        height as usize,
-        channels.channels(),
-    )?;
-    check_slice_size(
-        dst,
-        dst_stride as usize,
-        width as usize,
-        height as usize,
-        channels.channels(),
-    )?;
-    let mut linear_data: Vec<f32> =
-        vec![0f32; width as usize * height as usize * channels.channels()];
-    let mut linear_data_2: Vec<f32> =
-        vec![0f32; width as usize * height as usize * channels.channels()];
+    image.check_layout()?;
+    dst_image.check_layout()?;
+    image.size_matches_mut(dst_image)?;
+    let mut linear_data = BlurImageMut::alloc(image.width, image.height, image.channels);
+    let mut linear_data_2 = BlurImageMut::alloc(image.width, image.height, image.channels);
 
-    let forward_transformer = match channels {
+    let forward_transformer = match image.channels {
         FastBlurChannels::Plane => plane_to_linear,
         FastBlurChannels::Channels3 => rgb_to_linear,
         FastBlurChannels::Channels4 => rgba_to_linear,
     };
 
-    let inverse_transformer = match channels {
+    let inverse_transformer = match image.channels {
         FastBlurChannels::Plane => linear_to_plane,
         FastBlurChannels::Channels3 => linear_to_rgb,
         FastBlurChannels::Channels4 => linear_to_rgba,
     };
 
+    let channels = image.channels;
+    let width = image.width;
+    let height = image.height;
+
     forward_transformer(
-        src,
-        src_stride,
-        &mut linear_data,
-        width * std::mem::size_of::<f32>() as u32 * channels.channels() as u32,
+        image.data.as_ref(),
+        image.row_stride(),
+        linear_data.data.borrow_mut(),
+        width * size_of::<f32>() as u32 * channels.channels() as u32,
         width,
         height,
         transfer_function,
     );
 
-    gaussian_box_blur_f32(
-        &linear_data,
-        width * channels.channels() as u32,
-        &mut linear_data_2,
-        width * channels.channels() as u32,
-        width,
-        height,
-        sigma,
-        channels,
-        threading_policy,
-    )?;
+    let immutable_ref = linear_data.to_immutable_ref();
+
+    gaussian_box_blur_f32(&immutable_ref, &mut linear_data_2, sigma, threading_policy)?;
+
+    let dst_stride = dst_image.row_stride();
 
     inverse_transformer(
-        &linear_data_2,
+        linear_data_2.data.borrow(),
         width * std::mem::size_of::<f32>() as u32 * channels.channels() as u32,
-        dst,
+        dst_image.data.borrow_mut(),
         dst_stride,
         width,
         height,

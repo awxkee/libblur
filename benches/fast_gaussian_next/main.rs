@@ -1,7 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use image::{EncodableLayout, GenericImageView, ImageReader};
 
-use libblur::{EdgeMode, FastBlurChannels, ThreadingPolicy};
+use libblur::{BlurImageMut, EdgeMode, FastBlurChannels, ThreadingPolicy};
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     let img = ImageReader::open("assets/test_image_4.png")
@@ -9,19 +9,19 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         .decode()
         .unwrap();
     let dimensions = img.dimensions();
-    let components = 4;
-    let stride = dimensions.0 as usize * components;
     let src_bytes = img.as_bytes();
     c.bench_function("RGBA fast gaussian next", |b| {
         let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
+        let mut dst_image = BlurImageMut::borrow(
+            &mut dst_bytes,
+            dimensions.0,
+            dimensions.1,
+            FastBlurChannels::Channels4,
+        );
         b.iter(|| {
             libblur::fast_gaussian_next(
-                &mut dst_bytes,
-                stride as u32,
-                dimensions.0,
-                dimensions.1,
+                &mut dst_image,
                 77,
-                FastBlurChannels::Channels4,
                 ThreadingPolicy::Adaptive,
                 EdgeMode::Clamp,
             )
@@ -33,14 +33,16 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
     c.bench_function("RGBA16 fast gaussian next (Single Thread)", |b| {
         let mut dst_bytes: Vec<u16> = rgba_u16.to_vec();
+        let mut dst_image = BlurImageMut::borrow(
+            &mut dst_bytes,
+            dimensions.0,
+            dimensions.1,
+            FastBlurChannels::Channels4,
+        );
         b.iter(|| {
             libblur::fast_gaussian_next_u16(
-                &mut dst_bytes,
-                dimensions.0 * 4,
-                dimensions.0,
-                dimensions.1,
+                &mut dst_image,
                 77,
-                FastBlurChannels::Channels4,
                 ThreadingPolicy::Single,
                 EdgeMode::Clamp,
             )
@@ -52,14 +54,16 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
     c.bench_function("RGBA f32 fast gaussian next (Single Thread)", |b| {
         let mut dst_bytes: Vec<f32> = rgba_f32.to_vec();
+        let mut dst_image = BlurImageMut::borrow(
+            &mut dst_bytes,
+            dimensions.0,
+            dimensions.1,
+            FastBlurChannels::Channels4,
+        );
         b.iter(|| {
             libblur::fast_gaussian_next_f32(
-                &mut dst_bytes,
-                dimensions.0 * 4,
-                dimensions.0,
-                dimensions.1,
+                &mut dst_image,
                 77,
-                FastBlurChannels::Channels4,
                 ThreadingPolicy::Single,
                 EdgeMode::Clamp,
             )
@@ -77,14 +81,16 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
     c.bench_function("RGB fast gaussian next", |b| {
         let mut dst_bytes: Vec<u8> = rgb_src_bytes.to_vec();
+        let mut dst_image = BlurImageMut::borrow(
+            &mut dst_bytes,
+            dimensions.0,
+            dimensions.1,
+            FastBlurChannels::Channels3,
+        );
         b.iter(|| {
             libblur::fast_gaussian_next(
-                &mut dst_bytes,
-                img.dimensions().0 * 3,
-                img.dimensions().0,
-                img.dimensions().1,
+                &mut dst_image,
                 77,
-                FastBlurChannels::Channels3,
                 ThreadingPolicy::Adaptive,
                 EdgeMode::Clamp,
             )

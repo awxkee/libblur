@@ -52,7 +52,7 @@ mod sse;
 
 #[cfg(feature = "fft")]
 pub use fft_utils::fft_next_good_size;
-pub use filter_2d::filter_2d;
+pub use filter_2d::{filter_2d, filter_2d_arbitrary};
 #[cfg(feature = "fft")]
 pub use filter_2d_fft::filter_2d_fft;
 pub use filter_2d_rgb::filter_2d_rgb;

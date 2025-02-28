@@ -29,7 +29,7 @@
 
 #![no_main]
 
-use libblur::{stack_blur_f32, FastBlurChannels, ThreadingPolicy};
+use libblur::{stack_blur_f32, BlurImageMut, FastBlurChannels, ThreadingPolicy};
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: (u8, u8, u8)| {
@@ -57,15 +57,8 @@ fn fuzz_image(width: usize, height: usize, radius: usize, channels: FastBlurChan
     if width == 0 || height == 0 || radius == 0 {
         return;
     }
-    let mut dst_image = vec![0.2f32; width * height * channels.channels()];
-    stack_blur_f32(
-        &mut dst_image,
-        width as u32 * channels.channels() as u32,
-        width as u32,
-        height as u32,
-        radius as u32,
-        channels,
-        ThreadingPolicy::Single,
-    )
-    .unwrap();
+
+    let mut dst_image = BlurImageMut::alloc(width as u32, height as u32, channels);
+
+    stack_blur_f32(&mut dst_image, radius as u32, ThreadingPolicy::Single).unwrap();
 }

@@ -27,7 +27,7 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::{
-    fast_gaussian, fast_gaussian_f32, fast_gaussian_u16, EdgeMode, FastBlurChannels,
+    fast_gaussian, fast_gaussian_f32, fast_gaussian_u16, BlurImageMut, EdgeMode, FastBlurChannels,
     ThreadingPolicy,
 };
 use image::{
@@ -56,17 +56,15 @@ pub fn fast_gaussian_blur_image(
     match image {
         DynamicImage::ImageLuma8(gray) => {
             let mut new_image = gray.as_raw().to_vec();
-            fast_gaussian(
+
+            let mut image = BlurImageMut::borrow(
                 &mut new_image,
                 gray.width(),
-                gray.width(),
                 gray.height(),
-                radius,
                 FastBlurChannels::Plane,
-                threading_policy,
-                edge_mode,
-            )
-            .unwrap();
+            );
+
+            fast_gaussian(&mut image, radius, threading_policy, edge_mode).unwrap();
             let new_gray_image = GrayImage::from_raw(gray.width(), gray.height(), new_image)?;
             Some(DynamicImage::ImageLuma8(new_gray_image))
         }
@@ -86,29 +84,23 @@ pub fn fast_gaussian_blur_image(
                 *alpha = raw_buffer[1];
             }
 
-            fast_gaussian(
+            let mut image_intensity = BlurImageMut::borrow(
                 &mut intensity_plane,
                 luma_alpha_image.width(),
-                luma_alpha_image.width(),
                 luma_alpha_image.height(),
-                radius,
                 FastBlurChannels::Plane,
-                threading_policy,
-                edge_mode,
-            )
-            .unwrap();
+            );
 
-            fast_gaussian(
+            fast_gaussian(&mut image_intensity, radius, threading_policy, edge_mode).unwrap();
+
+            let mut image_alpha = BlurImageMut::borrow(
                 &mut alpha_plane,
                 luma_alpha_image.width(),
-                luma_alpha_image.width(),
                 luma_alpha_image.height(),
-                radius,
                 FastBlurChannels::Plane,
-                threading_policy,
-                edge_mode,
-            )
-            .unwrap();
+            );
+
+            fast_gaussian(&mut image_alpha, radius, threading_policy, edge_mode).unwrap();
 
             let mut new_raw_buffer =
                 vec![
@@ -134,51 +126,47 @@ pub fn fast_gaussian_blur_image(
         }
         DynamicImage::ImageRgb8(rgb_image) => {
             let mut new_image = rgb_image.as_raw().to_vec();
-            fast_gaussian(
+
+            let mut image = BlurImageMut::borrow(
                 &mut new_image,
-                rgb_image.width() * 3,
                 rgb_image.width(),
                 rgb_image.height(),
-                radius,
                 FastBlurChannels::Channels3,
-                threading_policy,
-                edge_mode,
-            )
-            .unwrap();
+            );
+
+            fast_gaussian(&mut image, radius, threading_policy, edge_mode).unwrap();
             let new_rgb_image =
                 RgbImage::from_raw(rgb_image.width(), rgb_image.height(), new_image)?;
             Some(DynamicImage::ImageRgb8(new_rgb_image))
         }
         DynamicImage::ImageRgba8(rgba_image) => {
             let mut new_image = rgba_image.as_raw().to_vec();
-            fast_gaussian(
+
+            let mut image = BlurImageMut::borrow(
                 &mut new_image,
-                rgba_image.width() * 4,
                 rgba_image.width(),
                 rgba_image.height(),
-                radius,
                 FastBlurChannels::Channels4,
-                threading_policy,
-                edge_mode,
-            )
-            .unwrap();
+            );
+
+            fast_gaussian(&mut image, radius, threading_policy, edge_mode).unwrap();
+
             let new_rgba_image =
                 RgbaImage::from_raw(rgba_image.width(), rgba_image.height(), new_image)?;
+
             Some(DynamicImage::ImageRgba8(new_rgba_image))
         }
         DynamicImage::ImageLuma16(luma_16) => {
             let mut new_image = luma_16.as_raw().to_vec();
-            fast_gaussian_u16(
+
+            let mut image = BlurImageMut::borrow(
                 &mut new_image,
                 luma_16.width(),
-                luma_16.width(),
                 luma_16.height(),
-                radius,
                 FastBlurChannels::Plane,
-                threading_policy,
-                edge_mode,
-            )
-            .unwrap();
+            );
+
+            fast_gaussian_u16(&mut image, radius, threading_policy, edge_mode).unwrap();
 
             let new_rgb_image = ImageBuffer::<Luma<u16>, Vec<u16>>::from_raw(
                 luma_16.width(),
@@ -203,29 +191,23 @@ pub fn fast_gaussian_blur_image(
                 *alpha = raw_buffer[1];
             }
 
-            fast_gaussian_u16(
+            let mut intensity_image = BlurImageMut::borrow(
                 &mut intensity_plane,
                 gray_alpha_16.width(),
-                gray_alpha_16.width(),
                 gray_alpha_16.height(),
-                radius,
                 FastBlurChannels::Plane,
-                threading_policy,
-                edge_mode,
-            )
-            .unwrap();
+            );
 
-            fast_gaussian_u16(
+            fast_gaussian_u16(&mut intensity_image, radius, threading_policy, edge_mode).unwrap();
+
+            let mut alpha_image = BlurImageMut::borrow(
                 &mut alpha_plane,
                 gray_alpha_16.width(),
-                gray_alpha_16.width(),
                 gray_alpha_16.height(),
-                radius,
                 FastBlurChannels::Plane,
-                threading_policy,
-                edge_mode,
-            )
-            .unwrap();
+            );
+
+            fast_gaussian_u16(&mut alpha_image, radius, threading_policy, edge_mode).unwrap();
 
             let mut new_raw_buffer =
                 vec![0u16; gray_alpha_16.width() as usize * gray_alpha_16.height() as usize * 2];
@@ -248,17 +230,15 @@ pub fn fast_gaussian_blur_image(
         }
         DynamicImage::ImageRgb16(rgb_16_image) => {
             let mut new_image = rgb_16_image.as_raw().to_vec();
-            fast_gaussian_u16(
+
+            let mut rgb_image = BlurImageMut::borrow(
                 &mut new_image,
-                rgb_16_image.width() * 3,
                 rgb_16_image.width(),
                 rgb_16_image.height(),
-                radius,
                 FastBlurChannels::Channels3,
-                threading_policy,
-                edge_mode,
-            )
-            .unwrap();
+            );
+
+            fast_gaussian_u16(&mut rgb_image, radius, threading_policy, edge_mode).unwrap();
 
             let new_rgb_image = ImageBuffer::<Rgb<u16>, Vec<u16>>::from_raw(
                 rgb_16_image.width(),
@@ -269,17 +249,15 @@ pub fn fast_gaussian_blur_image(
         }
         DynamicImage::ImageRgba16(rgba_16_image) => {
             let mut new_image = rgba_16_image.as_raw().to_vec();
-            fast_gaussian_u16(
+
+            let mut rgb_image = BlurImageMut::borrow(
                 &mut new_image,
-                rgba_16_image.width() * 4,
                 rgba_16_image.width(),
                 rgba_16_image.height(),
-                radius,
-                FastBlurChannels::Channels3,
-                threading_policy,
-                edge_mode,
-            )
-            .unwrap();
+                FastBlurChannels::Channels4,
+            );
+
+            fast_gaussian_u16(&mut rgb_image, radius, threading_policy, edge_mode).unwrap();
 
             let new_rgba_image = ImageBuffer::<Rgba<u16>, Vec<u16>>::from_raw(
                 rgba_16_image.width(),
@@ -290,34 +268,32 @@ pub fn fast_gaussian_blur_image(
         }
         DynamicImage::ImageRgb32F(rgb_image_f32) => {
             let mut new_image = rgb_image_f32.as_raw().to_vec();
-            fast_gaussian_f32(
+
+            let mut rgb_image = BlurImageMut::borrow(
                 &mut new_image,
-                rgb_image_f32.width() * 3,
                 rgb_image_f32.width(),
                 rgb_image_f32.height(),
-                radius,
                 FastBlurChannels::Channels3,
-                threading_policy,
-                edge_mode,
-            )
-            .unwrap();
+            );
+
+            fast_gaussian_f32(&mut rgb_image, radius, threading_policy, edge_mode).unwrap();
+
             let new_rgb_image =
                 Rgb32FImage::from_raw(rgb_image_f32.width(), rgb_image_f32.height(), new_image)?;
             Some(DynamicImage::ImageRgb32F(new_rgb_image))
         }
         DynamicImage::ImageRgba32F(rgba_image_f32) => {
             let mut new_image = rgba_image_f32.as_raw().to_vec();
-            fast_gaussian_f32(
+
+            let mut rgb_image = BlurImageMut::borrow(
                 &mut new_image,
-                rgba_image_f32.width() * 3,
                 rgba_image_f32.width(),
                 rgba_image_f32.height(),
-                radius,
                 FastBlurChannels::Channels4,
-                threading_policy,
-                edge_mode,
-            )
-            .unwrap();
+            );
+
+            fast_gaussian_f32(&mut rgb_image, radius, threading_policy, edge_mode).unwrap();
+
             let new_rgb_image =
                 Rgba32FImage::from_raw(rgba_image_f32.width(), rgba_image_f32.height(), new_image)?;
             Some(DynamicImage::ImageRgba32F(new_rgb_image))
