@@ -26,7 +26,9 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::{filter_2d, BlurError, BlurImage, BlurImageMut, EdgeMode, KernelShape, Scalar, ThreadingPolicy};
+use crate::{
+    filter_2d, BlurError, BlurImage, BlurImageMut, EdgeMode, KernelShape, Scalar, ThreadingPolicy,
+};
 
 #[derive(Copy, Clone)]
 pub struct BresenhamPoint {
@@ -147,7 +149,7 @@ pub fn motion_blur(
 ) -> Result<(), BlurError> {
     image.check_layout()?;
     destination.check_layout()?;
-    image.size_matches_mut(&destination)?;
+    image.size_matches_mut(destination)?;
     if kernel_size & 1 == 0 {
         return Err(BlurError::OddKernel(kernel_size));
     }

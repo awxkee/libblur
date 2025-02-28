@@ -80,7 +80,7 @@ where
 {
     src.check_layout()?;
     dst.check_layout()?;
-    src.size_matches_mut(&dst)?;
+    src.size_matches_mut(dst)?;
     let channels = src.channels;
     match channels {
         FastBlurChannels::Plane => filter_2d_arbitrary::<T, F, 1>(

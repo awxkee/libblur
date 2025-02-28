@@ -29,11 +29,7 @@
 
 /// Computes sigma from kernel size
 pub fn sigma_size(kernel_size: f32) -> f32 {
-    let safe_kernel_size = if kernel_size <= 1. {
-        2.
-    } else {
-        kernel_size
-    };
+    let safe_kernel_size = if kernel_size <= 1. { 2. } else { kernel_size };
     0.3f32 * ((safe_kernel_size - 1.) * 0.5f32 - 1f32) + 0.8f32
 }
 

@@ -57,13 +57,8 @@ fn fuzz_image(width: usize, height: usize, radius: usize, channels: FastBlurChan
     if width == 0 || height == 0 || radius == 0 {
         return;
     }
-    
+
     let mut dst_image = BlurImageMut::alloc(width as u32, height as u32, channels);
 
-    stack_blur_f32(
-        &mut dst_image,
-        radius as u32,
-        ThreadingPolicy::Single,
-    )
-    .unwrap();
+    stack_blur_f32(&mut dst_image, radius as u32, ThreadingPolicy::Single).unwrap();
 }

@@ -293,7 +293,7 @@ pub fn fast_gaussian_blur_image(
             );
 
             fast_gaussian_f32(&mut rgb_image, radius, threading_policy, edge_mode).unwrap();
-            
+
             let new_rgb_image =
                 Rgba32FImage::from_raw(rgba_image_f32.width(), rgba_image_f32.height(), new_image)?;
             Some(DynamicImage::ImageRgba32F(new_rgb_image))

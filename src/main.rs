@@ -177,101 +177,26 @@ fn main() {
     let stride = dimensions.0 as usize * components;
     let mut bytes: Vec<u8> = src_bytes.to_vec();
     let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
-
-    // let mut spawned_bytes = dst_bytes.iter().map(|&x| ((x as u16) << 8) | (x as u16)).collect::<Vec<_>>();
-
-    // let start = Instant::now();
-    //
-    /*libblur::fast_gaussian(
-        &mut dst_bytes,
-        stride as u32,
-        dimensions.0,
-        dimensions.1,
-        75,
-        FastBlurChannels::Channels3,
-        ThreadingPolicy::Single,
-        EdgeMode::Clamp,
-    );*/
-    //
-    // println!("stackblur {:?}", start.elapsed());
-
-    // dst_bytes = spawned_bytes.iter().map(|&x| (x >> 8) as u8).collect::<Vec<_>>();
-
-    // //
-    // libblur::gaussian_box_blur(
-    //     &bytes,
-    //     stride as u32,
-    //     &mut dst_bytes,
-    //     stride as u32,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     48f32,
-    //     FastBlurChannels::Channels4,
-    //     ThreadingPolicy::Single,
-    // );
-    // // bytes = dst_bytes;
-
+    
     let start_time = Instant::now();
-
-    // let bytes_16 = bytes.iter().map(|&x| x as u16).collect::<Vec<u16>>();
-    // let mut dst_16 = vec![0u16; bytes_16.len()];
-    //
-    // libblur::gaussian_blur_u16(
-    //     &bytes_16,
-    //     &mut dst_16,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     0,
-    //     12.,
-    //     FastBlurChannels::Channels3,
-    //     EdgeMode::Clamp,
-    //     ThreadingPolicy::Single,
-    // );
-    //
-    // dst_bytes = dst_16.iter().map(|&x| x as u8).collect();
-
-    // sobel(
-    //     &bytes,
-    //     &mut dst_bytes,
-    //     ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),
-    //     EdgeMode::Clamp,
-    //     Scalar::new(255.0, 0.0, 0.0, 255.0),
-    //     FastBlurChannels::Channels3,
-    //     ThreadingPolicy::Single,
-    // );
-
-    // let mut f16_bytes: Vec<f16> = dst_bytes
-    //     .iter()
-    //     .map(|&x| f16::from_f32(x as f32 * (1. / 255.)))
-    //     .collect();
-    // //
 
     println!("libblur::stack_blur: {:?}", start_time.elapsed());
 
     let start = Instant::now();
+    
+    let f32_image = BlurImage::borrow(&bytes, dyn_image.width(), dyn_image.height(), FastBlurChannels::Channels3);
+    let mut target_f32 = BlurImageMut::alloc(dyn_image.width(), dyn_image.height(), FastBlurChannels::Channels3);
 
-    // libblur::stack_blur_f32(
-    //     &mut j_vet,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     25,
-    //     FastBlurChannels::Channels4,
-    //     ThreadingPolicy::Adaptive,
-    // );
+    libblur::box_blur(
+        &f32_image,
+        &mut target_f32,
+        15,
+        ThreadingPolicy::Adaptive,
+    ).unwrap();
+    
+    dst_bytes = target_f32.data.borrow().to_vec();
 
-    // libblur::gaussian_blur_f32(
-    //     &img_f32,
-    //     &mut j_vet,
-    //     dimensions.0,
-    //     dimensions.1,
-    //     21,
-    //     3.5f32,
-    //     FastBlurChannels::Channels4,
-    //     EdgeMode::Clamp,
-    //     ThreadingPolicy::Single,
-    // );
-
-    // bytes = j_vet.iter().map(|&x| (x * 255f32).round() as u8).collect();
+    // dst_bytes = target_f32.data.borrow().iter().map(|&x| (x * 255f32).round() as u8).collect();
     //
     // libblur::gaussian_box_blur_in_linear(
     //     &bytes,
@@ -354,31 +279,31 @@ fn main() {
     // )
     // .unwrap();
 
-    let src_image = BlurImage::borrow(
-        &bytes,
-        dimensions.0,
-        dimensions.1,
-        FastBlurChannels::Channels3,
-    );
-    let mut dst_image = BlurImageMut::borrow(
-        &mut dst_bytes,
-        dimensions.0,
-        dimensions.1,
-        FastBlurChannels::Channels3,
-    );
-
-    motion_blur(
-        &src_image,
-        &mut dst_image,
-        120f32,
-        35,
-        EdgeMode::Clamp,
-        Scalar::new(255.0, 0.0, 0.0, 255.0),
-        ThreadingPolicy::Adaptive,
-    )
-    .unwrap();
-
-    let motion_kernel = generate_motion_kernel(51, 18.);
+    // let src_image = BlurImage::borrow(
+    //     &bytes,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     FastBlurChannels::Channels3,
+    // );
+    // let mut dst_image = BlurImageMut::borrow(
+    //     &mut dst_bytes,
+    //     dimensions.0,
+    //     dimensions.1,
+    //     FastBlurChannels::Channels3,
+    // );
+    // 
+    // motion_blur(
+    //     &src_image,
+    //     &mut dst_image,
+    //     120f32,
+    //     35,
+    //     EdgeMode::Clamp,
+    //     Scalar::new(255.0, 0.0, 0.0, 255.0),
+    //     ThreadingPolicy::Adaptive,
+    // )
+    // .unwrap();
+    // 
+    // let motion_kernel = generate_motion_kernel(51, 18.);
 
     // laplacian(
     //     &bytes,

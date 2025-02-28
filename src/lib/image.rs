@@ -287,7 +287,7 @@ impl<'a, T: Clone + Copy + Default + Debug> BlurImageMut<'a, T> {
         }
         Err(BlurError::ImagesMustMatch)
     }
-    
+
     pub fn to_immutable_ref(&self) -> BlurImage<'_, T> {
         BlurImage {
             data: std::borrow::Cow::Borrowed(self.data.borrow()),

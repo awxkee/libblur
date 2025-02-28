@@ -341,7 +341,7 @@ fn box_blur_vertical_pass_impl<T, J>(
         for y in 1..half_kernel as usize {
             let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
             unsafe {
-                w += src.get_unchecked(y_src_shift + x).as_();
+                w += src.get_unchecked(y_src_shift + x + start_x as usize).as_();
             }
         }
         *bf = w;
@@ -358,10 +358,16 @@ fn box_blur_vertical_pass_impl<T, J>(
 
         let dst = unsafe {
             std::slice::from_raw_parts_mut(
-                unsafe_dst.slice.as_ptr().add(y_dst_shift) as *mut T,
-                end_x as usize,
+                unsafe_dst
+                    .slice
+                    .as_ptr()
+                    .add(y_dst_shift + start_x as usize) as *mut T,
+                end_x as usize - start_x as usize,
             )
         };
+
+        let previous_row = &previous_row[start_x as usize..];
+        let next_row = &next_row[start_x as usize..];
 
         for (((src_next, src_previous), buffer), dst) in next_row
             .iter()
@@ -502,7 +508,7 @@ fn box_blur_vertical_pass<
                 let start_x = i * segment_size;
                 let mut end_x = (i + 1) * segment_size;
                 if i == thread_count as usize - 1 {
-                    end_x = width as usize * CN;
+                    end_x = total_width;
                 }
 
                 scope.spawn(move |_| {
