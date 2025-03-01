@@ -27,6 +27,7 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![forbid(unsafe_code)]
+
 use crate::filter1d::arena::{make_arena_columns, make_arena_row, Arena};
 use crate::filter1d::filter_1d_column_handler_approx::Filter1DColumnHandlerApprox;
 use crate::filter1d::filter_1d_rgba_row_handler_approx::Filter1DRgbaRowHandlerApprox;
@@ -35,11 +36,11 @@ use crate::filter1d::filter_scan::{is_symmetric_1d, scan_se_1d};
 use crate::filter1d::region::FilterRegion;
 use crate::filter1d::to_approx_storage::{ApproxLevel, ToApproxStorage};
 use crate::to_storage::ToStorage;
-use crate::util::check_slice_size;
-use crate::{BlurError, EdgeMode, ImageSize, Scalar, ThreadingPolicy};
+use crate::{BlurError, BlurImage, BlurImageMut, EdgeMode, Scalar, ThreadingPolicy};
 use num_traits::{AsPrimitive, Float, MulAdd};
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::ParallelSliceMut;
+use std::fmt::Debug;
 use std::ops::{Add, Mul, Shl, Shr};
 
 /// Performs 2D separable approximated convolution on RGBA image
@@ -51,7 +52,6 @@ use std::ops::{Add, Mul, Shl, Shr};
 ///
 /// * `image`: Single RGBA image
 /// * `destination`: Destination RGBA image
-/// * `image_size`: Image size see [ImageSize]
 /// * `row_kernel`: Row kernel, *size must be odd*!
 /// * `column_kernel`: Column kernel, *size must be odd*!
 /// * `border_mode`: See [EdgeMode] for more info
@@ -65,9 +65,8 @@ use std::ops::{Add, Mul, Shl, Shr};
 /// See [crate::gaussian_blur] for example
 ///
 pub fn filter_1d_rgba_approx<T, F, I>(
-    image: &[T],
-    destination: &mut [T],
-    image_size: ImageSize,
+    image: &BlurImage<T>,
+    destination: &mut BlurImageMut<T>,
     row_kernel: &[F],
     column_kernel: &[F],
     border_mode: EdgeMode,
@@ -81,7 +80,8 @@ where
         + Send
         + Sync
         + Filter1DRgbaRowHandlerApprox<T, I>
-        + Filter1DColumnHandlerApprox<T, I>,
+        + Filter1DColumnHandlerApprox<T, I>
+        + Debug,
     F: ToStorage<T> + Mul<F> + MulAdd<F, Output = F> + Send + Sync + AsPrimitive<I> + Float,
     I: Copy
         + Mul<Output = I>
@@ -100,20 +100,9 @@ where
     i64: AsPrimitive<I> + AsPrimitive<F>,
     f64: AsPrimitive<T>,
 {
-    check_slice_size(
-        image,
-        image_size.width * 4,
-        image_size.width,
-        image_size.height,
-        4,
-    )?;
-    check_slice_size(
-        destination,
-        image_size.width * 4,
-        image_size.width,
-        image_size.height,
-        4,
-    )?;
+    image.check_layout()?;
+    destination.check_layout()?;
+    image.size_matches_mut(destination)?;
     if row_kernel.len() & 1 == 0 {
         return Err(BlurError::OddKernel(row_kernel.len()));
     }
@@ -140,6 +129,8 @@ where
     let scanned_column_kernel_slice = scanned_column_kernel.as_slice();
     let is_column_kernel_symmetric = is_symmetric_1d(column_kernel);
     let is_row_kernel_symmetric = is_symmetric_1d(row_kernel);
+
+    let image_size = image.size();
 
     let thread_count =
         threading_policy.thread_count(image_size.width as u32, image_size.height as u32) as u32;
@@ -168,7 +159,6 @@ where
                     let (row, arena_width) = make_arena_row::<T, N>(
                         image,
                         y,
-                        image_size,
                         KernelShape::new(row_kernel.len(), 0),
                         border_mode,
                         border_constant,
@@ -195,7 +185,6 @@ where
                 let (row, arena_width) = make_arena_row::<T, N>(
                     image,
                     y,
-                    image_size,
                     KernelShape::new(row_kernel.len(), 0),
                     border_mode,
                     border_constant,
@@ -234,13 +223,16 @@ where
         pool.install(|| {
             let column_handler = T::get_column_handler(is_column_kernel_symmetric);
             let src_stride = image_size.width * N;
-            let dst_stride = image_size.width * N;
+            let dst_stride = destination.row_stride() as usize;
 
             destination
+                .data
+                .borrow_mut()
                 .par_chunks_exact_mut(dst_stride)
                 .enumerate()
                 .for_each(|(y, row)| {
-                    let mut brows: Vec<&[T]> = vec![&image[0..]; column_kernel_shape.height];
+                    let mut brows: Vec<&[T]> =
+                        vec![&transient_image_slice[0..]; column_kernel_shape.height];
 
                     for (k, row) in (0..column_kernel_shape.height).zip(brows.iter_mut()) {
                         if (y as i64 - pad_h as i64 + k as i64) < 0 {
@@ -257,6 +249,7 @@ where
                     }
 
                     let brows_slice = brows.as_slice();
+                    let row = &mut row[..image_size.width * N];
 
                     column_handler(
                         Arena::new(image_size.width, pad_h, 0, pad_h, N),
@@ -271,13 +264,16 @@ where
     } else {
         let column_handler = T::get_column_handler(is_column_kernel_symmetric);
         let src_stride = image_size.width * N;
-        let dst_stride = image_size.width * N;
+        let dst_stride = destination.row_stride() as usize;
 
         destination
+            .data
+            .borrow_mut()
             .chunks_exact_mut(dst_stride)
             .enumerate()
             .for_each(|(y, row)| {
-                let mut brows: Vec<&[T]> = vec![&image[0..]; column_kernel_shape.height];
+                let mut brows: Vec<&[T]> =
+                    vec![&transient_image_slice[0..]; column_kernel_shape.height];
 
                 for (k, row) in (0..column_kernel_shape.height).zip(brows.iter_mut()) {
                     if (y as i64 - pad_h as i64 + k as i64) < 0 {
@@ -292,6 +288,7 @@ where
                 }
 
                 let brows_slice = brows.as_slice();
+                let row = &mut row[..image_size.width * N];
 
                 column_handler(
                     Arena::new(image_size.width, pad_h, 0, pad_h, N),

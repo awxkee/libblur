@@ -27,8 +27,8 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::{
-    filter_1d_exact, filter_1d_rgb_exact, filter_1d_rgba_exact, BlurError, EdgeMode,
-    FastBlurChannels, ImageSize, Scalar, ThreadingPolicy,
+    filter_1d_exact, filter_1d_rgb_exact, filter_1d_rgba_exact, BlurError, BlurImage, BlurImageMut,
+    EdgeMode, FastBlurChannels, Scalar, ThreadingPolicy,
 };
 
 /// Performs sobel operator on the image
@@ -37,26 +37,25 @@ use crate::{
 ///
 /// * `image`: Source image
 /// * `destination`: Destination image
-/// * `image_size`: Image size, see [ImageSize]
 /// * `border_mode`: See [EdgeMode] for more info
 /// * `border_constant`: If [EdgeMode::Constant] border will be replaced with this provided [Scalar] value
-/// * `channels`: see [FastBlurChannels] for more info
 /// * `threading_policy`: see [ThreadingPolicy] for more info
 ///
 /// returns: ()
 ///
 pub fn sobel(
-    image: &[u8],
-    destination: &mut [u8],
-    image_size: ImageSize,
+    image: &BlurImage<u8>,
+    destination: &mut BlurImageMut<u8>,
     border_mode: EdgeMode,
     border_constant: Scalar,
-    channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
+    image.check_layout()?;
+    destination.check_layout()?;
+    image.size_matches_mut(destination)?;
     let sobel_horizontal: [i16; 3] = [-1, 0, 1];
     let sobel_vertical: [i16; 3] = [1, 2, 1];
-    let _dispatcher = match channels {
+    let _dispatcher = match image.channels {
         FastBlurChannels::Plane => filter_1d_exact::<u8, i16>,
         FastBlurChannels::Channels3 => filter_1d_rgb_exact::<u8, i16>,
         FastBlurChannels::Channels4 => filter_1d_rgba_exact::<u8, i16>,
@@ -64,7 +63,6 @@ pub fn sobel(
     _dispatcher(
         image,
         destination,
-        image_size,
         &sobel_horizontal,
         &sobel_vertical,
         border_mode,

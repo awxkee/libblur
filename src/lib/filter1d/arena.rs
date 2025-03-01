@@ -31,8 +31,9 @@ use crate::filter1d::arena_roi::copy_roi;
 use crate::filter1d::filter_element::KernelShape;
 use crate::img_size::ImageSize;
 use crate::util::check_slice_size;
-use crate::{BlurError, EdgeMode, Scalar};
+use crate::{BlurError, BlurImage, EdgeMode, Scalar};
 use num_traits::AsPrimitive;
+use std::fmt::Debug;
 
 #[derive(Copy, Clone)]
 pub struct Arena {
@@ -327,10 +328,9 @@ where
 }
 
 /// Pads an image with chosen border strategy
-pub fn make_arena_row<T, const COMPONENTS: usize>(
-    image: &[T],
+pub fn make_arena_row<T: Debug, const COMPONENTS: usize>(
+    image: &BlurImage<T>,
     source_y: usize,
-    image_size: ImageSize,
     kernel_size: KernelShape,
     border_mode: EdgeMode,
     scalar: Scalar,
@@ -339,22 +339,18 @@ where
     T: Default + Copy + Send + Sync + 'static,
     f64: AsPrimitive<T>,
 {
-    check_slice_size(
-        image,
-        image_size.width * COMPONENTS,
-        image_size.width,
-        image_size.height,
-        COMPONENTS,
-    )?;
-
+    image.check_layout()?;
     let pad_w = kernel_size.width / 2;
+
+    let image_size = image.size();
 
     let arena_width = image_size.width * COMPONENTS + pad_w * 2 * COMPONENTS;
     let mut row = vec![T::default(); arena_width];
 
-    let source_offset = source_y * image_size.width * COMPONENTS;
+    let source_offset = source_y * image.row_stride() as usize;
 
-    let source_row = &image[source_offset..(source_offset + image_size.width * COMPONENTS)];
+    let source_row =
+        &image.data.as_ref()[source_offset..(source_offset + image_size.width * COMPONENTS)];
 
     let row_dst =
         &mut row[pad_w * COMPONENTS..(pad_w * COMPONENTS + image_size.width * COMPONENTS)];

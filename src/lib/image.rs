@@ -26,7 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::{BlurError, FastBlurChannels, MismatchedSize};
+use crate::{BlurError, FastBlurChannels, ImageSize, MismatchedSize};
 use std::fmt::Debug;
 
 #[derive(Debug)]
@@ -112,6 +112,11 @@ impl<'a, T: Clone + Copy + Default + Debug> BlurImage<'a, T> {
             return Ok(());
         }
         Err(BlurError::ImagesMustMatch)
+    }
+
+    #[inline]
+    pub fn size(&self) -> ImageSize {
+        ImageSize::new(self.width as usize, self.height as usize)
     }
 
     /// Checks if it is matches the size of the other image

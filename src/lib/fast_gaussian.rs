@@ -951,7 +951,6 @@ pub fn fast_gaussian_f32(
 pub fn fast_gaussian_in_linear(
     image: &mut BlurImageMut<u8>,
     radius: u32,
-    channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
     transfer_function: TransferFunction,
     edge_mode: EdgeMode,
@@ -959,13 +958,13 @@ pub fn fast_gaussian_in_linear(
     image.check_layout()?;
     let mut linear_data = BlurImageMut::alloc(image.width, image.height, image.channels);
 
-    let forward_transformer = match channels {
+    let forward_transformer = match image.channels {
         FastBlurChannels::Plane => plane_to_linear,
         FastBlurChannels::Channels3 => rgb_to_linear,
         FastBlurChannels::Channels4 => rgba_to_linear,
     };
 
-    let inverse_transformer = match channels {
+    let inverse_transformer = match image.channels {
         FastBlurChannels::Plane => linear_to_plane,
         FastBlurChannels::Channels3 => linear_to_rgb,
         FastBlurChannels::Channels4 => linear_to_rgba,
@@ -979,7 +978,7 @@ pub fn fast_gaussian_in_linear(
         image.data.borrow(),
         stride,
         linear_data.data.borrow_mut(),
-        width * std::mem::size_of::<f32>() as u32 * channels.channels() as u32,
+        width * std::mem::size_of::<f32>() as u32 * image.channels.channels() as u32,
         width,
         height,
         transfer_function,
@@ -989,7 +988,7 @@ pub fn fast_gaussian_in_linear(
 
     inverse_transformer(
         linear_data.data.borrow(),
-        width * std::mem::size_of::<f32>() as u32 * channels.channels() as u32,
+        width * std::mem::size_of::<f32>() as u32 * image.channels.channels() as u32,
         image.data.borrow_mut(),
         stride,
         width,
