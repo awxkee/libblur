@@ -85,7 +85,7 @@ where
 {
     image.check_layout_channels(N)?;
     destination.check_layout_channels(N)?;
-    image.size_matches_mut(destination)?;
+    image.only_size_matches_mut(destination)?;
     if row_kernel.len() & 1 == 0 {
         return Err(BlurError::OddKernel(row_kernel.len()));
     }

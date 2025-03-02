@@ -79,7 +79,7 @@ fn main() {
         &f32_image,
         &mut target_f32,
         0,
-        25f32,
+        30f32,
         EdgeMode::Clamp,
         ThreadingPolicy::Single,
     )

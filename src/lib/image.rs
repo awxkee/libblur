@@ -131,6 +131,15 @@ impl<'a, T: Clone + Copy + Default + Debug> BlurImage<'a, T> {
         Err(BlurError::ImagesMustMatch)
     }
 
+    /// Checks if it is matches the size of the other image
+    #[inline]
+    pub fn only_size_matches_mut(&self, other: &BlurImageMut<'_, T>) -> Result<(), BlurError> {
+        if self.width == other.width && self.height == other.height {
+            return Ok(());
+        }
+        Err(BlurError::ImagesMustMatch)
+    }
+
     /// Checks if layout matches necessary requirements by using external channels count
     #[inline]
     pub fn check_layout_channels(&self, cn: usize) -> Result<(), BlurError> {

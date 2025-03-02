@@ -51,7 +51,6 @@ use std::ops::{Add, Mul, Shl, Shr};
 ///
 /// * `image`: Single plane image
 /// * `destination`: Destination image
-/// * `image_size`: Image size see [ImageSize]
 /// * `row_kernel`: Row kernel, *size must be odd*!
 /// * `column_kernel`: Column kernel, *size must be odd*!
 /// * `border_mode`: See [EdgeMode] for more info
@@ -102,7 +101,7 @@ where
 {
     image.check_layout_channels(N)?;
     destination.check_layout_channels(N)?;
-    image.size_matches_mut(destination)?;
+    image.only_size_matches_mut(destination)?;
     if row_kernel.len() & 1 == 0 {
         return Err(BlurError::OddKernel(row_kernel.len()));
     }
