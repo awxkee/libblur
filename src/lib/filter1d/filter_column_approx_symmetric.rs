@@ -35,7 +35,7 @@ use crate::img_size::ImageSize;
 use num_traits::AsPrimitive;
 use std::ops::{Add, Mul, Shr};
 
-pub fn filter_column_symmetric_approx<T, I>(
+pub(crate) fn filter_column_symmetric_approx<T, I>(
     arena: Arena,
     arena_src: &[&[T]],
     dst: &mut [T],

@@ -25,9 +25,9 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::util::check_slice_size;
 use crate::{
-    gaussian_blur_f32, sigma_size, BlurError, EdgeMode, FastBlurChannels, ThreadingPolicy,
+    gaussian_blur_f32, sigma_size, BlurError, BlurImage, BlurImageMut, EdgeMode, FastBlurChannels,
+    ThreadingPolicy,
 };
 use colorutils_rs::linear_to_planar::linear_to_plane;
 use colorutils_rs::planar_to_linear::plane_to_linear;
@@ -57,56 +57,41 @@ use std::mem::size_of;
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
-#[allow(clippy::too_many_arguments)]
 pub fn gaussian_blur_in_linear(
-    src: &[u8],
-    src_stride: u32,
-    dst: &mut [u8],
-    dst_stride: u32,
-    width: u32,
-    height: u32,
+    src: &BlurImage<u8>,
+    dst: &mut BlurImageMut<u8>,
     kernel_size: u32,
     sigma: f32,
-    channels: FastBlurChannels,
     edge_mode: EdgeMode,
     threading_policy: ThreadingPolicy,
     transfer_function: TransferFunction,
 ) -> Result<(), BlurError> {
-    check_slice_size(
-        src,
-        width as usize * channels.channels(),
-        width as usize,
-        height as usize,
-        channels.channels(),
-    )?;
-    check_slice_size(
-        dst,
-        width as usize * channels.channels(),
-        width as usize,
-        height as usize,
-        channels.channels(),
-    )?;
-    let mut linear_data: Vec<f32> =
-        vec![0f32; width as usize * height as usize * channels.channels()];
-    let mut linear_data_1: Vec<f32> =
-        vec![0f32; width as usize * height as usize * channels.channels()];
+    src.check_layout()?;
+    dst.check_layout()?;
+    src.size_matches_mut(dst)?;
+    let mut linear_data = BlurImageMut::alloc(src.width, src.height, src.channels);
+    let mut linear_data_1 = BlurImageMut::alloc(src.width, src.height, src.channels);
 
-    let forward_transformer = match channels {
+    let forward_transformer = match src.channels {
         FastBlurChannels::Plane => plane_to_linear,
         FastBlurChannels::Channels3 => rgb_to_linear,
         FastBlurChannels::Channels4 => rgba_to_linear,
     };
 
-    let inverse_transformer = match channels {
+    let inverse_transformer = match src.channels {
         FastBlurChannels::Plane => linear_to_plane,
         FastBlurChannels::Channels3 => linear_to_rgb,
         FastBlurChannels::Channels4 => linear_to_rgba,
     };
 
+    let width = src.width;
+    let height = src.height;
+    let channels = src.channels;
+
     forward_transformer(
-        src,
-        src_stride,
-        &mut linear_data,
+        src.data.as_ref(),
+        src.row_stride(),
+        linear_data.data.borrow_mut(),
         width * size_of::<f32>() as u32 * channels.channels() as u32,
         width,
         height,
@@ -114,26 +99,28 @@ pub fn gaussian_blur_in_linear(
     );
 
     let sigma = if sigma <= 0. {
-        sigma_size(kernel_size as usize)
+        sigma_size(kernel_size as f32)
     } else {
         sigma
     };
 
+    let lin_data = linear_data.to_immutable_ref();
+
     gaussian_blur_f32(
-        &linear_data,
+        &lin_data,
         &mut linear_data_1,
-        width,
-        height,
         kernel_size,
         sigma,
-        channels,
         edge_mode,
         threading_policy,
     )?;
+
+    let dst_stride = dst.row_stride();
+
     inverse_transformer(
-        &linear_data_1,
+        linear_data_1.data.borrow(),
         width * size_of::<f32>() as u32 * channels.channels() as u32,
-        dst,
+        dst.data.borrow_mut(),
         dst_stride,
         width,
         height,

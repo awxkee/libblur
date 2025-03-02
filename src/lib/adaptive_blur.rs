@@ -28,13 +28,13 @@
  */
 #![allow(clippy::manual_clamp)]
 
-use crate::util::check_slice_size;
 use crate::{
-    filter_2d, filter_2d_fft, gaussian_blur, stack_blur, BlurError, ConvolutionMode, EdgeMode,
-    FastBlurChannels, ImageSize, KernelShape, Scalar, ThreadingPolicy,
+    filter_2d, filter_2d_fft, gaussian_blur, stack_blur, BlurError, BlurImage, BlurImageMut,
+    ConvolutionMode, EdgeMode, FastBlurChannels, KernelShape, Scalar, ThreadingPolicy,
 };
 use colorutils_rs::TransferFunction;
 use num_traits::AsPrimitive;
+use std::fmt::Debug;
 
 trait Blend<T> {
     fn blend(
@@ -91,56 +91,48 @@ trait BlurEdges<T> {
 
 impl BlurEdges<u8> for u8 {
     fn blur_edges(image: &mut [u8], width: usize, height: usize, radius: u32) {
-        stack_blur(
-            image,
-            width as u32,
-            width as u32,
-            height as u32,
-            radius,
-            FastBlurChannels::Plane,
-            ThreadingPolicy::Adaptive,
-        )
-        .unwrap();
+        let mut blur_img =
+            BlurImageMut::borrow(image, width as u32, height as u32, FastBlurChannels::Plane);
+        stack_blur(&mut blur_img, radius, ThreadingPolicy::Adaptive).unwrap();
     }
 }
 
 trait Blur<T> {
     fn blur(
         image: &[T],
+        dst_image: &mut [T],
         width: usize,
         height: usize,
         radius: u32,
         channels: FastBlurChannels,
-    ) -> Vec<T>;
+    );
 }
 
 impl Blur<u8> for u8 {
     fn blur(
         image: &[u8],
+        dst_image: &mut [u8],
         width: usize,
         height: usize,
         radius: u32,
         channels: FastBlurChannels,
-    ) -> Vec<u8> {
-        let mut dst = image.to_vec();
+    ) {
         let mut rad = (radius / 2).saturating_sub(1).max(1);
         if rad % 2 == 0 {
             rad += 1;
         }
+        let src = BlurImage::borrow(image, width as u32, height as u32, channels);
+        let mut dst = BlurImageMut::borrow(dst_image, width as u32, height as u32, channels);
         gaussian_blur(
-            image,
+            &src,
             &mut dst,
-            width as u32,
-            height as u32,
             rad,
             0.,
-            channels,
             EdgeMode::Clamp,
             ThreadingPolicy::Adaptive,
             ConvolutionMode::FixedPoint,
         )
         .unwrap();
-        dst
     }
 }
 
@@ -261,10 +253,17 @@ impl Edges<u8> for u8 {
         let mut edge_filter = vec![-1f32; full_size];
         edge_filter[radius * (radius / 2) + radius / 2] = radius as f32 * radius as f32 - 1f32;
         if radius > 15 {
-            filter_2d_fft::<u8, f32, f32>(
-                source,
+            let src_image =
+                BlurImage::borrow(source, width as u32, height as u32, FastBlurChannels::Plane);
+            let mut dst_image = BlurImageMut::borrow(
                 &mut dst,
-                ImageSize::new(width, height),
+                width as u32,
+                height as u32,
+                FastBlurChannels::Plane,
+            );
+            filter_2d_fft::<u8, f32, f32>(
+                &src_image,
+                &mut dst_image,
                 &edge_filter,
                 KernelShape::new(radius, radius),
                 border_mode,
@@ -272,12 +271,17 @@ impl Edges<u8> for u8 {
             )
             .unwrap();
         } else {
-            filter_2d::<u8, f32, 1>(
-                source,
-                width,
+            let src_image =
+                BlurImage::borrow(source, width as u32, height as u32, FastBlurChannels::Plane);
+            let mut dst_image = BlurImageMut::borrow(
                 &mut dst,
-                width,
-                ImageSize::new(width, height),
+                width as u32,
+                height as u32,
+                FastBlurChannels::Plane,
+            );
+            filter_2d::<u8, f32>(
+                &src_image,
+                &mut dst_image,
                 &edge_filter,
                 KernelShape::new(radius, radius),
                 border_mode,
@@ -382,17 +386,20 @@ fn adaptive_blur_impl<
         + Blur<T>
         + BlurEdges<T>
         + Blend<T>
-        + Gamma<T>,
+        + Gamma<T>
+        + Debug,
 >(
-    image: &[T],
-    width: usize,
-    height: usize,
+    src_image: &BlurImage<T>,
+    dst_image: &mut BlurImageMut<T>,
     radius: u32,
-    channels: FastBlurChannels,
     transfer_function: TransferFunction,
     border_mode: EdgeMode,
     border_constant: Scalar,
-) -> Vec<T> {
+) {
+    let image = src_image.data.as_ref();
+    let width = src_image.width as usize;
+    let height = src_image.height as usize;
+    let channels = src_image.channels;
     let linear_source = T::linearize(image, width, height, channels, transfer_function);
     let grayscale = T::grayscale(&linear_source, width, height, channels);
     let mut edges = T::edges(
@@ -407,46 +414,55 @@ fn adaptive_blur_impl<
     T::blur_edges(&mut edges, width, height, radius);
     T::auto_level(&mut edges, width, height);
 
-    let mut blurred = T::blur(&linear_source, width, height, radius, channels);
+    T::blur(
+        &linear_source,
+        dst_image.data.borrow_mut(),
+        width,
+        height,
+        radius,
+        channels,
+    );
 
     T::blend(
         &linear_source,
-        &mut blurred,
+        dst_image.data.borrow_mut(),
         &edges,
         width,
         height,
         channels,
     );
 
-    T::gamma(&mut blurred, width, height, channels, transfer_function);
-
-    blurred
+    T::gamma(
+        dst_image.data.borrow_mut(),
+        width,
+        height,
+        channels,
+        transfer_function,
+    );
 }
 
 /// Performs an adaptive blur on the image
 pub fn adaptive_blur(
-    image: &[u8],
-    width: usize,
-    height: usize,
+    src_image: &BlurImage<u8>,
+    dst_image: &mut BlurImageMut<u8>,
     radius: u32,
-    channels: FastBlurChannels,
     transfer_function: TransferFunction,
     border_mode: EdgeMode,
     border_constant: Scalar,
 ) -> Result<(), BlurError> {
-    check_slice_size(
-        image,
-        width * channels.channels(),
-        width,
-        height,
-        channels.channels(),
-    )?;
+    src_image.check_layout()?;
+    dst_image.check_layout()?;
+    src_image.size_matches_mut(dst_image)?;
+    if src_image.row_stride() != src_image.width * src_image.channels.channels() as u32 {
+        return Err(BlurError::StrideIsNotSupported);
+    }
+    if dst_image.row_stride() != dst_image.width * dst_image.channels.channels() as u32 {
+        return Err(BlurError::StrideIsNotSupported);
+    }
     adaptive_blur_impl(
-        image,
-        width,
-        height,
+        src_image,
+        dst_image,
         radius,
-        channels,
         transfer_function,
         border_mode,
         border_constant,

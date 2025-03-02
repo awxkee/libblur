@@ -33,8 +33,7 @@ use crate::stackblur::neon::{
 use crate::stackblur::sse::{HorizontalSseStackBlurPassFloat32, VerticalSseStackBlurPassFloat32};
 use crate::stackblur::*;
 use crate::unsafe_slice::UnsafeSlice;
-use crate::util::check_slice_size;
-use crate::{BlurError, FastBlurChannels, ThreadingPolicy};
+use crate::{BlurError, BlurImageMut, FastBlurChannels, ThreadingPolicy};
 
 fn stack_blur_worker_horizontal(
     slice: &UnsafeSlice<f32>,
@@ -156,36 +155,26 @@ fn stack_blur_worker_vertical(
 /// Fast gaussian approximation using stack blur.
 ///
 /// # Arguments
-/// * `in_place` - mutable buffer contains image data that will be used as a source and destination.
-/// * `stride` - Elements per row, lane length.
-/// * `width` - image width
-/// * `height` - image height
-/// * `radius` - radius almost is not limited, minimum is one
-/// * `channels` - Count of channels of the image
+/// * `image` - mutable buffer contains image data that will be used as a source and destination.
+/// * `radius` - radius almost is not limited, minimum is one.
 /// * `threading_policy` - Threads usage policy
 ///
 /// # Complexity
 /// O(1) complexity.
 pub fn stack_blur_f32(
-    in_place: &mut [f32],
-    stride: u32,
-    width: u32,
-    height: u32,
+    image: &mut BlurImageMut<f32>,
     radius: u32,
-    channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
-    check_slice_size(
-        in_place,
-        stride as usize,
-        width as usize,
-        height as usize,
-        channels.channels(),
-    )?;
+    image.check_layout()?;
     let radius = radius.max(1);
-    let thread_count = threading_policy.thread_count(width, height) as u32;
+    let thread_count = threading_policy.thread_count(image.width, image.height) as u32;
+    let stride = image.row_stride();
+    let width = image.width;
+    let height = image.height;
+    let channels = image.channels;
     if thread_count == 1 {
-        let slice = UnsafeSlice::new(in_place);
+        let slice = UnsafeSlice::new(image.data.borrow_mut());
         stack_blur_worker_horizontal(&slice, stride, width, height, radius, channels, 0, 1);
         stack_blur_worker_vertical(&slice, stride, width, height, radius, channels, 0, 1);
         return Ok(());
@@ -195,7 +184,7 @@ pub fn stack_blur_f32(
         .build()
         .unwrap();
     pool.scope(|scope| {
-        let slice = UnsafeSlice::new(in_place);
+        let slice = UnsafeSlice::new(image.data.borrow_mut());
         for i in 0..thread_count {
             scope.spawn(move |_| {
                 stack_blur_worker_horizontal(
@@ -212,7 +201,7 @@ pub fn stack_blur_f32(
         }
     });
     pool.scope(|scope| {
-        let slice = UnsafeSlice::new(in_place);
+        let slice = UnsafeSlice::new(image.data.borrow_mut());
         for i in 0..thread_count {
             scope.spawn(move |_| {
                 stack_blur_worker_vertical(

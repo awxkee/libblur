@@ -71,6 +71,7 @@ mod filter2d;
 mod gaussian;
 #[cfg(feature = "image")]
 mod gaussian_blur_image;
+mod image;
 mod img_size;
 mod laplacian;
 mod median_blur;
@@ -114,13 +115,9 @@ pub use fast_bilateral_filter::{
 };
 #[cfg(feature = "image")]
 pub use fast_bilateral_image::fast_bilateral_filter_image;
-pub use fast_gaussian::fast_gaussian;
-pub use fast_gaussian::fast_gaussian_f16;
-pub use fast_gaussian::fast_gaussian_f32;
-pub use fast_gaussian::fast_gaussian_in_linear;
-pub use fast_gaussian::fast_gaussian_plane;
-pub use fast_gaussian::fast_gaussian_plane_f32;
-pub use fast_gaussian::fast_gaussian_u16;
+pub use fast_gaussian::{
+    fast_gaussian, fast_gaussian_f16, fast_gaussian_f32, fast_gaussian_in_linear, fast_gaussian_u16,
+};
 #[cfg(feature = "image")]
 pub use fast_gaussian_image::fast_gaussian_blur_image;
 #[cfg(feature = "image")]
@@ -131,13 +128,10 @@ pub use fast_gaussian_next::fast_gaussian_next_f32;
 pub use fast_gaussian_next::fast_gaussian_next_in_linear;
 pub use fast_gaussian_next::fast_gaussian_next_u16;
 pub use fast_gaussian_superior::fast_gaussian_superior;
-pub use filter1d::{
-    filter_1d_approx, filter_1d_exact, filter_1d_rgb_approx, filter_1d_rgb_exact,
-    filter_1d_rgba_approx, filter_1d_rgba_exact, make_arena, Arena, ArenaPads, KernelShape,
-};
+pub use filter1d::{filter_1d_approx, filter_1d_exact, make_arena, Arena, ArenaPads, KernelShape};
 #[cfg(feature = "fft")]
 pub use filter2d::{fft_next_good_size, filter_2d_fft, filter_2d_rgb_fft, filter_2d_rgba_fft};
-pub use filter2d::{filter_2d, filter_2d_rgb, filter_2d_rgba};
+pub use filter2d::{filter_2d, filter_2d_arbitrary, filter_2d_rgb, filter_2d_rgba};
 pub use gaussian::gaussian_blur;
 pub use gaussian::gaussian_blur_f16;
 pub use gaussian::gaussian_blur_f32;
@@ -148,6 +142,7 @@ pub use gaussian::sigma_size;
 pub use gaussian::ConvolutionMode;
 #[cfg(feature = "image")]
 pub use gaussian_blur_image::gaussian_blur_image;
+pub use image::{BlurImage, BlurImageMut, BufferStore};
 pub use img_size::ImageSize;
 pub use laplacian::{laplacian, laplacian_kernel};
 pub use median_blur::median_blur;

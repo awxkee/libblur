@@ -29,8 +29,9 @@
 use crate::filter1d::KernelShape;
 use crate::filter2d::filter_2d_handler::Filter2dHandler;
 use crate::to_storage::ToStorage;
-use crate::{filter_2d, BlurError, EdgeMode, ImageSize, Scalar, ThreadingPolicy};
+use crate::{filter_2d, BlurError, BlurImage, BlurImageMut, EdgeMode, Scalar, ThreadingPolicy};
 use num_traits::{AsPrimitive, MulAdd};
+use std::fmt::Debug;
 use std::ops::Mul;
 
 /// This performs direct 2D convolution on RGB image.
@@ -55,11 +56,8 @@ use std::ops::Mul;
 /// See [crate::motion_blur] for example
 ///
 pub fn filter_2d_rgb<T, F>(
-    src: &[T],
-    src_stride: usize,
-    dst: &mut [T],
-    dst_stride: usize,
-    image_size: ImageSize,
+    src: &BlurImage<T>,
+    dst: &mut BlurImageMut<T>,
     kernel: &[F],
     kernel_shape: KernelShape,
     border_mode: EdgeMode,
@@ -67,17 +65,14 @@ pub fn filter_2d_rgb<T, F>(
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError>
 where
-    T: Copy + AsPrimitive<F> + Default + Send + Sync + Filter2dHandler<T, F>,
+    T: Copy + AsPrimitive<F> + Default + Send + Sync + Filter2dHandler<T, F> + Debug,
     F: ToStorage<T> + Mul<F> + MulAdd<F, Output = F> + Send + Sync + PartialEq,
     i32: AsPrimitive<F>,
     f64: AsPrimitive<T>,
 {
-    filter_2d::<T, F, 3>(
+    filter_2d::<T, F>(
         src,
-        src_stride,
         dst,
-        dst_stride,
-        image_size,
         kernel,
         kernel_shape,
         border_mode,

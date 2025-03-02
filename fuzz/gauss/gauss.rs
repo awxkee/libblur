@@ -30,9 +30,8 @@
 #![no_main]
 
 use libblur::{
-    filter_1d_approx, filter_1d_exact, filter_1d_rgb_approx, filter_1d_rgb_exact,
-    filter_1d_rgba_approx, filter_1d_rgba_exact, gaussian_kernel_1d, sigma_size, ConvolutionMode,
-    EdgeMode, FastBlurChannels, ImageSize, Scalar, ThreadingPolicy,
+    filter_1d_approx, filter_1d_exact, gaussian_kernel_1d, sigma_size, BlurImage, BlurImageMut,
+    ConvolutionMode, EdgeMode, FastBlurChannels, Scalar, ThreadingPolicy,
 };
 use libfuzzer_sys::fuzz_target;
 
@@ -79,17 +78,14 @@ fn fuzz_8bit(width: usize, height: usize, radius: usize, channels: FastBlurChann
     if width == 0 || height == 0 || radius == 0 {
         return;
     }
-    let src_image = vec![15u8; width * height * channels.channels()];
-    let mut dst_image = vec![0u8; width * height * channels.channels()];
+    let src_image = BlurImage::alloc(width as u32, height as u32, channels);
+    let mut dst_image = BlurImageMut::alloc(width as u32, height as u32, channels);
 
     libblur::gaussian_blur(
         &src_image,
         &mut dst_image,
-        width as u32,
-        height as u32,
         radius as u32 * 2 + 1,
         0.,
-        channels,
         EdgeMode::Clamp,
         ThreadingPolicy::Single,
         ConvolutionMode::FixedPoint,
@@ -99,11 +95,8 @@ fn fuzz_8bit(width: usize, height: usize, radius: usize, channels: FastBlurChann
     libblur::gaussian_blur(
         &src_image,
         &mut dst_image,
-        width as u32,
-        height as u32,
         radius as u32 * 2 + 1,
         0.,
-        channels,
         EdgeMode::Clamp,
         ThreadingPolicy::Single,
         ConvolutionMode::Exact,
@@ -115,19 +108,18 @@ fn fuzz_8bit_non_symmetry(width: usize, height: usize, radius: usize, channels: 
     if width == 0 || height == 0 || radius == 0 {
         return;
     }
-    let src_image = vec![15u8; width * height * channels.channels()];
-    let mut dst_image = vec![0u8; width * height * channels.channels()];
+    let src_image = BlurImage::alloc(width as u32, height as u32, channels);
+    let mut dst_image = BlurImageMut::alloc(width as u32, height as u32, channels);
 
     let kernel_size = radius * 2 + 1;
 
-    let kernel = gaussian_kernel_1d(kernel_size as u32, sigma_size(kernel_size));
+    let kernel = gaussian_kernel_1d(kernel_size as u32, sigma_size(kernel_size as f32));
 
     match channels {
         FastBlurChannels::Plane => {
-            filter_1d_exact(
+            filter_1d_exact::<u8, f32, 1>(
                 &src_image,
                 &mut dst_image,
-                ImageSize::new(width, height),
                 &kernel,
                 &kernel,
                 EdgeMode::Clamp,
@@ -135,10 +127,9 @@ fn fuzz_8bit_non_symmetry(width: usize, height: usize, radius: usize, channels: 
                 ThreadingPolicy::Single,
             )
             .unwrap();
-            filter_1d_approx::<u8, f32, i32>(
+            filter_1d_approx::<u8, f32, i32, 1>(
                 &src_image,
                 &mut dst_image,
-                ImageSize::new(width, height),
                 &kernel,
                 &kernel,
                 EdgeMode::Clamp,
@@ -148,10 +139,9 @@ fn fuzz_8bit_non_symmetry(width: usize, height: usize, radius: usize, channels: 
             .unwrap();
         }
         FastBlurChannels::Channels3 => {
-            filter_1d_rgb_exact(
+            filter_1d_exact::<u8, f32, 3>(
                 &src_image,
                 &mut dst_image,
-                ImageSize::new(width, height),
                 &kernel,
                 &kernel,
                 EdgeMode::Clamp,
@@ -159,10 +149,9 @@ fn fuzz_8bit_non_symmetry(width: usize, height: usize, radius: usize, channels: 
                 ThreadingPolicy::Single,
             )
             .unwrap();
-            filter_1d_rgb_approx::<u8, f32, i32>(
+            filter_1d_approx::<u8, f32, i32, 3>(
                 &src_image,
                 &mut dst_image,
-                ImageSize::new(width, height),
                 &kernel,
                 &kernel,
                 EdgeMode::Clamp,
@@ -172,10 +161,9 @@ fn fuzz_8bit_non_symmetry(width: usize, height: usize, radius: usize, channels: 
             .unwrap();
         }
         FastBlurChannels::Channels4 => {
-            filter_1d_rgba_exact(
+            filter_1d_exact::<u8, f32, 4>(
                 &src_image,
                 &mut dst_image,
-                ImageSize::new(width, height),
                 &kernel,
                 &kernel,
                 EdgeMode::Clamp,
@@ -183,10 +171,9 @@ fn fuzz_8bit_non_symmetry(width: usize, height: usize, radius: usize, channels: 
                 ThreadingPolicy::Single,
             )
             .unwrap();
-            filter_1d_rgba_approx::<u8, f32, i32>(
+            filter_1d_approx::<u8, f32, i32, 4>(
                 &src_image,
                 &mut dst_image,
-                ImageSize::new(width, height),
                 &kernel,
                 &kernel,
                 EdgeMode::Clamp,

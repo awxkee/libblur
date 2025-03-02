@@ -27,19 +27,23 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![forbid(unsafe_code)]
+
 use crate::filter1d::{make_arena, ArenaPads};
 use crate::filter2d::fft_utils::fft_next_good_size;
 use crate::filter2d::mul_spectrum::mul_spectrum_in_place;
 use crate::filter2d::scan_se_2d::scan_se_2d;
 use crate::to_storage::ToStorage;
-use crate::util::check_slice_size;
-use crate::{BlurError, EdgeMode, ImageSize, KernelShape, MismatchedSize, Scalar};
+use crate::{
+    BlurError, BlurImage, BlurImageMut, EdgeMode, FastBlurChannels, KernelShape, MismatchedSize,
+    Scalar,
+};
 use fast_transpose::{transpose_arbitrary, FlipMode, FlopMode};
 use num_traits::AsPrimitive;
 use rayon::iter::ParallelIterator;
 use rayon::prelude::ParallelSliceMut;
 use rustfft::num_complex::Complex;
 use rustfft::{FftNum, FftPlanner};
+use std::fmt::Debug;
 use std::ops::Mul;
 
 fn transpose<T: Copy + Default>(
@@ -77,7 +81,6 @@ fn transpose<T: Copy + Default>(
 ///
 /// * `image`: Single plane image.
 /// * `destination`: Destination image.
-/// * `image_size`: Image size see [ImageSize].
 /// * `kernel`: Kernel.
 /// * `kernel_shape`: Kernel size, see [KernelShape] for more info.
 /// * `border_mode`: See [EdgeMode] for more info.
@@ -87,38 +90,25 @@ fn transpose<T: Copy + Default>(
 /// returns: Result<(), String>
 ///
 pub fn filter_2d_fft<T, F, FftIntermediate>(
-    src: &[T],
-    dst: &mut [T],
-    image_size: ImageSize,
+    src: &BlurImage<T>,
+    dst: &mut BlurImageMut<T>,
     kernel: &[F],
     kernel_shape: KernelShape,
     border_mode: EdgeMode,
     border_constant: Scalar,
 ) -> Result<(), BlurError>
 where
-    T: Copy + AsPrimitive<F> + Default + Send + Sync + AsPrimitive<FftIntermediate>,
+    T: Copy + AsPrimitive<F> + Default + Send + Sync + AsPrimitive<FftIntermediate> + Debug,
     F: ToStorage<T> + Mul<F> + Send + Sync + PartialEq + AsPrimitive<FftIntermediate>,
     FftIntermediate: FftNum + Default + Mul<FftIntermediate> + ToStorage<T>,
     i32: AsPrimitive<F>,
     f64: AsPrimitive<T> + AsPrimitive<FftIntermediate>,
 {
-    check_slice_size(
-        src,
-        image_size.width,
-        image_size.width,
-        image_size.height,
-        1,
-    )?;
-    check_slice_size(
-        dst,
-        image_size.width,
-        image_size.width,
-        image_size.height,
-        1,
-    )?;
-
-    if src.len() != dst.len() {
-        return Err(BlurError::ImagesMustMatch);
+    src.check_layout()?;
+    dst.check_layout()?;
+    src.size_matches_mut(dst)?;
+    if src.channels != FastBlurChannels::Plane {
+        return Err(BlurError::FftChannelsNotSupported);
     }
 
     let kernel_width = kernel_shape.width;
@@ -130,13 +120,20 @@ where
         }));
     }
 
-    let width = image_size.width;
+    let image_size = src.size();
+    let dst_stride = dst.stride as usize;
 
     let analyzed_se = scan_se_2d(kernel, kernel_shape);
 
     if analyzed_se.is_empty() {
-        for (src, dst) in src.iter().zip(dst.iter_mut()) {
-            *dst = *src;
+        for (src, dst) in src
+            .data
+            .chunks_exact(src.row_stride() as usize)
+            .zip(dst.data.borrow_mut().chunks_exact_mut(dst_stride))
+        {
+            for (src, dst) in src.iter().zip(dst.iter_mut()) {
+                *dst = *src;
+            }
         }
         return Ok(());
     }
@@ -150,8 +147,8 @@ where
     let arena_pad_bottom = best_height - image_size.height - arena_pad_top;
 
     let (arena_v_src, _) = make_arena::<T, 1>(
-        src,
-        image_size.width,
+        src.data.as_ref(),
+        src.row_stride() as usize,
         image_size,
         ArenaPads::new(
             arena_pad_left,
@@ -242,7 +239,9 @@ where
             rows_inverse_planner.process(row);
         });
 
-    for (dst_chunk, src_chunk) in dst.chunks_exact_mut(width).zip(
+    let dst_stride = dst.row_stride() as usize;
+
+    for (dst_chunk, src_chunk) in dst.data.borrow_mut().chunks_exact_mut(dst_stride).zip(
         kernel_arena
             .chunks_exact_mut(best_width)
             .skip(arena_pad_top),

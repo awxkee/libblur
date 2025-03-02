@@ -27,8 +27,7 @@
 
 use crate::channels_configuration::FastBlurChannels;
 use crate::unsafe_slice::UnsafeSlice;
-use crate::util::check_slice_size;
-use crate::{BlurError, ThreadingPolicy};
+use crate::{BlurError, BlurImage, BlurImageMut, ThreadingPolicy};
 
 struct MedianHistogram {
     r: [i32; 256],
@@ -363,9 +362,8 @@ fn push_hist<const CN: usize>(
 ///
 /// # Arguments
 ///
-/// * `stride` - Lane length, default is width * channels_count if not aligned
-/// * `width` - Width of the image
-/// * `height` - Height of the image
+/// * `src_image` - Src image, see [BlurImage] for more info
+/// * `dst_image` - Destination image, see [BlurImageMut] for more info
 /// * `radius` - Radius of kernel
 /// * `channels` - Count of channels in the image, see [FastBlurChannels] for more info
 ///
@@ -373,40 +371,28 @@ fn push_hist<const CN: usize>(
 /// Panic is stride/width/height/channel configuration do not match provided
 #[allow(clippy::too_many_arguments)]
 pub fn median_blur(
-    src: &[u8],
-    src_stride: u32,
-    dst: &mut [u8],
-    dst_stride: u32,
-    width: u32,
-    height: u32,
+    src_image: &BlurImage<u8>,
+    dst_image: &mut BlurImageMut<u8>,
     radius: u32,
-    channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
-    check_slice_size(
-        src,
-        src_stride as usize,
-        width as usize,
-        height as usize,
-        channels.channels(),
-    )?;
-    check_slice_size(
-        dst,
-        dst_stride as usize,
-        width as usize,
-        height as usize,
-        channels.channels(),
-    )?;
-    let unsafe_dst = UnsafeSlice::new(dst);
-    let _dispatcher = match channels {
+    src_image.check_layout()?;
+    dst_image.check_layout()?;
+    src_image.size_matches_mut(dst_image)?;
+    let _dispatcher = match src_image.channels {
         FastBlurChannels::Plane => median_blur_impl::<1>,
         FastBlurChannels::Channels3 => median_blur_impl::<3>,
         FastBlurChannels::Channels4 => median_blur_impl::<4>,
     };
+    let width = src_image.width;
+    let height = src_image.height;
+    let src_stride = src_image.row_stride();
+    let dst_stride = dst_image.row_stride();
     let thread_count = threading_policy.thread_count(width, height) as u32;
+    let unsafe_dst = UnsafeSlice::new(dst_image.data.borrow_mut());
     if thread_count == 1 {
         _dispatcher(
-            src,
+            src_image.data.as_ref(),
             src_stride,
             &unsafe_dst,
             dst_stride,
@@ -417,6 +403,7 @@ pub fn median_blur(
             height,
         );
     } else {
+        let src = src_image.data.as_ref();
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(thread_count as usize)
             .build()

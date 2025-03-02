@@ -1,0 +1,314 @@
+/*
+ * // Copyright (c) Radzivon Bartoshyk 2/2025. All rights reserved.
+ * //
+ * // Redistribution and use in source and binary forms, with or without modification,
+ * // are permitted provided that the following conditions are met:
+ * //
+ * // 1.  Redistributions of source code must retain the above copyright notice, this
+ * // list of conditions and the following disclaimer.
+ * //
+ * // 2.  Redistributions in binary form must reproduce the above copyright notice,
+ * // this list of conditions and the following disclaimer in the documentation
+ * // and/or other materials provided with the distribution.
+ * //
+ * // 3.  Neither the name of the copyright holder nor the names of its
+ * // contributors may be used to endorse or promote products derived from
+ * // this software without specific prior written permission.
+ * //
+ * // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * // AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * // IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * // DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * // FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * // DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * // SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * // CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+use crate::{BlurError, FastBlurChannels, ImageSize, MismatchedSize};
+use std::fmt::Debug;
+
+#[derive(Debug)]
+pub enum BufferStore<'a, T: Copy + Debug> {
+    Borrowed(&'a mut [T]),
+    Owned(Vec<T>),
+}
+
+impl<T: Copy + Debug> BufferStore<'_, T> {
+    #[allow(clippy::should_implement_trait)]
+    pub fn borrow(&self) -> &[T] {
+        match self {
+            Self::Borrowed(p_ref) => p_ref,
+            Self::Owned(vec) => vec,
+        }
+    }
+
+    #[allow(clippy::should_implement_trait)]
+    pub fn borrow_mut(&mut self) -> &mut [T] {
+        match self {
+            Self::Borrowed(p_ref) => p_ref,
+            Self::Owned(vec) => vec,
+        }
+    }
+}
+
+/// Immutable image store
+pub struct BlurImage<'a, T: Clone + Copy + Default + Debug> {
+    pub data: std::borrow::Cow<'a, [T]>,
+    pub width: u32,
+    pub height: u32,
+    /// Image stride, items per row, might be 0
+    pub stride: u32,
+    pub channels: FastBlurChannels,
+}
+
+/// Mutable image store
+pub struct BlurImageMut<'a, T: Clone + Copy + Default + Debug> {
+    pub data: BufferStore<'a, T>,
+    pub width: u32,
+    pub height: u32,
+    /// Image stride, items per row, might be 0
+    pub stride: u32,
+    pub channels: FastBlurChannels,
+}
+
+impl<'a, T: Clone + Copy + Default + Debug> BlurImage<'a, T> {
+    /// Allocates default image layout for given [FastBlurChannels]
+    pub fn alloc(width: u32, height: u32, channels: FastBlurChannels) -> Self {
+        Self {
+            data: std::borrow::Cow::Owned(vec![
+                T::default();
+                width as usize
+                    * height as usize
+                    * channels.channels()
+            ]),
+            width,
+            height,
+            stride: width * channels.channels() as u32,
+            channels,
+        }
+    }
+
+    /// Borrows existing data
+    /// Stride will be default `width * channels.channels()`
+    pub fn borrow(arr: &'a [T], width: u32, height: u32, channels: FastBlurChannels) -> Self {
+        Self {
+            data: std::borrow::Cow::Borrowed(arr),
+            width,
+            height,
+            stride: width * channels.channels() as u32,
+            channels,
+        }
+    }
+
+    /// Checks if it is matches the size of the other image
+    #[inline]
+    pub fn size_matches(&self, other: &BlurImage<'_, T>) -> Result<(), BlurError> {
+        if self.width == other.width
+            && self.height == other.height
+            && self.channels == other.channels
+        {
+            return Ok(());
+        }
+        Err(BlurError::ImagesMustMatch)
+    }
+
+    #[inline]
+    pub fn size(&self) -> ImageSize {
+        ImageSize::new(self.width as usize, self.height as usize)
+    }
+
+    /// Checks if it is matches the size of the other image
+    #[inline]
+    pub fn size_matches_mut(&self, other: &BlurImageMut<'_, T>) -> Result<(), BlurError> {
+        if self.width == other.width
+            && self.height == other.height
+            && self.channels == other.channels
+        {
+            return Ok(());
+        }
+        Err(BlurError::ImagesMustMatch)
+    }
+
+    /// Checks if it is matches the size of the other image
+    #[inline]
+    pub fn only_size_matches_mut(&self, other: &BlurImageMut<'_, T>) -> Result<(), BlurError> {
+        if self.width == other.width && self.height == other.height {
+            return Ok(());
+        }
+        Err(BlurError::ImagesMustMatch)
+    }
+
+    /// Checks if layout matches necessary requirements by using external channels count
+    #[inline]
+    pub fn check_layout_channels(&self, cn: usize) -> Result<(), BlurError> {
+        if self.width == 0 || self.height == 0 {
+            return Err(BlurError::ZeroBaseSize);
+        }
+        let data_len = self.data.as_ref().len();
+        if data_len < self.stride as usize * (self.height as usize - 1) + self.width as usize * cn {
+            return Err(BlurError::MinimumSliceSizeMismatch(MismatchedSize {
+                expected: self.stride as usize * self.height as usize,
+                received: data_len,
+            }));
+        }
+        if (self.stride as usize) < (self.width as usize * cn) {
+            return Err(BlurError::MinimumStrideSizeMismatch(MismatchedSize {
+                expected: self.width as usize * cn,
+                received: self.stride as usize,
+            }));
+        }
+        Ok(())
+    }
+
+    /// Returns row stride
+    #[inline]
+    pub fn row_stride(&self) -> u32 {
+        if self.stride == 0 {
+            self.width * self.channels.channels() as u32
+        } else {
+            self.stride
+        }
+    }
+
+    #[inline]
+    pub fn check_layout(&self) -> Result<(), BlurError> {
+        if self.width == 0 || self.height == 0 {
+            return Err(BlurError::ZeroBaseSize);
+        }
+        let cn = self.channels.channels();
+        if self.data.len()
+            < self.stride as usize * (self.height as usize - 1) + self.width as usize * cn
+        {
+            return Err(BlurError::MinimumSliceSizeMismatch(MismatchedSize {
+                expected: self.stride as usize * self.height as usize,
+                received: self.data.len(),
+            }));
+        }
+        if (self.stride as usize) < (self.width as usize * cn) {
+            return Err(BlurError::MinimumStrideSizeMismatch(MismatchedSize {
+                expected: self.width as usize * cn,
+                received: self.stride as usize,
+            }));
+        }
+        Ok(())
+    }
+}
+
+impl<'a, T: Clone + Copy + Default + Debug> BlurImageMut<'a, T> {
+    /// Allocates default image layout for given [FastBlurChannels]
+    pub fn alloc(width: u32, height: u32, channels: FastBlurChannels) -> Self {
+        Self {
+            data: BufferStore::Owned(vec![
+                T::default();
+                width as usize * height as usize * channels.channels()
+            ]),
+            width,
+            height,
+            stride: width * channels.channels() as u32,
+            channels,
+        }
+    }
+
+    /// Mutable borrows existing data
+    /// Stride will be default `width * channels.channels()`
+    pub fn borrow(arr: &'a mut [T], width: u32, height: u32, channels: FastBlurChannels) -> Self {
+        Self {
+            data: BufferStore::Borrowed(arr),
+            width,
+            height,
+            stride: width * channels.channels() as u32,
+            channels,
+        }
+    }
+
+    /// Returns row stride
+    #[inline]
+    pub fn row_stride(&self) -> u32 {
+        if self.stride == 0 {
+            self.width * self.channels.channels() as u32
+        } else {
+            self.stride
+        }
+    }
+
+    /// Checks if layout matches necessary requirements
+    #[inline]
+    pub fn check_layout(&self) -> Result<(), BlurError> {
+        if self.width == 0 || self.height == 0 {
+            return Err(BlurError::ZeroBaseSize);
+        }
+        let cn = self.channels.channels();
+        let data_len = self.data.borrow().len();
+        if data_len < self.stride as usize * (self.height as usize - 1) + self.width as usize * cn {
+            return Err(BlurError::MinimumSliceSizeMismatch(MismatchedSize {
+                expected: self.stride as usize * self.height as usize,
+                received: data_len,
+            }));
+        }
+        if (self.stride as usize) < (self.width as usize * cn) {
+            return Err(BlurError::MinimumStrideSizeMismatch(MismatchedSize {
+                expected: self.width as usize * cn,
+                received: self.stride as usize,
+            }));
+        }
+        Ok(())
+    }
+
+    /// Checks if layout matches necessary requirements by using external channels count
+    #[inline]
+    pub fn check_layout_channels(&self, cn: usize) -> Result<(), BlurError> {
+        if self.width == 0 || self.height == 0 {
+            return Err(BlurError::ZeroBaseSize);
+        }
+        let data_len = self.data.borrow().len();
+        if data_len < self.stride as usize * (self.height as usize - 1) + self.width as usize * cn {
+            return Err(BlurError::MinimumSliceSizeMismatch(MismatchedSize {
+                expected: self.stride as usize * self.height as usize,
+                received: data_len,
+            }));
+        }
+        if (self.stride as usize) < (self.width as usize * cn) {
+            return Err(BlurError::MinimumStrideSizeMismatch(MismatchedSize {
+                expected: self.width as usize * cn,
+                received: self.stride as usize,
+            }));
+        }
+        Ok(())
+    }
+
+    /// Checks if it is matches the size of the other image
+    #[inline]
+    pub fn size_matches(&self, other: &BlurImage<'_, T>) -> Result<(), BlurError> {
+        if self.width == other.width
+            && self.height == other.height
+            && self.channels == other.channels
+        {
+            return Ok(());
+        }
+        Err(BlurError::ImagesMustMatch)
+    }
+
+    /// Checks if it is matches the size of the other image
+    #[inline]
+    pub fn size_matches_mut(&self, other: &BlurImageMut<'_, T>) -> Result<(), BlurError> {
+        if self.width == other.width
+            && self.height == other.height
+            && self.channels == other.channels
+        {
+            return Ok(());
+        }
+        Err(BlurError::ImagesMustMatch)
+    }
+
+    pub fn to_immutable_ref(&self) -> BlurImage<'_, T> {
+        BlurImage {
+            data: std::borrow::Cow::Borrowed(self.data.borrow()),
+            stride: self.row_stride(),
+            width: self.width,
+            height: self.height,
+            channels: self.channels,
+        }
+    }
+}
