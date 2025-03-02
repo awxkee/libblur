@@ -44,6 +44,7 @@ pub enum BlurError {
     KernelSizeMismatch(MismatchedSize),
     ImagesMustMatch,
     StrideIsNotSupported,
+    FftChannelsNotSupported,
 }
 
 impl Error for BlurError {}
@@ -72,6 +73,7 @@ impl std::fmt::Display for BlurError {
                 f.write_str("Source and destination images must match in their dimensions")
             }
             BlurError::StrideIsNotSupported => f.write_str("Stride is not supported"),
+            BlurError::FftChannelsNotSupported => f.write_str("Fft supports only planar images"),
         }
     }
 }

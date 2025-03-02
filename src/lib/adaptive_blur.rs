@@ -30,7 +30,7 @@
 
 use crate::{
     filter_2d, filter_2d_fft, gaussian_blur, stack_blur, BlurError, BlurImage, BlurImageMut,
-    ConvolutionMode, EdgeMode, FastBlurChannels, ImageSize, KernelShape, Scalar, ThreadingPolicy,
+    ConvolutionMode, EdgeMode, FastBlurChannels, KernelShape, Scalar, ThreadingPolicy,
 };
 use colorutils_rs::TransferFunction;
 use num_traits::AsPrimitive;
@@ -253,10 +253,17 @@ impl Edges<u8> for u8 {
         let mut edge_filter = vec![-1f32; full_size];
         edge_filter[radius * (radius / 2) + radius / 2] = radius as f32 * radius as f32 - 1f32;
         if radius > 15 {
-            filter_2d_fft::<u8, f32, f32>(
-                source,
+            let src_image =
+                BlurImage::borrow(source, width as u32, height as u32, FastBlurChannels::Plane);
+            let mut dst_image = BlurImageMut::borrow(
                 &mut dst,
-                ImageSize::new(width, height),
+                width as u32,
+                height as u32,
+                FastBlurChannels::Plane,
+            );
+            filter_2d_fft::<u8, f32, f32>(
+                &src_image,
+                &mut dst_image,
                 &edge_filter,
                 KernelShape::new(radius, radius),
                 border_mode,

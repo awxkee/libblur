@@ -29,10 +29,10 @@
 use crate::filter2d::filter_2d_fft::filter_2d_fft;
 use crate::filter2d::gather_channel::{gather_channel, squash_channel};
 use crate::to_storage::ToStorage;
-use crate::util::check_slice_size;
-use crate::{BlurError, EdgeMode, ImageSize, KernelShape, Scalar};
+use crate::{BlurError, BlurImage, BlurImageMut, EdgeMode, FastBlurChannels, KernelShape, Scalar};
 use num_traits::AsPrimitive;
 use rustfft::FftNum;
+use std::fmt::Debug;
 use std::ops::Mul;
 
 /// Performs 2D separable approximated convolution on RGB image.
@@ -53,76 +53,64 @@ use std::ops::Mul;
 /// returns: Result<(), String>
 ///
 pub fn filter_2d_rgb_fft<T, F, FftIntermediate>(
-    src: &[T],
-    dst: &mut [T],
-    image_size: ImageSize,
+    src: &BlurImage<T>,
+    dst: &mut BlurImageMut<T>,
     kernel: &[F],
     kernel_shape: KernelShape,
     border_mode: EdgeMode,
     border_constant: Scalar,
 ) -> Result<(), BlurError>
 where
-    T: Copy + AsPrimitive<F> + Default + Send + Sync + AsPrimitive<FftIntermediate>,
+    T: Copy + AsPrimitive<F> + Default + Send + Sync + AsPrimitive<FftIntermediate> + Debug,
     F: ToStorage<T> + Mul<F> + Send + Sync + PartialEq + AsPrimitive<FftIntermediate>,
     FftIntermediate: FftNum + Default + Mul<FftIntermediate> + ToStorage<T>,
     i32: AsPrimitive<F>,
     f64: AsPrimitive<T> + AsPrimitive<FftIntermediate>,
 {
-    check_slice_size(
-        src,
-        image_size.width * 3,
-        image_size.width,
-        image_size.height,
-        3,
-    )?;
-    check_slice_size(
-        dst,
-        image_size.width * 3,
-        image_size.width,
-        image_size.height,
-        3,
-    )?;
+    src.check_layout()?;
+    dst.check_layout()?;
+    src.size_matches_mut(dst)?;
 
-    let mut working_channel = vec![T::default(); image_size.width * image_size.height];
+    let image_size = src.size();
 
-    let mut chanel_first = gather_channel::<T, 3>(src, image_size, 0);
+    let mut working_channel = BlurImageMut::alloc(
+        image_size.width as u32,
+        image_size.height as u32,
+        FastBlurChannels::Plane,
+    );
+
+    let chanel_first = gather_channel::<T, 3>(src, 0);
     filter_2d_fft(
-        &chanel_first,
+        &chanel_first.to_immutable_ref(),
         &mut working_channel,
-        image_size,
         kernel,
         kernel_shape,
         border_mode,
         Scalar::dup(border_constant[0]),
     )?;
-    squash_channel::<T, 3>(dst, &working_channel, 0);
-    chanel_first.resize(0, T::default());
+    squash_channel::<T, 3>(dst, &working_channel.to_immutable_ref(), 0);
 
-    let mut chanel_second = gather_channel::<T, 3>(src, image_size, 1);
+    let chanel_second = gather_channel::<T, 3>(src, 1);
     filter_2d_fft(
-        &chanel_second,
+        &chanel_second.to_immutable_ref(),
         &mut working_channel,
-        image_size,
         kernel,
         kernel_shape,
         border_mode,
         Scalar::dup(border_constant[1]),
     )?;
-    squash_channel::<T, 3>(dst, &working_channel, 1);
-    chanel_second.resize(0, T::default());
+    squash_channel::<T, 3>(dst, &working_channel.to_immutable_ref(), 1);
 
-    let mut chanel_third = gather_channel::<T, 3>(src, image_size, 2);
+    let chanel_third = gather_channel::<T, 3>(src, 2);
     filter_2d_fft(
-        &chanel_third,
+        &chanel_third.to_immutable_ref(),
         &mut working_channel,
-        image_size,
         kernel,
         kernel_shape,
         border_mode,
         Scalar::dup(border_constant[2]),
     )?;
-    squash_channel::<T, 3>(dst, &working_channel, 2);
-    chanel_third.resize(0, T::default());
+    squash_channel::<T, 3>(dst, &working_channel.to_immutable_ref(), 2);
 
     Ok(())
 }

@@ -27,29 +27,46 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![forbid(unsafe_code)]
-use crate::ImageSize;
 
-pub fn gather_channel<T: Copy + Default, const CN: usize>(
-    image: &[T],
-    image_size: ImageSize,
+use crate::{BlurImage, BlurImageMut, FastBlurChannels};
+use std::fmt::Debug;
+
+pub fn gather_channel<'a, T: Copy + Default + Debug, const CN: usize>(
+    image: &BlurImage<'a, T>,
     order: usize,
-) -> Vec<T> {
+) -> BlurImageMut<'a, T> {
     assert!(order < CN);
-    let mut channel = vec![T::default(); image_size.width * image_size.height];
-    let src_chunks = image.chunks_exact(CN);
-    for (dst, src) in channel.iter_mut().zip(src_chunks) {
-        *dst = src[order];
+    let mut channel =
+        BlurImageMut::<'a, T>::alloc(image.width, image.height, FastBlurChannels::Plane);
+    let dst_stride = channel.row_stride() as usize;
+    for (dst, src) in channel.data.borrow_mut().chunks_exact_mut(dst_stride).zip(
+        image
+            .data
+            .as_ref()
+            .chunks_exact(image.row_stride() as usize),
+    ) {
+        for (dst, src) in dst.iter_mut().zip(src.chunks_exact(CN)) {
+            *dst = src[order];
+        }
     }
     channel
 }
 
-pub fn squash_channel<T: Copy + Default, const CN: usize>(
-    image: &mut [T],
-    source: &[T],
+pub fn squash_channel<T: Copy + Default + Debug, const CN: usize>(
+    image: &mut BlurImageMut<'_, T>,
+    source: &BlurImage<T>,
     order: usize,
 ) {
     assert!(order < CN);
-    for (dst, src) in image.chunks_exact_mut(CN).zip(source.iter()) {
-        dst[order] = *src;
+    let dst_stride = image.row_stride() as usize;
+    for (dst, src) in image.data.borrow_mut().chunks_exact_mut(dst_stride).zip(
+        source
+            .data
+            .as_ref()
+            .chunks_exact(source.row_stride() as usize),
+    ) {
+        for (dst, src) in dst.chunks_exact_mut(CN).zip(src.iter()) {
+            dst[order] = *src;
+        }
     }
 }
