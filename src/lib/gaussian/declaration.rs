@@ -30,8 +30,7 @@ use crate::edge_mode::EdgeMode;
 use crate::gaussian::gaussian_kernel::gaussian_kernel_1d;
 use crate::gaussian::gaussian_util::kernel_size as get_kernel_size;
 use crate::{
-    filter_1d_approx, filter_1d_exact, filter_1d_rgb_approx, filter_1d_rgb_exact,
-    filter_1d_rgba_approx, filter_1d_rgba_exact, sigma_size, BlurError, BlurImage, BlurImageMut,
+    filter_1d_approx, filter_1d_exact, sigma_size, BlurError, BlurImage, BlurImageMut,
     ConvolutionMode, Scalar, ThreadingPolicy,
 };
 use half::f16;
@@ -88,9 +87,9 @@ pub fn gaussian_blur(
     match hint {
         ConvolutionMode::Exact => {
             let _dispatcher = match src.channels {
-                FastBlurChannels::Plane => filter_1d_exact::<u8, f32>,
-                FastBlurChannels::Channels3 => filter_1d_rgb_exact::<u8, f32>,
-                FastBlurChannels::Channels4 => filter_1d_rgba_exact::<u8, f32>,
+                FastBlurChannels::Plane => filter_1d_exact::<u8, f32, 1>,
+                FastBlurChannels::Channels3 => filter_1d_exact::<u8, f32, 3>,
+                FastBlurChannels::Channels4 => filter_1d_exact::<u8, f32, 4>,
             };
             _dispatcher(
                 src,
@@ -104,9 +103,9 @@ pub fn gaussian_blur(
         }
         ConvolutionMode::FixedPoint => {
             let _dispatcher = match src.channels {
-                FastBlurChannels::Plane => filter_1d_approx::<u8, f32, i32>,
-                FastBlurChannels::Channels3 => filter_1d_rgb_approx::<u8, f32, i32>,
-                FastBlurChannels::Channels4 => filter_1d_rgba_approx::<u8, f32, i32>,
+                FastBlurChannels::Plane => filter_1d_approx::<u8, f32, i32, 1>,
+                FastBlurChannels::Channels3 => filter_1d_approx::<u8, f32, i32, 3>,
+                FastBlurChannels::Channels4 => filter_1d_approx::<u8, f32, i32, 4>,
             };
             _dispatcher(
                 src,
@@ -171,9 +170,9 @@ pub fn gaussian_blur_u16(
     };
     let kernel = gaussian_kernel_1d(kernel_size, sigma);
     let _dispatcher = match src.channels {
-        FastBlurChannels::Plane => filter_1d_exact::<u16, f32>,
-        FastBlurChannels::Channels3 => filter_1d_rgb_exact::<u16, f32>,
-        FastBlurChannels::Channels4 => filter_1d_rgba_exact::<u16, f32>,
+        FastBlurChannels::Plane => filter_1d_exact::<u16, f32, 1>,
+        FastBlurChannels::Channels3 => filter_1d_exact::<u16, f32, 3>,
+        FastBlurChannels::Channels4 => filter_1d_exact::<u16, f32, 4>,
     };
     _dispatcher(
         src,
@@ -235,9 +234,9 @@ pub fn gaussian_blur_f32(
     };
     let kernel = gaussian_kernel_1d(kernel_size, sigma);
     let _dispatcher = match src.channels {
-        FastBlurChannels::Plane => filter_1d_exact::<f32, f32>,
-        FastBlurChannels::Channels3 => filter_1d_rgb_exact::<f32, f32>,
-        FastBlurChannels::Channels4 => filter_1d_rgba_exact::<f32, f32>,
+        FastBlurChannels::Plane => filter_1d_exact::<f32, f32, 1>,
+        FastBlurChannels::Channels3 => filter_1d_exact::<f32, f32, 3>,
+        FastBlurChannels::Channels4 => filter_1d_exact::<f32, f32, 4>,
     };
     _dispatcher(
         src,
@@ -299,9 +298,9 @@ pub fn gaussian_blur_f16(
     };
     let kernel = gaussian_kernel_1d(kernel_size, sigma);
     let _dispatcher = match src.channels {
-        FastBlurChannels::Plane => filter_1d_exact::<f16, f32>,
-        FastBlurChannels::Channels3 => filter_1d_rgb_exact::<f16, f32>,
-        FastBlurChannels::Channels4 => filter_1d_rgba_exact::<f16, f32>,
+        FastBlurChannels::Plane => filter_1d_exact::<f16, f32, 1>,
+        FastBlurChannels::Channels3 => filter_1d_exact::<f16, f32, 3>,
+        FastBlurChannels::Channels4 => filter_1d_exact::<f16, f32, 4>,
     };
     _dispatcher(
         src,

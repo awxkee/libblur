@@ -35,7 +35,7 @@ use crate::ImageSize;
 
 pub trait Filter1DRowHandlerApprox<T, F> {
     #[allow(clippy::type_complexity)]
-    fn get_row_handler_apr(
+    fn get_row_handler_apr<const N: usize>(
         is_kernel_symmetric: bool,
     ) -> fn(
         arena: Arena,
@@ -50,7 +50,7 @@ pub trait Filter1DRowHandlerApprox<T, F> {
 macro_rules! default_1d_row_handler {
     ($store:ty, $intermediate:ty) => {
         impl Filter1DRowHandlerApprox<$store, $intermediate> for $store {
-            fn get_row_handler_apr(
+            fn get_row_handler_apr<const N: usize>(
                 is_kernel_symmetric: bool,
             ) -> fn(
                 Arena,
@@ -61,9 +61,9 @@ macro_rules! default_1d_row_handler {
                 &[ScanPoint1d<$intermediate>],
             ) {
                 if is_kernel_symmetric {
-                    filter_row_symmetric_approx::<$store, $intermediate, 1>
+                    filter_row_symmetric_approx::<$store, $intermediate, N>
                 } else {
-                    filter_row_approx::<$store, $intermediate, 1>
+                    filter_row_approx::<$store, $intermediate, N>
                 }
             }
         }
@@ -75,18 +75,18 @@ impl Filter1DRowHandlerApprox<u8, i32> for u8 {
         all(target_arch = "aarch64", target_feature = "neon"),
         any(target_arch = "x86_64", target_arch = "x86")
     )))]
-    fn get_row_handler_apr(
+    fn get_row_handler_apr<const N: usize>(
         is_kernel_symmetric: bool,
     ) -> fn(Arena, &[u8], &mut [u8], ImageSize, FilterRegion, &[ScanPoint1d<i32>]) {
         if is_kernel_symmetric {
-            filter_row_symmetric_approx::<u8, i32, 1>
+            filter_row_symmetric_approx::<u8, i32, N>
         } else {
-            filter_row_approx::<u8, i32, 1>
+            filter_row_approx::<u8, i32, N>
         }
     }
 
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-    fn get_row_handler_apr(
+    fn get_row_handler_apr<const N: usize>(
         is_symmetric_kernel: bool,
     ) -> fn(Arena, &[u8], &mut [u8], ImageSize, FilterRegion, &[ScanPoint1d<i32>]) {
         if is_symmetric_kernel {
@@ -95,45 +95,45 @@ impl Filter1DRowHandlerApprox<u8, i32> for u8 {
                 use crate::cpu_features::is_aarch_rdm_supported;
                 if is_aarch_rdm_supported() {
                     use crate::filter1d::neon::filter_row_symm_neon_u8_i32_rdm;
-                    return filter_row_symm_neon_u8_i32_rdm::<1>;
+                    return filter_row_symm_neon_u8_i32_rdm::<N>;
                 }
             }
             use crate::filter1d::neon::filter_row_symm_neon_u8_i32;
-            return filter_row_symm_neon_u8_i32::<1>;
+            return filter_row_symm_neon_u8_i32::<N>;
         }
         #[cfg(feature = "rdm")]
         {
             use crate::cpu_features::is_aarch_rdm_supported;
             if is_aarch_rdm_supported() {
                 use crate::filter1d::neon::filter_row_neon_u8_i32_rdm;
-                return filter_row_neon_u8_i32_rdm::<1>;
+                return filter_row_neon_u8_i32_rdm::<N>;
             }
         }
         use crate::filter1d::neon::filter_row_neon_u8_i32_app;
-        filter_row_neon_u8_i32_app::<1>
+        filter_row_neon_u8_i32_app::<N>
     }
 
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-    fn get_row_handler_apr(
+    fn get_row_handler_apr<const N: usize>(
         is_kernel_symmetric: bool,
     ) -> fn(Arena, &[u8], &mut [u8], ImageSize, FilterRegion, &[ScanPoint1d<i32>]) {
         #[cfg(feature = "avx")]
         if std::arch::is_x86_feature_detected!("avx2") {
             if is_kernel_symmetric {
                 use crate::filter1d::avx::filter_row_avx_symm_u8_i32_app;
-                return filter_row_avx_symm_u8_i32_app::<1>;
+                return filter_row_avx_symm_u8_i32_app::<N>;
             }
             use crate::filter1d::avx::filter_row_avx_u8_i32_app;
-            return filter_row_avx_u8_i32_app::<1>;
+            return filter_row_avx_u8_i32_app::<N>;
         }
         if std::arch::is_x86_feature_detected!("sse4.1") {
             use crate::filter1d::sse::filter_row_sse_u8_i32;
-            return filter_row_sse_u8_i32::<1>;
+            return filter_row_sse_u8_i32::<N>;
         }
         if is_kernel_symmetric {
-            filter_row_symmetric_approx::<u8, i32, 1>
+            filter_row_symmetric_approx::<u8, i32, N>
         } else {
-            filter_row_approx::<u8, i32, 1>
+            filter_row_approx::<u8, i32, N>
         }
     }
 }

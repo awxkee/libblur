@@ -1,8 +1,8 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use image::{GenericImageView, ImageReader};
 use libblur::{
-    filter_1d_rgb_exact, gaussian_kernel_1d, sigma_size, BlurImage, BlurImageMut, ConvolutionMode,
-    EdgeMode, FastBlurChannels, ImageSize, Scalar, ThreadingPolicy,
+    filter_1d_exact, gaussian_kernel_1d, sigma_size, BlurImage, BlurImageMut,
+    ConvolutionMode, EdgeMode, FastBlurChannels, Scalar, ThreadingPolicy,
 };
 use opencv::core::{find_file, split, AlgorithmHint, Mat, Size, Vector, BORDER_DEFAULT};
 use opencv::imgcodecs::{imread, IMREAD_COLOR};
@@ -230,7 +230,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 BlurImageMut::alloc(img.width(), img.height(), FastBlurChannels::Channels3);
             let kernel = gaussian_kernel_1d(25, sigma_size(25f32));
             b.iter(|| {
-                filter_1d_rgb_exact(
+                filter_1d_exact::<u8, f32, 3>(
                     &src_image,
                     &mut dst_bytes,
                     &kernel,
@@ -248,7 +248,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 BlurImageMut::alloc(img.width(), img.height(), FastBlurChannels::Channels3);
             let kernel = gaussian_kernel_1d(151, sigma_size(151f32));
             b.iter(|| {
-                filter_1d_rgb_exact(
+                filter_1d_exact::<u8, f32, 3>(
                     &src_image,
                     &mut dst_bytes,
                     &kernel,

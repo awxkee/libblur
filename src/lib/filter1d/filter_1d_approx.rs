@@ -64,7 +64,7 @@ use std::ops::{Add, Mul, Shl, Shr};
 ///
 /// See [crate::gaussian_blur] for example
 ///
-pub fn filter_1d_approx<T, F, I>(
+pub fn filter_1d_approx<T, F, I, const N: usize>(
     image: &BlurImage<T>,
     destination: &mut BlurImageMut<T>,
     row_kernel: &[F],
@@ -100,8 +100,8 @@ where
     i64: AsPrimitive<I> + AsPrimitive<F>,
     f64: AsPrimitive<T>,
 {
-    image.check_layout()?;
-    destination.check_layout()?;
+    image.check_layout_channels(N)?;
+    destination.check_layout_channels(N)?;
     image.size_matches_mut(destination)?;
     if row_kernel.len() & 1 == 0 {
         return Err(BlurError::OddKernel(row_kernel.len()));
@@ -144,12 +144,10 @@ where
         Some(hold)
     };
 
-    const N: usize = 1;
-
     let mut transient_image = vec![T::default(); image_size.width * image_size.height * N];
 
     if let Some(pool) = &pool {
-        let row_handler = T::get_row_handler_apr(is_row_kernel_symmetric);
+        let row_handler = T::get_row_handler_apr::<N>(is_row_kernel_symmetric);
         pool.install(|| {
             transient_image
                 .par_chunks_exact_mut(image_size.width * N)
@@ -176,7 +174,7 @@ where
                 });
         });
     } else {
-        let row_handler = T::get_row_handler_apr(is_row_kernel_symmetric);
+        let row_handler = T::get_row_handler_apr::<N>(is_row_kernel_symmetric);
         transient_image
             .chunks_exact_mut(image_size.width * N)
             .enumerate()

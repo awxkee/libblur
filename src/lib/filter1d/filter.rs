@@ -61,7 +61,7 @@ use std::ops::Mul;
 ///
 /// See [crate::gaussian_blur] for example
 ///
-pub fn filter_1d_exact<T, F>(
+pub fn filter_1d_exact<T, F, const N: usize>(
     image: &BlurImage<T>,
     destination: &mut BlurImageMut<T>,
     row_kernel: &[F],
@@ -83,8 +83,8 @@ where
     i32: AsPrimitive<F>,
     f64: AsPrimitive<T>,
 {
-    image.check_layout()?;
-    destination.check_layout()?;
+    image.check_layout_channels(N)?;
+    destination.check_layout_channels(N)?;
     image.size_matches_mut(destination)?;
     if row_kernel.len() & 1 == 0 {
         return Err(BlurError::OddKernel(row_kernel.len()));
@@ -114,12 +114,10 @@ where
         Some(hold)
     };
 
-    const N: usize = 1;
-
     let mut transient_image = vec![T::default(); image_size.width * image_size.height * N];
 
     if let Some(pool) = &pool {
-        let row_handler = T::get_row_handler(is_row_kernel_symmetrical);
+        let row_handler = T::get_row_handler::<N>(is_row_kernel_symmetrical);
         pool.install(|| {
             transient_image
                 .par_chunks_exact_mut(image_size.width * N)
@@ -146,7 +144,7 @@ where
                 });
         });
     } else {
-        let row_handler = T::get_row_handler(is_row_kernel_symmetrical);
+        let row_handler = T::get_row_handler::<N>(is_row_kernel_symmetrical);
         transient_image
             .chunks_exact_mut(image_size.width * N)
             .enumerate()
