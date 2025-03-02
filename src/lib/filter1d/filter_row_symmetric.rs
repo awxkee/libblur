@@ -36,7 +36,7 @@ use crate::to_storage::ToStorage;
 use num_traits::{AsPrimitive, MulAdd};
 use std::ops::{Add, Mul};
 
-pub fn filter_row_symmetrical<T, F, const N: usize>(
+pub(crate) fn filter_row_symmetrical<T, F, const N: usize>(
     _: Arena,
     arena_src: &[T],
     dst: &mut [T],

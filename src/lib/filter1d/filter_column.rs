@@ -35,7 +35,7 @@ use crate::to_storage::ToStorage;
 use num_traits::{AsPrimitive, MulAdd};
 use std::ops::{Add, Mul};
 
-pub fn filter_column<T, F>(
+pub(crate) fn filter_column<T, F>(
     arena: Arena,
     arena_src: &[&[T]],
     dst: &mut [T],

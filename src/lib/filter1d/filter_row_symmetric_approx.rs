@@ -34,7 +34,7 @@ use crate::img_size::ImageSize;
 use num_traits::AsPrimitive;
 use std::ops::{Add, Mul, Shr};
 
-pub fn filter_row_symmetric_approx<T, I, const N: usize>(
+pub(crate) fn filter_row_symmetric_approx<T, I, const N: usize>(
     _: Arena,
     arena_src: &[T],
     dst: &mut [T],
