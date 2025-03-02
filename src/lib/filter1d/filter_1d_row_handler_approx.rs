@@ -127,6 +127,10 @@ impl Filter1DRowHandlerApprox<u8, i32> for u8 {
             return filter_row_avx_u8_i32_app::<N>;
         }
         if std::arch::is_x86_feature_detected!("sse4.1") {
+            if is_kernel_symmetric {
+                use crate::filter1d::sse::filter_row_symm_sse_u8_i32_app;
+                return filter_row_symm_sse_u8_i32_app::<N>;
+            }
             use crate::filter1d::sse::filter_row_sse_u8_i32;
             return filter_row_sse_u8_i32::<N>;
         }
