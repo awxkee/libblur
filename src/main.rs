@@ -57,7 +57,10 @@ fn main() {
 
     let start = Instant::now();
 
-    let rc= bytes.iter().map(|&x| x as f32 * (1./255.)).collect::<Vec<_>>();
+    let rc = bytes
+        .iter()
+        .map(|&x| x as f32 * (1. / 255.))
+        .collect::<Vec<_>>();
     let f32_image = BlurImage::borrow(
         &rc,
         dyn_image.width(),
@@ -79,12 +82,18 @@ fn main() {
         25f32,
         EdgeMode::Clamp,
         ThreadingPolicy::Single,
-    ).unwrap();
+    )
+    .unwrap();
 
     // dst_bytes = target_f32.data.borrow().to_vec();
 
-    dst_bytes = target_f32.data.borrow().iter().map(|&x| (x * 255f32).round() as u8).collect();
-  
+    dst_bytes = target_f32
+        .data
+        .borrow()
+        .iter()
+        .map(|&x| (x * 255f32).round() as u8)
+        .collect();
+
     //
     // filter_2d_rgba_approx::<u8, f32, i32>(
     //     &bytes,

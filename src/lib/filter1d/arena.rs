@@ -328,7 +328,7 @@ where
 }
 
 /// Pads an image with chosen border strategy
-pub fn make_arena_row<T: Debug, const COMPONENTS: usize>(
+pub fn make_arena_row<T, const COMPONENTS: usize>(
     image: &BlurImage<T>,
     source_y: usize,
     kernel_size: KernelShape,
@@ -336,7 +336,7 @@ pub fn make_arena_row<T: Debug, const COMPONENTS: usize>(
     scalar: Scalar,
 ) -> Result<(Vec<T>, usize), BlurError>
 where
-    T: Default + Copy + Send + Sync + 'static,
+    T: Default + Copy + Send + Sync + 'static + Debug,
     f64: AsPrimitive<T>,
 {
     image.check_layout()?;
