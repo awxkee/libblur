@@ -79,7 +79,7 @@ where
     f64: AsPrimitive<T>,
 {
     src.check_layout()?;
-    dst.check_layout()?;
+    dst.check_layout(Some(&src))?;
     src.size_matches_mut(dst)?;
     let channels = src.channels;
     match channels {

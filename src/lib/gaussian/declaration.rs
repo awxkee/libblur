@@ -64,7 +64,7 @@ pub fn gaussian_blur(
     hint: ConvolutionMode,
 ) -> Result<(), BlurError> {
     src.check_layout()?;
-    dst.check_layout()?;
+    dst.check_layout(Some(&src))?;
     src.size_matches_mut(dst)?;
     assert!(
         kernel_size != 0 || sigma > 0.0,
@@ -149,7 +149,7 @@ pub fn gaussian_blur_u16(
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
     src.check_layout()?;
-    dst.check_layout()?;
+    dst.check_layout(Some(&src))?;
     src.size_matches_mut(dst)?;
     assert!(
         kernel_size != 0 || sigma > 0.0,
@@ -213,7 +213,7 @@ pub fn gaussian_blur_f32(
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
     src.check_layout()?;
-    dst.check_layout()?;
+    dst.check_layout(Some(&src))?;
     src.size_matches_mut(dst)?;
     assert!(
         kernel_size != 0 || sigma > 0.0,
@@ -277,7 +277,7 @@ pub fn gaussian_blur_f16(
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
     src.check_layout()?;
-    dst.check_layout()?;
+    dst.check_layout(Some(&src))?;
     src.size_matches_mut(dst)?;
     assert!(
         kernel_size != 0 || sigma > 0.0,

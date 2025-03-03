@@ -51,6 +51,14 @@ impl<T: Copy + Debug> BufferStore<'_, T> {
             Self::Owned(vec) => vec,
         }
     }
+
+    #[allow(clippy::should_implement_trait)]
+    pub(crate) fn resize(&mut self, new_size: usize, value: T) {
+        match self {
+            Self::Borrowed(_) => {}
+            Self::Owned(vec) => vec.resize(new_size, value),
+        }
+    }
 }
 
 /// Immutable image store
@@ -64,6 +72,7 @@ pub struct BlurImage<'a, T: Clone + Copy + Default + Debug> {
 }
 
 /// Mutable image store
+/// If it owns vector it does auto resizing on methods that working out-of-place.
 pub struct BlurImageMut<'a, T: Clone + Copy + Default + Debug> {
     pub data: BufferStore<'a, T>,
     pub width: u32,
@@ -233,11 +242,46 @@ impl<'a, T: Clone + Copy + Default + Debug> BlurImageMut<'a, T> {
         }
     }
 
-    /// Checks if layout matches necessary requirements
     #[inline]
-    pub fn check_layout(&self) -> Result<(), BlurError> {
+    pub fn layout_test(&self) -> Result<(), BlurError> {
         if self.width == 0 || self.height == 0 {
             return Err(BlurError::ZeroBaseSize);
+        }
+        let cn = self.channels.channels();
+        let data_len = self.data.borrow().len();
+        if data_len < self.stride as usize * (self.height as usize - 1) + self.width as usize * cn {
+            return Err(BlurError::MinimumSliceSizeMismatch(MismatchedSize {
+                expected: self.stride as usize * self.height as usize,
+                received: data_len,
+            }));
+        }
+        if (self.stride as usize) < (self.width as usize * cn) {
+            return Err(BlurError::MinimumStrideSizeMismatch(MismatchedSize {
+                expected: self.width as usize * cn,
+                received: self.stride as usize,
+            }));
+        }
+        Ok(())
+    }
+
+    /// Checks if layout matches necessary requirements
+    #[inline]
+    pub fn check_layout(&mut self, other: Option<&BlurImage<'_, T>>) -> Result<(), BlurError> {
+        if self.width == 0 || self.height == 0 {
+            return Err(BlurError::ZeroBaseSize);
+        }
+        if let Some(other) = other {
+            if matches!(self.data, BufferStore::Owned(_)) {
+                self.height = other.height;
+                self.width = other.width;
+                self.channels = other.channels;
+                self.stride = self.width * self.channels.channels() as u32;
+                self.data.resize(
+                    self.row_stride() as usize * self.height as usize,
+                    T::default(),
+                );
+                return Ok(());
+            }
         }
         let cn = self.channels.channels();
         let data_len = self.data.borrow().len();

@@ -51,7 +51,7 @@ pub fn sobel(
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
     image.check_layout()?;
-    destination.check_layout()?;
+    destination.check_layout(Some(image))?;
     image.size_matches_mut(destination)?;
     let sobel_horizontal: [i16; 3] = [-1, 0, 1];
     let sobel_vertical: [i16; 3] = [1, 2, 1];

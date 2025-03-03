@@ -377,7 +377,7 @@ pub fn median_blur(
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
     src_image.check_layout()?;
-    dst_image.check_layout()?;
+    dst_image.check_layout(Some(&src_image))?;
     src_image.size_matches_mut(dst_image)?;
     let _dispatcher = match src_image.channels {
         FastBlurChannels::Plane => median_blur_impl::<1>,

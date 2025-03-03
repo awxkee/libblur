@@ -90,7 +90,7 @@ pub fn laplacian(
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
     image.check_layout()?;
-    destination.check_layout()?;
+    destination.check_layout(Some(&image))?;
     image.size_matches_mut(destination)?;
     let kernel = [-1, -1, -1, -1, 8, -1, -1, -1, -1];
     filter_2d::<u8, i16>(

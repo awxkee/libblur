@@ -451,7 +451,7 @@ pub fn adaptive_blur(
     border_constant: Scalar,
 ) -> Result<(), BlurError> {
     src_image.check_layout()?;
-    dst_image.check_layout()?;
+    dst_image.check_layout(Some(src_image))?;
     src_image.size_matches_mut(dst_image)?;
     if src_image.row_stride() != src_image.width * src_image.channels.channels() as u32 {
         return Err(BlurError::StrideIsNotSupported);

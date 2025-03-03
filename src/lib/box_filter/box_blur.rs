@@ -633,7 +633,7 @@ pub fn box_blur(
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
     image.check_layout()?;
-    dst_image.check_layout()?;
+    dst_image.check_layout(Some(image))?;
     image.size_matches_mut(dst_image)?;
     let width = image.width;
     let height = image.height;
@@ -690,7 +690,7 @@ pub fn box_blur_u16(
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
     image.check_layout()?;
-    dst_image.check_layout()?;
+    dst_image.check_layout(Some(image))?;
     image.size_matches_mut(dst_image)?;
     let width = image.width;
     let height = image.height;
@@ -747,7 +747,7 @@ pub fn box_blur_f32(
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
     image.check_layout()?;
-    dst_image.check_layout()?;
+    dst_image.check_layout(Some(&image))?;
     image.size_matches_mut(dst_image)?;
     let width = image.width;
     let height = image.height;
@@ -806,7 +806,7 @@ pub fn box_blur_in_linear(
     transfer_function: TransferFunction,
 ) -> Result<(), BlurError> {
     image.check_layout()?;
-    dst_image.check_layout()?;
+    dst_image.check_layout(Some(&image))?;
     image.size_matches_mut(dst_image)?;
 
     let mut linear_data = BlurImageMut::alloc(image.width, image.height, image.channels);
@@ -991,7 +991,7 @@ pub fn tent_blur(
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
     image.check_layout()?;
-    dst_image.check_layout()?;
+    dst_image.check_layout(Some(&image))?;
     image.size_matches_mut(dst_image)?;
     let dispatcher = match image.channels {
         FastBlurChannels::Plane => tent_blur_impl::<u8, 1>,
@@ -1040,7 +1040,7 @@ pub fn tent_blur_u16(
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
     image.check_layout()?;
-    dst_image.check_layout()?;
+    dst_image.check_layout(Some(&image))?;
     image.size_matches_mut(dst_image)?;
     let dispatcher = match image.channels {
         FastBlurChannels::Plane => tent_blur_impl::<u16, 1>,
@@ -1087,7 +1087,7 @@ pub fn tent_blur_f32(
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
     image.check_layout()?;
-    dst_image.check_layout()?;
+    dst_image.check_layout(Some(&image))?;
     image.size_matches_mut(dst_image)?;
     let dispatcher = match image.channels {
         FastBlurChannels::Plane => tent_blur_impl::<f32, 1>,
@@ -1137,7 +1137,7 @@ pub fn tent_blur_in_linear(
     transfer_function: TransferFunction,
 ) -> Result<(), BlurError> {
     image.check_layout()?;
-    dst_image.check_layout()?;
+    dst_image.check_layout(Some(&image))?;
     image.size_matches_mut(dst_image)?;
 
     let mut linear_data = BlurImageMut::alloc(image.width, image.height, image.channels);
@@ -1443,7 +1443,7 @@ pub fn gaussian_box_blur_in_linear(
     transfer_function: TransferFunction,
 ) -> Result<(), BlurError> {
     image.check_layout()?;
-    dst_image.check_layout()?;
+    dst_image.check_layout(Some(&image))?;
     image.size_matches_mut(dst_image)?;
     let mut linear_data = BlurImageMut::alloc(image.width, image.height, image.channels);
     let mut linear_data_2 = BlurImageMut::alloc(image.width, image.height, image.channels);
