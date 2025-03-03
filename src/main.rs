@@ -74,7 +74,7 @@ fn main() {
     libblur::fast_bilateral_filter(&f32_image, &mut target_f32, 25, 7f32, 7f32).unwrap();
 
     println!("Exec time {:?}", instant.elapsed());
-    
+
     dst_bytes = target_f32.data.borrow().to_vec();
     //
     // filter_2d_rgba_approx::<u8, f32, i32>(
