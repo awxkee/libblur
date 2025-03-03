@@ -57,12 +57,8 @@ fn main() {
 
     let start = Instant::now();
 
-    let rc = bytes
-        .iter()
-        .map(|&x| x as f32 * (1. / 255.))
-        .collect::<Vec<_>>();
     let f32_image = BlurImage::borrow(
-        &rc,
+        &src_bytes,
         dyn_image.width(),
         dyn_image.height(),
         FastBlurChannels::Channels3,
@@ -73,27 +69,13 @@ fn main() {
         FastBlurChannels::Channels3,
     );
 
-    // libblur::fast_bilateral_filter(&f32_image, &mut target_f32, 25, 7f32, 7f32).unwrap();
+    let instant = Instant::now();
+    // test_image_1_eq.jpg - 208ms
+    libblur::fast_bilateral_filter(&f32_image, &mut target_f32, 25, 7f32, 7f32).unwrap();
 
-    libblur::gaussian_blur_f32(
-        &f32_image,
-        &mut target_f32,
-        0,
-        30f32,
-        EdgeMode::Clamp,
-        ThreadingPolicy::Single,
-    )
-    .unwrap();
-
-    // dst_bytes = target_f32.data.borrow().to_vec();
-
-    dst_bytes = target_f32
-        .data
-        .borrow()
-        .iter()
-        .map(|&x| (x * 255f32).round() as u8)
-        .collect();
-
+    println!("Exec time {:?}", instant.elapsed());
+    
+    dst_bytes = target_f32.data.borrow().to_vec();
     //
     // filter_2d_rgba_approx::<u8, f32, i32>(
     //     &bytes,

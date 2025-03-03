@@ -47,8 +47,8 @@ blurred
 
 Excellent results. Have improvements, however, much slower than any approximations. Use when use need gaussian
 methods - smoothing, FFT, advanced analysis etc.
-There are two methods of convolution, integral approximation and exact,
-approximation in integral form is still gaussian with 1-3% of error however about 2x faster.
+There are two methods of convolution, fixed point approximation and exact,
+approximation in fixed point adds 1-3% of error. However, it is about two times faster.
 
 Kernel size must be odd. Will panic if kernel size is not odd.
 
@@ -60,27 +60,27 @@ libblur::gaussian_blur( & bytes, src_stride, & mut dst_bytes, dst_stride, width,
 
 Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded mode with 151 kernel size.
 
-|                   | Time(NEON) | Time(AVX) | 
-|-------------------|:----------:|:---------:| 
-| libblur(Exact)    |  53.83ms   |  43.41ms  | 
-| libblur(Integral) |  33.20ms   |  30.72ms  | 
-| OpenCV            |  180.56ms  | 182.44ms  | 
+|                     | Time(NEON) | Time(AVX) | 
+|---------------------|:----------:|:---------:| 
+| libblur(Exact)      |  53.83ms   |  43.41ms  | 
+| libblur(FixedPoint) |  33.20ms   |  30.72ms  | 
+| OpenCV              |  180.56ms  | 182.44ms  | 
 
 Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded mode with 151 kernel size.
 
-|                   | time(NEON) | Time(AVX) |
-|-------------------|:----------:|:---------:|
-| libblur(Exact)    |  70.45ms   |  54.36ms  |
-| libblur(Integral) |  40.13ms   |  38.91ms  |
-| OpenCV            |  177.46ms  | 185.30ms  |
+|                     | time(NEON) | Time(AVX) |
+|---------------------|:----------:|:---------:|
+| libblur(Exact)      |  70.45ms   |  54.36ms  |
+| libblur(FixedPoint) |  40.13ms   |  38.91ms  |
+| OpenCV              |  177.46ms  | 185.30ms  |
 
 Example comparison time for blurring image 3000x4000 single plane 8-bit in multithreaded mode with 151 kernel size.
 
-|                   | time(NEON) | Time(SSE/AVX) |
-|-------------------|:----------:|:-------------:|
-| libblur(Exact)    |  17.59ms   |    15.51ms    |
-| libblur(Integral) |   9.88ms   |    11.45ms    |
-| OpenCV            |  74.73ms   |    64.20ms    |
+|                     | time(NEON) | Time(SSE/AVX) |
+|---------------------|:----------:|:-------------:|
+| libblur(Exact)      |  17.59ms   |    15.51ms    |
+| libblur(FixedPoint) |   9.88ms   |    11.45ms    |
+| OpenCV              |  74.73ms   |    64.20ms    |
 
 ### Stack blur
 
