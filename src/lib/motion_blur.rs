@@ -148,7 +148,7 @@ pub fn motion_blur(
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
     image.check_layout()?;
-    destination.check_layout(Some(&image))?;
+    destination.check_layout(Some(image))?;
     image.size_matches_mut(destination)?;
     if kernel_size & 1 == 0 {
         return Err(BlurError::OddKernel(kernel_size));
