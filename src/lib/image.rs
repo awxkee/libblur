@@ -82,6 +82,18 @@ pub struct BlurImageMut<'a, T: Clone + Copy + Default + Debug> {
     pub channels: FastBlurChannels,
 }
 
+impl<'a, T: Clone + Copy + Default + Debug> Default for BlurImageMut<'a, T> {
+    fn default() -> Self {
+        BlurImageMut {
+            data: BufferStore::Owned(Vec::new()),
+            width: 0,
+            height: 0,
+            stride: 0,
+            channels: FastBlurChannels::Plane,
+        }
+    }
+}
+
 impl<'a, T: Clone + Copy + Default + Debug> BlurImage<'a, T> {
     /// Allocates default image layout for given [FastBlurChannels]
     pub fn alloc(width: u32, height: u32, channels: FastBlurChannels) -> Self {
@@ -272,14 +284,7 @@ impl<'a, T: Clone + Copy + Default + Debug> BlurImageMut<'a, T> {
         }
         if let Some(other) = other {
             if matches!(self.data, BufferStore::Owned(_)) {
-                self.height = other.height;
-                self.width = other.width;
-                self.channels = other.channels;
-                self.stride = self.width * self.channels.channels() as u32;
-                self.data.resize(
-                    self.row_stride() as usize * self.height as usize,
-                    T::default(),
-                );
+                self.resize(other.width, other.height, other.channels);
                 return Ok(());
             }
         }
@@ -346,6 +351,7 @@ impl<'a, T: Clone + Copy + Default + Debug> BlurImageMut<'a, T> {
         Err(BlurError::ImagesMustMatch)
     }
 
+    #[inline]
     pub fn to_immutable_ref(&self) -> BlurImage<'_, T> {
         BlurImage {
             data: std::borrow::Cow::Borrowed(self.data.borrow()),
@@ -354,5 +360,18 @@ impl<'a, T: Clone + Copy + Default + Debug> BlurImageMut<'a, T> {
             height: self.height,
             channels: self.channels,
         }
+    }
+
+    #[inline]
+    #[allow(clippy::should_implement_trait)]
+    pub fn resize(&mut self, width: u32, height: u32, channels: FastBlurChannels) {
+        self.height = height;
+        self.width = width;
+        self.channels = channels;
+        self.stride = self.width * self.channels.channels() as u32;
+        self.data.resize(
+            self.row_stride() as usize * self.height as usize,
+            T::default(),
+        );
     }
 }
