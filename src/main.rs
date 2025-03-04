@@ -63,14 +63,9 @@ fn main() {
         dyn_image.height(),
         FastBlurChannels::Channels3,
     );
-    let mut target_f32 = BlurImageMut::alloc(
-        dyn_image.width(),
-        dyn_image.height(),
-        FastBlurChannels::Channels3,
-    );
+    let mut target_f32 = BlurImageMut::default();
 
     let instant = Instant::now();
-    // test_image_1_eq.jpg - 208ms
     libblur::fast_bilateral_filter(&f32_image, &mut target_f32, 25, 7f32, 7f32).unwrap();
 
     println!("Exec time {:?}", instant.elapsed());

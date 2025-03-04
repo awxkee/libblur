@@ -279,14 +279,14 @@ impl<'a, T: Clone + Copy + Default + Debug> BlurImageMut<'a, T> {
     /// Checks if layout matches necessary requirements
     #[inline]
     pub fn check_layout(&mut self, other: Option<&BlurImage<'_, T>>) -> Result<(), BlurError> {
-        if self.width == 0 || self.height == 0 {
-            return Err(BlurError::ZeroBaseSize);
-        }
         if let Some(other) = other {
             if matches!(self.data, BufferStore::Owned(_)) {
                 self.resize(other.width, other.height, other.channels);
                 return Ok(());
             }
+        }
+        if self.width == 0 || self.height == 0 {
+            return Err(BlurError::ZeroBaseSize);
         }
         let cn = self.channels.channels();
         let data_len = self.data.borrow().len();
