@@ -105,7 +105,7 @@ where
     f64: AsPrimitive<T> + AsPrimitive<FftIntermediate>,
 {
     src.check_layout()?;
-    dst.check_layout()?;
+    dst.check_layout(Some(src))?;
     src.size_matches_mut(dst)?;
     if src.channels != FastBlurChannels::Plane {
         return Err(BlurError::FftChannelsNotSupported);

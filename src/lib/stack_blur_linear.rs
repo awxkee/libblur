@@ -55,7 +55,7 @@ pub fn stack_blur_in_linear(
     threading_policy: ThreadingPolicy,
     transfer_function: TransferFunction,
 ) -> Result<(), BlurError> {
-    image.check_layout()?;
+    image.check_layout(None)?;
     let radius = radius.max(1);
     let stride = image.row_stride();
     let width = image.width;

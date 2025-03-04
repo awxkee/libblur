@@ -51,6 +51,14 @@ impl<T: Copy + Debug> BufferStore<'_, T> {
             Self::Owned(vec) => vec,
         }
     }
+
+    #[allow(clippy::should_implement_trait)]
+    pub(crate) fn resize(&mut self, new_size: usize, value: T) {
+        match self {
+            Self::Borrowed(_) => {}
+            Self::Owned(vec) => vec.resize(new_size, value),
+        }
+    }
 }
 
 /// Immutable image store
@@ -64,6 +72,7 @@ pub struct BlurImage<'a, T: Clone + Copy + Default + Debug> {
 }
 
 /// Mutable image store
+/// If it owns vector it does auto resizing on methods that working out-of-place.
 pub struct BlurImageMut<'a, T: Clone + Copy + Default + Debug> {
     pub data: BufferStore<'a, T>,
     pub width: u32,
@@ -71,6 +80,18 @@ pub struct BlurImageMut<'a, T: Clone + Copy + Default + Debug> {
     /// Image stride, items per row, might be 0
     pub stride: u32,
     pub channels: FastBlurChannels,
+}
+
+impl<'a, T: Clone + Copy + Default + Debug> Default for BlurImageMut<'a, T> {
+    fn default() -> Self {
+        BlurImageMut {
+            data: BufferStore::Owned(Vec::new()),
+            width: 0,
+            height: 0,
+            stride: 0,
+            channels: FastBlurChannels::Plane,
+        }
+    }
 }
 
 impl<'a, T: Clone + Copy + Default + Debug> BlurImage<'a, T> {
@@ -233,9 +254,37 @@ impl<'a, T: Clone + Copy + Default + Debug> BlurImageMut<'a, T> {
         }
     }
 
+    #[inline]
+    pub fn layout_test(&self) -> Result<(), BlurError> {
+        if self.width == 0 || self.height == 0 {
+            return Err(BlurError::ZeroBaseSize);
+        }
+        let cn = self.channels.channels();
+        let data_len = self.data.borrow().len();
+        if data_len < self.stride as usize * (self.height as usize - 1) + self.width as usize * cn {
+            return Err(BlurError::MinimumSliceSizeMismatch(MismatchedSize {
+                expected: self.stride as usize * self.height as usize,
+                received: data_len,
+            }));
+        }
+        if (self.stride as usize) < (self.width as usize * cn) {
+            return Err(BlurError::MinimumStrideSizeMismatch(MismatchedSize {
+                expected: self.width as usize * cn,
+                received: self.stride as usize,
+            }));
+        }
+        Ok(())
+    }
+
     /// Checks if layout matches necessary requirements
     #[inline]
-    pub fn check_layout(&self) -> Result<(), BlurError> {
+    pub fn check_layout(&mut self, other: Option<&BlurImage<'_, T>>) -> Result<(), BlurError> {
+        if let Some(other) = other {
+            if matches!(self.data, BufferStore::Owned(_)) {
+                self.resize(other.width, other.height, other.channels);
+                return Ok(());
+            }
+        }
         if self.width == 0 || self.height == 0 {
             return Err(BlurError::ZeroBaseSize);
         }
@@ -302,6 +351,7 @@ impl<'a, T: Clone + Copy + Default + Debug> BlurImageMut<'a, T> {
         Err(BlurError::ImagesMustMatch)
     }
 
+    #[inline]
     pub fn to_immutable_ref(&self) -> BlurImage<'_, T> {
         BlurImage {
             data: std::borrow::Cow::Borrowed(self.data.borrow()),
@@ -310,5 +360,18 @@ impl<'a, T: Clone + Copy + Default + Debug> BlurImageMut<'a, T> {
             height: self.height,
             channels: self.channels,
         }
+    }
+
+    #[inline]
+    #[allow(clippy::should_implement_trait)]
+    pub fn resize(&mut self, width: u32, height: u32, channels: FastBlurChannels) {
+        self.height = height;
+        self.width = width;
+        self.channels = channels;
+        self.stride = self.width * self.channels.channels() as u32;
+        self.data.resize(
+            self.row_stride() as usize * self.height as usize,
+            T::default(),
+        );
     }
 }

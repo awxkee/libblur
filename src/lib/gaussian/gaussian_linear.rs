@@ -67,7 +67,7 @@ pub fn gaussian_blur_in_linear(
     transfer_function: TransferFunction,
 ) -> Result<(), BlurError> {
     src.check_layout()?;
-    dst.check_layout()?;
+    dst.check_layout(Some(src))?;
     src.size_matches_mut(dst)?;
     let mut linear_data = BlurImageMut::alloc(src.width, src.height, src.channels);
     let mut linear_data_1 = BlurImageMut::alloc(src.width, src.height, src.channels);
