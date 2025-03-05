@@ -1293,10 +1293,12 @@ pub fn gaussian_box_blur(
     image: &BlurImage<u8>,
     dst_image: &mut BlurImageMut<u8>,
     sigma: f32,
-    channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
-    let dispatcher = match channels {
+    image.check_layout()?;
+    dst_image.check_layout(Some(image))?;
+    image.size_matches_mut(dst_image)?;
+    let dispatcher = match image.channels {
         FastBlurChannels::Plane => gaussian_box_blur_impl::<u8, 1>,
         FastBlurChannels::Channels3 => gaussian_box_blur_impl::<u8, 3>,
         FastBlurChannels::Channels4 => gaussian_box_blur_impl::<u8, 4>,
@@ -1344,6 +1346,9 @@ pub fn gaussian_box_blur_u16(
     sigma: f32,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
+    image.check_layout()?;
+    dst_image.check_layout(Some(image))?;
+    image.size_matches_mut(dst_image)?;
     let channels = image.channels;
     let executor = match channels {
         FastBlurChannels::Plane => gaussian_box_blur_impl::<u16, 1>,
@@ -1393,6 +1398,9 @@ pub fn gaussian_box_blur_f32(
     sigma: f32,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
+    image.check_layout()?;
+    dst_image.check_layout(Some(image))?;
+    image.size_matches_mut(dst_image)?;
     let channels = image.channels;
     let dispatcher = match channels {
         FastBlurChannels::Plane => gaussian_box_blur_impl::<f32, 1>,

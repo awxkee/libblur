@@ -129,7 +129,6 @@ pub fn generate_motion_kernel(size: usize, angle_deg: f32) -> Vec<f32> {
 ///
 /// * `image`: Source image.
 /// * `destination`: Destination image.
-/// * `image_size`: [ImageSize] of the images.
 /// * `angle`: Degree of acceleration, in degrees.
 /// * `kernel_size`: Convolve kernel size, must be odd!
 /// * `border_mode`: See [EdgeMode] for more info.

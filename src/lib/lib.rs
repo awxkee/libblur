@@ -65,7 +65,6 @@ mod fast_gaussian_image;
 #[cfg(feature = "image")]
 mod fast_gaussian_image_next;
 mod fast_gaussian_next;
-mod fast_gaussian_superior;
 mod filter1d;
 mod filter2d;
 mod gaussian;
@@ -127,7 +126,6 @@ pub use fast_gaussian_next::fast_gaussian_next_f16;
 pub use fast_gaussian_next::fast_gaussian_next_f32;
 pub use fast_gaussian_next::fast_gaussian_next_in_linear;
 pub use fast_gaussian_next::fast_gaussian_next_u16;
-pub use fast_gaussian_superior::fast_gaussian_superior;
 pub use filter1d::{filter_1d_approx, filter_1d_exact, make_arena, Arena, ArenaPads, KernelShape};
 #[cfg(feature = "fft")]
 pub use filter2d::{fft_next_good_size, filter_2d_fft, filter_2d_rgb_fft, filter_2d_rgba_fft};

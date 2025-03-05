@@ -43,7 +43,6 @@ use std::ops::Mul;
 ///
 /// * `image`: RGB image.
 /// * `destination`: Destination RGB image.
-/// * `image_size`: Image size see [ImageSize].
 /// * `kernel` - Kernel.
 /// * `kernel_shape`: Kernel size, see [KernelShape] for more info.
 /// * `border_mode`: See [EdgeMode] for more info.
