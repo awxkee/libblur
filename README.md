@@ -47,8 +47,8 @@ blurred
 
 Excellent results. Have improvements, however, much slower than any approximations. Use when use need gaussian
 methods - smoothing, FFT, advanced analysis etc.
-There are two methods of convolution, integral approximation and exact,
-approximation in integral form is still gaussian with 1-3% of error however about 2x faster.
+There are two methods of convolution, fixed point approximation and exact,
+approximation in fixed point adds 1-3% of error. However, it is about two times faster.
 
 Kernel size must be odd. Will panic if kernel size is not odd.
 
@@ -60,27 +60,27 @@ libblur::gaussian_blur( & bytes, src_stride, & mut dst_bytes, dst_stride, width,
 
 Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded mode with 151 kernel size.
 
-|                   | Time(NEON) | Time(AVX) | 
-|-------------------|:----------:|:---------:| 
-| libblur(Exact)    |  53.83ms   |  43.41ms  | 
-| libblur(Integral) |  33.20ms   |  30.72ms  | 
-| OpenCV            |  180.56ms  | 182.44ms  | 
+|                     | Time(NEON) | Time(AVX) | 
+|---------------------|:----------:|:---------:| 
+| libblur(Exact)      |  53.83ms   |  43.41ms  | 
+| libblur(FixedPoint) |  33.20ms   |  30.72ms  | 
+| OpenCV              |  180.56ms  | 182.44ms  | 
 
 Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded mode with 151 kernel size.
 
-|                   | time(NEON) | Time(AVX) |
-|-------------------|:----------:|:---------:|
-| libblur(Exact)    |  70.45ms   |  54.36ms  |
-| libblur(Integral) |  40.13ms   |  38.91ms  |
-| OpenCV            |  177.46ms  | 185.30ms  |
+|                     | time(NEON) | Time(AVX) |
+|---------------------|:----------:|:---------:|
+| libblur(Exact)      |  70.45ms   |  54.36ms  |
+| libblur(FixedPoint) |  40.13ms   |  38.91ms  |
+| OpenCV              |  177.46ms  | 185.30ms  |
 
 Example comparison time for blurring image 3000x4000 single plane 8-bit in multithreaded mode with 151 kernel size.
 
-|                   | time(NEON) | Time(SSE/AVX) |
-|-------------------|:----------:|:-------------:|
-| libblur(Exact)    |  17.59ms   |    15.51ms    |
-| libblur(Integral) |   9.88ms   |    11.45ms    |
-| OpenCV            |  74.73ms   |    64.20ms    |
+|                     | time(NEON) | Time(SSE/AVX) |
+|---------------------|:----------:|:-------------:|
+| libblur(Exact)      |  17.59ms   |    15.51ms    |
+| libblur(FixedPoint) |   9.88ms   |    11.45ms    |
+| OpenCV              |  74.73ms   |    64.20ms    |
 
 ### Stack blur
 
@@ -92,7 +92,8 @@ advanced analysis. Results just a little worse than in 'fast gaussian', however 
 O(1) complexity.
 
 ```rust
-libblur::stack_blur( & mut bytes, stride, width0, height, radius, FastBlurChannels::Channels3);
+let mut dst_image = BlurImageMut::borrow(&mut src_bytes, dyn_image.width(), dyn_image.height(), FastBlurChannels::Channels3)
+libblur::stack_blur( &mut dst_image, 10, ThreadingPolicy::Single).unwrap();
 ```
 
 Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded mode with 77 radius.
@@ -121,7 +122,8 @@ blur , however results are better.
 O(log R) complexity.
 
 ```rust
-libblur::fast_gaussian( & mut bytes, stride, width0, height, radius, FastBlurChannels::Channels3);
+let mut dst_image = BlurImageMut::borrow(&mut src_bytes, dyn_image.width(), dyn_image.height(), FastBlurChannels::Channels3)
+libblur::fast_gaussian(&mut dst_image,10, ThreadingPolicy::Single, EdgeMode::Wrap).unwrap();
 ```
 
 Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded mode with 77 radius.
@@ -146,7 +148,8 @@ Produces very pleasant results close to gaussian. Max radius ~150-180 for u8, fo
 O(log R) complexity.
 
 ```rust
-libblur::fast_gaussian_next( & mut bytes, stride, width, height, radius, FastBlurChannels::Channels3);
+let mut dst_image = BlurImageMut::borrow(&mut src_bytes, dyn_image.width(), dyn_image.height(), FastBlurChannels::Channels3)
+libblur::fast_gaussian_next(&mut dst_image,10, ThreadingPolicy::Single, EdgeMode::Wrap).unwrap();
 ```
 
 Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded mode with 35 radius.
@@ -171,7 +174,14 @@ Medium speed, good-looking results with large radius `tents` becoming more notic
 O(1) complexity.
 
 ```rust
-libblur::tent_blur(bytes, stride, & mut dst_bytes, stride, width, height, radius, FastBlurChannels::Channels3);
+let image = BlurImage::borrow(
+    &src_bytes,
+    dyn_image.width(),
+    dyn_image.height(),
+    FastBlurChannels::Channels3,
+);
+let mut dst_image = BlurImageMut::default();
+libblur::tent_blur(&image, &mut dst_image,10f32, ThreadingPolicy::Single).unwrap();
 ```
 
 ### Median blur
@@ -181,7 +191,14 @@ Median blur ( median filter ). Implementation is fast enough.
 O(log R) complexity.
 
 ```rust
-libblur::median_blur(bytes, stride, & mut dst_bytes, stride, width, height, radius, FastBlurChannels::Channels3);
+let image = BlurImage::borrow(
+    &src_bytes,
+    dyn_image.width(),
+    dyn_image.height(),
+    FastBlurChannels::Channels3,
+);
+let mut dst_image = BlurImageMut::default();
+libblur::median_blur(&image, &mut dst_image,10, ThreadingPolicy::Single).unwrap();
 ```
 
 Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded mode with 35 radius.
@@ -207,7 +224,14 @@ Medium speed.
 O(1) complexity.
 
 ```rust
-libblur::gaussian_box_blur(bytes, stride, & mut dst_bytes, stride, width, height, radius, FastBlurChannels::Channels3);
+let image = BlurImage::borrow(
+    &src_bytes,
+    dyn_image.width(),
+    dyn_image.height(),
+    FastBlurChannels::Channels3,
+);
+let mut dst_image = BlurImageMut::default();
+libblur::gaussian_box_blur(&image, &mut dst_image, 10f32, ThreadingPolicy::Single).unwrap();
 ```
 
 ### Box blur
@@ -218,7 +242,14 @@ Medium speed.
 O(1) complexity.
 
 ```rust
-libblur::box_blur(bytes, stride, & mut dst_bytes, stride, width, height, radius, FastBlurChannels::Channels3);
+let image = BlurImage::borrow(
+    &src_bytes,
+    dyn_image.width(),
+    dyn_image.height(),
+    FastBlurChannels::Channels3,
+);
+let mut dst_image = BlurImageMut::default();
+libblur::box_blur(&image, &mut dst_image,10, ThreadingPolicy::Single).unwrap();
 ```
 
 Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded mode with 77 radius.
@@ -249,16 +280,14 @@ This method has high convergence and will completely blur an image very fast wit
 By the nature of this filter the more spatial sigma are the faster method is.
 
 ```rust
-fast_bilateral_filter(
-    src_bytes,
-    & mut dst_bytes,
-    dimensions.0,
-    dimensions.1,
-    kernel_size,
-    spatial_sigma,
-    range_sigma,
+let image = BlurImage::borrow(
+    &src_bytes,
+    dyn_image.width(),
+    dyn_image.height(),
     FastBlurChannels::Channels3,
 );
+let mut dst_image = BlurImageMut::default();
+libblur::fast_bilateral_filter(&image, &mut dst_image, 25, 7f32, 7f32).unwrap();
 ```
 
 ### Common speed chain

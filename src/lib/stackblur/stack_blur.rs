@@ -191,7 +191,7 @@ pub fn stack_blur(
     radius: u32,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
-    image.check_layout()?;
+    image.check_layout(None)?;
     #[allow(clippy::manual_clamp)]
     let radius = radius.max(1).min(1449);
     let thread_count = threading_policy.thread_count(image.width, image.height) as u32;

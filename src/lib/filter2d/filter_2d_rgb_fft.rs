@@ -43,7 +43,6 @@ use std::ops::Mul;
 ///
 /// * `image`: RGB image.
 /// * `destination`: Destination RGB image.
-/// * `image_size`: Image size see [ImageSize].
 /// * `kernel` - Kernel.
 /// * `kernel_shape`: Kernel size, see [KernelShape] for more info.
 /// * `border_mode`: See [EdgeMode] for more info.
@@ -68,7 +67,7 @@ where
     f64: AsPrimitive<T> + AsPrimitive<FftIntermediate>,
 {
     src.check_layout()?;
-    dst.check_layout()?;
+    dst.check_layout(Some(src))?;
     src.size_matches_mut(dst)?;
 
     let image_size = src.size();

@@ -84,7 +84,7 @@ where
     f64: AsPrimitive<T>,
 {
     image.check_layout_channels(N)?;
-    destination.check_layout_channels(N)?;
+    destination.check_layout_channels(N, Some(image))?;
     image.only_size_matches_mut(destination)?;
     if row_kernel.len() & 1 == 0 {
         return Err(BlurError::OddKernel(row_kernel.len()));

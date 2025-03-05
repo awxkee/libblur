@@ -79,7 +79,7 @@ where
     f64: AsPrimitive<T>,
 {
     src.check_layout()?;
-    dst.check_layout()?;
+    dst.check_layout(Some(src))?;
     src.size_matches_mut(dst)?;
     let channels = src.channels;
     match channels {
@@ -151,7 +151,7 @@ where
     f64: AsPrimitive<T>,
 {
     src.check_layout_channels(CN)?;
-    dst.check_layout_channels(CN)?;
+    dst.check_layout_channels(CN, Some(src))?;
     let kernel_width = kernel_shape.width;
     let kernel_height = kernel_shape.height;
     if kernel_height * kernel_width != kernel.len() {

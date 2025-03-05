@@ -634,7 +634,7 @@ fn fast_bilateral_filter_plane_impl<
     range_sigma: f32,
 ) -> Result<(), BlurError> {
     img.check_layout()?;
-    dst.check_layout()?;
+    dst.check_layout(Some(img))?;
     img.size_matches_mut(dst)?;
     let width = img.width;
     let height = img.height;
@@ -689,7 +689,7 @@ pub(crate) fn fast_bilateral_filter_gray_alpha_impl<
     range_sigma: f32,
 ) -> Result<(), BlurError> {
     img.check_layout_channels(2)?;
-    dst.check_layout_channels(2)?;
+    dst.check_layout_channels(2, Some(img))?;
     assert_ne!(kernel_size & 1, 0, "kernel size must be odd");
     assert!(
         !(spatial_sigma <= 0. || range_sigma <= 0.0),
@@ -769,7 +769,7 @@ fn fast_bilateral_filter_rgb_impl<
     range_sigma: f32,
 ) -> Result<(), BlurError> {
     img.check_layout()?;
-    dst.check_layout()?;
+    dst.check_layout(None)?;
     img.size_matches_mut(dst)?;
     let width = img.width;
     let height = img.height;
@@ -873,7 +873,7 @@ fn fast_bilateral_filter_rgba_impl<
     range_sigma: f32,
 ) -> Result<(), BlurError> {
     img.check_layout()?;
-    dst.check_layout()?;
+    dst.check_layout(Some(img))?;
     img.size_matches_mut(dst)?;
     let width = img.width;
     let height = img.height;
@@ -1007,7 +1007,7 @@ pub fn fast_bilateral_filter(
     range_sigma: f32,
 ) -> Result<(), BlurError> {
     src.check_layout()?;
-    dst.check_layout()?;
+    dst.check_layout(Some(src))?;
     src.size_matches_mut(dst)?;
     let channels = src.channels;
     assert_ne!(kernel_size & 1, 0, "kernel_size must be odd");
@@ -1050,7 +1050,7 @@ pub fn fast_bilateral_filter_u16(
     range_sigma: f32,
 ) -> Result<(), BlurError> {
     src.check_layout()?;
-    dst.check_layout()?;
+    dst.check_layout(Some(src))?;
     src.size_matches_mut(dst)?;
     let channels = src.channels;
     assert_ne!(kernel_size & 1, 0, "kernel_size must be odd");
@@ -1093,7 +1093,7 @@ pub fn fast_bilateral_filter_f32(
     range_sigma: f32,
 ) -> Result<(), BlurError> {
     src.check_layout()?;
-    dst.check_layout()?;
+    dst.check_layout(Some(src))?;
     src.size_matches_mut(dst)?;
     let channels = src.channels;
     assert_ne!(kernel_size & 1, 0, "kernel_size must be odd");

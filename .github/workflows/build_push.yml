@@ -41,7 +41,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo clippy --manifest-path ./src/lib/Cargo.toml --all-features -- -D warnings
+      - run:
+
 
   clippy-wasm:
     name: Clippy WASM

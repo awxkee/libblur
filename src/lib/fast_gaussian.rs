@@ -830,7 +830,7 @@ pub fn fast_gaussian(
     threading_policy: ThreadingPolicy,
     edge_mode: EdgeMode,
 ) -> Result<(), BlurError> {
-    image.check_layout()?;
+    image.check_layout(None)?;
     let radius = std::cmp::min(radius, 319);
     let stride = image.row_stride();
     let width = image.width;
@@ -870,7 +870,7 @@ pub fn fast_gaussian_u16(
     threading_policy: ThreadingPolicy,
     edge_mode: EdgeMode,
 ) -> Result<(), BlurError> {
-    image.check_layout()?;
+    image.check_layout(None)?;
     let stride = image.row_stride();
     let width = image.width;
     let height = image.height;
@@ -912,7 +912,7 @@ pub fn fast_gaussian_f32(
     threading_policy: ThreadingPolicy,
     edge_mode: EdgeMode,
 ) -> Result<(), BlurError> {
-    image.check_layout()?;
+    image.check_layout(None)?;
     let stride = image.row_stride();
     let width = image.width;
     let height = image.height;
@@ -955,7 +955,7 @@ pub fn fast_gaussian_in_linear(
     transfer_function: TransferFunction,
     edge_mode: EdgeMode,
 ) -> Result<(), BlurError> {
-    image.check_layout()?;
+    image.check_layout(None)?;
     let mut linear_data = BlurImageMut::alloc(image.width, image.height, image.channels);
 
     let forward_transformer = match image.channels {
@@ -1019,7 +1019,7 @@ pub fn fast_gaussian_f16(
     threading_policy: ThreadingPolicy,
     edge_mode: EdgeMode,
 ) -> Result<(), BlurError> {
-    image.check_layout()?;
+    image.check_layout(None)?;
     let stride = image.row_stride();
     let width = image.width;
     let height = image.height;
