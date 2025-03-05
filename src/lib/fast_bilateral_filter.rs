@@ -689,7 +689,7 @@ pub(crate) fn fast_bilateral_filter_gray_alpha_impl<
     range_sigma: f32,
 ) -> Result<(), BlurError> {
     img.check_layout_channels(2)?;
-    dst.check_layout_channels(2)?;
+    dst.check_layout_channels(2, Some(img))?;
     assert_ne!(kernel_size & 1, 0, "kernel size must be odd");
     assert!(
         !(spatial_sigma <= 0. || range_sigma <= 0.0),

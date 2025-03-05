@@ -82,7 +82,7 @@ pub struct BlurImageMut<'a, T: Clone + Copy + Default + Debug> {
     pub channels: FastBlurChannels,
 }
 
-impl<'a, T: Clone + Copy + Default + Debug> Default for BlurImageMut<'a, T> {
+impl<T: Clone + Copy + Default + Debug> Default for BlurImageMut<'_, T> {
     fn default() -> Self {
         BlurImageMut {
             data: BufferStore::Owned(Vec::new()),
@@ -307,7 +307,17 @@ impl<'a, T: Clone + Copy + Default + Debug> BlurImageMut<'a, T> {
 
     /// Checks if layout matches necessary requirements by using external channels count
     #[inline]
-    pub fn check_layout_channels(&self, cn: usize) -> Result<(), BlurError> {
+    pub fn check_layout_channels(
+        &mut self,
+        cn: usize,
+        other: Option<&BlurImage<'_, T>>,
+    ) -> Result<(), BlurError> {
+        if let Some(other) = other {
+            if matches!(self.data, BufferStore::Owned(_)) {
+                self.resize_arbitrary(other.width, other.height, cn);
+                return Ok(());
+            }
+        }
         if self.width == 0 || self.height == 0 {
             return Err(BlurError::ZeroBaseSize);
         }
@@ -369,6 +379,19 @@ impl<'a, T: Clone + Copy + Default + Debug> BlurImageMut<'a, T> {
         self.width = width;
         self.channels = channels;
         self.stride = self.width * self.channels.channels() as u32;
+        self.data.resize(
+            self.row_stride() as usize * self.height as usize,
+            T::default(),
+        );
+    }
+
+    #[inline]
+    #[allow(clippy::should_implement_trait)]
+    pub fn resize_arbitrary(&mut self, width: u32, height: u32, cn: usize) {
+        self.height = height;
+        self.width = width;
+        self.channels = FastBlurChannels::Plane;
+        self.stride = self.width * cn as u32;
         self.data.resize(
             self.row_stride() as usize * self.height as usize,
             T::default(),
