@@ -46,11 +46,8 @@ use std::mem::size_of;
 /// # Arguments
 ///
 /// * `stride` - Lane length, default is width * channels_count * size_of(PixelType) if not aligned
-/// * `width` - Width of the image
-/// * `height` - Height of the image
 /// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted.
 /// * `sigma` - Sigma for a gaussian kernel, corresponds to kernel flattening level. If zero of negative then *get_sigma_size* will be used
-/// * `channels` - Count of channels in the image
 /// * `edge_mode` - Rule to handle edge mode
 /// * `threading_policy` - Threading policy according to *ThreadingPolicy*
 /// * `transfer_function` - Transfer function in linear colorspace
