@@ -1,0 +1,41 @@
+[package]
+name = "fast-blur"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+colorutils-rs = "0.7.0"
+half = "2.4.1"
+image = "0.25.5"
+libblur = {path = "../", features = ["image", "fft", "sse", "nightly_avx512", "avx", "rdm"], default-features = false}
+accelerate = {path = "accelerate" }
+rayon = "1.10.0"
+fast_transpose = "0.2.3"
+
+[dev-dependencies]
+criterion = "0.5.1"
+opencv = { version = "0.94.2", default-features = false, features = ["imgcodecs", "imgproc", "clang-runtime"] }
+
+[[bench]]
+name = "gauss"
+harness = false
+
+[[bench]]
+name = "median"
+harness = false
+
+[[bench]]
+name = "box"
+harness = false
+
+[[bench]]
+name = "stack_blur"
+harness = false
+
+[[bench]]
+name = "fast_gaussian"
+harness = false
+
+[[bench]]
+name = "fast_gaussian_next"
+harness = false
