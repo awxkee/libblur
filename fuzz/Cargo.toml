@@ -9,7 +9,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-libblur = {path = "../src/lib", default-features = false}
+libblur = {path = "../", default-features = false}
 
 [features]
 avx = ["libblur/avx"]

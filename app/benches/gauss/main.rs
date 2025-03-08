@@ -36,7 +36,7 @@ pub(crate) fn split_channels_3<T: Copy>(
 pub fn criterion_benchmark(c: &mut Criterion) {
     let mut c = c.benchmark_group("Gauss");
     c.sample_size(10);
-    let img = ImageReader::open("assets/test_image_4.png")
+    let img = ImageReader::open("../../../assets/test_image_4.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -181,7 +181,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     });
 
     {
-        let img = ImageReader::open("assets/test_image_1.jpg")
+        let img = ImageReader::open("../../../assets/test_image_1.jpg")
             .unwrap()
             .decode()
             .unwrap();
@@ -301,7 +301,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         });
     }
     {
-        let img = ImageReader::open("assets/test_image_1.jpg")
+        let img = ImageReader::open("../../../assets/test_image_1.jpg")
             .unwrap()
             .decode()
             .unwrap();
