@@ -37,7 +37,7 @@ use crate::to_storage::ToStorage;
 use std::arch::aarch64::*;
 use std::ops::Mul;
 
-pub fn filter_row_neon_f32_f32<const N: usize>(
+pub(crate) fn filter_row_neon_f32_f32<const N: usize>(
     _: Arena,
     arena_src: &[f32],
     dst: &mut [f32],

@@ -38,7 +38,7 @@ use crate::mlaf::mlaf;
 use crate::to_storage::ToStorage;
 use std::arch::aarch64::*;
 
-pub fn filter_row_symm_neon_u8_f32<const N: usize>(
+pub(crate) fn filter_row_symm_neon_u8_f32<const N: usize>(
     _: Arena,
     arena_src: &[u8],
     dst: &mut [u8],

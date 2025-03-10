@@ -50,27 +50,12 @@ pub(crate) unsafe fn _mm256_mul_epi8_by_ps_x4<const FMA: bool>(
     let o2 = _mm256_cvtepi32_ps(j2);
     let o3 = _mm256_cvtepi32_ps(j3);
 
-    if FMA {
-        (
-            _mm256_opt_fmlaf_ps::<FMA>(_mm256_set1_ps(0.5f32), o0, weight),
-            _mm256_opt_fmlaf_ps::<FMA>(_mm256_set1_ps(0.5f32), o1, weight),
-            _mm256_opt_fmlaf_ps::<FMA>(_mm256_set1_ps(0.5f32), o2, weight),
-            _mm256_opt_fmlaf_ps::<FMA>(_mm256_set1_ps(0.5f32), o3, weight),
-        )
-    } else {
-        let kz = (
-            _mm256_mul_ps(o0, weight),
-            _mm256_mul_ps(o1, weight),
-            _mm256_mul_ps(o2, weight),
-            _mm256_mul_ps(o3, weight),
-        );
-        (
-            _mm256_add_ps(_mm256_set1_ps(0.5f32), kz.0),
-            _mm256_add_ps(_mm256_set1_ps(0.5f32), kz.1),
-            _mm256_add_ps(_mm256_set1_ps(0.5f32), kz.2),
-            _mm256_add_ps(_mm256_set1_ps(0.5f32), kz.3),
-        )
-    }
+    (
+        _mm256_opt_fmlaf_ps::<FMA>(_mm256_set1_ps(0.5f32), o0, weight),
+        _mm256_opt_fmlaf_ps::<FMA>(_mm256_set1_ps(0.5f32), o1, weight),
+        _mm256_opt_fmlaf_ps::<FMA>(_mm256_set1_ps(0.5f32), o2, weight),
+        _mm256_opt_fmlaf_ps::<FMA>(_mm256_set1_ps(0.5f32), o3, weight),
+    )
 }
 
 #[inline(always)]
@@ -84,18 +69,10 @@ pub(crate) unsafe fn _mm256_mul_epi16_by_ps_x2<const FMA: bool>(
     let o0 = _mm256_cvtepi32_ps(j0);
     let o1 = _mm256_cvtepi32_ps(j1);
 
-    if FMA {
-        (
-            _mm256_opt_fmlaf_ps::<FMA>(_mm256_set1_ps(0.5f32), o0, weight),
-            _mm256_opt_fmlaf_ps::<FMA>(_mm256_set1_ps(0.5f32), o1, weight),
-        )
-    } else {
-        let kz = (_mm256_mul_ps(o0, weight), _mm256_mul_ps(o1, weight));
-        (
-            _mm256_add_ps(_mm256_set1_ps(0.5f32), kz.0),
-            _mm256_add_ps(_mm256_set1_ps(0.5f32), kz.1),
-        )
-    }
+    (
+        _mm256_opt_fmlaf_ps::<FMA>(_mm256_set1_ps(0.5f32), o0, weight),
+        _mm256_opt_fmlaf_ps::<FMA>(_mm256_set1_ps(0.5f32), o1, weight),
+    )
 }
 
 #[inline(always)]

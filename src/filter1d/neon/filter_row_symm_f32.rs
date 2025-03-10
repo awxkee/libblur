@@ -36,7 +36,7 @@ use crate::neon::prefer_vfmaq_f32;
 use crate::to_storage::ToStorage;
 use std::arch::aarch64::*;
 
-pub fn filter_row_neon_symm_f32_f32(
+pub(crate) fn filter_row_neon_symm_f32_f32(
     arena: Arena,
     arena_src: &[f32],
     dst: &mut [f32],

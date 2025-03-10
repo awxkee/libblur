@@ -39,7 +39,7 @@ use crate::to_storage::ToStorage;
 use std::arch::aarch64::*;
 use std::ops::Mul;
 
-pub fn filter_row_neon_u8_f32<const N: usize>(
+pub(crate) fn filter_row_neon_u8_f32<const N: usize>(
     arena: Arena,
     arena_src: &[u8],
     dst: &mut [u8],
