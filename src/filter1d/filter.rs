@@ -211,10 +211,10 @@ where
                         let brows0 = create_brows(
                             image_size,
                             column_kernel_shape,
-                            &top_pad,
-                            &bottom_pad,
+                            top_pad,
+                            bottom_pad,
                             pad_h,
-                            &transient_image_slice,
+                            transient_image_slice,
                             src_stride,
                             y,
                         );
@@ -222,10 +222,10 @@ where
                         let brows1 = create_brows(
                             image_size,
                             column_kernel_shape,
-                            &top_pad,
-                            &bottom_pad,
+                            top_pad,
+                            bottom_pad,
                             pad_h,
-                            &transient_image_slice,
+                            transient_image_slice,
                             src_stride,
                             y + 1,
                         );
@@ -233,10 +233,10 @@ where
                         let brows2 = create_brows(
                             image_size,
                             column_kernel_shape,
-                            &top_pad,
-                            &bottom_pad,
+                            top_pad,
+                            bottom_pad,
                             pad_h,
-                            &transient_image_slice,
+                            transient_image_slice,
                             src_stride,
                             y + 2,
                         );
@@ -271,10 +271,10 @@ where
                         let brows0 = create_brows(
                             image_size,
                             column_kernel_shape,
-                            &top_pad,
-                            &bottom_pad,
+                            top_pad,
+                            bottom_pad,
                             pad_h,
-                            &transient_image_slice,
+                            transient_image_slice,
                             src_stride,
                             y,
                         );
@@ -282,10 +282,10 @@ where
                         let brows1 = create_brows(
                             image_size,
                             column_kernel_shape,
-                            &top_pad,
-                            &bottom_pad,
+                            top_pad,
+                            bottom_pad,
                             pad_h,
-                            &transient_image_slice,
+                            transient_image_slice,
                             src_stride,
                             y + 1,
                         );
@@ -316,10 +316,10 @@ where
                     let brows = create_brows(
                         image_size,
                         column_kernel_shape,
-                        &top_pad,
-                        &bottom_pad,
+                        top_pad,
+                        bottom_pad,
                         pad_h,
-                        &transient_image_slice,
+                        transient_image_slice,
                         src_stride,
                         y,
                     );
@@ -357,10 +357,10 @@ where
                     let brows0 = create_brows(
                         image_size,
                         column_kernel_shape,
-                        &top_pad,
-                        &bottom_pad,
+                        top_pad,
+                        bottom_pad,
                         pad_h,
-                        &transient_image_slice,
+                        transient_image_slice,
                         src_stride,
                         y,
                     );
@@ -368,10 +368,10 @@ where
                     let brows1 = create_brows(
                         image_size,
                         column_kernel_shape,
-                        &top_pad,
-                        &bottom_pad,
+                        top_pad,
+                        bottom_pad,
                         pad_h,
-                        &transient_image_slice,
+                        transient_image_slice,
                         src_stride,
                         y + 1,
                     );
@@ -405,10 +405,10 @@ where
                     let brows0 = create_brows(
                         image_size,
                         column_kernel_shape,
-                        &top_pad,
-                        &bottom_pad,
+                        top_pad,
+                        bottom_pad,
                         pad_h,
-                        &transient_image_slice,
+                        transient_image_slice,
                         src_stride,
                         y,
                     );
@@ -416,10 +416,10 @@ where
                     let brows1 = create_brows(
                         image_size,
                         column_kernel_shape,
-                        &top_pad,
-                        &bottom_pad,
+                        top_pad,
+                        bottom_pad,
                         pad_h,
-                        &transient_image_slice,
+                        transient_image_slice,
                         src_stride,
                         y + 1,
                     );
@@ -427,10 +427,10 @@ where
                     let brows2 = create_brows(
                         image_size,
                         column_kernel_shape,
-                        &top_pad,
-                        &bottom_pad,
+                        top_pad,
+                        bottom_pad,
                         pad_h,
-                        &transient_image_slice,
+                        transient_image_slice,
                         src_stride,
                         y + 2,
                     );
@@ -462,10 +462,10 @@ where
                 let brows = create_brows(
                     image_size,
                     column_kernel_shape,
-                    &top_pad,
-                    &bottom_pad,
+                    top_pad,
+                    bottom_pad,
                     pad_h,
-                    &transient_image_slice,
+                    transient_image_slice,
                     src_stride,
                     y,
                 );
