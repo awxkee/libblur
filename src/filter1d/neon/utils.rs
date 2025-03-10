@@ -26,7 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::neon::prefer_vfmaq_f32;
+use crate::neon::p_vfmaq_f32;
 use std::arch::aarch64::*;
 
 #[inline(always)]
@@ -216,10 +216,10 @@ pub(crate) unsafe fn vfmlaq_u8_f32(
     let hi_hi = vcvtq_f32_u32(o3);
 
     (
-        prefer_vfmaq_f32(store.0, lo_lo, weight),
-        prefer_vfmaq_f32(store.1, lo_hi, weight),
-        prefer_vfmaq_f32(store.2, hi_lo, weight),
-        prefer_vfmaq_f32(store.3, hi_hi, weight),
+        p_vfmaq_f32(store.0, lo_lo, weight),
+        p_vfmaq_f32(store.1, lo_hi, weight),
+        p_vfmaq_f32(store.2, hi_lo, weight),
+        p_vfmaq_f32(store.3, hi_hi, weight),
     )
 }
 
@@ -245,10 +245,10 @@ pub(crate) unsafe fn vfmlaq_symm_u8_f32(
     let hi_hi = vcvtq_f32_u32(o3);
 
     (
-        prefer_vfmaq_f32(store.0, lo_lo, weight),
-        prefer_vfmaq_f32(store.1, lo_hi, weight),
-        prefer_vfmaq_f32(store.2, hi_lo, weight),
-        prefer_vfmaq_f32(store.3, hi_hi, weight),
+        p_vfmaq_f32(store.0, lo_lo, weight),
+        p_vfmaq_f32(store.1, lo_hi, weight),
+        p_vfmaq_f32(store.2, hi_lo, weight),
+        p_vfmaq_f32(store.3, hi_hi, weight),
     )
 }
 
@@ -265,8 +265,8 @@ pub(crate) unsafe fn vfmlaq_symm_u16_f32(
     let ll = vcvtq_f32_u32(lo_32);
     let hh = vcvtq_f32_u32(hi_32);
     (
-        prefer_vfmaq_f32(store.0, ll, weight),
-        prefer_vfmaq_f32(store.1, hh, weight),
+        p_vfmaq_f32(store.0, ll, weight),
+        p_vfmaq_f32(store.1, hh, weight),
     )
 }
 
@@ -382,8 +382,8 @@ pub(crate) unsafe fn vfmla_symm_u8_f32(
     let lo_hi = vcvtq_f32_u32(a1);
 
     (
-        prefer_vfmaq_f32(store.0, lo_lo, weight),
-        prefer_vfmaq_f32(store.1, lo_hi, weight),
+        p_vfmaq_f32(store.0, lo_lo, weight),
+        p_vfmaq_f32(store.1, lo_hi, weight),
     )
 }
 

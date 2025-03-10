@@ -247,7 +247,7 @@ pub unsafe fn load_u8<const CHANNELS_COUNT: usize>(ptr: *const u8) -> uint8x8_t 
 }
 
 #[inline(always)]
-pub unsafe fn prefer_vfmaq_f32(a: float32x4_t, b: float32x4_t, c: float32x4_t) -> float32x4_t {
+pub unsafe fn p_vfmaq_f32(a: float32x4_t, b: float32x4_t, c: float32x4_t) -> float32x4_t {
     #[cfg(target_arch = "aarch64")]
     {
         vfmaq_f32(a, b, c)

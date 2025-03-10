@@ -32,7 +32,7 @@ use crate::filter1d::neon::utils::{xvld1q_f32_x2, xvld1q_f32_x4};
 use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
-use crate::neon::{prefer_vfma_f32, prefer_vfmaq_f32};
+use crate::neon::{p_vfmaq_f32, prefer_vfma_f32};
 use crate::to_storage::ToStorage;
 use std::arch::aarch64::*;
 use std::ops::Mul;
@@ -70,10 +70,10 @@ pub(crate) fn filter_row_neon_f32_f32<const N: usize>(
             for i in 1..length {
                 let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(i).weight);
                 let v_source = xvld1q_f32_x4(shifted_src.get_unchecked(i * N..).as_ptr());
-                k0 = prefer_vfmaq_f32(k0, v_source.0, coeff);
-                k1 = prefer_vfmaq_f32(k1, v_source.1, coeff);
-                k2 = prefer_vfmaq_f32(k2, v_source.2, coeff);
-                k3 = prefer_vfmaq_f32(k3, v_source.3, coeff);
+                k0 = p_vfmaq_f32(k0, v_source.0, coeff);
+                k1 = p_vfmaq_f32(k1, v_source.1, coeff);
+                k2 = p_vfmaq_f32(k2, v_source.2, coeff);
+                k3 = p_vfmaq_f32(k3, v_source.3, coeff);
             }
 
             let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
@@ -93,8 +93,8 @@ pub(crate) fn filter_row_neon_f32_f32<const N: usize>(
             for i in 1..length {
                 let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(i).weight);
                 let v_source = xvld1q_f32_x2(shifted_src.get_unchecked(i * N..).as_ptr());
-                k0 = prefer_vfmaq_f32(k0, v_source.0, coeff);
-                k1 = prefer_vfmaq_f32(k1, v_source.1, coeff);
+                k0 = p_vfmaq_f32(k0, v_source.0, coeff);
+                k1 = p_vfmaq_f32(k1, v_source.1, coeff);
             }
 
             let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
@@ -113,7 +113,7 @@ pub(crate) fn filter_row_neon_f32_f32<const N: usize>(
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
                 let v_source_0 = vld1q_f32(shifted_src.get_unchecked(i * N..).as_ptr());
-                k0 = prefer_vfmaq_f32(k0, v_source_0, vdupq_n_f32(coeff.weight));
+                k0 = p_vfmaq_f32(k0, v_source_0, vdupq_n_f32(coeff.weight));
             }
 
             let dst_ptr = dst.get_unchecked_mut(cx..).as_mut_ptr();

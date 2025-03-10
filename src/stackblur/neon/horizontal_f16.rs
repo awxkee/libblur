@@ -26,7 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::neon::{load_f32_f16, prefer_vfmaq_f32, store_f32_f16};
+use crate::neon::{load_f32_f16, p_vfmaq_f32, store_f32_f16};
 use crate::stackblur::stack_blur_pass::StackBlurWorkingPass;
 use crate::unsafe_slice::UnsafeSlice;
 use half::f16;
@@ -111,7 +111,7 @@ where
                 for i in 0..=radius {
                     let stack_value = stacks.as_mut_ptr().add(i as usize * 4);
                     vst1q_f32(stack_value, src_pixel);
-                    sums = prefer_vfmaq_f32(sums, src_pixel, vdupq_n_f32(i as f32 + 1f32));
+                    sums = p_vfmaq_f32(sums, src_pixel, vdupq_n_f32(i as f32 + 1f32));
                     sum_out = vaddq_f32(sum_out, src_pixel);
                 }
 
@@ -123,7 +123,7 @@ where
                     let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f16;
                     let src_pixel = load_f32_f16::<COMPONENTS>(src_ld);
                     vst1q_f32(stack_ptr, src_pixel);
-                    sums = prefer_vfmaq_f32(
+                    sums = p_vfmaq_f32(
                         sums,
                         src_pixel,
                         vdupq_n_f32(radius as f32 + 1f32 - i as f32),
