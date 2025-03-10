@@ -48,6 +48,7 @@ use crate::filter1d::sse::{
 use crate::ImageSize;
 use half::f16;
 
+#[allow(dead_code, unused)]
 #[derive(Clone, Debug)]
 pub struct FilterBrows<'a, T> {
     pub(crate) brows: Vec<&'a [&'a [T]]>,
