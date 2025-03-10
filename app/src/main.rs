@@ -96,7 +96,16 @@ fn main() {
     );
     let mut dst_image = BlurImageMut::default();
 
-    libblur::box_blur(&image, &mut dst_image, 10, ThreadingPolicy::Single).unwrap();
+    libblur::gaussian_blur(
+        &image,
+        &mut dst_image,
+        0,
+        15.,
+        EdgeMode::Wrap,
+        ThreadingPolicy::Single,
+        ConvolutionMode::Exact,
+    )
+    .unwrap();
 
     dst_bytes = dst_image.data.borrow().to_vec();
     //
@@ -124,7 +133,7 @@ fn main() {
 
     if components == 3 {
         image::save_buffer(
-            "../../blurred_stack_next.jpg",
+            "blurred_stack_next.jpg",
             bytes.as_bytes(),
             dimensions.0,
             dimensions.1,

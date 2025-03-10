@@ -39,7 +39,7 @@ use crate::to_storage::ToStorage;
 use std::arch::aarch64::*;
 use std::ops::{Add, Mul};
 
-pub fn filter_symm_column_neon_u8_f32(
+pub(crate) fn filter_symm_column_neon_u8_f32(
     arena: Arena,
     brows: &[&[u8]],
     dst: &mut [u8],
