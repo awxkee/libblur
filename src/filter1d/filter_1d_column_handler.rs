@@ -298,6 +298,42 @@ impl Filter1DColumnHandlerMultipleRows<u8, f32> for u8 {
     }
 }
 
+impl Filter1DColumnHandlerMultipleRows<u16, f32> for u16 {
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    fn get_column_handler_multiple_rows(
+        is_symmetric_kernel: bool,
+    ) -> Option<fn(Arena, FilterBrows<u16>, &mut [u16], ImageSize, usize, &[ScanPoint1d<f32>])>
+    {
+        None
+    }
+
+    #[cfg(not(any(
+        all(target_arch = "aarch64", target_feature = "neon"),
+        any(target_arch = "x86_64", target_arch = "x86")
+    )))]
+    fn get_column_handler_multiple_rows(
+        _: bool,
+    ) -> Option<fn(Arena, FilterBrows<u16>, &mut [u16], ImageSize, usize, &[ScanPoint1d<f32>])>
+    {
+        None
+    }
+
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    fn get_column_handler_multiple_rows(
+        is_symmetric_kernel: bool,
+    ) -> Option<fn(Arena, FilterBrows<u16>, &mut [u16], ImageSize, usize, &[ScanPoint1d<f32>])>
+    {
+        if is_symmetric_kernel {
+            #[cfg(feature = "avx")]
+            if std::arch::is_x86_feature_detected!("avx2") {
+                use crate::filter1d::avx::filter_column_avx_symm_u16_f32_x2;
+                return Some(filter_column_avx_symm_u16_f32_x2);
+            }
+        }
+        None
+    }
+}
+
 macro_rules! default_1d_column_handler {
     ($store:ty, $intermediate:ty) => {
         impl Filter1DColumnHandler<$store, $intermediate> for $store {
@@ -368,7 +404,6 @@ default_1d_column_handler_multiple_rows!(u8, i16);
 default_1d_column_handler_multiple_rows!(u8, i32);
 default_1d_column_handler_multiple_rows!(u8, u32);
 default_1d_column_handler_multiple_rows!(u16, f64);
-default_1d_column_handler_multiple_rows!(u16, f32);
 default_1d_column_handler_multiple_rows!(i16, f32);
 default_1d_column_handler_multiple_rows!(i16, f64);
 default_1d_column_handler_multiple_rows!(u32, f32);
