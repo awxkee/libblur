@@ -38,6 +38,7 @@ mod filter_column_symm_approx;
 mod filter_column_symm_approx_rdm;
 mod filter_column_symm_f32;
 mod filter_column_symm_u16;
+mod filter_column_symm_u16_x3;
 mod filter_column_symm_u8_i16;
 mod filter_column_symm_x3;
 mod filter_column_u8_i16;
@@ -56,30 +57,31 @@ mod filter_row_symm_u8_i16;
 mod filter_row_u8_i16;
 pub mod utils;
 
-pub use filter_column::filter_column_neon_u8_f32;
-pub use filter_column_approx::filter_column_neon_u8_i32_app;
+pub(crate) use filter_column::filter_column_neon_u8_f32;
+pub(crate) use filter_column_approx::filter_column_neon_u8_i32_app;
 #[cfg(feature = "rdm")]
 pub(crate) use filter_column_approx_rdm::filter_column_neon_u8_i32_i16_qrdm_app;
-pub use filter_column_f32::filter_column_neon_f32_f32;
+pub(crate) use filter_column_f32::filter_column_neon_f32_f32;
 pub(crate) use filter_column_symm::filter_symm_column_neon_u8_f32;
-pub use filter_column_symm_approx::filter_column_symm_neon_u8_i32_app;
+pub(crate) use filter_column_symm_approx::filter_column_symm_neon_u8_i32_app;
 #[cfg(feature = "rdm")]
 pub(crate) use filter_column_symm_approx_rdm::filter_column_symm_neon_u8_i32_rdm;
-pub use filter_column_symm_f32::filter_column_neon_symm_f32_f32;
+pub(crate) use filter_column_symm_f32::filter_column_neon_symm_f32_f32;
 pub(crate) use filter_column_symm_u16::filter_symm_column_neon_u16_f32;
-pub use filter_column_symm_u8_i16::filter_column_symm_neon_u8_i16;
+pub(crate) use filter_column_symm_u16_x3::filter_symm_column_neon_u16_f32_x3;
+pub(crate) use filter_column_symm_u8_i16::filter_column_symm_neon_u8_i16;
 pub(crate) use filter_column_symm_x3::filter_symm_column_neon_u8_f32_x3;
-pub use filter_column_u8_i16::filter_column_neon_u8_i16;
-pub use filter_row::filter_row_neon_u8_f32;
-pub use filter_row_approx::filter_row_neon_u8_i32_app;
+pub(crate) use filter_column_u8_i16::filter_column_neon_u8_i16;
+pub(crate) use filter_row::filter_row_neon_u8_f32;
+pub(crate) use filter_row_approx::filter_row_neon_u8_i32_app;
 #[cfg(feature = "rdm")]
 pub(crate) use filter_row_approx_rdm::filter_row_neon_u8_i32_rdm;
-pub use filter_row_f32::filter_row_neon_f32_f32;
-pub use filter_row_symm::filter_row_symm_neon_u8_f32;
-pub use filter_row_symm_approx::filter_row_symm_neon_u8_i32;
+pub(crate) use filter_row_f32::filter_row_neon_f32_f32;
+pub(crate) use filter_row_symm::filter_row_symm_neon_u8_f32;
+pub(crate) use filter_row_symm_approx::filter_row_symm_neon_u8_i32;
 #[cfg(feature = "rdm")]
 pub(crate) use filter_row_symm_approx_rdm::filter_row_symm_neon_u8_i32_rdm;
-pub use filter_row_symm_f32::filter_row_neon_symm_f32_f32;
+pub(crate) use filter_row_symm_f32::filter_row_neon_symm_f32_f32;
 pub(crate) use filter_row_symm_u16::filter_row_symm_neon_u16_f32;
 pub(crate) use filter_row_symm_u8_i16::filter_rgb_row_symm_neon_u8_i16;
-pub use filter_row_u8_i16::filter_rgb_row_neon_u8_i16;
+pub(crate) use filter_row_u8_i16::filter_rgb_row_neon_u8_i16;

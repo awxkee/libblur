@@ -37,7 +37,7 @@ use crate::to_storage::ToStorage;
 use std::arch::aarch64::*;
 use std::ops::{Add, Mul};
 
-pub fn filter_column_neon_symm_f32_f32(
+pub(crate) fn filter_column_neon_symm_f32_f32(
     arena: Arena,
     arena_src: &[&[f32]],
     dst: &mut [f32],

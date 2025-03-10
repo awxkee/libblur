@@ -36,7 +36,7 @@ use crate::img_size::ImageSize;
 use crate::to_storage::ToStorage;
 use std::arch::aarch64::*;
 
-pub fn filter_rgb_row_neon_u8_i16<const N: usize>(
+pub(crate) fn filter_rgb_row_neon_u8_i16<const N: usize>(
     _: Arena,
     arena_src: &[u8],
     dst: &mut [u8],

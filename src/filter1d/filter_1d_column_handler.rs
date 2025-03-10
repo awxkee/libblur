@@ -304,6 +304,10 @@ impl Filter1DColumnHandlerMultipleRows<u16, f32> for u16 {
         is_symmetric_kernel: bool,
     ) -> Option<fn(Arena, FilterBrows<u16>, &mut [u16], ImageSize, usize, &[ScanPoint1d<f32>])>
     {
+        if is_symmetric_kernel {
+            use crate::filter1d::neon::filter_symm_column_neon_u16_f32_x3;
+            return Some(filter_symm_column_neon_u16_f32_x3);
+        }
         None
     }
 
