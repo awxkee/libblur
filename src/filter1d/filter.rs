@@ -199,11 +199,11 @@ where
             let src_stride = image_size.width * N;
             let dst_stride = destination.row_stride() as usize;
 
-            let mut dest_slice = destination.data.borrow_mut();
+            let mut _dest_slice = destination.data.borrow_mut();
 
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             if let Some(column_multiple_rows) = _column_multiple_rows {
-                dest_slice
+                _dest_slice
                     .par_chunks_exact_mut(dst_stride * 3)
                     .enumerate()
                     .for_each(|(y, row)| {
@@ -259,12 +259,14 @@ where
                             scanned_column_kernel_slice,
                         );
                     });
-                dest_slice = dest_slice.chunks_exact_mut(dst_stride * 3).into_remainder();
+                _dest_slice = _dest_slice
+                    .chunks_exact_mut(dst_stride * 3)
+                    .into_remainder();
             }
 
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             if let Some(column_multiple_rows) = _column_multiple_rows {
-                dest_slice
+                _dest_slice
                     .par_chunks_exact_mut(dst_stride * 2)
                     .enumerate()
                     .for_each(|(y, row)| {
@@ -308,10 +310,12 @@ where
                             scanned_column_kernel_slice,
                         );
                     });
-                dest_slice = dest_slice.chunks_exact_mut(dst_stride * 2).into_remainder();
+                _dest_slice = _dest_slice
+                    .chunks_exact_mut(dst_stride * 2)
+                    .into_remainder();
             }
 
-            dest_slice
+            _dest_slice
                 .par_chunks_exact_mut(dst_stride)
                 .enumerate()
                 .for_each(|(y, row)| {
@@ -347,11 +351,11 @@ where
         let src_stride = image_size.width * N;
         let dst_stride = destination.row_stride() as usize;
 
-        let mut dest_slice = destination.data.borrow_mut();
+        let mut _dest_slice = destination.data.borrow_mut();
 
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         if let Some(column_multiple_rows) = _column_multiple_rows {
-            dest_slice
+            _dest_slice
                 .chunks_exact_mut(dst_stride * 2)
                 .enumerate()
                 .for_each(|(y, row)| {
@@ -395,12 +399,14 @@ where
                         scanned_column_kernel_slice,
                     );
                 });
-            dest_slice = dest_slice.chunks_exact_mut(dst_stride * 2).into_remainder();
+            _dest_slice = _dest_slice
+                .chunks_exact_mut(dst_stride * 2)
+                .into_remainder();
         }
 
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         if let Some(column_multiple_rows) = _column_multiple_rows {
-            dest_slice
+            _dest_slice
                 .chunks_exact_mut(dst_stride * 3)
                 .enumerate()
                 .for_each(|(y, row)| {
@@ -456,10 +462,12 @@ where
                         scanned_column_kernel_slice,
                     );
                 });
-            dest_slice = dest_slice.chunks_exact_mut(dst_stride * 3).into_remainder();
+            _dest_slice = _dest_slice
+                .chunks_exact_mut(dst_stride * 3)
+                .into_remainder();
         }
 
-        dest_slice
+        _dest_slice
             .chunks_exact_mut(dst_stride)
             .enumerate()
             .for_each(|(y, row)| {
