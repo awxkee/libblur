@@ -30,8 +30,7 @@ use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_1d_column_handler::FilterBrows;
 use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::neon::utils::{
-    vfmlaq_symm_u8_f32, vmulq_u8_by_f32, vqmovnq_f32_u8, xvld1q_u8_x2,
-    xvst1q_u8_x2,
+    vfmlaq_symm_u8_f32, vmulq_u8_by_f32, vqmovnq_f32_u8, xvld1q_u8_x2, xvst1q_u8_x2,
 };
 use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;

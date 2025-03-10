@@ -201,6 +201,7 @@ where
 
             let mut dest_slice = destination.data.borrow_mut();
 
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             if let Some(column_multiple_rows) = column_multiple_rows {
                 dest_slice
                     .par_chunks_exact_mut(dst_stride * 3)
@@ -239,13 +240,12 @@ where
                             src_stride,
                             y + 2,
                         );
-                        
+
                         let brows_slice0 = brows0.as_slice();
                         let brows_slice1 = brows1.as_slice();
                         let brows_slice2 = brows2.as_slice();
 
-                        let brows_vec =
-                            vec![brows_slice0, brows_slice1, brows_slice2];
+                        let brows_vec = vec![brows_slice0, brows_slice1, brows_slice2];
 
                         let brows = FilterBrows { brows: brows_vec };
 
@@ -259,6 +259,54 @@ where
                         );
                     });
                 dest_slice = dest_slice.chunks_exact_mut(dst_stride * 3).into_remainder();
+            }
+
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+            if let Some(column_multiple_rows) = column_multiple_rows {
+                dest_slice
+                    .par_chunks_exact_mut(dst_stride * 2)
+                    .enumerate()
+                    .for_each(|(y, row)| {
+                        let y = y * 2;
+                        let brows0 = create_brows(
+                            image_size,
+                            column_kernel_shape,
+                            &top_pad,
+                            &bottom_pad,
+                            pad_h,
+                            &transient_image_slice,
+                            src_stride,
+                            y,
+                        );
+
+                        let brows1 = create_brows(
+                            image_size,
+                            column_kernel_shape,
+                            &top_pad,
+                            &bottom_pad,
+                            pad_h,
+                            &transient_image_slice,
+                            src_stride,
+                            y + 1,
+                        );
+
+                        let brows_slice0 = brows0.as_slice();
+                        let brows_slice1 = brows1.as_slice();
+
+                        let brows_vec = vec![brows_slice0, brows_slice1];
+
+                        let brows = FilterBrows { brows: brows_vec };
+
+                        column_multiple_rows(
+                            Arena::new(image_size.width, pad_h, 0, pad_h, N),
+                            brows,
+                            row,
+                            image_size,
+                            dst_stride,
+                            scanned_column_kernel_slice,
+                        );
+                    });
+                dest_slice = dest_slice.chunks_exact_mut(dst_stride * 2).into_remainder();
             }
 
             dest_slice
@@ -299,6 +347,55 @@ where
 
         let mut dest_slice = destination.data.borrow_mut();
 
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        if let Some(column_multiple_rows) = column_multiple_rows {
+            dest_slice
+                .chunks_exact_mut(dst_stride * 2)
+                .enumerate()
+                .for_each(|(y, row)| {
+                    let y = y * 2;
+                    let brows0 = create_brows(
+                        image_size,
+                        column_kernel_shape,
+                        &top_pad,
+                        &bottom_pad,
+                        pad_h,
+                        &transient_image_slice,
+                        src_stride,
+                        y,
+                    );
+
+                    let brows1 = create_brows(
+                        image_size,
+                        column_kernel_shape,
+                        &top_pad,
+                        &bottom_pad,
+                        pad_h,
+                        &transient_image_slice,
+                        src_stride,
+                        y + 1,
+                    );
+
+                    let brows_slice0 = brows0.as_slice();
+                    let brows_slice1 = brows1.as_slice();
+
+                    let brows_vec = vec![brows_slice0, brows_slice1];
+
+                    let brows = FilterBrows { brows: brows_vec };
+
+                    column_multiple_rows(
+                        Arena::new(image_size.width, pad_h, 0, pad_h, N),
+                        brows,
+                        row,
+                        image_size,
+                        dst_stride,
+                        scanned_column_kernel_slice,
+                    );
+                });
+            dest_slice = dest_slice.chunks_exact_mut(dst_stride * 2).into_remainder();
+        }
+
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         if let Some(column_multiple_rows) = column_multiple_rows {
             dest_slice
                 .chunks_exact_mut(dst_stride * 3)

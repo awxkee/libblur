@@ -273,10 +273,27 @@ impl Filter1DColumnHandlerMultipleRows<u8, f32> for u8 {
         None
     }
 
-    #[cfg(not(all(target_arch = "aarch64", target_feature = "neon")))]
+    #[cfg(not(any(
+        all(target_arch = "aarch64", target_feature = "neon"),
+        any(target_arch = "x86_64", target_arch = "x86")
+    )))]
+    fn get_column_handler_multiple_rows(
+        _: bool,
+    ) -> Option<fn(Arena, FilterBrows<u8>, &mut [u8], ImageSize, usize, &[ScanPoint1d<f32>])> {
+        None
+    }
+
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     fn get_column_handler_multiple_rows(
         is_symmetric_kernel: bool,
     ) -> Option<fn(Arena, FilterBrows<u8>, &mut [u8], ImageSize, usize, &[ScanPoint1d<f32>])> {
+        if is_symmetric_kernel {
+            #[cfg(feature = "avx")]
+            if std::arch::is_x86_feature_detected!("avx2") {
+                use crate::filter1d::avx::filter_column_avx_symm_u8_f32_x2;
+                return Some(filter_column_avx_symm_u8_f32_x2);
+            }
+        }
         None
     }
 }
