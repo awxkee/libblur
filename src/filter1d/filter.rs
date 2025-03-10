@@ -28,7 +28,7 @@
  */
 use crate::filter1d::arena::{make_arena_columns, make_arena_row, Arena};
 use crate::filter1d::filter_1d_column_handler::{
-    Filter1DColumnHandler, Filter1DColumnHandlerMultipleRows, FilterBrows,
+    Filter1DColumnHandler, Filter1DColumnHandlerMultipleRows,
 };
 use crate::filter1d::filter_1d_row_handler::Filter1DRowHandler;
 use crate::filter1d::filter_element::KernelShape;
@@ -207,6 +207,7 @@ where
                     .par_chunks_exact_mut(dst_stride * 3)
                     .enumerate()
                     .for_each(|(y, row)| {
+                        use crate::filter1d::filter_1d_column_handler::FilterBrows;
                         let y = y * 3;
                         let brows0 = create_brows(
                             image_size,
@@ -268,6 +269,7 @@ where
                     .enumerate()
                     .for_each(|(y, row)| {
                         let y = y * 2;
+                        use crate::filter1d::filter_1d_column_handler::FilterBrows;
                         let brows0 = create_brows(
                             image_size,
                             column_kernel_shape,
@@ -353,6 +355,7 @@ where
                 .chunks_exact_mut(dst_stride * 2)
                 .enumerate()
                 .for_each(|(y, row)| {
+                    use crate::filter1d::filter_1d_column_handler::FilterBrows;
                     let y = y * 2;
                     let brows0 = create_brows(
                         image_size,
@@ -401,6 +404,7 @@ where
                 .chunks_exact_mut(dst_stride * 3)
                 .enumerate()
                 .for_each(|(y, row)| {
+                    use crate::filter1d::filter_1d_column_handler::FilterBrows;
                     let y = y * 3;
                     let brows0 = create_brows(
                         image_size,
