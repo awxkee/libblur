@@ -36,6 +36,7 @@ mod filter_column_symm;
 mod filter_column_symm_approx;
 #[cfg(feature = "rdm")]
 mod filter_column_symm_approx_rdm;
+#[cfg(feature = "rdm")]
 mod filter_column_symm_approx_rdm_x3;
 mod filter_column_symm_f32;
 mod filter_column_symm_u16;

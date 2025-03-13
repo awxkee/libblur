@@ -4,7 +4,9 @@ use libblur::{
     filter_1d_exact, gaussian_kernel_1d, sigma_size, BlurImage, BlurImageMut, ConvolutionMode,
     EdgeMode, FastBlurChannels, Scalar, ThreadingPolicy,
 };
-use opencv::core::{find_file, split, AlgorithmHint, Mat, Size, Vector, BORDER_DEFAULT};
+use opencv::core::{
+    find_file, split, AlgorithmHint, Mat, Size, Vector, BORDER_DEFAULT, CV_32FC3, CV_8UC3, CV_8UC4,
+};
 use opencv::imgcodecs::{imread, IMREAD_COLOR};
 
 pub(crate) fn split_channels_3<T: Copy>(
@@ -108,11 +110,72 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
-    let src = imread(
+    c.bench_function("RGB f32 gauss blur edge clamp: rad 51", |b| {
+        let mut dst_bytes = BlurImageMut::default();
+        let src_bytes = img
+            .as_bytes()
+            .chunks_exact(4)
+            .flat_map(|x| [x[0], x[1], x[2]])
+            .map(|v| v as f32 * (1.0 / 255.0))
+            .collect::<Vec<f32>>();
+        let src_image = BlurImage::borrow(
+            &src_bytes,
+            img.width(),
+            img.height(),
+            FastBlurChannels::Channels3,
+        );
+        b.iter(|| {
+            libblur::gaussian_blur_f32(
+                &src_image,
+                &mut dst_bytes,
+                25 * 2 + 1,
+                0.,
+                EdgeMode::Clamp,
+                ThreadingPolicy::Adaptive,
+            )
+            .unwrap();
+        })
+    });
+
+    let src0 = imread(
         &find_file(&"../assets/test_image_4.png", false, false).unwrap(),
         IMREAD_COLOR,
     )
     .unwrap();
+    let mut src = Mat::default();
+    opencv::imgproc::cvt_color(
+        &src0,
+        &mut src,
+        CV_8UC3,
+        CV_8UC4,
+        AlgorithmHint::ALGO_HINT_DEFAULT,
+    )
+    .unwrap();
+
+    c.bench_function("OpenCV RGB f32 Gaussian: rad 51", |b| {
+        let mut cvt_dst = Mat::default();
+        opencv::imgproc::cvt_color(
+            &src0,
+            &mut cvt_dst,
+            CV_8UC3,
+            CV_32FC3,
+            AlgorithmHint::ALGO_HINT_DEFAULT,
+        )
+        .unwrap();
+        b.iter(|| {
+            let mut dst = Mat::default();
+            opencv::imgproc::gaussian_blur(
+                &cvt_dst,
+                &mut dst,
+                Size::new(51, 51),
+                0.,
+                0.,
+                BORDER_DEFAULT,
+                AlgorithmHint::ALGO_HINT_ACCURATE,
+            )
+            .unwrap();
+        })
+    });
 
     c.bench_function("OpenCV RGBA Gaussian: 13", |b| {
         b.iter(|| {
