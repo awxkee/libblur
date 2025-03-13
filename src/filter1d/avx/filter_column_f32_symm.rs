@@ -53,68 +53,18 @@ pub(crate) fn filter_column_avx_f32_f32_symm(
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
     unsafe {
-        let has_fma = std::arch::is_x86_feature_detected!("fma");
-        if has_fma {
-            filter_column_avx_f32_f32_impl_fma_symm(
-                arena,
-                arena_src,
-                dst,
-                image_size,
-                filter_region,
-                scanned_kernel,
-            );
-        } else {
-            filter_column_avx_f32_f32_impl_def_symm(
-                arena,
-                arena_src,
-                dst,
-                image_size,
-                filter_region,
-                scanned_kernel,
-            );
-        }
+        filter_column_avx_f32_f32_impl_symm::<true>(
+            arena,
+            arena_src,
+            dst,
+            image_size,
+            filter_region,
+            scanned_kernel,
+        );
     }
 }
 
 #[target_feature(enable = "avx2", enable = "fma")]
-unsafe fn filter_column_avx_f32_f32_impl_fma_symm(
-    arena: Arena,
-    arena_src: &[&[f32]],
-    dst: &mut [f32],
-    image_size: ImageSize,
-    filter_region: FilterRegion,
-    scanned_kernel: &[ScanPoint1d<f32>],
-) {
-    filter_column_avx_f32_f32_impl_symm::<true>(
-        arena,
-        arena_src,
-        dst,
-        image_size,
-        filter_region,
-        scanned_kernel,
-    );
-}
-
-#[target_feature(enable = "avx2")]
-unsafe fn filter_column_avx_f32_f32_impl_def_symm(
-    arena: Arena,
-    arena_src: &[&[f32]],
-    dst: &mut [f32],
-    image_size: ImageSize,
-    filter_region: FilterRegion,
-    scanned_kernel: &[ScanPoint1d<f32>],
-) {
-    filter_column_avx_f32_f32_impl_symm::<false>(
-        arena,
-        arena_src,
-        dst,
-        image_size,
-        filter_region,
-        scanned_kernel,
-    );
-}
-
-#[inline(always)]
 unsafe fn filter_column_avx_f32_f32_impl_symm<const FMA: bool>(
     arena: Arena,
     arena_src: &[&[f32]],
