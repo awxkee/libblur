@@ -87,27 +87,30 @@ fn main() {
     let start = Instant::now();
 
     // let mut dst_image = BlurImageMut::borrow(&mut src_bytes, dyn_image.width(), dyn_image.height(), FastBlurChannels::Channels3)
+    
+    let remapped = src_bytes.iter().map(|&x| x as f32 * (1. / 255.)).collect::<Vec<f32>>();
 
     let image = BlurImage::borrow(
-        &src_bytes,
+        &remapped,
         dyn_image.width(),
         dyn_image.height(),
         FastBlurChannels::Channels3,
     );
     let mut dst_image = BlurImageMut::default();
 
-    libblur::gaussian_blur(
+    libblur::gaussian_blur_f32(
         &image,
         &mut dst_image,
         0,
         15.,
         EdgeMode::Wrap,
         ThreadingPolicy::Single,
-        ConvolutionMode::FixedPoint,
     )
     .unwrap();
+    
+    dst_bytes = dst_image.data.borrow().iter().map(|&x| (x * 255f32).round() as u8).collect::<Vec<u8>>();
 
-    dst_bytes = dst_image.data.borrow().to_vec();
+    // dst_bytes = dst_image.data.borrow().to_vec();
     //
     // filter_2d_rgba_approx::<u8, f32, i32>(
     //     &bytes,
