@@ -334,9 +334,7 @@ impl Filter1DColumnHandlerMultipleRows<u16, f32> for u16 {
     {
         if is_symmetric_kernel {
             #[cfg(feature = "avx")]
-            if std::arch::is_x86_feature_detected!("avx2")
-                && std::arch::is_x86_feature_detected!("fma")
-            {
+            if std::arch::is_x86_feature_detected!("avx2") {
                 use crate::filter1d::avx::filter_column_avx_symm_u16_f32_x2;
                 return Some(filter_column_avx_symm_u16_f32_x2);
             }
