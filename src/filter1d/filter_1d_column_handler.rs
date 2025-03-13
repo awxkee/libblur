@@ -362,7 +362,7 @@ macro_rules! default_1d_column_handler {
     };
 }
 
-macro_rules! default_1d_column_handler_multiple_rows {
+macro_rules! default_1d_column_multiple_rows {
     ($store:ty, $intermediate:ty) => {
         impl Filter1DColumnHandlerMultipleRows<$store, $intermediate> for $store {
             fn get_column_handler_multiple_rows(
@@ -401,22 +401,22 @@ default_1d_column_handler!(f16, f64);
 default_1d_column_handler!(f32, f64);
 default_1d_column_handler!(f64, f64);
 
-default_1d_column_handler_multiple_rows!(i8, f32);
-default_1d_column_handler_multiple_rows!(i8, f64);
-default_1d_column_handler_multiple_rows!(u8, f64);
-default_1d_column_handler_multiple_rows!(u8, u16);
-default_1d_column_handler_multiple_rows!(u8, i16);
-default_1d_column_handler_multiple_rows!(u8, i32);
-default_1d_column_handler_multiple_rows!(u8, u32);
-default_1d_column_handler_multiple_rows!(u16, f64);
-default_1d_column_handler_multiple_rows!(i16, f32);
-default_1d_column_handler_multiple_rows!(i16, f64);
-default_1d_column_handler_multiple_rows!(u32, f32);
-default_1d_column_handler_multiple_rows!(u32, f64);
-default_1d_column_handler_multiple_rows!(i32, f32);
-default_1d_column_handler_multiple_rows!(i32, f64);
-default_1d_column_handler_multiple_rows!(f16, f32);
-default_1d_column_handler_multiple_rows!(f16, f64);
-default_1d_column_handler_multiple_rows!(f32, f64);
-default_1d_column_handler_multiple_rows!(f64, f64);
-default_1d_column_handler_multiple_rows!(f32, f32);
+default_1d_column_multiple_rows!(i8, f32);
+default_1d_column_multiple_rows!(i8, f64);
+default_1d_column_multiple_rows!(u8, f64);
+default_1d_column_multiple_rows!(u8, u16);
+default_1d_column_multiple_rows!(u8, i16);
+default_1d_column_multiple_rows!(u8, i32);
+default_1d_column_multiple_rows!(u8, u32);
+default_1d_column_multiple_rows!(u16, f64);
+default_1d_column_multiple_rows!(i16, f32);
+default_1d_column_multiple_rows!(i16, f64);
+default_1d_column_multiple_rows!(u32, f32);
+default_1d_column_multiple_rows!(u32, f64);
+default_1d_column_multiple_rows!(i32, f32);
+default_1d_column_multiple_rows!(i32, f64);
+default_1d_column_multiple_rows!(f16, f32);
+default_1d_column_multiple_rows!(f16, f64);
+default_1d_column_multiple_rows!(f32, f64);
+default_1d_column_multiple_rows!(f64, f64);
+default_1d_column_multiple_rows!(f32, f32);

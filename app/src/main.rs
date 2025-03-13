@@ -103,7 +103,7 @@ fn main() {
         15.,
         EdgeMode::Wrap,
         ThreadingPolicy::Single,
-        ConvolutionMode::Exact,
+        ConvolutionMode::FixedPoint,
     )
     .unwrap();
 

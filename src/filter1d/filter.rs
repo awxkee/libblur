@@ -345,8 +345,6 @@ where
         });
     } else {
         let column_handler = T::get_column_handler(is_column_kernel_symmetrical);
-        let _column_multiple_rows =
-            T::get_column_handler_multiple_rows(is_column_kernel_symmetrical);
 
         let src_stride = image_size.width * N;
         let dst_stride = destination.row_stride() as usize;
@@ -354,7 +352,9 @@ where
         let mut _dest_slice = destination.data.borrow_mut();
 
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-        if let Some(column_multiple_rows) = _column_multiple_rows {
+        if let Some(column_multiple_rows) =
+            T::get_column_handler_multiple_rows(is_column_kernel_symmetrical)
+        {
             _dest_slice
                 .chunks_exact_mut(dst_stride * 2)
                 .enumerate()
@@ -405,7 +405,9 @@ where
         }
 
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-        if let Some(column_multiple_rows) = _column_multiple_rows {
+        if let Some(column_multiple_rows) =
+            T::get_column_handler_multiple_rows(is_column_kernel_symmetrical)
+        {
             _dest_slice
                 .chunks_exact_mut(dst_stride * 3)
                 .enumerate()
@@ -499,7 +501,7 @@ where
     Ok(())
 }
 
-fn create_brows<'a, T>(
+pub(crate) fn create_brows<'a, T>(
     image_size: ImageSize,
     column_kernel_shape: KernelShape,
     top_pad: &'a [T],

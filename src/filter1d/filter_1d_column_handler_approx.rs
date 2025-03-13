@@ -29,6 +29,7 @@
 use crate::filter1d::arena::Arena;
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]
 use crate::filter1d::avx::{filter_column_avx_symm_u8_i32_app, filter_column_avx_u8_i32_app};
+use crate::filter1d::filter_1d_column_handler::FilterBrows;
 use crate::filter1d::filter_column_approx::filter_column_approx;
 use crate::filter1d::filter_column_approx_symmetric::filter_column_symmetric_approx;
 use crate::filter1d::filter_scan::ScanPoint1d;
@@ -50,6 +51,21 @@ pub trait Filter1DColumnHandlerApprox<T, F> {
         FilterRegion,
         scanned_kernel: &[ScanPoint1d<F>],
     );
+}
+
+pub trait Filter1DColumnMultipleRowsApprox<T, F> {
+    fn get_column_multiple_rows(
+        is_symmetric_kernel: bool,
+    ) -> Option<
+        fn(
+            arena: Arena,
+            FilterBrows<T>,
+            dst: &mut [T],
+            image_size: ImageSize,
+            dst_stride: usize,
+            scanned_kernel: &[ScanPoint1d<F>],
+        ),
+    >;
 }
 
 macro_rules! default_1d_column_handler {
@@ -142,6 +158,48 @@ impl Filter1DColumnHandlerApprox<u8, i32> for u8 {
     }
 }
 
+impl Filter1DColumnMultipleRowsApprox<u8, i32> for u8 {
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    fn get_column_multiple_rows(
+        is_symmetric_kernel: bool,
+    ) -> Option<fn(Arena, FilterBrows<u8>, &mut [u8], ImageSize, usize, &[ScanPoint1d<i32>])> {
+        if is_symmetric_kernel {
+            #[cfg(feature = "rdm")]
+            {
+                if std::arch::is_aarch64_feature_detected!("rdm") {
+                    use crate::filter1d::neon::filter_column_symm_neon_u8_i32_rdm_x3;
+                    return Some(filter_column_symm_neon_u8_i32_rdm_x3);
+                }
+            }
+        }
+        None
+    }
+
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    fn get_column_multiple_rows(
+        _: bool,
+    ) -> Option<fn(Arena, FilterBrows<u8>, &mut [u8], ImageSize, usize, &[ScanPoint1d<i32>])> {
+        #[cfg(feature = "avx")]
+        {
+            if std::arch::is_x86_feature_detected!("avx2") {
+                use crate::filter1d::avx::filter_column_avx_symm_u8_i32_app_x2;
+                return Some(filter_column_avx_symm_u8_i32_app_x2);
+            }
+        }
+        None
+    }
+
+    #[cfg(not(any(
+        all(target_arch = "aarch64", target_feature = "neon"),
+        any(target_arch = "x86_64", target_arch = "x86")
+    )))]
+    fn get_column_multiple_rows(
+        _: bool,
+    ) -> Option<fn(Arena, FilterBrows<u8>, &mut [u8], ImageSize, usize, &[ScanPoint1d<i32>])> {
+        None
+    }
+}
+
 default_1d_column_handler!(u8, i64);
 default_1d_column_handler!(u8, u16);
 default_1d_column_handler!(u8, i16);
@@ -156,3 +214,39 @@ default_1d_column_handler!(u16, i64);
 default_1d_column_handler!(u16, u64);
 default_1d_column_handler!(i16, i32);
 default_1d_column_handler!(i16, i64);
+
+macro_rules! default_1d_column_multiple_rows {
+    ($store:ty, $intermediate:ty) => {
+        impl Filter1DColumnMultipleRowsApprox<$store, $intermediate> for $store {
+            fn get_column_multiple_rows(
+                _: bool,
+            ) -> Option<
+                fn(
+                    Arena,
+                    FilterBrows<$store>,
+                    &mut [$store],
+                    ImageSize,
+                    usize,
+                    &[ScanPoint1d<$intermediate>],
+                ),
+            > {
+                None
+            }
+        }
+    };
+}
+
+default_1d_column_multiple_rows!(u8, i64);
+default_1d_column_multiple_rows!(u8, u16);
+default_1d_column_multiple_rows!(u8, i16);
+default_1d_column_multiple_rows!(u8, u32);
+default_1d_column_multiple_rows!(u8, u64);
+default_1d_column_multiple_rows!(i8, i32);
+default_1d_column_multiple_rows!(i8, i64);
+default_1d_column_multiple_rows!(i8, i16);
+default_1d_column_multiple_rows!(u16, u32);
+default_1d_column_multiple_rows!(u16, i32);
+default_1d_column_multiple_rows!(u16, i64);
+default_1d_column_multiple_rows!(u16, u64);
+default_1d_column_multiple_rows!(i16, i32);
+default_1d_column_multiple_rows!(i16, i64);
