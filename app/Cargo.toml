@@ -11,6 +11,7 @@ libblur = {path = "../", features = ["image", "fft", "sse", "nightly_avx512", "a
 accelerate = {path = "accelerate" }
 rayon = "1.10.0"
 fast_transpose = "0.2.3"
+opencv = { version = "0.94.2", default-features = false, features = ["imgcodecs", "imgproc", "clang-runtime"] }
 
 [dev-dependencies]
 criterion = "0.5.1"

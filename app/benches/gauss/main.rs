@@ -168,8 +168,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 &cvt_dst,
                 &mut dst,
                 Size::new(51, 51),
-                0.,
-                0.,
+                5.,
+                5.,
                 BORDER_DEFAULT,
                 AlgorithmHint::ALGO_HINT_ACCURATE,
             )
@@ -184,8 +184,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 &src,
                 &mut dst,
                 Size::new(13, 13),
-                0.,
-                0.,
+                5.,
+                5.,
                 BORDER_DEFAULT,
                 AlgorithmHint::ALGO_HINT_ACCURATE,
             )
@@ -432,8 +432,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         let source_plane = planes.get(0).unwrap();
 
         c.bench_function("OpenCV Plane Gaussian: Rad 151", |b| {
+            let mut dst = Mat::default();
             b.iter(|| {
-                let mut dst = Mat::default();
                 opencv::imgproc::gaussian_blur(
                     &source_plane,
                     &mut dst,

@@ -39,6 +39,8 @@ use libblur::{
     Scalar, ThreadingPolicy,
 };
 use std::time::Instant;
+use opencv::core::{find_file, MatTraitConst};
+use opencv::imgcodecs::{imread, IMREAD_COLOR};
 
 #[allow(dead_code)]
 fn f32_to_f16(bytes: Vec<f32>) -> Vec<u16> {
