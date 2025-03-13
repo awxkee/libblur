@@ -27,13 +27,15 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter1d::arena::{make_arena_columns, make_arena_row, Arena};
-use crate::filter1d::filter_1d_column_handler::Filter1DColumnHandler;
+use crate::filter1d::filter_1d_column_handler::{
+    Filter1DColumnHandler, Filter1DColumnHandlerMultipleRows,
+};
 use crate::filter1d::filter_1d_row_handler::Filter1DRowHandler;
 use crate::filter1d::filter_element::KernelShape;
 use crate::filter1d::filter_scan::{is_symmetric_1d, scan_se_1d};
 use crate::filter1d::region::FilterRegion;
 use crate::to_storage::ToStorage;
-use crate::{BlurError, BlurImage, BlurImageMut, EdgeMode, Scalar, ThreadingPolicy};
+use crate::{BlurError, BlurImage, BlurImageMut, EdgeMode, ImageSize, Scalar, ThreadingPolicy};
 use num_traits::{AsPrimitive, MulAdd};
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::ParallelSliceMut;
@@ -78,7 +80,8 @@ where
         + Sync
         + Filter1DRowHandler<T, F>
         + Filter1DColumnHandler<T, F>
-        + Debug,
+        + Debug
+        + Filter1DColumnHandlerMultipleRows<T, F>,
     F: ToStorage<T> + Mul<F> + MulAdd<F, Output = F> + Send + Sync + PartialEq + Default,
     i32: AsPrimitive<F>,
     f64: AsPrimitive<T>,
@@ -190,32 +193,142 @@ where
     if let Some(pool) = &pool {
         pool.install(|| {
             let column_handler = T::get_column_handler(is_column_kernel_symmetrical);
+            let _column_multiple_rows =
+                T::get_column_handler_multiple_rows(is_column_kernel_symmetrical);
 
             let src_stride = image_size.width * N;
             let dst_stride = destination.row_stride() as usize;
 
-            destination
-                .data
-                .borrow_mut()
+            let mut _dest_slice = destination.data.borrow_mut();
+
+            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            if let Some(column_multiple_rows) = _column_multiple_rows {
+                _dest_slice
+                    .par_chunks_exact_mut(dst_stride * 3)
+                    .enumerate()
+                    .for_each(|(y, row)| {
+                        use crate::filter1d::filter_1d_column_handler::FilterBrows;
+                        let y = y * 3;
+                        let brows0 = create_brows(
+                            image_size,
+                            column_kernel_shape,
+                            top_pad,
+                            bottom_pad,
+                            pad_h,
+                            transient_image_slice,
+                            src_stride,
+                            y,
+                        );
+
+                        let brows1 = create_brows(
+                            image_size,
+                            column_kernel_shape,
+                            top_pad,
+                            bottom_pad,
+                            pad_h,
+                            transient_image_slice,
+                            src_stride,
+                            y + 1,
+                        );
+
+                        let brows2 = create_brows(
+                            image_size,
+                            column_kernel_shape,
+                            top_pad,
+                            bottom_pad,
+                            pad_h,
+                            transient_image_slice,
+                            src_stride,
+                            y + 2,
+                        );
+
+                        let brows_slice0 = brows0.as_slice();
+                        let brows_slice1 = brows1.as_slice();
+                        let brows_slice2 = brows2.as_slice();
+
+                        let brows_vec = vec![brows_slice0, brows_slice1, brows_slice2];
+
+                        let brows = FilterBrows { brows: brows_vec };
+
+                        column_multiple_rows(
+                            Arena::new(image_size.width, pad_h, 0, pad_h, N),
+                            brows,
+                            row,
+                            image_size,
+                            dst_stride,
+                            scanned_column_kernel_slice,
+                        );
+                    });
+                _dest_slice = _dest_slice
+                    .chunks_exact_mut(dst_stride * 3)
+                    .into_remainder();
+            }
+
+            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+            if let Some(column_multiple_rows) = _column_multiple_rows {
+                _dest_slice
+                    .par_chunks_exact_mut(dst_stride * 2)
+                    .enumerate()
+                    .for_each(|(y, row)| {
+                        let y = y * 2;
+                        use crate::filter1d::filter_1d_column_handler::FilterBrows;
+                        let brows0 = create_brows(
+                            image_size,
+                            column_kernel_shape,
+                            top_pad,
+                            bottom_pad,
+                            pad_h,
+                            transient_image_slice,
+                            src_stride,
+                            y,
+                        );
+
+                        let brows1 = create_brows(
+                            image_size,
+                            column_kernel_shape,
+                            top_pad,
+                            bottom_pad,
+                            pad_h,
+                            transient_image_slice,
+                            src_stride,
+                            y + 1,
+                        );
+
+                        let brows_slice0 = brows0.as_slice();
+                        let brows_slice1 = brows1.as_slice();
+
+                        let brows_vec = vec![brows_slice0, brows_slice1];
+
+                        let brows = FilterBrows { brows: brows_vec };
+
+                        column_multiple_rows(
+                            Arena::new(image_size.width, pad_h, 0, pad_h, N),
+                            brows,
+                            row,
+                            image_size,
+                            dst_stride,
+                            scanned_column_kernel_slice,
+                        );
+                    });
+                _dest_slice = _dest_slice
+                    .chunks_exact_mut(dst_stride * 2)
+                    .into_remainder();
+            }
+
+            _dest_slice
                 .par_chunks_exact_mut(dst_stride)
                 .enumerate()
                 .for_each(|(y, row)| {
-                    let mut brows: Vec<&[T]> =
-                        vec![&transient_image_slice[0..]; column_kernel_shape.height];
-
-                    for (k, row) in (0..column_kernel_shape.height).zip(brows.iter_mut()) {
-                        if (y as i64 - pad_h as i64 + k as i64) < 0 {
-                            *row = &top_pad[(pad_h - k - 1) * src_stride..];
-                        } else if (y as i64 - pad_h as i64 + k as i64) as usize >= image_size.height
-                        {
-                            *row = &bottom_pad[(k - pad_h - 1) * src_stride..];
-                        } else {
-                            let fy = (y as i64 + k as i64 - pad_h as i64) as usize;
-                            let start_offset = src_stride * fy;
-                            *row =
-                                &transient_image_slice[start_offset..(start_offset + src_stride)];
-                        }
-                    }
+                    let brows = create_brows(
+                        image_size,
+                        column_kernel_shape,
+                        top_pad,
+                        bottom_pad,
+                        pad_h,
+                        transient_image_slice,
+                        src_stride,
+                        y,
+                    );
 
                     let brows_slice = brows.as_slice();
                     let row = &mut row[..image_size.width * N];
@@ -236,26 +349,140 @@ where
         let src_stride = image_size.width * N;
         let dst_stride = destination.row_stride() as usize;
 
-        destination
-            .data
-            .borrow_mut()
+        let mut _dest_slice = destination.data.borrow_mut();
+
+        #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+        if let Some(column_multiple_rows) =
+            T::get_column_handler_multiple_rows(is_column_kernel_symmetrical)
+        {
+            _dest_slice
+                .chunks_exact_mut(dst_stride * 2)
+                .enumerate()
+                .for_each(|(y, row)| {
+                    use crate::filter1d::filter_1d_column_handler::FilterBrows;
+                    let y = y * 2;
+                    let brows0 = create_brows(
+                        image_size,
+                        column_kernel_shape,
+                        top_pad,
+                        bottom_pad,
+                        pad_h,
+                        transient_image_slice,
+                        src_stride,
+                        y,
+                    );
+
+                    let brows1 = create_brows(
+                        image_size,
+                        column_kernel_shape,
+                        top_pad,
+                        bottom_pad,
+                        pad_h,
+                        transient_image_slice,
+                        src_stride,
+                        y + 1,
+                    );
+
+                    let brows_slice0 = brows0.as_slice();
+                    let brows_slice1 = brows1.as_slice();
+
+                    let brows_vec = vec![brows_slice0, brows_slice1];
+
+                    let brows = FilterBrows { brows: brows_vec };
+
+                    column_multiple_rows(
+                        Arena::new(image_size.width, pad_h, 0, pad_h, N),
+                        brows,
+                        row,
+                        image_size,
+                        dst_stride,
+                        scanned_column_kernel_slice,
+                    );
+                });
+            _dest_slice = _dest_slice
+                .chunks_exact_mut(dst_stride * 2)
+                .into_remainder();
+        }
+
+        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        if let Some(column_multiple_rows) =
+            T::get_column_handler_multiple_rows(is_column_kernel_symmetrical)
+        {
+            _dest_slice
+                .chunks_exact_mut(dst_stride * 3)
+                .enumerate()
+                .for_each(|(y, row)| {
+                    use crate::filter1d::filter_1d_column_handler::FilterBrows;
+                    let y = y * 3;
+                    let brows0 = create_brows(
+                        image_size,
+                        column_kernel_shape,
+                        top_pad,
+                        bottom_pad,
+                        pad_h,
+                        transient_image_slice,
+                        src_stride,
+                        y,
+                    );
+
+                    let brows1 = create_brows(
+                        image_size,
+                        column_kernel_shape,
+                        top_pad,
+                        bottom_pad,
+                        pad_h,
+                        transient_image_slice,
+                        src_stride,
+                        y + 1,
+                    );
+
+                    let brows2 = create_brows(
+                        image_size,
+                        column_kernel_shape,
+                        top_pad,
+                        bottom_pad,
+                        pad_h,
+                        transient_image_slice,
+                        src_stride,
+                        y + 2,
+                    );
+
+                    let brows_slice0 = brows0.as_slice();
+                    let brows_slice1 = brows1.as_slice();
+                    let brows_slice2 = brows2.as_slice();
+
+                    let brows_vec = vec![brows_slice0, brows_slice1, brows_slice2];
+
+                    let brows = FilterBrows { brows: brows_vec };
+
+                    column_multiple_rows(
+                        Arena::new(image_size.width, pad_h, 0, pad_h, N),
+                        brows,
+                        row,
+                        image_size,
+                        dst_stride,
+                        scanned_column_kernel_slice,
+                    );
+                });
+            _dest_slice = _dest_slice
+                .chunks_exact_mut(dst_stride * 3)
+                .into_remainder();
+        }
+
+        _dest_slice
             .chunks_exact_mut(dst_stride)
             .enumerate()
             .for_each(|(y, row)| {
-                let mut brows: Vec<&[T]> =
-                    vec![&transient_image_slice[0..]; column_kernel_shape.height];
-
-                for (k, row) in (0..column_kernel_shape.height).zip(brows.iter_mut()) {
-                    if (y as i64 - pad_h as i64 + k as i64) < 0 {
-                        *row = &top_pad[(pad_h - k - 1) * src_stride..];
-                    } else if (y as i64 - pad_h as i64 + k as i64) as usize >= image_size.height {
-                        *row = &bottom_pad[(k - pad_h - 1) * src_stride..];
-                    } else {
-                        let fy = (y as i64 + k as i64 - pad_h as i64) as usize;
-                        let start_offset = src_stride * fy;
-                        *row = &transient_image_slice[start_offset..(start_offset + src_stride)];
-                    }
-                }
+                let brows = create_brows(
+                    image_size,
+                    column_kernel_shape,
+                    top_pad,
+                    bottom_pad,
+                    pad_h,
+                    transient_image_slice,
+                    src_stride,
+                    y,
+                );
 
                 let brows_slice = brows.as_slice();
                 let row = &mut row[..image_size.width * N];
@@ -272,4 +499,30 @@ where
     }
 
     Ok(())
+}
+
+pub(crate) fn create_brows<'a, T>(
+    image_size: ImageSize,
+    column_kernel_shape: KernelShape,
+    top_pad: &'a [T],
+    bottom_pad: &'a [T],
+    pad_h: usize,
+    transient_image_slice: &'a [T],
+    src_stride: usize,
+    y: usize,
+) -> Vec<&'a [T]> {
+    let mut brows: Vec<&[T]> = vec![&transient_image_slice[0..]; column_kernel_shape.height];
+
+    for (k, row) in (0..column_kernel_shape.height).zip(brows.iter_mut()) {
+        if (y as i64 - pad_h as i64 + k as i64) < 0 {
+            *row = &top_pad[(pad_h - k - 1) * src_stride..];
+        } else if (y as i64 - pad_h as i64 + k as i64) as usize >= image_size.height {
+            *row = &bottom_pad[(k - pad_h - 1) * src_stride..];
+        } else {
+            let fy = (y as i64 + k as i64 - pad_h as i64) as usize;
+            let start_offset = src_stride * fy;
+            *row = &transient_image_slice[start_offset..(start_offset + src_stride)];
+        }
+    }
+    brows
 }

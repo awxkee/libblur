@@ -53,7 +53,7 @@ pub(crate) fn filter_column_avx_f32_f32(
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
     unsafe {
-        let has_fma = std::arch::is_x86_feature_detected!("sse4.1");
+        let has_fma = std::arch::is_x86_feature_detected!("fma");
         if has_fma {
             filter_column_avx_f32_f32_impl_fma(
                 arena,

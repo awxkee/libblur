@@ -38,7 +38,7 @@ use crate::img_size::ImageSize;
 use std::arch::aarch64::*;
 use std::ops::{Add, Mul};
 
-pub fn filter_column_neon_u8_i32_app(
+pub(crate) fn filter_column_neon_u8_i32_app(
     arena: Arena,
     arena_src: &[&[u8]],
     dst: &mut [u8],

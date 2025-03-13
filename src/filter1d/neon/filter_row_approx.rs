@@ -36,7 +36,7 @@ use crate::filter1d::to_approx_storage::ToApproxStorage;
 use crate::img_size::ImageSize;
 use std::arch::aarch64::*;
 
-pub fn filter_row_neon_u8_i32_app<const N: usize>(
+pub(crate) fn filter_row_neon_u8_i32_app<const N: usize>(
     _: Arena,
     arena_src: &[u8],
     dst: &mut [u8],

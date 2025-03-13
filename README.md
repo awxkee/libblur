@@ -62,7 +62,7 @@ Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded 
 
 |                     | Time(NEON) | Time(AVX) | 
 |---------------------|:----------:|:---------:| 
-| libblur(Exact)      |  53.83ms   |  43.41ms  | 
+| libblur(Exact)      |  52.39ms   |  43.41ms  | 
 | libblur(FixedPoint) |  33.20ms   |  30.72ms  | 
 | OpenCV              |  180.56ms  | 182.44ms  | 
 
@@ -70,7 +70,7 @@ Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded
 
 |                     | time(NEON) | Time(AVX) |
 |---------------------|:----------:|:---------:|
-| libblur(Exact)      |  70.45ms   |  54.36ms  |
+| libblur(Exact)      |  66.13ms   |  54.36ms  |
 | libblur(FixedPoint) |  40.13ms   |  38.91ms  |
 | OpenCV              |  177.46ms  | 185.30ms  |
 

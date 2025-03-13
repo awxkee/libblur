@@ -48,6 +48,27 @@ use crate::filter1d::sse::{
 use crate::ImageSize;
 use half::f16;
 
+#[allow(dead_code, unused)]
+#[derive(Clone, Debug)]
+pub struct FilterBrows<'a, T> {
+    pub(crate) brows: Vec<&'a [&'a [T]]>,
+}
+
+pub trait Filter1DColumnHandlerMultipleRows<T, F> {
+    fn get_column_handler_multiple_rows(
+        is_symmetric_kernel: bool,
+    ) -> Option<
+        fn(
+            arena: Arena,
+            FilterBrows<T>,
+            dst: &mut [T],
+            image_size: ImageSize,
+            dst_stride: usize,
+            scanned_kernel: &[ScanPoint1d<F>],
+        ),
+    >;
+}
+
 pub trait Filter1DColumnHandler<T, F> {
     fn get_column_handler(
         is_symmetric_kernel: bool,
@@ -241,6 +262,83 @@ impl Filter1DColumnHandler<u16, f32> for u16 {
     }
 }
 
+impl Filter1DColumnHandlerMultipleRows<u8, f32> for u8 {
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    fn get_column_handler_multiple_rows(
+        is_symmetric_kernel: bool,
+    ) -> Option<fn(Arena, FilterBrows<u8>, &mut [u8], ImageSize, usize, &[ScanPoint1d<f32>])> {
+        if is_symmetric_kernel {
+            use crate::filter1d::neon::filter_symm_column_neon_u8_f32_x3;
+            return Some(filter_symm_column_neon_u8_f32_x3);
+        }
+        None
+    }
+
+    #[cfg(not(any(
+        all(target_arch = "aarch64", target_feature = "neon"),
+        any(target_arch = "x86_64", target_arch = "x86")
+    )))]
+    fn get_column_handler_multiple_rows(
+        _: bool,
+    ) -> Option<fn(Arena, FilterBrows<u8>, &mut [u8], ImageSize, usize, &[ScanPoint1d<f32>])> {
+        None
+    }
+
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    fn get_column_handler_multiple_rows(
+        is_symmetric_kernel: bool,
+    ) -> Option<fn(Arena, FilterBrows<u8>, &mut [u8], ImageSize, usize, &[ScanPoint1d<f32>])> {
+        if is_symmetric_kernel {
+            #[cfg(feature = "avx")]
+            if std::arch::is_x86_feature_detected!("avx2") {
+                use crate::filter1d::avx::filter_column_avx_symm_u8_f32_x2;
+                return Some(filter_column_avx_symm_u8_f32_x2);
+            }
+        }
+        None
+    }
+}
+
+impl Filter1DColumnHandlerMultipleRows<u16, f32> for u16 {
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    fn get_column_handler_multiple_rows(
+        is_symmetric_kernel: bool,
+    ) -> Option<fn(Arena, FilterBrows<u16>, &mut [u16], ImageSize, usize, &[ScanPoint1d<f32>])>
+    {
+        if is_symmetric_kernel {
+            use crate::filter1d::neon::filter_symm_column_neon_u16_f32_x3;
+            return Some(filter_symm_column_neon_u16_f32_x3);
+        }
+        None
+    }
+
+    #[cfg(not(any(
+        all(target_arch = "aarch64", target_feature = "neon"),
+        any(target_arch = "x86_64", target_arch = "x86")
+    )))]
+    fn get_column_handler_multiple_rows(
+        _: bool,
+    ) -> Option<fn(Arena, FilterBrows<u16>, &mut [u16], ImageSize, usize, &[ScanPoint1d<f32>])>
+    {
+        None
+    }
+
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    fn get_column_handler_multiple_rows(
+        is_symmetric_kernel: bool,
+    ) -> Option<fn(Arena, FilterBrows<u16>, &mut [u16], ImageSize, usize, &[ScanPoint1d<f32>])>
+    {
+        if is_symmetric_kernel {
+            #[cfg(feature = "avx")]
+            if std::arch::is_x86_feature_detected!("avx2") {
+                use crate::filter1d::avx::filter_column_avx_symm_u16_f32_x2;
+                return Some(filter_column_avx_symm_u16_f32_x2);
+            }
+        }
+        None
+    }
+}
+
 macro_rules! default_1d_column_handler {
     ($store:ty, $intermediate:ty) => {
         impl Filter1DColumnHandler<$store, $intermediate> for $store {
@@ -264,6 +362,27 @@ macro_rules! default_1d_column_handler {
     };
 }
 
+macro_rules! default_1d_column_multiple_rows {
+    ($store:ty, $intermediate:ty) => {
+        impl Filter1DColumnHandlerMultipleRows<$store, $intermediate> for $store {
+            fn get_column_handler_multiple_rows(
+                _: bool,
+            ) -> Option<
+                fn(
+                    Arena,
+                    FilterBrows<$store>,
+                    &mut [$store],
+                    ImageSize,
+                    usize,
+                    &[ScanPoint1d<$intermediate>],
+                ),
+            > {
+                None
+            }
+        }
+    };
+}
+
 default_1d_column_handler!(i8, f32);
 default_1d_column_handler!(i8, f64);
 default_1d_column_handler!(u8, f64);
@@ -281,3 +400,23 @@ default_1d_column_handler!(f16, f32);
 default_1d_column_handler!(f16, f64);
 default_1d_column_handler!(f32, f64);
 default_1d_column_handler!(f64, f64);
+
+default_1d_column_multiple_rows!(i8, f32);
+default_1d_column_multiple_rows!(i8, f64);
+default_1d_column_multiple_rows!(u8, f64);
+default_1d_column_multiple_rows!(u8, u16);
+default_1d_column_multiple_rows!(u8, i16);
+default_1d_column_multiple_rows!(u8, i32);
+default_1d_column_multiple_rows!(u8, u32);
+default_1d_column_multiple_rows!(u16, f64);
+default_1d_column_multiple_rows!(i16, f32);
+default_1d_column_multiple_rows!(i16, f64);
+default_1d_column_multiple_rows!(u32, f32);
+default_1d_column_multiple_rows!(u32, f64);
+default_1d_column_multiple_rows!(i32, f32);
+default_1d_column_multiple_rows!(i32, f64);
+default_1d_column_multiple_rows!(f16, f32);
+default_1d_column_multiple_rows!(f16, f64);
+default_1d_column_multiple_rows!(f32, f64);
+default_1d_column_multiple_rows!(f64, f64);
+default_1d_column_multiple_rows!(f32, f32);
