@@ -129,7 +129,7 @@ impl Filter1DRowHandler<f32, f32> for f32 {
     ) -> fn(Arena, &[f32], &mut [f32], ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
         if is_kernel_symmetric {
             use crate::filter1d::neon::filter_row_neon_symm_f32_f32;
-            filter_row_neon_symm_f32_f32
+            filter_row_neon_symm_f32_f32::<N>
         } else {
             use crate::filter1d::neon::filter_row_neon_f32_f32;
             filter_row_neon_f32_f32::<N>
@@ -140,6 +140,15 @@ impl Filter1DRowHandler<f32, f32> for f32 {
     fn get_row_handler<const N: usize>(
         is_symmetric_kernel: bool,
     ) -> fn(Arena, &[f32], &mut [f32], ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
+        if is_symmetric_kernel {
+            #[cfg(feature = "avx")]
+            {
+                if std::arch::is_x86_feature_detected!("avx2") {
+                    use crate::filter1d::avx::filter_row_avx_f32_f32_symm;
+                    return filter_row_avx_f32_f32_symm::<N>;
+                }
+            }
+        }
         #[cfg(feature = "avx")]
         if std::arch::is_x86_feature_detected!("avx2") {
             use crate::filter1d::avx::filter_row_avx_f32_f32;

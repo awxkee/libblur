@@ -36,7 +36,7 @@ use crate::neon::p_vfmaq_f32;
 use crate::to_storage::ToStorage;
 use std::arch::aarch64::*;
 
-pub(crate) fn filter_row_neon_symm_f32_f32(
+pub(crate) fn filter_row_neon_symm_f32_f32<const N: usize>(
     arena: Arena,
     arena_src: &[f32],
     dst: &mut [f32],
@@ -52,8 +52,6 @@ pub(crate) fn filter_row_neon_symm_f32_f32(
         let half_len = length / 2;
 
         let mut cx = 0usize;
-
-        let n = arena.components;
 
         let max_width = image_size.width * arena.components;
 
@@ -71,8 +69,8 @@ pub(crate) fn filter_row_neon_symm_f32_f32(
             for i in 0..half_len {
                 let rollback = length - i - 1;
                 let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(i).weight);
-                let v_source0 = xvld1q_f32_x4(shifted_src.get_unchecked(i * n..).as_ptr());
-                let v_source1 = xvld1q_f32_x4(shifted_src.get_unchecked(rollback * n..).as_ptr());
+                let v_source0 = xvld1q_f32_x4(shifted_src.get_unchecked(i * N..).as_ptr());
+                let v_source1 = xvld1q_f32_x4(shifted_src.get_unchecked(rollback * N..).as_ptr());
                 k0 = p_vfmaq_f32(k0, vaddq_f32(v_source0.0, v_source1.0), coeff);
                 k1 = p_vfmaq_f32(k1, vaddq_f32(v_source0.1, v_source1.1), coeff);
                 k2 = p_vfmaq_f32(k2, vaddq_f32(v_source0.2, v_source1.2), coeff);
@@ -96,8 +94,8 @@ pub(crate) fn filter_row_neon_symm_f32_f32(
             for i in 0..half_len {
                 let rollback = length - i - 1;
                 let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(i).weight);
-                let v_source0 = xvld1q_f32_x2(shifted_src.get_unchecked((i * n)..).as_ptr());
-                let v_source1 = xvld1q_f32_x2(shifted_src.get_unchecked((rollback * n)..).as_ptr());
+                let v_source0 = xvld1q_f32_x2(shifted_src.get_unchecked((i * N)..).as_ptr());
+                let v_source1 = xvld1q_f32_x2(shifted_src.get_unchecked((rollback * N)..).as_ptr());
                 k0 = p_vfmaq_f32(k0, vaddq_f32(v_source0.0, v_source1.0), coeff);
                 k1 = p_vfmaq_f32(k1, vaddq_f32(v_source0.1, v_source1.1), coeff);
             }
@@ -118,8 +116,8 @@ pub(crate) fn filter_row_neon_symm_f32_f32(
             for i in 0..half_len {
                 let rollback = length - i - 1;
                 let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(i).weight);
-                let v_source0 = vld1q_f32(shifted_src.get_unchecked((i * n)..).as_ptr());
-                let v_source1 = vld1q_f32(shifted_src.get_unchecked((rollback * n)..).as_ptr());
+                let v_source0 = vld1q_f32(shifted_src.get_unchecked((i * N)..).as_ptr());
+                let v_source1 = vld1q_f32(shifted_src.get_unchecked((rollback * N)..).as_ptr());
                 k0 = p_vfmaq_f32(k0, vaddq_f32(v_source0, v_source1), coeff);
             }
 
@@ -139,8 +137,8 @@ pub(crate) fn filter_row_neon_symm_f32_f32(
 
                 k0 = mlaf(
                     k0,
-                    (*shifted_src.get_unchecked(i * n))
-                        + (*shifted_src.get_unchecked(rollback * n)),
+                    (*shifted_src.get_unchecked(i * N))
+                        + (*shifted_src.get_unchecked(rollback * N)),
                     coeff.weight,
                 );
             }
