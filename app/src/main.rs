@@ -87,8 +87,11 @@ fn main() {
     let start = Instant::now();
 
     // let mut dst_image = BlurImageMut::borrow(&mut src_bytes, dyn_image.width(), dyn_image.height(), FastBlurChannels::Channels3)
-    
-    let remapped = src_bytes.iter().map(|&x| x as f32 * (1. / 255.)).collect::<Vec<f32>>();
+
+    let remapped = src_bytes
+        .iter()
+        .map(|&x| x as f32 * (1. / 255.))
+        .collect::<Vec<f32>>();
 
     let image = BlurImage::borrow(
         &remapped,
@@ -107,8 +110,13 @@ fn main() {
         ThreadingPolicy::Single,
     )
     .unwrap();
-    
-    dst_bytes = dst_image.data.borrow().iter().map(|&x| (x * 255f32).round() as u8).collect::<Vec<u8>>();
+
+    dst_bytes = dst_image
+        .data
+        .borrow()
+        .iter()
+        .map(|&x| (x * 255f32).round() as u8)
+        .collect::<Vec<u8>>();
 
     // dst_bytes = dst_image.data.borrow().to_vec();
     //

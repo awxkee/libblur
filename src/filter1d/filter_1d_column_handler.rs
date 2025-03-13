@@ -201,10 +201,6 @@ impl Filter1DColumnHandler<f32, f32> for f32 {
     ) -> fn(Arena, &[&[f32]], &mut [f32], ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
         #[cfg(feature = "avx")]
         if std::arch::is_x86_feature_detected!("avx2") {
-            if is_symmetric_kernel {
-                use crate::filter1d::avx::filter_column_avx_f32_f32_symm;
-                return filter_column_avx_f32_f32_symm;
-            }
             return filter_column_avx_f32_f32;
         }
         if std::arch::is_x86_feature_detected!("sse4.1") {
