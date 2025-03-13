@@ -82,38 +82,38 @@ unsafe fn filter_column_avx_f32_f32_impl_symm<const FMA: bool>(
 
         let mut cx = 0usize;
 
-        while cx + 32 < dst_stride {
-            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
-
-            let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
-
-            let source = _mm256_load_pack_ps_x4(v_src.as_ptr());
-            let mut k0 = _mm256_mul_ps(source.0, coeff);
-            let mut k1 = _mm256_mul_ps(source.1, coeff);
-            let mut k2 = _mm256_mul_ps(source.2, coeff);
-            let mut k3 = _mm256_mul_ps(source.3, coeff);
-
-            for i in 0..half_len {
-                let rollback = length - i - 1;
-                let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(i).weight);
-                let v_source0 =
-                    _mm256_load_pack_ps_x4(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
-                let v_source1 = _mm256_load_pack_ps_x4(
-                    arena_src
-                        .get_unchecked(rollback)
-                        .get_unchecked(cx..)
-                        .as_ptr(),
-                );
-                k0 = _mm256_opt_fmlaf_ps::<FMA>(k0, _mm256_add_ps(v_source0.0, v_source1.0), coeff);
-                k1 = _mm256_opt_fmlaf_ps::<FMA>(k1, _mm256_add_ps(v_source0.1, v_source1.1), coeff);
-                k2 = _mm256_opt_fmlaf_ps::<FMA>(k2, _mm256_add_ps(v_source0.2, v_source1.2), coeff);
-                k3 = _mm256_opt_fmlaf_ps::<FMA>(k3, _mm256_add_ps(v_source0.3, v_source1.3), coeff);
-            }
-
-            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
-            _mm256_store_pack_ps_x4(dst_ptr0, (k0, k1, k2, k3));
-            cx += 32;
-        }
+        // while cx + 32 < dst_stride {
+        //     let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
+        // 
+        //     let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
+        // 
+        //     let source = _mm256_load_pack_ps_x4(v_src.as_ptr());
+        //     let mut k0 = _mm256_mul_ps(source.0, coeff);
+        //     let mut k1 = _mm256_mul_ps(source.1, coeff);
+        //     let mut k2 = _mm256_mul_ps(source.2, coeff);
+        //     let mut k3 = _mm256_mul_ps(source.3, coeff);
+        // 
+        //     for i in 0..half_len {
+        //         let rollback = length - i - 1;
+        //         let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(i).weight);
+        //         let v_source0 =
+        //             _mm256_load_pack_ps_x4(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
+        //         let v_source1 = _mm256_load_pack_ps_x4(
+        //             arena_src
+        //                 .get_unchecked(rollback)
+        //                 .get_unchecked(cx..)
+        //                 .as_ptr(),
+        //         );
+        //         k0 = _mm256_opt_fmlaf_ps::<FMA>(k0, _mm256_add_ps(v_source0.0, v_source1.0), coeff);
+        //         k1 = _mm256_opt_fmlaf_ps::<FMA>(k1, _mm256_add_ps(v_source0.1, v_source1.1), coeff);
+        //         k2 = _mm256_opt_fmlaf_ps::<FMA>(k2, _mm256_add_ps(v_source0.2, v_source1.2), coeff);
+        //         k3 = _mm256_opt_fmlaf_ps::<FMA>(k3, _mm256_add_ps(v_source0.3, v_source1.3), coeff);
+        //     }
+        // 
+        //     let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
+        //     _mm256_store_pack_ps_x4(dst_ptr0, (k0, k1, k2, k3));
+        //     cx += 32;
+        // }
 
         while cx + 16 < dst_stride {
             let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
