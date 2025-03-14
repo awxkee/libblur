@@ -166,11 +166,6 @@ pub(crate) unsafe fn store_u8_s32<const CN: usize>(dst_ptr: *mut u8, regi: __m12
     }
 }
 
-#[inline(always)]
-pub(crate) unsafe fn _mm_mul_round_ps(a: __m128, b: __m128) -> __m128 {
-    _mm_fmadd_ps(a, b, _mm_set1_ps(0.5f32))
-}
-
 /// Stores u32 up to x4 as u8 up to x4 based on channels count
 #[inline(always)]
 pub(crate) unsafe fn store_u8_u32<const CN: usize>(dst_ptr: *mut u8, regi: __m128i) {
