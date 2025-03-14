@@ -5,7 +5,7 @@ use opencv::core::{find_file, Mat, Point, Size, BORDER_DEFAULT};
 use opencv::imgcodecs::{imread, IMREAD_COLOR};
 
 pub fn criterion_benchmark(c: &mut Criterion) {
-    let img = ImageReader::open("../../../assets/test_image_4.png")
+    let img = ImageReader::open("../assets/test_image_4.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -214,7 +214,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     });
 
     let src = imread(
-        &find_file("assets/test_image_4.png", false, false).unwrap(),
+        &find_file("../assets/test_image_4.png", false, false).unwrap(),
         IMREAD_COLOR,
     )
     .unwrap();
@@ -234,7 +234,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
-    let img = ImageReader::open("../../../assets/test_image_1.jpg")
+    let img = ImageReader::open("../assets/test_image_1.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -270,7 +270,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     });
 
     let src_rgb = imread(
-        &find_file("assets/test_image_1.jpg", false, false).unwrap(),
+        &find_file("../assets/test_image_1.jpg", false, false).unwrap(),
         IMREAD_COLOR,
     )
     .unwrap();

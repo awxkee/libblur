@@ -4,7 +4,7 @@ use image::{EncodableLayout, GenericImageView, ImageReader};
 use libblur::{BlurImageMut, EdgeMode, FastBlurChannels, ThreadingPolicy};
 
 pub fn criterion_benchmark(c: &mut Criterion) {
-    let img = ImageReader::open("../../../assets/test_image_4.png")
+    let img = ImageReader::open("../assets/test_image_4.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -71,7 +71,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
-    let img = ImageReader::open("../../../assets/test_image_1.jpg")
+    let img = ImageReader::open("../assets/test_image_1.jpg")
         .unwrap()
         .decode()
         .unwrap();

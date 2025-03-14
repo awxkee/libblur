@@ -25,7 +25,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     });
 
     let src = imread(
-        &find_file("assets/test_image_4.png", false, false).unwrap(),
+        &find_file("../assets/test_image_4.png", false, false).unwrap(),
         IMREAD_COLOR,
     )
     .unwrap();
@@ -57,7 +57,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     });
 
     let src_rgb = imread(
-        &find_file("assets/test_image_1.jpg", false, false).unwrap(),
+        &find_file("../assets/test_image_1.jpg", false, false).unwrap(),
         IMREAD_COLOR,
     )
     .unwrap();
