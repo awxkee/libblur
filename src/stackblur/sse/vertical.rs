@@ -182,13 +182,8 @@ where
                 let casted_sum0 = _mm_cvtepi32_ps(sums0);
                 let casted_sum1 = _mm_cvtepi32_ps(sums1);
 
-                const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
-
-                let mut a0 = _mm_mul_ps(casted_sum0, v_mul_value);
-                let mut a1 = _mm_mul_ps(casted_sum1, v_mul_value);
-
-                a0 = _mm_round_ps::<ROUNDING_FLAGS>(a0);
-                a1 = _mm_round_ps::<ROUNDING_FLAGS>(a1);
+                let a0 = _mm_mul_ps(casted_sum0, v_mul_value);
+                let a1 = _mm_mul_ps(casted_sum1, v_mul_value);
 
                 let scaled_val0 = _mm_cvtps_epi32(a0);
                 let scaled_val1 = _mm_cvtps_epi32(a1);
@@ -304,11 +299,7 @@ where
             dst_ptr = cx;
             for _ in 0..height {
                 let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
-                const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
-                let result = _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(
-                    _mm_cvtepi32_ps(sums),
-                    v_mul_value,
-                )));
+                let result = _mm_cvtps_epi32(_mm_mul_ps(_mm_cvtepi32_ps(sums), v_mul_value));
                 store_u8_s32::<CN>(store_ld, result);
 
                 dst_ptr += stride as usize;
@@ -400,11 +391,7 @@ where
             dst_ptr = cx;
             for _ in 0..height {
                 let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
-                const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
-                let result = _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(
-                    _mm_cvtepi32_ps(sums),
-                    v_mul_value,
-                )));
+                let result = _mm_cvtps_epi32(_mm_mul_ps(_mm_cvtepi32_ps(sums), v_mul_value));
                 store_u8_s32::<TAIL>(store_ld, result);
 
                 dst_ptr += stride as usize;

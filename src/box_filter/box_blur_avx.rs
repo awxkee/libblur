@@ -25,7 +25,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::avx::{_mm256_mul_round_ps, _mm_mul_round_ps, shuffle};
+use crate::avx::shuffle;
 use crate::sse::{load_u8_s16_fast, load_u8_s32_fast, store_u8_s16, store_u8_u32};
 use crate::unsafe_slice::UnsafeSlice;
 #[cfg(target_arch = "x86")]
@@ -48,17 +48,7 @@ pub(crate) fn box_blur_vertical_pass_avx2<T>(
     let unsafe_dst: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(undefined_unsafe_dst) };
 
     unsafe {
-        if std::arch::is_x86_feature_detected!("fma") {
-            if radius < 240 {
-                box_blur_vertical_pass_avx2_fma_lr(
-                    src, src_stride, unsafe_dst, dst_stride, w, height, radius, start_x, end_x,
-                )
-            } else {
-                box_blur_vertical_pass_avx2_fma(
-                    src, src_stride, unsafe_dst, dst_stride, w, height, radius, start_x, end_x,
-                )
-            }
-        } else if radius < 240 {
+        if radius < 240 {
             box_blur_vertical_pass_avx2_def_lr(
                 src, src_stride, unsafe_dst, dst_stride, w, height, radius, start_x, end_x,
             )
@@ -83,31 +73,6 @@ unsafe fn box_blur_vertical_pass_avx2_def(
     end_x: u32,
 ) {
     box_blur_vertical_pass_avx2_impl::<false>(
-        undefined_src,
-        src_stride,
-        undefined_unsafe_dst,
-        dst_stride,
-        w,
-        height,
-        radius,
-        start_x,
-        end_x,
-    )
-}
-
-#[target_feature(enable = "avx2", enable = "fma")]
-unsafe fn box_blur_vertical_pass_avx2_fma(
-    undefined_src: &[u8],
-    src_stride: u32,
-    undefined_unsafe_dst: &UnsafeSlice<u8>,
-    dst_stride: u32,
-    w: u32,
-    height: u32,
-    radius: u32,
-    start_x: u32,
-    end_x: u32,
-) {
-    box_blur_vertical_pass_avx2_impl::<true>(
         undefined_src,
         src_stride,
         undefined_unsafe_dst,
@@ -311,36 +276,14 @@ unsafe fn box_blur_vertical_pass_avx2_impl<const FMA: bool>(
                 let store6_ps = _mm256_cvtepi32_ps(store_6);
                 let store7_ps = _mm256_cvtepi32_ps(store_7);
 
-                let (r0, r1, r2, r3, r4, r5, r6, r7);
-
-                if FMA {
-                    r0 = _mm256_mul_round_ps(store0_ps, v_weight);
-                    r1 = _mm256_mul_round_ps(store1_ps, v_weight);
-                    r2 = _mm256_mul_round_ps(store2_ps, v_weight);
-                    r3 = _mm256_mul_round_ps(store3_ps, v_weight);
-                    r4 = _mm256_mul_round_ps(store4_ps, v_weight);
-                    r5 = _mm256_mul_round_ps(store5_ps, v_weight);
-                    r6 = _mm256_mul_round_ps(store6_ps, v_weight);
-                    r7 = _mm256_mul_round_ps(store7_ps, v_weight);
-                } else {
-                    let scale_store_0_ps = _mm256_mul_ps(store0_ps, v_weight);
-                    let scale_store_1_ps = _mm256_mul_ps(store1_ps, v_weight);
-                    let scale_store_2_ps = _mm256_mul_ps(store2_ps, v_weight);
-                    let scale_store_3_ps = _mm256_mul_ps(store3_ps, v_weight);
-                    let scale_store_4_ps = _mm256_mul_ps(store4_ps, v_weight);
-                    let scale_store_5_ps = _mm256_mul_ps(store5_ps, v_weight);
-                    let scale_store_6_ps = _mm256_mul_ps(store6_ps, v_weight);
-                    let scale_store_7_ps = _mm256_mul_ps(store7_ps, v_weight);
-
-                    r0 = _mm256_round_ps::<0x00>(scale_store_0_ps);
-                    r1 = _mm256_round_ps::<0x00>(scale_store_1_ps);
-                    r2 = _mm256_round_ps::<0x00>(scale_store_2_ps);
-                    r3 = _mm256_round_ps::<0x00>(scale_store_3_ps);
-                    r4 = _mm256_round_ps::<0x00>(scale_store_4_ps);
-                    r5 = _mm256_round_ps::<0x00>(scale_store_5_ps);
-                    r6 = _mm256_round_ps::<0x00>(scale_store_6_ps);
-                    r7 = _mm256_round_ps::<0x00>(scale_store_7_ps);
-                }
+                let r0 = _mm256_mul_ps(store0_ps, v_weight);
+                let r1 = _mm256_mul_ps(store1_ps, v_weight);
+                let r2 = _mm256_mul_ps(store2_ps, v_weight);
+                let r3 = _mm256_mul_ps(store3_ps, v_weight);
+                let r4 = _mm256_mul_ps(store4_ps, v_weight);
+                let r5 = _mm256_mul_ps(store5_ps, v_weight);
+                let r6 = _mm256_mul_ps(store6_ps, v_weight);
+                let r7 = _mm256_mul_ps(store7_ps, v_weight);
 
                 let scale_store_0 = _mm256_cvtps_epi32(r0);
                 let scale_store_1 = _mm256_cvtps_epi32(r1);
@@ -470,24 +413,10 @@ unsafe fn box_blur_vertical_pass_avx2_impl<const FMA: bool>(
                 let store2_ps = _mm256_cvtepi32_ps(store_2);
                 let store3_ps = _mm256_cvtepi32_ps(store_3);
 
-                let (r0, r1, r2, r3);
-
-                if FMA {
-                    r0 = _mm256_mul_round_ps(store0_ps, v_weight);
-                    r1 = _mm256_mul_round_ps(store1_ps, v_weight);
-                    r2 = _mm256_mul_round_ps(store2_ps, v_weight);
-                    r3 = _mm256_mul_round_ps(store3_ps, v_weight);
-                } else {
-                    let scale_store_0_ps = _mm256_mul_ps(store0_ps, v_weight);
-                    let scale_store_1_ps = _mm256_mul_ps(store1_ps, v_weight);
-                    let scale_store_2_ps = _mm256_mul_ps(store2_ps, v_weight);
-                    let scale_store_3_ps = _mm256_mul_ps(store3_ps, v_weight);
-
-                    r0 = _mm256_round_ps::<0x00>(scale_store_0_ps);
-                    r1 = _mm256_round_ps::<0x00>(scale_store_1_ps);
-                    r2 = _mm256_round_ps::<0x00>(scale_store_2_ps);
-                    r3 = _mm256_round_ps::<0x00>(scale_store_3_ps);
-                }
+                let r0 = _mm256_mul_ps(store0_ps, v_weight);
+                let r1 = _mm256_mul_ps(store1_ps, v_weight);
+                let r2 = _mm256_mul_ps(store2_ps, v_weight);
+                let r3 = _mm256_mul_ps(store3_ps, v_weight);
 
                 let scale_store_0 = _mm256_cvtps_epi32(r0);
                 let scale_store_1 = _mm256_cvtps_epi32(r1);
@@ -613,26 +542,10 @@ unsafe fn box_blur_vertical_pass_avx2_impl<const FMA: bool>(
                 let store2_ps = _mm_cvtepi32_ps(store_2);
                 let store3_ps = _mm_cvtepi32_ps(store_3);
 
-                let (r0, r1, r2, r3);
-
-                if FMA {
-                    r0 = _mm_mul_round_ps(store0_ps, v_weight);
-                    r1 = _mm_mul_round_ps(store1_ps, v_weight);
-                    r2 = _mm_mul_round_ps(store2_ps, v_weight);
-                    r3 = _mm_mul_round_ps(store3_ps, v_weight);
-                } else {
-                    let scale_store_0_ps = _mm_mul_ps(store0_ps, v_weight);
-                    let scale_store_1_ps = _mm_mul_ps(store1_ps, v_weight);
-                    let scale_store_2_ps = _mm_mul_ps(store2_ps, v_weight);
-                    let scale_store_3_ps = _mm_mul_ps(store3_ps, v_weight);
-
-                    const RND: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
-
-                    r0 = _mm_round_ps::<RND>(scale_store_0_ps);
-                    r1 = _mm_round_ps::<RND>(scale_store_1_ps);
-                    r2 = _mm_round_ps::<RND>(scale_store_2_ps);
-                    r3 = _mm_round_ps::<RND>(scale_store_3_ps);
-                }
+                let r0 = _mm_mul_ps(store0_ps, v_weight);
+                let r1 = _mm_mul_ps(store1_ps, v_weight);
+                let r2 = _mm_mul_ps(store2_ps, v_weight);
+                let r3 = _mm_mul_ps(store3_ps, v_weight);
 
                 let scale_store_0 = _mm_cvtps_epi32(r0);
                 let scale_store_1 = _mm_cvtps_epi32(r1);
@@ -727,20 +640,8 @@ unsafe fn box_blur_vertical_pass_avx2_impl<const FMA: bool>(
                 let store0_ps = _mm_cvtepi32_ps(store_0);
                 let store1_ps = _mm_cvtepi32_ps(store_1);
 
-                let (r0, r1);
-
-                if FMA {
-                    r0 = _mm_mul_round_ps(store0_ps, v_weight);
-                    r1 = _mm_mul_round_ps(store1_ps, v_weight);
-                } else {
-                    let scale_store_0_ps = _mm_mul_ps(store0_ps, v_weight);
-                    let scale_store_1_ps = _mm_mul_ps(store1_ps, v_weight);
-
-                    const RND: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
-
-                    r0 = _mm_round_ps::<RND>(scale_store_0_ps);
-                    r1 = _mm_round_ps::<RND>(scale_store_1_ps);
-                }
+                let r0 = _mm_mul_ps(store0_ps, v_weight);
+                let r1 = _mm_mul_ps(store1_ps, v_weight);
 
                 let scale_store_0 = _mm_cvtps_epi32(r0);
                 let scale_store_1 = _mm_cvtps_epi32(r1);
@@ -803,15 +704,7 @@ unsafe fn box_blur_vertical_pass_avx2_impl<const FMA: bool>(
             let px = x as usize;
 
             unsafe {
-                let r0 = if FMA {
-                    _mm_mul_round_ps(_mm_cvtepi32_ps(store), v_weight)
-                } else {
-                    let scale_store_0_ps = _mm_mul_ps(_mm_cvtepi32_ps(store), v_weight);
-
-                    const RND: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
-
-                    _mm_round_ps::<RND>(scale_store_0_ps)
-                };
+                let r0 = _mm_mul_ps(_mm_cvtepi32_ps(store), v_weight);
                 let ptr = unsafe_dst.slice.as_ptr().add(y_dst_shift + px) as *mut u8;
                 store_u8_u32::<TAIL_CN>(ptr, _mm_cvtps_epi32(r0));
             }
@@ -832,31 +725,6 @@ unsafe fn box_blur_vertical_pass_avx2_def_lr(
     end_x: u32,
 ) {
     box_blur_vertical_pass_avx2_impl_lr::<false>(
-        undefined_src,
-        src_stride,
-        undefined_unsafe_dst,
-        dst_stride,
-        w,
-        height,
-        radius,
-        start_x,
-        end_x,
-    )
-}
-
-#[target_feature(enable = "avx2", enable = "fma")]
-unsafe fn box_blur_vertical_pass_avx2_fma_lr(
-    undefined_src: &[u8],
-    src_stride: u32,
-    undefined_unsafe_dst: &UnsafeSlice<u8>,
-    dst_stride: u32,
-    w: u32,
-    height: u32,
-    radius: u32,
-    start_x: u32,
-    end_x: u32,
-) {
-    box_blur_vertical_pass_avx2_impl_lr::<true>(
         undefined_src,
         src_stride,
         undefined_unsafe_dst,
@@ -1195,36 +1063,14 @@ unsafe fn box_blur_vertical_pass_avx2_impl_lr<const FMA: bool>(
                 let store6_ps = _mm256_cvtepi32_ps(jw6);
                 let store7_ps = _mm256_cvtepi32_ps(jw7);
 
-                let (r0, r1, r2, r3, r4, r5, r6, r7);
-
-                if FMA {
-                    r0 = _mm256_mul_round_ps(store0_ps, v_weight);
-                    r1 = _mm256_mul_round_ps(store1_ps, v_weight);
-                    r2 = _mm256_mul_round_ps(store2_ps, v_weight);
-                    r3 = _mm256_mul_round_ps(store3_ps, v_weight);
-                    r4 = _mm256_mul_round_ps(store4_ps, v_weight);
-                    r5 = _mm256_mul_round_ps(store5_ps, v_weight);
-                    r6 = _mm256_mul_round_ps(store6_ps, v_weight);
-                    r7 = _mm256_mul_round_ps(store7_ps, v_weight);
-                } else {
-                    let scale_store_0_ps = _mm256_mul_ps(store0_ps, v_weight);
-                    let scale_store_1_ps = _mm256_mul_ps(store1_ps, v_weight);
-                    let scale_store_2_ps = _mm256_mul_ps(store2_ps, v_weight);
-                    let scale_store_3_ps = _mm256_mul_ps(store3_ps, v_weight);
-                    let scale_store_4_ps = _mm256_mul_ps(store4_ps, v_weight);
-                    let scale_store_5_ps = _mm256_mul_ps(store5_ps, v_weight);
-                    let scale_store_6_ps = _mm256_mul_ps(store6_ps, v_weight);
-                    let scale_store_7_ps = _mm256_mul_ps(store7_ps, v_weight);
-
-                    r0 = _mm256_round_ps::<0x00>(scale_store_0_ps);
-                    r1 = _mm256_round_ps::<0x00>(scale_store_1_ps);
-                    r2 = _mm256_round_ps::<0x00>(scale_store_2_ps);
-                    r3 = _mm256_round_ps::<0x00>(scale_store_3_ps);
-                    r4 = _mm256_round_ps::<0x00>(scale_store_4_ps);
-                    r5 = _mm256_round_ps::<0x00>(scale_store_5_ps);
-                    r6 = _mm256_round_ps::<0x00>(scale_store_6_ps);
-                    r7 = _mm256_round_ps::<0x00>(scale_store_7_ps);
-                }
+                let r0 = _mm256_mul_ps(store0_ps, v_weight);
+                let r1 = _mm256_mul_ps(store1_ps, v_weight);
+                let r2 = _mm256_mul_ps(store2_ps, v_weight);
+                let r3 = _mm256_mul_ps(store3_ps, v_weight);
+                let r4 = _mm256_mul_ps(store4_ps, v_weight);
+                let r5 = _mm256_mul_ps(store5_ps, v_weight);
+                let r6 = _mm256_mul_ps(store6_ps, v_weight);
+                let r7 = _mm256_mul_ps(store7_ps, v_weight);
 
                 let scale_store_0 = _mm256_cvtps_epi32(r0);
                 let scale_store_1 = _mm256_cvtps_epi32(r1);
@@ -1301,24 +1147,10 @@ unsafe fn box_blur_vertical_pass_avx2_impl_lr<const FMA: bool>(
             let store2_ps = _mm256_cvtepi32_ps(jw2);
             let store3_ps = _mm256_cvtepi32_ps(jw3);
 
-            let (r0, r1, r2, r3);
-
-            if FMA {
-                r0 = _mm256_mul_round_ps(store0_ps, v_weight);
-                r1 = _mm256_mul_round_ps(store1_ps, v_weight);
-                r2 = _mm256_mul_round_ps(store2_ps, v_weight);
-                r3 = _mm256_mul_round_ps(store3_ps, v_weight);
-            } else {
-                let scale_store_0_ps = _mm256_mul_ps(store0_ps, v_weight);
-                let scale_store_1_ps = _mm256_mul_ps(store1_ps, v_weight);
-                let scale_store_2_ps = _mm256_mul_ps(store2_ps, v_weight);
-                let scale_store_3_ps = _mm256_mul_ps(store3_ps, v_weight);
-
-                r0 = _mm256_round_ps::<0x00>(scale_store_0_ps);
-                r1 = _mm256_round_ps::<0x00>(scale_store_1_ps);
-                r2 = _mm256_round_ps::<0x00>(scale_store_2_ps);
-                r3 = _mm256_round_ps::<0x00>(scale_store_3_ps);
-            }
+            let r0 = _mm256_mul_ps(store0_ps, v_weight);
+            let r1 = _mm256_mul_ps(store1_ps, v_weight);
+            let r2 = _mm256_mul_ps(store2_ps, v_weight);
+            let r3 = _mm256_mul_ps(store3_ps, v_weight);
 
             let scale_store_0 = _mm256_cvtps_epi32(r0);
             let scale_store_1 = _mm256_cvtps_epi32(r1);
@@ -1380,18 +1212,8 @@ unsafe fn box_blur_vertical_pass_avx2_impl_lr<const FMA: bool>(
             let store0_ps = _mm256_cvtepi32_ps(jw0);
             let store1_ps = _mm256_cvtepi32_ps(jw1);
 
-            let (r0, r1);
-
-            if FMA {
-                r0 = _mm256_mul_round_ps(store0_ps, v_weight);
-                r1 = _mm256_mul_round_ps(store1_ps, v_weight);
-            } else {
-                let scale_store_0_ps = _mm256_mul_ps(store0_ps, v_weight);
-                let scale_store_1_ps = _mm256_mul_ps(store1_ps, v_weight);
-
-                r0 = _mm256_round_ps::<0x00>(scale_store_0_ps);
-                r1 = _mm256_round_ps::<0x00>(scale_store_1_ps);
-            }
+            let r0 = _mm256_mul_ps(store0_ps, v_weight);
+            let r1 = _mm256_mul_ps(store1_ps, v_weight);
 
             let scale_store_0 = _mm256_cvtps_epi32(r0);
             let scale_store_1 = _mm256_cvtps_epi32(r1);
@@ -1445,20 +1267,8 @@ unsafe fn box_blur_vertical_pass_avx2_impl_lr<const FMA: bool>(
             let store0_ps = _mm_cvtepi32_ps(store_0);
             let store1_ps = _mm_cvtepi32_ps(store_1);
 
-            let (r0, r1);
-
-            if FMA {
-                r0 = _mm_mul_round_ps(store0_ps, v_weight);
-                r1 = _mm_mul_round_ps(store1_ps, v_weight);
-            } else {
-                let scale_store_0_ps = _mm_mul_ps(store0_ps, v_weight);
-                let scale_store_1_ps = _mm_mul_ps(store1_ps, v_weight);
-
-                const RND: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
-
-                r0 = _mm_round_ps::<RND>(scale_store_0_ps);
-                r1 = _mm_round_ps::<RND>(scale_store_1_ps);
-            }
+            let r0 = _mm_mul_ps(store0_ps, v_weight);
+            let r1 = _mm_mul_ps(store1_ps, v_weight);
 
             let scale_store_0 = _mm_cvtps_epi32(r0);
             let scale_store_1 = _mm_cvtps_epi32(r1);
@@ -1501,18 +1311,7 @@ unsafe fn box_blur_vertical_pass_avx2_impl_lr<const FMA: bool>(
             _mm_storeu_si16(buffer.get_unchecked(buf_cx..).as_ptr() as *mut _, store);
 
             let store = _mm_unpacklo_epi16(store, _mm_setzero_si128());
-            let r0 = if FMA {
-                _mm_mul_round_ps(
-                    _mm_cvtepi32_ps(_mm_unpacklo_epi16(store, _mm_setzero_si128())),
-                    v_weight,
-                )
-            } else {
-                let scale_store_0_ps = _mm_mul_ps(_mm_cvtepi32_ps(store), v_weight);
-
-                const RND: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
-
-                _mm_round_ps::<RND>(scale_store_0_ps)
-            };
+            let r0 = _mm_mul_ps(_mm_cvtepi32_ps(store), v_weight);
             let ptr = unsafe_dst.slice.as_ptr().add(y_dst_shift + px) as *mut u8;
             store_u8_s16::<TAIL_CN>(ptr, _mm_cvtps_epi32(r0));
             buf_cx += 1;
