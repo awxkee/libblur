@@ -30,7 +30,7 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-use crate::sse::{_mm_mul_ps_epi32, _mm_mul_round_ps, load_u8_s32_fast, store_u8_u32, write_u8};
+use crate::sse::{_mm_mul_ps_epi32, load_u8_s32_fast, store_u8_u32, write_u8};
 use crate::unsafe_slice::UnsafeSlice;
 
 pub(crate) fn box_blur_horizontal_pass_sse<T, const CHANNELS: usize>(
@@ -46,15 +46,9 @@ pub(crate) fn box_blur_horizontal_pass_sse<T, const CHANNELS: usize>(
     unsafe {
         let src: &[u8] = std::mem::transmute(undefined_src);
         let unsafe_dst: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_unsafe_dst);
-        if std::arch::is_x86_feature_detected!("fma") {
-            box_blur_horizontal_pass_fma::<CHANNELS>(
-                src, src_stride, unsafe_dst, dst_stride, width, radius, start_y, end_y,
-            );
-        } else {
-            box_blur_horizontal_pass_def::<CHANNELS>(
-                src, src_stride, unsafe_dst, dst_stride, width, radius, start_y, end_y,
-            );
-        }
+        box_blur_horizontal_pass_def::<CHANNELS>(
+            src, src_stride, unsafe_dst, dst_stride, width, radius, start_y, end_y,
+        );
     }
 }
 
@@ -70,22 +64,6 @@ unsafe fn box_blur_horizontal_pass_def<const CHANNELS: usize>(
     end_y: u32,
 ) {
     box_blur_horizontal_pass_impl::<CHANNELS, false>(
-        src, src_stride, unsafe_dst, dst_stride, width, radius, start_y, end_y,
-    )
-}
-
-#[target_feature(enable = "sse4.1", enable = "fma")]
-unsafe fn box_blur_horizontal_pass_fma<const CHANNELS: usize>(
-    src: &[u8],
-    src_stride: u32,
-    unsafe_dst: &UnsafeSlice<u8>,
-    dst_stride: u32,
-    width: u32,
-    radius: u32,
-    start_y: u32,
-    end_y: u32,
-) {
-    box_blur_horizontal_pass_impl::<CHANNELS, true>(
         src, src_stride, unsafe_dst, dst_stride, width, radius, start_y, end_y,
     )
 }
@@ -303,26 +281,10 @@ unsafe fn box_blur_horizontal_pass_impl<const CHANNELS: usize, const FMA: bool>(
                 let scale_store_ps2 = _mm_cvtepi32_ps(store_2);
                 let scale_store_ps3 = _mm_cvtepi32_ps(store_3);
 
-                let (mut r0, mut r1, mut r2, mut r3);
-
-                if FMA {
-                    r0 = _mm_mul_round_ps(scale_store_ps0, v_weight);
-                    r1 = _mm_mul_round_ps(scale_store_ps1, v_weight);
-                    r2 = _mm_mul_round_ps(scale_store_ps2, v_weight);
-                    r3 = _mm_mul_round_ps(scale_store_ps3, v_weight);
-                } else {
-                    r0 = _mm_mul_ps(scale_store_ps0, v_weight);
-                    r1 = _mm_mul_ps(scale_store_ps1, v_weight);
-                    r2 = _mm_mul_ps(scale_store_ps2, v_weight);
-                    r3 = _mm_mul_ps(scale_store_ps3, v_weight);
-
-                    const RND: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
-
-                    r0 = _mm_round_ps::<RND>(r0);
-                    r1 = _mm_round_ps::<RND>(r1);
-                    r2 = _mm_round_ps::<RND>(r2);
-                    r3 = _mm_round_ps::<RND>(r3);
-                }
+                let r0 = _mm_mul_ps(scale_store_ps0, v_weight);
+                let r1 = _mm_mul_ps(scale_store_ps1, v_weight);
+                let r2 = _mm_mul_ps(scale_store_ps2, v_weight);
+                let r3 = _mm_mul_ps(scale_store_ps3, v_weight);
 
                 let scale_store0 = _mm_cvtps_epi32(r0);
                 let scale_store1 = _mm_cvtps_epi32(r1);
@@ -461,18 +423,7 @@ unsafe fn box_blur_horizontal_pass_impl<const CHANNELS: usize, const FMA: bool>(
             let px = x as usize * CHANNELS;
 
             unsafe {
-                let mut r0;
-
-                if FMA {
-                    r0 = _mm_mul_round_ps(_mm_cvtepi32_ps(store), v_weight);
-                } else {
-                    r0 = _mm_mul_ps(_mm_cvtepi32_ps(store), v_weight);
-
-                    const RND: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
-
-                    r0 = _mm_round_ps::<RND>(r0);
-                }
-
+                let r0 = _mm_mul_ps(_mm_cvtepi32_ps(store), v_weight);
                 let bytes_offset = y_dst_shift + px;
                 let ptr = unsafe_dst.slice.as_ptr().add(bytes_offset) as *mut u8;
                 store_u8_u32::<CHANNELS>(ptr, _mm_cvtps_epi32(r0));
@@ -625,17 +576,10 @@ unsafe fn box_blur_vertical_pass_sse_impl(
                 let store2_ps = _mm_cvtepi32_ps(store_2);
                 let store3_ps = _mm_cvtepi32_ps(store_3);
 
-                let scale_store_0_ps = _mm_mul_ps(store0_ps, v_weight);
-                let scale_store_1_ps = _mm_mul_ps(store1_ps, v_weight);
-                let scale_store_2_ps = _mm_mul_ps(store2_ps, v_weight);
-                let scale_store_3_ps = _mm_mul_ps(store3_ps, v_weight);
-
-                const RND: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
-
-                let r0 = _mm_round_ps::<RND>(scale_store_0_ps);
-                let r1 = _mm_round_ps::<RND>(scale_store_1_ps);
-                let r2 = _mm_round_ps::<RND>(scale_store_2_ps);
-                let r3 = _mm_round_ps::<RND>(scale_store_3_ps);
+                let r0 = _mm_mul_ps(store0_ps, v_weight);
+                let r1 = _mm_mul_ps(store1_ps, v_weight);
+                let r2 = _mm_mul_ps(store2_ps, v_weight);
+                let r3 = _mm_mul_ps(store3_ps, v_weight);
 
                 let scale_store_0 = _mm_cvtps_epi32(r0);
                 let scale_store_1 = _mm_cvtps_epi32(r1);
@@ -733,13 +677,8 @@ unsafe fn box_blur_vertical_pass_sse_impl(
                 let scale_store_0_ps = _mm_mul_ps(store0_ps, v_weight);
                 let scale_store_1_ps = _mm_mul_ps(store1_ps, v_weight);
 
-                const RND: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
-
-                let scale_store_0_rnd = _mm_round_ps::<RND>(scale_store_0_ps);
-                let scale_store_1_rnd = _mm_round_ps::<RND>(scale_store_1_ps);
-
-                let scale_store_0 = _mm_cvtps_epi32(scale_store_0_rnd);
-                let scale_store_1 = _mm_cvtps_epi32(scale_store_1_rnd);
+                let scale_store_0 = _mm_cvtps_epi32(scale_store_0_ps);
+                let scale_store_1 = _mm_cvtps_epi32(scale_store_1_ps);
 
                 let offset = y_dst_shift + px;
                 let ptr = unsafe_dst.slice.get_unchecked(offset).get();

@@ -26,7 +26,6 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::avx::{_mm256_mul_round_ps, _mm_mul_round_ps};
 use crate::sse::{load_u8_s32_fast, store_u8_s32};
 use crate::stackblur::stack_blur_pass::StackBlurWorkingPass;
 use crate::unsafe_slice::UnsafeSlice;
@@ -62,28 +61,7 @@ unsafe fn stack_blur_avx_vertical_def<const CN: usize>(
     thread: usize,
     total_threads: usize,
 ) {
-    stack_blur_avx_vertical::<CN, false, false>(
-        pixels,
-        stride,
-        width,
-        height,
-        radius,
-        thread,
-        total_threads,
-    );
-}
-
-#[target_feature(enable = "avx2", enable = "fma")]
-unsafe fn stack_blur_avx_vertical_fma<const CN: usize>(
-    pixels: &UnsafeSlice<u8>,
-    stride: u32,
-    width: u32,
-    height: u32,
-    radius: u32,
-    thread: usize,
-    total_threads: usize,
-) {
-    stack_blur_avx_vertical::<CN, true, false>(
+    stack_blur_avx_vertical::<CN, false>(
         pixels,
         stride,
         width,
@@ -95,7 +73,7 @@ unsafe fn stack_blur_avx_vertical_fma<const CN: usize>(
 }
 
 #[cfg(feature = "nightly_avx512")]
-#[target_feature(enable = "avx2", enable = "fma", enable = "avxvnni")]
+#[target_feature(enable = "avx2", enable = "avxvnni")]
 unsafe fn stack_blur_avx_vertical_fma_vnni<const CN: usize>(
     pixels: &UnsafeSlice<u8>,
     stride: u32,
@@ -105,7 +83,7 @@ unsafe fn stack_blur_avx_vertical_fma_vnni<const CN: usize>(
     thread: usize,
     total_threads: usize,
 ) {
-    stack_blur_avx_vertical::<CN, true, true>(
+    stack_blur_avx_vertical::<CN, true>(
         pixels,
         stride,
         width,
@@ -117,7 +95,7 @@ unsafe fn stack_blur_avx_vertical_fma_vnni<const CN: usize>(
 }
 
 #[inline(always)]
-unsafe fn stack_blur_avx_vertical<const CN: usize, const FMA: bool, const VNNI: bool>(
+unsafe fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
     pixels: &UnsafeSlice<u8>,
     stride: u32,
     width: u32,
@@ -277,24 +255,10 @@ unsafe fn stack_blur_avx_vertical<const CN: usize, const FMA: bool, const VNNI: 
             let casted_sum2 = _mm256_cvtepi32_ps(sums2);
             let casted_sum3 = _mm256_cvtepi32_ps(sums3);
 
-            let (mut a0, mut a1, mut a2, mut a3);
-
-            if FMA {
-                a0 = _mm256_mul_round_ps(casted_sum0, v_mul_value);
-                a1 = _mm256_mul_round_ps(casted_sum1, v_mul_value);
-                a2 = _mm256_mul_round_ps(casted_sum2, v_mul_value);
-                a3 = _mm256_mul_round_ps(casted_sum3, v_mul_value);
-            } else {
-                a0 = _mm256_mul_ps(casted_sum0, v_mul_value);
-                a1 = _mm256_mul_ps(casted_sum1, v_mul_value);
-                a2 = _mm256_mul_ps(casted_sum2, v_mul_value);
-                a3 = _mm256_mul_ps(casted_sum3, v_mul_value);
-
-                a0 = _mm256_round_ps::<0>(a0);
-                a1 = _mm256_round_ps::<0>(a1);
-                a2 = _mm256_round_ps::<0>(a2);
-                a3 = _mm256_round_ps::<0>(a3);
-            }
+            let a0 = _mm256_mul_ps(casted_sum0, v_mul_value);
+            let a1 = _mm256_mul_ps(casted_sum1, v_mul_value);
+            let a2 = _mm256_mul_ps(casted_sum2, v_mul_value);
+            let a3 = _mm256_mul_ps(casted_sum3, v_mul_value);
 
             let scaled_val0 = _mm256_cvtps_epi32(a0);
             let scaled_val1 = _mm256_cvtps_epi32(a1);
@@ -488,20 +452,8 @@ unsafe fn stack_blur_avx_vertical<const CN: usize, const FMA: bool, const VNNI: 
             let casted_sum0 = _mm_cvtepi32_ps(sums0);
             let casted_sum1 = _mm_cvtepi32_ps(sums1);
 
-            let (mut a0, mut a1);
-
-            if FMA {
-                a0 = _mm_mul_round_ps(casted_sum0, v_mul_value);
-                a1 = _mm_mul_round_ps(casted_sum1, v_mul_value);
-            } else {
-                const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
-
-                a0 = _mm_mul_ps(casted_sum0, v_mul_value);
-                a1 = _mm_mul_ps(casted_sum1, v_mul_value);
-
-                a0 = _mm_round_ps::<ROUNDING_FLAGS>(a0);
-                a1 = _mm_round_ps::<ROUNDING_FLAGS>(a1);
-            }
+            let a0 = _mm_mul_ps(casted_sum0, v_mul_value);
+            let a1 = _mm_mul_ps(casted_sum1, v_mul_value);
 
             let scaled_val0 = _mm_cvtps_epi32(a0);
             let scaled_val1 = _mm_cvtps_epi32(a1);
@@ -631,15 +583,7 @@ unsafe fn stack_blur_avx_vertical<const CN: usize, const FMA: bool, const VNNI: 
         dst_ptr = cx;
         for _ in 0..height {
             let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
-            const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
-            let result = if FMA {
-                _mm_cvtps_epi32(_mm_mul_round_ps(_mm_cvtepi32_ps(sums), v_mul_value))
-            } else {
-                _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(
-                    _mm_cvtepi32_ps(sums),
-                    v_mul_value,
-                )))
-            };
+            let result = _mm_cvtps_epi32(_mm_mul_ps(_mm_cvtepi32_ps(sums), v_mul_value));
             store_u8_s32::<CN>(store_ld, result);
 
             dst_ptr += stride as usize;
@@ -745,15 +689,7 @@ unsafe fn stack_blur_avx_vertical<const CN: usize, const FMA: bool, const VNNI: 
         dst_ptr = cx;
         for _ in 0..height {
             let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
-            const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
-            let result = if FMA {
-                _mm_cvtps_epi32(_mm_mul_round_ps(_mm_cvtepi32_ps(sums), v_mul_value))
-            } else {
-                _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(
-                    _mm_cvtepi32_ps(sums),
-                    v_mul_value,
-                )))
-            };
+            let result = _mm_cvtps_epi32(_mm_mul_ps(_mm_cvtepi32_ps(sums), v_mul_value));
             store_u8_s32::<TAIL>(store_ld, result);
 
             dst_ptr += stride as usize;
@@ -829,41 +765,29 @@ where
     ) {
         unsafe {
             let pixels: &UnsafeSlice<u8> = std::mem::transmute(pixels);
-            if std::arch::is_x86_feature_detected!("fma") {
-                #[cfg(feature = "nightly_avx512")]
-                {
-                    if std::arch::is_x86_feature_detected!("avxvnni") {
-                        return stack_blur_avx_vertical_fma_vnni::<COMPONENTS>(
-                            pixels,
-                            stride,
-                            width,
-                            height,
-                            radius,
-                            thread,
-                            total_threads,
-                        );
-                    }
+            #[cfg(feature = "nightly_avx512")]
+            {
+                if std::arch::is_x86_feature_detected!("avxvnni") {
+                    return stack_blur_avx_vertical_fma_vnni::<COMPONENTS>(
+                        pixels,
+                        stride,
+                        width,
+                        height,
+                        radius,
+                        thread,
+                        total_threads,
+                    );
                 }
-                stack_blur_avx_vertical_fma::<COMPONENTS>(
-                    pixels,
-                    stride,
-                    width,
-                    height,
-                    radius,
-                    thread,
-                    total_threads,
-                );
-            } else {
-                stack_blur_avx_vertical_def::<COMPONENTS>(
-                    pixels,
-                    stride,
-                    width,
-                    height,
-                    radius,
-                    thread,
-                    total_threads,
-                );
             }
+            stack_blur_avx_vertical_def::<COMPONENTS>(
+                pixels,
+                stride,
+                width,
+                height,
+                radius,
+                thread,
+                total_threads,
+            );
         }
     }
 }

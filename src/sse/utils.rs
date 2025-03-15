@@ -103,8 +103,7 @@ pub(crate) unsafe fn load_u8_s32_fast<const CN: usize>(ptr: *const u8) -> __m128
 #[inline(always)]
 pub(crate) unsafe fn _mm_mul_ps_epi32(ab: __m128i, cd: __m128) -> __m128i {
     let cvt = _mm_cvtepi32_ps(ab);
-    const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
-    let rs = _mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(cvt, cd));
+    let rs = _mm_mul_ps(cvt, cd);
     _mm_cvtps_epi32(rs)
 }
 
@@ -165,11 +164,6 @@ pub(crate) unsafe fn store_u8_s32<const CN: usize>(dst_ptr: *mut u8, regi: __m12
         let pixel_bytes = pixel_s32.to_le_bytes();
         dst_ptr.write_unaligned(pixel_bytes[0]);
     }
-}
-
-#[inline(always)]
-pub(crate) unsafe fn _mm_mul_round_ps(a: __m128, b: __m128) -> __m128 {
-    _mm_fmadd_ps(a, b, _mm_set1_ps(0.5f32))
 }
 
 /// Stores u32 up to x4 as u8 up to x4 based on channels count

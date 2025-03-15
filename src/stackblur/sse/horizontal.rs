@@ -26,7 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::sse::{_mm_mul_round_ps, load_u8_s32_fast, store_u8_s32};
+use crate::sse::{load_u8_s32_fast, store_u8_s32};
 use crate::stackblur::stack_blur_pass::StackBlurWorkingPass;
 use crate::unsafe_slice::UnsafeSlice;
 use num_traits::{AsPrimitive, FromPrimitive};
@@ -52,7 +52,7 @@ impl<T, J, const COMPONENTS: usize> Default for HorizontalSseStackBlurPass<T, J,
 }
 
 #[inline(always)]
-unsafe fn sse_horiz_pass_impl<const CN: usize, const FMA: bool>(
+unsafe fn sse_horiz_pass_impl<const CN: usize>(
     pixels: &UnsafeSlice<u8>,
     stride: u32,
     width: u32,
@@ -152,20 +152,8 @@ unsafe fn sse_horiz_pass_impl<const CN: usize, const FMA: bool>(
             let o0 = _mm_cvtepi32_ps(sums0);
             let o1 = _mm_cvtepi32_ps(sums1);
 
-            let (r0, r1);
-
-            if FMA {
-                r0 = _mm_mul_round_ps(o0, v_mul_value);
-                r1 = _mm_mul_round_ps(o1, v_mul_value);
-            } else {
-                let m0 = _mm_mul_ps(o0, v_mul_value);
-                let m1 = _mm_mul_ps(o1, v_mul_value);
-
-                const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
-
-                r0 = _mm_round_ps::<ROUNDING_FLAGS>(m0);
-                r1 = _mm_round_ps::<ROUNDING_FLAGS>(m1);
-            }
+            let r0 = _mm_mul_ps(o0, v_mul_value);
+            let r1 = _mm_mul_ps(o1, v_mul_value);
 
             store_u8_s32::<CN>(store_ld0, _mm_cvtps_epi32(r0));
             store_u8_s32::<CN>(store_ld1, _mm_cvtps_epi32(r1));
@@ -273,15 +261,7 @@ unsafe fn sse_horiz_pass_impl<const CN: usize, const FMA: bool>(
         let mut dst_ptr = y * stride as usize;
         for _ in 0..width {
             let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
-            const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
-            let result = if FMA {
-                _mm_cvtps_epi32(_mm_mul_round_ps(_mm_cvtepi32_ps(sums), v_mul_value))
-            } else {
-                _mm_cvtps_epi32(_mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(
-                    _mm_cvtepi32_ps(sums),
-                    v_mul_value,
-                )))
-            };
+            let result = _mm_cvtps_epi32(_mm_mul_ps(_mm_cvtepi32_ps(sums), v_mul_value));
             store_u8_s32::<CN>(store_ld, result);
             dst_ptr += CN;
 
@@ -332,20 +312,7 @@ unsafe fn sse_horiz_pass_impl_def<const CN: usize>(
     thread: usize,
     total_threads: usize,
 ) {
-    sse_horiz_pass_impl::<CN, false>(pixels, stride, width, height, radius, thread, total_threads);
-}
-
-#[target_feature(enable = "sse4.1", enable = "fma")]
-unsafe fn sse_horiz_pass_impl_fma<const CN: usize>(
-    pixels: &UnsafeSlice<u8>,
-    stride: u32,
-    width: u32,
-    height: u32,
-    radius: u32,
-    thread: usize,
-    total_threads: usize,
-) {
-    sse_horiz_pass_impl::<CN, true>(pixels, stride, width, height, radius, thread, total_threads);
+    sse_horiz_pass_impl::<CN>(pixels, stride, width, height, radius, thread, total_threads);
 }
 
 impl<T, J, const COMPONENTS: usize> StackBlurWorkingPass<T, COMPONENTS>
@@ -380,27 +347,15 @@ where
     ) {
         unsafe {
             let pixels: &UnsafeSlice<u8> = std::mem::transmute(pixels);
-            if std::arch::is_x86_feature_detected!("fma") {
-                sse_horiz_pass_impl_fma::<COMPONENTS>(
-                    pixels,
-                    stride,
-                    width,
-                    height,
-                    radius,
-                    thread,
-                    total_threads,
-                );
-            } else {
-                sse_horiz_pass_impl_def::<COMPONENTS>(
-                    pixels,
-                    stride,
-                    width,
-                    height,
-                    radius,
-                    thread,
-                    total_threads,
-                );
-            }
+            sse_horiz_pass_impl_def::<COMPONENTS>(
+                pixels,
+                stride,
+                width,
+                height,
+                radius,
+                thread,
+                total_threads,
+            );
         }
     }
 }

@@ -32,8 +32,8 @@ use std::arch::x86_64::*;
 
 use crate::reflect_101;
 use crate::reflect_index;
+use crate::sse::store_u16_u32;
 use crate::sse::utils::load_u16_s32_fast;
-use crate::sse::{_mm_mul_round_ps, store_u16_u32};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, EdgeMode};
 
@@ -112,7 +112,6 @@ unsafe fn fg_horizontal_pass_sse_u16_impl<const CN: usize, const FMA: bool>(
 
     let radius_64 = radius as i64;
     let width_wide = width as i64;
-    const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
 
     let v_weight = _mm_set1_ps(1f32 / (radius as f32 * radius as f32));
 
@@ -144,24 +143,10 @@ unsafe fn fg_horizontal_pass_sse_u16_impl<const CN: usize, const FMA: bool>(
                 let ss2 = _mm_cvtepi32_ps(summs2);
                 let ss3 = _mm_cvtepi32_ps(summs3);
 
-                let (r0, r1, r2, r3);
-
-                if FMA {
-                    r0 = _mm_mul_round_ps(ss0, v_weight);
-                    r1 = _mm_mul_round_ps(ss1, v_weight);
-                    r2 = _mm_mul_round_ps(ss2, v_weight);
-                    r3 = _mm_mul_round_ps(ss3, v_weight);
-                } else {
-                    let ms0 = _mm_mul_ps(ss0, v_weight);
-                    let ms1 = _mm_mul_ps(ss1, v_weight);
-                    let ms2 = _mm_mul_ps(ss2, v_weight);
-                    let ms3 = _mm_mul_ps(ss3, v_weight);
-
-                    r0 = _mm_round_ps::<ROUNDING_FLAGS>(ms0);
-                    r1 = _mm_round_ps::<ROUNDING_FLAGS>(ms1);
-                    r2 = _mm_round_ps::<ROUNDING_FLAGS>(ms2);
-                    r3 = _mm_round_ps::<ROUNDING_FLAGS>(ms3);
-                }
+                let r0 = _mm_mul_ps(ss0, v_weight);
+                let r1 = _mm_mul_ps(ss1, v_weight);
+                let r2 = _mm_mul_ps(ss2, v_weight);
+                let r3 = _mm_mul_ps(ss3, v_weight);
 
                 let prepared_px0 = _mm_cvtps_epi32(r0);
                 let prepared_px1 = _mm_cvtps_epi32(r1);
@@ -291,11 +276,7 @@ unsafe fn fg_horizontal_pass_sse_u16_impl<const CN: usize, const FMA: bool>(
             if x >= 0 {
                 let current_px = (x as u32 * CN as u32) as usize;
 
-                let pixel_f32 = if FMA {
-                    _mm_mul_round_ps(_mm_cvtepi32_ps(summs), v_weight)
-                } else {
-                    _mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(_mm_cvtepi32_ps(summs), v_weight))
-                };
+                let pixel_f32 = _mm_mul_ps(_mm_cvtepi32_ps(summs), v_weight);
                 let pixel_u32 = _mm_cvtps_epi32(pixel_f32);
 
                 let bytes_offset = current_y + current_px;
@@ -351,15 +332,9 @@ pub(crate) fn fg_vertical_pass_sse_u16<const CN: usize>(
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        if std::arch::is_x86_feature_detected!("fma") {
-            fg_vertical_pass_sse_u16_fma::<CN>(
-                bytes, stride, width, height, radius, start, end, edge_mode,
-            );
-        } else {
-            fg_vertical_pass_sse_u16_def::<CN>(
-                bytes, stride, width, height, radius, start, end, edge_mode,
-            );
-        }
+        fg_vertical_pass_sse_u16_def::<CN>(
+            bytes, stride, width, height, radius, start, end, edge_mode,
+        );
     }
 }
 
@@ -374,29 +349,13 @@ unsafe fn fg_vertical_pass_sse_u16_def<const CN: usize>(
     end: u32,
     edge_mode: EdgeMode,
 ) {
-    fg_vertical_pass_sse_u16_impl::<CN, false>(
-        bytes, stride, width, height, radius, start, end, edge_mode,
-    );
-}
-
-#[target_feature(enable = "sse4.1", enable = "fma")]
-unsafe fn fg_vertical_pass_sse_u16_fma<const CN: usize>(
-    bytes: &UnsafeSlice<u16>,
-    stride: u32,
-    width: u32,
-    height: u32,
-    radius: u32,
-    start: u32,
-    end: u32,
-    edge_mode: EdgeMode,
-) {
-    fg_vertical_pass_sse_u16_impl::<CN, true>(
+    fg_vertical_pass_sse_u16_impl::<CN>(
         bytes, stride, width, height, radius, start, end, edge_mode,
     );
 }
 
 #[inline(always)]
-unsafe fn fg_vertical_pass_sse_u16_impl<const CN: usize, const FMA: bool>(
+unsafe fn fg_vertical_pass_sse_u16_impl<const CN: usize>(
     bytes: &UnsafeSlice<u16>,
     stride: u32,
     width: u32,
@@ -415,8 +374,6 @@ unsafe fn fg_vertical_pass_sse_u16_impl<const CN: usize, const FMA: bool>(
     let height_wide = height as i64;
 
     let radius_64 = radius as i64;
-
-    const ROUNDING_FLAGS: i32 = _MM_FROUND_TO_NEAREST_INT | _MM_FROUND_NO_EXC;
 
     let v_weight = _mm_set1_ps(1f32 / (radius as f32 * radius as f32));
 
@@ -447,23 +404,10 @@ unsafe fn fg_vertical_pass_sse_u16_impl<const CN: usize, const FMA: bool>(
                 let ss2 = _mm_cvtepi32_ps(summs2);
                 let ss3 = _mm_cvtepi32_ps(summs3);
 
-                let (r0, r1, r2, r3);
-                if FMA {
-                    r0 = _mm_mul_round_ps(ss0, v_weight);
-                    r1 = _mm_mul_round_ps(ss1, v_weight);
-                    r2 = _mm_mul_round_ps(ss2, v_weight);
-                    r3 = _mm_mul_round_ps(ss3, v_weight);
-                } else {
-                    let ms0 = _mm_mul_ps(ss0, v_weight);
-                    let ms1 = _mm_mul_ps(ss1, v_weight);
-                    let ms2 = _mm_mul_ps(ss2, v_weight);
-                    let ms3 = _mm_mul_ps(ss3, v_weight);
-
-                    r0 = _mm_round_ps::<ROUNDING_FLAGS>(ms0);
-                    r1 = _mm_round_ps::<ROUNDING_FLAGS>(ms1);
-                    r2 = _mm_round_ps::<ROUNDING_FLAGS>(ms2);
-                    r3 = _mm_round_ps::<ROUNDING_FLAGS>(ms3);
-                }
+                let r0 = _mm_mul_ps(ss0, v_weight);
+                let r1 = _mm_mul_ps(ss1, v_weight);
+                let r2 = _mm_mul_ps(ss2, v_weight);
+                let r3 = _mm_mul_ps(ss3, v_weight);
 
                 let prepared_px0 = _mm_cvtps_epi32(r0);
                 let prepared_px1 = _mm_cvtps_epi32(r1);
@@ -594,11 +538,7 @@ unsafe fn fg_vertical_pass_sse_u16_impl<const CN: usize, const FMA: bool>(
         let start_y = 0 - 2 * radius as i64;
         for y in start_y..height_wide {
             if y >= 0 {
-                let pixel_f32 = if FMA {
-                    _mm_mul_round_ps(_mm_cvtepi32_ps(summs), v_weight)
-                } else {
-                    _mm_round_ps::<ROUNDING_FLAGS>(_mm_mul_ps(_mm_cvtepi32_ps(summs), v_weight))
-                };
+                let pixel_f32 = _mm_mul_ps(_mm_cvtepi32_ps(summs), v_weight);
 
                 let current_y = (y * (stride as i64)) as usize;
 

@@ -68,27 +68,12 @@ pub(crate) unsafe fn _mm_mul_epi8_by_ps_x4<const FMA: bool>(
     let v2 = _mm_cvtepi32_ps(a2);
     let v3 = _mm_cvtepi32_ps(a3);
 
-    if FMA {
-        (
-            _mm_opt_fmlaf_ps::<FMA>(_mm_set1_ps(0.5f32), v0, weight),
-            _mm_opt_fmlaf_ps::<FMA>(_mm_set1_ps(0.5f32), v1, weight),
-            _mm_opt_fmlaf_ps::<FMA>(_mm_set1_ps(0.5f32), v2, weight),
-            _mm_opt_fmlaf_ps::<FMA>(_mm_set1_ps(0.5f32), v3, weight),
-        )
-    } else {
-        let kz = (
-            _mm_mul_ps(v0, weight),
-            _mm_mul_ps(v1, weight),
-            _mm_mul_ps(v2, weight),
-            _mm_mul_ps(v3, weight),
-        );
-        (
-            _mm_add_ps(_mm_set1_ps(0.5f32), kz.0),
-            _mm_add_ps(_mm_set1_ps(0.5f32), kz.1),
-            _mm_add_ps(_mm_set1_ps(0.5f32), kz.2),
-            _mm_add_ps(_mm_set1_ps(0.5f32), kz.3),
-        )
-    }
+    (
+        _mm_mul_ps(v0, weight),
+        _mm_mul_ps(v1, weight),
+        _mm_mul_ps(v2, weight),
+        _mm_mul_ps(v3, weight),
+    )
 }
 
 #[inline(always)]
@@ -103,18 +88,7 @@ pub(crate) unsafe fn _mm_mul_epi16_by_ps_x2<const FMA: bool>(
     let v0 = _mm_cvtepi32_ps(a0);
     let v1 = _mm_cvtepi32_ps(a1);
 
-    if FMA {
-        (
-            _mm_opt_fmlaf_ps::<FMA>(_mm_set1_ps(0.5f32), v0, weight),
-            _mm_opt_fmlaf_ps::<FMA>(_mm_set1_ps(0.5f32), v1, weight),
-        )
-    } else {
-        let kz = (_mm_mul_ps(v0, weight), _mm_mul_ps(v1, weight));
-        (
-            _mm_add_ps(_mm_set1_ps(0.5f32), kz.0),
-            _mm_add_ps(_mm_set1_ps(0.5f32), kz.1),
-        )
-    }
+    (_mm_mul_ps(v0, weight), _mm_mul_ps(v1, weight))
 }
 
 #[inline(always)]
@@ -156,17 +130,7 @@ pub(crate) unsafe fn _mm_mul_epi8_by_ps_x2<const FMA: bool>(
     let a0 = _mm_cvtepi32_ps(k0);
     let a1 = _mm_cvtepi32_ps(k1);
 
-    if FMA {
-        (
-            _mm_opt_fmlaf_ps::<FMA>(_mm_set1_ps(0.5f32), a0, weight),
-            _mm_opt_fmlaf_ps::<FMA>(_mm_set1_ps(0.5f32), a1, weight),
-        )
-    } else {
-        (
-            _mm_add_ps(_mm_set1_ps(0.5f32), _mm_mul_ps(a0, weight)),
-            _mm_add_ps(_mm_set1_ps(0.5f32), _mm_mul_ps(a1, weight)),
-        )
-    }
+    (_mm_mul_ps(a0, weight), _mm_mul_ps(a1, weight))
 }
 
 #[inline(always)]
@@ -180,11 +144,7 @@ pub(crate) unsafe fn _mm_mul_epi16_by_ps<const FMA: bool>(
 
     let a0 = _mm_cvtepi32_ps(k0);
 
-    if FMA {
-        _mm_opt_fmlaf_ps::<FMA>(_mm_set1_ps(0.5f32), a0, weight)
-    } else {
-        _mm_add_ps(_mm_set1_ps(0.5f32), _mm_mul_ps(a0, weight))
-    }
+    _mm_mul_ps(a0, weight)
 }
 
 #[inline(always)]
