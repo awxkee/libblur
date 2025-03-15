@@ -72,7 +72,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     });
 
     let src_rgb = imread(
-        &find_file("assets/test_image_1.jpg", false, false).unwrap(),
+        &find_file("../assets/test_image_1.jpg", false, false).unwrap(),
         IMREAD_COLOR,
     )
     .unwrap();
