@@ -73,6 +73,7 @@ pub(crate) fn reflect_index_101(i: isize, n: isize) -> usize {
         return 0;
     }
     (n_r - i.rem_euclid(n_r)) as usize
+}
 
 macro_rules! reflect_101 {
     ($i:expr, $n:expr) => {{
