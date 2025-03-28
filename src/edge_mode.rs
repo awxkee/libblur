@@ -69,8 +69,10 @@ pub(crate) fn reflect_index(i: isize, n: isize) -> usize {
 #[allow(dead_code)]
 pub(crate) fn reflect_index_101(i: isize, n: isize) -> usize {
     let n_r = n - 1;
+    if n_r == 0 {
+        return 0;
+    }
     (n_r - i.rem_euclid(n_r)) as usize
-}
 
 macro_rules! reflect_101 {
     ($i:expr, $n:expr) => {{

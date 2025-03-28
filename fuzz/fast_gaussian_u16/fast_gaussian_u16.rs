@@ -51,14 +51,14 @@ fuzz_target!(|data: (u8, u8, u8, u8)| {
         data.1 as usize,
         data.2 as usize,
         FastBlurChannels::Channels3,
-         edge_mode,
+        edge_mode,
     );
     fuzz_image(
         data.0 as usize,
         data.1 as usize,
         data.2 as usize,
         FastBlurChannels::Plane,
-         edge_mode,
+        edge_mode,
     );
 });
 
