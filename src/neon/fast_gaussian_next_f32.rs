@@ -162,9 +162,8 @@ pub(crate) fn fgn_vertical_pass_neon_f32<T, const CHANNELS_COUNT: usize>(
                     diffs3 = vfmaq_n_f32(diffs3, sd3, -3f32);
                 }
 
-                let next_row_y =
-                    clamp_edge!(edge_mode, y + ((3 * radius_64) >> 1), 0, height_wide - 1)
-                        * (stride as usize);
+                let next_row_y = clamp_edge!(edge_mode, y + ((3 * radius_64) >> 1), 0, height_wide)
+                    * (stride as usize);
 
                 let s_ptr0 = bytes.slice.as_ptr().add(next_row_y + current_px0) as *mut f32;
                 let s_ptr1 = bytes.slice.as_ptr().add(next_row_y + current_px1) as *mut f32;
@@ -250,9 +249,8 @@ pub(crate) fn fgn_vertical_pass_neon_f32<T, const CHANNELS_COUNT: usize>(
                     diffs = vfmaq_f32(diffs, stored, vdupq_n_f32(-3f32));
                 }
 
-                let next_row_y =
-                    clamp_edge!(edge_mode, y + ((3 * radius_64) >> 1), 0, height_wide - 1)
-                        * (stride as usize);
+                let next_row_y = clamp_edge!(edge_mode, y + ((3 * radius_64) >> 1), 0, height_wide)
+                    * (stride as usize);
                 let next_row_x = x * CHANNELS_COUNT;
 
                 let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_x) as *mut f32;
@@ -402,7 +400,7 @@ pub(crate) fn fgn_horizontal_pass_neon_f32<T, const CHANNELS_COUNT: usize>(
                     diffs3 = vfmaq_n_f32(diffs3, sd3, -3f32);
                 }
 
-                let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide - 1);
+                let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide);
                 let next_row_px = next_row_x * CHANNELS_COUNT;
 
                 let s_ptr0 = bytes.slice.as_ptr().add(current_y0 + next_row_px) as *mut f32;
@@ -492,7 +490,7 @@ pub(crate) fn fgn_horizontal_pass_neon_f32<T, const CHANNELS_COUNT: usize>(
                 }
 
                 let next_row_y = y * (stride as usize);
-                let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide - 1);
+                let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide);
                 let next_row_px = next_row_x * CHANNELS_COUNT;
 
                 let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut f32;

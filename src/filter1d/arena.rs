@@ -244,8 +244,8 @@ where
                         .clone()
                         .zip(dst.chunks_exact_mut(CN).skip(ranges.1.start))
                     {
-                        let y = (i as i64 - pad_h as i64).rem_euclid(height as i64 - 1) as usize;
-                        let x = (j as i64 - pad_w as i64).rem_euclid(width as i64 - 1) as usize;
+                        let y = (i as i64 - pad_h as i64).rem_euclid(height as i64) as usize;
+                        let x = (j as i64 - pad_w as i64).rem_euclid(width as i64) as usize;
                         let v_src = y * old_stride + x * CN;
                         let src_iter = &image[v_src..(v_src + CN)];
                         for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
@@ -267,8 +267,8 @@ where
                         .clone()
                         .zip(dst.chunks_exact_mut(CN).skip(ranges.1.start))
                     {
-                        let y = reflect_index(i as i64 - pad_h as i64, height as i64 - 1);
-                        let x = reflect_index(j as i64 - pad_w as i64, width as i64 - 1);
+                        let y = reflect_index(i as isize - pad_h as isize, height as isize);
+                        let x = reflect_index(j as isize - pad_w as isize, width as isize);
                         let v_src = y * old_stride + x * CN;
                         let src_iter = &image[v_src..(v_src + CN)];
                         for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
@@ -290,8 +290,8 @@ where
                         .clone()
                         .zip(dst.chunks_exact_mut(CN).skip(ranges.1.start))
                     {
-                        let y = reflect_index_101(i as i64 - pad_h as i64, height as i64 - 1);
-                        let x = reflect_index_101(j as i64 - pad_w as i64, width as i64 - 1);
+                        let y = reflect_index_101(i as isize - pad_h as isize, height as isize);
+                        let x = reflect_index_101(j as isize - pad_w as isize, width as isize);
                         let v_src = y * old_stride + x * CN;
                         let src_iter = &image[v_src..(v_src + CN)];
                         for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
@@ -379,7 +379,7 @@ where
                 }
             }
             EdgeMode::Reflect => {
-                let old_x = reflect_index(x as i64 - pad_w as i64, image_size.width as i64 - 1);
+                let old_x = reflect_index(x as isize - pad_w as isize, image_size.width as isize);
                 let old_px = old_x * COMPONENTS;
                 let src_iter = &source_row[old_px..(old_px + COMPONENTS)];
                 for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
@@ -387,7 +387,8 @@ where
                 }
             }
             EdgeMode::Reflect101 => {
-                let old_x = reflect_index_101(x as i64 - pad_w as i64, image_size.width as i64 - 1);
+                let old_x =
+                    reflect_index_101(x as isize - pad_w as isize, image_size.width as isize);
                 let old_px = old_x * COMPONENTS;
                 let src_iter = &source_row[old_px..(old_px + COMPONENTS)];
                 for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
@@ -415,7 +416,7 @@ where
                 }
             }
             EdgeMode::Wrap => {
-                let old_x = (x as i64).rem_euclid(image_size.width as i64 - 1) as usize;
+                let old_x = (x as i64).rem_euclid(image_size.width as i64) as usize;
                 let old_px = old_x * COMPONENTS;
                 let src_iter = &source_row[old_px..(old_px + COMPONENTS)];
                 for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
@@ -423,7 +424,7 @@ where
                 }
             }
             EdgeMode::Reflect => {
-                let old_x = reflect_index(x as i64, image_size.width as i64 - 1);
+                let old_x = reflect_index(x as isize, image_size.width as isize);
                 let old_px = old_x * COMPONENTS;
                 let src_iter = &source_row[old_px..(old_px + COMPONENTS)];
                 for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
@@ -431,7 +432,7 @@ where
                 }
             }
             EdgeMode::Reflect101 => {
-                let old_x = reflect_index_101(x as i64, image_size.width as i64 - 1);
+                let old_x = reflect_index_101(x as isize, image_size.width as isize);
                 let old_px = old_x * COMPONENTS;
                 let src_iter = &source_row[old_px..(old_px + COMPONENTS)];
                 for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
@@ -573,8 +574,8 @@ where
                     }
                 }
                 EdgeMode::Wrap => {
-                    let y = (ky as i64 - pad_h as i64).rem_euclid(image_size.height as i64 - 1)
-                        as usize;
+                    let y =
+                        (ky as i64 - pad_h as i64).rem_euclid(image_size.height as i64) as usize;
                     let v_src = y * top_pad_stride + kx * COMPONENTS;
                     let src_iter = &image[v_src..(v_src + COMPONENTS)];
                     for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
@@ -582,7 +583,7 @@ where
                     }
                 }
                 EdgeMode::Reflect => {
-                    let y = reflect_index(ky as i64 - pad_h as i64, image_size.height as i64 - 1);
+                    let y = reflect_index(ky as isize - pad_h as isize, image_size.height as isize);
                     let v_src = y * top_pad_stride + kx * COMPONENTS;
                     let src_iter = &image[v_src..(v_src + COMPONENTS)];
                     for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
@@ -591,7 +592,7 @@ where
                 }
                 EdgeMode::Reflect101 => {
                     let y =
-                        reflect_index_101(ky as i64 - pad_h as i64, image_size.height as i64 - 1);
+                        reflect_index_101(ky as isize - pad_h as isize, image_size.height as isize);
                     let v_src = y * top_pad_stride + kx * COMPONENTS;
                     let src_iter = &image[v_src..(v_src + COMPONENTS)];
                     for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
@@ -632,8 +633,8 @@ where
                 }
                 EdgeMode::Reflect => {
                     let y = reflect_index(
-                        ky as i64 + image_size.height as i64,
-                        image_size.height as i64 - 1,
+                        ky as isize + image_size.height as isize,
+                        image_size.height as isize,
                     );
                     let v_src = y * top_pad_stride + kx * COMPONENTS;
                     let src_iter = &image[v_src..(v_src + COMPONENTS)];
@@ -643,8 +644,8 @@ where
                 }
                 EdgeMode::Reflect101 => {
                     let y = reflect_index_101(
-                        ky as i64 + image_size.height as i64,
-                        image_size.height as i64 - 1,
+                        ky as isize + image_size.height as isize,
+                        image_size.height as isize,
                     );
                     let v_src = y * top_pad_stride + kx * COMPONENTS;
                     let src_iter = &image[v_src..(v_src + COMPONENTS)];

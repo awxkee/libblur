@@ -105,7 +105,7 @@ fn main() {
         &image,
         &mut dst_image,
         0,
-        15.,
+        55.,
         EdgeMode::Wrap,
         ThreadingPolicy::Single,
     )

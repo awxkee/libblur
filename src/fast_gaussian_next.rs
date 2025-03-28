@@ -262,7 +262,7 @@ fn fgn_vertical_pass<
                 }
             }
 
-            let next_row_y = clamp_edge!(edge_mode, y + ((3 * radius_64) >> 1), 0, height_wide - 1)
+            let next_row_y = clamp_edge!(edge_mode, y + ((3 * radius_64) >> 1), 0, height_wide)
                 * (stride as usize);
             let next_row_x = (x * CN as u32) as usize;
 
@@ -407,7 +407,7 @@ fn fgn_horizontal_pass<
             }
 
             let next_row_y = (y as usize) * (stride as usize);
-            let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide - 1) * CN;
+            let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide) * CN;
 
             let px_off = next_row_y + next_row_x;
 

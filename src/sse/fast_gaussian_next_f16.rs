@@ -135,7 +135,7 @@ unsafe fn fast_gaussian_next_vertical_pass_sse_f16_impl<T, const CHANNELS_COUNT:
                 diffs = _mm_sub_ps(diffs, _mm_mul_ps(stored, threes));
             }
 
-            let next_row_y = clamp_edge!(edge_mode, y + ((3 * radius_64) >> 1), 0, height_wide - 1)
+            let next_row_y = clamp_edge!(edge_mode, y + ((3 * radius_64) >> 1), 0, height_wide)
                 * (stride as usize);
             let next_row_x = (x * CHANNELS_COUNT as u32) as usize;
 
@@ -252,7 +252,7 @@ unsafe fn fast_gaussian_next_horizontal_pass_sse_f16_impl<T, const CHANNELS_COUN
             }
 
             let next_row_y = (y as usize) * (stride as usize);
-            let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide - 1);
+            let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide);
             let next_row_px = next_row_x * CHANNELS_COUNT;
 
             let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut f16;

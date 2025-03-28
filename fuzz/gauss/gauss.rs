@@ -35,46 +35,64 @@ use libblur::{
 };
 use libfuzzer_sys::fuzz_target;
 
-fuzz_target!(|data: (u8, u8, u8)| {
+fuzz_target!(|data: (u8, u8, u8, u8)| {
+    let edge_mode = match data.3 % 4 {
+        0 => EdgeMode::Clamp,
+        1 => EdgeMode::Wrap,
+        2 => EdgeMode::Reflect,
+        _ => EdgeMode::Reflect101,
+    };
     fuzz_8bit(
         data.0 as usize,
         data.1 as usize,
         data.2 as usize,
         FastBlurChannels::Channels4,
+        edge_mode,
     );
     fuzz_8bit_non_symmetry(
         data.0 as usize,
         data.1 as usize,
         data.2 as usize,
         FastBlurChannels::Channels4,
+        edge_mode,
     );
     fuzz_8bit(
         data.0 as usize,
         data.1 as usize,
         data.2 as usize,
         FastBlurChannels::Channels3,
+        edge_mode,
     );
     fuzz_8bit_non_symmetry(
         data.0 as usize,
         data.1 as usize,
         data.2 as usize,
         FastBlurChannels::Channels3,
+        edge_mode,
     );
     fuzz_8bit(
         data.0 as usize,
         data.1 as usize,
         data.2 as usize,
         FastBlurChannels::Plane,
+        edge_mode,
     );
     fuzz_8bit_non_symmetry(
         data.0 as usize,
         data.1 as usize,
         data.2 as usize,
         FastBlurChannels::Plane,
+        edge_mode,
     );
 });
 
-fn fuzz_8bit(width: usize, height: usize, radius: usize, channels: FastBlurChannels) {
+fn fuzz_8bit(
+    width: usize,
+    height: usize,
+    radius: usize,
+    channels: FastBlurChannels,
+    edge_mode: EdgeMode,
+) {
     if width == 0 || height == 0 || radius == 0 {
         return;
     }
@@ -86,7 +104,7 @@ fn fuzz_8bit(width: usize, height: usize, radius: usize, channels: FastBlurChann
         &mut dst_image,
         radius as u32 * 2 + 1,
         0.,
-        EdgeMode::Clamp,
+        edge_mode,
         ThreadingPolicy::Single,
         ConvolutionMode::FixedPoint,
     )
@@ -97,14 +115,20 @@ fn fuzz_8bit(width: usize, height: usize, radius: usize, channels: FastBlurChann
         &mut dst_image,
         radius as u32 * 2 + 1,
         0.,
-        EdgeMode::Clamp,
+        edge_mode,
         ThreadingPolicy::Single,
         ConvolutionMode::Exact,
     )
     .unwrap();
 }
 
-fn fuzz_8bit_non_symmetry(width: usize, height: usize, radius: usize, channels: FastBlurChannels) {
+fn fuzz_8bit_non_symmetry(
+    width: usize,
+    height: usize,
+    radius: usize,
+    channels: FastBlurChannels,
+    edge_mode: EdgeMode,
+) {
     if width == 0 || height == 0 || radius == 0 {
         return;
     }
@@ -122,7 +146,7 @@ fn fuzz_8bit_non_symmetry(width: usize, height: usize, radius: usize, channels: 
                 &mut dst_image,
                 &kernel,
                 &kernel,
-                EdgeMode::Clamp,
+                edge_mode,
                 Scalar::default(),
                 ThreadingPolicy::Single,
             )
@@ -132,7 +156,7 @@ fn fuzz_8bit_non_symmetry(width: usize, height: usize, radius: usize, channels: 
                 &mut dst_image,
                 &kernel,
                 &kernel,
-                EdgeMode::Clamp,
+                edge_mode,
                 Scalar::default(),
                 ThreadingPolicy::Single,
             )
@@ -144,7 +168,7 @@ fn fuzz_8bit_non_symmetry(width: usize, height: usize, radius: usize, channels: 
                 &mut dst_image,
                 &kernel,
                 &kernel,
-                EdgeMode::Clamp,
+                edge_mode,
                 Scalar::default(),
                 ThreadingPolicy::Single,
             )
@@ -154,7 +178,7 @@ fn fuzz_8bit_non_symmetry(width: usize, height: usize, radius: usize, channels: 
                 &mut dst_image,
                 &kernel,
                 &kernel,
-                EdgeMode::Clamp,
+                edge_mode,
                 Scalar::default(),
                 ThreadingPolicy::Single,
             )
@@ -166,7 +190,7 @@ fn fuzz_8bit_non_symmetry(width: usize, height: usize, radius: usize, channels: 
                 &mut dst_image,
                 &kernel,
                 &kernel,
-                EdgeMode::Clamp,
+                edge_mode,
                 Scalar::default(),
                 ThreadingPolicy::Single,
             )
@@ -176,7 +200,7 @@ fn fuzz_8bit_non_symmetry(width: usize, height: usize, radius: usize, channels: 
                 &mut dst_image,
                 &kernel,
                 &kernel,
-                EdgeMode::Clamp,
+                edge_mode,
                 Scalar::default(),
                 ThreadingPolicy::Single,
             )

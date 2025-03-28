@@ -123,7 +123,7 @@ pub(crate) fn fg_vertical_pass_neon_f32<T, const CN: usize>(
                 }
 
                 let next_row_y =
-                    clamp_edge!(edge_mode, y + radius_64, 0, height_wide - 1) * (stride as usize);
+                    clamp_edge!(edge_mode, y + radius_64, 0, height_wide) * (stride as usize);
 
                 let s_ptr0 = bytes.slice.as_ptr().add(next_row_y + current_px0) as *mut f32;
                 let s_ptr1 = bytes.slice.as_ptr().add(next_row_y + current_px1) as *mut f32;
@@ -189,7 +189,7 @@ pub(crate) fn fg_vertical_pass_neon_f32<T, const CN: usize>(
                 }
 
                 let next_row_y =
-                    clamp_edge!(edge_mode, y + radius_64, 0, height_wide - 1) * (stride as usize);
+                    clamp_edge!(edge_mode, y + radius_64, 0, height_wide) * (stride as usize);
                 let next_row_x = x * CN;
 
                 let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_x) as *mut f32;
@@ -296,7 +296,7 @@ pub(crate) fn fg_horizontal_pass_neon_f32<T, const CN: usize>(
                     diffs3 = vfmaq_n_f32(diffs3, s3, -2f32);
                 }
 
-                let next_row_x = clamp_edge!(edge_mode, x + radius_64, 0, width_wide - 1);
+                let next_row_x = clamp_edge!(edge_mode, x + radius_64, 0, width_wide);
                 let next_row_px = next_row_x * CN;
 
                 let s_ptr0 = bytes.slice.as_ptr().add(current_y0 + next_row_px) as *mut f32;
@@ -364,7 +364,7 @@ pub(crate) fn fg_horizontal_pass_neon_f32<T, const CN: usize>(
                 }
 
                 let next_row_y = y * (stride as usize);
-                let next_row_x = clamp_edge!(edge_mode, x + radius_64, 0, width_wide - 1);
+                let next_row_x = clamp_edge!(edge_mode, x + radius_64, 0, width_wide);
                 let next_row_px = next_row_x * CN;
 
                 let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut f32;
