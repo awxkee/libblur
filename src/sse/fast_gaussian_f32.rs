@@ -25,16 +25,14 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#[cfg(target_arch = "x86")]
-use std::arch::x86::*;
-#[cfg(target_arch = "x86_64")]
-use std::arch::x86_64::*;
-
-use crate::reflect_101;
 use crate::reflect_index;
 use crate::sse::{_mm_opt_fnmlaf_ps, load_f32, store_f32};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, EdgeMode};
+#[cfg(target_arch = "x86")]
+use std::arch::x86::*;
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::*;
 
 pub(crate) fn fg_horizontal_pass_sse_f32<T, const CN: usize>(
     undefined_slice: &UnsafeSlice<T>,
@@ -182,7 +180,7 @@ unsafe fn fg_horizontal_pass_sse_f32_impl<const CN: usize, const FMA: bool>(
                 diffs3 = _mm_opt_fnmlaf_ps::<FMA>(diffs3, s3, v_double);
             }
 
-            let next_row_x = clamp_edge!(edge_mode, x + radius_64, 0, width_wide - 1);
+            let next_row_x = clamp_edge!(edge_mode, x + radius_64, 0, width_wide);
             let next_row_px = next_row_x * CN;
 
             let s_ptr0 = bytes.slice.as_ptr().add(current_y0 + next_row_px) as *mut f32;
@@ -255,7 +253,7 @@ unsafe fn fg_horizontal_pass_sse_f32_impl<const CN: usize, const FMA: bool>(
             }
 
             let next_row_y = y * (stride as usize);
-            let next_row_x = clamp_edge!(edge_mode, x + radius_64, 0, width_wide - 1);
+            let next_row_x = clamp_edge!(edge_mode, x + radius_64, 0, width_wide);
             let next_row_px = next_row_x * CN;
 
             let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut f32;
@@ -420,7 +418,7 @@ unsafe fn fg_vertical_pass_sse_f32_impl<const CN: usize, const FMA: bool>(
             }
 
             let next_row_y =
-                clamp_edge!(edge_mode, y + radius_64, 0, height_wide - 1) * (stride as usize);
+                clamp_edge!(edge_mode, y + radius_64, 0, height_wide) * (stride as usize);
 
             let s_ptr0 = bytes.slice.as_ptr().add(next_row_y + current_px0) as *mut f32;
             let s_ptr1 = bytes.slice.as_ptr().add(next_row_y + current_px1) as *mut f32;
@@ -493,7 +491,7 @@ unsafe fn fg_vertical_pass_sse_f32_impl<const CN: usize, const FMA: bool>(
             }
 
             let next_row_y =
-                clamp_edge!(edge_mode, y + radius_64, 0, height_wide - 1) * (stride as usize);
+                clamp_edge!(edge_mode, y + radius_64, 0, height_wide) * (stride as usize);
             let next_row_x = x * CN;
 
             let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_x) as *mut f32;

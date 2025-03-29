@@ -25,7 +25,6 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use num_traits::{AsPrimitive, Euclid, FromPrimitive, Signed};
 use std::ops::Index;
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Default)]
@@ -61,104 +60,41 @@ impl From<usize> for EdgeMode {
     }
 }
 
-#[inline]
-pub(crate) fn reflect_index<
-    T: Copy
-        + 'static
-        + PartialOrd
-        + PartialEq
-        + std::ops::Sub<Output = T>
-        + std::ops::Mul<Output = T>
-        + Euclid
-        + FromPrimitive
-        + Signed
-        + AsPrimitive<usize>,
->(
-    i: T,
-    n: T,
-) -> usize
-where
-    i64: AsPrimitive<T>,
-{
-    let i = (i - n).rem_euclid(&(2i64.as_() * n));
-    let i = (i - n).abs();
-    i.as_()
+#[inline(always)]
+pub(crate) fn reflect_index(i: isize, n: isize) -> usize {
+    (n - i.rem_euclid(n) - 1) as usize
 }
 
 #[inline(always)]
 #[allow(dead_code)]
-pub(crate) fn reflect_index_101<
-    T: Copy
-        + 'static
-        + PartialOrd
-        + PartialEq
-        + std::ops::Sub<Output = T>
-        + std::ops::Mul<Output = T>
-        + Euclid
-        + FromPrimitive
-        + Signed
-        + AsPrimitive<usize>
-        + Ord,
->(
-    i: T,
-    n: T,
-) -> usize
-where
-    i64: AsPrimitive<T>,
-{
-    if i < T::from_i32(0i32).unwrap() {
-        let i = (i - n).rem_euclid(&(2i64.as_() * n));
-        let i = (i - n).abs();
-        return (i + T::from_i32(1).unwrap()).min(n).as_();
+pub(crate) fn reflect_index_101(i: isize, n: isize) -> usize {
+    let n_r = n - 1;
+    if n_r == 0 {
+        return 0;
     }
-    if i > n {
-        let i = (i - n).rem_euclid(&(2i64.as_() * n));
-        let i = (i - n).abs();
-        return (i - T::from_i32(1i32).unwrap())
-            .max(T::from_i32(0i32).unwrap())
-            .as_();
-    }
-    i.as_()
+    (n_r - i.rem_euclid(n_r)) as usize
 }
-
-macro_rules! reflect_101 {
-    ($i:expr, $n:expr) => {{
-        if $i < 0 {
-            let i = ($i - $n).rem_euclid(2i64 * $n as i64);
-            let i = (i - $n).abs();
-            (i + 1).min($n) as usize
-        } else if $i > $n {
-            let i = ($i - $n).rem_euclid(2i64 * $n as i64);
-            let i = (i - $n).abs();
-            (i - 1).max(0) as usize
-        } else {
-            $i as usize
-        }
-    }};
-}
-
-pub(crate) use reflect_101;
 
 macro_rules! clamp_edge {
     ($edge_mode:expr, $value:expr, $min:expr, $max:expr) => {{
         match $edge_mode {
             EdgeMode::Clamp | EdgeMode::Constant => {
-                (std::cmp::min(std::cmp::max($value, $min), $max) as u32) as usize
+                (std::cmp::min(std::cmp::max($value, $min), $max - 1) as u32) as usize
             }
             EdgeMode::Wrap => {
-                if $value < $min || $value > $max {
-                    $value.rem_euclid($max + 1) as usize
+                if $value < $min || $value >= $max {
+                    $value.rem_euclid($max) as usize
                 } else {
                     $value as usize
                 }
             }
             EdgeMode::Reflect => {
-                let cx = reflect_index($value, $max);
+                let cx = reflect_index($value as isize, $max as isize);
                 cx as usize
             }
             EdgeMode::Reflect101 => {
-                let cx = reflect_101!($value, $max);
-                cx as usize
+                use crate::reflect_index_101;
+                reflect_index_101($value as isize, $max as isize)
             }
         }
     }};

@@ -25,7 +25,6 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::reflect_101;
 use crate::reflect_index;
 use crate::sse::utils::load_u8_s32_fast;
 use crate::sse::{_mm_mul_by_3_epi32, store_u8_u32};
@@ -246,7 +245,7 @@ unsafe fn fgn_vertical_pass_sse_u8_impl<const CN: usize>(
                 diffs3 = _mm_sub_epi32(diffs3, _mm_mul_by_3_epi32(stored3));
             }
 
-            let next_row_y = clamp_edge!(edge_mode, y + ((3 * radius_64) >> 1), 0, height_wide - 1)
+            let next_row_y = clamp_edge!(edge_mode, y + ((3 * radius_64) >> 1), 0, height_wide)
                 * (stride as usize);
 
             let s_ptr0 = bytes.slice.as_ptr().add(next_row_y + current_px0) as *mut u8;
@@ -344,7 +343,7 @@ unsafe fn fgn_vertical_pass_sse_u8_impl<const CN: usize>(
                 diffs = _mm_sub_epi32(diffs, _mm_mul_by_3_epi32(stored));
             }
 
-            let next_row_y = clamp_edge!(edge_mode, y + ((3 * radius_64) >> 1), 0, height_wide - 1)
+            let next_row_y = clamp_edge!(edge_mode, y + ((3 * radius_64) >> 1), 0, height_wide)
                 * (stride as usize);
             let next_row_x = (x * CN as u32) as usize;
 
@@ -569,7 +568,7 @@ unsafe fn fgn_horizontal_pass_sse_u8_impl<const CN: usize>(
                 diffs3 = _mm_sub_epi32(diffs3, _mm_mul_by_3_epi32(stored3));
             }
 
-            let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide - 1);
+            let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide);
             let next_row_px = next_row_x * CN;
 
             let s_ptr0 = bytes.slice.as_ptr().add(current_y0 + next_row_px) as *mut u8;
@@ -668,7 +667,7 @@ unsafe fn fgn_horizontal_pass_sse_u8_impl<const CN: usize>(
             }
 
             let next_row_y = (y as usize) * (stride as usize);
-            let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide - 1);
+            let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide);
             let next_row_px = next_row_x * CN;
 
             let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut u8;

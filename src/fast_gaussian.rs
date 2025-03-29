@@ -53,7 +53,7 @@ use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 use crate::wasm32::{fg_horizontal_pass_wasm_u8, fg_vertical_pass_wasm_u8};
-use crate::{clamp_edge, reflect_101, BlurError, BlurImageMut, EdgeMode};
+use crate::{clamp_edge, BlurError, BlurImageMut, EdgeMode};
 
 const BASE_RADIUS_I64_CUTOFF: u32 = 180;
 
@@ -264,7 +264,7 @@ fn fg_vertical_pass<T, J, M, const CN: usize>(
             }
 
             let next_row_y =
-                clamp_edge!(edge_mode, y + radius_64, 0i64, height_wide - 1) * (stride as usize);
+                clamp_edge!(edge_mode, y + radius_64, 0i64, height_wide) * (stride as usize);
             let next_row_x = (x * CN as u32) as usize;
 
             let px_idx = next_row_y + next_row_x;
@@ -385,7 +385,7 @@ fn fg_horizontal_pass<T, J, M, const CN: usize>(
             }
 
             let next_row_y = (y as usize) * (stride as usize);
-            let next_row_x = clamp_edge!(edge_mode, x + radius_64, 0, width_wide - 1) * CN;
+            let next_row_x = clamp_edge!(edge_mode, x + radius_64, 0, width_wide) * CN;
 
             let bytes_offset = next_row_y + next_row_x;
 

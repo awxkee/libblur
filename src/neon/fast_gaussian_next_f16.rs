@@ -32,7 +32,7 @@ use half::f16;
 use crate::neon::{load_f32_f16, store_f32_f16};
 use crate::reflect_index;
 use crate::unsafe_slice::UnsafeSlice;
-use crate::{clamp_edge, reflect_101, EdgeMode};
+use crate::{clamp_edge, EdgeMode};
 
 pub(crate) fn fgn_vertical_pass_neon_f16<T, const CHANNELS_COUNT: usize>(
     undef_bytes: &UnsafeSlice<T>,
@@ -104,9 +104,8 @@ pub(crate) fn fgn_vertical_pass_neon_f16<T, const CHANNELS_COUNT: usize>(
                     diffs = vsubq_f32(diffs, vmulq_n_f32(stored, 3f32));
                 }
 
-                let next_row_y =
-                    clamp_edge!(edge_mode, y + ((3 * radius_64) >> 1), 0, height_wide - 1)
-                        * (stride as usize);
+                let next_row_y = clamp_edge!(edge_mode, y + ((3 * radius_64) >> 1), 0, height_wide)
+                    * (stride as usize);
                 let next_row_x = x as usize * CHANNELS_COUNT;
 
                 let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_x) as *mut f16;
@@ -197,7 +196,7 @@ pub(crate) fn fgn_horizontal_pass_neon_f16<T, const CHANNELS_COUNT: usize>(
                 }
 
                 let next_row_y = (y as usize) * (stride as usize);
-                let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide - 1);
+                let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide);
                 let next_row_px = next_row_x * CHANNELS_COUNT;
 
                 let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut f16;

@@ -32,28 +32,43 @@
 use libblur::{fast_gaussian_u16, BlurImageMut, EdgeMode, FastBlurChannels, ThreadingPolicy};
 use libfuzzer_sys::fuzz_target;
 
-fuzz_target!(|data: (u8, u8, u8)| {
+fuzz_target!(|data: (u8, u8, u8, u8)| {
+    let edge_mode = match data.3 % 4 {
+        0 => EdgeMode::Clamp,
+        1 => EdgeMode::Wrap,
+        2 => EdgeMode::Reflect,
+        _ => EdgeMode::Reflect101,
+    };
     fuzz_image(
         data.0 as usize,
         data.1 as usize,
         data.2 as usize,
         FastBlurChannels::Channels4,
+        edge_mode,
     );
     fuzz_image(
         data.0 as usize,
         data.1 as usize,
         data.2 as usize,
         FastBlurChannels::Channels3,
+        edge_mode,
     );
     fuzz_image(
         data.0 as usize,
         data.1 as usize,
         data.2 as usize,
         FastBlurChannels::Plane,
+        edge_mode,
     );
 });
 
-fn fuzz_image(width: usize, height: usize, radius: usize, channels: FastBlurChannels) {
+fn fuzz_image(
+    width: usize,
+    height: usize,
+    radius: usize,
+    channels: FastBlurChannels,
+    edge_mode: EdgeMode,
+) {
     if width == 0 || height == 0 || radius == 0 {
         return;
     }
@@ -63,7 +78,7 @@ fn fuzz_image(width: usize, height: usize, radius: usize, channels: FastBlurChan
         &mut dst_image,
         radius as u32,
         ThreadingPolicy::Single,
-        EdgeMode::Clamp,
+        edge_mode,
     )
     .unwrap();
 }

@@ -26,7 +26,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::neon::{load_u8_s32_fast, store_u8_s32_x4, store_u8x8_m4, vmulq_s32_f32};
-use crate::{clamp_edge, reflect_101, reflect_index, EdgeMode};
+use crate::{clamp_edge, reflect_index, EdgeMode};
 use std::arch::aarch64::*;
 
 use crate::unsafe_slice::UnsafeSlice;
@@ -138,7 +138,7 @@ pub(crate) fn fg_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
                     diffs3 = vsubq_s32(diffs3, stored3);
                 }
 
-                let next_row_x = clamp_edge!(edge_mode, x + radius_64, 0, width_wide - 1);
+                let next_row_x = clamp_edge!(edge_mode, x + radius_64, 0, width_wide);
                 let next_row_px = next_row_x * CHANNELS_COUNT;
 
                 let s_ptr0 = bytes.slice.as_ptr().add(current_y0 + next_row_px) as *mut u8;
@@ -221,7 +221,7 @@ pub(crate) fn fg_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
                     diffs = vsubq_s32(diffs, stored);
                 }
 
-                let next_row_x = clamp_edge!(edge_mode, x + radius_64, 0, width_wide - 1);
+                let next_row_x = clamp_edge!(edge_mode, x + radius_64, 0, width_wide);
                 let next_row_px = next_row_x * CHANNELS_COUNT;
 
                 let s_ptr = bytes.slice.as_ptr().add(current_y + next_row_px) as *mut u8;
@@ -349,7 +349,7 @@ pub(crate) fn fg_vertical_pass_neon_u8<T, const CN: usize>(
                 }
 
                 let next_row_y =
-                    clamp_edge!(edge_mode, y + radius_64, 0, height_wide - 1) * (stride as usize);
+                    clamp_edge!(edge_mode, y + radius_64, 0, height_wide) * (stride as usize);
 
                 let s_ptr0 = bytes.slice.as_ptr().add(next_row_y + current_px0) as *mut u8;
                 let s_ptr1 = bytes.slice.as_ptr().add(next_row_y + current_px1) as *mut u8;
@@ -432,7 +432,7 @@ pub(crate) fn fg_vertical_pass_neon_u8<T, const CN: usize>(
                 }
 
                 let next_row_y =
-                    clamp_edge!(edge_mode, y + radius_64, 0, height_wide - 1) * (stride as usize);
+                    clamp_edge!(edge_mode, y + radius_64, 0, height_wide) * (stride as usize);
                 let next_row_x = (x * CN as u32) as usize;
 
                 let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_x) as *mut u8;

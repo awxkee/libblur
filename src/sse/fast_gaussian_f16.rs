@@ -30,13 +30,11 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-use half::f16;
-
-use crate::reflect_101;
 use crate::reflect_index;
 use crate::sse::{load_f32_f16, store_f32_f16};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, EdgeMode};
+use half::f16;
 
 pub(crate) fn fg_horizontal_pass_sse_f16<T, const CHANNELS_COUNT: usize>(
     undefined_slice: &UnsafeSlice<T>,
@@ -121,7 +119,7 @@ unsafe fn fast_gaussian_horizontal_pass_sse_f16_impl<T, const CHANNELS_COUNT: us
             }
 
             let next_row_y = (y as usize) * (stride as usize);
-            let next_row_x = clamp_edge!(edge_mode, x + radius_64, 0, width_wide - 1);
+            let next_row_x = clamp_edge!(edge_mode, x + radius_64, 0, width_wide);
             let next_row_px = next_row_x * CHANNELS_COUNT;
 
             let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut f16;
@@ -220,7 +218,7 @@ unsafe fn fast_gaussian_vertical_pass_sse_f16_impl<T, const CHANNELS_COUNT: usiz
             }
 
             let next_row_y =
-                clamp_edge!(edge_mode, y + radius_64, 0, height_wide - 1) * (stride as usize);
+                clamp_edge!(edge_mode, y + radius_64, 0, height_wide) * (stride as usize);
             let next_row_x = (x * CHANNELS_COUNT as u32) as usize;
 
             let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_x) as *mut f16;

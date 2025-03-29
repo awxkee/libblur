@@ -54,8 +54,8 @@ where
                 let zero_f = 0i32.as_();
                 if element.ne(&zero_f) {
                     left_front.push(ScanPoint2d::new(
-                        y as i64 - half_kernel_height,
                         x as i64 - horizontal_anchor,
+                        y as i64 - half_kernel_height,
                         element,
                     ));
                 }

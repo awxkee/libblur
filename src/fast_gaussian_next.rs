@@ -44,7 +44,7 @@ use crate::unsafe_slice::UnsafeSlice;
 use crate::wasm32::{
     fast_gaussian_next_horizontal_pass_wasm_u8, fast_gaussian_next_vertical_pass_wasm_u8,
 };
-use crate::{clamp_edge, reflect_101, BlurImageMut, EdgeMode, FastBlurChannels, ThreadingPolicy};
+use crate::{clamp_edge, BlurImageMut, EdgeMode, FastBlurChannels, ThreadingPolicy};
 use crate::{reflect_index, BlurError};
 use colorutils_rs::linear_to_planar::linear_to_plane;
 use colorutils_rs::planar_to_linear::plane_to_linear;
@@ -262,7 +262,7 @@ fn fgn_vertical_pass<
                 }
             }
 
-            let next_row_y = clamp_edge!(edge_mode, y + ((3 * radius_64) >> 1), 0, height_wide - 1)
+            let next_row_y = clamp_edge!(edge_mode, y + ((3 * radius_64) >> 1), 0, height_wide)
                 * (stride as usize);
             let next_row_x = (x * CN as u32) as usize;
 
@@ -407,7 +407,7 @@ fn fgn_horizontal_pass<
             }
 
             let next_row_y = (y as usize) * (stride as usize);
-            let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide - 1) * CN;
+            let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide) * CN;
 
             let px_off = next_row_y + next_row_x;
 
