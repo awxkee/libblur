@@ -53,7 +53,7 @@ use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 use crate::wasm32::{fg_horizontal_pass_wasm_u8, fg_vertical_pass_wasm_u8};
-use crate::{clamp_edge, reflect_101, BlurError, BlurImageMut, EdgeMode};
+use crate::{clamp_edge, BlurError, BlurImageMut, EdgeMode};
 
 const BASE_RADIUS_I64_CUTOFF: u32 = 180;
 

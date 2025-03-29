@@ -75,24 +75,6 @@ pub(crate) fn reflect_index_101(i: isize, n: isize) -> usize {
     (n_r - i.rem_euclid(n_r)) as usize
 }
 
-macro_rules! reflect_101 {
-    ($i:expr, $n:expr) => {{
-        if $i < 0 {
-            let i = ($i - $n).rem_euclid(2i64 * $n as i64);
-            let i = (i - $n).abs();
-            (i + 1).min($n) as usize
-        } else if $i > $n {
-            let i = ($i - $n).rem_euclid(2i64 * $n as i64);
-            let i = (i - $n).abs();
-            (i - 1).max(0) as usize
-        } else {
-            $i as usize
-        }
-    }};
-}
-
-pub(crate) use reflect_101;
-
 macro_rules! clamp_edge {
     ($edge_mode:expr, $value:expr, $min:expr, $max:expr) => {{
         match $edge_mode {
@@ -111,8 +93,8 @@ macro_rules! clamp_edge {
                 cx as usize
             }
             EdgeMode::Reflect101 => {
-                let cx = reflect_101!($value, $max);
-                cx as usize
+                use crate::reflect_index_101;
+                reflect_index_101($value as isize, $max as isize)
             }
         }
     }};

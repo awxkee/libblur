@@ -30,13 +30,11 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-use half::f16;
-
-use crate::reflect_101;
 use crate::reflect_index;
 use crate::sse::{load_f32_f16, store_f32_f16};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, EdgeMode};
+use half::f16;
 
 pub(crate) fn fast_gaussian_next_vertical_pass_sse_f16<T, const CHANNELS_COUNT: usize>(
     undefined_slice: &UnsafeSlice<T>,

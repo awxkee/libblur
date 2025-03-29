@@ -28,7 +28,7 @@
 use crate::neon::{load_u8_s32_fast, store_u8_s32_x4, store_u8x8_m4, vmulq_by_3_s32};
 use crate::reflect_index;
 use crate::unsafe_slice::UnsafeSlice;
-use crate::{clamp_edge, reflect_101, EdgeMode};
+use crate::{clamp_edge, EdgeMode};
 use std::arch::aarch64::*;
 
 pub(crate) fn fgn_vertical_pass_neon_u8<T, const CN: usize>(

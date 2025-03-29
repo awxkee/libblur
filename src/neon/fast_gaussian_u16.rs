@@ -26,7 +26,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::neon::{load_u16_s32_fast, store_u16_s32_x4, store_u16x4, vmulq_s32_f32};
-use crate::{clamp_edge, reflect_101, reflect_index, EdgeMode};
+use crate::{clamp_edge, reflect_index, EdgeMode};
 use std::arch::aarch64::*;
 
 use crate::unsafe_slice::UnsafeSlice;

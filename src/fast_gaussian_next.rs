@@ -44,7 +44,7 @@ use crate::unsafe_slice::UnsafeSlice;
 use crate::wasm32::{
     fast_gaussian_next_horizontal_pass_wasm_u8, fast_gaussian_next_vertical_pass_wasm_u8,
 };
-use crate::{clamp_edge, reflect_101, BlurImageMut, EdgeMode, FastBlurChannels, ThreadingPolicy};
+use crate::{clamp_edge, BlurImageMut, EdgeMode, FastBlurChannels, ThreadingPolicy};
 use crate::{reflect_index, BlurError};
 use colorutils_rs::linear_to_planar::linear_to_plane;
 use colorutils_rs::planar_to_linear::plane_to_linear;

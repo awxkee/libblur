@@ -31,7 +31,7 @@ use half::f16;
 
 use crate::neon::{load_f32_f16, store_f32_f16};
 use crate::unsafe_slice::UnsafeSlice;
-use crate::{clamp_edge, reflect_101, reflect_index, EdgeMode};
+use crate::{clamp_edge, reflect_index, EdgeMode};
 
 pub(crate) fn fg_vertical_pass_neon_f16<T, const CHANNELS_COUNT: usize>(
     undef_bytes: &UnsafeSlice<T>,

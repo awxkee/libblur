@@ -25,17 +25,15 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#[cfg(target_arch = "x86")]
-use std::arch::x86::*;
-#[cfg(target_arch = "x86_64")]
-use std::arch::x86_64::*;
-
-use crate::reflect_101;
 use crate::reflect_index;
 use crate::sse::store_u16_u32;
 use crate::sse::utils::load_u16_s32_fast;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, EdgeMode};
+#[cfg(target_arch = "x86")]
+use std::arch::x86::*;
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::*;
 
 pub(crate) fn fg_horizontal_pass_sse_u16<const CN: usize>(
     bytes: &UnsafeSlice<u16>,
