@@ -60,7 +60,7 @@ impl From<usize> for EdgeMode {
     }
 }
 
-#[inline]
+#[inline(always)]
 pub(crate) fn reflect_index(i: isize, n: isize) -> usize {
     (n - i.rem_euclid(n) - 1) as usize
 }

@@ -29,7 +29,7 @@ use crate::unsafe_slice::UnsafeSlice;
 use crate::wasm32::utils::{
     load_u8_s32_fast, u16x8_pack_trunc_u8x16, u32x4_pack_trunc_u16x8, w_store_u8x8_m4,
 };
-use crate::{clamp_edge, reflect_101, reflect_index, EdgeMode};
+use crate::{clamp_edge, reflect_index, EdgeMode};
 use std::arch::wasm32::*;
 
 pub fn fg_horizontal_pass_wasm_u8<T, const CHANNELS_COUNT: usize>(

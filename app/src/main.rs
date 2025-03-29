@@ -105,8 +105,8 @@ fn main() {
         &image,
         &mut dst_image,
         0,
-        55.,
-        EdgeMode::Wrap,
+        5.,
+        EdgeMode::Reflect101,
         ThreadingPolicy::Single,
     )
     .unwrap();
