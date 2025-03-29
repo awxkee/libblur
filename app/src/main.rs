@@ -88,34 +88,40 @@ fn main() {
 
     // let mut dst_image = BlurImageMut::borrow(&mut src_bytes, dyn_image.width(), dyn_image.height(), FastBlurChannels::Channels3)
 
-    let remapped = src_bytes
-        .iter()
-        .map(|&x| x as f32 * (1. / 255.))
-        .collect::<Vec<f32>>();
-
     let image = BlurImage::borrow(
-        &remapped,
+        &src_bytes,
         dyn_image.width(),
         dyn_image.height(),
         FastBlurChannels::Channels3,
     );
     let mut dst_image = BlurImageMut::default();
 
-    libblur::gaussian_blur_f32(
+    // libblur::gaussian_blur_f32(
+    //     &image,
+    //     &mut dst_image,
+    //     0,
+    //     5.,
+    //     EdgeMode::Reflect101,
+    //     ThreadingPolicy::Single,
+    // )
+    // .unwrap();
+    
+    libblur::motion_blur(
         &image,
         &mut dst_image,
-        0,
-        5.,
-        EdgeMode::Reflect101,
+        35.,
+        25,
+        EdgeMode::Clamp,
+        Scalar::new(0.0, 0.0, 0.0, 0.0),
         ThreadingPolicy::Single,
-    )
-    .unwrap();
+    ).unwrap();
 
     dst_bytes = dst_image
         .data
         .borrow()
         .iter()
-        .map(|&x| (x * 255f32).round() as u8)
+        .map(|&x| x)
+        // .map(|&x| (x * 255f32).round() as u8)
         .collect::<Vec<u8>>();
 
     // dst_bytes = dst_image.data.borrow().to_vec();
