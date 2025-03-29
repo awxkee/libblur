@@ -370,8 +370,7 @@ where
                 }
             }
             EdgeMode::Wrap => {
-                let old_x =
-                    (x as i64 - pad_w as i64).rem_euclid(image_size.width as i64 - 1) as usize;
+                let old_x = (x as i64 - pad_w as i64).rem_euclid(image_size.width as i64) as usize;
                 let old_px = old_x * COMPONENTS;
                 let src_iter = &source_row[old_px..(old_px + COMPONENTS)];
                 for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
@@ -623,8 +622,7 @@ where
                 }
                 EdgeMode::Wrap => {
                     let y = (ky as i64 + image_size.height as i64)
-                        .rem_euclid(image_size.height as i64 - 1)
-                        as usize;
+                        .rem_euclid(image_size.height as i64) as usize;
                     let v_src = y * top_pad_stride + kx * COMPONENTS;
                     let src_iter = &image[v_src..(v_src + COMPONENTS)];
                     for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
