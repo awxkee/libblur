@@ -17,6 +17,13 @@ sse = ["libblur/sse"]
 rdm = ["libblur/rdm"]
 
 [[bin]]
+name = "motion"
+path = "motion/motion.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "gauss"
 path = "gauss/gauss.rs"
 test = false
