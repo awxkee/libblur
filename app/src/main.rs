@@ -105,16 +105,17 @@ fn main() {
     //     ThreadingPolicy::Single,
     // )
     // .unwrap();
-    
+
     libblur::motion_blur(
         &image,
         &mut dst_image,
         35.,
-        25,
+        43,
         EdgeMode::Clamp,
         Scalar::new(0.0, 0.0, 0.0, 0.0),
         ThreadingPolicy::Single,
-    ).unwrap();
+    )
+    .unwrap();
 
     dst_bytes = dst_image
         .data

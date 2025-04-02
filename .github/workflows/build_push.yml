@@ -73,8 +73,8 @@ jobs:
       - run: cargo install cargo-fuzz
       - run: cargo fuzz run box --features ${{ matrix.feature }} -- -max_total_time=45
 
-  fuzz_gauss_arm:
-    name: Fuzzing Gauss
+  fuzz_filters_arm:
+    name: Fuzzing Filter 1D/2D
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -83,9 +83,10 @@ jobs:
       - run: cargo fuzz run gauss -- -max_total_time=45
       - run: cargo fuzz run gauss_u16 -- -max_total_time=45
       - run: cargo fuzz run gauss_f32 -- -max_total_time=45
+      - run: cargo fuzz run motion -- -max_total_time=45
 
-  fuzz_gauss_arm_rdm:
-    name: Fuzzing Gauss ARM RDM
+  fuzz_filter_1d_arm_rdm:
+    name: Fuzzing Filter 1D ARM RDM
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -93,8 +94,8 @@ jobs:
       - run: cargo install cargo-fuzz
       - run: cargo fuzz run gauss --features rdm -- -max_total_time=45
 
-  fuzz_gauss_x86:
-    name: Fuzzing Gauss x86
+  fuzz_filters_x86:
+    name: Fuzzing Filters 1D/2D x86
     strategy:
       matrix:
         feature: [ sse, avx ]
@@ -107,6 +108,7 @@ jobs:
       - run: cargo fuzz run gauss --features ${{ matrix.feature }} -- -max_total_time=45
       - run: cargo fuzz run gauss_u16 --features ${{ matrix.feature }} -- -max_total_time=45
       - run: cargo fuzz run gauss_f32 --features ${{ matrix.feature }} -- -max_total_time=45
+      - run: cargo fuzz run motion --features ${{ matrix.feature }} -- -max_total_time=45
 
   fuzz_stack_blur:
     name: Fuzzing Stack Blur
