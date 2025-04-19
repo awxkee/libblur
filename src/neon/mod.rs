@@ -32,7 +32,11 @@ mod fast_gaussian_f32;
 mod fast_gaussian_next;
 mod fast_gaussian_next_f16;
 mod fast_gaussian_next_f32;
+#[cfg(feature = "rdm")]
+mod fast_gaussian_next_q0_31;
 mod fast_gaussian_next_u16;
+#[cfg(feature = "rdm")]
+mod fast_gaussian_q0_31;
 mod fast_gaussian_u16;
 mod utils;
 
@@ -42,6 +46,14 @@ pub(crate) use fast_gaussian_f32::{fg_horizontal_pass_neon_f32, fg_vertical_pass
 pub(crate) use fast_gaussian_next::{fgn_horizontal_pass_neon_u8, fgn_vertical_pass_neon_u8};
 pub(crate) use fast_gaussian_next_f16::{fgn_horizontal_pass_neon_f16, fgn_vertical_pass_neon_f16};
 pub(crate) use fast_gaussian_next_f32::{fgn_horizontal_pass_neon_f32, fgn_vertical_pass_neon_f32};
+#[cfg(feature = "rdm")]
+pub(crate) use fast_gaussian_next_q0_31::{
+    fgn_horizontal_pass_neon_u8_rdm, fgn_vertical_pass_neon_u8_rdm,
+};
 pub(crate) use fast_gaussian_next_u16::{fgn_horizontal_pass_neon_u16, fgn_vertical_pass_neon_u16};
+#[cfg(feature = "rdm")]
+pub(crate) use fast_gaussian_q0_31::{
+    fg_horizontal_pass_neon_u8_rdm, fg_vertical_pass_neon_u8_rdm,
+};
 pub(crate) use fast_gaussian_u16::{fg_horizontal_pass_neon_u16, fg_vertical_pass_neon_u16};
 pub(crate) use utils::*;

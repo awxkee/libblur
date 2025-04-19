@@ -498,6 +498,13 @@ impl FastGaussianDispatchProvider<u8> for u8 {
         {
             if BASE_RADIUS_I64_CUTOFF > radius {
                 _dispatcher_horizontal = fg_horizontal_pass_neon_u8::<u8, CN>;
+                #[cfg(feature = "rdm")]
+                {
+                    if std::arch::is_aarch64_feature_detected!("rdm") {
+                        use crate::neon::fg_horizontal_pass_neon_u8_rdm;
+                        _dispatcher_horizontal = fg_horizontal_pass_neon_u8_rdm::<u8, CN>;
+                    }
+                }
             }
         }
         #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
@@ -537,6 +544,13 @@ impl FastGaussianDispatchProvider<u8> for u8 {
         {
             if BASE_RADIUS_I64_CUTOFF > radius {
                 _dispatcher_vertical = fg_vertical_pass_neon_u8::<u8, CN>;
+                #[cfg(feature = "rdm")]
+                {
+                    if std::arch::is_aarch64_feature_detected!("rdm") {
+                        use crate::neon::fg_vertical_pass_neon_u8_rdm;
+                        _dispatcher_vertical = fg_vertical_pass_neon_u8_rdm::<u8, CN>;
+                    }
+                }
             }
         }
         #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]

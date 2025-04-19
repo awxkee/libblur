@@ -33,9 +33,9 @@ mod vertical;
 mod vertical_f16;
 mod vertical_f32;
 
-pub use horizontal::HorizontalSseStackBlurPass;
-pub use horizontal_f16::HorizontalSseStackBlurPassFloat16;
-pub use horizontal_f32::HorizontalSseStackBlurPassFloat32;
-pub use vertical::VerticalSseStackBlurPass;
-pub use vertical_f16::VerticalSseStackBlurPassFloat16;
-pub use vertical_f32::VerticalSseStackBlurPassFloat32;
+pub(crate) use horizontal::HorizontalSseStackBlurPass;
+pub(crate) use horizontal_f16::HorizontalSseStackBlurPassFloat16;
+pub(crate) use horizontal_f32::HorizontalSseStackBlurPassFloat32;
+pub(crate) use vertical::VerticalSseStackBlurPass;
+pub(crate) use vertical_f16::VerticalSseStackBlurPassFloat16;
+pub(crate) use vertical_f32::VerticalSseStackBlurPassFloat32;

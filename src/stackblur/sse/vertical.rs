@@ -37,7 +37,7 @@ use std::arch::x86_64::*;
 use std::marker::PhantomData;
 use std::ops::{AddAssign, Mul, Shr, Sub, SubAssign};
 
-pub struct VerticalSseStackBlurPass<T, J, const COMPONENTS: usize> {
+pub(crate) struct VerticalSseStackBlurPass<T, J, const COMPONENTS: usize> {
     _phantom_t: PhantomData<T>,
     _phantom_j: PhantomData<J>,
 }

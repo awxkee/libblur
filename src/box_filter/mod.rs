@@ -30,6 +30,8 @@ mod box_blur;
 mod box_blur_avx;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 mod box_blur_neon;
+#[cfg(all(target_arch = "aarch64", target_feature = "neon", feature = "rdm"))]
+mod box_blur_neon_q0_31;
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 mod box_blur_sse;
 

@@ -208,6 +208,14 @@ impl BoxBlurHorizontalPass<u8> for u8 {
             #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
             {
                 _dispatcher_horizontal = box_blur_horizontal_pass_neon::<u8, CHANNEL_CONFIGURATION>;
+                #[cfg(feature = "rdm")]
+                {
+                    if std::arch::is_aarch64_feature_detected!("rdm") {
+                        use crate::box_filter::box_blur_neon_q0_31::box_blur_horizontal_pass_neon_rdm;
+                        _dispatcher_horizontal =
+                            box_blur_horizontal_pass_neon_rdm::<u8, CHANNEL_CONFIGURATION>;
+                    }
+                }
             }
             #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
             {
@@ -463,6 +471,13 @@ impl BoxBlurVerticalPass<u8> for u8 {
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             _dispatcher_vertical = box_blur_vertical_pass_neon::<u8>;
+            #[cfg(feature = "rdm")]
+            {
+                if std::arch::is_aarch64_feature_detected!("rdm") {
+                    use crate::box_filter::box_blur_neon_q0_31::box_blur_vertical_pass_neon_rdm;
+                    _dispatcher_vertical = box_blur_vertical_pass_neon_rdm::<u8>;
+                }
+            }
         }
         _dispatcher_vertical
     }

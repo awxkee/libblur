@@ -89,12 +89,20 @@ macro_rules! clamp_edge {
                 }
             }
             EdgeMode::Reflect => {
-                let cx = reflect_index($value as isize, $max as isize);
-                cx as usize
+                if $value < $min || $value >= $max {
+                    let cx = reflect_index($value as isize, $max as isize);
+                    cx as usize
+                } else {
+                    $value as usize
+                }
             }
             EdgeMode::Reflect101 => {
-                use crate::reflect_index_101;
-                reflect_index_101($value as isize, $max as isize)
+                if $value < $min || $value >= $max {
+                    use crate::reflect_index_101;
+                    reflect_index_101($value as isize, $max as isize)
+                } else {
+                    $value as usize
+                }
             }
         }
     }};

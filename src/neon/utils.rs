@@ -52,7 +52,7 @@ pub unsafe fn store_f32<const CHANNELS_COUNT: usize>(dst_ptr: *mut f32, regi: fl
 
 #[inline(always)]
 pub unsafe fn store_u8_s32<const CHANNELS_COUNT: usize>(dst_ptr: *mut u8, regi: int32x4_t) {
-    let s16 = vreinterpret_u16_s16(vqmovn_s32(regi));
+    let s16 = vqmovun_s32(regi);
     let u16_f = vcombine_u16(s16, s16);
     let v8 = vqmovn_u16(u16_f);
     if CHANNELS_COUNT == 4 {
@@ -199,6 +199,13 @@ pub(crate) unsafe fn vmulq_u32_f32(a: uint32x4_t, b: float32x4_t) -> uint32x4_t 
 pub(crate) unsafe fn vmulq_u16_low_f32(a: uint16x8_t, b: float32x4_t) -> uint32x4_t {
     let cvt = vcvtq_f32_u32(vmovl_u16(vget_low_u16(a)));
     vcvtaq_u32_f32(vmulq_f32(cvt, b))
+}
+
+#[inline(always)]
+#[allow(dead_code)]
+pub(crate) unsafe fn vmulq_u16_low_s32(a: uint16x8_t, b: int32x4_t) -> int32x4_t {
+    let cvt = vmovl_u16(vget_low_u16(a));
+    vqrdmulhq_s32(vreinterpretq_s32_u32(cvt), b)
 }
 
 #[inline(always)]
