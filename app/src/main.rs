@@ -73,9 +73,9 @@ fn main() {
 
     println!("{:?}", dyn_image.color());
 
-    let img = dyn_image.to_rgb8();
+    let img = dyn_image.to_rgba8();
     let mut src_bytes = img.as_bytes();
-    let components = 3;
+    let components = 4;
     let stride = dimensions.0 as usize * components;
     let mut bytes: Vec<u8> = src_bytes.to_vec();
     let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
@@ -86,36 +86,35 @@ fn main() {
 
     let start = Instant::now();
 
-    // let mut dst_image = BlurImageMut::borrow(&mut src_bytes, dyn_image.width(), dyn_image.height(), FastBlurChannels::Channels3)
+    let mut v_vec = src_bytes.to_vec();
+
+    // let mut dst_image = BlurImageMut::borrow(
+    //     &mut v_vec,
+    //     dyn_image.width(),
+    //     dyn_image.height(),
+    //     FastBlurChannels::Channels4,
+    // );
 
     let image = BlurImage::borrow(
         &src_bytes,
         dyn_image.width(),
         dyn_image.height(),
-        FastBlurChannels::Channels3,
+        FastBlurChannels::Channels4,
     );
     let mut dst_image = BlurImageMut::default();
 
-    // libblur::gaussian_blur_f32(
+    libblur::gaussian_box_blur(&image, &mut dst_image, 10., ThreadingPolicy::Single).unwrap();
+
+    // libblur::motion_blur(
     //     &image,
     //     &mut dst_image,
-    //     0,
-    //     5.,
-    //     EdgeMode::Reflect101,
+    //     35.,
+    //     43,
+    //     EdgeMode::Clamp,
+    //     Scalar::new(0.0, 0.0, 0.0, 0.0),
     //     ThreadingPolicy::Single,
     // )
     // .unwrap();
-
-    libblur::motion_blur(
-        &image,
-        &mut dst_image,
-        35.,
-        43,
-        EdgeMode::Clamp,
-        Scalar::new(0.0, 0.0, 0.0, 0.0),
-        ThreadingPolicy::Single,
-    )
-    .unwrap();
 
     dst_bytes = dst_image
         .data
@@ -160,7 +159,7 @@ fn main() {
         .unwrap();
     } else {
         image::save_buffer(
-            "blurred_stack_next.png",
+            "blurred_stack_next_f.png",
             bytes.as_bytes(),
             dimensions.0,
             dimensions.1,

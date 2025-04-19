@@ -29,13 +29,21 @@
 mod horizontal;
 mod horizontal_f16;
 mod horizontal_f32;
+#[cfg(feature = "rdm")]
+mod horizontal_q0_31;
 mod vertical;
 mod vertical_f16;
 mod vertical_f32;
+#[cfg(feature = "rdm")]
+mod vertical_q0_31;
 
-pub use horizontal::HorizontalNeonStackBlurPass;
-pub use horizontal_f16::HorizontalNeonStackBlurPassFloat16;
-pub use horizontal_f32::HorizontalNeonStackBlurPassFloat32;
-pub use vertical::VerticalNeonStackBlurPass;
-pub use vertical_f16::VerticalNeonStackBlurPassFloat16;
-pub use vertical_f32::VerticalNeonStackBlurPassFloat32;
+pub(crate) use horizontal::HorizontalNeonStackBlurPass;
+pub(crate) use horizontal_f16::HorizontalNeonStackBlurPassFloat16;
+pub(crate) use horizontal_f32::HorizontalNeonStackBlurPassFloat32;
+#[cfg(feature = "rdm")]
+pub(crate) use horizontal_q0_31::HorizontalNeonStackBlurPassQ0_31;
+pub(crate) use vertical::VerticalNeonStackBlurPass;
+pub(crate) use vertical_f16::VerticalNeonStackBlurPassFloat16;
+pub(crate) use vertical_f32::VerticalNeonStackBlurPassFloat32;
+#[cfg(feature = "rdm")]
+pub(crate) use vertical_q0_31::VerticalNeonStackBlurPassQ0_31;

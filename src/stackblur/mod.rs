@@ -26,7 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]
+#[cfg(all(target_arch = "x86_64", feature = "avx"))]
 mod avx;
 #[deny(unused, unreachable_pub)]
 mod horizontal;
@@ -45,6 +45,6 @@ mod vertical;
 mod wasm;
 
 pub(crate) use horizontal::HorizontalStackBlurPass;
-pub use stack_blur_pass::StackBlurWorkingPass;
+pub(crate) use stack_blur_pass::StackBlurWorkingPass;
 pub use stack_blur_u16::stack_blur_u16;
 pub use vertical::VerticalStackBlurPass;

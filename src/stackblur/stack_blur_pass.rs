@@ -29,7 +29,7 @@
 use crate::unsafe_slice::UnsafeSlice;
 use num_traits::{AsPrimitive, FromPrimitive};
 
-pub trait StackBlurWorkingPass<T, const COMPONENTS: usize>
+pub(crate) trait StackBlurWorkingPass<T, const COMPONENTS: usize>
 where
     T: Copy + FromPrimitive + 'static,
     f32: AsPrimitive<T>,

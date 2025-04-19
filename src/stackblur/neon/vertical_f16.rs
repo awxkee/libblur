@@ -35,7 +35,7 @@ use std::arch::aarch64::*;
 use std::marker::PhantomData;
 use std::ops::{AddAssign, Mul, Sub, SubAssign};
 
-pub struct VerticalNeonStackBlurPassFloat16<T, J, const COMPONENTS: usize> {
+pub(crate) struct VerticalNeonStackBlurPassFloat16<T, J, const COMPONENTS: usize> {
     _phantom_t: PhantomData<T>,
     _phantom_j: PhantomData<J>,
 }

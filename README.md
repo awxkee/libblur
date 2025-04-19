@@ -100,14 +100,14 @@ Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded 
 
 |         | time(NEON) | time(SSE) |
 |---------|:----------:|:---------:|
-| libblur |   5.77ms   |  5.30ms   |
+| libblur |   5.11ms   |  5.30ms   |
 | OpenCV  |   8.43ms   |  10.36ms  |
 
 Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded mode with 77 radius.
 
 |         | time(NEON) | time(SSE) |
 |---------|:----------:|:---------:|
-| libblur |   5.58ms   |  5.48ms   |
+| libblur |   5.37ms   |  5.48ms   |
 | OpenCV  |   8.00ms   |  8.55ms   |
 
 ### Fast gaussian
@@ -130,14 +130,14 @@ Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded 
 
 |         | time(NEON) | time(SSE) | 
 |---------|:----------:|:---------:| 
-| libblur |   5.92ms   |  6.38ms   | 
+| libblur |   5.72ms   |  6.38ms   | 
 | OpenCV  |     -      |     -     | 
 
 Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded mode with 77 radius.
 
 |         | time(NEON) | time(SSE) |
 |---------|:----------:|:---------:|
-| libblur |   6.65ms   |  7.18ms   |
+| libblur |   5.49ms   |  7.18ms   |
 | OpenCV  |     --     |    --     |
 
 ### Fast gaussian next
@@ -156,14 +156,14 @@ Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded
 
 |         | time(NEON) | time(SSE) |
 |---------|:----------:|:---------:| 
-| libblur |   4.18ms   |  5.29ms   | 
+| libblur |   3.69ms   |  5.29ms   | 
 | OpenCV  |     -      |     -     | 
 
 Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded mode with 77 radius.
 
 |         | time(NEON) | time(SSE) |
 |---------|:----------:|:---------:|
-| libblur |   4.46ms   |  5.39ms   |
+| libblur |   4.15ms   |  5.39ms   |
 | OpenCV  |     -      |     -     |
 
 ### Tent blur
@@ -263,7 +263,7 @@ Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded
 
 |         | Time(NEON) | Time(SSE) |
 |---------|:----------:|:---------:|
-| libblur |   6.13ms   |  7.99ms   |
+| libblur |   5.89ms   |  7.99ms   |
 | OpenCV  |  15.77ms   |  31.29ms  |
 
 Example comparison time for blurring image 2828x4242 RGBA 8-bit in single-thread mode with 15 radius on MacOS.

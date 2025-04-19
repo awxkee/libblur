@@ -1,7 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use libblur::{BlurImageMut, FastBlurChannels, ThreadingPolicy};
-use opencv::core::{find_file, Mat, Size};
+use opencv::core::{find_file, AlgorithmHint, Mat, Size, CV_8UC3, CV_8UC4};
 use opencv::imgcodecs::{imread, IMREAD_COLOR};
 
 pub fn criterion_benchmark(c: &mut Criterion) {
@@ -24,11 +24,22 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
-    let src = imread(
+    let src0 = imread(
         &find_file("../assets/test_image_4.png", false, false).unwrap(),
         IMREAD_COLOR,
     )
     .unwrap();
+
+    let mut src = Mat::default();
+    opencv::imgproc::cvt_color(
+        &src0,
+        &mut src,
+        CV_8UC3,
+        CV_8UC4,
+        AlgorithmHint::ALGO_HINT_DEFAULT,
+    )
+    .unwrap();
+
     c.bench_function("OpenCV: RGBA stack blur", |b| {
         b.iter(|| {
             let mut dst = Mat::default();
@@ -62,10 +73,20 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     )
     .unwrap();
 
+    let mut src = Mat::default();
+    opencv::imgproc::cvt_color(
+        &src_rgb,
+        &mut src,
+        CV_8UC3,
+        CV_8UC4,
+        AlgorithmHint::ALGO_HINT_DEFAULT,
+    )
+    .unwrap();
+
     c.bench_function("OpenCV: RGB stack blur", |b| {
         b.iter(|| {
             let mut dst = Mat::default();
-            opencv::imgproc::stack_blur(&src_rgb, &mut dst, Size::new(77, 77)).unwrap();
+            opencv::imgproc::stack_blur(&src, &mut dst, Size::new(77, 77)).unwrap();
         })
     });
 }

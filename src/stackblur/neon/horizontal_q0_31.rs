@@ -34,14 +34,14 @@ use std::arch::aarch64::*;
 use std::marker::PhantomData;
 use std::ops::{AddAssign, Mul, Shr, Sub, SubAssign};
 
-pub(crate) struct HorizontalNeonStackBlurPass<T, J, const COMPONENTS: usize> {
+pub(crate) struct HorizontalNeonStackBlurPassQ0_31<T, J, const COMPONENTS: usize> {
     _phantom_t: PhantomData<T>,
     _phantom_j: PhantomData<J>,
 }
 
-impl<T, J, const COMPONENTS: usize> Default for HorizontalNeonStackBlurPass<T, J, COMPONENTS> {
+impl<T, J, const COMPONENTS: usize> Default for HorizontalNeonStackBlurPassQ0_31<T, J, COMPONENTS> {
     fn default() -> Self {
-        HorizontalNeonStackBlurPass::<T, J, COMPONENTS> {
+        HorizontalNeonStackBlurPassQ0_31::<T, J, COMPONENTS> {
             _phantom_t: Default::default(),
             _phantom_j: Default::default(),
         }
@@ -49,7 +49,7 @@ impl<T, J, const COMPONENTS: usize> Default for HorizontalNeonStackBlurPass<T, J
 }
 
 impl<T, J, const COMPONENTS: usize> StackBlurWorkingPass<T, COMPONENTS>
-    for HorizontalNeonStackBlurPass<T, J, COMPONENTS>
+    for HorizontalNeonStackBlurPassQ0_31<T, J, COMPONENTS>
 where
     J: Copy
         + 'static
@@ -78,6 +78,40 @@ where
         thread: usize,
         total_threads: usize,
     ) {
+        unsafe { self.pass_impl(pixels, stride, width, height, radius, thread, total_threads) }
+    }
+}
+
+impl<T, J, const COMPONENTS: usize> HorizontalNeonStackBlurPassQ0_31<T, J, COMPONENTS>
+where
+    J: Copy
+        + 'static
+        + FromPrimitive
+        + AddAssign<J>
+        + Mul<Output = J>
+        + Shr<Output = J>
+        + Sub<Output = J>
+        + AsPrimitive<f32>
+        + SubAssign
+        + AsPrimitive<T>
+        + Default,
+    T: Copy + AsPrimitive<J> + FromPrimitive,
+    i32: AsPrimitive<J>,
+    u32: AsPrimitive<J>,
+    f32: AsPrimitive<T>,
+    usize: AsPrimitive<J>,
+{
+    #[target_feature(enable = "rdm")]
+    unsafe fn pass_impl(
+        &self,
+        pixels: &UnsafeSlice<T>,
+        stride: u32,
+        width: u32,
+        height: u32,
+        radius: u32,
+        thread: usize,
+        total_threads: usize,
+    ) {
         unsafe {
             let pixels: &UnsafeSlice<u8> = std::mem::transmute(pixels);
             let min_y = thread * height as usize / total_threads;
@@ -89,7 +123,9 @@ where
             let mut stack_start;
             let mut stacks0 = vec![0i32; 4 * div * 4];
 
-            let mul_value = vdupq_n_f32(1. / ((radius as f32 + 1.) * (radius as f32 + 1.)));
+            const Q: f64 = ((1i64 << 31i64) - 1) as f64;
+            let recip_scale = Q / ((radius as f64 + 1.) * (radius as f64 + 1.));
+            let mul_value = vdupq_n_s32(recip_scale as i32);
 
             let wm = width - 1;
             let div = (radius * 2) + 1;
@@ -203,20 +239,10 @@ where
                 let mut dst_ptr3 = (yy + 3) * stride as usize;
 
                 for _ in 0..width {
-                    let casted_sum0 = vcvtq_f32_s32(sums0);
-                    let casted_sum1 = vcvtq_f32_s32(sums1);
-                    let casted_sum2 = vcvtq_f32_s32(sums2);
-                    let casted_sum3 = vcvtq_f32_s32(sums3);
-
-                    let j0 = vmulq_f32(casted_sum0, mul_value);
-                    let j1 = vmulq_f32(casted_sum1, mul_value);
-                    let j2 = vmulq_f32(casted_sum2, mul_value);
-                    let j3 = vmulq_f32(casted_sum3, mul_value);
-
-                    let scaled_val0 = vcvtaq_s32_f32(j0);
-                    let scaled_val1 = vcvtaq_s32_f32(j1);
-                    let scaled_val2 = vcvtaq_s32_f32(j2);
-                    let scaled_val3 = vcvtaq_s32_f32(j3);
+                    let scaled_val0 = vqrdmulhq_s32(sums0, mul_value);
+                    let scaled_val1 = vqrdmulhq_s32(sums1, mul_value);
+                    let scaled_val2 = vqrdmulhq_s32(sums2, mul_value);
+                    let scaled_val3 = vqrdmulhq_s32(sums3, mul_value);
 
                     store_u8_s32_x4::<COMPONENTS>(
                         (
@@ -356,8 +382,8 @@ where
                 let mut dst_ptr = y * stride as usize;
                 for _ in 0..width {
                     let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
-                    let casted_sum = vcvtq_f32_s32(sums);
-                    let scaled_val = vcvtaq_s32_f32(vmulq_f32(casted_sum, mul_value));
+
+                    let scaled_val = vqrdmulhq_s32(sums, mul_value);
                     store_u8_s32::<COMPONENTS>(store_ld, scaled_val);
                     dst_ptr += COMPONENTS;
 

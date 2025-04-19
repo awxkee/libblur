@@ -34,21 +34,20 @@ use std::arch::aarch64::*;
 use std::marker::PhantomData;
 use std::ops::{AddAssign, Mul, Shr, Sub, SubAssign};
 
-pub(crate) struct VerticalNeonStackBlurPass<T, J, const COMPONENTS: usize> {
+pub(crate) struct VerticalNeonStackBlurPassQ0_31<T, J, const COMPONENTS: usize> {
     _phantom_t: PhantomData<T>,
     _phantom_j: PhantomData<J>,
 }
 
-impl<T, J, const COMPONENTS: usize> Default for VerticalNeonStackBlurPass<T, J, COMPONENTS> {
+impl<T, J, const COMPONENTS: usize> Default for VerticalNeonStackBlurPassQ0_31<T, J, COMPONENTS> {
     fn default() -> Self {
-        VerticalNeonStackBlurPass {
+        VerticalNeonStackBlurPassQ0_31 {
             _phantom_t: Default::default(),
             _phantom_j: Default::default(),
         }
     }
 }
-
-impl<T, J, const CN: usize> StackBlurWorkingPass<T, CN> for VerticalNeonStackBlurPass<T, J, CN>
+impl<T, J, const CN: usize> StackBlurWorkingPass<T, CN> for VerticalNeonStackBlurPassQ0_31<T, J, CN>
 where
     J: Copy
         + 'static
@@ -77,6 +76,40 @@ where
         thread: usize,
         total_threads: usize,
     ) {
+        unsafe { self.pass_impl(pixels, stride, width, height, radius, thread, total_threads) }
+    }
+}
+
+impl<T, J, const CN: usize> VerticalNeonStackBlurPassQ0_31<T, J, CN>
+where
+    J: Copy
+        + 'static
+        + FromPrimitive
+        + AddAssign<J>
+        + Mul<Output = J>
+        + Shr<Output = J>
+        + Sub<Output = J>
+        + AsPrimitive<f32>
+        + SubAssign
+        + AsPrimitive<T>
+        + Default,
+    T: Copy + AsPrimitive<J> + FromPrimitive,
+    i32: AsPrimitive<J>,
+    u32: AsPrimitive<J>,
+    f32: AsPrimitive<T>,
+    usize: AsPrimitive<J>,
+{
+    #[target_feature(enable = "rdm")]
+    unsafe fn pass_impl(
+        &self,
+        pixels: &UnsafeSlice<T>,
+        stride: u32,
+        width: u32,
+        height: u32,
+        radius: u32,
+        thread: usize,
+        total_threads: usize,
+    ) {
         unsafe {
             let div = ((radius * 2) + 1) as usize;
             let mut yp;
@@ -86,7 +119,9 @@ where
 
             let hm = height - 1;
             let div = (radius * 2) + 1;
-            let mul_value = vdupq_n_f32(1. / ((radius as f32 + 1.) * (radius as f32 + 1.)));
+            const Q: f64 = ((1i64 << 31i64) - 1) as f64;
+            let recip_scale = Q / ((radius as f64 + 1.) * (radius as f64 + 1.));
+            let mul_value = vdupq_n_s32(recip_scale as i32);
 
             let min_x = (thread * width as usize / total_threads) * CN;
             let max_x = ((thread + 1) * width as usize / total_threads) * CN;
@@ -191,20 +226,10 @@ where
                 for _ in 0..height {
                     let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
 
-                    let casted_sum0 = vcvtq_f32_s32(sums0);
-                    let casted_sum1 = vcvtq_f32_s32(sums1);
-                    let casted_sum2 = vcvtq_f32_s32(sums2);
-                    let casted_sum3 = vcvtq_f32_s32(sums3);
-
-                    let a0 = vmulq_f32(casted_sum0, mul_value);
-                    let a1 = vmulq_f32(casted_sum1, mul_value);
-                    let a2 = vmulq_f32(casted_sum2, mul_value);
-                    let a3 = vmulq_f32(casted_sum3, mul_value);
-
-                    let scaled_val0 = vcvtaq_s32_f32(a0);
-                    let scaled_val1 = vcvtaq_s32_f32(a1);
-                    let scaled_val2 = vcvtaq_s32_f32(a2);
-                    let scaled_val3 = vcvtaq_s32_f32(a3);
+                    let scaled_val0 = vqrdmulhq_s32(sums0, mul_value);
+                    let scaled_val1 = vqrdmulhq_s32(sums1, mul_value);
+                    let scaled_val2 = vqrdmulhq_s32(sums2, mul_value);
+                    let scaled_val3 = vqrdmulhq_s32(sums3, mul_value);
 
                     let jv0 = vcombine_u16(vqmovun_s32(scaled_val0), vqmovun_s32(scaled_val1));
                     let jv1 = vcombine_u16(vqmovun_s32(scaled_val2), vqmovun_s32(scaled_val3));
@@ -367,14 +392,8 @@ where
                 for _ in 0..height {
                     let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
 
-                    let casted_sum0 = vcvtq_f32_s32(sums0);
-                    let casted_sum1 = vcvtq_f32_s32(sums1);
-
-                    let a0 = vmulq_f32(casted_sum0, mul_value);
-                    let a1 = vmulq_f32(casted_sum1, mul_value);
-
-                    let scaled_val0 = vcvtaq_s32_f32(a0);
-                    let scaled_val1 = vcvtaq_s32_f32(a1);
+                    let scaled_val0 = vqrdmulhq_s32(sums0, mul_value);
+                    let scaled_val1 = vqrdmulhq_s32(sums1, mul_value);
 
                     let jv0 = vcombine_u16(vqmovun_s32(scaled_val0), vqmovun_s32(scaled_val1));
 
@@ -481,8 +500,7 @@ where
                 let mut dst_ptr = cx;
                 for _ in 0..height {
                     let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
-                    let casted_sum = vcvtq_f32_s32(sums);
-                    let scaled_val = vcvtaq_s32_f32(vmulq_f32(casted_sum, mul_value));
+                    let scaled_val = vqrdmulhq_s32(sums, mul_value);
                     store_u8_s32::<CN>(store_ld, scaled_val);
 
                     dst_ptr += stride as usize;
@@ -568,8 +586,8 @@ where
                 let mut dst_ptr = cx;
                 for _ in 0..height {
                     let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
-                    let casted_sum = vcvtq_f32_s32(sums);
-                    let scaled_val = vcvtaq_s32_f32(vmulq_f32(casted_sum, mul_value));
+                    let scaled_val = vqrdmulhq_s32(sums, mul_value);
+
                     store_u8_s32::<TAIL>(store_ld, scaled_val);
 
                     dst_ptr += stride as usize;
