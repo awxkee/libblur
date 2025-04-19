@@ -28,9 +28,6 @@
 use crate::avx::shuffle;
 use crate::sse::{load_u8_s16_fast, load_u8_s32_fast, store_u8_s16, store_u8_u32};
 use crate::unsafe_slice::UnsafeSlice;
-#[cfg(target_arch = "x86")]
-use std::arch::x86::*;
-#[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
 pub(crate) fn box_blur_vertical_pass_avx2<T>(
