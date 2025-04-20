@@ -26,8 +26,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::reflect_index;
-use crate::sse::utils::load_u8_s32_fast;
-use crate::sse::{_mm_mul_by_3_epi32, store_u8_u32};
+use crate::sse::{_mm_mul_by_3_epi32, load_u8_s32_fast, store_u8_u32};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, EdgeMode};
 #[cfg(target_arch = "x86")]
@@ -35,7 +34,7 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-pub(crate) fn fgn_vertical_pass_sse_u8<T, const CHANNELS_COUNT: usize>(
+pub(crate) fn fgn_vertical_pass_avx_u8<T, const CN: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -48,30 +47,14 @@ pub(crate) fn fgn_vertical_pass_sse_u8<T, const CHANNELS_COUNT: usize>(
     unsafe {
         let bytes: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_slice);
 
-        fgn_vertical_pass_sse_u8_def::<CHANNELS_COUNT>(
+        fgn_vertical_pass_avx2_u8_impl::<CN>(
             bytes, stride, width, height, radius, start, end, edge_mode,
         );
     }
 }
 
-#[target_feature(enable = "sse4.1")]
-unsafe fn fgn_vertical_pass_sse_u8_def<const CN: usize>(
-    bytes: &UnsafeSlice<u8>,
-    stride: u32,
-    width: u32,
-    height: u32,
-    radius: u32,
-    start: u32,
-    end: u32,
-    edge_mode: EdgeMode,
-) {
-    fgn_vertical_pass_sse_u8_impl::<CN>(
-        bytes, stride, width, height, radius, start, end, edge_mode,
-    );
-}
-
-#[inline(always)]
-unsafe fn fgn_vertical_pass_sse_u8_impl<const CN: usize>(
+#[target_feature(enable = "avx2")]
+unsafe fn fgn_vertical_pass_avx2_u8_impl<const CN: usize>(
     bytes: &UnsafeSlice<u8>,
     stride: u32,
     width: u32,
@@ -362,7 +345,7 @@ unsafe fn fgn_vertical_pass_sse_u8_impl<const CN: usize>(
     }
 }
 
-pub(crate) fn fgn_horizontal_pass_sse_u8<T, const CHANNELS_COUNT: usize>(
+pub(crate) fn fgn_horizontal_pass_avx2_u8<T, const CHANNELS_COUNT: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -374,30 +357,14 @@ pub(crate) fn fgn_horizontal_pass_sse_u8<T, const CHANNELS_COUNT: usize>(
 ) {
     unsafe {
         let bytes: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_slice);
-        fgn_horizontal_pass_sse_u8_def::<CHANNELS_COUNT>(
+        fgn_horizontal_pass_avx2_u8_impl::<CHANNELS_COUNT>(
             bytes, stride, width, height, radius, start, end, edge_mode,
         );
     }
 }
 
-#[target_feature(enable = "sse4.1")]
-unsafe fn fgn_horizontal_pass_sse_u8_def<const CN: usize>(
-    bytes: &UnsafeSlice<u8>,
-    stride: u32,
-    width: u32,
-    height: u32,
-    radius: u32,
-    start: u32,
-    end: u32,
-    edge_mode: EdgeMode,
-) {
-    fgn_horizontal_pass_sse_u8_impl::<CN>(
-        bytes, stride, width, height, radius, start, end, edge_mode,
-    );
-}
-
-#[inline(always)]
-unsafe fn fgn_horizontal_pass_sse_u8_impl<const CN: usize>(
+#[target_feature(enable = "avx2")]
+unsafe fn fgn_horizontal_pass_avx2_u8_impl<const CN: usize>(
     bytes: &UnsafeSlice<u8>,
     stride: u32,
     width: u32,

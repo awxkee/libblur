@@ -27,11 +27,15 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![deny(unreachable_pub)]
+#[cfg(feature = "avx")]
+mod fast_gaussian_next;
 mod pack;
 mod utils;
 mod v_load;
 mod v_store;
 
+#[cfg(feature = "avx")]
+pub(crate) use fast_gaussian_next::{fgn_horizontal_pass_avx2_u8, fgn_vertical_pass_avx_u8};
 pub(crate) use pack::*;
 pub(crate) use v_load::*;
 pub(crate) use v_store::*;

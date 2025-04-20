@@ -69,28 +69,28 @@ unsafe fn stack_blur_avx_vertical_def<const CN: usize>(
     );
 }
 
-//TODO: Re-enable when AVX512 is stabilized
-// #[cfg(feature = "nightly_avx512")]
-// #[target_feature(enable = "avx2", enable = "avxvnni")]
-// unsafe fn stack_blur_avx_vertical_fma_vnni<const CN: usize>(
-//     pixels: &UnsafeSlice<u8>,
-//     stride: u32,
-//     width: u32,
-//     height: u32,
-//     radius: u32,
-//     thread: usize,
-//     total_threads: usize,
-// ) {
-//     stack_blur_avx_vertical::<CN, true>(
-//         pixels,
-//         stride,
-//         width,
-//         height,
-//         radius,
-//         thread,
-//         total_threads,
-//     );
-// }
+// TODO: Re-enable when AVX512 is stabilized
+#[cfg(feature = "nightly_avx512")]
+#[target_feature(enable = "avx2", enable = "avxvnni")]
+unsafe fn stack_blur_avx_vertical_fma_vnni<const CN: usize>(
+    pixels: &UnsafeSlice<u8>,
+    stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    thread: usize,
+    total_threads: usize,
+) {
+    stack_blur_avx_vertical::<CN, true>(
+        pixels,
+        stride,
+        width,
+        height,
+        radius,
+        thread,
+        total_threads,
+    );
+}
 
 #[inline(always)]
 unsafe fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
@@ -763,20 +763,20 @@ where
     ) {
         unsafe {
             let pixels: &UnsafeSlice<u8> = std::mem::transmute(pixels);
-            // #[cfg(feature = "nightly_avx512")]
-            // {
-            //     if std::arch::is_x86_feature_detected!("avxvnni") {
-            //         return stack_blur_avx_vertical_fma_vnni::<COMPONENTS>(
-            //             pixels,
-            //             stride,
-            //             width,
-            //             height,
-            //             radius,
-            //             thread,
-            //             total_threads,
-            //         );
-            //     }
-            // }
+            #[cfg(feature = "nightly_avx512")]
+            {
+                if std::arch::is_x86_feature_detected!("avxvnni") {
+                    return stack_blur_avx_vertical_fma_vnni::<COMPONENTS>(
+                        pixels,
+                        stride,
+                        width,
+                        height,
+                        radius,
+                        thread,
+                        total_threads,
+                    );
+                }
+            }
             stack_blur_avx_vertical_def::<COMPONENTS>(
                 pixels,
                 stride,

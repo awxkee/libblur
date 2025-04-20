@@ -310,52 +310,14 @@ pub(crate) fn fg_vertical_pass_sse_u8<T, const CN: usize>(
 ) {
     unsafe {
         let bytes: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_slice);
-        if std::arch::is_x86_feature_detected!("fma") {
-            fg_vertical_pass_sse_u8_fma::<CN>(
-                bytes, stride, width, height, radius, start, end, edge_mode,
-            );
-        } else {
-            fg_vertical_pass_sse_u8_def::<CN>(
-                bytes, stride, width, height, radius, start, end, edge_mode,
-            );
-        }
+        fg_vertical_pass_sse_u8_def::<CN>(
+            bytes, stride, width, height, radius, start, end, edge_mode,
+        );
     }
 }
 
 #[target_feature(enable = "sse4.1")]
 unsafe fn fg_vertical_pass_sse_u8_def<const CN: usize>(
-    bytes: &UnsafeSlice<u8>,
-    stride: u32,
-    width: u32,
-    height: u32,
-    radius: u32,
-    start: u32,
-    end: u32,
-    edge_mode: EdgeMode,
-) {
-    fg_vertical_pass_sse_u8_impl::<CN, false>(
-        bytes, stride, width, height, radius, start, end, edge_mode,
-    );
-}
-
-#[target_feature(enable = "sse4.1", enable = "fma")]
-unsafe fn fg_vertical_pass_sse_u8_fma<const CN: usize>(
-    bytes: &UnsafeSlice<u8>,
-    stride: u32,
-    width: u32,
-    height: u32,
-    radius: u32,
-    start: u32,
-    end: u32,
-    edge_mode: EdgeMode,
-) {
-    fg_vertical_pass_sse_u8_impl::<CN, true>(
-        bytes, stride, width, height, radius, start, end, edge_mode,
-    );
-}
-
-#[inline(always)]
-unsafe fn fg_vertical_pass_sse_u8_impl<const CN: usize, const FMA: bool>(
     bytes: &UnsafeSlice<u8>,
     stride: u32,
     width: u32,

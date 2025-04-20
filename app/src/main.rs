@@ -88,22 +88,25 @@ fn main() {
 
     let mut v_vec = src_bytes.to_vec();
 
-    // let mut dst_image = BlurImageMut::borrow(
-    //     &mut v_vec,
-    //     dyn_image.width(),
-    //     dyn_image.height(),
-    //     FastBlurChannels::Channels4,
-    // );
-
-    let image = BlurImage::borrow(
-        &src_bytes,
+    let mut dst_image = BlurImageMut::borrow(
+        &mut v_vec,
         dyn_image.width(),
         dyn_image.height(),
         FastBlurChannels::Channels4,
     );
-    let mut dst_image = BlurImageMut::default();
 
-    libblur::gaussian_box_blur(&image, &mut dst_image, 10., ThreadingPolicy::Single).unwrap();
+    // let image = BlurImage::borrow(
+    //     &src_bytes,
+    //     dyn_image.width(),
+    //     dyn_image.height(),
+    //     FastBlurChannels::Channels4,
+    // );
+    // let mut dst_image = BlurImageMut::default();
+    //
+    // libblur::gaussian_box_blur(&image, &mut dst_image, 10., ThreadingPolicy::Single).unwrap();
+
+    libblur::fast_gaussian_next(&mut dst_image, 17, ThreadingPolicy::Single, EdgeMode::Clamp)
+        .unwrap();
 
     // libblur::motion_blur(
     //     &image,
