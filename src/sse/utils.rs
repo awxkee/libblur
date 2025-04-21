@@ -50,8 +50,8 @@ pub(crate) unsafe fn load_f32<const CN: usize>(ptr: *const f32) -> __m128 {
 pub(crate) unsafe fn load_u8_s16_fast<const CN: usize>(ptr: *const u8) -> __m128i {
     let sh1 = _mm_setr_epi8(0, -1, 1, -1, 2, -1, 3, -1, -1, -1, -1, -1, -1, -1, -1, -1);
     if CN == 4 {
-        let v = _mm_load_ss(ptr as *const _);
-        _mm_shuffle_epi8(_mm_castps_si128(v), sh1)
+        let v = _mm_loadu_si32(ptr as *const _);
+        _mm_shuffle_epi8(v, sh1)
     } else if CN == 3 {
         let mut v0 = _mm_loadu_si16(ptr);
         v0 = _mm_insert_epi8::<2>(v0, ptr.add(2).read_unaligned() as i32);
@@ -86,8 +86,8 @@ pub(crate) unsafe fn load_u16_s32_fast<const CN: usize>(ptr: *const u16) -> __m1
 pub(crate) unsafe fn load_u8_s32_fast<const CN: usize>(ptr: *const u8) -> __m128i {
     let sh1 = _mm_setr_epi8(0, -1, -1, -1, 1, -1, -1, -1, 2, -1, -1, -1, 3, -1, -1, -1);
     if CN == 4 {
-        let v = _mm_load_ss(ptr as *const _);
-        _mm_shuffle_epi8(_mm_castps_si128(v), sh1)
+        let v = _mm_loadu_si32(ptr as *const _);
+        _mm_shuffle_epi8(v, sh1)
     } else if CN == 3 {
         let mut v0 = _mm_loadu_si16(ptr);
         v0 = _mm_insert_epi8::<2>(v0, ptr.add(2).read_unaligned() as i32);
@@ -152,7 +152,7 @@ pub(crate) unsafe fn store_u8_s32<const CN: usize>(dst_ptr: *mut u8, regi: __m12
     let s16 = _mm_packs_epi32(regi, regi);
     let v8 = _mm_packus_epi16(s16, s16);
     if CN == 4 {
-        _mm_store_ss(dst_ptr as *mut f32, _mm_castsi128_ps(v8));
+        _mm_storeu_si32(dst_ptr as *mut _, v8);
     } else if CN == 3 {
         let pixel_3 = _mm_extract_epi8::<2>(v8);
         _mm_storeu_si16(dst_ptr, v8);
@@ -172,7 +172,7 @@ pub(crate) unsafe fn store_u8_u32<const CN: usize>(dst_ptr: *mut u8, regi: __m12
     let s16 = _mm_packus_epi32(regi, regi);
     let v8 = _mm_packus_epi16(s16, s16);
     if CN == 4 {
-        _mm_store_ss(dst_ptr as *mut f32, _mm_castsi128_ps(v8));
+        _mm_storeu_si32(dst_ptr as *mut _, v8);
     } else if CN == 3 {
         let pixel_3 = _mm_extract_epi8::<2>(v8);
         _mm_storeu_si16(dst_ptr, v8);
@@ -192,7 +192,7 @@ pub(crate) unsafe fn store_u8_u32<const CN: usize>(dst_ptr: *mut u8, regi: __m12
 pub(crate) unsafe fn store_u8_s16<const CN: usize>(dst_ptr: *mut u8, regi: __m128i) {
     let v8 = _mm_packus_epi16(regi, regi);
     if CN == 4 {
-        _mm_store_ss(dst_ptr as *mut f32, _mm_castsi128_ps(v8));
+        _mm_storeu_si32(dst_ptr as *mut _, v8);
     } else if CN == 3 {
         let pixel_3 = _mm_extract_epi8::<2>(v8);
         _mm_storeu_si16(dst_ptr, v8);
@@ -213,11 +213,11 @@ pub(crate) unsafe fn store_u16_u32<const CN: usize>(dst_ptr: *mut u16, regi: __m
     if CN == 4 {
         _mm_storeu_si64(dst_ptr as *mut _, v0);
     } else if CN == 3 {
-        _mm_store_ss(dst_ptr as *mut f32, _mm_castsi128_ps(v0));
+        _mm_storeu_si32(dst_ptr as *mut _, v0);
         let val = _mm_extract_epi16::<2>(v0);
         dst_ptr.add(2).write_unaligned(val as u16);
     } else if CN == 2 {
-        _mm_store_ss(dst_ptr as *mut f32, _mm_castsi128_ps(v0));
+        _mm_storeu_si32(dst_ptr as *mut _, v0);
     } else {
         _mm_storeu_si16(dst_ptr as *mut _, v0);
     }
@@ -227,7 +227,7 @@ pub(crate) unsafe fn store_u16_u32<const CN: usize>(dst_ptr: *mut u16, regi: __m
 #[cfg(feature = "sse")]
 pub(crate) unsafe fn write_u8<const CN: usize>(dst_ptr: *mut u8, v8: __m128i) {
     if CN == 4 {
-        _mm_store_ss(dst_ptr as *mut f32, _mm_castsi128_ps(v8));
+        _mm_storeu_si32(dst_ptr as *mut _, v8);
     } else if CN == 3 {
         let pixel_3 = _mm_extract_epi8::<2>(v8);
         _mm_storeu_si16(dst_ptr, v8);
