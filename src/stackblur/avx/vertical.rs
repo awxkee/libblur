@@ -48,6 +48,10 @@ impl<T, J, const COMPONENTS: usize> Default for VerticalAvxStackBlurPass<T, J, C
     }
 }
 
+#[repr(C, align(32))]
+#[derive(Copy, Clone, Default)]
+pub(crate) struct StackAvxSseI32x4(pub(crate) [i32; 4]);
+
 #[target_feature(enable = "avx2")]
 unsafe fn stack_blur_avx_vertical_def<const CN: usize>(
     pixels: &UnsafeSlice<u8>,
@@ -69,7 +73,6 @@ unsafe fn stack_blur_avx_vertical_def<const CN: usize>(
     );
 }
 
-// TODO: Re-enable when AVX512 is stabilized
 #[cfg(feature = "nightly_avx512")]
 #[target_feature(enable = "avx2", enable = "avxvnni")]
 unsafe fn stack_blur_avx_vertical_fma_vnni<const CN: usize>(
@@ -106,7 +109,7 @@ unsafe fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
     let mut yp;
     let mut sp;
     let mut stack_start;
-    let mut stacks = vec![0i32; 4 * div * 8];
+    let mut stacks = vec![StackAvxSseI32x4::default(); div * 8];
 
     let hm = height - 1;
     let div = (radius * 2) + 1;
@@ -151,12 +154,12 @@ unsafe fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
             let i16_h1 = _mm256_unpackhi_epi16(hi1, _mm256_setzero_si256());
 
             for i in 0..=radius {
-                let stack_ptr = stacks.as_mut_ptr().add(i as usize * 4 * 8);
+                let stack_ptr = stacks.as_mut_ptr().add(i as usize * 8);
 
-                _mm256_storeu_si256(stack_ptr as *mut _, i16_l0);
-                _mm256_storeu_si256(stack_ptr.add(8) as *mut _, i16_h0);
-                _mm256_storeu_si256(stack_ptr.add(16) as *mut _, i16_l1);
-                _mm256_storeu_si256(stack_ptr.add(24) as *mut _, i16_h1);
+                _mm256_store_si256(stack_ptr as *mut _, i16_l0);
+                _mm256_store_si256(stack_ptr.add(2) as *mut _, i16_h0);
+                _mm256_store_si256(stack_ptr.add(4) as *mut _, i16_l1);
+                _mm256_store_si256(stack_ptr.add(6) as *mut _, i16_h1);
 
                 let w = _mm256_set1_epi32(i as i32 + 1);
 
@@ -193,7 +196,7 @@ unsafe fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
                     src_ptr += stride as usize;
                 }
 
-                let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4 * 8);
+                let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 8);
                 let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
                 let src_pixel0 = _mm256_loadu_si256(src_ld as *const _);
                 let lo0 = _mm256_unpacklo_epi8(src_pixel0, _mm256_setzero_si256());
@@ -204,10 +207,10 @@ unsafe fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
                 let i16_l1 = _mm256_unpacklo_epi16(hi1, _mm256_setzero_si256());
                 let i16_h1 = _mm256_unpackhi_epi16(hi1, _mm256_setzero_si256());
 
-                _mm256_storeu_si256(stack_ptr as *mut _, i16_l0);
-                _mm256_storeu_si256(stack_ptr.add(8) as *mut _, i16_h0);
-                _mm256_storeu_si256(stack_ptr.add(16) as *mut _, i16_l1);
-                _mm256_storeu_si256(stack_ptr.add(24) as *mut _, i16_h1);
+                _mm256_store_si256(stack_ptr as *mut _, i16_l0);
+                _mm256_store_si256(stack_ptr.add(2) as *mut _, i16_h0);
+                _mm256_store_si256(stack_ptr.add(4) as *mut _, i16_l1);
+                _mm256_store_si256(stack_ptr.add(6) as *mut _, i16_h1);
 
                 let w = _mm256_set1_epi32(radius as i32 + 1 - i as i32);
 
@@ -280,12 +283,12 @@ unsafe fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
                 stack_start -= div;
             }
 
-            let stack_ptr = stacks.as_mut_ptr().add(stack_start as usize * 4 * 8);
+            let stack_ptr = stacks.as_mut_ptr().add(stack_start as usize * 8);
 
-            let stack_val0 = _mm256_loadu_si256(stack_ptr as *const _);
-            let stack_val1 = _mm256_loadu_si256(stack_ptr.add(8) as *const _);
-            let stack_val2 = _mm256_loadu_si256(stack_ptr.add(16) as *const _);
-            let stack_val3 = _mm256_loadu_si256(stack_ptr.add(24) as *const _);
+            let stack_val0 = _mm256_load_si256(stack_ptr as *const _);
+            let stack_val1 = _mm256_load_si256(stack_ptr.add(2) as *const _);
+            let stack_val2 = _mm256_load_si256(stack_ptr.add(4) as *const _);
+            let stack_val3 = _mm256_load_si256(stack_ptr.add(6) as *const _);
 
             sum_out0 = _mm256_sub_epi32(sum_out0, stack_val0);
             sum_out1 = _mm256_sub_epi32(sum_out1, stack_val1);
@@ -308,10 +311,10 @@ unsafe fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
             let i16_l1 = _mm256_unpacklo_epi16(hi1, _mm256_setzero_si256());
             let i16_h1 = _mm256_unpackhi_epi16(hi1, _mm256_setzero_si256());
 
-            _mm256_storeu_si256(stack_ptr as *mut _, i16_l0);
-            _mm256_storeu_si256(stack_ptr.add(8) as *mut _, i16_h0);
-            _mm256_storeu_si256(stack_ptr.add(16) as *mut _, i16_l1);
-            _mm256_storeu_si256(stack_ptr.add(24) as *mut _, i16_h1);
+            _mm256_store_si256(stack_ptr as *mut _, i16_l0);
+            _mm256_store_si256(stack_ptr.add(2) as *mut _, i16_h0);
+            _mm256_store_si256(stack_ptr.add(4) as *mut _, i16_l1);
+            _mm256_store_si256(stack_ptr.add(6) as *mut _, i16_h1);
 
             sum_in0 = _mm256_add_epi32(sum_in0, i16_l0);
             sum_in1 = _mm256_add_epi32(sum_in1, i16_h0);
@@ -328,12 +331,12 @@ unsafe fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
             if sp >= div {
                 sp = 0;
             }
-            let stack_ptr = stacks.as_mut_ptr().add(sp as usize * 4 * 8);
+            let stack_ptr = stacks.as_mut_ptr().add(sp as usize * 8);
 
-            let stack_val0 = _mm256_loadu_si256(stack_ptr as *const _);
-            let stack_val1 = _mm256_loadu_si256(stack_ptr.add(8) as *const _);
-            let stack_val2 = _mm256_loadu_si256(stack_ptr.add(16) as *const _);
-            let stack_val3 = _mm256_loadu_si256(stack_ptr.add(24) as *const _);
+            let stack_val0 = _mm256_load_si256(stack_ptr as *const _);
+            let stack_val1 = _mm256_load_si256(stack_ptr.add(2) as *const _);
+            let stack_val2 = _mm256_load_si256(stack_ptr.add(4) as *const _);
+            let stack_val3 = _mm256_load_si256(stack_ptr.add(6) as *const _);
 
             sum_out0 = _mm256_add_epi32(sum_out0, stack_val0);
             sum_out1 = _mm256_add_epi32(sum_out1, stack_val1);
@@ -348,8 +351,6 @@ unsafe fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
 
         cx += 32;
     }
-
-    let v_mul_value = _mm_set1_ps(1. / ((radius as f32 + 1.) * (radius as f32 + 1.)));
 
     while cx + 8 < max_x {
         let mut sums0 = _mm_setzero_si128();
@@ -373,10 +374,10 @@ unsafe fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
             let i16_h0 = _mm_unpackhi_epi16(lo0, _mm_setzero_si128());
 
             for i in 0..=radius {
-                let stack_ptr = stacks.as_mut_ptr().add(i as usize * 4 * 4);
+                let stack_ptr = stacks.as_mut_ptr().add(i as usize * 4);
 
-                _mm_storeu_si128(stack_ptr as *mut _, i16_l0);
-                _mm_storeu_si128(stack_ptr.add(4) as *mut _, i16_h0);
+                _mm_store_si128(stack_ptr as *mut _, i16_l0);
+                _mm_store_si128(stack_ptr.add(1) as *mut _, i16_h0);
 
                 let w = _mm_set1_epi32(i as i32 + 1);
 
@@ -405,7 +406,7 @@ unsafe fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
                     src_ptr += stride as usize;
                 }
 
-                let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4 * 4);
+                let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4);
                 let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
                 let src_pixel0 = _mm_loadu_si64(src_ld as *const u8);
                 let lo0 = _mm_unpacklo_epi8(src_pixel0, _mm_setzero_si128());
@@ -413,8 +414,8 @@ unsafe fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
                 let i16_l0 = _mm_unpacklo_epi16(lo0, _mm_setzero_si128());
                 let i16_h0 = _mm_unpackhi_epi16(lo0, _mm_setzero_si128());
 
-                _mm_storeu_si128(stack_ptr as *mut _, i16_l0);
-                _mm_storeu_si128(stack_ptr.add(4) as *mut _, i16_h0);
+                _mm_store_si128(stack_ptr as *mut _, i16_l0);
+                _mm_store_si128(stack_ptr.add(1) as *mut _, i16_h0);
 
                 let w = _mm_set1_epi32(radius as i32 + 1 - i as i32);
 
@@ -447,16 +448,18 @@ unsafe fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
         for _ in 0..height {
             let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
 
-            let casted_sum0 = _mm_cvtepi32_ps(sums0);
-            let casted_sum1 = _mm_cvtepi32_ps(sums1);
+            let ss01 = _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(sums0), sums1);
 
-            let a0 = _mm_mul_ps(casted_sum0, v_mul_value);
-            let a1 = _mm_mul_ps(casted_sum1, v_mul_value);
+            let css01 = _mm256_cvtepi32_ps(ss01);
 
-            let scaled_val0 = _mm_cvtps_epi32(a0);
-            let scaled_val1 = _mm_cvtps_epi32(a1);
+            let a0 = _mm256_mul_ps(css01, v_mul_value);
 
-            let jv0 = _mm_packus_epi32(scaled_val0, scaled_val1);
+            let scaled_val0 = _mm256_cvtps_epi32(a0);
+
+            let jv0 = _mm_packus_epi32(
+                _mm256_castsi256_si128(scaled_val0),
+                _mm256_extracti128_si256::<1>(scaled_val0),
+            );
 
             _mm_storeu_si64(store_ld, _mm_packus_epi16(jv0, _mm_setzero_si128()));
 
@@ -470,10 +473,10 @@ unsafe fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
                 stack_start -= div;
             }
 
-            let stack_ptr = stacks.as_mut_ptr().add(stack_start as usize * 4 * 4);
+            let stack_ptr = stacks.as_mut_ptr().add(stack_start as usize * 4);
 
-            let stack_val0 = _mm_loadu_si128(stack_ptr as *const _);
-            let stack_val1 = _mm_loadu_si128(stack_ptr.add(4) as *const _);
+            let stack_val0 = _mm_load_si128(stack_ptr as *const _);
+            let stack_val1 = _mm_load_si128(stack_ptr.add(1) as *const _);
 
             sum_out0 = _mm_sub_epi32(sum_out0, stack_val0);
             sum_out1 = _mm_sub_epi32(sum_out1, stack_val1);
@@ -491,8 +494,8 @@ unsafe fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
             let i16_l0 = _mm_unpacklo_epi16(lo0, _mm_setzero_si128());
             let i16_h0 = _mm_unpackhi_epi16(lo0, _mm_setzero_si128());
 
-            _mm_storeu_si128(stack_ptr as *mut _, i16_l0);
-            _mm_storeu_si128(stack_ptr.add(4) as *mut _, i16_h0);
+            _mm_store_si128(stack_ptr as *mut _, i16_l0);
+            _mm_store_si128(stack_ptr.add(1) as *mut _, i16_h0);
 
             sum_in0 = _mm_add_epi32(sum_in0, i16_l0);
             sum_in1 = _mm_add_epi32(sum_in1, i16_h0);
@@ -505,10 +508,10 @@ unsafe fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
             if sp >= div {
                 sp = 0;
             }
-            let stack_ptr = stacks.as_mut_ptr().add(sp as usize * 4 * 4);
+            let stack_ptr = stacks.as_mut_ptr().add(sp as usize * 4);
 
-            let stack_val0 = _mm_loadu_si128(stack_ptr as *const _);
-            let stack_val1 = _mm_loadu_si128(stack_ptr.add(4) as *const _);
+            let stack_val0 = _mm_load_si128(stack_ptr as *const _);
+            let stack_val1 = _mm_load_si128(stack_ptr.add(1) as *const _);
 
             sum_out0 = _mm_add_epi32(sum_out0, stack_val0);
             sum_out1 = _mm_add_epi32(sum_out1, stack_val1);
@@ -532,8 +535,8 @@ unsafe fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
         let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
 
         for i in 0..=radius {
-            let stack_ptr = stacks.as_mut_ptr().add(i as usize * 4);
-            _mm_storeu_si128(stack_ptr as *mut __m128i, src_pixel);
+            let stack_ptr = stacks.as_mut_ptr().add(i as usize);
+            _mm_store_si128(stack_ptr as *mut __m128i, src_pixel);
 
             let w = _mm_set1_epi32(i as i32 + 1);
 
@@ -553,10 +556,10 @@ unsafe fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
                 src_ptr += stride as usize;
             }
 
-            let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4);
+            let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize);
             let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
             let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
-            _mm_storeu_si128(stack_ptr as *mut __m128i, src_pixel);
+            _mm_store_si128(stack_ptr as *mut __m128i, src_pixel);
 
             let w = _mm_set1_epi32(radius as i32 + 1 - i as i32);
 
@@ -581,7 +584,10 @@ unsafe fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
         dst_ptr = cx;
         for _ in 0..height {
             let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
-            let result = _mm_cvtps_epi32(_mm_mul_ps(_mm_cvtepi32_ps(sums), v_mul_value));
+            let result = _mm_cvtps_epi32(_mm_mul_ps(
+                _mm_cvtepi32_ps(sums),
+                _mm256_castps256_ps128(v_mul_value),
+            ));
             store_u8_s32::<CN>(store_ld, result);
 
             dst_ptr += stride as usize;
@@ -593,8 +599,8 @@ unsafe fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
                 stack_start -= div;
             }
 
-            let stack_ptr = stacks.as_mut_ptr().add(stack_start as usize * 4);
-            let stack_val = _mm_loadu_si128(stack_ptr as *const __m128i);
+            let stack_ptr = stacks.as_mut_ptr().add(stack_start as usize);
+            let stack_val = _mm_load_si128(stack_ptr as *const __m128i);
             sum_out = _mm_sub_epi32(sum_out, stack_val);
 
             if yp < hm {
@@ -604,7 +610,7 @@ unsafe fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
 
             let src_ld = pixels.slice.as_ptr().add(src_ptr);
             let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
-            _mm_storeu_si128(stack_ptr as *mut __m128i, src_pixel);
+            _mm_store_si128(stack_ptr as *mut __m128i, src_pixel);
 
             sum_in = _mm_add_epi32(sum_in, src_pixel);
             sums = _mm_add_epi32(sums, sum_in);
@@ -614,8 +620,8 @@ unsafe fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
             if sp >= div {
                 sp = 0;
             }
-            let stack_ptr = stacks.as_mut_ptr().add(sp as usize * 4);
-            let stack_val = _mm_loadu_si128(stack_ptr as *const __m128i);
+            let stack_ptr = stacks.as_mut_ptr().add(sp as usize);
+            let stack_val = _mm_load_si128(stack_ptr as *const __m128i);
 
             sum_out = _mm_add_epi32(sum_out, stack_val);
             sum_in = _mm_sub_epi32(sum_in, stack_val);
@@ -638,8 +644,8 @@ unsafe fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
         let src_pixel = load_u8_s32_fast::<TAIL>(src_ld as *const u8);
 
         for i in 0..=radius {
-            let stack_ptr = stacks.as_mut_ptr().add(i as usize * 4);
-            _mm_storeu_si128(stack_ptr as *mut __m128i, src_pixel);
+            let stack_ptr = stacks.as_mut_ptr().add(i as usize);
+            _mm_store_si128(stack_ptr as *mut __m128i, src_pixel);
 
             let w = _mm_set1_epi32(i as i32 + 1);
 
@@ -659,10 +665,10 @@ unsafe fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
                 src_ptr += stride as usize;
             }
 
-            let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4);
+            let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize);
             let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
             let src_pixel = load_u8_s32_fast::<TAIL>(src_ld as *const u8);
-            _mm_storeu_si128(stack_ptr as *mut __m128i, src_pixel);
+            _mm_store_si128(stack_ptr as *mut __m128i, src_pixel);
 
             let w = _mm_set1_epi32(radius as i32 + 1 - i as i32);
 
@@ -687,7 +693,10 @@ unsafe fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
         dst_ptr = cx;
         for _ in 0..height {
             let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
-            let result = _mm_cvtps_epi32(_mm_mul_ps(_mm_cvtepi32_ps(sums), v_mul_value));
+            let result = _mm_cvtps_epi32(_mm_mul_ps(
+                _mm_cvtepi32_ps(sums),
+                _mm256_castps256_ps128(v_mul_value),
+            ));
             store_u8_s32::<TAIL>(store_ld, result);
 
             dst_ptr += stride as usize;
@@ -699,8 +708,8 @@ unsafe fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
                 stack_start -= div;
             }
 
-            let stack_ptr = stacks.as_mut_ptr().add(stack_start as usize * 4);
-            let stack_val = _mm_loadu_si128(stack_ptr as *const __m128i);
+            let stack_ptr = stacks.as_mut_ptr().add(stack_start as usize);
+            let stack_val = _mm_load_si128(stack_ptr as *const __m128i);
             sum_out = _mm_sub_epi32(sum_out, stack_val);
 
             if yp < hm {
@@ -710,7 +719,7 @@ unsafe fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
 
             let src_ld = pixels.slice.as_ptr().add(src_ptr);
             let src_pixel = load_u8_s32_fast::<TAIL>(src_ld as *const u8);
-            _mm_storeu_si128(stack_ptr as *mut __m128i, src_pixel);
+            _mm_store_si128(stack_ptr as *mut __m128i, src_pixel);
 
             sum_in = _mm_add_epi32(sum_in, src_pixel);
             sums = _mm_add_epi32(sums, sum_in);
@@ -720,8 +729,8 @@ unsafe fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
             if sp >= div {
                 sp = 0;
             }
-            let stack_ptr = stacks.as_mut_ptr().add(sp as usize * 4);
-            let stack_val = _mm_loadu_si128(stack_ptr as *const __m128i);
+            let stack_ptr = stacks.as_mut_ptr().add(sp as usize);
+            let stack_val = _mm_load_si128(stack_ptr as *const __m128i);
 
             sum_out = _mm_add_epi32(sum_out, stack_val);
             sum_in = _mm_sub_epi32(sum_in, stack_val);

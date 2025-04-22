@@ -36,7 +36,6 @@ use libblur::{
     BlurImage, BlurImageMut, BufferStore, ConvolutionMode, EdgeMode, FastBlurChannels, ImageSize,
     Scalar, ThreadingPolicy,
 };
-use std::arch::x86_64::*;
 use std::time::Instant;
 
 #[allow(dead_code)]
@@ -55,56 +54,7 @@ fn f16_to_f32(bytes: Vec<u16>) -> Vec<f32> {
         .collect()
 }
 
-#[inline(always)]
-pub(crate) unsafe fn _mm_mulhi_epi32(a0: __m128i, b0: __m256i) -> __m128i {
-    let rnd = _mm256_set1_epi64x((1 << 30) - 1);
-
-    let perm = _mm256_setr_epi32(0, -1, 1, -1, 2, -1, 3, -1);
-
-    let v0p = _mm256_permutevar8x32_epi32(_mm256_castsi128_si256(a0), perm);
-
-    let mut values: [i64; 8] = [0; 8];
-    _mm256_storeu_si256(values.as_mut_ptr() as *mut _, v0p);
-    println!("{:?}", values);
-
-    let lo = _mm256_mul_epi32(v0p, b0);
-
-    let mut values: [i64; 8] = [0; 8];
-    _mm256_storeu_si256(values.as_mut_ptr() as *mut _, lo);
-    println!("{:?}", values);
-
-    let a0 = _mm256_add_epi64(lo, rnd);
-
-    let mut values: [i64; 8] = [0; 8];
-    _mm256_storeu_si256(values.as_mut_ptr() as *mut _, lo);
-    println!("{:?}", values);
-
-    let b0 = _mm256_srli_epi64::<31>(a0);
-
-    let mut values: [i64; 8] = [0; 8];
-    _mm256_storeu_si256(values.as_mut_ptr() as *mut _, lo);
-    println!("{:?}", values);
-
-    let perm = _mm256_setr_epi32(0, 2, 4, 6, 0, 0, 0, 0);
-    let shuffled0 = _mm256_permutevar8x32_epi32(b0, perm);
-    _mm256_castsi256_si128(shuffled0)
-}
-
 fn main() {
-    unsafe {
-        let v0 = _mm256_set1_epi64x(10);
-
-        let v1 = _mm_set1_epi32(((1i64 << 31) - 1) as i32);
-
-        let mut values: [i32; 8] = [0; 8];
-        _mm_storeu_si128(values.as_mut_ptr() as *mut __m128i, v1);
-        println!("{:?}", values);
-
-        let v = _mm_mulhi_epi32(v1, v0);
-        let mut values: [i32; 8] = [0; 8];
-        _mm_storeu_si128(values.as_mut_ptr() as *mut __m128i, v);
-        println!("{:?}", values);
-    }
     let dyn_image = ImageReader::open("./assets/test_image_2.png")
         .unwrap()
         .decode()
@@ -134,11 +84,7 @@ fn main() {
 
     let start = Instant::now();
 
-    let mut v_vec = src_bytes
-        .to_vec()
-        .iter()
-        .map(|&x| u16::from_ne_bytes([x, x]))
-        .collect::<Vec<u16>>();
+    let mut v_vec = src_bytes.to_vec().iter().map(|&x| x).collect::<Vec<u8>>();
 
     let mut dst_image = BlurImageMut::borrow(
         &mut v_vec,
@@ -157,8 +103,7 @@ fn main() {
     //
     // libblur::gaussian_box_blur(&image, &mut dst_image, 10., ThreadingPolicy::Single).unwrap();
 
-    libblur::fast_gaussian_next_u16(&mut dst_image, 6, ThreadingPolicy::Single, EdgeMode::Clamp)
-        .unwrap();
+    libblur::stack_blur(&mut dst_image, 6, ThreadingPolicy::Single).unwrap();
 
     // libblur::motion_blur(
     //     &image,
@@ -175,7 +120,7 @@ fn main() {
         .data
         .borrow()
         .iter()
-        .map(|&x| (x >> 8) as u8)
+        .map(|&x| x)
         // .map(|&x| (x * 255f32).round() as u8)
         .collect::<Vec<u8>>();
 
