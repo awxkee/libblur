@@ -89,9 +89,8 @@ unsafe fn fgn_vertical_pass_sse_u16_impl<const CN: usize>(
 
     let radius_64 = radius as i64;
 
-    const Q: f64 = ((1i64 << 31i64) - 1) as f64;
-    let weight = Q / ((radius as f64) * (radius as f64) * (radius as f64));
-    let v_weight = _mm256_set1_epi64x(weight as i64);
+    let weight = 1.0f32 / ((radius as f32) * (radius as f32) * (radius as f32));
+    let v_weight = _mm256_set1_ps(weight);
 
     let mut xx = start;
 
@@ -120,10 +119,22 @@ unsafe fn fgn_vertical_pass_sse_u16_impl<const CN: usize>(
 
         for y in start_y..height_wide {
             if y >= 0 {
-                let (prepared_px0, prepared_px1) =
-                    _mm256_mulhi_epi32_m128(summs0, v_weight, summs1, v_weight);
-                let (prepared_px2, prepared_px3) =
-                    _mm256_mulhi_epi32_m128(summs2, v_weight, summs3, v_weight);
+                let ss01 = _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(summs0), summs1);
+                let ss23 = _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(summs2), summs3);
+
+                let ps01 = _mm256_cvtepi32_ps(ss01);
+                let ps23 = _mm256_cvtepi32_ps(ss23);
+
+                let r01 = _mm256_mul_ps(ps01, v_weight);
+                let r23 = _mm256_mul_ps(ps23, v_weight);
+
+                let e01 = _mm256_cvtps_epi32(r01);
+                let e23 = _mm256_cvtps_epi32(r23);
+
+                let prepared_px0 = _mm256_castsi256_si128(e01);
+                let prepared_px1 = _mm256_extracti128_si256::<1>(e01);
+                let prepared_px2 = _mm256_castsi256_si128(e23);
+                let prepared_px3 = _mm256_extracti128_si256::<1>(e23);
 
                 let current_y = (y * (stride as i64)) as usize;
 
@@ -288,7 +299,11 @@ unsafe fn fgn_vertical_pass_sse_u16_impl<const CN: usize>(
         for y in start_y..height_wide {
             if y >= 0 {
                 let current_px = (x * CN as u32) as usize;
-                let prepared_px_s32 = _mm_mulhi_epi32(summs, v_weight);
+
+                let prepared_px_s32 = _mm_cvtps_epi32(_mm_mul_ps(
+                    _mm_cvtepi32_ps(summs),
+                    _mm256_castps256_ps128(v_weight),
+                ));
 
                 let current_y = (y * (stride as i64)) as usize;
 
@@ -406,9 +421,8 @@ unsafe fn fgn_horizontal_pass_sse_u16_impl<const CN: usize>(
 
     let radius_64 = radius as i64;
 
-    const Q: f64 = ((1i64 << 31i64) - 1) as f64;
-    let weight = Q / ((radius as f64) * (radius as f64) * (radius as f64));
-    let v_weight = _mm256_set1_epi64x(weight as i64);
+    let weight = 1.0f32 / ((radius as f32) * (radius as f32) * (radius as f32));
+    let v_weight = _mm256_set1_ps(weight);
 
     let mut yy = start;
 
@@ -437,10 +451,22 @@ unsafe fn fgn_horizontal_pass_sse_u16_impl<const CN: usize>(
             if x >= 0 {
                 let current_px = x as usize * CN;
 
-                let (prepared_px0, prepared_px1) =
-                    _mm256_mulhi_epi32_m128(summs0, v_weight, summs1, v_weight);
-                let (prepared_px2, prepared_px3) =
-                    _mm256_mulhi_epi32_m128(summs2, v_weight, summs3, v_weight);
+                let ss01 = _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(summs0), summs1);
+                let ss23 = _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(summs2), summs3);
+
+                let ps01 = _mm256_cvtepi32_ps(ss01);
+                let ps23 = _mm256_cvtepi32_ps(ss23);
+
+                let r01 = _mm256_mul_ps(ps01, v_weight);
+                let r23 = _mm256_mul_ps(ps23, v_weight);
+
+                let e01 = _mm256_cvtps_epi32(r01);
+                let e23 = _mm256_cvtps_epi32(r23);
+
+                let prepared_px0 = _mm256_castsi256_si128(e01);
+                let prepared_px1 = _mm256_extracti128_si256::<1>(e01);
+                let prepared_px2 = _mm256_castsi256_si128(e23);
+                let prepared_px3 = _mm256_extracti128_si256::<1>(e23);
 
                 let dst_ptr0 = (bytes.slice.as_ptr() as *mut u16).add(current_y0 + current_px);
                 let dst_ptr1 = (bytes.slice.as_ptr() as *mut u16).add(current_y1 + current_px);
@@ -604,7 +630,10 @@ unsafe fn fgn_horizontal_pass_sse_u16_impl<const CN: usize>(
             if x >= 0 {
                 let current_px = x as usize * CN;
 
-                let prepared_px_s32 = _mm_mulhi_epi32(summs, v_weight);
+                let prepared_px_s32 = _mm_cvtps_epi32(_mm_mul_ps(
+                    _mm_cvtepi32_ps(summs),
+                    _mm256_castps256_ps128(v_weight),
+                ));
 
                 let bytes_offset = current_y + current_px;
 

@@ -50,8 +50,14 @@ pub(crate) unsafe fn _mm256_mulhi_epi32_m128(
 ) -> (__m128i, __m128i) {
     let rnd = _mm256_set1_epi64x((1 << 30) - 1);
     let perm0 = _mm256_setr_epi32(0, -1, 1, -1, 2, -1, 3, -1);
-    let lo = _mm256_mul_epi32(_mm256_permutevar8x32_epi32(_mm256_castsi128_si256(a0), perm0), b0);
-    let hi = _mm256_mul_epi32(_mm256_permutevar8x32_epi32(_mm256_castsi128_si256(a1), perm0), b1);
+    let lo = _mm256_mul_epi32(
+        _mm256_permutevar8x32_epi32(_mm256_castsi128_si256(a0), perm0),
+        b0,
+    );
+    let hi = _mm256_mul_epi32(
+        _mm256_permutevar8x32_epi32(_mm256_castsi128_si256(a1), perm0),
+        b1,
+    );
 
     let a0 = _mm256_add_epi64(lo, rnd);
     let a1 = _mm256_add_epi64(hi, rnd);
@@ -70,11 +76,13 @@ pub(crate) unsafe fn _mm256_mulhi_epi32_m128(
 
 #[inline(always)]
 pub(crate) unsafe fn _mm_mulhi_epi32(a0: __m128i, b0: __m256i) -> __m128i {
-
     let perm0 = _mm256_setr_epi32(0, -1, 1, -1, 2, -1, 3, -1);
-    
+
     let rnd = _mm256_set1_epi64x((1 << 30) - 1);
-    let lo = _mm256_mul_epi32(_mm256_permutevar8x32_epi32(_mm256_castsi128_si256(a0), perm0), b0);
+    let lo = _mm256_mul_epi32(
+        _mm256_permutevar8x32_epi32(_mm256_castsi128_si256(a0), perm0),
+        b0,
+    );
 
     let a0 = _mm256_add_epi64(lo, rnd);
 

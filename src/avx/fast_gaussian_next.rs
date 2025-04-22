@@ -25,6 +25,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use crate::avx::utils::{_mm256_mulhi_epi32_m128, _mm_mulhi_epi32};
 use crate::reflect_index;
 use crate::sse::{_mm_mul_by_3_epi32, load_u8_s32_fast, store_u8_u32};
 use crate::unsafe_slice::UnsafeSlice;
@@ -33,7 +34,6 @@ use crate::{clamp_edge, EdgeMode};
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
-use crate::avx::utils::{_mm256_mulhi_epi32_m128, _mm_mulhi_epi32};
 
 pub(crate) fn fgn_vertical_pass_avx_u8<T, const CN: usize>(
     undefined_slice: &UnsafeSlice<T>,
@@ -79,7 +79,7 @@ unsafe fn fgn_vertical_pass_avx2_u8_impl<const CN: usize>(
     // const Q: f64 = ((1i64 << 31i64) - 1) as f64;
     // let weight = Q / ((radius as f64) * (radius as f64) * (radius as f64));
     // let v_weight = _mm256_set1_epi64x(weight as i64);
-    
+
     let mut xx = start;
 
     while xx + 4 < width.min(end) {
@@ -109,20 +109,15 @@ unsafe fn fgn_vertical_pass_avx2_u8_impl<const CN: usize>(
             if y >= 0 {
                 let ss01 = _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(summs0), summs1);
                 let ss23 = _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(summs2), summs3);
-                
+
                 let ps01 = _mm256_cvtepi32_ps(ss01);
                 let ps23 = _mm256_cvtepi32_ps(ss23);
-                
+
                 let r01 = _mm256_mul_ps(ps01, v_weight);
                 let r23 = _mm256_mul_ps(ps23, v_weight);
-                
+
                 let e01 = _mm256_cvtps_epi32(r01);
                 let e23 = _mm256_cvtps_epi32(r23);
-
-                // let (prepared_px0, prepared_px1) =
-                //     _mm256_mulhi_epi32_m128(summs0, v_weight, summs1, v_weight);
-                // let (prepared_px2, prepared_px3) =
-                //     _mm256_mulhi_epi32_m128(summs2, v_weight, summs3, v_weight);
 
                 let prepared_px0 = _mm256_castsi256_si128(e01);
                 let prepared_px1 = _mm256_extracti128_si256::<1>(e01);
@@ -402,10 +397,6 @@ unsafe fn fgn_horizontal_pass_avx2_u8_impl<const CN: usize>(
     let weight = 1.0f32 / ((radius as f32) * (radius as f32) * (radius as f32));
     let v_weight = _mm256_set1_ps(weight);
 
-    // const Q: f64 = ((1i64 << 31i64) - 1) as f64;
-    // let weight = Q / ((radius as f64) * (radius as f64) * (radius as f64));
-    // let v_weight = _mm256_set1_epi64x(weight as i64);
-
     let mut yy = start;
 
     while yy + 4 < height.min(end) {
@@ -435,25 +426,20 @@ unsafe fn fgn_horizontal_pass_avx2_u8_impl<const CN: usize>(
 
                 let ss01 = _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(summs0), summs1);
                 let ss23 = _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(summs2), summs3);
-                
+
                 let ps01 = _mm256_cvtepi32_ps(ss01);
                 let ps23 = _mm256_cvtepi32_ps(ss23);
-                
+
                 let r01 = _mm256_mul_ps(ps01, v_weight);
                 let r23 = _mm256_mul_ps(ps23, v_weight);
-                
+
                 let e01 = _mm256_cvtps_epi32(r01);
                 let e23 = _mm256_cvtps_epi32(r23);
-                
+
                 let prepared_px0 = _mm256_castsi256_si128(e01);
                 let prepared_px1 = _mm256_extracti128_si256::<1>(e01);
                 let prepared_px2 = _mm256_castsi256_si128(e23);
                 let prepared_px3 = _mm256_extracti128_si256::<1>(e23);
-
-                // let (prepared_px0, prepared_px1) =
-                //     _mm256_mulhi_epi32_m128(summs0, v_weight, summs1, v_weight);
-                // let (prepared_px2, prepared_px3) =
-                //     _mm256_mulhi_epi32_m128(summs2, v_weight, summs3, v_weight);
 
                 let dst_ptr0 = (bytes.slice.as_ptr() as *mut u8).add(current_y0 + current_px);
                 let dst_ptr1 = (bytes.slice.as_ptr() as *mut u8).add(current_y1 + current_px);
@@ -621,8 +607,6 @@ unsafe fn fgn_horizontal_pass_avx2_u8_impl<const CN: usize>(
                     _mm_cvtepi32_ps(summs),
                     _mm256_castps256_ps128(v_weight),
                 ));
-
-                // let prepared_px_s32 = _mm_mulhi_epi32(summs, v_weight);
 
                 let bytes_offset = current_y + current_px;
 
