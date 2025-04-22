@@ -4,7 +4,10 @@ use libblur::{
     filter_1d_exact, gaussian_kernel_1d, sigma_size, BlurImage, BlurImageMut, ConvolutionMode,
     EdgeMode, FastBlurChannels, Scalar, ThreadingPolicy,
 };
-use opencv::core::{find_file, split, AlgorithmHint, Mat, Size, Vector, BORDER_DEFAULT, CV_16UC4, CV_32FC3, CV_8UC3, CV_8UC4};
+use opencv::core::{
+    find_file, split, AlgorithmHint, Mat, Size, Vector, BORDER_DEFAULT, CV_16UC4, CV_32FC3,
+    CV_8UC3, CV_8UC4,
+};
 use opencv::imgcodecs::{imread, IMREAD_COLOR};
 
 pub(crate) fn split_channels_3<T: Copy>(
@@ -36,7 +39,7 @@ pub(crate) fn split_channels_3<T: Copy>(
 pub fn criterion_benchmark(c: &mut Criterion) {
     let mut c = c.benchmark_group("Gauss");
     c.sample_size(10);
-    
+
     let img = ImageReader::open("../assets/test_image_4.png")
         .unwrap()
         .decode()
@@ -147,7 +150,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 EdgeMode::Clamp,
                 ThreadingPolicy::Adaptive,
             )
-                .unwrap();
+            .unwrap();
         })
     });
 
@@ -160,7 +163,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             CV_16UC4,
             AlgorithmHint::ALGO_HINT_DEFAULT,
         )
-            .unwrap();
+        .unwrap();
         b.iter(|| {
             let mut dst = Mat::default();
             opencv::imgproc::gaussian_blur(
@@ -172,7 +175,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 BORDER_DEFAULT,
                 AlgorithmHint::ALGO_HINT_ACCURATE,
             )
-                .unwrap();
+            .unwrap();
         })
     });
 

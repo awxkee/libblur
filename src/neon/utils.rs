@@ -359,10 +359,10 @@ pub unsafe fn store_u16_s32_x4<const CN: usize>(
     dst_ptr: (*mut u16, *mut u16, *mut u16, *mut u16),
     regi: int32x4x4_t,
 ) {
-    let a0 = vreinterpret_u16_s16(vqmovn_s32(regi.0));
-    let a1 = vreinterpret_u16_s16(vqmovn_s32(regi.1));
-    let a2 = vreinterpret_u16_s16(vqmovn_s32(regi.2));
-    let a3 = vreinterpret_u16_s16(vqmovn_s32(regi.3));
+    let a0 = vqmovun_s32(regi.0);
+    let a1 = vqmovun_s32(regi.1);
+    let a2 = vqmovun_s32(regi.2);
+    let a3 = vqmovun_s32(regi.3);
     if CN == 4 {
         vst1_u16(dst_ptr.0, a0);
         vst1_u16(dst_ptr.1, a1);

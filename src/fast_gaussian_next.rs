@@ -462,6 +462,13 @@ impl FastGaussianNextPassProvider<u16> for u16 {
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             if BASE_RADIUS_I64_CUTOFF > radius {
+                #[cfg(feature = "rdm")]
+                {
+                    if std::arch::is_aarch64_feature_detected!("rdm") {
+                        use crate::neon::fgn_horizontal_pass_neon_u16_q0_31;
+                        return fgn_horizontal_pass_neon_u16_q0_31::<CN>;
+                    }
+                }
                 use crate::neon::fgn_horizontal_pass_neon_u16;
                 return fgn_horizontal_pass_neon_u16::<CN>;
             }
@@ -488,6 +495,13 @@ impl FastGaussianNextPassProvider<u16> for u16 {
         #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
         {
             if BASE_RADIUS_I64_CUTOFF > radius {
+                #[cfg(feature = "rdm")]
+                {
+                    if std::arch::is_aarch64_feature_detected!("rdm") {
+                        use crate::neon::fgn_vertical_pass_neon_u16_q0_31;
+                        return fgn_vertical_pass_neon_u16_q0_31::<CN>;
+                    }
+                }
                 use crate::neon::fgn_vertical_pass_neon_u16;
                 return fgn_vertical_pass_neon_u16::<CN>;
             }

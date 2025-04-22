@@ -86,7 +86,11 @@ fn main() {
 
     let start = Instant::now();
 
-    let mut v_vec = src_bytes.to_vec();
+    let mut v_vec = src_bytes
+        .to_vec()
+        .iter()
+        .map(|&x| u16::from_ne_bytes([x, x]))
+        .collect::<Vec<u16>>();
 
     let mut dst_image = BlurImageMut::borrow(
         &mut v_vec,
@@ -105,7 +109,7 @@ fn main() {
     //
     // libblur::gaussian_box_blur(&image, &mut dst_image, 10., ThreadingPolicy::Single).unwrap();
 
-    libblur::fast_gaussian_next(&mut dst_image, 17, ThreadingPolicy::Single, EdgeMode::Clamp)
+    libblur::fast_gaussian_next_u16(&mut dst_image, 6, ThreadingPolicy::Single, EdgeMode::Clamp)
         .unwrap();
 
     // libblur::motion_blur(
@@ -123,7 +127,7 @@ fn main() {
         .data
         .borrow()
         .iter()
-        .map(|&x| x)
+        .map(|&x| (x >> 8) as u8)
         // .map(|&x| (x * 255f32).round() as u8)
         .collect::<Vec<u8>>();
 
