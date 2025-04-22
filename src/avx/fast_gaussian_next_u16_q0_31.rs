@@ -25,7 +25,6 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::avx::utils::{_mm256_mulhi_epi32_m128, _mm_mulhi_epi32};
 use crate::reflect_index;
 use crate::sse::utils::load_u16_s32_fast;
 use crate::sse::{_mm_mul_by_3_epi32, store_u16_u32};
