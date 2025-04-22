@@ -473,6 +473,15 @@ impl FastGaussianNextPassProvider<u16> for u16 {
                 return fgn_horizontal_pass_neon_u16::<CN>;
             }
         }
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        {
+            let has_avx = std::arch::is_x86_feature_detected!("avx2");
+
+            if BASE_RADIUS_I64_CUTOFF > radius && has_avx {
+                use crate::avx::fgn_horizontal_pass_avx_u16;
+                return fgn_horizontal_pass_avx_u16::<CN>;
+            }
+        }
         #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
             let is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
@@ -504,6 +513,15 @@ impl FastGaussianNextPassProvider<u16> for u16 {
                 }
                 use crate::neon::fgn_vertical_pass_neon_u16;
                 return fgn_vertical_pass_neon_u16::<CN>;
+            }
+        }
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        {
+            let has_avx = std::arch::is_x86_feature_detected!("avx2");
+
+            if BASE_RADIUS_I64_CUTOFF > radius && has_avx {
+                use crate::avx::fgn_vertical_pass_avx_u16;
+                return fgn_vertical_pass_avx_u16::<CN>;
             }
         }
         #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
