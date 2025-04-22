@@ -292,12 +292,12 @@ unsafe fn fgn_vertical_pass_avx2_u8_impl<const CN: usize>(
         for y in start_y..height_wide {
             if y >= 0 {
                 let current_px = (x * CN as u32) as usize;
-                // let prepared_px_s32 = _mm_cvtps_epi32(_mm_mul_ps(
-                //     _mm_cvtepi32_ps(summs),
-                //     _mm256_castps256_ps128(v_weight),
-                // ));
+                let prepared_px_s32 = _mm_cvtps_epi32(_mm_mul_ps(
+                    _mm_cvtepi32_ps(summs),
+                    _mm256_castps256_ps128(v_weight),
+                ));
 
-                let prepared_px_s32 = _mm_mulhi_epi32(summs, v_weight);
+                // let prepared_px_s32 = _mm_mulhi_epi32(summs, v_weight);
 
                 let current_y = (y * (stride as i64)) as usize;
 
