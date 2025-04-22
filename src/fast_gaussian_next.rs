@@ -682,6 +682,15 @@ impl FastGaussianNextPassProvider<f32> for f32 {
         } else {
             fgn_horizontal_pass::<f32, f64, f64, CN>
         };
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        {
+            let has_avx = std::arch::is_x86_feature_detected!("avx2");
+
+            if has_avx {
+                use crate::avx::fgn_horizontal_pass_avx_f32;
+                return fgn_horizontal_pass_avx_f32::<f32, CN>;
+            }
+        }
         #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
             let is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
@@ -715,6 +724,15 @@ impl FastGaussianNextPassProvider<f32> for f32 {
         } else {
             fgn_vertical_pass::<f32, f64, f64, CN>
         };
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        {
+            let has_avx = std::arch::is_x86_feature_detected!("avx2");
+
+            if has_avx {
+                use crate::avx::fgn_vertical_pass_avx_f32;
+                return fgn_vertical_pass_avx_f32::<f32, CN>;
+            }
+        }
         #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
             let is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
