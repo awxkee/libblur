@@ -55,7 +55,7 @@ pub(crate) fn fgn_vertical_pass_avx_u8<T, const CN: usize>(
 
 #[repr(C, align(16))]
 #[derive(Copy, Clone, Default)]
-pub(crate) struct AvxSseI32x4([i32; 4]);
+pub(crate) struct AvxSseI32x4(pub(crate) [i32; 4]);
 
 #[target_feature(enable = "avx2")]
 unsafe fn fgn_vertical_pass_avx2_u8_impl<const CN: usize>(

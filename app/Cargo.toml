@@ -14,7 +14,7 @@ fast_transpose = "0.2.3"
 
 [dev-dependencies]
 criterion = "0.5.1"
-#opencv = { version = "0.94.2", default-features = false, features = ["imgcodecs", "imgproc", "clang-runtime"] }
+opencv = { version = "0.94.2", default-features = false, features = ["imgcodecs", "imgproc", "clang-runtime"] }
 
 [[bench]]
 name = "gauss"
