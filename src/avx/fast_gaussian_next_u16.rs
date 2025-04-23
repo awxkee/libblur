@@ -34,7 +34,7 @@ use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, EdgeMode};
 use std::arch::x86_64::*;
 
-pub(crate) fn fgn_vertical_pass_avx_u16<const CHANNELS_COUNT: usize>(
+pub(crate) fn fgn_vertical_pass_avx_u16<const CN: usize>(
     bytes: &UnsafeSlice<u16>,
     stride: u32,
     width: u32,
@@ -45,7 +45,7 @@ pub(crate) fn fgn_vertical_pass_avx_u16<const CHANNELS_COUNT: usize>(
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        fgn_vertical_pass_avx_u16_def::<CHANNELS_COUNT>(
+        fgn_vertical_pass_avx_u16_def::<CN>(
             bytes, stride, width, height, radius, start, end, edge_mode,
         );
     }
@@ -53,22 +53,6 @@ pub(crate) fn fgn_vertical_pass_avx_u16<const CHANNELS_COUNT: usize>(
 
 #[target_feature(enable = "avx2")]
 unsafe fn fgn_vertical_pass_avx_u16_def<const CN: usize>(
-    bytes: &UnsafeSlice<u16>,
-    stride: u32,
-    width: u32,
-    height: u32,
-    radius: u32,
-    start: u32,
-    end: u32,
-    edge_mode: EdgeMode,
-) {
-    fgn_vertical_pass_sse_u16_impl::<CN>(
-        bytes, stride, width, height, radius, start, end, edge_mode,
-    );
-}
-
-#[inline(always)]
-unsafe fn fgn_vertical_pass_sse_u16_impl<const CN: usize>(
     bytes: &UnsafeSlice<u16>,
     stride: u32,
     width: u32,
@@ -335,22 +319,6 @@ pub(crate) fn fgn_horizontal_pass_avx_u16<const CHANNELS_COUNT: usize>(
 
 #[target_feature(enable = "avx2")]
 unsafe fn fgn_horizontal_pass_avx_u16_def<const CN: usize>(
-    bytes: &UnsafeSlice<u16>,
-    stride: u32,
-    width: u32,
-    height: u32,
-    radius: u32,
-    start: u32,
-    end: u32,
-    edge_mode: EdgeMode,
-) {
-    fgn_horizontal_pass_sse_u16_impl::<CN>(
-        bytes, stride, width, height, radius, start, end, edge_mode,
-    );
-}
-
-#[inline(always)]
-unsafe fn fgn_horizontal_pass_sse_u16_impl<const CN: usize>(
     bytes: &UnsafeSlice<u16>,
     stride: u32,
     width: u32,
