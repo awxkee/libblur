@@ -45,10 +45,11 @@ pub(crate) fn fgn_vertical_pass_neon_u8<T, const CN: usize>(
     unsafe {
         let bytes: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_slice);
 
-        let mut buffer0 = Box::new([NeonI32x4::default(); 1024]);
-        let mut buffer1 = Box::new([NeonI32x4::default(); 1024]);
-        let mut buffer2 = Box::new([NeonI32x4::default(); 1024]);
-        let mut buffer3 = Box::new([NeonI32x4::default(); 1024]);
+        let mut full_buffer = Box::new([NeonI32x4::default(); 1024 * 4]);
+
+        let (buffer0, rem) = full_buffer.split_at_mut(1024);
+        let (buffer1, rem) = rem.split_at_mut(1024);
+        let (buffer2, buffer3) = rem.split_at_mut(1024);
 
         let height_wide = height as i64;
 
@@ -334,10 +335,11 @@ pub(crate) fn fgn_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
     unsafe {
         let bytes: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_slice);
 
-        let mut buffer0 = Box::new([NeonI32x4::default(); 1024]);
-        let mut buffer1 = Box::new([NeonI32x4::default(); 1024]);
-        let mut buffer2 = Box::new([NeonI32x4::default(); 1024]);
-        let mut buffer3 = Box::new([NeonI32x4::default(); 1024]);
+        let mut full_buffer = Box::new([NeonI32x4::default(); 1024 * 4]);
+
+        let (buffer0, rem) = full_buffer.split_at_mut(1024);
+        let (buffer1, rem) = rem.split_at_mut(1024);
+        let (buffer2, buffer3) = rem.split_at_mut(1024);
 
         let width_wide = width as i64;
 

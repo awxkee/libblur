@@ -69,11 +69,12 @@ unsafe fn fg_horizontal_pass_neon_rdm<T, const CN: usize>(
     unsafe {
         let bytes: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_slice);
 
-        let mut buffer0 = Box::new([NeonI32x4::default(); 1024]);
-        let mut buffer1 = Box::new([NeonI32x4::default(); 1024]);
-        let mut buffer2 = Box::new([NeonI32x4::default(); 1024]);
-        let mut buffer3 = Box::new([NeonI32x4::default(); 1024]);
-        let mut buffer4 = Box::new([NeonI32x4::default(); 1024]);
+        let mut full_buffer = Box::new([NeonI32x4::default(); 1024 * 5]);
+
+        let (buffer0, rem) = full_buffer.split_at_mut(1024);
+        let (buffer1, rem) = rem.split_at_mut(1024);
+        let (buffer2, rem) = rem.split_at_mut(1024);
+        let (buffer3, buffer4) = rem.split_at_mut(1024);
 
         let initial_sum = ((radius * radius) >> 1) as i32;
 
@@ -340,11 +341,12 @@ unsafe fn fg_vertical_pass_neon_rdm<T, const CN: usize>(
     unsafe {
         let bytes: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_slice);
 
-        let mut buffer0 = Box::new([NeonI32x4::default(); 1024]);
-        let mut buffer1 = Box::new([NeonI32x4::default(); 1024]);
-        let mut buffer2 = Box::new([NeonI32x4::default(); 1024]);
-        let mut buffer3 = Box::new([NeonI32x4::default(); 1024]);
-        let mut buffer4 = Box::new([NeonI32x4::default(); 1024]);
+        let mut full_buffer = Box::new([NeonI32x4::default(); 1024 * 5]);
+
+        let (buffer0, rem) = full_buffer.split_at_mut(1024);
+        let (buffer1, rem) = rem.split_at_mut(1024);
+        let (buffer2, rem) = rem.split_at_mut(1024);
+        let (buffer3, buffer4) = rem.split_at_mut(1024);
 
         let initial_sum = ((radius * radius) >> 1) as i32;
 
