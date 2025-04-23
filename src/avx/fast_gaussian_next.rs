@@ -54,10 +54,6 @@ pub(crate) fn fgn_vertical_pass_avx_u8<T, const CN: usize>(
     }
 }
 
-#[repr(C, align(16))]
-#[derive(Copy, Clone, Default)]
-pub(crate) struct AvxSseI32x4(pub(crate) [i32; 4]);
-
 #[repr(C, align(32))]
 #[derive(Copy, Clone, Default)]
 pub(crate) struct AvxSseI32x8(pub(crate) [i32; 8]);
