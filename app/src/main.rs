@@ -108,7 +108,8 @@ fn main() {
     //
     // libblur::gaussian_box_blur(&image, &mut dst_image, 10., ThreadingPolicy::Single).unwrap();
 
-    libblur::stack_blur(&mut dst_image, 15, ThreadingPolicy::Single).unwrap();
+    libblur::fast_gaussian_next(&mut dst_image, 15, ThreadingPolicy::Single, EdgeMode::Clamp)
+        .unwrap();
 
     // libblur::motion_blur(
     //     &image,

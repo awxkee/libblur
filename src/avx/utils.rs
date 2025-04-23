@@ -40,3 +40,8 @@ pub(crate) unsafe fn _mm256_mul_round_ps(a: __m256, b: __m256) -> __m256 {
 pub(crate) unsafe fn _mm_mul_round_ps(a: __m128, b: __m128) -> __m128 {
     _mm_fmadd_ps(a, b, _mm_set1_ps(0.5f32))
 }
+
+#[inline(always)]
+pub(crate) unsafe fn _mm256_mul_by_3_epi32(v: __m256i) -> __m256i {
+    _mm256_add_epi32(_mm256_slli_epi32::<1>(v), v)
+}
