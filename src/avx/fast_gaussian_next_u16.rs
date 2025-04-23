@@ -25,6 +25,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use crate::avx::fast_gaussian_next::AvxSseI32x4;
 use crate::reflect_index;
 use crate::sse::utils::load_u16_s32_fast;
 use crate::sse::{_mm_mul_by_3_epi32, store_u16_u32};
@@ -35,7 +36,7 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-pub(crate) fn fgn_vertical_pass_sse_u16<const CHANNELS_COUNT: usize>(
+pub(crate) fn fgn_vertical_pass_avx_u16<const CHANNELS_COUNT: usize>(
     bytes: &UnsafeSlice<u16>,
     stride: u32,
     width: u32,
@@ -46,14 +47,14 @@ pub(crate) fn fgn_vertical_pass_sse_u16<const CHANNELS_COUNT: usize>(
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        fgn_vertical_pass_sse_u16_def::<CHANNELS_COUNT>(
+        fgn_vertical_pass_avx_u16_def::<CHANNELS_COUNT>(
             bytes, stride, width, height, radius, start, end, edge_mode,
         );
     }
 }
 
-#[target_feature(enable = "sse4.1")]
-unsafe fn fgn_vertical_pass_sse_u16_def<const CN: usize>(
+#[target_feature(enable = "avx2")]
+unsafe fn fgn_vertical_pass_avx_u16_def<const CN: usize>(
     bytes: &UnsafeSlice<u16>,
     stride: u32,
     width: u32,
@@ -79,16 +80,17 @@ unsafe fn fgn_vertical_pass_sse_u16_impl<const CN: usize>(
     end: u32,
     edge_mode: EdgeMode,
 ) {
-    let mut buffer0 = Box::new([[0; 4]; 1024]);
-    let mut buffer1 = Box::new([[0; 4]; 1024]);
-    let mut buffer2 = Box::new([[0; 4]; 1024]);
-    let mut buffer3 = Box::new([[0; 4]; 1024]);
+    let mut buffer0 = Box::new([AvxSseI32x4::default(); 1024]);
+    let mut buffer1 = Box::new([AvxSseI32x4::default(); 1024]);
+    let mut buffer2 = Box::new([AvxSseI32x4::default(); 1024]);
+    let mut buffer3 = Box::new([AvxSseI32x4::default(); 1024]);
 
     let height_wide = height as i64;
 
     let radius_64 = radius as i64;
+
     let weight = 1.0f32 / ((radius as f32) * (radius as f32) * (radius as f32));
-    let v_weight = _mm_set1_ps(weight);
+    let v_weight = _mm256_set1_ps(weight);
 
     let mut xx = start;
 
@@ -117,20 +119,22 @@ unsafe fn fgn_vertical_pass_sse_u16_impl<const CN: usize>(
 
         for y in start_y..height_wide {
             if y >= 0 {
-                let ss0 = _mm_cvtepi32_ps(summs0);
-                let ss1 = _mm_cvtepi32_ps(summs1);
-                let ss2 = _mm_cvtepi32_ps(summs2);
-                let ss3 = _mm_cvtepi32_ps(summs3);
+                let ss01 = _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(summs0), summs1);
+                let ss23 = _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(summs2), summs3);
 
-                let r0 = _mm_mul_ps(ss0, v_weight);
-                let r1 = _mm_mul_ps(ss1, v_weight);
-                let r2 = _mm_mul_ps(ss2, v_weight);
-                let r3 = _mm_mul_ps(ss3, v_weight);
+                let ps01 = _mm256_cvtepi32_ps(ss01);
+                let ps23 = _mm256_cvtepi32_ps(ss23);
 
-                let prepared_px0 = _mm_cvtps_epi32(r0);
-                let prepared_px1 = _mm_cvtps_epi32(r1);
-                let prepared_px2 = _mm_cvtps_epi32(r2);
-                let prepared_px3 = _mm_cvtps_epi32(r3);
+                let r01 = _mm256_mul_ps(ps01, v_weight);
+                let r23 = _mm256_mul_ps(ps23, v_weight);
+
+                let e01 = _mm256_cvtps_epi32(r01);
+                let e23 = _mm256_cvtps_epi32(r23);
+
+                let prepared_px0 = _mm256_castsi256_si128(e01);
+                let prepared_px1 = _mm256_extracti128_si256::<1>(e01);
+                let prepared_px2 = _mm256_castsi256_si128(e23);
+                let prepared_px3 = _mm256_extracti128_si256::<1>(e23);
 
                 let current_y = (y * (stride as i64)) as usize;
 
@@ -148,33 +152,25 @@ unsafe fn fgn_vertical_pass_sse_u16_impl<const CN: usize>(
                 let d_arr_index_2 = ((y - radius_64) & 1023) as usize;
                 let d_arr_index = (y & 1023) as usize;
 
-                let stored0 = _mm_loadu_si128(buffer0.as_mut_ptr().add(d_arr_index) as *const _);
-                let stored1 = _mm_loadu_si128(buffer1.as_mut_ptr().add(d_arr_index) as *const _);
-                let stored2 = _mm_loadu_si128(buffer2.as_mut_ptr().add(d_arr_index) as *const _);
-                let stored3 = _mm_loadu_si128(buffer3.as_mut_ptr().add(d_arr_index) as *const _);
+                let stored0 = _mm_load_si128(buffer0.as_mut_ptr().add(d_arr_index) as *const _);
+                let stored1 = _mm_load_si128(buffer1.as_mut_ptr().add(d_arr_index) as *const _);
+                let stored2 = _mm_load_si128(buffer2.as_mut_ptr().add(d_arr_index) as *const _);
+                let stored3 = _mm_load_si128(buffer3.as_mut_ptr().add(d_arr_index) as *const _);
 
-                let stored_10 =
-                    _mm_loadu_si128(buffer0.as_mut_ptr().add(d_arr_index_1) as *const _);
-                let stored_11 =
-                    _mm_loadu_si128(buffer1.as_mut_ptr().add(d_arr_index_1) as *const _);
-                let stored_12 =
-                    _mm_loadu_si128(buffer2.as_mut_ptr().add(d_arr_index_1) as *const _);
-                let stored_13 =
-                    _mm_loadu_si128(buffer3.as_mut_ptr().add(d_arr_index_1) as *const _);
+                let stored_10 = _mm_load_si128(buffer0.as_mut_ptr().add(d_arr_index_1) as *const _);
+                let stored_11 = _mm_load_si128(buffer1.as_mut_ptr().add(d_arr_index_1) as *const _);
+                let stored_12 = _mm_load_si128(buffer2.as_mut_ptr().add(d_arr_index_1) as *const _);
+                let stored_13 = _mm_load_si128(buffer3.as_mut_ptr().add(d_arr_index_1) as *const _);
 
                 let j0 = _mm_sub_epi32(stored0, stored_10);
                 let j1 = _mm_sub_epi32(stored1, stored_11);
                 let j2 = _mm_sub_epi32(stored2, stored_12);
                 let j3 = _mm_sub_epi32(stored3, stored_13);
 
-                let stored_20 =
-                    _mm_loadu_si128(buffer0.as_mut_ptr().add(d_arr_index_2) as *const _);
-                let stored_21 =
-                    _mm_loadu_si128(buffer1.as_mut_ptr().add(d_arr_index_2) as *const _);
-                let stored_22 =
-                    _mm_loadu_si128(buffer2.as_mut_ptr().add(d_arr_index_2) as *const _);
-                let stored_23 =
-                    _mm_loadu_si128(buffer3.as_mut_ptr().add(d_arr_index_2) as *const _);
+                let stored_20 = _mm_load_si128(buffer0.as_mut_ptr().add(d_arr_index_2) as *const _);
+                let stored_21 = _mm_load_si128(buffer1.as_mut_ptr().add(d_arr_index_2) as *const _);
+                let stored_22 = _mm_load_si128(buffer2.as_mut_ptr().add(d_arr_index_2) as *const _);
+                let stored_23 = _mm_load_si128(buffer3.as_mut_ptr().add(d_arr_index_2) as *const _);
 
                 let k0 = _mm_mul_by_3_epi32(j0);
                 let k1 = _mm_mul_by_3_epi32(j1);
@@ -195,25 +191,25 @@ unsafe fn fgn_vertical_pass_sse_u16_impl<const CN: usize>(
                 let arr_index_1 = ((y + radius_64) & 1023) as usize;
 
                 let stored0 =
-                    _mm_loadu_si128(buffer0.get_unchecked_mut(arr_index).as_mut_ptr() as *const _);
+                    _mm_load_si128(buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr() as *const _);
                 let stored1 =
-                    _mm_loadu_si128(buffer1.get_unchecked_mut(arr_index).as_mut_ptr() as *const _);
+                    _mm_load_si128(buffer1.get_unchecked_mut(arr_index).0.as_mut_ptr() as *const _);
                 let stored2 =
-                    _mm_loadu_si128(buffer2.get_unchecked_mut(arr_index).as_mut_ptr() as *const _);
+                    _mm_load_si128(buffer2.get_unchecked_mut(arr_index).0.as_mut_ptr() as *const _);
                 let stored3 =
-                    _mm_loadu_si128(buffer3.get_unchecked_mut(arr_index).as_mut_ptr() as *const _);
+                    _mm_load_si128(buffer3.get_unchecked_mut(arr_index).0.as_mut_ptr() as *const _);
 
-                let stored_10 = _mm_loadu_si128(
-                    buffer0.get_unchecked_mut(arr_index_1).as_mut_ptr() as *const _,
+                let stored_10 = _mm_load_si128(
+                    buffer0.get_unchecked_mut(arr_index_1).0.as_mut_ptr() as *const _,
                 );
-                let stored_11 = _mm_loadu_si128(
-                    buffer1.get_unchecked_mut(arr_index_1).as_mut_ptr() as *const _,
+                let stored_11 = _mm_load_si128(
+                    buffer1.get_unchecked_mut(arr_index_1).0.as_mut_ptr() as *const _,
                 );
-                let stored_12 = _mm_loadu_si128(
-                    buffer2.get_unchecked_mut(arr_index_1).as_mut_ptr() as *const _,
+                let stored_12 = _mm_load_si128(
+                    buffer2.get_unchecked_mut(arr_index_1).0.as_mut_ptr() as *const _,
                 );
-                let stored_13 = _mm_loadu_si128(
-                    buffer3.get_unchecked_mut(arr_index_1).as_mut_ptr() as *const _,
+                let stored_13 = _mm_load_si128(
+                    buffer3.get_unchecked_mut(arr_index_1).0.as_mut_ptr() as *const _,
                 );
 
                 let new_diff0 = _mm_mul_by_3_epi32(_mm_sub_epi32(stored0, stored_10));
@@ -229,13 +225,13 @@ unsafe fn fgn_vertical_pass_sse_u16_impl<const CN: usize>(
                 let arr_index = ((y + radius_64) & 1023) as usize;
 
                 let stored0 =
-                    _mm_loadu_si128(buffer0.get_unchecked_mut(arr_index).as_mut_ptr() as *const _);
+                    _mm_load_si128(buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr() as *const _);
                 let stored1 =
-                    _mm_loadu_si128(buffer1.get_unchecked_mut(arr_index).as_mut_ptr() as *const _);
+                    _mm_load_si128(buffer1.get_unchecked_mut(arr_index).0.as_mut_ptr() as *const _);
                 let stored2 =
-                    _mm_loadu_si128(buffer2.get_unchecked_mut(arr_index).as_mut_ptr() as *const _);
+                    _mm_load_si128(buffer2.get_unchecked_mut(arr_index).0.as_mut_ptr() as *const _);
                 let stored3 =
-                    _mm_loadu_si128(buffer3.get_unchecked_mut(arr_index).as_mut_ptr() as *const _);
+                    _mm_load_si128(buffer3.get_unchecked_mut(arr_index).0.as_mut_ptr() as *const _);
 
                 diffs0 = _mm_sub_epi32(diffs0, _mm_mul_by_3_epi32(stored0));
                 diffs1 = _mm_sub_epi32(diffs1, _mm_mul_by_3_epi32(stored1));
@@ -258,20 +254,20 @@ unsafe fn fgn_vertical_pass_sse_u16_impl<const CN: usize>(
 
             let arr_index = ((y + 2 * radius_64) & 1023) as usize;
 
-            let buf_ptr0 = buffer0.get_unchecked_mut(arr_index).as_mut_ptr();
-            let buf_ptr1 = buffer1.get_unchecked_mut(arr_index).as_mut_ptr();
-            let buf_ptr2 = buffer2.get_unchecked_mut(arr_index).as_mut_ptr();
-            let buf_ptr3 = buffer3.get_unchecked_mut(arr_index).as_mut_ptr();
+            let buf_ptr0 = buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr();
+            let buf_ptr1 = buffer1.get_unchecked_mut(arr_index).0.as_mut_ptr();
+            let buf_ptr2 = buffer2.get_unchecked_mut(arr_index).0.as_mut_ptr();
+            let buf_ptr3 = buffer3.get_unchecked_mut(arr_index).0.as_mut_ptr();
 
             diffs0 = _mm_add_epi32(diffs0, pixel_color0);
             diffs1 = _mm_add_epi32(diffs1, pixel_color1);
             diffs2 = _mm_add_epi32(diffs2, pixel_color2);
             diffs3 = _mm_add_epi32(diffs3, pixel_color3);
 
-            _mm_storeu_si128(buf_ptr0 as *mut _, pixel_color0);
-            _mm_storeu_si128(buf_ptr1 as *mut _, pixel_color1);
-            _mm_storeu_si128(buf_ptr2 as *mut _, pixel_color2);
-            _mm_storeu_si128(buf_ptr3 as *mut _, pixel_color3);
+            _mm_store_si128(buf_ptr0 as *mut _, pixel_color0);
+            _mm_store_si128(buf_ptr1 as *mut _, pixel_color1);
+            _mm_store_si128(buf_ptr2 as *mut _, pixel_color2);
+            _mm_store_si128(buf_ptr3 as *mut _, pixel_color3);
 
             ders0 = _mm_add_epi32(ders0, diffs0);
             ders1 = _mm_add_epi32(ders1, diffs1);
@@ -295,7 +291,11 @@ unsafe fn fgn_vertical_pass_sse_u16_impl<const CN: usize>(
         for y in start_y..height_wide {
             if y >= 0 {
                 let current_px = (x * CN as u32) as usize;
-                let prepared_px_s32 = _mm_cvtps_epi32(_mm_mul_ps(_mm_cvtepi32_ps(summs), v_weight));
+
+                let prepared_px_s32 = _mm_cvtps_epi32(_mm_mul_ps(
+                    _mm_cvtepi32_ps(summs),
+                    _mm256_castps256_ps128(v_weight),
+                ));
 
                 let current_y = (y * (stride as i64)) as usize;
 
@@ -308,14 +308,14 @@ unsafe fn fgn_vertical_pass_sse_u16_impl<const CN: usize>(
                 let d_arr_index_2 = ((y - radius_64) & 1023) as usize;
                 let d_arr_index = (y & 1023) as usize;
 
-                let buf_ptr = buffer0.get_unchecked_mut(d_arr_index).as_mut_ptr();
-                let stored = _mm_loadu_si128(buf_ptr as *const __m128i);
+                let buf_ptr = buffer0.get_unchecked_mut(d_arr_index).0.as_mut_ptr();
+                let stored = _mm_load_si128(buf_ptr as *const __m128i);
 
                 let buf_ptr_1 = buffer0.as_mut_ptr().add(d_arr_index_1);
-                let stored_1 = _mm_loadu_si128(buf_ptr_1 as *const __m128i);
+                let stored_1 = _mm_load_si128(buf_ptr_1 as *const __m128i);
 
                 let buf_ptr_2 = buffer0.as_mut_ptr().add(d_arr_index_2);
-                let stored_2 = _mm_loadu_si128(buf_ptr_2 as *const __m128i);
+                let stored_2 = _mm_load_si128(buf_ptr_2 as *const __m128i);
 
                 let new_diff = _mm_sub_epi32(
                     _mm_mul_by_3_epi32(_mm_sub_epi32(stored, stored_1)),
@@ -325,19 +325,19 @@ unsafe fn fgn_vertical_pass_sse_u16_impl<const CN: usize>(
             } else if y + radius_64 >= 0 {
                 let arr_index = (y & 1023) as usize;
                 let arr_index_1 = ((y + radius_64) & 1023) as usize;
-                let buf_ptr = buffer0.get_unchecked_mut(arr_index).as_mut_ptr();
-                let stored = _mm_loadu_si128(buf_ptr as *const __m128i);
+                let buf_ptr = buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr();
+                let stored = _mm_load_si128(buf_ptr as *const __m128i);
 
-                let buf_ptr_1 = buffer0.get_unchecked_mut(arr_index_1).as_mut_ptr();
-                let stored_1 = _mm_loadu_si128(buf_ptr_1 as *const __m128i);
+                let buf_ptr_1 = buffer0.get_unchecked_mut(arr_index_1).0.as_mut_ptr();
+                let stored_1 = _mm_load_si128(buf_ptr_1 as *const __m128i);
 
                 let new_diff = _mm_mul_by_3_epi32(_mm_sub_epi32(stored, stored_1));
 
                 diffs = _mm_add_epi32(diffs, new_diff);
             } else if y + 2 * radius_64 >= 0 {
                 let arr_index = ((y + radius_64) & 1023) as usize;
-                let buf_ptr = buffer0.get_unchecked_mut(arr_index).as_mut_ptr();
-                let stored = _mm_loadu_si128(buf_ptr as *const __m128i);
+                let buf_ptr = buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr();
+                let stored = _mm_load_si128(buf_ptr as *const __m128i);
                 diffs = _mm_sub_epi32(diffs, _mm_mul_by_3_epi32(stored));
             }
 
@@ -350,17 +350,17 @@ unsafe fn fgn_vertical_pass_sse_u16_impl<const CN: usize>(
             let pixel_color = load_u16_s32_fast::<CN>(s_ptr);
 
             let arr_index = ((y + 2 * radius_64) & 1023) as usize;
-            let buf_ptr = buffer0.get_unchecked_mut(arr_index).as_mut_ptr();
+            let buf_ptr = buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr();
 
             diffs = _mm_add_epi32(diffs, pixel_color);
             ders = _mm_add_epi32(ders, diffs);
             summs = _mm_add_epi32(summs, ders);
-            _mm_storeu_si128(buf_ptr as *mut __m128i, pixel_color);
+            _mm_store_si128(buf_ptr as *mut __m128i, pixel_color);
         }
     }
 }
 
-pub(crate) fn fgn_horizontal_pass_sse_u16<const CHANNELS_COUNT: usize>(
+pub(crate) fn fgn_horizontal_pass_avx_u16<const CHANNELS_COUNT: usize>(
     bytes: &UnsafeSlice<u16>,
     stride: u32,
     width: u32,
@@ -371,14 +371,14 @@ pub(crate) fn fgn_horizontal_pass_sse_u16<const CHANNELS_COUNT: usize>(
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        fgn_horizontal_pass_sse_u16_def::<CHANNELS_COUNT>(
+        fgn_horizontal_pass_avx_u16_def::<CHANNELS_COUNT>(
             bytes, stride, width, height, radius, start, end, edge_mode,
         );
     }
 }
 
-#[target_feature(enable = "sse4.1")]
-unsafe fn fgn_horizontal_pass_sse_u16_def<const CN: usize>(
+#[target_feature(enable = "avx2")]
+unsafe fn fgn_horizontal_pass_avx_u16_def<const CN: usize>(
     bytes: &UnsafeSlice<u16>,
     stride: u32,
     width: u32,
@@ -404,16 +404,17 @@ unsafe fn fgn_horizontal_pass_sse_u16_impl<const CN: usize>(
     end: u32,
     edge_mode: EdgeMode,
 ) {
-    let mut buffer0 = Box::new([[0; 4]; 1024]);
-    let mut buffer1 = Box::new([[0; 4]; 1024]);
-    let mut buffer2 = Box::new([[0; 4]; 1024]);
-    let mut buffer3 = Box::new([[0; 4]; 1024]);
+    let mut buffer0 = Box::new([AvxSseI32x4::default(); 1024]);
+    let mut buffer1 = Box::new([AvxSseI32x4::default(); 1024]);
+    let mut buffer2 = Box::new([AvxSseI32x4::default(); 1024]);
+    let mut buffer3 = Box::new([AvxSseI32x4::default(); 1024]);
 
     let width_wide = width as i64;
 
     let radius_64 = radius as i64;
+
     let weight = 1.0f32 / ((radius as f32) * (radius as f32) * (radius as f32));
-    let v_weight = _mm_set1_ps(weight);
+    let v_weight = _mm256_set1_ps(weight);
 
     let mut yy = start;
 
@@ -442,20 +443,22 @@ unsafe fn fgn_horizontal_pass_sse_u16_impl<const CN: usize>(
             if x >= 0 {
                 let current_px = x as usize * CN;
 
-                let ss0 = _mm_cvtepi32_ps(summs0);
-                let ss1 = _mm_cvtepi32_ps(summs1);
-                let ss2 = _mm_cvtepi32_ps(summs2);
-                let ss3 = _mm_cvtepi32_ps(summs3);
+                let ss01 = _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(summs0), summs1);
+                let ss23 = _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(summs2), summs3);
 
-                let r0 = _mm_mul_ps(ss0, v_weight);
-                let r1 = _mm_mul_ps(ss1, v_weight);
-                let r2 = _mm_mul_ps(ss2, v_weight);
-                let r3 = _mm_mul_ps(ss3, v_weight);
+                let ps01 = _mm256_cvtepi32_ps(ss01);
+                let ps23 = _mm256_cvtepi32_ps(ss23);
 
-                let prepared_px0 = _mm_cvtps_epi32(r0);
-                let prepared_px1 = _mm_cvtps_epi32(r1);
-                let prepared_px2 = _mm_cvtps_epi32(r2);
-                let prepared_px3 = _mm_cvtps_epi32(r3);
+                let r01 = _mm256_mul_ps(ps01, v_weight);
+                let r23 = _mm256_mul_ps(ps23, v_weight);
+
+                let e01 = _mm256_cvtps_epi32(r01);
+                let e23 = _mm256_cvtps_epi32(r23);
+
+                let prepared_px0 = _mm256_castsi256_si128(e01);
+                let prepared_px1 = _mm256_extracti128_si256::<1>(e01);
+                let prepared_px2 = _mm256_castsi256_si128(e23);
+                let prepared_px3 = _mm256_extracti128_si256::<1>(e23);
 
                 let dst_ptr0 = (bytes.slice.as_ptr() as *mut u16).add(current_y0 + current_px);
                 let dst_ptr1 = (bytes.slice.as_ptr() as *mut u16).add(current_y1 + current_px);
@@ -471,33 +474,25 @@ unsafe fn fgn_horizontal_pass_sse_u16_impl<const CN: usize>(
                 let d_arr_index_2 = ((x - radius_64) & 1023) as usize;
                 let d_arr_index = (x & 1023) as usize;
 
-                let stored0 = _mm_loadu_si128(buffer0.as_mut_ptr().add(d_arr_index) as *const _);
-                let stored1 = _mm_loadu_si128(buffer1.as_mut_ptr().add(d_arr_index) as *const _);
-                let stored2 = _mm_loadu_si128(buffer2.as_mut_ptr().add(d_arr_index) as *const _);
-                let stored3 = _mm_loadu_si128(buffer3.as_mut_ptr().add(d_arr_index) as *const _);
+                let stored0 = _mm_load_si128(buffer0.as_mut_ptr().add(d_arr_index) as *const _);
+                let stored1 = _mm_load_si128(buffer1.as_mut_ptr().add(d_arr_index) as *const _);
+                let stored2 = _mm_load_si128(buffer2.as_mut_ptr().add(d_arr_index) as *const _);
+                let stored3 = _mm_load_si128(buffer3.as_mut_ptr().add(d_arr_index) as *const _);
 
-                let stored_10 =
-                    _mm_loadu_si128(buffer0.as_mut_ptr().add(d_arr_index_1) as *const _);
-                let stored_11 =
-                    _mm_loadu_si128(buffer1.as_mut_ptr().add(d_arr_index_1) as *const _);
-                let stored_12 =
-                    _mm_loadu_si128(buffer2.as_mut_ptr().add(d_arr_index_1) as *const _);
-                let stored_13 =
-                    _mm_loadu_si128(buffer3.as_mut_ptr().add(d_arr_index_1) as *const _);
+                let stored_10 = _mm_load_si128(buffer0.as_mut_ptr().add(d_arr_index_1) as *const _);
+                let stored_11 = _mm_load_si128(buffer1.as_mut_ptr().add(d_arr_index_1) as *const _);
+                let stored_12 = _mm_load_si128(buffer2.as_mut_ptr().add(d_arr_index_1) as *const _);
+                let stored_13 = _mm_load_si128(buffer3.as_mut_ptr().add(d_arr_index_1) as *const _);
 
                 let j0 = _mm_sub_epi32(stored0, stored_10);
                 let j1 = _mm_sub_epi32(stored1, stored_11);
                 let j2 = _mm_sub_epi32(stored2, stored_12);
                 let j3 = _mm_sub_epi32(stored3, stored_13);
 
-                let stored_20 =
-                    _mm_loadu_si128(buffer0.as_mut_ptr().add(d_arr_index_2) as *const _);
-                let stored_21 =
-                    _mm_loadu_si128(buffer1.as_mut_ptr().add(d_arr_index_2) as *const _);
-                let stored_22 =
-                    _mm_loadu_si128(buffer2.as_mut_ptr().add(d_arr_index_2) as *const _);
-                let stored_23 =
-                    _mm_loadu_si128(buffer3.as_mut_ptr().add(d_arr_index_2) as *const _);
+                let stored_20 = _mm_load_si128(buffer0.as_mut_ptr().add(d_arr_index_2) as *const _);
+                let stored_21 = _mm_load_si128(buffer1.as_mut_ptr().add(d_arr_index_2) as *const _);
+                let stored_22 = _mm_load_si128(buffer2.as_mut_ptr().add(d_arr_index_2) as *const _);
+                let stored_23 = _mm_load_si128(buffer3.as_mut_ptr().add(d_arr_index_2) as *const _);
 
                 let k0 = _mm_mul_by_3_epi32(j0);
                 let k1 = _mm_mul_by_3_epi32(j1);
@@ -518,25 +513,25 @@ unsafe fn fgn_horizontal_pass_sse_u16_impl<const CN: usize>(
                 let arr_index_1 = ((x + radius_64) & 1023) as usize;
 
                 let stored0 =
-                    _mm_loadu_si128(buffer0.get_unchecked_mut(arr_index).as_mut_ptr() as *const _);
+                    _mm_load_si128(buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr() as *const _);
                 let stored1 =
-                    _mm_loadu_si128(buffer1.get_unchecked_mut(arr_index).as_mut_ptr() as *const _);
+                    _mm_load_si128(buffer1.get_unchecked_mut(arr_index).0.as_mut_ptr() as *const _);
                 let stored2 =
-                    _mm_loadu_si128(buffer2.get_unchecked_mut(arr_index).as_mut_ptr() as *const _);
+                    _mm_load_si128(buffer2.get_unchecked_mut(arr_index).0.as_mut_ptr() as *const _);
                 let stored3 =
-                    _mm_loadu_si128(buffer3.get_unchecked_mut(arr_index).as_mut_ptr() as *const _);
+                    _mm_load_si128(buffer3.get_unchecked_mut(arr_index).0.as_mut_ptr() as *const _);
 
-                let stored_10 = _mm_loadu_si128(
-                    buffer0.get_unchecked_mut(arr_index_1).as_mut_ptr() as *const _,
+                let stored_10 = _mm_load_si128(
+                    buffer0.get_unchecked_mut(arr_index_1).0.as_mut_ptr() as *const _,
                 );
-                let stored_11 = _mm_loadu_si128(
-                    buffer1.get_unchecked_mut(arr_index_1).as_mut_ptr() as *const _,
+                let stored_11 = _mm_load_si128(
+                    buffer1.get_unchecked_mut(arr_index_1).0.as_mut_ptr() as *const _,
                 );
-                let stored_12 = _mm_loadu_si128(
-                    buffer2.get_unchecked_mut(arr_index_1).as_mut_ptr() as *const _,
+                let stored_12 = _mm_load_si128(
+                    buffer2.get_unchecked_mut(arr_index_1).0.as_mut_ptr() as *const _,
                 );
-                let stored_13 = _mm_loadu_si128(
-                    buffer3.get_unchecked_mut(arr_index_1).as_mut_ptr() as *const _,
+                let stored_13 = _mm_load_si128(
+                    buffer3.get_unchecked_mut(arr_index_1).0.as_mut_ptr() as *const _,
                 );
 
                 let new_diff0 = _mm_mul_by_3_epi32(_mm_sub_epi32(stored0, stored_10));
@@ -551,13 +546,13 @@ unsafe fn fgn_horizontal_pass_sse_u16_impl<const CN: usize>(
             } else if x + 2 * radius_64 >= 0 {
                 let arr_index = ((x + radius_64) & 1023) as usize;
                 let stored0 =
-                    _mm_loadu_si128(buffer0.get_unchecked_mut(arr_index).as_mut_ptr() as *const _);
+                    _mm_load_si128(buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr() as *const _);
                 let stored1 =
-                    _mm_loadu_si128(buffer1.get_unchecked_mut(arr_index).as_mut_ptr() as *const _);
+                    _mm_load_si128(buffer1.get_unchecked_mut(arr_index).0.as_mut_ptr() as *const _);
                 let stored2 =
-                    _mm_loadu_si128(buffer2.get_unchecked_mut(arr_index).as_mut_ptr() as *const _);
+                    _mm_load_si128(buffer2.get_unchecked_mut(arr_index).0.as_mut_ptr() as *const _);
                 let stored3 =
-                    _mm_loadu_si128(buffer3.get_unchecked_mut(arr_index).as_mut_ptr() as *const _);
+                    _mm_load_si128(buffer3.get_unchecked_mut(arr_index).0.as_mut_ptr() as *const _);
 
                 diffs0 = _mm_sub_epi32(diffs0, _mm_mul_by_3_epi32(stored0));
                 diffs1 = _mm_sub_epi32(diffs1, _mm_mul_by_3_epi32(stored1));
@@ -579,20 +574,20 @@ unsafe fn fgn_horizontal_pass_sse_u16_impl<const CN: usize>(
             let pixel_color3 = load_u16_s32_fast::<CN>(s_ptr3);
 
             let arr_index = ((x + 2 * radius_64) & 1023) as usize;
-            let buf_ptr0 = buffer0.get_unchecked_mut(arr_index).as_mut_ptr();
-            let buf_ptr1 = buffer1.get_unchecked_mut(arr_index).as_mut_ptr();
-            let buf_ptr2 = buffer2.get_unchecked_mut(arr_index).as_mut_ptr();
-            let buf_ptr3 = buffer3.get_unchecked_mut(arr_index).as_mut_ptr();
+            let buf_ptr0 = buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr();
+            let buf_ptr1 = buffer1.get_unchecked_mut(arr_index).0.as_mut_ptr();
+            let buf_ptr2 = buffer2.get_unchecked_mut(arr_index).0.as_mut_ptr();
+            let buf_ptr3 = buffer3.get_unchecked_mut(arr_index).0.as_mut_ptr();
 
             diffs0 = _mm_add_epi32(diffs0, pixel_color0);
             diffs1 = _mm_add_epi32(diffs1, pixel_color1);
             diffs2 = _mm_add_epi32(diffs2, pixel_color2);
             diffs3 = _mm_add_epi32(diffs3, pixel_color3);
 
-            _mm_storeu_si128(buf_ptr0 as *mut _, pixel_color0);
-            _mm_storeu_si128(buf_ptr1 as *mut _, pixel_color1);
-            _mm_storeu_si128(buf_ptr2 as *mut _, pixel_color2);
-            _mm_storeu_si128(buf_ptr3 as *mut _, pixel_color3);
+            _mm_store_si128(buf_ptr0 as *mut _, pixel_color0);
+            _mm_store_si128(buf_ptr1 as *mut _, pixel_color1);
+            _mm_store_si128(buf_ptr2 as *mut _, pixel_color2);
+            _mm_store_si128(buf_ptr3 as *mut _, pixel_color3);
 
             ders0 = _mm_add_epi32(ders0, diffs0);
             ders1 = _mm_add_epi32(ders1, diffs1);
@@ -619,7 +614,10 @@ unsafe fn fgn_horizontal_pass_sse_u16_impl<const CN: usize>(
             if x >= 0 {
                 let current_px = x as usize * CN;
 
-                let prepared_px_s32 = _mm_cvtps_epi32(_mm_mul_ps(_mm_cvtepi32_ps(summs), v_weight));
+                let prepared_px_s32 = _mm_cvtps_epi32(_mm_mul_ps(
+                    _mm_cvtepi32_ps(summs),
+                    _mm256_castps256_ps128(v_weight),
+                ));
 
                 let bytes_offset = current_y + current_px;
 
@@ -630,14 +628,14 @@ unsafe fn fgn_horizontal_pass_sse_u16_impl<const CN: usize>(
                 let d_arr_index_2 = ((x - radius_64) & 1023) as usize;
                 let d_arr_index = (x & 1023) as usize;
 
-                let buf_ptr = buffer0.get_unchecked_mut(d_arr_index).as_mut_ptr();
-                let stored = _mm_loadu_si128(buf_ptr as *const __m128i);
+                let buf_ptr = buffer0.get_unchecked_mut(d_arr_index).0.as_mut_ptr();
+                let stored = _mm_load_si128(buf_ptr as *const __m128i);
 
-                let buf_ptr_1 = buffer0.get_unchecked_mut(d_arr_index_1).as_mut_ptr();
-                let stored_1 = _mm_loadu_si128(buf_ptr_1 as *const __m128i);
+                let buf_ptr_1 = buffer0.get_unchecked_mut(d_arr_index_1).0.as_mut_ptr();
+                let stored_1 = _mm_load_si128(buf_ptr_1 as *const __m128i);
 
-                let buf_ptr_2 = buffer0.get_unchecked_mut(d_arr_index_2).as_mut_ptr();
-                let stored_2 = _mm_loadu_si128(buf_ptr_2 as *const __m128i);
+                let buf_ptr_2 = buffer0.get_unchecked_mut(d_arr_index_2).0.as_mut_ptr();
+                let stored_2 = _mm_load_si128(buf_ptr_2 as *const __m128i);
 
                 let new_diff = _mm_sub_epi32(
                     _mm_mul_by_3_epi32(_mm_sub_epi32(stored, stored_1)),
@@ -648,10 +646,10 @@ unsafe fn fgn_horizontal_pass_sse_u16_impl<const CN: usize>(
                 let arr_index = (x & 1023) as usize;
                 let arr_index_1 = ((x + radius_64) & 1023) as usize;
                 let buf_ptr = buffer0.as_mut_ptr().add(arr_index) as *mut i32;
-                let stored = _mm_loadu_si128(buf_ptr as *const __m128i);
+                let stored = _mm_load_si128(buf_ptr as *const __m128i);
 
                 let buf_ptr_1 = buffer0.as_mut_ptr().add(arr_index_1);
-                let stored_1 = _mm_loadu_si128(buf_ptr_1 as *const __m128i);
+                let stored_1 = _mm_load_si128(buf_ptr_1 as *const __m128i);
 
                 let new_diff = _mm_mul_by_3_epi32(_mm_sub_epi32(stored, stored_1));
 
@@ -659,7 +657,7 @@ unsafe fn fgn_horizontal_pass_sse_u16_impl<const CN: usize>(
             } else if x + 2 * radius_64 >= 0 {
                 let arr_index = ((x + radius_64) & 1023) as usize;
                 let buf_ptr = buffer0.as_mut_ptr().add(arr_index);
-                let stored = _mm_loadu_si128(buf_ptr as *const __m128i);
+                let stored = _mm_load_si128(buf_ptr as *const __m128i);
                 diffs = _mm_sub_epi32(diffs, _mm_mul_by_3_epi32(stored));
             }
 
@@ -672,12 +670,12 @@ unsafe fn fgn_horizontal_pass_sse_u16_impl<const CN: usize>(
             let pixel_color = load_u16_s32_fast::<CN>(s_ptr);
 
             let arr_index = ((x + 2 * radius_64) & 1023) as usize;
-            let buf_ptr = buffer0.get_unchecked_mut(arr_index).as_mut_ptr();
+            let buf_ptr = buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr();
 
             diffs = _mm_add_epi32(diffs, pixel_color);
             ders = _mm_add_epi32(ders, diffs);
             summs = _mm_add_epi32(summs, ders);
-            _mm_storeu_si128(buf_ptr as *mut __m128i, pixel_color);
+            _mm_store_si128(buf_ptr as *mut __m128i, pixel_color);
         }
     }
 }

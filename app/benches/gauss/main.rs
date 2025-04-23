@@ -5,7 +5,8 @@ use libblur::{
     EdgeMode, FastBlurChannels, Scalar, ThreadingPolicy,
 };
 use opencv::core::{
-    find_file, split, AlgorithmHint, Mat, Size, Vector, BORDER_DEFAULT, CV_32FC3, CV_8UC3, CV_8UC4,
+    find_file, split, AlgorithmHint, Mat, Size, Vector, BORDER_DEFAULT, CV_16UC4, CV_32FC3,
+    CV_8UC3, CV_8UC4,
 };
 use opencv::imgcodecs::{imread, IMREAD_COLOR};
 
@@ -38,6 +39,7 @@ pub(crate) fn split_channels_3<T: Copy>(
 pub fn criterion_benchmark(c: &mut Criterion) {
     let mut c = c.benchmark_group("Gauss");
     c.sample_size(10);
+
     let img = ImageReader::open("../assets/test_image_4.png")
         .unwrap()
         .decode()
@@ -78,33 +80,6 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 EdgeMode::Clamp,
                 ThreadingPolicy::Adaptive,
                 ConvolutionMode::FixedPoint,
-            )
-            .unwrap();
-        })
-    });
-
-    c.bench_function("RGBA16 gauss blur edge clamp: rad 51", |b| {
-        let mut dst_bytes =
-            BlurImageMut::alloc(img.width(), img.height(), FastBlurChannels::Channels4);
-        let src_bytes = img
-            .as_bytes()
-            .iter()
-            .map(|&v| v as u16)
-            .collect::<Vec<u16>>();
-        let src_image = BlurImage::borrow(
-            &src_bytes,
-            img.width(),
-            img.height(),
-            FastBlurChannels::Channels4,
-        );
-        b.iter(|| {
-            libblur::gaussian_blur_u16(
-                &src_image,
-                &mut dst_bytes,
-                51 * 2 + 1,
-                0.,
-                EdgeMode::Clamp,
-                ThreadingPolicy::Adaptive,
             )
             .unwrap();
         })
@@ -152,6 +127,58 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     )
     .unwrap();
 
+    c.bench_function("RGBA16 gauss blur edge clamp: rad 151", |b| {
+        let mut dst_bytes =
+            BlurImageMut::alloc(img.width(), img.height(), FastBlurChannels::Channels4);
+        let src_bytes = img
+            .as_bytes()
+            .iter()
+            .map(|&v| v as u16)
+            .collect::<Vec<u16>>();
+        let src_image = BlurImage::borrow(
+            &src_bytes,
+            img.width(),
+            img.height(),
+            FastBlurChannels::Channels4,
+        );
+        b.iter(|| {
+            libblur::gaussian_blur_u16(
+                &src_image,
+                &mut dst_bytes,
+                151 * 2 + 1,
+                0.,
+                EdgeMode::Clamp,
+                ThreadingPolicy::Adaptive,
+            )
+            .unwrap();
+        })
+    });
+
+    c.bench_function("OpenCV RGBA16 gauss blur: rad 151", |b| {
+        let mut cvt_dst = Mat::default();
+        opencv::imgproc::cvt_color(
+            &src0,
+            &mut cvt_dst,
+            CV_8UC3,
+            CV_16UC4,
+            AlgorithmHint::ALGO_HINT_DEFAULT,
+        )
+        .unwrap();
+        b.iter(|| {
+            let mut dst = Mat::default();
+            opencv::imgproc::gaussian_blur(
+                &cvt_dst,
+                &mut dst,
+                Size::new(151 * 2 + 1, 151 * 2 + 1),
+                5.,
+                5.,
+                BORDER_DEFAULT,
+                AlgorithmHint::ALGO_HINT_ACCURATE,
+            )
+            .unwrap();
+        })
+    });
+
     c.bench_function("OpenCV RGB f32 Gaussian: rad 51", |b| {
         let mut cvt_dst = Mat::default();
         opencv::imgproc::cvt_color(
@@ -167,7 +194,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             opencv::imgproc::gaussian_blur(
                 &cvt_dst,
                 &mut dst,
-                Size::new(51, 51),
+                Size::new(51 * 2 + 1, 51 * 2 + 1),
                 5.,
                 5.,
                 BORDER_DEFAULT,

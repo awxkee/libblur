@@ -35,7 +35,7 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-pub(crate) fn fast_gaussian_next_vertical_pass_sse_u8<T, const CHANNELS_COUNT: usize>(
+pub(crate) fn fgn_vertical_pass_sse_u8<T, const CHANNELS_COUNT: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -281,9 +281,9 @@ unsafe fn fgn_vertical_pass_sse_u8_impl<const CN: usize>(
             ders3 = _mm_add_epi32(ders3, diffs3);
 
             summs0 = _mm_add_epi32(summs0, ders0);
-            summs1 = _mm_add_epi32(summs1, ders0);
-            summs2 = _mm_add_epi32(summs2, ders0);
-            summs3 = _mm_add_epi32(summs3, ders0);
+            summs1 = _mm_add_epi32(summs1, ders1);
+            summs2 = _mm_add_epi32(summs2, ders2);
+            summs3 = _mm_add_epi32(summs3, ders3);
         }
         xx += 4;
     }
@@ -362,7 +362,7 @@ unsafe fn fgn_vertical_pass_sse_u8_impl<const CN: usize>(
     }
 }
 
-pub(crate) fn fast_gaussian_next_horizontal_pass_sse_u8<T, const CHANNELS_COUNT: usize>(
+pub(crate) fn fgn_horizontal_pass_sse_u8<T, const CHANNELS_COUNT: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -603,9 +603,9 @@ unsafe fn fgn_horizontal_pass_sse_u8_impl<const CN: usize>(
             ders3 = _mm_add_epi32(ders3, diffs3);
 
             summs0 = _mm_add_epi32(summs0, ders0);
-            summs1 = _mm_add_epi32(summs1, ders0);
-            summs2 = _mm_add_epi32(summs2, ders0);
-            summs3 = _mm_add_epi32(summs3, ders0);
+            summs1 = _mm_add_epi32(summs1, ders1);
+            summs2 = _mm_add_epi32(summs2, ders2);
+            summs3 = _mm_add_epi32(summs3, ders3);
         }
 
         yy += 4;

@@ -25,14 +25,14 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::neon::{load_u8_s32_fast, store_u8_s32_x4, store_u8x8_m4, vmulq_by_3_s32};
+use crate::neon::{load_u16_s32_fast, store_u16_s32_x4, store_u16x4, vmulq_by_3_s32};
 use crate::reflect_index;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, EdgeMode};
 use std::arch::aarch64::*;
 
-pub(crate) fn fgn_vertical_pass_neon_u8<T, const CN: usize>(
-    undefined_slice: &UnsafeSlice<T>,
+pub(crate) fn fgn_vertical_pass_neon_u16_q0_31<const CN: usize>(
+    bytes: &UnsafeSlice<u16>,
     stride: u32,
     width: u32,
     height: u32,
@@ -42,8 +42,24 @@ pub(crate) fn fgn_vertical_pass_neon_u8<T, const CN: usize>(
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        let bytes: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_slice);
+        fgn_vertical_pass_q0_31_impl::<CN>(
+            bytes, stride, width, height, radius, start, end, edge_mode,
+        )
+    }
+}
 
+#[target_feature(enable = "rdm")]
+unsafe fn fgn_vertical_pass_q0_31_impl<const CN: usize>(
+    bytes: &UnsafeSlice<u16>,
+    stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    start: u32,
+    end: u32,
+    edge_mode: EdgeMode,
+) {
+    unsafe {
         let mut buffer0 = Box::new([[0i32; 4]; 1024]);
         let mut buffer1 = Box::new([[0i32; 4]; 1024]);
         let mut buffer2 = Box::new([[0i32; 4]; 1024]);
@@ -52,8 +68,10 @@ pub(crate) fn fgn_vertical_pass_neon_u8<T, const CN: usize>(
         let height_wide = height as i64;
 
         let radius_64 = radius as i64;
-        let weight = 1.0f32 / ((radius as f32) * (radius as f32) * (radius as f32));
-        let v_weight = vdupq_n_f32(weight);
+
+        const Q: f64 = ((1i64 << 31i64) - 1) as f64;
+        let weight = Q / ((radius as f64) * (radius as f64) * (radius as f64));
+        let v_weight = vdupq_n_s32(weight as i32);
 
         let mut xx = start;
 
@@ -84,27 +102,17 @@ pub(crate) fn fgn_vertical_pass_neon_u8<T, const CN: usize>(
                 let current_y = (y * (stride as i64)) as usize;
 
                 if y >= 0 {
-                    let c0 = vcvtq_f32_s32(summs0);
-                    let c1 = vcvtq_f32_s32(summs1);
-                    let c2 = vcvtq_f32_s32(summs2);
-                    let c3 = vcvtq_f32_s32(summs3);
+                    let prepared_px0 = vqrdmulhq_s32(summs0, v_weight);
+                    let prepared_px1 = vqrdmulhq_s32(summs1, v_weight);
+                    let prepared_px2 = vqrdmulhq_s32(summs2, v_weight);
+                    let prepared_px3 = vqrdmulhq_s32(summs3, v_weight);
 
-                    let p0 = vmulq_f32(c0, v_weight);
-                    let p1 = vmulq_f32(c1, v_weight);
-                    let p2 = vmulq_f32(c2, v_weight);
-                    let p3 = vmulq_f32(c3, v_weight);
+                    let dst_ptr0 = (bytes.slice.as_ptr() as *mut u16).add(current_y + current_px0);
+                    let dst_ptr1 = (bytes.slice.as_ptr() as *mut u16).add(current_y + current_px1);
+                    let dst_ptr2 = (bytes.slice.as_ptr() as *mut u16).add(current_y + current_px2);
+                    let dst_ptr3 = (bytes.slice.as_ptr() as *mut u16).add(current_y + current_px3);
 
-                    let prepared_px0 = vcvtaq_s32_f32(p0);
-                    let prepared_px1 = vcvtaq_s32_f32(p1);
-                    let prepared_px2 = vcvtaq_s32_f32(p2);
-                    let prepared_px3 = vcvtaq_s32_f32(p3);
-
-                    let dst_ptr0 = (bytes.slice.as_ptr() as *mut u8).add(current_y + current_px0);
-                    let dst_ptr1 = (bytes.slice.as_ptr() as *mut u8).add(current_y + current_px1);
-                    let dst_ptr2 = (bytes.slice.as_ptr() as *mut u8).add(current_y + current_px2);
-                    let dst_ptr3 = (bytes.slice.as_ptr() as *mut u8).add(current_y + current_px3);
-
-                    store_u8_s32_x4::<CN>(
+                    store_u16_s32_x4::<CN>(
                         (dst_ptr0, dst_ptr1, dst_ptr2, dst_ptr3),
                         int32x4x4_t(prepared_px0, prepared_px1, prepared_px2, prepared_px3),
                     );
@@ -206,15 +214,15 @@ pub(crate) fn fgn_vertical_pass_neon_u8<T, const CN: usize>(
                 let next_row_y = clamp_edge!(edge_mode, y + ((3 * radius_64) >> 1), 0, height_wide)
                     * (stride as usize);
 
-                let s_ptr0 = bytes.slice.as_ptr().add(next_row_y + current_px0) as *mut u8;
-                let s_ptr1 = bytes.slice.as_ptr().add(next_row_y + current_px1) as *mut u8;
-                let s_ptr2 = bytes.slice.as_ptr().add(next_row_y + current_px2) as *mut u8;
-                let s_ptr3 = bytes.slice.as_ptr().add(next_row_y + current_px3) as *mut u8;
+                let s_ptr0 = bytes.slice.as_ptr().add(next_row_y + current_px0) as *mut u16;
+                let s_ptr1 = bytes.slice.as_ptr().add(next_row_y + current_px1) as *mut u16;
+                let s_ptr2 = bytes.slice.as_ptr().add(next_row_y + current_px2) as *mut u16;
+                let s_ptr3 = bytes.slice.as_ptr().add(next_row_y + current_px3) as *mut u16;
 
-                let pixel_color0 = load_u8_s32_fast::<CN>(s_ptr0);
-                let pixel_color1 = load_u8_s32_fast::<CN>(s_ptr1);
-                let pixel_color2 = load_u8_s32_fast::<CN>(s_ptr2);
-                let pixel_color3 = load_u8_s32_fast::<CN>(s_ptr3);
+                let pixel_color0 = load_u16_s32_fast::<CN>(s_ptr0);
+                let pixel_color1 = load_u16_s32_fast::<CN>(s_ptr1);
+                let pixel_color2 = load_u16_s32_fast::<CN>(s_ptr2);
+                let pixel_color3 = load_u16_s32_fast::<CN>(s_ptr3);
 
                 let arr_index = ((y + 2 * radius_64) & 1023) as usize;
 
@@ -239,9 +247,9 @@ pub(crate) fn fgn_vertical_pass_neon_u8<T, const CN: usize>(
                 ders3 = vaddq_s32(ders3, diffs3);
 
                 summs0 = vaddq_s32(summs0, ders0);
-                summs1 = vaddq_s32(summs1, ders0);
-                summs2 = vaddq_s32(summs2, ders0);
-                summs3 = vaddq_s32(summs3, ders0);
+                summs1 = vaddq_s32(summs1, ders1);
+                summs2 = vaddq_s32(summs2, ders2);
+                summs3 = vaddq_s32(summs3, ders3);
             }
             xx += 4;
         }
@@ -258,14 +266,13 @@ pub(crate) fn fgn_vertical_pass_neon_u8<T, const CN: usize>(
                 let current_y = (y * (stride as i64)) as usize;
 
                 if y >= 0 {
-                    let prepared_px_s32 = vcvtaq_s32_f32(vmulq_f32(vcvtq_f32_s32(summs), v_weight));
+                    let prepared_px_s32 = vqrdmulhq_s32(summs, v_weight);
                     let prepared_u16 = vqmovun_s32(prepared_px_s32);
-                    let prepared_u8 = vqmovn_u16(vcombine_u16(prepared_u16, prepared_u16));
 
                     let bytes_offset = current_y + current_px;
 
-                    let dst_ptr = (bytes.slice.as_ptr() as *mut u8).add(bytes_offset);
-                    store_u8x8_m4::<CN>(dst_ptr, prepared_u8);
+                    let dst_ptr = (bytes.slice.as_ptr() as *mut u16).add(bytes_offset);
+                    store_u16x4::<CN>(dst_ptr, prepared_u16);
 
                     let d_arr_index_1 = ((y + radius_64) & 1023) as usize;
                     let d_arr_index_2 = ((y - radius_64) & 1023) as usize;
@@ -304,9 +311,9 @@ pub(crate) fn fgn_vertical_pass_neon_u8<T, const CN: usize>(
                     * (stride as usize);
                 let next_row_x = (x * CN as u32) as usize;
 
-                let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_x) as *mut u8;
+                let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_x) as *mut u16;
 
-                let pixel_color = load_u8_s32_fast::<CN>(s_ptr);
+                let pixel_color = load_u16_s32_fast::<CN>(s_ptr);
 
                 let arr_index = ((y + 2 * radius_64) & 1023) as usize;
                 let buf_ptr = buffer0.get_unchecked_mut(arr_index..).as_mut_ptr() as *mut _;
@@ -320,8 +327,8 @@ pub(crate) fn fgn_vertical_pass_neon_u8<T, const CN: usize>(
     }
 }
 
-pub(crate) fn fgn_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
-    undefined_slice: &UnsafeSlice<T>,
+pub(crate) fn fgn_horizontal_pass_neon_u16_q0_31<const CN: usize>(
+    bytes: &UnsafeSlice<u16>,
     stride: u32,
     width: u32,
     height: u32,
@@ -331,8 +338,24 @@ pub(crate) fn fgn_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        let bytes: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_slice);
+        fgn_horizontal_pass_q0_31_impl::<CN>(
+            bytes, stride, width, height, radius, start, end, edge_mode,
+        );
+    }
+}
 
+#[target_feature(enable = "rdm")]
+unsafe fn fgn_horizontal_pass_q0_31_impl<const CN: usize>(
+    bytes: &UnsafeSlice<u16>,
+    stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    start: u32,
+    end: u32,
+    edge_mode: EdgeMode,
+) {
+    unsafe {
         let mut buffer0 = Box::new([[0i32; 4]; 1024]);
         let mut buffer1 = Box::new([[0i32; 4]; 1024]);
         let mut buffer2 = Box::new([[0i32; 4]; 1024]);
@@ -341,8 +364,10 @@ pub(crate) fn fgn_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
         let width_wide = width as i64;
 
         let radius_64 = radius as i64;
-        let weight = 1.0f32 / ((radius as f32) * (radius as f32) * (radius as f32));
-        let v_weight = vdupq_n_f32(weight);
+
+        const Q: f64 = ((1i64 << 31i64) - 1) as f64;
+        let weight = Q / ((radius as f64) * (radius as f64) * (radius as f64));
+        let v_weight = vdupq_n_s32(weight as i32);
 
         let mut yy = start;
 
@@ -369,29 +394,19 @@ pub(crate) fn fgn_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
 
             for x in (0 - 3 * radius_64)..(width as i64) {
                 if x >= 0 {
-                    let current_px = x as usize * CHANNELS_COUNT;
+                    let current_px = x as usize * CN;
 
-                    let c0 = vcvtq_f32_s32(summs0);
-                    let c1 = vcvtq_f32_s32(summs1);
-                    let c2 = vcvtq_f32_s32(summs2);
-                    let c3 = vcvtq_f32_s32(summs3);
+                    let prepared_px0 = vqrdmulhq_s32(summs0, v_weight);
+                    let prepared_px1 = vqrdmulhq_s32(summs1, v_weight);
+                    let prepared_px2 = vqrdmulhq_s32(summs2, v_weight);
+                    let prepared_px3 = vqrdmulhq_s32(summs3, v_weight);
 
-                    let p0 = vmulq_f32(c0, v_weight);
-                    let p1 = vmulq_f32(c1, v_weight);
-                    let p2 = vmulq_f32(c2, v_weight);
-                    let p3 = vmulq_f32(c3, v_weight);
+                    let dst_ptr0 = (bytes.slice.as_ptr() as *mut u16).add(current_y0 + current_px);
+                    let dst_ptr1 = (bytes.slice.as_ptr() as *mut u16).add(current_y1 + current_px);
+                    let dst_ptr2 = (bytes.slice.as_ptr() as *mut u16).add(current_y2 + current_px);
+                    let dst_ptr3 = (bytes.slice.as_ptr() as *mut u16).add(current_y3 + current_px);
 
-                    let prepared_px0 = vcvtaq_s32_f32(p0);
-                    let prepared_px1 = vcvtaq_s32_f32(p1);
-                    let prepared_px2 = vcvtaq_s32_f32(p2);
-                    let prepared_px3 = vcvtaq_s32_f32(p3);
-
-                    let dst_ptr0 = (bytes.slice.as_ptr() as *mut u8).add(current_y0 + current_px);
-                    let dst_ptr1 = (bytes.slice.as_ptr() as *mut u8).add(current_y1 + current_px);
-                    let dst_ptr2 = (bytes.slice.as_ptr() as *mut u8).add(current_y2 + current_px);
-                    let dst_ptr3 = (bytes.slice.as_ptr() as *mut u8).add(current_y3 + current_px);
-
-                    store_u8_s32_x4::<CHANNELS_COUNT>(
+                    store_u16_s32_x4::<CN>(
                         (dst_ptr0, dst_ptr1, dst_ptr2, dst_ptr3),
                         int32x4x4_t(prepared_px0, prepared_px1, prepared_px2, prepared_px3),
                     );
@@ -486,17 +501,17 @@ pub(crate) fn fgn_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
                 }
 
                 let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide);
-                let next_row_px = next_row_x * CHANNELS_COUNT;
+                let next_row_px = next_row_x * CN;
 
-                let s_ptr0 = bytes.slice.as_ptr().add(current_y0 + next_row_px) as *mut u8;
-                let s_ptr1 = bytes.slice.as_ptr().add(current_y1 + next_row_px) as *mut u8;
-                let s_ptr2 = bytes.slice.as_ptr().add(current_y2 + next_row_px) as *mut u8;
-                let s_ptr3 = bytes.slice.as_ptr().add(current_y3 + next_row_px) as *mut u8;
+                let s_ptr0 = bytes.slice.as_ptr().add(current_y0 + next_row_px) as *mut u16;
+                let s_ptr1 = bytes.slice.as_ptr().add(current_y1 + next_row_px) as *mut u16;
+                let s_ptr2 = bytes.slice.as_ptr().add(current_y2 + next_row_px) as *mut u16;
+                let s_ptr3 = bytes.slice.as_ptr().add(current_y3 + next_row_px) as *mut u16;
 
-                let pixel_color0 = load_u8_s32_fast::<CHANNELS_COUNT>(s_ptr0);
-                let pixel_color1 = load_u8_s32_fast::<CHANNELS_COUNT>(s_ptr1);
-                let pixel_color2 = load_u8_s32_fast::<CHANNELS_COUNT>(s_ptr2);
-                let pixel_color3 = load_u8_s32_fast::<CHANNELS_COUNT>(s_ptr3);
+                let pixel_color0 = load_u16_s32_fast::<CN>(s_ptr0);
+                let pixel_color1 = load_u16_s32_fast::<CN>(s_ptr1);
+                let pixel_color2 = load_u16_s32_fast::<CN>(s_ptr2);
+                let pixel_color3 = load_u16_s32_fast::<CN>(s_ptr3);
 
                 let arr_index = ((x + 2 * radius_64) & 1023) as usize;
                 let buf_ptr0 = buffer0.get_unchecked_mut(arr_index).as_mut_ptr() as *mut _;
@@ -537,16 +552,15 @@ pub(crate) fn fgn_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
 
             for x in (0 - 3 * radius_64)..(width as i64) {
                 if x >= 0 {
-                    let current_px = x as usize * CHANNELS_COUNT;
+                    let current_px = x as usize * CN;
 
-                    let prepared_px_s32 = vcvtaq_s32_f32(vmulq_f32(vcvtq_f32_s32(summs), v_weight));
+                    let prepared_px_s32 = vqrdmulhq_s32(summs, v_weight);
                     let prepared_u16 = vqmovun_s32(prepared_px_s32);
-                    let prepared_u8 = vqmovn_u16(vcombine_u16(prepared_u16, prepared_u16));
 
                     let bytes_offset = current_y + current_px;
 
-                    let dst_ptr = (bytes.slice.as_ptr() as *mut u8).add(bytes_offset);
-                    store_u8x8_m4::<CHANNELS_COUNT>(dst_ptr, prepared_u8);
+                    let dst_ptr = (bytes.slice.as_ptr() as *mut u16).add(bytes_offset);
+                    store_u16x4::<CN>(dst_ptr, prepared_u16);
 
                     let d_arr_index_1 = ((x + radius_64) & 1023) as usize;
                     let d_arr_index_2 = ((x - radius_64) & 1023) as usize;
@@ -582,11 +596,11 @@ pub(crate) fn fgn_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
 
                 let next_row_y = (y as usize) * (stride as usize);
                 let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide);
-                let next_row_px = next_row_x * CHANNELS_COUNT;
+                let next_row_px = next_row_x * CN;
 
-                let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut u8;
+                let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut u16;
 
-                let pixel_color = load_u8_s32_fast::<CHANNELS_COUNT>(s_ptr);
+                let pixel_color = load_u16_s32_fast::<CN>(s_ptr);
 
                 let arr_index = ((x + 2 * radius_64) & 1023) as usize;
                 let buf_ptr = buffer0.get_unchecked_mut(arr_index).as_mut_ptr() as *mut _;

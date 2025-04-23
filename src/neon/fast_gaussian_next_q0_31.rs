@@ -552,9 +552,9 @@ unsafe fn fgn_horizontal_pass_neon_impl<T, const CN: usize>(
                 ders3 = vaddq_s32(ders3, diffs3);
 
                 summs0 = vaddq_s32(summs0, ders0);
-                summs1 = vaddq_s32(summs1, ders0);
-                summs2 = vaddq_s32(summs2, ders0);
-                summs3 = vaddq_s32(summs3, ders0);
+                summs1 = vaddq_s32(summs1, ders1);
+                summs2 = vaddq_s32(summs2, ders2);
+                summs3 = vaddq_s32(summs3, ders3);
             }
 
             yy += 4;
