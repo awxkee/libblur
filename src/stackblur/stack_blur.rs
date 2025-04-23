@@ -56,7 +56,7 @@ fn stack_blur_worker_horizontal(
     ) {
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         fn select_blur_pass<const N: usize>() -> Box<dyn StackBlurWorkingPass<u8, N>> {
-            #[cfg(feature = "avx")]
+            #[cfg(all(target_arch = "x86_64", feature = "avx"))]
             {
                 if std::arch::is_x86_feature_detected!("avx2") {
                     use crate::stackblur::avx::HorizontalAvxStackBlurPass;
