@@ -47,15 +47,15 @@ pub(crate) fn fgn_vertical_pass_avx_f32<T, const CN: usize>(
 ) {
     unsafe {
         let bytes: &UnsafeSlice<'_, f32> = std::mem::transmute(undefined_slice);
-        if std::arch::is_x86_feature_detected!("fma") {
-            fgn_vertical_pass_avx_f32_fma::<CN>(
-                bytes, stride, width, height, radius, start, end, edge_mode,
-            );
-        } else {
+        // if std::arch::is_x86_feature_detected!("fma") {
+        //     fgn_vertical_pass_avx_f32_fma::<CN>(
+        //         bytes, stride, width, height, radius, start, end, edge_mode,
+        //     );
+        // } else {
             fgn_vertical_pass_avx_f32_def::<CN>(
                 bytes, stride, width, height, radius, start, end, edge_mode,
             );
-        }
+        // }
     }
 }
 
