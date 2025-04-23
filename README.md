@@ -16,8 +16,6 @@ options also available
 # Performance
 
 Most blur algorithms done very good and works at excellent speed. Where appropriate comparison with OpenCV is available.
-For measurement was used M3 Pro with NEON feature. On x86_84 OpenCV might be better sometimes since AVX-2 is not fully
-supported in library
 
 # Usage
 
