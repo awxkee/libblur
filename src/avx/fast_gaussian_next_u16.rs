@@ -32,9 +32,6 @@ use crate::sse::utils::load_u16_s32_fast;
 use crate::sse::{_mm_mul_by_3_epi32, store_u16_u32};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, EdgeMode};
-#[cfg(target_arch = "x86")]
-use std::arch::x86::*;
-#[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
 pub(crate) fn fgn_vertical_pass_avx_u16<const CHANNELS_COUNT: usize>(
