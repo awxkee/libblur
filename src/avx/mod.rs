@@ -28,6 +28,8 @@
  */
 #![deny(unreachable_pub)]
 #[cfg(feature = "avx")]
+mod fast_gaussian;
+#[cfg(feature = "avx")]
 mod fast_gaussian_next;
 #[cfg(feature = "avx")]
 mod fast_gaussian_next_f32;
@@ -38,6 +40,8 @@ mod utils;
 mod v_load;
 mod v_store;
 
+#[cfg(feature = "avx")]
+pub(crate) use fast_gaussian::{fg_horizontal_pass_sse_u8, fg_vertical_pass_avx_u8};
 #[cfg(feature = "avx")]
 pub(crate) use fast_gaussian_next::{fgn_horizontal_pass_avx2_u8, fgn_vertical_pass_avx_u8};
 #[cfg(feature = "avx")]
