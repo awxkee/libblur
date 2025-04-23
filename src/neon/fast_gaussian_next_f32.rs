@@ -32,6 +32,10 @@ use crate::reflect_index;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, EdgeMode};
 
+#[repr(C, align(16))]
+#[derive(Copy, Clone, Default)]
+pub(crate) struct NeonF32x4(pub(crate) [f32; 4]);
+
 pub(crate) fn fgn_vertical_pass_neon_f32<T, const CHANNELS_COUNT: usize>(
     undef_bytes: &UnsafeSlice<T>,
     stride: u32,
@@ -45,10 +49,10 @@ pub(crate) fn fgn_vertical_pass_neon_f32<T, const CHANNELS_COUNT: usize>(
     unsafe {
         let bytes: &UnsafeSlice<'_, f32> = std::mem::transmute(undef_bytes);
 
-        let mut bf0 = Box::new([[0f32; 4]; 1024]);
-        let mut bf1 = Box::new([[0f32; 4]; 1024]);
-        let mut bf2 = Box::new([[0f32; 4]; 1024]);
-        let mut bf3 = Box::new([[0f32; 4]; 1024]);
+        let mut bf0 = Box::new([NeonF32x4::default(); 1024]);
+        let mut bf1 = Box::new([NeonF32x4::default(); 1024]);
+        let mut bf2 = Box::new([NeonF32x4::default(); 1024]);
+        let mut bf3 = Box::new([NeonF32x4::default(); 1024]);
 
         let height_wide = height as i64;
 
@@ -280,10 +284,10 @@ pub(crate) fn fgn_horizontal_pass_neon_f32<T, const CHANNELS_COUNT: usize>(
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        let mut bf0 = Box::new([[0f32; 4]; 1024]);
-        let mut bf1 = Box::new([[0f32; 4]; 1024]);
-        let mut bf2 = Box::new([[0f32; 4]; 1024]);
-        let mut bf3 = Box::new([[0f32; 4]; 1024]);
+        let mut bf0 = Box::new([NeonF32x4::default(); 1024]);
+        let mut bf1 = Box::new([NeonF32x4::default(); 1024]);
+        let mut bf2 = Box::new([NeonF32x4::default(); 1024]);
+        let mut bf3 = Box::new([NeonF32x4::default(); 1024]);
 
         let bytes: &UnsafeSlice<'_, f32> = std::mem::transmute(undef_bytes);
 

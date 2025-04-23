@@ -111,6 +111,60 @@ pub unsafe fn store_u8_s32_x4<const CHANNELS_COUNT: usize>(
     }
 }
 
+#[allow(dead_code)]
+#[inline(always)]
+pub unsafe fn store_u8_s32_x5<const CHANNELS_COUNT: usize>(
+    dst_ptr: (*mut u8, *mut u8, *mut u8, *mut u8, *mut u8),
+    regi: int32x4x4_t,
+    add: int32x4_t,
+) {
+    let s16_0 = vreinterpret_u16_s16(vqmovn_s32(regi.0));
+    let s16_1 = vreinterpret_u16_s16(vqmovn_s32(regi.1));
+    let s16_2 = vreinterpret_u16_s16(vqmovn_s32(regi.2));
+    let s16_3 = vreinterpret_u16_s16(vqmovn_s32(regi.3));
+    let s16_4 = vreinterpret_u16_s16(vqmovn_s32(add));
+    let u16_f_0 = vcombine_u16(s16_0, s16_0);
+    let u16_f_1 = vcombine_u16(s16_1, s16_1);
+    let u16_f_2 = vcombine_u16(s16_2, s16_2);
+    let u16_f_3 = vcombine_u16(s16_3, s16_3);
+    let u16_f_4 = vcombine_u16(s16_4, s16_4);
+    let v8_0 = vqmovn_u16(u16_f_0);
+    let v8_1 = vqmovn_u16(u16_f_1);
+    let v8_2 = vqmovn_u16(u16_f_2);
+    let v8_3 = vqmovn_u16(u16_f_3);
+    let v8_4 = vqmovn_u16(u16_f_4);
+    if CHANNELS_COUNT == 4 {
+        vst1_lane_u32::<0>(dst_ptr.0 as *mut u32, vreinterpret_u32_u8(v8_0));
+        vst1_lane_u32::<0>(dst_ptr.1 as *mut u32, vreinterpret_u32_u8(v8_1));
+        vst1_lane_u32::<0>(dst_ptr.2 as *mut u32, vreinterpret_u32_u8(v8_2));
+        vst1_lane_u32::<0>(dst_ptr.3 as *mut u32, vreinterpret_u32_u8(v8_3));
+        vst1_lane_u32::<0>(dst_ptr.4 as *mut u32, vreinterpret_u32_u8(v8_4));
+    } else if CHANNELS_COUNT == 3 {
+        vst1_lane_u16::<0>(dst_ptr.0 as *mut u16, vreinterpret_u16_u8(v8_0));
+        vst1_lane_u8::<2>(dst_ptr.0.add(2), v8_0);
+        vst1_lane_u16::<0>(dst_ptr.1 as *mut u16, vreinterpret_u16_u8(v8_1));
+        vst1_lane_u8::<2>(dst_ptr.1.add(2), v8_1);
+        vst1_lane_u16::<0>(dst_ptr.2 as *mut u16, vreinterpret_u16_u8(v8_2));
+        vst1_lane_u8::<2>(dst_ptr.2.add(2), v8_2);
+        vst1_lane_u16::<0>(dst_ptr.3 as *mut u16, vreinterpret_u16_u8(v8_3));
+        vst1_lane_u8::<2>(dst_ptr.3.add(2), v8_3);
+        vst1_lane_u16::<0>(dst_ptr.4 as *mut u16, vreinterpret_u16_u8(v8_4));
+        vst1_lane_u8::<2>(dst_ptr.4.add(2), v8_4);
+    } else if CHANNELS_COUNT == 2 {
+        vst1_lane_u16::<0>(dst_ptr.0 as *mut u16, vreinterpret_u16_u8(v8_0));
+        vst1_lane_u16::<0>(dst_ptr.1 as *mut u16, vreinterpret_u16_u8(v8_1));
+        vst1_lane_u16::<0>(dst_ptr.2 as *mut u16, vreinterpret_u16_u8(v8_2));
+        vst1_lane_u16::<0>(dst_ptr.3 as *mut u16, vreinterpret_u16_u8(v8_3));
+        vst1_lane_u16::<0>(dst_ptr.4 as *mut u16, vreinterpret_u16_u8(v8_4));
+    } else {
+        vst1_lane_u8::<0>(dst_ptr.0, v8_0);
+        vst1_lane_u8::<0>(dst_ptr.1, v8_1);
+        vst1_lane_u8::<0>(dst_ptr.2, v8_2);
+        vst1_lane_u8::<0>(dst_ptr.3, v8_3);
+        vst1_lane_u8::<0>(dst_ptr.4, v8_4);
+    }
+}
+
 #[inline(always)]
 pub unsafe fn store_u8_u32<const CHANNELS_COUNT: usize>(dst_ptr: *mut u8, regi: uint32x4_t) {
     let s16 = vqmovn_u32(regi);
@@ -387,5 +441,48 @@ pub unsafe fn store_u16_s32_x4<const CN: usize>(
         vst1_lane_u16::<0>(dst_ptr.1 as *mut _, a1);
         vst1_lane_u16::<0>(dst_ptr.2 as *mut _, a2);
         vst1_lane_u16::<0>(dst_ptr.3 as *mut _, a3);
+    }
+}
+
+#[inline(always)]
+pub unsafe fn store_u16_s32_x5<const CN: usize>(
+    dst_ptr: (*mut u16, *mut u16, *mut u16, *mut u16, *mut u16),
+    regi: int32x4x4_t,
+    add: int32x4_t,
+) {
+    let a0 = vqmovun_s32(regi.0);
+    let a1 = vqmovun_s32(regi.1);
+    let a2 = vqmovun_s32(regi.2);
+    let a3 = vqmovun_s32(regi.3);
+    let a4 = vqmovun_s32(add);
+    if CN == 4 {
+        vst1_u16(dst_ptr.0, a0);
+        vst1_u16(dst_ptr.1, a1);
+        vst1_u16(dst_ptr.2, a2);
+        vst1_u16(dst_ptr.3, a3);
+        vst1_u16(dst_ptr.4, a4);
+    } else if CN == 3 {
+        vst1_lane_u32::<0>(dst_ptr.0 as *mut _, vreinterpret_u32_u16(a0));
+        vst1_lane_u16::<2>(dst_ptr.0.add(2) as *mut _, a0);
+        vst1_lane_u32::<0>(dst_ptr.1 as *mut _, vreinterpret_u32_u16(a1));
+        vst1_lane_u16::<2>(dst_ptr.1.add(2) as *mut _, a1);
+        vst1_lane_u32::<0>(dst_ptr.2 as *mut _, vreinterpret_u32_u16(a2));
+        vst1_lane_u16::<2>(dst_ptr.2.add(2) as *mut _, a2);
+        vst1_lane_u32::<0>(dst_ptr.3 as *mut _, vreinterpret_u32_u16(a3));
+        vst1_lane_u16::<2>(dst_ptr.3.add(2) as *mut _, a3);
+        vst1_lane_u32::<0>(dst_ptr.4 as *mut _, vreinterpret_u32_u16(a4));
+        vst1_lane_u16::<2>(dst_ptr.4.add(2) as *mut _, a4);
+    } else if CN == 2 {
+        vst1_lane_u32::<0>(dst_ptr.0 as *mut _, vreinterpret_u32_u16(a0));
+        vst1_lane_u32::<0>(dst_ptr.1 as *mut _, vreinterpret_u32_u16(a1));
+        vst1_lane_u32::<0>(dst_ptr.2 as *mut _, vreinterpret_u32_u16(a2));
+        vst1_lane_u32::<0>(dst_ptr.3 as *mut _, vreinterpret_u32_u16(a3));
+        vst1_lane_u32::<0>(dst_ptr.4 as *mut _, vreinterpret_u32_u16(a4));
+    } else {
+        vst1_lane_u16::<0>(dst_ptr.0 as *mut _, a0);
+        vst1_lane_u16::<0>(dst_ptr.1 as *mut _, a1);
+        vst1_lane_u16::<0>(dst_ptr.2 as *mut _, a2);
+        vst1_lane_u16::<0>(dst_ptr.3 as *mut _, a3);
+        vst1_lane_u16::<0>(dst_ptr.4 as *mut _, a4);
     }
 }

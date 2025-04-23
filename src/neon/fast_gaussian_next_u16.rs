@@ -25,6 +25,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use crate::neon::fast_gaussian::NeonI32x4;
 use crate::neon::{load_u16_s32_fast, store_u16_s32_x4, store_u16x4, vmulq_by_3_s32};
 use crate::reflect_index;
 use crate::unsafe_slice::UnsafeSlice;
@@ -42,10 +43,10 @@ pub(crate) fn fgn_vertical_pass_neon_u16<const CN: usize>(
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        let mut buffer0 = Box::new([[0i32; 4]; 1024]);
-        let mut buffer1 = Box::new([[0i32; 4]; 1024]);
-        let mut buffer2 = Box::new([[0i32; 4]; 1024]);
-        let mut buffer3 = Box::new([[0i32; 4]; 1024]);
+        let mut buffer0 = Box::new([NeonI32x4::default(); 1024]);
+        let mut buffer1 = Box::new([NeonI32x4::default(); 1024]);
+        let mut buffer2 = Box::new([NeonI32x4::default(); 1024]);
+        let mut buffer3 = Box::new([NeonI32x4::default(); 1024]);
 
         let height_wide = height as i64;
 
@@ -292,7 +293,7 @@ pub(crate) fn fgn_vertical_pass_neon_u16<const CN: usize>(
                     diffs = vmlaq_s32(diffs, vsubq_s32(stored, stored_1), vdupq_n_s32(3));
                 } else if y + 2 * radius_64 >= 0 {
                     let arr_index = ((y + radius_64) & 1023) as usize;
-                    let buf_ptr = buffer0.get_unchecked_mut(arr_index).as_ptr() as *const _;
+                    let buf_ptr = buffer0.get_unchecked(arr_index).0.as_ptr() as *const _;
                     let stored = vld1q_s32(buf_ptr);
                     diffs = vmlaq_s32(diffs, stored, vdupq_n_s32(-3));
                 }
@@ -328,10 +329,10 @@ pub(crate) fn fgn_horizontal_pass_neon_u16<const CN: usize>(
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        let mut buffer0 = Box::new([[0i32; 4]; 1024]);
-        let mut buffer1 = Box::new([[0i32; 4]; 1024]);
-        let mut buffer2 = Box::new([[0i32; 4]; 1024]);
-        let mut buffer3 = Box::new([[0i32; 4]; 1024]);
+        let mut buffer0 = Box::new([NeonI32x4::default(); 1024]);
+        let mut buffer1 = Box::new([NeonI32x4::default(); 1024]);
+        let mut buffer2 = Box::new([NeonI32x4::default(); 1024]);
+        let mut buffer3 = Box::new([NeonI32x4::default(); 1024]);
 
         let width_wide = width as i64;
 
@@ -584,7 +585,7 @@ pub(crate) fn fgn_horizontal_pass_neon_u16<const CN: usize>(
                 let pixel_color = load_u16_s32_fast::<CN>(s_ptr);
 
                 let arr_index = ((x + 2 * radius_64) & 1023) as usize;
-                let buf_ptr = buffer0.get_unchecked_mut(arr_index).as_mut_ptr() as *mut _;
+                let buf_ptr = buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr() as *mut _;
 
                 diffs = vaddq_s32(diffs, pixel_color);
                 ders = vaddq_s32(ders, diffs);
