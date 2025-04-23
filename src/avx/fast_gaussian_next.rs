@@ -528,9 +528,9 @@ unsafe fn fgn_horizontal_pass_avx2_u8_impl<const CN: usize>(
             ders3 = _mm_add_epi32(ders3, diffs3);
 
             summs0 = _mm_add_epi32(summs0, ders0);
-            summs1 = _mm_add_epi32(summs1, ders1);
-            summs2 = _mm_add_epi32(summs2, ders2);
-            summs3 = _mm_add_epi32(summs3, ders3);
+            summs1 = _mm_add_epi32(summs1, ders0);
+            summs2 = _mm_add_epi32(summs2, ders0);
+            summs3 = _mm_add_epi32(summs3, ders0);
         }
 
         yy += 4;
