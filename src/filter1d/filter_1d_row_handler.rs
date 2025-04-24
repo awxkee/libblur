@@ -81,7 +81,7 @@ impl Filter1DRowHandler<u8, f32> for u8 {
     fn get_row_handler<const N: usize>(
         is_symmetric_kernel: bool,
     ) -> fn(Arena, &[u8], &mut [u8], ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
-        #[cfg(feature = "avx")]
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
         if std::arch::is_x86_feature_detected!("avx2") {
             if is_symmetric_kernel {
                 use crate::filter1d::avx::filter_row_avx_symm_u8_f32;
@@ -141,7 +141,7 @@ impl Filter1DRowHandler<f32, f32> for f32 {
         is_symmetric_kernel: bool,
     ) -> fn(Arena, &[f32], &mut [f32], ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
         if is_symmetric_kernel {
-            #[cfg(feature = "avx")]
+            #[cfg(all(target_arch = "x86_64", feature = "avx"))]
             {
                 if std::arch::is_x86_feature_detected!("avx2") {
                     use crate::filter1d::avx::filter_row_avx_f32_f32_symm;
@@ -149,7 +149,7 @@ impl Filter1DRowHandler<f32, f32> for f32 {
                 }
             }
         }
-        #[cfg(feature = "avx")]
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
         if std::arch::is_x86_feature_detected!("avx2") {
             use crate::filter1d::avx::filter_row_avx_f32_f32;
             return filter_row_avx_f32_f32::<N>;
@@ -185,7 +185,7 @@ impl Filter1DRowHandler<u16, f32> for f32 {
         is_symmetric_kernel: bool,
     ) -> fn(Arena, &[u16], &mut [u16], ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
         if is_symmetric_kernel {
-            #[cfg(feature = "avx")]
+            #[cfg(all(target_arch = "x86_64", feature = "avx"))]
             if std::arch::is_x86_feature_detected!("avx2") {
                 use crate::filter1d::avx::filter_row_avx_symm_u16_f32;
                 return filter_row_avx_symm_u16_f32::<N>;

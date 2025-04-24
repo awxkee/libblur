@@ -26,10 +26,13 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::neon::{load_u8_s32_fast, store_u8_s32_x4, store_u8x8_m4, vmulq_s32_f32};
+use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, reflect_index, EdgeMode};
 use std::arch::aarch64::*;
 
-use crate::unsafe_slice::UnsafeSlice;
+#[repr(C, align(16))]
+#[derive(Copy, Clone, Default)]
+pub(crate) struct NeonI32x4(pub(crate) [i32; 4]);
 
 pub(crate) fn fg_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
     undefined_slice: &UnsafeSlice<T>,
@@ -44,10 +47,11 @@ pub(crate) fn fg_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
     unsafe {
         let bytes: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_slice);
 
-        let mut buffer0 = Box::new([[0i32; 4]; 1024]);
-        let mut buffer1 = Box::new([[0i32; 4]; 1024]);
-        let mut buffer2 = Box::new([[0i32; 4]; 1024]);
-        let mut buffer3 = Box::new([[0i32; 4]; 1024]);
+        let mut full_buffer = Box::new([NeonI32x4::default(); 1024 * 4]);
+
+        let (buffer0, rem) = full_buffer.split_at_mut(1024);
+        let (buffer1, rem) = rem.split_at_mut(1024);
+        let (buffer2, buffer3) = rem.split_at_mut(1024);
 
         let initial_sum = ((radius * radius) >> 1) as i32;
 
@@ -106,26 +110,46 @@ pub(crate) fn fg_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
                     let arr_index = ((x - radius_64) & 1023) as usize;
                     let d_arr_index = (x & 1023) as usize;
 
-                    let d_stored0 = vld1q_s32(buffer0.get_unchecked_mut(d_arr_index).as_mut_ptr());
-                    let d_stored1 = vld1q_s32(buffer1.get_unchecked_mut(d_arr_index).as_mut_ptr());
-                    let d_stored2 = vld1q_s32(buffer2.get_unchecked_mut(d_arr_index).as_mut_ptr());
-                    let d_stored3 = vld1q_s32(buffer3.get_unchecked_mut(d_arr_index).as_mut_ptr());
+                    let d_stored0 =
+                        vld1q_s32(buffer0.get_unchecked_mut(d_arr_index).0.as_mut_ptr());
+                    let d_stored1 =
+                        vld1q_s32(buffer1.get_unchecked_mut(d_arr_index).0.as_mut_ptr());
+                    let d_stored2 =
+                        vld1q_s32(buffer2.get_unchecked_mut(d_arr_index).0.as_mut_ptr());
+                    let d_stored3 =
+                        vld1q_s32(buffer3.get_unchecked_mut(d_arr_index).0.as_mut_ptr());
 
-                    let a_stored0 = vld1q_s32(buffer0.get_unchecked_mut(arr_index).as_mut_ptr());
-                    let a_stored1 = vld1q_s32(buffer1.get_unchecked_mut(arr_index).as_mut_ptr());
-                    let a_stored2 = vld1q_s32(buffer2.get_unchecked_mut(arr_index).as_mut_ptr());
-                    let a_stored3 = vld1q_s32(buffer3.get_unchecked_mut(arr_index).as_mut_ptr());
+                    let a_stored0 = vld1q_s32(buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr());
+                    let a_stored1 = vld1q_s32(buffer1.get_unchecked_mut(arr_index).0.as_mut_ptr());
+                    let a_stored2 = vld1q_s32(buffer2.get_unchecked_mut(arr_index).0.as_mut_ptr());
+                    let a_stored3 = vld1q_s32(buffer3.get_unchecked_mut(arr_index).0.as_mut_ptr());
 
-                    diffs0 = vaddq_s32(diffs0, vmlaq_s32(a_stored0, d_stored0, vdupq_n_s32(-2)));
-                    diffs1 = vaddq_s32(diffs1, vmlaq_s32(a_stored1, d_stored1, vdupq_n_s32(-2)));
-                    diffs2 = vaddq_s32(diffs2, vmlaq_s32(a_stored2, d_stored2, vdupq_n_s32(-2)));
-                    diffs3 = vaddq_s32(diffs3, vmlaq_s32(a_stored3, d_stored3, vdupq_n_s32(-2)));
+                    diffs0 = vaddq_s32(
+                        diffs0,
+                        vsubq_s32(a_stored0, vaddq_s32(d_stored0, d_stored0)),
+                    );
+                    diffs1 = vaddq_s32(
+                        diffs1,
+                        vsubq_s32(a_stored1, vaddq_s32(d_stored1, d_stored1)),
+                    );
+                    diffs2 = vaddq_s32(
+                        diffs2,
+                        vsubq_s32(a_stored2, vaddq_s32(d_stored2, d_stored2)),
+                    );
+                    diffs3 = vaddq_s32(
+                        diffs3,
+                        vsubq_s32(a_stored3, vaddq_s32(d_stored3, d_stored3)),
+                    );
                 } else if x + radius_64 >= 0 {
                     let arr_index = (x & 1023) as usize;
-                    let mut stored0 = vld1q_s32(buffer0.get_unchecked_mut(arr_index).as_mut_ptr());
-                    let mut stored1 = vld1q_s32(buffer1.get_unchecked_mut(arr_index).as_mut_ptr());
-                    let mut stored2 = vld1q_s32(buffer2.get_unchecked_mut(arr_index).as_mut_ptr());
-                    let mut stored3 = vld1q_s32(buffer3.get_unchecked_mut(arr_index).as_mut_ptr());
+                    let mut stored0 =
+                        vld1q_s32(buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr());
+                    let mut stored1 =
+                        vld1q_s32(buffer1.get_unchecked_mut(arr_index).0.as_mut_ptr());
+                    let mut stored2 =
+                        vld1q_s32(buffer2.get_unchecked_mut(arr_index).0.as_mut_ptr());
+                    let mut stored3 =
+                        vld1q_s32(buffer3.get_unchecked_mut(arr_index).0.as_mut_ptr());
 
                     stored0 = vshlq_n_s32::<1>(stored0);
                     stored1 = vshlq_n_s32::<1>(stored1);
@@ -154,19 +178,19 @@ pub(crate) fn fg_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
                 let arr_index = ((x + radius_64) & 1023) as usize;
 
                 vst1q_s32(
-                    buffer0.get_unchecked_mut(arr_index).as_mut_ptr(),
+                    buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr(),
                     pixel_color0,
                 );
                 vst1q_s32(
-                    buffer1.get_unchecked_mut(arr_index).as_mut_ptr(),
+                    buffer1.get_unchecked_mut(arr_index).0.as_mut_ptr(),
                     pixel_color1,
                 );
                 vst1q_s32(
-                    buffer2.get_unchecked_mut(arr_index).as_mut_ptr(),
+                    buffer2.get_unchecked_mut(arr_index).0.as_mut_ptr(),
                     pixel_color2,
                 );
                 vst1q_s32(
-                    buffer3.get_unchecked_mut(arr_index).as_mut_ptr(),
+                    buffer3.get_unchecked_mut(arr_index).0.as_mut_ptr(),
                     pixel_color3,
                 );
 
@@ -206,16 +230,16 @@ pub(crate) fn fg_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
                     let arr_index = ((x - radius_64) & 1023) as usize;
                     let d_arr_index = (x & 1023) as usize;
 
-                    let d_buf_ptr = buffer0.get_unchecked_mut(d_arr_index).as_mut_ptr();
+                    let d_buf_ptr = buffer0.get_unchecked_mut(d_arr_index).0.as_mut_ptr();
                     let d_stored = vld1q_s32(d_buf_ptr);
 
-                    let buf_ptr = buffer0.get_unchecked_mut(arr_index).as_mut_ptr();
+                    let buf_ptr = buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr();
                     let a_stored = vld1q_s32(buf_ptr);
 
-                    diffs = vaddq_s32(diffs, vmlaq_s32(a_stored, d_stored, vdupq_n_s32(-2)));
+                    diffs = vaddq_s32(diffs, vsubq_s32(a_stored, vaddq_s32(d_stored, d_stored)));
                 } else if x + radius_64 >= 0 {
                     let arr_index = (x & 1023) as usize;
-                    let buf_ptr = buffer0.get_unchecked_mut(arr_index).as_mut_ptr();
+                    let buf_ptr = buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr();
                     let mut stored = vld1q_s32(buf_ptr);
                     stored = vshlq_n_s32::<1>(stored);
                     diffs = vsubq_s32(diffs, stored);
@@ -228,7 +252,7 @@ pub(crate) fn fg_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
                 let pixel_color = load_u8_s32_fast::<CHANNELS_COUNT>(s_ptr);
 
                 let arr_index = ((x + radius_64) & 1023) as usize;
-                let buf_ptr = buffer0.get_unchecked_mut(arr_index).as_mut_ptr();
+                let buf_ptr = buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr();
 
                 diffs = vaddq_s32(diffs, pixel_color);
                 summs = vaddq_s32(summs, diffs);
@@ -251,10 +275,11 @@ pub(crate) fn fg_vertical_pass_neon_u8<T, const CN: usize>(
     unsafe {
         let bytes: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_slice);
 
-        let mut buffer0 = Box::new([[0; 4]; 1024]);
-        let mut buffer1 = Box::new([[0; 4]; 1024]);
-        let mut buffer2 = Box::new([[0; 4]; 1024]);
-        let mut buffer3 = Box::new([[0; 4]; 1024]);
+        let mut full_buffer = Box::new([NeonI32x4::default(); 1024 * 4]);
+
+        let (buffer0, rem) = full_buffer.split_at_mut(1024);
+        let (buffer1, rem) = rem.split_at_mut(1024);
+        let (buffer2, buffer3) = rem.split_at_mut(1024);
 
         let initial_sum = ((radius * radius) >> 1) as i32;
 
@@ -315,27 +340,47 @@ pub(crate) fn fg_vertical_pass_neon_u8<T, const CN: usize>(
                     let arr_index = ((y - radius_64) & 1023) as usize;
                     let d_arr_index = (y & 1023) as usize;
 
-                    let d_stored0 = vld1q_s32(buffer0.get_unchecked_mut(d_arr_index).as_mut_ptr());
-                    let d_stored1 = vld1q_s32(buffer1.get_unchecked_mut(d_arr_index).as_mut_ptr());
-                    let d_stored2 = vld1q_s32(buffer2.get_unchecked_mut(d_arr_index).as_mut_ptr());
-                    let d_stored3 = vld1q_s32(buffer3.get_unchecked_mut(d_arr_index).as_mut_ptr());
+                    let d_stored0 =
+                        vld1q_s32(buffer0.get_unchecked_mut(d_arr_index).0.as_mut_ptr());
+                    let d_stored1 =
+                        vld1q_s32(buffer1.get_unchecked_mut(d_arr_index).0.as_mut_ptr());
+                    let d_stored2 =
+                        vld1q_s32(buffer2.get_unchecked_mut(d_arr_index).0.as_mut_ptr());
+                    let d_stored3 =
+                        vld1q_s32(buffer3.get_unchecked_mut(d_arr_index).0.as_mut_ptr());
 
-                    let a_stored0 = vld1q_s32(buffer0.get_unchecked_mut(arr_index).as_mut_ptr());
-                    let a_stored1 = vld1q_s32(buffer1.get_unchecked_mut(arr_index).as_mut_ptr());
-                    let a_stored2 = vld1q_s32(buffer2.get_unchecked_mut(arr_index).as_mut_ptr());
-                    let a_stored3 = vld1q_s32(buffer3.get_unchecked_mut(arr_index).as_mut_ptr());
+                    let a_stored0 = vld1q_s32(buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr());
+                    let a_stored1 = vld1q_s32(buffer1.get_unchecked_mut(arr_index).0.as_mut_ptr());
+                    let a_stored2 = vld1q_s32(buffer2.get_unchecked_mut(arr_index).0.as_mut_ptr());
+                    let a_stored3 = vld1q_s32(buffer3.get_unchecked_mut(arr_index).0.as_mut_ptr());
 
-                    diffs0 = vaddq_s32(diffs0, vmlaq_s32(a_stored0, d_stored0, vdupq_n_s32(-2)));
-                    diffs1 = vaddq_s32(diffs1, vmlaq_s32(a_stored1, d_stored1, vdupq_n_s32(-2)));
-                    diffs2 = vaddq_s32(diffs2, vmlaq_s32(a_stored2, d_stored2, vdupq_n_s32(-2)));
-                    diffs3 = vaddq_s32(diffs3, vmlaq_s32(a_stored3, d_stored3, vdupq_n_s32(-2)));
+                    diffs0 = vaddq_s32(
+                        diffs0,
+                        vsubq_s32(a_stored0, vaddq_s32(d_stored0, d_stored0)),
+                    );
+                    diffs1 = vaddq_s32(
+                        diffs1,
+                        vsubq_s32(a_stored1, vaddq_s32(d_stored1, d_stored1)),
+                    );
+                    diffs2 = vaddq_s32(
+                        diffs2,
+                        vsubq_s32(a_stored2, vaddq_s32(d_stored2, d_stored2)),
+                    );
+                    diffs3 = vaddq_s32(
+                        diffs3,
+                        vsubq_s32(a_stored3, vaddq_s32(d_stored3, d_stored3)),
+                    );
                 } else if y + radius_64 >= 0 {
                     let arr_index = (y & 1023) as usize;
 
-                    let mut stored0 = vld1q_s32(buffer0.get_unchecked_mut(arr_index).as_mut_ptr());
-                    let mut stored1 = vld1q_s32(buffer1.get_unchecked_mut(arr_index).as_mut_ptr());
-                    let mut stored2 = vld1q_s32(buffer2.get_unchecked_mut(arr_index).as_mut_ptr());
-                    let mut stored3 = vld1q_s32(buffer3.get_unchecked_mut(arr_index).as_mut_ptr());
+                    let mut stored0 =
+                        vld1q_s32(buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr());
+                    let mut stored1 =
+                        vld1q_s32(buffer1.get_unchecked_mut(arr_index).0.as_mut_ptr());
+                    let mut stored2 =
+                        vld1q_s32(buffer2.get_unchecked_mut(arr_index).0.as_mut_ptr());
+                    let mut stored3 =
+                        vld1q_s32(buffer3.get_unchecked_mut(arr_index).0.as_mut_ptr());
 
                     stored0 = vshlq_n_s32::<1>(stored0);
                     stored1 = vshlq_n_s32::<1>(stored1);
@@ -369,19 +414,19 @@ pub(crate) fn fg_vertical_pass_neon_u8<T, const CN: usize>(
                 diffs3 = vaddq_s32(diffs3, pixel_color3);
 
                 vst1q_s32(
-                    buffer0.get_unchecked_mut(arr_index).as_mut_ptr(),
+                    buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr(),
                     pixel_color0,
                 );
                 vst1q_s32(
-                    buffer1.get_unchecked_mut(arr_index).as_mut_ptr(),
+                    buffer1.get_unchecked_mut(arr_index).0.as_mut_ptr(),
                     pixel_color1,
                 );
                 vst1q_s32(
-                    buffer2.get_unchecked_mut(arr_index).as_mut_ptr(),
+                    buffer2.get_unchecked_mut(arr_index).0.as_mut_ptr(),
                     pixel_color2,
                 );
                 vst1q_s32(
-                    buffer3.get_unchecked_mut(arr_index).as_mut_ptr(),
+                    buffer3.get_unchecked_mut(arr_index).0.as_mut_ptr(),
                     pixel_color3,
                 );
 
@@ -417,18 +462,18 @@ pub(crate) fn fg_vertical_pass_neon_u8<T, const CN: usize>(
                     let arr_index = ((y - radius_64) & 1023) as usize;
                     let d_arr_index = (y & 1023) as usize;
 
-                    let d_buf_ptr = buffer0.get_unchecked_mut(d_arr_index).as_mut_ptr();
+                    let d_buf_ptr = buffer0.get_unchecked_mut(d_arr_index).0.as_mut_ptr();
                     let d_stored = vld1q_s32(d_buf_ptr);
 
-                    let buf_ptr = buffer0.get_unchecked_mut(arr_index).as_mut_ptr();
+                    let buf_ptr = buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr();
                     let a_stored = vld1q_s32(buf_ptr);
 
-                    diffs = vaddq_s32(diffs, vmlaq_s32(a_stored, d_stored, vdupq_n_s32(-2)));
+                    diffs = vaddq_s32(diffs, vsubq_s32(a_stored, vaddq_s32(d_stored, d_stored)));
                 } else if y + radius_64 >= 0 {
                     let arr_index = (y & 1023) as usize;
-                    let buf_ptr = buffer0.get_unchecked_mut(arr_index).as_mut_ptr();
+                    let buf_ptr = buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr();
                     let stored = vld1q_s32(buf_ptr);
-                    diffs = vmlaq_s32(diffs, stored, vdupq_n_s32(-2));
+                    diffs = vsubq_s32(diffs, vaddq_s32(stored, stored));
                 }
 
                 let next_row_y =
@@ -439,7 +484,7 @@ pub(crate) fn fg_vertical_pass_neon_u8<T, const CN: usize>(
                 let pixel_color = load_u8_s32_fast::<CN>(s_ptr);
 
                 let arr_index = ((y + radius_64) & 1023) as usize;
-                let buf_ptr = buffer0.get_unchecked_mut(arr_index).as_mut_ptr();
+                let buf_ptr = buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr();
 
                 diffs = vaddq_s32(diffs, pixel_color);
                 summs = vaddq_s32(summs, diffs);

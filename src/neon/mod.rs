@@ -35,6 +35,7 @@ mod fast_gaussian_next_f32;
 #[cfg(feature = "rdm")]
 mod fast_gaussian_next_q0_31;
 mod fast_gaussian_next_u16;
+#[cfg(feature = "rdm")]
 mod fast_gaussian_next_u16_q0_31;
 #[cfg(feature = "rdm")]
 mod fast_gaussian_q0_31;

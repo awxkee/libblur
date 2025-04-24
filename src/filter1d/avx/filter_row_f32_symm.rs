@@ -85,7 +85,8 @@ unsafe fn filter_row_avx_f32_f32_def_symm<const N: usize>(
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
     unsafe {
-        filter_row_avx_f32_f32_impl_symm::<false, N>(
+        let unit = ExecutionUnit::<false, N>::default();
+        unit.pass(
             arena,
             arena_src,
             dst,
@@ -106,7 +107,8 @@ unsafe fn filter_row_avx_f32_f32_fma_symm<const N: usize>(
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
     unsafe {
-        filter_row_avx_f32_f32_impl_symm::<true, N>(
+        let unit = ExecutionUnit::<true, N>::default();
+        unit.pass(
             arena,
             arena_src,
             dst,
@@ -117,137 +119,145 @@ unsafe fn filter_row_avx_f32_f32_fma_symm<const N: usize>(
     }
 }
 
-#[inline(always)]
-unsafe fn filter_row_avx_f32_f32_impl_symm<const FMA: bool, const N: usize>(
-    _: Arena,
-    arena_src: &[f32],
-    dst: &mut [f32],
-    image_size: ImageSize,
-    _: FilterRegion,
-    scanned_kernel: &[ScanPoint1d<f32>],
-) {
-    let src = arena_src;
+#[derive(Debug, Default, Copy, Clone)]
+struct ExecutionUnit<const FMA: bool, const N: usize> {}
 
-    let local_src = src;
+impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
+    #[inline(always)]
+    unsafe fn pass(
+        &self,
+        _: Arena,
+        arena_src: &[f32],
+        dst: &mut [f32],
+        image_size: ImageSize,
+        _: FilterRegion,
+        scanned_kernel: &[ScanPoint1d<f32>],
+    ) {
+        let src = arena_src;
 
-    let length = scanned_kernel.len();
+        let local_src = src;
 
-    let mut cx = 0usize;
+        let length = scanned_kernel.len();
 
-    let max_width = image_size.width * N;
+        let mut cx = 0usize;
 
-    let half_len = length / 2;
+        let max_width = image_size.width * N;
 
-    while cx + 32 < max_width {
-        let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
+        let half_len = length / 2;
 
-        let shifted_src = local_src.get_unchecked(cx..);
+        while cx + 32 < max_width {
+            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
 
-        let source = _mm256_load_pack_ps_x4(shifted_src.as_ptr());
-        let mut k0 = _mm256_mul_ps(source.0, coeff);
-        let mut k1 = _mm256_mul_ps(source.1, coeff);
-        let mut k2 = _mm256_mul_ps(source.2, coeff);
-        let mut k3 = _mm256_mul_ps(source.3, coeff);
+            let shifted_src = local_src.get_unchecked(cx..);
 
-        for i in 0..half_len {
-            let rollback = length - i - 1;
-            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(i).weight);
-            let v_source0 = _mm256_load_pack_ps_x4(shifted_src.get_unchecked(i * N..).as_ptr());
-            let v_source1 =
-                _mm256_load_pack_ps_x4(shifted_src.get_unchecked(rollback * N..).as_ptr());
-            k0 = _mm256_opt_fmlaf_ps::<FMA>(k0, _mm256_add_ps(v_source0.0, v_source1.0), coeff);
-            k1 = _mm256_opt_fmlaf_ps::<FMA>(k1, _mm256_add_ps(v_source0.1, v_source1.1), coeff);
-            k2 = _mm256_opt_fmlaf_ps::<FMA>(k2, _mm256_add_ps(v_source0.2, v_source1.2), coeff);
-            k3 = _mm256_opt_fmlaf_ps::<FMA>(k3, _mm256_add_ps(v_source0.3, v_source1.3), coeff);
+            let source = _mm256_load_pack_ps_x4(shifted_src.get_unchecked(half_len * N..).as_ptr());
+            let mut k0 = _mm256_mul_ps(source.0, coeff);
+            let mut k1 = _mm256_mul_ps(source.1, coeff);
+            let mut k2 = _mm256_mul_ps(source.2, coeff);
+            let mut k3 = _mm256_mul_ps(source.3, coeff);
+
+            for i in 0..half_len {
+                let rollback = length - i - 1;
+                let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(i).weight);
+                let v_source0 = _mm256_load_pack_ps_x4(shifted_src.get_unchecked(i * N..).as_ptr());
+                let v_source1 =
+                    _mm256_load_pack_ps_x4(shifted_src.get_unchecked(rollback * N..).as_ptr());
+                k0 = _mm256_opt_fmlaf_ps::<FMA>(k0, _mm256_add_ps(v_source0.0, v_source1.0), coeff);
+                k1 = _mm256_opt_fmlaf_ps::<FMA>(k1, _mm256_add_ps(v_source0.1, v_source1.1), coeff);
+                k2 = _mm256_opt_fmlaf_ps::<FMA>(k2, _mm256_add_ps(v_source0.2, v_source1.2), coeff);
+                k3 = _mm256_opt_fmlaf_ps::<FMA>(k3, _mm256_add_ps(v_source0.3, v_source1.3), coeff);
+            }
+
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
+            _mm256_store_pack_ps_x4(dst_ptr0, (k0, k1, k2, k3));
+            cx += 32;
         }
 
-        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
-        _mm256_store_pack_ps_x4(dst_ptr0, (k0, k1, k2, k3));
-        cx += 32;
-    }
+        while cx + 16 < max_width {
+            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
 
-    while cx + 16 < max_width {
-        let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
+            let shifted_src = local_src.get_unchecked(cx..);
 
-        let shifted_src = local_src.get_unchecked(cx..);
+            let source = _mm256_load_pack_ps_x2(shifted_src.get_unchecked(half_len * N..).as_ptr());
+            let mut k0 = _mm256_mul_ps(source.0, coeff);
+            let mut k1 = _mm256_mul_ps(source.1, coeff);
 
-        let source = _mm256_load_pack_ps_x2(shifted_src.as_ptr());
-        let mut k0 = _mm256_mul_ps(source.0, coeff);
-        let mut k1 = _mm256_mul_ps(source.1, coeff);
+            for i in 0..half_len {
+                let rollback = length - i - 1;
+                let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(i).weight);
+                let v_source0 = _mm256_load_pack_ps_x2(shifted_src.get_unchecked(i * N..).as_ptr());
+                let v_source1 =
+                    _mm256_load_pack_ps_x2(shifted_src.get_unchecked(rollback * N..).as_ptr());
+                k0 = _mm256_opt_fmlaf_ps::<FMA>(k0, _mm256_add_ps(v_source0.0, v_source1.0), coeff);
+                k1 = _mm256_opt_fmlaf_ps::<FMA>(k1, _mm256_add_ps(v_source0.1, v_source1.1), coeff);
+            }
 
-        for i in 0..half_len {
-            let rollback = length - i - 1;
-            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(i).weight);
-            let v_source0 = _mm256_load_pack_ps_x2(shifted_src.get_unchecked(i * N..).as_ptr());
-            let v_source1 =
-                _mm256_load_pack_ps_x2(shifted_src.get_unchecked(rollback * N..).as_ptr());
-            k0 = _mm256_opt_fmlaf_ps::<FMA>(k0, _mm256_add_ps(v_source0.0, v_source1.0), coeff);
-            k1 = _mm256_opt_fmlaf_ps::<FMA>(k1, _mm256_add_ps(v_source0.1, v_source1.1), coeff);
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
+            _mm256_store_pack_ps_x2(dst_ptr0, (k0, k1));
+            cx += 16;
         }
 
-        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
-        _mm256_store_pack_ps_x2(dst_ptr0, (k0, k1));
-        cx += 16;
-    }
+        while cx + 8 < max_width {
+            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
 
-    while cx + 8 < max_width {
-        let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
+            let shifted_src = local_src.get_unchecked(cx..);
 
-        let shifted_src = local_src.get_unchecked(cx..);
+            let source = _mm256_loadu_ps(shifted_src.get_unchecked(half_len * N..).as_ptr());
+            let mut k0 = _mm256_mul_ps(source, coeff);
 
-        let source = _mm256_loadu_ps(shifted_src.as_ptr());
-        let mut k0 = _mm256_mul_ps(source, coeff);
+            for i in 0..half_len {
+                let rollback = length - i - 1;
+                let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(i).weight);
+                let v_source0 = _mm256_loadu_ps(shifted_src.get_unchecked(i * N..).as_ptr());
+                let v_source1 =
+                    _mm256_loadu_ps(shifted_src.get_unchecked((rollback * N)..).as_ptr());
+                k0 = _mm256_opt_fmlaf_ps::<FMA>(k0, _mm256_add_ps(v_source0, v_source1), coeff);
+            }
 
-        for i in 0..half_len {
-            let rollback = length - i - 1;
-            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(i).weight);
-            let v_source0 = _mm256_loadu_ps(shifted_src.get_unchecked(i * N..).as_ptr());
-            let v_source1 = _mm256_loadu_ps(shifted_src.get_unchecked((rollback * N)..).as_ptr());
-            k0 = _mm256_opt_fmlaf_ps::<FMA>(k0, _mm256_add_ps(v_source0, v_source1), coeff);
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
+            _mm256_storeu_ps(dst_ptr0, k0);
+            cx += 8;
         }
 
-        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
-        _mm256_storeu_ps(dst_ptr0, k0);
-        cx += 8;
-    }
+        while cx + 4 < max_width {
+            let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
 
-    while cx + 4 < max_width {
-        let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
+            let shifted_src = local_src.get_unchecked(cx..);
 
-        let shifted_src = local_src.get_unchecked(cx..);
+            let source_0 = _mm_loadu_ps(shifted_src.get_unchecked(half_len * N..).as_ptr());
+            let mut k0 = _mm_mul_ps(source_0, coeff);
 
-        let source_0 = _mm_loadu_ps(shifted_src.as_ptr());
-        let mut k0 = _mm_mul_ps(source_0, coeff);
+            for i in 0..half_len {
+                let rollback = length - i - 1;
+                let coeff = _mm_set_ps1(scanned_kernel.get_unchecked(i).weight);
+                let v_source0 = _mm_loadu_ps(shifted_src.get_unchecked((i * N)..).as_ptr());
+                let v_source1 = _mm_loadu_ps(shifted_src.get_unchecked((rollback * N)..).as_ptr());
+                k0 = _mm_opt_fmlaf_ps::<FMA>(k0, _mm_add_ps(v_source0, v_source1), coeff);
+            }
 
-        for i in 0..half_len {
-            let rollback = length - i - 1;
-            let coeff = _mm_set_ps1(scanned_kernel.get_unchecked(i).weight);
-            let v_source0 = _mm_loadu_ps(shifted_src.get_unchecked((i * N)..).as_ptr());
-            let v_source1 = _mm_loadu_ps(shifted_src.get_unchecked((rollback * N)..).as_ptr());
-            k0 = _mm_opt_fmlaf_ps::<FMA>(k0, _mm_add_ps(v_source0, v_source1), coeff);
+            let dst_ptr = dst.get_unchecked_mut(cx..).as_mut_ptr();
+            _mm_storeu_ps(dst_ptr, k0);
+            cx += 4;
         }
 
-        let dst_ptr = dst.get_unchecked_mut(cx..).as_mut_ptr();
-        _mm_storeu_ps(dst_ptr, k0);
-        cx += 4;
-    }
+        for x in cx..max_width {
+            let coeff = *scanned_kernel.get_unchecked(half_len);
+            let shifted_src = local_src.get_unchecked(x..);
+            let mut k0 = shifted_src.get_unchecked(half_len * N) * coeff.weight;
 
-    for x in cx..max_width {
-        let coeff = *scanned_kernel.get_unchecked(half_len);
-        let shifted_src = local_src.get_unchecked(x..);
-        let mut k0 = shifted_src.get_unchecked(half_len) * coeff.weight;
+            for i in 0..half_len {
+                let rollback = length - i - 1;
+                let coeff = *scanned_kernel.get_unchecked(i);
 
-        for i in 0..half_len {
-            let rollback = length - i - 1;
-            let coeff = *scanned_kernel.get_unchecked(i);
+                k0 = mlaf(
+                    k0,
+                    (*shifted_src.get_unchecked(i * N))
+                        + (*shifted_src.get_unchecked(rollback * N)),
+                    coeff.weight,
+                );
+            }
 
-            k0 = mlaf(
-                k0,
-                (*shifted_src.get_unchecked(i * N)) + (*shifted_src.get_unchecked(rollback * N)),
-                coeff.weight,
-            );
+            *dst.get_unchecked_mut(x) = k0.to_();
         }
-
-        *dst.get_unchecked_mut(x) = k0.to_();
     }
 }

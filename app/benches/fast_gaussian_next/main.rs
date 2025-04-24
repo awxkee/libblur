@@ -29,6 +29,25 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
+    c.bench_function("RGBA fast gaussian next (Single Thread)", |b| {
+        let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
+        let mut dst_image = BlurImageMut::borrow(
+            &mut dst_bytes,
+            dimensions.0,
+            dimensions.1,
+            FastBlurChannels::Channels4,
+        );
+        b.iter(|| {
+            libblur::fast_gaussian_next(
+                &mut dst_image,
+                77,
+                ThreadingPolicy::Single,
+                EdgeMode::Clamp,
+            )
+            .unwrap();
+        })
+    });
+
     let rgba_u16 = img.to_rgba16();
 
     c.bench_function("RGBA16 fast gaussian next (Single Thread)", |b| {
@@ -92,6 +111,25 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 &mut dst_image,
                 77,
                 ThreadingPolicy::Adaptive,
+                EdgeMode::Clamp,
+            )
+            .unwrap();
+        })
+    });
+
+    c.bench_function("RGB fast gaussian next ( Single Thread )", |b| {
+        let mut dst_bytes: Vec<u8> = rgb_src_bytes.to_vec();
+        let mut dst_image = BlurImageMut::borrow(
+            &mut dst_bytes,
+            dimensions.0,
+            dimensions.1,
+            FastBlurChannels::Channels3,
+        );
+        b.iter(|| {
+            libblur::fast_gaussian_next(
+                &mut dst_image,
+                77,
+                ThreadingPolicy::Single,
                 EdgeMode::Clamp,
             )
             .unwrap();

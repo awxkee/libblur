@@ -25,13 +25,11 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use std::arch::aarch64::*;
-
-use half::f16;
-
 use crate::neon::{load_f32_f16, store_f32_f16};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, reflect_index, EdgeMode};
+use half::f16;
+use std::arch::aarch64::*;
 
 pub(crate) fn fg_vertical_pass_neon_f16<T, const CHANNELS_COUNT: usize>(
     undef_bytes: &UnsafeSlice<T>,

@@ -435,6 +435,14 @@ impl FastGaussianDispatchProvider<u16> for u16 {
                 return fg_vertical_pass_neon_u16::<CN>;
             }
         }
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        {
+            let has_avx = std::arch::is_x86_feature_detected!("avx2");
+            if has_avx && BASE_RADIUS_I64_CUTOFF > radius {
+                use crate::avx::fg_vertical_pass_avx_u16;
+                return fg_vertical_pass_avx_u16::<CN>;
+            }
+        }
         #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
             let is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
@@ -458,6 +466,14 @@ impl FastGaussianDispatchProvider<u16> for u16 {
             if BASE_RADIUS_I64_CUTOFF > radius {
                 use crate::neon::fg_horizontal_pass_neon_u16;
                 return fg_horizontal_pass_neon_u16::<CN>;
+            }
+        }
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        {
+            let has_avx = std::arch::is_x86_feature_detected!("avx2");
+            if has_avx && BASE_RADIUS_I64_CUTOFF > radius {
+                use crate::avx::fg_horizontal_pass_avx_u16;
+                return fg_horizontal_pass_avx_u16::<CN>;
             }
         }
         #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
@@ -513,6 +529,14 @@ impl FastGaussianDispatchProvider<u8> for u8 {
                 _dispatcher_horizontal = fg_horizontal_pass_wasm_u8::<u8, CN>;
             }
         }
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        {
+            let has_avx = std::arch::is_x86_feature_detected!("avx2");
+            if has_avx && BASE_RADIUS_I64_CUTOFF > radius {
+                use crate::avx::fg_horizontal_pass_sse_u8;
+                return fg_horizontal_pass_sse_u8::<u8, CN>;
+            }
+        }
         #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
             let is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
@@ -559,6 +583,14 @@ impl FastGaussianDispatchProvider<u8> for u8 {
                 _dispatcher_vertical = fg_vertical_pass_wasm_u8::<u8, CN>;
             }
         }
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        {
+            let has_avx = std::arch::is_x86_feature_detected!("avx2");
+            if has_avx && BASE_RADIUS_I64_CUTOFF > radius {
+                use crate::avx::fg_vertical_pass_avx_u8;
+                return fg_vertical_pass_avx_u8::<u8, CN>;
+            }
+        }
         #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
             let is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
@@ -588,6 +620,14 @@ impl FastGaussianDispatchProvider<f32> for f32 {
         } else {
             fg_vertical_pass::<f32, f64, f64, CN>
         };
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        {
+            let has_avx = std::arch::is_x86_feature_detected!("avx2");
+            if has_avx {
+                use crate::avx::fg_vertical_pass_avx_f32;
+                return fg_vertical_pass_avx_f32::<f32, CN>;
+            }
+        }
         #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
             let is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
@@ -619,6 +659,14 @@ impl FastGaussianDispatchProvider<f32> for f32 {
         } else {
             fg_horizontal_pass::<f32, f64, f64, CN>
         };
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        {
+            let has_avx = std::arch::is_x86_feature_detected!("avx2");
+            if has_avx {
+                use crate::avx::fg_horizontal_pass_avx_f32;
+                return fg_horizontal_pass_avx_f32::<f32, CN>;
+            }
+        }
         #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
             let is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");

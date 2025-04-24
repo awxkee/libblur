@@ -62,7 +62,7 @@ pub(crate) fn filter_row_symm_neon_u8_i32<const N: usize>(
 
             let shifted_src = local_src.get_unchecked(cx..);
 
-            let source = xvld1q_u8_x4(shifted_src.get_unchecked(half_len..).as_ptr());
+            let source = xvld1q_u8_x4(shifted_src.get_unchecked(half_len * N..).as_ptr());
             let mut k0 = vmullq_u8_by_i16(source.0, coeff);
             let mut k1 = vmullq_u8_by_i16(source.1, coeff);
             let mut k2 = vmullq_u8_by_i16(source.2, coeff);
@@ -97,7 +97,7 @@ pub(crate) fn filter_row_symm_neon_u8_i32<const N: usize>(
 
             let shifted_src = local_src.get_unchecked(cx..);
 
-            let source = xvld1q_u8_x2(shifted_src.get_unchecked(half_len..).as_ptr());
+            let source = xvld1q_u8_x2(shifted_src.get_unchecked(half_len * N..).as_ptr());
             let mut k0 = vmullq_u8_by_i16(source.0, coeff);
             let mut k1 = vmullq_u8_by_i16(source.1, coeff);
 
@@ -123,7 +123,7 @@ pub(crate) fn filter_row_symm_neon_u8_i32<const N: usize>(
 
             let shifted_src = local_src.get_unchecked(cx..);
 
-            let source = vld1q_u8(shifted_src.get_unchecked(half_len..).as_ptr());
+            let source = vld1q_u8(shifted_src.get_unchecked(half_len * N..).as_ptr());
             let mut k0 = vmullq_u8_by_i16(source, coeff);
 
             for i in 0..half_len {
@@ -144,7 +144,7 @@ pub(crate) fn filter_row_symm_neon_u8_i32<const N: usize>(
 
             let shifted_src = local_src.get_unchecked(cx..);
 
-            let source = vld1_u8(shifted_src.get_unchecked(half_len..).as_ptr());
+            let source = vld1_u8(shifted_src.get_unchecked(half_len * N..).as_ptr());
             let mut k0 = vmull_u8_by_i16(source, coeff);
 
             for i in 0..half_len {
@@ -166,10 +166,10 @@ pub(crate) fn filter_row_symm_neon_u8_i32<const N: usize>(
         while cx + 4 < max_width {
             let coeff = *scanned_kernel.get_unchecked(half_len);
             let shifted_src = local_src.get_unchecked(cx..);
-            let mut k0 = RND + *shifted_src.get_unchecked(0) as i32 * coeff.weight;
-            let mut k1 = RND + *shifted_src.get_unchecked(1) as i32 * coeff.weight;
-            let mut k2 = RND + *shifted_src.get_unchecked(2) as i32 * coeff.weight;
-            let mut k3 = RND + *shifted_src.get_unchecked(3) as i32 * coeff.weight;
+            let mut k0 = RND + *shifted_src.get_unchecked(half_len * N) as i32 * coeff.weight;
+            let mut k1 = RND + *shifted_src.get_unchecked(half_len * N + 1) as i32 * coeff.weight;
+            let mut k2 = RND + *shifted_src.get_unchecked(half_len * N + 2) as i32 * coeff.weight;
+            let mut k3 = RND + *shifted_src.get_unchecked(half_len * N + 3) as i32 * coeff.weight;
 
             for i in 0..half_len {
                 let coeff = *scanned_kernel.get_unchecked(i);
@@ -205,7 +205,7 @@ pub(crate) fn filter_row_symm_neon_u8_i32<const N: usize>(
         for x in cx..max_width {
             let coeff = *scanned_kernel.get_unchecked(half_len);
             let shifted_src = local_src.get_unchecked(x..);
-            let mut k0 = RND + *shifted_src.get_unchecked(0) as i32 * coeff.weight;
+            let mut k0 = RND + *shifted_src.get_unchecked(half_len * N) as i32 * coeff.weight;
 
             for i in 0..half_len {
                 let coeff = *scanned_kernel.get_unchecked(i);

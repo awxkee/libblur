@@ -27,7 +27,7 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter1d::arena::Arena;
-#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]
+#[cfg(all(target_arch = "x86_64", feature = "avx"))]
 use crate::filter1d::avx::{
     filter_column_avx_f32_f32, filter_column_avx_symm_u8_f32, filter_column_avx_u8_f32,
 };
@@ -108,7 +108,7 @@ impl Filter1DColumnHandler<u8, f32> for u8 {
     fn get_column_handler(
         is_symmetric_kernel: bool,
     ) -> fn(Arena, &[&[u8]], &mut [u8], ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
-        #[cfg(feature = "avx")]
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
         if std::arch::is_x86_feature_detected!("avx2") {
             if is_symmetric_kernel {
                 return filter_column_avx_symm_u8_f32;
@@ -199,7 +199,7 @@ impl Filter1DColumnHandler<f32, f32> for f32 {
     fn get_column_handler(
         is_symmetric_kernel: bool,
     ) -> fn(Arena, &[&[f32]], &mut [f32], ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
-        #[cfg(feature = "avx")]
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
         if std::arch::is_x86_feature_detected!("avx2") {
             return filter_column_avx_f32_f32;
         }
@@ -232,7 +232,7 @@ impl Filter1DColumnHandler<u16, f32> for u16 {
         is_symmetric_kernel: bool,
     ) -> fn(Arena, &[&[u16]], &mut [u16], ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
         if is_symmetric_kernel {
-            #[cfg(feature = "avx")]
+            #[cfg(all(target_arch = "x86_64", feature = "avx"))]
             if std::arch::is_x86_feature_detected!("avx2") {
                 use crate::filter1d::avx::filter_column_avx_symm_u16_f32;
                 return filter_column_avx_symm_u16_f32;
@@ -289,7 +289,7 @@ impl Filter1DColumnHandlerMultipleRows<u8, f32> for u8 {
         is_symmetric_kernel: bool,
     ) -> Option<fn(Arena, FilterBrows<u8>, &mut [u8], ImageSize, usize, &[ScanPoint1d<f32>])> {
         if is_symmetric_kernel {
-            #[cfg(feature = "avx")]
+            #[cfg(all(target_arch = "x86_64", feature = "avx"))]
             if std::arch::is_x86_feature_detected!("avx2") {
                 use crate::filter1d::avx::filter_column_avx_symm_u8_f32_x2;
                 return Some(filter_column_avx_symm_u8_f32_x2);
@@ -329,7 +329,7 @@ impl Filter1DColumnHandlerMultipleRows<u16, f32> for u16 {
     ) -> Option<fn(Arena, FilterBrows<u16>, &mut [u16], ImageSize, usize, &[ScanPoint1d<f32>])>
     {
         if is_symmetric_kernel {
-            #[cfg(feature = "avx")]
+            #[cfg(all(target_arch = "x86_64", feature = "avx"))]
             if std::arch::is_x86_feature_detected!("avx2") {
                 use crate::filter1d::avx::filter_column_avx_symm_u16_f32_x2;
                 return Some(filter_column_avx_symm_u16_f32_x2);

@@ -27,6 +27,7 @@
 
 use std::arch::aarch64::*;
 
+use crate::neon::fast_gaussian_next_f32::NeonF32x4;
 use crate::neon::{load_f32_fast, store_f32};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, reflect_index, EdgeMode};
@@ -43,10 +44,12 @@ pub(crate) fn fg_vertical_pass_neon_f32<T, const CN: usize>(
 ) {
     unsafe {
         let bytes: &UnsafeSlice<'_, f32> = std::mem::transmute(undef_bytes);
-        let mut bf0 = Box::new([[0f32; 4]; 1024]);
-        let mut bf1 = Box::new([[0f32; 4]; 1024]);
-        let mut bf2 = Box::new([[0f32; 4]; 1024]);
-        let mut bf3 = Box::new([[0f32; 4]; 1024]);
+
+        let mut full_buffer = Box::new([NeonF32x4::default(); 1024 * 4]);
+
+        let (bf0, rem) = full_buffer.split_at_mut(1024);
+        let (bf1, rem) = rem.split_at_mut(1024);
+        let (bf2, bf3) = rem.split_at_mut(1024);
 
         let height_wide = height as i64;
 
@@ -218,10 +221,12 @@ pub(crate) fn fg_horizontal_pass_neon_f32<T, const CN: usize>(
 ) {
     unsafe {
         let bytes: &UnsafeSlice<'_, f32> = std::mem::transmute(undef_bytes);
-        let mut bf0 = Box::new([[0f32; 4]; 1024]);
-        let mut bf1 = Box::new([[0f32; 4]; 1024]);
-        let mut bf2 = Box::new([[0f32; 4]; 1024]);
-        let mut bf3 = Box::new([[0f32; 4]; 1024]);
+
+        let mut full_buffer = Box::new([NeonF32x4::default(); 1024 * 4]);
+
+        let (bf0, rem) = full_buffer.split_at_mut(1024);
+        let (bf1, rem) = rem.split_at_mut(1024);
+        let (bf2, bf3) = rem.split_at_mut(1024);
 
         let radius_64 = radius as i64;
         let width_wide = width as i64;

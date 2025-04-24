@@ -10,6 +10,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         .unwrap();
     let dimensions = img.dimensions();
     let src_bytes = img.as_bytes();
+
     c.bench_function("RGBA fast gaussian", |b| {
         let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
         let mut dst_image = BlurImageMut::borrow(
@@ -26,6 +27,20 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 EdgeMode::Clamp,
             )
             .unwrap();
+        })
+    });
+
+    c.bench_function("RGBA fast gaussian ( Single Thread )", |b| {
+        let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
+        let mut dst_image = BlurImageMut::borrow(
+            &mut dst_bytes,
+            dimensions.0,
+            dimensions.1,
+            FastBlurChannels::Channels4,
+        );
+        b.iter(|| {
+            libblur::fast_gaussian(&mut dst_image, 77, ThreadingPolicy::Single, EdgeMode::Clamp)
+                .unwrap();
         })
     });
 
@@ -95,6 +110,20 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 EdgeMode::Clamp,
             )
             .unwrap();
+        })
+    });
+
+    c.bench_function("RGB fast gaussian ( Single Thread )", |b| {
+        let mut dst_bytes: Vec<u8> = rgb_src_bytes.to_vec();
+        let mut dst_image = BlurImageMut::borrow(
+            &mut dst_bytes,
+            dimensions.0,
+            dimensions.1,
+            FastBlurChannels::Channels3,
+        );
+        b.iter(|| {
+            libblur::fast_gaussian(&mut dst_image, 77, ThreadingPolicy::Single, EdgeMode::Clamp)
+                .unwrap();
         })
     });
 }

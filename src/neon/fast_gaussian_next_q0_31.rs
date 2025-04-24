@@ -25,6 +25,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use crate::neon::fast_gaussian::NeonI32x4;
 use crate::neon::{load_u8_s32_fast, store_u8_s32_x4, store_u8x8_m4, vmulq_by_3_s32};
 use crate::reflect_index;
 use crate::unsafe_slice::UnsafeSlice;
@@ -69,10 +70,11 @@ unsafe fn fgn_vertical_pass_neon_impl_rdm<T, const CN: usize>(
     unsafe {
         let bytes: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_slice);
 
-        let mut buffer0 = Box::new([[0i32; 4]; 1024]);
-        let mut buffer1 = Box::new([[0i32; 4]; 1024]);
-        let mut buffer2 = Box::new([[0i32; 4]; 1024]);
-        let mut buffer3 = Box::new([[0i32; 4]; 1024]);
+        let mut full_buffer = Box::new([NeonI32x4::default(); 1024 * 4]);
+
+        let (buffer0, rem) = full_buffer.split_at_mut(1024);
+        let (buffer1, rem) = rem.split_at_mut(1024);
+        let (buffer2, buffer3) = rem.split_at_mut(1024);
 
         let height_wide = height as i64;
 
@@ -255,9 +257,9 @@ unsafe fn fgn_vertical_pass_neon_impl_rdm<T, const CN: usize>(
                 ders3 = vaddq_s32(ders3, diffs3);
 
                 summs0 = vaddq_s32(summs0, ders0);
-                summs1 = vaddq_s32(summs1, ders0);
-                summs2 = vaddq_s32(summs2, ders0);
-                summs3 = vaddq_s32(summs3, ders0);
+                summs1 = vaddq_s32(summs1, ders1);
+                summs2 = vaddq_s32(summs2, ders2);
+                summs3 = vaddq_s32(summs3, ders3);
             }
             xx += 4;
         }
@@ -311,7 +313,7 @@ unsafe fn fgn_vertical_pass_neon_impl_rdm<T, const CN: usize>(
                     diffs = vmlaq_s32(diffs, vsubq_s32(stored, stored_1), vdupq_n_s32(3));
                 } else if y + 2 * radius_64 >= 0 {
                     let arr_index = ((y + radius_64) & 1023) as usize;
-                    let buf_ptr = buffer0.get_unchecked_mut(arr_index).as_ptr() as *const _;
+                    let buf_ptr = buffer0.get_unchecked_mut(arr_index).0.as_ptr() as *const _;
                     let stored = vld1q_s32(buf_ptr);
                     diffs = vmlaq_s32(diffs, stored, vdupq_n_s32(-3));
                 }
@@ -374,10 +376,11 @@ unsafe fn fgn_horizontal_pass_neon_impl<T, const CN: usize>(
     unsafe {
         let bytes: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_slice);
 
-        let mut buffer0 = Box::new([[0i32; 4]; 1024]);
-        let mut buffer1 = Box::new([[0i32; 4]; 1024]);
-        let mut buffer2 = Box::new([[0i32; 4]; 1024]);
-        let mut buffer3 = Box::new([[0i32; 4]; 1024]);
+        let mut full_buffer = Box::new([NeonI32x4::default(); 1024 * 4]);
+
+        let (buffer0, rem) = full_buffer.split_at_mut(1024);
+        let (buffer1, rem) = rem.split_at_mut(1024);
+        let (buffer2, buffer3) = rem.split_at_mut(1024);
 
         let width_wide = width as i64;
 
@@ -531,10 +534,10 @@ unsafe fn fgn_horizontal_pass_neon_impl<T, const CN: usize>(
                 let pixel_color3 = load_u8_s32_fast::<CN>(s_ptr3);
 
                 let arr_index = ((x + 2 * radius_64) & 1023) as usize;
-                let buf_ptr0 = buffer0.get_unchecked_mut(arr_index).as_mut_ptr() as *mut _;
-                let buf_ptr1 = buffer1.get_unchecked_mut(arr_index).as_mut_ptr() as *mut _;
-                let buf_ptr2 = buffer2.get_unchecked_mut(arr_index).as_mut_ptr() as *mut _;
-                let buf_ptr3 = buffer3.get_unchecked_mut(arr_index).as_mut_ptr() as *mut _;
+                let buf_ptr0 = buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr() as *mut _;
+                let buf_ptr1 = buffer1.get_unchecked_mut(arr_index).0.as_mut_ptr() as *mut _;
+                let buf_ptr2 = buffer2.get_unchecked_mut(arr_index).0.as_mut_ptr() as *mut _;
+                let buf_ptr3 = buffer3.get_unchecked_mut(arr_index).0.as_mut_ptr() as *mut _;
 
                 diffs0 = vaddq_s32(diffs0, pixel_color0);
                 diffs1 = vaddq_s32(diffs1, pixel_color1);
@@ -621,7 +624,7 @@ unsafe fn fgn_horizontal_pass_neon_impl<T, const CN: usize>(
                 let pixel_color = load_u8_s32_fast::<CN>(s_ptr);
 
                 let arr_index = ((x + 2 * radius_64) & 1023) as usize;
-                let buf_ptr = buffer0.get_unchecked_mut(arr_index).as_mut_ptr() as *mut _;
+                let buf_ptr = buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr() as *mut _;
 
                 diffs = vaddq_s32(diffs, pixel_color);
                 ders = vaddq_s32(ders, diffs);
