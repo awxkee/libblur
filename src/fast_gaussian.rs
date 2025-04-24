@@ -623,7 +623,7 @@ impl FastGaussianDispatchProvider<f32> for f32 {
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]
         {
             let has_avx = std::arch::is_x86_feature_detected!("avx2");
-            if has_avx && BASE_RADIUS_I64_CUTOFF > radius {
+            if has_avx {
                 use crate::avx::fg_vertical_pass_avx_f32;
                 return fg_vertical_pass_avx_f32::<f32, CN>;
             }
@@ -662,7 +662,7 @@ impl FastGaussianDispatchProvider<f32> for f32 {
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]
         {
             let has_avx = std::arch::is_x86_feature_detected!("avx2");
-            if has_avx && BASE_RADIUS_I64_CUTOFF > radius {
+            if has_avx {
                 use crate::avx::fg_horizontal_pass_avx_f32;
                 return fg_horizontal_pass_avx_f32::<f32, CN>;
             }
