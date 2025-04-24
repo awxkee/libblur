@@ -54,7 +54,7 @@ impl From<usize> for EdgeMode {
             3 => EdgeMode::Reflect101,
             4 => EdgeMode::Constant,
             _ => {
-                panic!("Unknown edge mode for value: {}", value);
+                panic!("Unknown edge mode for value: {value}");
             }
         }
     }

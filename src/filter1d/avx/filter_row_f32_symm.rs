@@ -143,7 +143,7 @@ unsafe fn filter_row_avx_f32_f32_impl_symm<const FMA: bool, const N: usize>(
 
         let shifted_src = local_src.get_unchecked(cx..);
 
-        let source = _mm256_load_pack_ps_x4(shifted_src.get_unchecked(half_len * N).as_ptr());
+        let source = _mm256_load_pack_ps_x4(shifted_src.get_unchecked(half_len * N..).as_ptr());
         let mut k0 = _mm256_mul_ps(source.0, coeff);
         let mut k1 = _mm256_mul_ps(source.1, coeff);
         let mut k2 = _mm256_mul_ps(source.2, coeff);
