@@ -57,7 +57,7 @@
 
 #[cfg(feature = "fft")]
 mod adaptive_blur;
-#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]
+#[cfg(all(target_arch = "x86_64", feature = "avx"))]
 mod avx;
 mod box_filter;
 mod channels_configuration;

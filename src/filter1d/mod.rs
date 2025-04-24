@@ -29,7 +29,7 @@
 #![allow(clippy::type_complexity)]
 mod arena;
 mod arena_roi;
-#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]
+#[cfg(all(target_arch = "x86_64", feature = "avx"))]
 mod avx;
 mod color_group;
 mod filter;

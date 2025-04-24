@@ -117,7 +117,7 @@ impl Filter1DRowHandlerApprox<u8, i32> for u8 {
     fn get_row_handler_apr<const N: usize>(
         is_kernel_symmetric: bool,
     ) -> fn(Arena, &[u8], &mut [u8], ImageSize, FilterRegion, &[ScanPoint1d<i32>]) {
-        #[cfg(feature = "avx")]
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
         if std::arch::is_x86_feature_detected!("avx2") {
             if is_kernel_symmetric {
                 use crate::filter1d::avx::filter_row_avx_symm_u8_i32_app;

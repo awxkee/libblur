@@ -27,7 +27,7 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter1d::arena::Arena;
-#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]
+#[cfg(all(target_arch = "x86_64", feature = "avx"))]
 use crate::filter1d::avx::{filter_column_avx_symm_u8_i32_app, filter_column_avx_u8_i32_app};
 use crate::filter1d::filter_1d_column_handler::FilterBrows;
 use crate::filter1d::filter_column_approx::filter_column_approx;
@@ -137,7 +137,7 @@ impl Filter1DColumnHandlerApprox<u8, i32> for u8 {
     fn get_column_handler(
         is_kernel_symmetric: bool,
     ) -> fn(Arena, &[&[u8]], &mut [u8], ImageSize, FilterRegion, &[ScanPoint1d<i32>]) {
-        #[cfg(feature = "avx")]
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
         if std::arch::is_x86_feature_detected!("avx2") {
             if is_kernel_symmetric {
                 return filter_column_avx_symm_u8_i32_app;
@@ -179,7 +179,7 @@ impl Filter1DColumnMultipleRowsApprox<u8, i32> for u8 {
     fn get_column_multiple_rows(
         _: bool,
     ) -> Option<fn(Arena, FilterBrows<u8>, &mut [u8], ImageSize, usize, &[ScanPoint1d<i32>])> {
-        #[cfg(feature = "avx")]
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
         {
             if std::arch::is_x86_feature_detected!("avx2") {
                 use crate::filter1d::avx::filter_column_avx_symm_u8_i32_app_x2;
