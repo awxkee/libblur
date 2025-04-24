@@ -160,13 +160,13 @@ impl<const CN: usize, const FMA: bool> HorizontalExecutionUnit<CN, FMA> {
                     let arr_index = ((x - radius_64) & 1023) as usize;
                     let d_arr_index = (x & 1023) as usize;
 
-                    let d_s0 = _mm256_loadu_ps(bf0.as_mut_ptr().add(d_arr_index) as *mut f32);
-                    let d_s1 = _mm256_loadu_ps(bf1.as_mut_ptr().add(d_arr_index) as *mut f32);
-                    let d_s2 = _mm256_loadu_ps(bf2.as_mut_ptr().add(d_arr_index) as *mut f32);
+                    let d_s0 = _mm256_load_ps(bf0.as_mut_ptr().add(d_arr_index) as *mut f32);
+                    let d_s1 = _mm256_load_ps(bf1.as_mut_ptr().add(d_arr_index) as *mut f32);
+                    let d_s2 = _mm256_load_ps(bf2.as_mut_ptr().add(d_arr_index) as *mut f32);
 
-                    let a_s0 = _mm256_loadu_ps(bf0.as_mut_ptr().add(arr_index) as *mut f32);
-                    let a_s1 = _mm256_loadu_ps(bf1.as_mut_ptr().add(arr_index) as *mut f32);
-                    let a_s2 = _mm256_loadu_ps(bf2.as_mut_ptr().add(arr_index) as *mut f32);
+                    let a_s0 = _mm256_load_ps(bf0.as_mut_ptr().add(arr_index) as *mut f32);
+                    let a_s1 = _mm256_load_ps(bf1.as_mut_ptr().add(arr_index) as *mut f32);
+                    let a_s2 = _mm256_load_ps(bf2.as_mut_ptr().add(arr_index) as *mut f32);
 
                     diffs0 =
                         _mm256_add_ps(diffs0, _mm256_opt_fnmlaf_ps::<FMA>(a_s0, d_s0, v_double));
@@ -176,9 +176,9 @@ impl<const CN: usize, const FMA: bool> HorizontalExecutionUnit<CN, FMA> {
                         _mm256_add_ps(diffs2, _mm256_opt_fnmlaf_ps::<FMA>(a_s2, d_s2, v_double));
                 } else if x + radius_64 >= 0 {
                     let arr_index = (x & 1023) as usize;
-                    let s0 = _mm256_loadu_ps(bf0.as_mut_ptr().add(arr_index) as *mut f32);
-                    let s1 = _mm256_loadu_ps(bf1.as_mut_ptr().add(arr_index) as *mut f32);
-                    let s2 = _mm256_loadu_ps(bf2.as_mut_ptr().add(arr_index) as *mut f32);
+                    let s0 = _mm256_load_ps(bf0.as_mut_ptr().add(arr_index) as *mut f32);
+                    let s1 = _mm256_load_ps(bf1.as_mut_ptr().add(arr_index) as *mut f32);
+                    let s2 = _mm256_load_ps(bf2.as_mut_ptr().add(arr_index) as *mut f32);
 
                     diffs0 = _mm256_opt_fnmlaf_ps::<FMA>(diffs0, s0, v_double);
                     diffs1 = _mm256_opt_fnmlaf_ps::<FMA>(diffs1, s1, v_double);
@@ -208,9 +208,9 @@ impl<const CN: usize, const FMA: bool> HorizontalExecutionUnit<CN, FMA> {
                 let px23 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(px2), px3);
                 let px45 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(px4), px5);
 
-                _mm256_storeu_ps(bf0.as_mut_ptr().add(arr_index) as *mut f32, px01);
-                _mm256_storeu_ps(bf1.as_mut_ptr().add(arr_index) as *mut f32, px23);
-                _mm256_storeu_ps(bf2.as_mut_ptr().add(arr_index) as *mut f32, px45);
+                _mm256_store_ps(bf0.as_mut_ptr().add(arr_index) as *mut f32, px01);
+                _mm256_store_ps(bf1.as_mut_ptr().add(arr_index) as *mut f32, px23);
+                _mm256_store_ps(bf2.as_mut_ptr().add(arr_index) as *mut f32, px45);
 
                 diffs0 = _mm256_add_ps(diffs0, px01);
                 diffs1 = _mm256_add_ps(diffs1, px23);
@@ -411,13 +411,13 @@ impl<const CN: usize, const FMA: bool> VerticalExecutionUnit<CN, FMA> {
                     let arr_index = ((y - radius_64) & 1023) as usize;
                     let d_arr_index = (y & 1023) as usize;
 
-                    let d_s0 = _mm256_loadu_ps(bf0.as_mut_ptr().add(d_arr_index) as *mut f32);
-                    let d_s1 = _mm256_loadu_ps(bf1.as_mut_ptr().add(d_arr_index) as *mut f32);
-                    let d_s2 = _mm256_loadu_ps(bf2.as_mut_ptr().add(d_arr_index) as *mut f32);
+                    let d_s0 = _mm256_load_ps(bf0.as_mut_ptr().add(d_arr_index) as *mut f32);
+                    let d_s1 = _mm256_load_ps(bf1.as_mut_ptr().add(d_arr_index) as *mut f32);
+                    let d_s2 = _mm256_load_ps(bf2.as_mut_ptr().add(d_arr_index) as *mut f32);
 
-                    let a_s0 = _mm256_loadu_ps(bf0.as_mut_ptr().add(arr_index) as *mut f32);
-                    let a_s1 = _mm256_loadu_ps(bf1.as_mut_ptr().add(arr_index) as *mut f32);
-                    let a_s2 = _mm256_loadu_ps(bf2.as_mut_ptr().add(arr_index) as *mut f32);
+                    let a_s0 = _mm256_load_ps(bf0.as_mut_ptr().add(arr_index) as *mut f32);
+                    let a_s1 = _mm256_load_ps(bf1.as_mut_ptr().add(arr_index) as *mut f32);
+                    let a_s2 = _mm256_load_ps(bf2.as_mut_ptr().add(arr_index) as *mut f32);
 
                     diffs0 =
                         _mm256_add_ps(diffs0, _mm256_opt_fnmlaf_ps::<FMA>(a_s0, d_s0, v_double));
@@ -427,9 +427,9 @@ impl<const CN: usize, const FMA: bool> VerticalExecutionUnit<CN, FMA> {
                         _mm256_add_ps(diffs2, _mm256_opt_fnmlaf_ps::<FMA>(a_s2, d_s2, v_double));
                 } else if y + radius_64 >= 0 {
                     let arr_index = (y & 1023) as usize;
-                    let s0 = _mm256_loadu_ps(bf0.as_mut_ptr().add(arr_index) as *mut f32);
-                    let s1 = _mm256_loadu_ps(bf1.as_mut_ptr().add(arr_index) as *mut f32);
-                    let s2 = _mm256_loadu_ps(bf2.as_mut_ptr().add(arr_index) as *mut f32);
+                    let s0 = _mm256_load_ps(bf0.as_mut_ptr().add(arr_index) as *mut f32);
+                    let s1 = _mm256_load_ps(bf1.as_mut_ptr().add(arr_index) as *mut f32);
+                    let s2 = _mm256_load_ps(bf2.as_mut_ptr().add(arr_index) as *mut f32);
 
                     diffs0 = _mm256_opt_fnmlaf_ps::<FMA>(diffs0, s0, v_double);
                     diffs1 = _mm256_opt_fnmlaf_ps::<FMA>(diffs1, s1, v_double);
@@ -459,9 +459,9 @@ impl<const CN: usize, const FMA: bool> VerticalExecutionUnit<CN, FMA> {
                 let px23 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(px2), px3);
                 let px45 = _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(px4), px5);
 
-                _mm256_storeu_ps(bf0.as_mut_ptr().add(arr_index) as *mut f32, px01);
-                _mm256_storeu_ps(bf1.as_mut_ptr().add(arr_index) as *mut f32, px23);
-                _mm256_storeu_ps(bf2.as_mut_ptr().add(arr_index) as *mut f32, px45);
+                _mm256_store_ps(bf0.as_mut_ptr().add(arr_index) as *mut f32, px01);
+                _mm256_store_ps(bf1.as_mut_ptr().add(arr_index) as *mut f32, px23);
+                _mm256_store_ps(bf2.as_mut_ptr().add(arr_index) as *mut f32, px45);
 
                 diffs0 = _mm256_add_ps(diffs0, px01);
                 diffs1 = _mm256_add_ps(diffs1, px23);

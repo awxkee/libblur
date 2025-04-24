@@ -335,6 +335,7 @@ unsafe fn fg_vertical_pass_avx_u8_def<const CN: usize>(
 ) {
     let mut buffer0 = Box::new([AvxSseI32x8::default(); 1024]);
     let mut buffer1 = Box::new([AvxSseI32x8::default(); 1024]);
+    let mut buffer2 = Box::new([AvxSseI32x8::default(); 1024]);
 
     let initial_sum = ((radius * radius) >> 1) as i32;
 
@@ -346,12 +347,14 @@ unsafe fn fg_vertical_pass_avx_u8_def<const CN: usize>(
 
     let mut xx = start;
 
-    while xx + 4 < width.min(end) {
+    while xx + 6 < width.min(end) {
         let mut diffs0 = _mm256_setzero_si256();
         let mut diffs1 = _mm256_setzero_si256();
+        let mut diffs2 = _mm256_setzero_si256();
 
         let mut summs0 = _mm256_set1_epi32(initial_sum);
         let mut summs1 = _mm256_set1_epi32(initial_sum);
+        let mut summs2 = _mm256_set1_epi32(initial_sum);
 
         let start_y = 0 - 2 * radius as i64;
 
@@ -359,22 +362,29 @@ unsafe fn fg_vertical_pass_avx_u8_def<const CN: usize>(
         let current_px1 = ((xx + 1) * CN as u32) as usize;
         let current_px2 = ((xx + 2) * CN as u32) as usize;
         let current_px3 = ((xx + 3) * CN as u32) as usize;
+        let current_px4 = ((xx + 4) * CN as u32) as usize;
+        let current_px5 = ((xx + 5) * CN as u32) as usize;
 
         for y in start_y..height_wide {
             if y >= 0 {
                 let ps01 = _mm256_cvtepi32_ps(summs0);
                 let ps23 = _mm256_cvtepi32_ps(summs1);
+                let ps45 = _mm256_cvtepi32_ps(summs2);
 
                 let r01 = _mm256_mul_ps(ps01, v_weight);
                 let r23 = _mm256_mul_ps(ps23, v_weight);
+                let r45 = _mm256_mul_ps(ps45, v_weight);
 
                 let e01 = _mm256_cvtps_epi32(r01);
                 let e23 = _mm256_cvtps_epi32(r23);
+                let e45 = _mm256_cvtps_epi32(r45);
 
                 let prepared_px0 = _mm256_castsi256_si128(e01);
                 let prepared_px1 = _mm256_extracti128_si256::<1>(e01);
                 let prepared_px2 = _mm256_castsi256_si128(e23);
                 let prepared_px3 = _mm256_extracti128_si256::<1>(e23);
+                let prepared_px4 = _mm256_castsi256_si128(e45);
+                let prepared_px5 = _mm256_extracti128_si256::<1>(e45);
 
                 let current_y = (y * (stride as i64)) as usize;
 
@@ -382,11 +392,15 @@ unsafe fn fg_vertical_pass_avx_u8_def<const CN: usize>(
                 let dst_ptr1 = (bytes.slice.as_ptr() as *mut u8).add(current_y + current_px1);
                 let dst_ptr2 = (bytes.slice.as_ptr() as *mut u8).add(current_y + current_px2);
                 let dst_ptr3 = (bytes.slice.as_ptr() as *mut u8).add(current_y + current_px3);
+                let dst_ptr4 = (bytes.slice.as_ptr() as *mut u8).add(current_y + current_px4);
+                let dst_ptr5 = (bytes.slice.as_ptr() as *mut u8).add(current_y + current_px5);
 
                 store_u8_u32::<CN>(dst_ptr0, prepared_px0);
                 store_u8_u32::<CN>(dst_ptr1, prepared_px1);
                 store_u8_u32::<CN>(dst_ptr2, prepared_px2);
                 store_u8_u32::<CN>(dst_ptr3, prepared_px3);
+                store_u8_u32::<CN>(dst_ptr4, prepared_px4);
+                store_u8_u32::<CN>(dst_ptr5, prepared_px5);
 
                 let arr_index = ((y - radius_64) & 1023) as usize;
                 let d_arr_index = (y & 1023) as usize;
@@ -397,9 +411,13 @@ unsafe fn fg_vertical_pass_avx_u8_def<const CN: usize>(
                 let mut d_stored1 = _mm256_load_si256(
                     buffer1.get_unchecked_mut(d_arr_index).0.as_mut_ptr() as *const _,
                 );
+                let mut d_stored2 = _mm256_load_si256(
+                    buffer2.get_unchecked_mut(d_arr_index).0.as_mut_ptr() as *const _,
+                );
 
                 d_stored0 = _mm256_slli_epi32::<1>(d_stored0);
                 d_stored1 = _mm256_slli_epi32::<1>(d_stored1);
+                d_stored2 = _mm256_slli_epi32::<1>(d_stored2);
 
                 let a_stored0 = _mm256_load_si256(
                     buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr() as *const _,
@@ -407,9 +425,13 @@ unsafe fn fg_vertical_pass_avx_u8_def<const CN: usize>(
                 let a_stored1 = _mm256_load_si256(
                     buffer1.get_unchecked_mut(arr_index).0.as_mut_ptr() as *const _,
                 );
+                let a_stored2 = _mm256_load_si256(
+                    buffer2.get_unchecked_mut(arr_index).0.as_mut_ptr() as *const _,
+                );
 
                 diffs0 = _mm256_add_epi32(diffs0, _mm256_sub_epi32(a_stored0, d_stored0));
                 diffs1 = _mm256_add_epi32(diffs1, _mm256_sub_epi32(a_stored1, d_stored1));
+                diffs2 = _mm256_add_epi32(diffs2, _mm256_sub_epi32(a_stored2, d_stored2));
             } else if y + radius_64 >= 0 {
                 let arr_index = (y & 1023) as usize;
 
@@ -419,12 +441,17 @@ unsafe fn fg_vertical_pass_avx_u8_def<const CN: usize>(
                 let mut stored1 = _mm256_load_si256(
                     buffer1.get_unchecked_mut(arr_index).0.as_mut_ptr() as *mut _,
                 );
+                let mut stored2 = _mm256_load_si256(
+                    buffer2.get_unchecked_mut(arr_index).0.as_mut_ptr() as *mut _,
+                );
 
                 stored0 = _mm256_slli_epi32::<1>(stored0);
                 stored1 = _mm256_slli_epi32::<1>(stored1);
+                stored2 = _mm256_slli_epi32::<1>(stored2);
 
                 diffs0 = _mm256_sub_epi32(diffs0, stored0);
                 diffs1 = _mm256_sub_epi32(diffs1, stored1);
+                diffs2 = _mm256_sub_epi32(diffs2, stored2);
             }
 
             let next_row_y =
@@ -434,11 +461,15 @@ unsafe fn fg_vertical_pass_avx_u8_def<const CN: usize>(
             let s_ptr1 = bytes.slice.as_ptr().add(next_row_y + current_px1) as *mut u8;
             let s_ptr2 = bytes.slice.as_ptr().add(next_row_y + current_px2) as *mut u8;
             let s_ptr3 = bytes.slice.as_ptr().add(next_row_y + current_px3) as *mut u8;
+            let s_ptr4 = bytes.slice.as_ptr().add(next_row_y + current_px4) as *mut u8;
+            let s_ptr5 = bytes.slice.as_ptr().add(next_row_y + current_px5) as *mut u8;
 
             let pixel_color0 = load_u8_s32_fast::<CN>(s_ptr0);
             let pixel_color1 = load_u8_s32_fast::<CN>(s_ptr1);
             let pixel_color2 = load_u8_s32_fast::<CN>(s_ptr2);
             let pixel_color3 = load_u8_s32_fast::<CN>(s_ptr3);
+            let pixel_color4 = load_u8_s32_fast::<CN>(s_ptr4);
+            let pixel_color5 = load_u8_s32_fast::<CN>(s_ptr5);
 
             let arr_index = ((y + radius_64) & 1023) as usize;
 
@@ -446,9 +477,12 @@ unsafe fn fg_vertical_pass_avx_u8_def<const CN: usize>(
                 _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(pixel_color0), pixel_color1);
             let px23 =
                 _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(pixel_color2), pixel_color3);
+            let px45 =
+                _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(pixel_color4), pixel_color5);
 
             diffs0 = _mm256_add_epi32(diffs0, px01);
             diffs1 = _mm256_add_epi32(diffs1, px23);
+            diffs2 = _mm256_add_epi32(diffs2, px45);
 
             _mm256_store_si256(
                 buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr() as *mut _,
@@ -458,12 +492,17 @@ unsafe fn fg_vertical_pass_avx_u8_def<const CN: usize>(
                 buffer1.get_unchecked_mut(arr_index).0.as_mut_ptr() as *mut _,
                 px23,
             );
+            _mm256_store_si256(
+                buffer2.get_unchecked_mut(arr_index).0.as_mut_ptr() as *mut _,
+                px45,
+            );
 
             summs0 = _mm256_add_epi32(summs0, diffs0);
             summs1 = _mm256_add_epi32(summs1, diffs1);
+            summs2 = _mm256_add_epi32(summs2, diffs2);
         }
 
-        xx += 4;
+        xx += 6;
     }
 
     for x in xx..width.min(end) {
