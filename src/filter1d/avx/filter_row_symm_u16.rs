@@ -144,7 +144,7 @@ unsafe fn filter_row_avx_symm_u16_f32_impl<const FMA: bool, const N: usize>(
         let shifted_src = local_src.get_unchecked(cx..);
 
         let source =
-            _mm256_load_pack_x4(shifted_src.get_unchecked(half_len..).as_ptr() as *const _);
+            _mm256_load_pack_x4(shifted_src.get_unchecked(half_len * N..).as_ptr() as *const _);
         let mut k0 = _mm256_mul_epi16_by_ps_x2::<FMA>(source.0, coeff);
         let mut k1 = _mm256_mul_epi16_by_ps_x2::<FMA>(source.1, coeff);
         let mut k2 = _mm256_mul_epi16_by_ps_x2::<FMA>(source.2, coeff);
@@ -183,7 +183,7 @@ unsafe fn filter_row_avx_symm_u16_f32_impl<const FMA: bool, const N: usize>(
         let shifted_src = local_src.get_unchecked(cx..);
 
         let source =
-            _mm256_load_pack_x2(shifted_src.get_unchecked(half_len..).as_ptr() as *const _);
+            _mm256_load_pack_x2(shifted_src.get_unchecked(half_len * N..).as_ptr() as *const _);
         let mut k0 = _mm256_mul_epi16_by_ps_x2::<FMA>(source.0, coeff);
         let mut k1 = _mm256_mul_epi16_by_ps_x2::<FMA>(source.1, coeff);
 
@@ -212,7 +212,8 @@ unsafe fn filter_row_avx_symm_u16_f32_impl<const FMA: bool, const N: usize>(
 
         let shifted_src = local_src.get_unchecked(cx..);
 
-        let source = _mm256_loadu_si256(shifted_src.get_unchecked(half_len..).as_ptr() as *const _);
+        let source =
+            _mm256_loadu_si256(shifted_src.get_unchecked(half_len * N..).as_ptr() as *const _);
         let mut k0 = _mm256_mul_epi16_by_ps_x2::<FMA>(source, coeff);
 
         for i in 0..half_len {
@@ -236,7 +237,8 @@ unsafe fn filter_row_avx_symm_u16_f32_impl<const FMA: bool, const N: usize>(
 
         let shifted_src = local_src.get_unchecked(cx..);
 
-        let source = _mm_loadu_si128(shifted_src.get_unchecked(half_len..).as_ptr() as *const _);
+        let source =
+            _mm_loadu_si128(shifted_src.get_unchecked(half_len * N..).as_ptr() as *const _);
         let mut k0 = _mm_mul_epi16_by_ps_x2::<FMA>(source, coeff);
 
         for i in 0..half_len {
@@ -259,7 +261,7 @@ unsafe fn filter_row_avx_symm_u16_f32_impl<const FMA: bool, const N: usize>(
 
         let shifted_src = local_src.get_unchecked(cx..);
 
-        let source = _mm_loadu_si64(shifted_src.get_unchecked(half_len..).as_ptr() as *const _);
+        let source = _mm_loadu_si64(shifted_src.get_unchecked(half_len * N..).as_ptr() as *const _);
         let mut k0 = _mm_mul_epi16_by_ps::<FMA>(source, coeff);
 
         for i in 0..half_len {
@@ -280,7 +282,7 @@ unsafe fn filter_row_avx_symm_u16_f32_impl<const FMA: bool, const N: usize>(
     for x in cx..max_width {
         let coeff = *scanned_kernel.get_unchecked(half_len);
         let shifted_src = local_src.get_unchecked(x..);
-        let mut k0 = *shifted_src.get_unchecked(0) as f32 * coeff.weight;
+        let mut k0 = *shifted_src.get_unchecked(half_len * N) as f32 * coeff.weight;
 
         for i in 0..half_len {
             let coeff = *scanned_kernel.get_unchecked(i);

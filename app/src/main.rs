@@ -30,6 +30,7 @@
 mod merge;
 mod split;
 
+use colorutils_rs::TransferFunction;
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use libblur::{
     filter_1d_exact, gaussian_kernel_1d, generate_motion_kernel, motion_blur, sigma_size,
@@ -87,28 +88,36 @@ fn main() {
     let mut v_vec = src_bytes
         .to_vec()
         .iter()
-        .map(|&x| x)
+        .map(|&x| (x as f32 / 255.))
         // .map(|&x| u16::from_ne_bytes([x, x]))
-        .collect::<Vec<u8>>();
+        .collect::<Vec<f32>>();
 
-    let mut dst_image = BlurImageMut::borrow(
-        &mut v_vec,
-        dyn_image.width(),
-        dyn_image.height(),
-        FastBlurChannels::Channels4,
-    );
-
-    // let image = BlurImage::borrow(
-    //     &src_bytes,
+    // let mut dst_image = BlurImageMut::borrow(
+    //     &mut v_vec,
     //     dyn_image.width(),
     //     dyn_image.height(),
     //     FastBlurChannels::Channels4,
     // );
-    // let mut dst_image = BlurImageMut::default();
+
+    let image = BlurImage::borrow(
+        &v_vec,
+        dyn_image.width(),
+        dyn_image.height(),
+        FastBlurChannels::Channels4,
+    );
+    let mut dst_image = BlurImageMut::default();
     //
     // libblur::gaussian_box_blur(&image, &mut dst_image, 10., ThreadingPolicy::Single).unwrap();
 
-    libblur::stack_blur(&mut dst_image, 15, ThreadingPolicy::Single).unwrap();
+    libblur::gaussian_blur_f32(
+        &image,
+        &mut dst_image,
+        21,
+        0.,
+        EdgeMode::Clamp,
+        ThreadingPolicy::Single,
+    )
+    .unwrap();
 
     // libblur::motion_blur(
     //     &image,
@@ -125,8 +134,8 @@ fn main() {
         .data
         .borrow()
         .iter()
-        .map(|&x| x)
-        // .map(|&x| (x * 255f32).round() as u8)
+        // .map(|&x| x)
+        .map(|&x| (x * 255f32).round() as u8)
         .collect::<Vec<u8>>();
 
     // dst_bytes = dst_image.data.borrow().to_vec();

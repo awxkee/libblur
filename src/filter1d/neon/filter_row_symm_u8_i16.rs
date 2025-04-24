@@ -61,7 +61,7 @@ pub(crate) fn filter_rgb_row_symm_neon_u8_i16<const N: usize>(
 
             let shifted_src = local_src.get_unchecked(cx..);
 
-            let source = xvld1q_u8_x3(shifted_src.get_unchecked(half_len..).as_ptr());
+            let source = xvld1q_u8_x3(shifted_src.get_unchecked(half_len * N..).as_ptr());
             let mut k0 = vmulq_u8_by_i16(source.0, coeff);
             let mut k1 = vmulq_u8_by_i16(source.1, coeff);
             let mut k2 = vmulq_u8_by_i16(source.2, coeff);
@@ -93,7 +93,7 @@ pub(crate) fn filter_rgb_row_symm_neon_u8_i16<const N: usize>(
 
             let shifted_src = local_src.get_unchecked(cx..);
 
-            let source = vld1q_u8(shifted_src.get_unchecked(half_len..).as_ptr());
+            let source = vld1q_u8(shifted_src.get_unchecked(half_len * N..).as_ptr());
             let mut k0 = vmulq_u8_by_i16(source, coeff);
 
             for i in 0..half_len {

@@ -143,7 +143,7 @@ unsafe fn filter_row_avx_f32_f32_impl_symm<const FMA: bool, const N: usize>(
 
         let shifted_src = local_src.get_unchecked(cx..);
 
-        let source = _mm256_load_pack_ps_x4(shifted_src.as_ptr());
+        let source = _mm256_load_pack_ps_x4(shifted_src.get_unchecked(half_len * N).as_ptr());
         let mut k0 = _mm256_mul_ps(source.0, coeff);
         let mut k1 = _mm256_mul_ps(source.1, coeff);
         let mut k2 = _mm256_mul_ps(source.2, coeff);
@@ -171,7 +171,7 @@ unsafe fn filter_row_avx_f32_f32_impl_symm<const FMA: bool, const N: usize>(
 
         let shifted_src = local_src.get_unchecked(cx..);
 
-        let source = _mm256_load_pack_ps_x2(shifted_src.as_ptr());
+        let source = _mm256_load_pack_ps_x2(shifted_src.get_unchecked(half_len * N..).as_ptr());
         let mut k0 = _mm256_mul_ps(source.0, coeff);
         let mut k1 = _mm256_mul_ps(source.1, coeff);
 
@@ -195,7 +195,7 @@ unsafe fn filter_row_avx_f32_f32_impl_symm<const FMA: bool, const N: usize>(
 
         let shifted_src = local_src.get_unchecked(cx..);
 
-        let source = _mm256_loadu_ps(shifted_src.as_ptr());
+        let source = _mm256_loadu_ps(shifted_src.get_unchecked(half_len * N..).as_ptr());
         let mut k0 = _mm256_mul_ps(source, coeff);
 
         for i in 0..half_len {
@@ -216,7 +216,7 @@ unsafe fn filter_row_avx_f32_f32_impl_symm<const FMA: bool, const N: usize>(
 
         let shifted_src = local_src.get_unchecked(cx..);
 
-        let source_0 = _mm_loadu_ps(shifted_src.as_ptr());
+        let source_0 = _mm_loadu_ps(shifted_src.get_unchecked(half_len * N..).as_ptr());
         let mut k0 = _mm_mul_ps(source_0, coeff);
 
         for i in 0..half_len {
@@ -235,7 +235,7 @@ unsafe fn filter_row_avx_f32_f32_impl_symm<const FMA: bool, const N: usize>(
     for x in cx..max_width {
         let coeff = *scanned_kernel.get_unchecked(half_len);
         let shifted_src = local_src.get_unchecked(x..);
-        let mut k0 = shifted_src.get_unchecked(half_len) * coeff.weight;
+        let mut k0 = shifted_src.get_unchecked(half_len * N) * coeff.weight;
 
         for i in 0..half_len {
             let rollback = length - i - 1;
