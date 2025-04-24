@@ -28,6 +28,7 @@
  */
 #![deny(unreachable_pub)]
 mod fast_gaussian;
+mod fast_gaussian_f32;
 mod fast_gaussian_next;
 mod fast_gaussian_next_f32;
 mod fast_gaussian_next_u16;
@@ -38,6 +39,7 @@ mod v_load;
 mod v_store;
 
 pub(crate) use fast_gaussian::{fg_horizontal_pass_sse_u8, fg_vertical_pass_avx_u8};
+pub(crate) use fast_gaussian_f32::{fg_horizontal_pass_avx_f32, fg_vertical_pass_avx_f32};
 pub(crate) use fast_gaussian_next::{fgn_horizontal_pass_avx2_u8, fgn_vertical_pass_avx_u8};
 pub(crate) use fast_gaussian_next_f32::{fgn_horizontal_pass_avx_f32, fgn_vertical_pass_avx_f32};
 pub(crate) use fast_gaussian_next_u16::{fgn_horizontal_pass_avx_u16, fgn_vertical_pass_avx_u16};
