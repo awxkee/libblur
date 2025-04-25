@@ -43,7 +43,7 @@ blurred
 
 ### Gaussian blur
 
-Excellent results. Have improvements, however, much slower than any approximations. Use when use need gaussian
+Excellent results. Have significant improvements, however, much slower than any approximations. Use when use need gaussian
 methods - smoothing, FFT, advanced analysis etc.
 There are two methods of convolution, fixed point approximation and exact,
 approximation in fixed point adds 1-3% of error. However, it is about two times faster.
@@ -77,7 +77,7 @@ Example comparison time for blurring image 3000x4000 single plane 8-bit in multi
 |                     | time(NEON) | Time(SSE/AVX) |
 |---------------------|:----------:|:-------------:|
 | libblur(Exact)      |  17.59ms   |    15.51ms    |
-| libblur(FixedPoint) |   9.88ms   |    11.45ms    |
+| libblur(FixedPoint) |   8.99ms   |    11.45ms    |
 | OpenCV              |  74.73ms   |    64.20ms    |
 
 ### Stack blur

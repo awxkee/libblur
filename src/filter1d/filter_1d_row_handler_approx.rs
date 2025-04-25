@@ -126,6 +126,7 @@ impl Filter1DRowHandlerApprox<u8, i32> for u8 {
             use crate::filter1d::avx::filter_row_avx_u8_i32_app;
             return filter_row_avx_u8_i32_app::<N>;
         }
+        #[cfg(feature = "sse")]
         if std::arch::is_x86_feature_detected!("sse4.1") {
             if is_kernel_symmetric {
                 use crate::filter1d::sse::filter_row_symm_sse_u8_i32_app;
@@ -142,6 +143,55 @@ impl Filter1DRowHandlerApprox<u8, i32> for u8 {
     }
 }
 
+impl Filter1DRowHandlerApprox<u16, u32> for u16 {
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    fn get_row_handler_apr<const N: usize>(
+        is_kernel_symmetric: bool,
+    ) -> fn(Arena, &[u16], &mut [u16], ImageSize, FilterRegion, &[ScanPoint1d<u32>]) {
+        if is_kernel_symmetric {
+            use crate::filter1d::neon::filter_row_symm_neon_uq15_u16;
+            filter_row_symm_neon_uq15_u16::<N>
+        } else {
+            filter_row_approx::<u16, u32, N>
+        }
+    }
+
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    fn get_row_handler_apr<const N: usize>(
+        is_kernel_symmetric: bool,
+    ) -> fn(Arena, &[u16], &mut [u16], ImageSize, FilterRegion, &[ScanPoint1d<u32>]) {
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        if std::arch::is_x86_feature_detected!("avx2") && is_kernel_symmetric {
+            use crate::filter1d::avx::filter_row_avx_symm_uq15_u16;
+            return filter_row_avx_symm_uq15_u16::<N>;
+        }
+        #[cfg(feature = "sse")]
+        if std::arch::is_x86_feature_detected!("sse4.1") && is_kernel_symmetric {
+            use crate::filter1d::sse::filter_row_sse_symm_uq15_u16;
+            return filter_row_sse_symm_uq15_u16::<N>;
+        }
+        if is_kernel_symmetric {
+            filter_row_symmetric_approx::<u16, u32, N>
+        } else {
+            filter_row_approx::<u16, u32, N>
+        }
+    }
+
+    #[cfg(not(any(
+        all(target_arch = "aarch64", target_feature = "neon"),
+        any(target_arch = "x86_64", target_arch = "x86")
+    )))]
+    fn get_row_handler_apr<const N: usize>(
+        is_kernel_symmetric: bool,
+    ) -> fn(Arena, &[u16], &mut [u16], ImageSize, FilterRegion, &[ScanPoint1d<u32>]) {
+        if is_kernel_symmetric {
+            filter_row_symmetric_approx::<u16, u32, N>
+        } else {
+            filter_row_approx::<u16, u32, N>
+        }
+    }
+}
+
 default_1d_row_handler!(u8, i64);
 default_1d_row_handler!(u8, u16);
 default_1d_row_handler!(u8, i16);
@@ -150,7 +200,6 @@ default_1d_row_handler!(u8, u64);
 default_1d_row_handler!(i8, i32);
 default_1d_row_handler!(i8, i64);
 default_1d_row_handler!(i8, i16);
-default_1d_row_handler!(u16, u32);
 default_1d_row_handler!(u16, i32);
 default_1d_row_handler!(u16, i64);
 default_1d_row_handler!(u16, u64);

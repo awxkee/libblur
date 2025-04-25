@@ -31,35 +31,32 @@ use std::arch::aarch64::*;
 
 #[inline(always)]
 #[cfg(feature = "rdm")]
-pub(crate) unsafe fn vmullq_expand_i16<const EXPAND: i32>(
+pub(crate) unsafe fn vmullq_expand_i16(
     input: uint8x16_t,
     weight: int16x8_t,
 ) -> (int16x8_t, int16x8_t) {
-    let lo_16 = vreinterpretq_s16_u16(vshll_n_u8::<EXPAND>(vget_low_u8(input)));
-    let hi_16 = vreinterpretq_s16_u16(vshll_high_n_u8::<EXPAND>(input));
+    let lo_16 = vreinterpretq_s16_u16(vshll_n_u8::<6>(vget_low_u8(input)));
+    let hi_16 = vreinterpretq_s16_u16(vshll_high_n_u8::<6>(input));
 
     (vqrdmulhq_s16(lo_16, weight), vqrdmulhq_s16(hi_16, weight))
 }
 
 #[inline(always)]
 #[cfg(feature = "rdm")]
-pub(crate) unsafe fn vmull_expand_i16<const EXPAND: i32>(
-    input: uint8x8_t,
-    weight: int16x8_t,
-) -> int16x8_t {
-    let v = vreinterpretq_s16_u16(vshll_n_u8::<EXPAND>(input));
+pub(crate) unsafe fn vmull_expand_i16(input: uint8x8_t, weight: int16x8_t) -> int16x8_t {
+    let v = vreinterpretq_s16_u16(vshll_n_u8::<6>(input));
     vqrdmulhq_s16(v, weight)
 }
 
 #[inline(always)]
 #[cfg(feature = "rdm")]
-pub(crate) unsafe fn vmlaq_hi_u8_s16<const EXPAND: i32>(
+pub(crate) unsafe fn vmlaq_hi_u8_s16(
     store: (int16x8_t, int16x8_t),
     input: uint8x16_t,
     weight: int16x8_t,
 ) -> (int16x8_t, int16x8_t) {
-    let lo_16 = vreinterpretq_s16_u16(vshll_n_u8::<EXPAND>(vget_low_u8(input)));
-    let hi_16 = vreinterpretq_s16_u16(vshll_high_n_u8::<EXPAND>(input));
+    let lo_16 = vreinterpretq_s16_u16(vshll_n_u8::<6>(vget_low_u8(input)));
+    let hi_16 = vreinterpretq_s16_u16(vshll_high_n_u8::<6>(input));
 
     (
         vqrdmlahq_s16(store.0, lo_16, weight),
@@ -69,20 +66,20 @@ pub(crate) unsafe fn vmlaq_hi_u8_s16<const EXPAND: i32>(
 
 #[inline(always)]
 #[cfg(feature = "rdm")]
-pub(crate) unsafe fn vmla_symm_hi_u8_s16<const EXPAND: i32>(
+pub(crate) unsafe fn vmla_symm_hi_u8_s16(
     store: int16x8_t,
     input0: uint8x8_t,
     input1: uint8x8_t,
     weight: int16x8_t,
 ) -> int16x8_t {
-    let lo_16 = vreinterpretq_s16_u16(vshlq_n_u16::<EXPAND>(vaddl_u8(input0, input1)));
+    let lo_16 = vreinterpretq_s16_u16(vshlq_n_u16::<6>(vaddl_u8(input0, input1)));
 
     vqrdmlahq_s16(store, lo_16, weight)
 }
 
 #[inline(always)]
 #[cfg(feature = "rdm")]
-pub(crate) unsafe fn vmlaq_symm_hi_u8_s16<const EXPAND: i32>(
+pub(crate) unsafe fn vmlaq_symm_hi_u8_s16(
     store: (int16x8_t, int16x8_t),
     input0: uint8x16_t,
     input1: uint8x16_t,
@@ -90,8 +87,8 @@ pub(crate) unsafe fn vmlaq_symm_hi_u8_s16<const EXPAND: i32>(
 ) -> (int16x8_t, int16x8_t) {
     let lw = vaddl_u8(vget_low_u8(input0), vget_low_u8(input1));
     let hw = vaddl_high_u8(input0, input1);
-    let lo_16 = vreinterpretq_s16_u16(vshlq_n_u16::<EXPAND>(lw));
-    let hi_16 = vreinterpretq_s16_u16(vshlq_n_u16::<EXPAND>(hw));
+    let lo_16 = vreinterpretq_s16_u16(vshlq_n_u16::<6>(lw));
+    let hi_16 = vreinterpretq_s16_u16(vshlq_n_u16::<6>(hw));
 
     (
         vqrdmlahq_s16(store.0, lo_16, weight),
@@ -104,14 +101,25 @@ pub(crate) unsafe fn vmullq_u8_by_i16(
     input: uint8x16_t,
     weight: int16x8_t,
 ) -> (int32x4_t, int32x4_t, int32x4_t, int32x4_t) {
-    let lo_16 = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(input)));
-    let hi_16 = vreinterpretq_s16_u16(vmovl_high_u8(input));
+    let lo_16 = vreinterpretq_s16_u16(vshll_n_u8::<6>(vget_low_u8(input)));
+    let hi_16 = vreinterpretq_s16_u16(vshll_high_n_u8::<6>(input));
 
     (
         vmull_s16(vget_low_s16(lo_16), vget_low_s16(weight)),
         vmull_high_s16(lo_16, weight),
         vmull_s16(vget_low_s16(hi_16), vget_low_s16(weight)),
         vmull_high_s16(hi_16, weight),
+    )
+}
+
+#[inline(always)]
+pub(crate) unsafe fn vmullq_u16_by_u16(
+    input: uint16x8_t,
+    weight: uint16x8_t,
+) -> (uint32x4_t, uint32x4_t) {
+    (
+        vmull_u16(vget_low_u16(input), vget_low_u16(weight)),
+        vmull_high_u16(input, weight),
     )
 }
 
@@ -338,6 +346,22 @@ pub(crate) unsafe fn vfmlaq_symm_u8_s16(
 }
 
 #[inline(always)]
+pub(crate) unsafe fn vfmlaq_symm_u16_u16(
+    store: (uint32x4_t, uint32x4_t),
+    input0: uint16x8_t,
+    input1: uint16x8_t,
+    weight: uint32x4_t,
+) -> (uint32x4_t, uint32x4_t) {
+    let lo_16 = vaddl_u16(vget_low_u16(input0), vget_low_u16(input1));
+    let hi_16 = vaddl_high_u16(input0, input1);
+
+    (
+        vmlaq_u32(store.0, lo_16, weight),
+        vmlaq_u32(store.1, hi_16, weight),
+    )
+}
+
+#[inline(always)]
 pub(crate) unsafe fn vfmla_u8_s16(
     store: (int32x4_t, int32x4_t),
     input: uint8x8_t,
@@ -417,14 +441,14 @@ pub(crate) unsafe fn vqmovnq_s32_u8(
 }
 
 #[inline(always)]
+pub(crate) unsafe fn vqmovnq_u32_u16(store: (uint32x4_t, uint32x4_t)) -> uint16x8_t {
+    vcombine_u16(vqrshrn_n_u32::<15>(store.0), vqrshrn_n_u32::<15>(store.1))
+}
+
+#[inline(always)]
 #[cfg(feature = "rdm")]
-pub(crate) unsafe fn vqmovnq_s16x2_u8<const PRECISION: i32>(
-    store: (int16x8_t, int16x8_t),
-) -> uint8x16_t {
-    vcombine_u8(
-        vqrshrun_n_s16::<PRECISION>(store.0),
-        vqrshrun_n_s16::<PRECISION>(store.1),
-    )
+pub(crate) unsafe fn vqmovnq_s16x2_u8(store: (int16x8_t, int16x8_t)) -> uint8x16_t {
+    vcombine_u8(vqrshrun_n_s16::<6>(store.0), vqrshrun_n_s16::<6>(store.1))
 }
 
 #[inline(always)]
@@ -435,8 +459,8 @@ pub(crate) unsafe fn vqmovn_s32_u8(store: (int32x4_t, int32x4_t)) -> uint8x8_t {
 
 #[inline(always)]
 #[cfg(feature = "rdm")]
-pub(crate) unsafe fn vqmovn_s16_u8<const PRECISION: i32>(store: int16x8_t) -> uint8x8_t {
-    vqrshrun_n_s16::<PRECISION>(store)
+pub(crate) unsafe fn vqmovn_s16_u8(store: int16x8_t) -> uint8x8_t {
+    vqrshrun_n_s16::<6>(store)
 }
 
 #[inline(always)]
@@ -501,6 +525,11 @@ pub(crate) unsafe fn xvld1q_u16_x4(a: *const u16) -> uint16x8x4_t {
 }
 
 #[inline(always)]
+pub(crate) unsafe fn xvld1q_u16_x3(a: *const u16) -> uint16x8x3_t {
+    uint16x8x3_t(vld1q_u16(a), vld1q_u16(a.add(8)), vld1q_u16(a.add(16)))
+}
+
+#[inline(always)]
 pub(crate) unsafe fn xvld1q_u16_x2(a: *const u16) -> uint16x8x2_t {
     uint16x8x2_t(vld1q_u16(a), vld1q_u16(a.add(8)))
 }
@@ -538,6 +567,13 @@ pub(crate) unsafe fn xvst1q_u16_x4(a: *mut u16, b: uint16x8x4_t) {
     vst1q_u16(a.add(8), b.1);
     vst1q_u16(a.add(16), b.2);
     vst1q_u16(a.add(24), b.3);
+}
+
+#[inline(always)]
+pub(crate) unsafe fn xvst1q_u16_x3(a: *mut u16, b: uint16x8x3_t) {
+    vst1q_u16(a, b.0);
+    vst1q_u16(a.add(8), b.1);
+    vst1q_u16(a.add(16), b.2);
 }
 
 #[inline(always)]

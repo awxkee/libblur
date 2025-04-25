@@ -36,7 +36,7 @@ use crate::filter1d::filter_scan::ScanPoint1d;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 use crate::filter1d::neon::{filter_column_neon_u8_i32_app, filter_column_symm_neon_u8_i32_app};
 use crate::filter1d::region::FilterRegion;
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 use crate::filter1d::sse::{filter_column_sse_u8_i32_app, filter_column_symm_u8_i32_app};
 use crate::ImageSize;
 
@@ -89,6 +89,57 @@ macro_rules! default_1d_column_handler {
             }
         }
     };
+}
+
+impl Filter1DColumnHandlerApprox<u16, u32> for u16 {
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    fn get_column_handler(
+        is_kernel_symmetric: bool,
+    ) -> fn(Arena, &[&[u16]], &mut [u16], ImageSize, FilterRegion, &[ScanPoint1d<u32>]) {
+        if is_kernel_symmetric {
+            use crate::filter1d::neon::filter_column_symm_neon_uq15_u16;
+            filter_column_symm_neon_uq15_u16
+        } else {
+            filter_column_approx
+        }
+    }
+
+    #[cfg(not(any(
+        all(target_arch = "aarch64", target_feature = "neon"),
+        any(target_arch = "x86_64", target_arch = "x86")
+    )))]
+    fn get_column_handler(
+        is_kernel_symmetric: bool,
+    ) -> fn(Arena, &[&[u16]], &mut [u16], ImageSize, FilterRegion, &[ScanPoint1d<u32>]) {
+        if is_kernel_symmetric {
+            filter_column_symmetric_approx
+        } else {
+            filter_column_approx
+        }
+    }
+
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    fn get_column_handler(
+        is_kernel_symmetric: bool,
+    ) -> fn(Arena, &[&[u16]], &mut [u16], ImageSize, FilterRegion, &[ScanPoint1d<u32>]) {
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        if std::arch::is_x86_feature_detected!("avx2") && is_kernel_symmetric {
+            use crate::filter1d::avx::filter_column_avx_symm_uq15_u16;
+            return filter_column_avx_symm_uq15_u16;
+        }
+        #[cfg(feature = "sse")]
+        {
+            if std::arch::is_x86_feature_detected!("sse4.1") && is_kernel_symmetric {
+                use crate::filter1d::sse::filter_column_sse_symm_uq15_u16;
+                return filter_column_sse_symm_uq15_u16;
+            }
+        }
+        if is_kernel_symmetric {
+            filter_column_symmetric_approx
+        } else {
+            filter_column_approx
+        }
+    }
 }
 
 impl Filter1DColumnHandlerApprox<u8, i32> for u8 {
@@ -144,6 +195,7 @@ impl Filter1DColumnHandlerApprox<u8, i32> for u8 {
             }
             return filter_column_avx_u8_i32_app;
         }
+        #[cfg(feature = "sse")]
         if std::arch::is_x86_feature_detected!("sse4.1") {
             if is_kernel_symmetric {
                 return filter_column_symm_u8_i32_app;
@@ -200,6 +252,44 @@ impl Filter1DColumnMultipleRowsApprox<u8, i32> for u8 {
     }
 }
 
+impl Filter1DColumnMultipleRowsApprox<u16, u32> for u16 {
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    fn get_column_multiple_rows(
+        is_symmetric_kernel: bool,
+    ) -> Option<fn(Arena, FilterBrows<u16>, &mut [u16], ImageSize, usize, &[ScanPoint1d<u32>])>
+    {
+        if is_symmetric_kernel {
+            use crate::filter1d::neon::filter_symm_column_neon_uq15_u16_x3;
+            return Some(filter_symm_column_neon_uq15_u16_x3);
+        }
+        None
+    }
+
+    #[cfg(not(any(
+        all(target_arch = "aarch64", target_feature = "neon"),
+        any(target_arch = "x86_64", target_arch = "x86")
+    )))]
+    fn get_column_multiple_rows(
+        _: bool,
+    ) -> Option<fn(Arena, FilterBrows<u16>, &mut [u16], ImageSize, usize, &[ScanPoint1d<u32>])>
+    {
+        None
+    }
+
+    #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+    fn get_column_multiple_rows(
+        _is_kernel_symmetric: bool,
+    ) -> Option<fn(Arena, FilterBrows<u16>, &mut [u16], ImageSize, usize, &[ScanPoint1d<u32>])>
+    {
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        if std::arch::is_x86_feature_detected!("avx2") && _is_kernel_symmetric {
+            use crate::filter1d::avx::filter_column_avx_symm_uq15_u16_x2;
+            return Some(filter_column_avx_symm_uq15_u16_x2);
+        }
+        None
+    }
+}
+
 default_1d_column_handler!(u8, i64);
 default_1d_column_handler!(u8, u16);
 default_1d_column_handler!(u8, i16);
@@ -208,7 +298,6 @@ default_1d_column_handler!(u8, u64);
 default_1d_column_handler!(i8, i32);
 default_1d_column_handler!(i8, i64);
 default_1d_column_handler!(i8, i16);
-default_1d_column_handler!(u16, u32);
 default_1d_column_handler!(u16, i32);
 default_1d_column_handler!(u16, i64);
 default_1d_column_handler!(u16, u64);
@@ -244,7 +333,6 @@ default_1d_column_multiple_rows!(u8, u64);
 default_1d_column_multiple_rows!(i8, i32);
 default_1d_column_multiple_rows!(i8, i64);
 default_1d_column_multiple_rows!(i8, i16);
-default_1d_column_multiple_rows!(u16, u32);
 default_1d_column_multiple_rows!(u16, i32);
 default_1d_column_multiple_rows!(u16, i64);
 default_1d_column_multiple_rows!(u16, u64);

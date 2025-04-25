@@ -136,6 +136,7 @@ pub fn gaussian_blur(
 /// * `channels` - Count of channels in the image
 /// * `edge_mode` - Rule to handle edge mode
 /// * `threading_policy` - Threading policy according to *ThreadingPolicy*
+/// * `hint` - see [ConvolutionMode] for more info
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided.
@@ -147,6 +148,7 @@ pub fn gaussian_blur_u16(
     sigma: f32,
     edge_mode: EdgeMode,
     threading_policy: ThreadingPolicy,
+    hint: ConvolutionMode,
 ) -> Result<(), BlurError> {
     src.check_layout()?;
     dst.check_layout(Some(src))?;
@@ -169,20 +171,41 @@ pub fn gaussian_blur_u16(
         kernel_size
     };
     let kernel = gaussian_kernel_1d(kernel_size, sigma);
-    let _dispatcher = match src.channels {
-        FastBlurChannels::Plane => filter_1d_exact::<u16, f32, 1>,
-        FastBlurChannels::Channels3 => filter_1d_exact::<u16, f32, 3>,
-        FastBlurChannels::Channels4 => filter_1d_exact::<u16, f32, 4>,
-    };
-    _dispatcher(
-        src,
-        dst,
-        &kernel,
-        &kernel,
-        edge_mode,
-        Scalar::default(),
-        threading_policy,
-    )
+    match hint {
+        ConvolutionMode::Exact => {
+            let _dispatcher = match src.channels {
+                FastBlurChannels::Plane => filter_1d_exact::<u16, f32, 1>,
+                FastBlurChannels::Channels3 => filter_1d_exact::<u16, f32, 3>,
+                FastBlurChannels::Channels4 => filter_1d_exact::<u16, f32, 4>,
+            };
+            _dispatcher(
+                src,
+                dst,
+                &kernel,
+                &kernel,
+                edge_mode,
+                Scalar::default(),
+                threading_policy,
+            )
+        }
+        ConvolutionMode::FixedPoint => {
+            use crate::filter1d::filter_1d_approx;
+            let _dispatcher = match src.channels {
+                FastBlurChannels::Plane => filter_1d_approx::<u16, f32, u32, 1>,
+                FastBlurChannels::Channels3 => filter_1d_approx::<u16, f32, u32, 3>,
+                FastBlurChannels::Channels4 => filter_1d_approx::<u16, f32, u32, 4>,
+            };
+            _dispatcher(
+                src,
+                dst,
+                &kernel,
+                &kernel,
+                edge_mode,
+                Scalar::default(),
+                threading_policy,
+            )
+        }
+    }
 }
 
 /// Performs gaussian blur on the image.

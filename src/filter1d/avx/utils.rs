@@ -77,15 +77,22 @@ pub(crate) unsafe fn _mm256_mul_epi8_by_epi16_x4(
     input: __m256i,
     weight: __m256i,
 ) -> (__m256i, __m256i) {
-    let j0 = _mm256_unpacklo_epi8(input, _mm256_setzero_si256());
-    let j1 = _mm256_unpackhi_epi8(input, _mm256_setzero_si256());
-
-    let lo_16 = _mm256_slli_epi16::<6>(j0);
-    let hi_16 = _mm256_slli_epi16::<6>(j1);
+    let j0 = _mm256_unpacklo_epi8(input, input);
+    let j1 = _mm256_unpackhi_epi8(input, input);
 
     (
-        _mm256_mulhrs_epi16(lo_16, weight),
-        _mm256_mulhrs_epi16(hi_16, weight),
+        _mm256_mulhrs_epi16(_mm256_srli_epi16::<2>(j0), weight),
+        _mm256_mulhrs_epi16(_mm256_srli_epi16::<2>(j1), weight),
+    )
+}
+
+#[inline(always)]
+pub(crate) unsafe fn _mm256_mul_epu16_widen(input: __m256i, weight: __m256i) -> (__m256i, __m256i) {
+    let v_lo = _mm256_unpacklo_epi16(input, _mm256_setzero_si256());
+    let v_hi = _mm256_unpackhi_epi16(input, _mm256_setzero_si256());
+    (
+        _mm256_mullo_epi32(v_lo, weight),
+        _mm256_mullo_epi32(v_hi, weight),
     )
 }
 
@@ -95,13 +102,11 @@ pub(crate) unsafe fn _mm256_mul_add_epi8_by_epi16_x4(
     input: __m256i,
     weight: __m256i,
 ) -> (__m256i, __m256i) {
-    let j0 = _mm256_unpacklo_epi8(input, _mm256_setzero_si256());
-    let j1 = _mm256_unpackhi_epi8(input, _mm256_setzero_si256());
-    let lo_16 = _mm256_slli_epi16::<6>(j0);
-    let hi_16 = _mm256_slli_epi16::<6>(j1);
+    let j0 = _mm256_unpacklo_epi8(input, input);
+    let j1 = _mm256_unpackhi_epi8(input, input);
 
-    let vj0 = _mm256_mulhrs_epi16(lo_16, weight);
-    let vj1 = _mm256_mulhrs_epi16(hi_16, weight);
+    let vj0 = _mm256_mulhrs_epi16(_mm256_srli_epi16::<2>(j0), weight);
+    let vj1 = _mm256_mulhrs_epi16(_mm256_srli_epi16::<2>(j1), weight);
     (
         _mm256_add_epi16(accumulator.0, vj0),
         _mm256_add_epi16(accumulator.1, vj1),
@@ -120,15 +125,39 @@ pub(crate) unsafe fn _mm256_mul_add_symm_epi8_by_epi16_x4(
     let a2 = _mm256_unpackhi_epi8(input0, _mm256_setzero_si256());
     let a3 = _mm256_unpackhi_epi8(input1, _mm256_setzero_si256());
 
-    let lo_16 = _mm256_slli_epi16::<6>(_mm256_add_epi16(a0, a1));
-    let hi_16 = _mm256_slli_epi16::<6>(_mm256_add_epi16(a2, a3));
+    let lo_16 = _mm256_add_epi16(a0, a1);
+    let hi_16 = _mm256_add_epi16(a2, a3);
 
-    let vj0 = _mm256_mulhrs_epi16(lo_16, weight);
-    let vj1 = _mm256_mulhrs_epi16(hi_16, weight);
+    let vj0 = _mm256_mulhrs_epi16(_mm256_slli_epi16::<6>(lo_16), weight);
+    let vj1 = _mm256_mulhrs_epi16(_mm256_slli_epi16::<6>(hi_16), weight);
 
     (
         _mm256_add_epi16(accumulator.0, vj0),
         _mm256_add_epi16(accumulator.1, vj1),
+    )
+}
+
+#[inline(always)]
+pub(crate) unsafe fn _mm256_mul_add_symm_epu16_by_epu16_x4(
+    accumulator: (__m256i, __m256i),
+    input0: __m256i,
+    input1: __m256i,
+    weight: __m256i,
+) -> (__m256i, __m256i) {
+    let a0 = _mm256_unpacklo_epi16(input0, _mm256_setzero_si256());
+    let a1 = _mm256_unpacklo_epi16(input1, _mm256_setzero_si256());
+    let a2 = _mm256_unpackhi_epi16(input0, _mm256_setzero_si256());
+    let a3 = _mm256_unpackhi_epi16(input1, _mm256_setzero_si256());
+
+    let lo_16 = _mm256_add_epi32(a0, a1);
+    let hi_16 = _mm256_add_epi32(a2, a3);
+
+    let vj0 = _mm256_mullo_epi32(lo_16, weight);
+    let vj1 = _mm256_mullo_epi32(hi_16, weight);
+
+    (
+        _mm256_add_epi32(accumulator.0, vj0),
+        _mm256_add_epi32(accumulator.1, vj1),
     )
 }
 
@@ -248,9 +277,18 @@ pub(crate) unsafe fn _mm256_pack_ps_x2_epi16(store: (__m256, __m256)) -> __m256i
 
 #[inline(always)]
 pub(crate) unsafe fn _mm256_pack_epi32_x4_epi8(store: (__m256i, __m256i)) -> __m256i {
-    let rounding_const = _mm256_set1_epi16(1 << 5);
+    let rnd = _mm256_set1_epi32((1 << 5) - 1);
     _mm256_packus_epi16(
-        _mm256_srai_epi16::<6>(_mm256_add_epi16(store.0, rounding_const)),
-        _mm256_srai_epi16::<6>(_mm256_add_epi16(store.1, rounding_const)),
+        _mm256_srai_epi16::<6>(_mm256_add_epi32(store.0, rnd)),
+        _mm256_srai_epi16::<6>(_mm256_add_epi32(store.1, rnd)),
+    )
+}
+
+#[inline(always)]
+pub(crate) unsafe fn _mm256_pack_epi32_x4_epu16(store: (__m256i, __m256i)) -> __m256i {
+    let rnd = _mm256_set1_epi32((1 << 14) - 1);
+    _mm256_packus_epi32(
+        _mm256_srli_epi32::<15>(_mm256_add_epi32(store.0, rnd)),
+        _mm256_srli_epi32::<15>(_mm256_add_epi32(store.1, rnd)),
     )
 }

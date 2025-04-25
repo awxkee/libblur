@@ -106,9 +106,10 @@ impl<const CN: usize, const FMA: bool> HorizontalExecutionUnit<CN, FMA> {
         end: u32,
         edge_mode: EdgeMode,
     ) {
-        let mut bf0 = Box::new([AvxSseF32x8::default(); 1024]);
-        let mut bf1 = Box::new([AvxSseF32x8::default(); 1024]);
-        let mut bf2 = Box::new([AvxSseF32x8::default(); 1024]);
+        let mut full_buffer = Box::new([AvxSseF32x8::default(); 1024 * 3]);
+
+        let (bf0, rem) = full_buffer.split_at_mut(1024);
+        let (bf1, bf2) = rem.split_at_mut(1024);
 
         let radius_64 = radius as i64;
         let width_wide = width as i64;
@@ -356,9 +357,10 @@ impl<const CN: usize, const FMA: bool> VerticalExecutionUnit<CN, FMA> {
         end: u32,
         edge_mode: EdgeMode,
     ) {
-        let mut bf0 = Box::new([AvxSseF32x8::default(); 1024]);
-        let mut bf1 = Box::new([AvxSseF32x8::default(); 1024]);
-        let mut bf2 = Box::new([AvxSseF32x8::default(); 1024]);
+        let mut full_buffer = Box::new([AvxSseF32x8::default(); 1024 * 3]);
+
+        let (bf0, rem) = full_buffer.split_at_mut(1024);
+        let (bf1, bf2) = rem.split_at_mut(1024);
 
         let v_double = _mm256_set1_ps(2.);
         let v_weight = _mm256_set1_ps(1f32 / (radius as f32 * radius as f32));

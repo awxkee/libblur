@@ -31,10 +31,10 @@ use crate::avx::{
     _mm256_store_pack_ps_x4,
 };
 use crate::filter1d::arena::Arena;
+use crate::filter1d::avx::sse_utils::_mm_opt_fmlaf_ps;
 use crate::filter1d::avx::utils::_mm256_opt_fmlaf_ps;
 use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::region::FilterRegion;
-use crate::filter1d::sse::utils::_mm_opt_fmlaf_ps;
 use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
 use crate::to_storage::ToStorage;

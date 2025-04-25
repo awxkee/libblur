@@ -149,6 +149,35 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 0.,
                 EdgeMode::Clamp,
                 ThreadingPolicy::Adaptive,
+                ConvolutionMode::Exact,
+            )
+            .unwrap();
+        })
+    });
+
+    c.bench_function("RGBA16 (Fixed Point) gauss blur edge clamp: rad 151", |b| {
+        let mut dst_bytes =
+            BlurImageMut::alloc(img.width(), img.height(), FastBlurChannels::Channels4);
+        let src_bytes = img
+            .as_bytes()
+            .iter()
+            .map(|&v| v as u16)
+            .collect::<Vec<u16>>();
+        let src_image = BlurImage::borrow(
+            &src_bytes,
+            img.width(),
+            img.height(),
+            FastBlurChannels::Channels4,
+        );
+        b.iter(|| {
+            libblur::gaussian_blur_u16(
+                &src_image,
+                &mut dst_bytes,
+                151 * 2 + 1,
+                0.,
+                EdgeMode::Clamp,
+                ThreadingPolicy::Adaptive,
+                ConvolutionMode::FixedPoint,
             )
             .unwrap();
         })

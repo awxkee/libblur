@@ -65,4 +65,5 @@ pub(crate) use fast_gaussian_next_u16::{fgn_horizontal_pass_sse_u16, fgn_vertica
 pub(crate) use fast_gaussian_u16::{fg_horizontal_pass_sse_u16, fg_vertical_pass_sse_u16};
 pub(crate) use packing::*;
 pub(crate) use utils::*;
+#[allow(unused_imports)]
 pub(crate) use v_load_store::*;

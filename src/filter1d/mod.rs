@@ -51,7 +51,7 @@ mod filter_scan;
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 pub(crate) mod neon;
 mod region;
-#[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 pub(crate) mod sse;
 mod to_approx_storage;
 

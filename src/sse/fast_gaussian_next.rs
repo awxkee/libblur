@@ -82,10 +82,11 @@ unsafe fn fgn_vertical_pass_sse_u8_impl<const CN: usize>(
     end: u32,
     edge_mode: EdgeMode,
 ) {
-    let mut buffer0 = Box::new([SseI32x4::default(); 1024]);
-    let mut buffer1 = Box::new([SseI32x4::default(); 1024]);
-    let mut buffer2 = Box::new([SseI32x4::default(); 1024]);
-    let mut buffer3 = Box::new([SseI32x4::default(); 1024]);
+    let mut full_buffer = Box::new([SseI32x4::default(); 1024 * 4]);
+
+    let (buffer0, rem) = full_buffer.split_at_mut(1024);
+    let (buffer1, rem) = rem.split_at_mut(1024);
+    let (buffer2, buffer3) = rem.split_at_mut(1024);
 
     let height_wide = height as i64;
 
@@ -400,10 +401,11 @@ unsafe fn fgn_horizontal_pass_sse_u8_impl<const CN: usize>(
     end: u32,
     edge_mode: EdgeMode,
 ) {
-    let mut buffer0 = Box::new([SseI32x4::default(); 1024]);
-    let mut buffer1 = Box::new([SseI32x4::default(); 1024]);
-    let mut buffer2 = Box::new([SseI32x4::default(); 1024]);
-    let mut buffer3 = Box::new([SseI32x4::default(); 1024]);
+    let mut full_buffer = Box::new([SseI32x4::default(); 1024 * 4]);
+
+    let (buffer0, rem) = full_buffer.split_at_mut(1024);
+    let (buffer1, rem) = rem.split_at_mut(1024);
+    let (buffer2, buffer3) = rem.split_at_mut(1024);
 
     let width_wide = width as i64;
 
