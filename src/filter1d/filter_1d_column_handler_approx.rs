@@ -127,6 +127,13 @@ impl Filter1DColumnHandlerApprox<u16, u32> for u16 {
             use crate::filter1d::avx::filter_column_avx_symm_uq15_u16;
             return filter_column_avx_symm_uq15_u16;
         }
+        #[cfg(feature = "sse")]
+        {
+            if std::arch::is_x86_feature_detected!("sse4.1") && is_kernel_symmetric {
+                use crate::filter1d::sse::filter_column_sse_symm_uq15_u16;
+                return filter_column_sse_symm_uq15_u16;
+            }
+        }
         if is_kernel_symmetric {
             filter_column_symmetric_approx
         } else {

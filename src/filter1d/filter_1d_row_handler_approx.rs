@@ -165,6 +165,11 @@ impl Filter1DRowHandlerApprox<u16, u32> for u16 {
             use crate::filter1d::avx::filter_row_avx_symm_uq15_u16;
             return filter_row_avx_symm_uq15_u16::<N>;
         }
+        #[cfg(feature = "sse")]
+        if std::arch::is_x86_feature_detected!("sse4.1") && is_kernel_symmetric {
+            use crate::filter1d::sse::filter_row_sse_symm_uq15_u16;
+            return filter_row_sse_symm_uq15_u16::<N>;
+        }
         if is_kernel_symmetric {
             filter_row_symmetric_approx::<u16, u32, N>
         } else {
