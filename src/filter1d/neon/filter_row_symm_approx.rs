@@ -58,7 +58,7 @@ pub(crate) fn filter_row_symm_neon_u8_i32<const N: usize>(
         let max_width = image_size.width * N;
 
         while cx + 64 < max_width {
-            let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(0).weight as i16);
+            let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(half_len).weight as i16);
 
             let shifted_src = local_src.get_unchecked(cx..);
 

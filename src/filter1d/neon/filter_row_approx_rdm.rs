@@ -28,7 +28,9 @@
  */
 use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_scan::ScanPoint1d;
-use crate::filter1d::neon::utils::{vmlaq_hi_u8_s16, vmullq_expand_i16, vqmovnq_s16x2_u8};
+use crate::filter1d::neon::utils::{
+    vmlaq_hi_u8_s16, vmullq_expand_i16, vqmovnq_s16x2_u8, xvld1q_u8_x4,
+};
 use crate::filter1d::region::FilterRegion;
 use crate::filter1d::to_approx_storage::ToApproxStorage;
 use crate::img_size::ImageSize;
@@ -51,9 +53,6 @@ pub(crate) fn filter_row_neon_u8_i32_rdm<const N: usize>(
 
         let max_width = N * image_size.width;
 
-        const EXPAND: i32 = 6;
-        const PRECISION: i32 = 6;
-
         let mut cx = 0usize;
 
         while cx + 64 < max_width {
@@ -61,29 +60,29 @@ pub(crate) fn filter_row_neon_u8_i32_rdm<const N: usize>(
 
             let shifted_src = local_src.get_unchecked(cx..);
 
-            let source = vld1q_u8_x4(shifted_src.as_ptr());
-            let mut k0 = vmullq_expand_i16::<EXPAND>(source.0, coeff);
-            let mut k1 = vmullq_expand_i16::<EXPAND>(source.1, coeff);
-            let mut k2 = vmullq_expand_i16::<EXPAND>(source.2, coeff);
-            let mut k3 = vmullq_expand_i16::<EXPAND>(source.3, coeff);
+            let source = xvld1q_u8_x4(shifted_src.as_ptr());
+            let mut k0 = vmullq_expand_i16(source.0, coeff);
+            let mut k1 = vmullq_expand_i16(source.1, coeff);
+            let mut k2 = vmullq_expand_i16(source.2, coeff);
+            let mut k3 = vmullq_expand_i16(source.3, coeff);
 
             for i in 1..length {
                 let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight as i16);
-                let v_source = vld1q_u8_x4(shifted_src.get_unchecked(i..).as_ptr());
-                k0 = vmlaq_hi_u8_s16::<EXPAND>(k0, v_source.0, coeff);
-                k1 = vmlaq_hi_u8_s16::<EXPAND>(k1, v_source.1, coeff);
-                k2 = vmlaq_hi_u8_s16::<EXPAND>(k2, v_source.2, coeff);
-                k3 = vmlaq_hi_u8_s16::<EXPAND>(k3, v_source.3, coeff);
+                let v_source = xvld1q_u8_x4(shifted_src.get_unchecked(i..).as_ptr());
+                k0 = vmlaq_hi_u8_s16(k0, v_source.0, coeff);
+                k1 = vmlaq_hi_u8_s16(k1, v_source.1, coeff);
+                k2 = vmlaq_hi_u8_s16(k2, v_source.2, coeff);
+                k3 = vmlaq_hi_u8_s16(k3, v_source.3, coeff);
             }
 
             let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
             vst1q_u8_x4(
                 dst_ptr0,
                 uint8x16x4_t(
-                    vqmovnq_s16x2_u8::<PRECISION>(k0),
-                    vqmovnq_s16x2_u8::<PRECISION>(k1),
-                    vqmovnq_s16x2_u8::<PRECISION>(k2),
-                    vqmovnq_s16x2_u8::<PRECISION>(k3),
+                    vqmovnq_s16x2_u8(k0),
+                    vqmovnq_s16x2_u8(k1),
+                    vqmovnq_s16x2_u8(k2),
+                    vqmovnq_s16x2_u8(k3),
                 ),
             );
             cx += 64;
@@ -95,23 +94,20 @@ pub(crate) fn filter_row_neon_u8_i32_rdm<const N: usize>(
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source = vld1q_u8_x2(shifted_src.as_ptr());
-            let mut k0 = vmullq_expand_i16::<EXPAND>(source.0, coeff);
-            let mut k1 = vmullq_expand_i16::<EXPAND>(source.1, coeff);
+            let mut k0 = vmullq_expand_i16(source.0, coeff);
+            let mut k1 = vmullq_expand_i16(source.1, coeff);
 
             for i in 1..length {
                 let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight as i16);
                 let v_source = vld1q_u8_x2(shifted_src.get_unchecked(i..).as_ptr());
-                k0 = vmlaq_hi_u8_s16::<EXPAND>(k0, v_source.0, coeff);
-                k1 = vmlaq_hi_u8_s16::<EXPAND>(k1, v_source.1, coeff);
+                k0 = vmlaq_hi_u8_s16(k0, v_source.0, coeff);
+                k1 = vmlaq_hi_u8_s16(k1, v_source.1, coeff);
             }
 
             let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
             vst1q_u8_x2(
                 dst_ptr0,
-                uint8x16x2_t(
-                    vqmovnq_s16x2_u8::<PRECISION>(k0),
-                    vqmovnq_s16x2_u8::<PRECISION>(k1),
-                ),
+                uint8x16x2_t(vqmovnq_s16x2_u8(k0), vqmovnq_s16x2_u8(k1)),
             );
             cx += 32;
         }
@@ -122,16 +118,16 @@ pub(crate) fn filter_row_neon_u8_i32_rdm<const N: usize>(
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source = vld1q_u8(shifted_src.as_ptr());
-            let mut k0 = vmullq_expand_i16::<EXPAND>(source, coeff);
+            let mut k0 = vmullq_expand_i16(source, coeff);
 
             for i in 1..length {
                 let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight as i16);
                 let v_source = vld1q_u8(shifted_src.get_unchecked(i..).as_ptr());
-                k0 = vmlaq_hi_u8_s16::<EXPAND>(k0, v_source, coeff);
+                k0 = vmlaq_hi_u8_s16(k0, v_source, coeff);
             }
 
             let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
-            vst1q_u8(dst_ptr0, vqmovnq_s16x2_u8::<PRECISION>(k0));
+            vst1q_u8(dst_ptr0, vqmovnq_s16x2_u8(k0));
             cx += 16;
         }
 

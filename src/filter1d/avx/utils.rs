@@ -80,12 +80,9 @@ pub(crate) unsafe fn _mm256_mul_epi8_by_epi16_x4(
     let j0 = _mm256_unpacklo_epi8(input, _mm256_setzero_si256());
     let j1 = _mm256_unpackhi_epi8(input, _mm256_setzero_si256());
 
-    let lo_16 = _mm256_slli_epi16::<6>(j0);
-    let hi_16 = _mm256_slli_epi16::<6>(j1);
-
     (
-        _mm256_mulhrs_epi16(lo_16, weight),
-        _mm256_mulhrs_epi16(hi_16, weight),
+        _mm256_mulhrs_epi16(j0, weight),
+        _mm256_mulhrs_epi16(j1, weight),
     )
 }
 
@@ -97,11 +94,9 @@ pub(crate) unsafe fn _mm256_mul_add_epi8_by_epi16_x4(
 ) -> (__m256i, __m256i) {
     let j0 = _mm256_unpacklo_epi8(input, _mm256_setzero_si256());
     let j1 = _mm256_unpackhi_epi8(input, _mm256_setzero_si256());
-    let lo_16 = _mm256_slli_epi16::<6>(j0);
-    let hi_16 = _mm256_slli_epi16::<6>(j1);
 
-    let vj0 = _mm256_mulhrs_epi16(lo_16, weight);
-    let vj1 = _mm256_mulhrs_epi16(hi_16, weight);
+    let vj0 = _mm256_mulhrs_epi16(j0, weight);
+    let vj1 = _mm256_mulhrs_epi16(j1, weight);
     (
         _mm256_add_epi16(accumulator.0, vj0),
         _mm256_add_epi16(accumulator.1, vj1),
@@ -120,8 +115,8 @@ pub(crate) unsafe fn _mm256_mul_add_symm_epi8_by_epi16_x4(
     let a2 = _mm256_unpackhi_epi8(input0, _mm256_setzero_si256());
     let a3 = _mm256_unpackhi_epi8(input1, _mm256_setzero_si256());
 
-    let lo_16 = _mm256_slli_epi16::<6>(_mm256_add_epi16(a0, a1));
-    let hi_16 = _mm256_slli_epi16::<6>(_mm256_add_epi16(a2, a3));
+    let lo_16 = _mm256_add_epi16(a0, a1);
+    let hi_16 = _mm256_add_epi16(a2, a3);
 
     let vj0 = _mm256_mulhrs_epi16(lo_16, weight);
     let vj1 = _mm256_mulhrs_epi16(hi_16, weight);
@@ -248,9 +243,5 @@ pub(crate) unsafe fn _mm256_pack_ps_x2_epi16(store: (__m256, __m256)) -> __m256i
 
 #[inline(always)]
 pub(crate) unsafe fn _mm256_pack_epi32_x4_epi8(store: (__m256i, __m256i)) -> __m256i {
-    let rounding_const = _mm256_set1_epi16(1 << 5);
-    _mm256_packus_epi16(
-        _mm256_srai_epi16::<6>(_mm256_add_epi16(store.0, rounding_const)),
-        _mm256_srai_epi16::<6>(_mm256_add_epi16(store.1, rounding_const)),
-    )
+    _mm256_packus_epi16(store.0, store.1)
 }

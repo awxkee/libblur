@@ -27,6 +27,7 @@
 
 use crate::channels_configuration::FastBlurChannels;
 use crate::edge_mode::EdgeMode;
+use crate::filter1d::filter_1d_uq1p15_u16;
 use crate::gaussian::gaussian_kernel::gaussian_kernel_1d;
 use crate::gaussian::gaussian_util::kernel_size as get_kernel_size;
 use crate::{

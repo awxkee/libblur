@@ -60,9 +60,6 @@ pub(crate) fn filter_column_symm_neon_u8_i32_rdm_x3(
 
         let mut cx = 0usize;
 
-        const EXPAND: i32 = 6;
-        const PRECISION: i32 = 6;
-
         while cx + 32 < image_width {
             let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(half_len).weight as i16);
 
@@ -74,14 +71,14 @@ pub(crate) fn filter_column_symm_neon_u8_i32_rdm_x3(
             let source1 = xvld1q_u8_x2(v_src1.as_ptr());
             let source2 = xvld1q_u8_x2(v_src2.as_ptr());
 
-            let mut k0_0 = vmullq_expand_i16::<EXPAND>(source0.0, coeff);
-            let mut k1_0 = vmullq_expand_i16::<EXPAND>(source0.1, coeff);
+            let mut k0_0 = vmullq_expand_i16(source0.0, coeff);
+            let mut k1_0 = vmullq_expand_i16(source0.1, coeff);
 
-            let mut k0_1 = vmullq_expand_i16::<EXPAND>(source1.0, coeff);
-            let mut k1_1 = vmullq_expand_i16::<EXPAND>(source1.1, coeff);
+            let mut k0_1 = vmullq_expand_i16(source1.0, coeff);
+            let mut k1_1 = vmullq_expand_i16(source1.1, coeff);
 
-            let mut k0_2 = vmullq_expand_i16::<EXPAND>(source2.0, coeff);
-            let mut k1_2 = vmullq_expand_i16::<EXPAND>(source2.1, coeff);
+            let mut k0_2 = vmullq_expand_i16(source2.0, coeff);
+            let mut k1_2 = vmullq_expand_i16(source2.1, coeff);
 
             for i in 0..half_len {
                 let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight as i16);
@@ -98,14 +95,14 @@ pub(crate) fn filter_column_symm_neon_u8_i32_rdm_x3(
                     xvld1q_u8_x2(brows2.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 let v_source1_2 =
                     xvld1q_u8_x2(brows2.get_unchecked(rollback).get_unchecked(cx..).as_ptr());
-                k0_0 = vmlaq_symm_hi_u8_s16::<EXPAND>(k0_0, v_source0_0.0, v_source1_0.0, coeff);
-                k1_0 = vmlaq_symm_hi_u8_s16::<EXPAND>(k1_0, v_source0_0.1, v_source1_0.1, coeff);
+                k0_0 = vmlaq_symm_hi_u8_s16(k0_0, v_source0_0.0, v_source1_0.0, coeff);
+                k1_0 = vmlaq_symm_hi_u8_s16(k1_0, v_source0_0.1, v_source1_0.1, coeff);
 
-                k0_1 = vmlaq_symm_hi_u8_s16::<EXPAND>(k0_1, v_source0_1.0, v_source1_1.0, coeff);
-                k1_1 = vmlaq_symm_hi_u8_s16::<EXPAND>(k1_1, v_source0_1.1, v_source1_1.1, coeff);
+                k0_1 = vmlaq_symm_hi_u8_s16(k0_1, v_source0_1.0, v_source1_1.0, coeff);
+                k1_1 = vmlaq_symm_hi_u8_s16(k1_1, v_source0_1.1, v_source1_1.1, coeff);
 
-                k0_2 = vmlaq_symm_hi_u8_s16::<EXPAND>(k0_2, v_source0_2.0, v_source1_2.0, coeff);
-                k1_2 = vmlaq_symm_hi_u8_s16::<EXPAND>(k1_2, v_source0_2.1, v_source1_2.1, coeff);
+                k0_2 = vmlaq_symm_hi_u8_s16(k0_2, v_source0_2.0, v_source1_2.0, coeff);
+                k1_2 = vmlaq_symm_hi_u8_s16(k1_2, v_source0_2.1, v_source1_2.1, coeff);
             }
 
             let dst_ptr0 = dst0.get_unchecked_mut(cx..).as_mut_ptr();
@@ -114,24 +111,15 @@ pub(crate) fn filter_column_symm_neon_u8_i32_rdm_x3(
 
             xvst1q_u8_x2(
                 dst_ptr0,
-                uint8x16x2_t(
-                    vqmovnq_s16x2_u8::<PRECISION>(k0_0),
-                    vqmovnq_s16x2_u8::<PRECISION>(k1_0),
-                ),
+                uint8x16x2_t(vqmovnq_s16x2_u8(k0_0), vqmovnq_s16x2_u8(k1_0)),
             );
             xvst1q_u8_x2(
                 dst_ptr1,
-                uint8x16x2_t(
-                    vqmovnq_s16x2_u8::<PRECISION>(k0_1),
-                    vqmovnq_s16x2_u8::<PRECISION>(k1_1),
-                ),
+                uint8x16x2_t(vqmovnq_s16x2_u8(k0_1), vqmovnq_s16x2_u8(k1_1)),
             );
             xvst1q_u8_x2(
                 dst_ptr2,
-                uint8x16x2_t(
-                    vqmovnq_s16x2_u8::<PRECISION>(k0_2),
-                    vqmovnq_s16x2_u8::<PRECISION>(k1_2),
-                ),
+                uint8x16x2_t(vqmovnq_s16x2_u8(k0_2), vqmovnq_s16x2_u8(k1_2)),
             );
             cx += 32;
         }
@@ -147,9 +135,9 @@ pub(crate) fn filter_column_symm_neon_u8_i32_rdm_x3(
             let source1 = vld1q_u8(v_src1.as_ptr());
             let source2 = vld1q_u8(v_src2.as_ptr());
 
-            let mut k0 = vmullq_expand_i16::<EXPAND>(source0, coeff);
-            let mut k1 = vmullq_expand_i16::<EXPAND>(source1, coeff);
-            let mut k2 = vmullq_expand_i16::<EXPAND>(source2, coeff);
+            let mut k0 = vmullq_expand_i16(source0, coeff);
+            let mut k1 = vmullq_expand_i16(source1, coeff);
+            let mut k2 = vmullq_expand_i16(source2, coeff);
 
             for i in 0..half_len {
                 let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight as i16);
@@ -163,18 +151,18 @@ pub(crate) fn filter_column_symm_neon_u8_i32_rdm_x3(
                 let v_source0_2 = vld1q_u8(brows2.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 let v_source1_2 =
                     vld1q_u8(brows2.get_unchecked(rollback).get_unchecked(cx..).as_ptr());
-                k0 = vmlaq_symm_hi_u8_s16::<EXPAND>(k0, v_source0_0, v_source1_0, coeff);
-                k1 = vmlaq_symm_hi_u8_s16::<EXPAND>(k1, v_source0_1, v_source1_1, coeff);
-                k2 = vmlaq_symm_hi_u8_s16::<EXPAND>(k2, v_source0_2, v_source1_2, coeff);
+                k0 = vmlaq_symm_hi_u8_s16(k0, v_source0_0, v_source1_0, coeff);
+                k1 = vmlaq_symm_hi_u8_s16(k1, v_source0_1, v_source1_1, coeff);
+                k2 = vmlaq_symm_hi_u8_s16(k2, v_source0_2, v_source1_2, coeff);
             }
 
             let dst_ptr0 = dst0.get_unchecked_mut(cx..).as_mut_ptr();
             let dst_ptr1 = dst1.get_unchecked_mut(cx..).as_mut_ptr();
             let dst_ptr2 = dst2.get_unchecked_mut(cx..).as_mut_ptr();
 
-            vst1q_u8(dst_ptr0, vqmovnq_s16x2_u8::<PRECISION>(k0));
-            vst1q_u8(dst_ptr1, vqmovnq_s16x2_u8::<PRECISION>(k1));
-            vst1q_u8(dst_ptr2, vqmovnq_s16x2_u8::<PRECISION>(k2));
+            vst1q_u8(dst_ptr0, vqmovnq_s16x2_u8(k0));
+            vst1q_u8(dst_ptr1, vqmovnq_s16x2_u8(k1));
+            vst1q_u8(dst_ptr2, vqmovnq_s16x2_u8(k2));
             cx += 16;
         }
 
