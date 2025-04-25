@@ -29,8 +29,9 @@
 use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::neon::utils::{
-    vmlaq_symm_hi_u8_s16, vmullq_expand_i16, vqmovnq_s16x2_u8, xvld1q_u8_x2, xvld1q_u8_x3,
-    xvld1q_u8_x4, xvst1q_u8_x2, xvst1q_u8_x3, xvst1q_u8_x4,
+    vmla_symm_hi_u8_s16, vmlaq_symm_hi_u8_s16, vmull_expand_i16, vmullq_expand_i16,
+    vqmovnq_s16x2_u8, xvld1q_u8_x2, xvld1q_u8_x3, xvld1q_u8_x4, xvld4u8, xvst1q_u8_x2,
+    xvst1q_u8_x3, xvst1q_u8_x4, xvst_u8x4_q15,
 };
 use crate::filter1d::region::FilterRegion;
 use crate::filter1d::to_approx_storage::ToApproxStorage;
@@ -39,6 +40,20 @@ use std::arch::aarch64::*;
 use std::ops::{Add, Mul};
 
 pub(crate) fn filter_column_symm_neon_u8_i32_rdm(
+    arena: Arena,
+    arena_src: &[&[u8]],
+    dst: &mut [u8],
+    image_size: ImageSize,
+    r: FilterRegion,
+    scanned_kernel: &[ScanPoint1d<i32>],
+) {
+    unsafe {
+        executor_unit(arena, arena_src, dst, image_size, r, scanned_kernel);
+    }
+}
+
+#[target_feature(enable = "rdm")]
+unsafe fn executor_unit(
     arena: Arena,
     arena_src: &[&[u8]],
     dst: &mut [u8],
@@ -192,40 +207,28 @@ pub(crate) fn filter_column_symm_neon_u8_i32_rdm(
         }
 
         while cx + 4 < image_width {
-            let coeff = *scanned_kernel.get_unchecked(half_len);
+            let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(half_len).weight as i16);
 
             let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
 
-            let mut k0 = (*v_src.get_unchecked(0) as i32).mul(coeff.weight);
-            let mut k1 = (*v_src.get_unchecked(1) as i32).mul(coeff.weight);
-            let mut k2 = (*v_src.get_unchecked(2) as i32).mul(coeff.weight);
-            let mut k3 = (*v_src.get_unchecked(3) as i32).mul(coeff.weight);
+            let source = xvld4u8(v_src.as_ptr());
+            let mut k0 = vmull_expand_i16(source, coeff);
 
             for i in 0..half_len {
-                let coeff = *scanned_kernel.get_unchecked(i);
+                let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight as i16);
                 let rollback = length - i - 1;
-                k0 = ((*arena_src.get_unchecked(i).get_unchecked(cx)) as i32)
-                    .add((*arena_src.get_unchecked(rollback).get_unchecked(cx)) as i32)
-                    .mul(coeff.weight)
-                    .add(k0);
-                k1 = ((*arena_src.get_unchecked(i).get_unchecked(cx + 1)) as i32)
-                    .add((*arena_src.get_unchecked(rollback).get_unchecked(cx + 1)) as i32)
-                    .mul(coeff.weight)
-                    .add(k1);
-                k2 = ((*arena_src.get_unchecked(i).get_unchecked(cx + 2)) as i32)
-                    .add((*arena_src.get_unchecked(rollback).get_unchecked(cx + 2)) as i32)
-                    .mul(coeff.weight)
-                    .add(k2);
-                k3 = ((*arena_src.get_unchecked(i).get_unchecked(cx + 3)) as i32)
-                    .add((*arena_src.get_unchecked(rollback).get_unchecked(cx + 3)) as i32)
-                    .mul(coeff.weight)
-                    .add(k3);
+                let v_source0 = xvld4u8(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
+                let v_source1 = xvld4u8(
+                    arena_src
+                        .get_unchecked(rollback)
+                        .get_unchecked(cx..)
+                        .as_ptr(),
+                );
+                k0 = vmla_symm_hi_u8_s16(k0, v_source0, v_source1, coeff);
             }
 
-            *dst.get_unchecked_mut(cx) = k0.to_approx_();
-            *dst.get_unchecked_mut(cx + 1) = k1.to_approx_();
-            *dst.get_unchecked_mut(cx + 2) = k2.to_approx_();
-            *dst.get_unchecked_mut(cx + 3) = k3.to_approx_();
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
+            xvst_u8x4_q15(dst_ptr0, k0);
             cx += 4;
         }
 

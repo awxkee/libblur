@@ -31,16 +31,13 @@ use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::region::FilterRegion;
 use crate::filter1d::sse::utils::_mm_opt_fmlaf_ps;
 use crate::img_size::ImageSize;
-use crate::mlaf::mlaf;
 use crate::sse::{
     _mm_load_pack_ps_x2, _mm_load_pack_ps_x4, _mm_store_pack_ps_x2, _mm_store_pack_ps_x4,
 };
-use crate::to_storage::ToStorage;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
-use std::ops::Mul;
 
 pub(crate) fn filter_column_sse_f32_f32(
     arena: Arena,
@@ -206,23 +203,24 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
                 cx += 4;
             }
 
-            for x in cx..dst_stride {
+            while cx < dst_stride {
                 let coeff = *scanned_kernel.get_unchecked(0);
 
-                let v_src = arena_src.get_unchecked(0).get_unchecked(x..);
+                let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
-                let mut k0 = (*v_src.get_unchecked(0)).mul(coeff.weight);
+                let source_0 = _mm_load_ss(v_src.as_ptr());
+                let mut k0 = _mm_mul_ps(source_0, _mm_set1_ps(coeff.weight));
 
                 for i in 1..length {
                     let coeff = *scanned_kernel.get_unchecked(i);
-                    k0 = mlaf(
-                        k0,
-                        *arena_src.get_unchecked(i).get_unchecked(cx),
-                        coeff.weight,
-                    );
+                    let v_source_0 =
+                        _mm_load_ss(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
+                    k0 = _mm_opt_fmlaf_ps::<FMA>(k0, v_source_0, _mm_set1_ps(coeff.weight));
                 }
 
-                *dst.get_unchecked_mut(x) = k0.to_();
+                let dst_ptr = dst.get_unchecked_mut(cx..).as_mut_ptr();
+                _mm_store_ss(dst_ptr, k0);
+                cx += 1;
             }
         }
     }

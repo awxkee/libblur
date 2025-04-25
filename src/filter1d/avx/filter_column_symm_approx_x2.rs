@@ -28,7 +28,10 @@
  */
 use crate::avx::{_mm256_load_pack_x2, _mm256_store_pack_x2};
 use crate::filter1d::arena::Arena;
-use crate::filter1d::avx::sse_utils::_mm_pack_epi32_x2_epi8;
+use crate::filter1d::avx::sse_utils::{
+    _mm_mul_add_symm_epi8_by_epi16_x2, _mm_mul_add_symm_epi8_by_epi16_x4, _mm_mul_epi8_by_epi16_x2,
+    _mm_mul_epi8_by_epi16_x4, _mm_pack_epi32_epi8, _mm_pack_epi32_x2_epi8,
+};
 use crate::filter1d::avx::utils::{
     _mm256_mul_add_symm_epi8_by_epi16_x4, _mm256_mul_epi8_by_epi16_x4, _mm256_pack_epi32_x4_epi8,
 };
@@ -185,7 +188,7 @@ unsafe fn filter_column_avx_symm_u8_i32_impl_x2(
         }
 
         while cx + 16 < image_width {
-            let coeff = _mm256_set1_epi16(scanned_kernel.get_unchecked(half_len).weight as i16);
+            let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(half_len).weight as i16);
 
             let v_src0 = brows0.get_unchecked(half_len).get_unchecked(cx..);
             let v_src1 = brows1.get_unchecked(half_len).get_unchecked(cx..);
@@ -193,13 +196,12 @@ unsafe fn filter_column_avx_symm_u8_i32_impl_x2(
             let s0 = _mm_loadu_si128(v_src0.as_ptr() as *const __m128i);
             let s1 = _mm_loadu_si128(v_src1.as_ptr() as *const __m128i);
 
-            let source = _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(s0), s1);
-
-            let mut k0 = _mm256_mul_epi8_by_epi16_x4(source, coeff);
+            let mut k0 = _mm_mul_epi8_by_epi16_x4(s0, coeff);
+            let mut k1 = _mm_mul_epi8_by_epi16_x4(s1, coeff);
 
             for i in 0..half_len {
                 let rollback = length - i - 1;
-                let coeff = _mm256_set1_epi16(scanned_kernel.get_unchecked(i).weight as i16);
+                let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(i).weight as i16);
                 let v_source0_0 = _mm_loadu_si128(
                     brows0.get_unchecked(i).get_unchecked(cx..).as_ptr() as *const __m128i,
                 );
@@ -213,97 +215,95 @@ unsafe fn filter_column_avx_symm_u8_i32_impl_x2(
                     _mm_loadu_si128(brows1.get_unchecked(rollback).get_unchecked(cx..).as_ptr()
                         as *const __m128i);
 
-                let source0 =
-                    _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(v_source0_0), v_source1_0);
-                let source1 =
-                    _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(v_source0_1), v_source1_1);
-
-                k0 = _mm256_mul_add_symm_epi8_by_epi16_x4(k0, source0, source1, coeff);
+                k0 = _mm_mul_add_symm_epi8_by_epi16_x4(k0, v_source0_0, v_source1_0, coeff);
+                k1 = _mm_mul_add_symm_epi8_by_epi16_x4(k1, v_source0_1, v_source1_1, coeff);
             }
 
             let dst_ptr0 = dst0.get_unchecked_mut(cx..).as_mut_ptr();
             let dst_ptr1 = dst1.get_unchecked_mut(cx..).as_mut_ptr();
 
-            _mm_storeu_si128(
-                dst_ptr0 as *mut __m128i,
-                _mm_pack_epi32_x2_epi8((
-                    _mm256_castsi256_si128(k0.0),
-                    _mm256_extracti128_si256::<1>(k0.0),
-                )),
-            );
-            _mm_storeu_si128(
-                dst_ptr1 as *mut __m128i,
-                _mm_pack_epi32_x2_epi8((
-                    _mm256_castsi256_si128(k0.1),
-                    _mm256_extracti128_si256::<1>(k0.1),
-                )),
-            );
+            _mm_storeu_si128(dst_ptr0 as *mut __m128i, _mm_pack_epi32_x2_epi8(k0));
+            _mm_storeu_si128(dst_ptr1 as *mut __m128i, _mm_pack_epi32_x2_epi8(k0));
             cx += 16;
         }
 
-        while cx + 4 < image_width {
-            let coeff = *scanned_kernel.get_unchecked(half_len);
+        while cx + 8 < image_width {
+            let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(half_len).weight as i16);
 
             let v_src0 = brows0.get_unchecked(half_len).get_unchecked(cx..);
             let v_src1 = brows1.get_unchecked(half_len).get_unchecked(cx..);
 
-            let mut k0_0 = (*v_src0.get_unchecked(0) as i32).mul(coeff.weight);
-            let mut k1_0 = (*v_src0.get_unchecked(1) as i32).mul(coeff.weight);
-            let mut k2_0 = (*v_src0.get_unchecked(2) as i32).mul(coeff.weight);
-            let mut k3_0 = (*v_src0.get_unchecked(3) as i32).mul(coeff.weight);
+            let s0 = _mm_loadu_si64(v_src0.as_ptr() as *const _);
+            let s1 = _mm_loadu_si64(v_src1.as_ptr() as *const _);
 
-            let mut k0_1 = (*v_src1.get_unchecked(0) as i32).mul(coeff.weight);
-            let mut k1_1 = (*v_src1.get_unchecked(1) as i32).mul(coeff.weight);
-            let mut k2_1 = (*v_src1.get_unchecked(2) as i32).mul(coeff.weight);
-            let mut k3_1 = (*v_src1.get_unchecked(3) as i32).mul(coeff.weight);
+            let mut k0 = _mm_mul_epi8_by_epi16_x2(s0, coeff);
+            let mut k1 = _mm_mul_epi8_by_epi16_x2(s1, coeff);
 
             for i in 0..half_len {
-                let coeff = *scanned_kernel.get_unchecked(i);
                 let rollback = length - i - 1;
-                k0_0 = ((*brows0.get_unchecked(i).get_unchecked(cx)) as i32)
-                    .add((*brows0.get_unchecked(rollback).get_unchecked(cx)) as i32)
-                    .mul(coeff.weight)
-                    .add(k0_0);
-                k1_0 = ((*brows0.get_unchecked(i).get_unchecked(cx + 1)) as i32)
-                    .add((*brows0.get_unchecked(rollback).get_unchecked(cx + 1)) as i32)
-                    .mul(coeff.weight)
-                    .add(k1_0);
-                k2_0 = ((*brows0.get_unchecked(i).get_unchecked(cx + 2)) as i32)
-                    .add((*brows0.get_unchecked(rollback).get_unchecked(cx + 2)) as i32)
-                    .mul(coeff.weight)
-                    .add(k2_0);
-                k3_0 = ((*brows0.get_unchecked(i).get_unchecked(cx + 3)) as i32)
-                    .add((*brows0.get_unchecked(rollback).get_unchecked(cx + 3)) as i32)
-                    .mul(coeff.weight)
-                    .add(k3_0);
+                let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(i).weight as i16);
+                let v_source0_0 = _mm_loadu_si64(
+                    brows0.get_unchecked(i).get_unchecked(cx..).as_ptr() as *const _,
+                );
+                let v_source1_0 = _mm_loadu_si64(
+                    brows0.get_unchecked(rollback).get_unchecked(cx..).as_ptr() as *const _,
+                );
+                let v_source0_1 = _mm_loadu_si64(
+                    brows1.get_unchecked(i).get_unchecked(cx..).as_ptr() as *const _,
+                );
+                let v_source1_1 = _mm_loadu_si64(
+                    brows1.get_unchecked(rollback).get_unchecked(cx..).as_ptr() as *const _,
+                );
 
-                k0_1 = ((*brows1.get_unchecked(i).get_unchecked(cx)) as i32)
-                    .add((*brows1.get_unchecked(rollback).get_unchecked(cx)) as i32)
-                    .mul(coeff.weight)
-                    .add(k0_1);
-                k1_1 = ((*brows1.get_unchecked(i).get_unchecked(cx + 1)) as i32)
-                    .add((*brows1.get_unchecked(rollback).get_unchecked(cx + 1)) as i32)
-                    .mul(coeff.weight)
-                    .add(k1_1);
-                k2_1 = ((*brows1.get_unchecked(i).get_unchecked(cx + 2)) as i32)
-                    .add((*brows1.get_unchecked(rollback).get_unchecked(cx + 2)) as i32)
-                    .mul(coeff.weight)
-                    .add(k2_1);
-                k3_1 = ((*brows1.get_unchecked(i).get_unchecked(cx + 3)) as i32)
-                    .add((*brows1.get_unchecked(rollback).get_unchecked(cx + 3)) as i32)
-                    .mul(coeff.weight)
-                    .add(k3_1);
+                k0 = _mm_mul_add_symm_epi8_by_epi16_x2(k0, v_source0_0, v_source1_0, coeff);
+                k1 = _mm_mul_add_symm_epi8_by_epi16_x2(k1, v_source0_1, v_source1_1, coeff);
             }
 
-            *dst0.get_unchecked_mut(cx) = k0_0.to_approx_();
-            *dst0.get_unchecked_mut(cx + 1) = k1_0.to_approx_();
-            *dst0.get_unchecked_mut(cx + 2) = k2_0.to_approx_();
-            *dst0.get_unchecked_mut(cx + 3) = k3_0.to_approx_();
+            let dst_ptr0 = dst0.get_unchecked_mut(cx..).as_mut_ptr();
+            let dst_ptr1 = dst1.get_unchecked_mut(cx..).as_mut_ptr();
 
-            *dst1.get_unchecked_mut(cx) = k0_1.to_approx_();
-            *dst1.get_unchecked_mut(cx + 1) = k1_1.to_approx_();
-            *dst1.get_unchecked_mut(cx + 2) = k2_1.to_approx_();
-            *dst1.get_unchecked_mut(cx + 3) = k3_1.to_approx_();
+            _mm_storeu_si64(dst_ptr0 as *mut _, _mm_pack_epi32_epi8(k0));
+            _mm_storeu_si64(dst_ptr1 as *mut _, _mm_pack_epi32_epi8(k0));
+            cx += 8;
+        }
+
+        while cx + 4 < image_width {
+            let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(half_len).weight as i16);
+
+            let v_src0 = brows0.get_unchecked(half_len).get_unchecked(cx..);
+            let v_src1 = brows1.get_unchecked(half_len).get_unchecked(cx..);
+
+            let s0 = _mm_loadu_si32(v_src0.as_ptr() as *const _);
+            let s1 = _mm_loadu_si32(v_src1.as_ptr() as *const _);
+
+            let mut k0 = _mm_mul_epi8_by_epi16_x2(s0, coeff);
+            let mut k1 = _mm_mul_epi8_by_epi16_x2(s1, coeff);
+
+            for i in 0..half_len {
+                let rollback = length - i - 1;
+                let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(i).weight as i16);
+                let v_source0_0 = _mm_loadu_si32(
+                    brows0.get_unchecked(i).get_unchecked(cx..).as_ptr() as *const _,
+                );
+                let v_source1_0 = _mm_loadu_si32(
+                    brows0.get_unchecked(rollback).get_unchecked(cx..).as_ptr() as *const _,
+                );
+                let v_source0_1 = _mm_loadu_si32(
+                    brows1.get_unchecked(i).get_unchecked(cx..).as_ptr() as *const _,
+                );
+                let v_source1_1 = _mm_loadu_si32(
+                    brows1.get_unchecked(rollback).get_unchecked(cx..).as_ptr() as *const _,
+                );
+
+                k0 = _mm_mul_add_symm_epi8_by_epi16_x2(k0, v_source0_0, v_source1_0, coeff);
+                k1 = _mm_mul_add_symm_epi8_by_epi16_x2(k1, v_source0_1, v_source1_1, coeff);
+            }
+
+            let dst_ptr0 = dst0.get_unchecked_mut(cx..).as_mut_ptr();
+            let dst_ptr1 = dst1.get_unchecked_mut(cx..).as_mut_ptr();
+
+            _mm_storeu_si32(dst_ptr0 as *mut _, _mm_pack_epi32_epi8(k0));
+            _mm_storeu_si32(dst_ptr1 as *mut _, _mm_pack_epi32_epi8(k0));
             cx += 4;
         }
 

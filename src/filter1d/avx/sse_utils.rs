@@ -118,10 +118,7 @@ pub(crate) unsafe fn _mm_mull_epi8_by_epi16_x2(input: __m128i, weight: __m128i) 
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_mul_epi8_by_ps_x2<const FMA: bool>(
-    input: __m128i,
-    weight: __m128,
-) -> (__m128, __m128) {
+pub(crate) unsafe fn _mm_mul_epi8_by_ps_x2(input: __m128i, weight: __m128) -> (__m128, __m128) {
     let zeros = _mm_setzero_si128();
     let lo_16 = _mm_unpacklo_epi8(input, zeros);
 
@@ -132,6 +129,18 @@ pub(crate) unsafe fn _mm_mul_epi8_by_ps_x2<const FMA: bool>(
     let a1 = _mm_cvtepi32_ps(k1);
 
     (_mm_mul_ps(a0, weight), _mm_mul_ps(a1, weight))
+}
+
+#[inline(always)]
+pub(crate) unsafe fn _mm_mul_epi8_by_ps(input: __m128i, weight: __m128) -> __m128 {
+    let zeros = _mm_setzero_si128();
+    let lo_16 = _mm_unpacklo_epi8(input, zeros);
+
+    let k0 = _mm_unpacklo_epi16(lo_16, zeros);
+
+    let a0 = _mm_cvtepi32_ps(k0);
+
+    _mm_mul_ps(a0, weight)
 }
 
 #[inline(always)]
@@ -409,6 +418,26 @@ pub(crate) unsafe fn _mm_mul_add_symm_epi8_by_ps_x2<const FMA: bool>(
 }
 
 #[inline(always)]
+pub(crate) unsafe fn _mm_mul_add_symm_epi8_by_ps<const FMA: bool>(
+    accumulator: __m128,
+    input0: __m128i,
+    input1: __m128i,
+    weight: __m128,
+) -> __m128 {
+    let zeros = _mm_setzero_si128();
+    let lo_16 = _mm_add_epi16(
+        _mm_unpacklo_epi8(input0, zeros),
+        _mm_unpacklo_epi8(input1, zeros),
+    );
+
+    let k0 = _mm_unpacklo_epi16(lo_16, zeros);
+
+    let a0 = _mm_cvtepi32_ps(k0);
+
+    _mm_opt_fmlaf_ps::<FMA>(accumulator, a0, weight)
+}
+
+#[inline(always)]
 pub(crate) unsafe fn _mm_mul_add_symm_epi16_by_ps<const FMA: bool>(
     accumulator: __m128,
     input0: __m128i,
@@ -589,6 +618,12 @@ pub(crate) unsafe fn _mm_pack_ps_x2_epi16(store: (__m128, __m128)) -> __m128i {
 #[inline(always)]
 pub(crate) unsafe fn _mm_pack_ps_x2_epi8(store: (__m128, __m128)) -> __m128i {
     let lo_s = _mm_packs_epi32(_mm_cvtps_epi32(store.0), _mm_cvtps_epi32(store.1));
+    _mm_packus_epi16(lo_s, _mm_setzero_si128())
+}
+
+#[inline(always)]
+pub(crate) unsafe fn _mm_pack_ps_epi8(store: __m128) -> __m128i {
+    let lo_s = _mm_packs_epi32(_mm_cvtps_epi32(store), _mm_setzero_si128());
     _mm_packus_epi16(lo_s, _mm_setzero_si128())
 }
 
