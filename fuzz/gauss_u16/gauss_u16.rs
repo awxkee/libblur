@@ -29,31 +29,42 @@
 
 #![no_main]
 
-use libblur::{BlurImage, BlurImageMut, EdgeMode, FastBlurChannels, ThreadingPolicy};
+use libblur::{
+    BlurImage, BlurImageMut, ConvolutionMode, EdgeMode, FastBlurChannels, ThreadingPolicy,
+};
 use libfuzzer_sys::fuzz_target;
 
-fuzz_target!(|data: (u8, u8, u8)| {
+fuzz_target!(|data: (u8, u8, u8, bool)| {
     fuzz_16bit(
         data.0 as usize,
         data.1 as usize,
         data.2 as usize,
         FastBlurChannels::Channels4,
+        data.3,
     );
     fuzz_16bit(
         data.0 as usize,
         data.1 as usize,
         data.2 as usize,
         FastBlurChannels::Channels3,
+        data.3,
     );
     fuzz_16bit(
         data.0 as usize,
         data.1 as usize,
         data.2 as usize,
         FastBlurChannels::Plane,
+        data.3,
     );
 });
 
-fn fuzz_16bit(width: usize, height: usize, radius: usize, channels: FastBlurChannels) {
+fn fuzz_16bit(
+    width: usize,
+    height: usize,
+    radius: usize,
+    channels: FastBlurChannels,
+    fixed_point: bool,
+) {
     if width == 0 || height == 0 || radius == 0 {
         return;
     }
@@ -67,6 +78,11 @@ fn fuzz_16bit(width: usize, height: usize, radius: usize, channels: FastBlurChan
         0.,
         EdgeMode::Clamp,
         ThreadingPolicy::Single,
+        if fixed_point {
+            ConvolutionMode::FixedPoint
+        } else {
+            ConvolutionMode::Exact
+        },
     )
     .unwrap();
 }

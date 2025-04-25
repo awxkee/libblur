@@ -217,6 +217,7 @@ pub fn gaussian_blur_image(
                 sigma,
                 edge_mode,
                 threading_policy,
+                precise_level,
             )
             .unwrap();
 
@@ -272,6 +273,7 @@ pub fn gaussian_blur_image(
                 sigma,
                 edge_mode,
                 threading_policy,
+                precise_level,
             )
             .unwrap();
 
@@ -282,6 +284,7 @@ pub fn gaussian_blur_image(
                 sigma,
                 edge_mode,
                 threading_policy,
+                precise_level,
             )
             .unwrap();
 
@@ -322,6 +325,7 @@ pub fn gaussian_blur_image(
                 sigma,
                 edge_mode,
                 threading_policy,
+                precise_level,
             )
             .unwrap();
 
@@ -344,6 +348,7 @@ pub fn gaussian_blur_image(
                 sigma,
                 edge_mode,
                 threading_policy,
+                precise_level,
             )
             .unwrap();
 
