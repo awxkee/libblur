@@ -77,12 +77,12 @@ pub(crate) unsafe fn _mm256_mul_epi8_by_epi16_x4(
     input: __m256i,
     weight: __m256i,
 ) -> (__m256i, __m256i) {
-    let j0 = _mm256_unpacklo_epi8(input, _mm256_setzero_si256());
-    let j1 = _mm256_unpackhi_epi8(input, _mm256_setzero_si256());
+    let j0 = _mm256_unpacklo_epi8(input, input);
+    let j1 = _mm256_unpackhi_epi8(input, input);
 
     (
-        _mm256_mulhrs_epi16(j0, weight),
-        _mm256_mulhrs_epi16(j1, weight),
+        _mm256_mulhrs_epi16(_mm256_srli_epi16::<2>(j0), weight),
+        _mm256_mulhrs_epi16(_mm256_srli_epi16::<2>(j1), weight),
     )
 }
 
@@ -102,11 +102,11 @@ pub(crate) unsafe fn _mm256_mul_add_epi8_by_epi16_x4(
     input: __m256i,
     weight: __m256i,
 ) -> (__m256i, __m256i) {
-    let j0 = _mm256_unpacklo_epi8(input, _mm256_setzero_si256());
-    let j1 = _mm256_unpackhi_epi8(input, _mm256_setzero_si256());
+    let j0 = _mm256_unpacklo_epi8(input, input);
+    let j1 = _mm256_unpackhi_epi8(input, input);
 
-    let vj0 = _mm256_mulhrs_epi16(j0, weight);
-    let vj1 = _mm256_mulhrs_epi16(j1, weight);
+    let vj0 = _mm256_mulhrs_epi16(_mm256_srli_epi16::<2>(j0), weight);
+    let vj1 = _mm256_mulhrs_epi16(_mm256_srli_epi16::<2>(j1), weight);
     (
         _mm256_add_epi16(accumulator.0, vj0),
         _mm256_add_epi16(accumulator.1, vj1),
@@ -128,8 +128,8 @@ pub(crate) unsafe fn _mm256_mul_add_symm_epi8_by_epi16_x4(
     let lo_16 = _mm256_add_epi16(a0, a1);
     let hi_16 = _mm256_add_epi16(a2, a3);
 
-    let vj0 = _mm256_mulhrs_epi16(lo_16, weight);
-    let vj1 = _mm256_mulhrs_epi16(hi_16, weight);
+    let vj0 = _mm256_mulhrs_epi16(_mm256_slli_epi16::<6>(lo_16), weight);
+    let vj1 = _mm256_mulhrs_epi16(_mm256_slli_epi16::<6>(hi_16), weight);
 
     (
         _mm256_add_epi16(accumulator.0, vj0),
@@ -277,7 +277,11 @@ pub(crate) unsafe fn _mm256_pack_ps_x2_epi16(store: (__m256, __m256)) -> __m256i
 
 #[inline(always)]
 pub(crate) unsafe fn _mm256_pack_epi32_x4_epi8(store: (__m256i, __m256i)) -> __m256i {
-    _mm256_packus_epi16(store.0, store.1)
+    let rnd = _mm256_set1_epi32((1 << 5) - 1);
+    _mm256_packus_epi16(
+        _mm256_srai_epi16::<6>(_mm256_add_epi32(store.0, rnd)),
+        _mm256_srai_epi16::<6>(_mm256_add_epi32(store.1, rnd)),
+    )
 }
 
 #[inline(always)]
