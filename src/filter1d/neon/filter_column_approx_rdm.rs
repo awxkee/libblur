@@ -43,6 +43,20 @@ pub(crate) fn filter_column_neon_u8_i32_i16_qrdm_app(
     arena_src: &[&[u8]],
     dst: &mut [u8],
     image_size: ImageSize,
+    r: FilterRegion,
+    scanned_kernel: &[ScanPoint1d<i32>],
+) {
+    unsafe {
+        executor_unit(arena, arena_src, dst, image_size, r, scanned_kernel);
+    }
+}
+
+#[target_feature(enable = "rdm")]
+unsafe fn executor_unit(
+    arena: Arena,
+    arena_src: &[&[u8]],
+    dst: &mut [u8],
+    image_size: ImageSize,
     _: FilterRegion,
     scanned_kernel: &[ScanPoint1d<i32>],
 ) {

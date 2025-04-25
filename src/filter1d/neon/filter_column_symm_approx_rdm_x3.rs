@@ -47,6 +47,20 @@ pub(crate) fn filter_column_symm_neon_u8_i32_rdm_x3(
     scanned_kernel: &[ScanPoint1d<i32>],
 ) {
     unsafe {
+        executor_unit(arena, brows, dst, image_size, dst_stride, scanned_kernel);
+    }
+}
+
+#[target_feature(enable = "rdm")]
+unsafe fn executor_unit(
+    arena: Arena,
+    brows: FilterBrows<u8>,
+    dst: &mut [u8],
+    image_size: ImageSize,
+    dst_stride: usize,
+    scanned_kernel: &[ScanPoint1d<i32>],
+) {
+    unsafe {
         let image_width = image_size.width * arena.components;
 
         let length = scanned_kernel.len();
