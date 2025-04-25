@@ -219,20 +219,20 @@ unsafe fn filter_column_avx_symm_uq15_u16_impl(
 
             let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
 
-            let source = _mm_loadu_si128(v_src.as_ptr() as *const __m128i);
+            let source = _mm_loadu_si64(v_src.as_ptr() as *const _);
             let mut k0 = _mm_mullo_epi32(_mm_unpacklo_epi16(source, _mm_setzero_si128()), coeff);
 
             for i in 0..half_len {
                 let rollback = length - i - 1;
                 let coeff = _mm_set1_epi32(scanned_kernel.get_unchecked(i).weight as i32);
-                let v_source0 = _mm_loadu_si128(
-                    arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr() as *const __m128i,
+                let v_source0 = _mm_loadu_si64(
+                    arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr() as *const _,
                 );
-                let v_source1 = _mm_loadu_si128(
+                let v_source1 = _mm_loadu_si64(
                     arena_src
                         .get_unchecked(rollback)
                         .get_unchecked(cx..)
-                        .as_ptr() as *const __m128i,
+                        .as_ptr() as *const _,
                 );
                 k0 = _mm_add_epi32(
                     k0,
