@@ -61,9 +61,10 @@ unsafe fn fg_horizontal_pass_avx_u16_def<const CN: usize>(
     end: u32,
     edge_mode: EdgeMode,
 ) {
-    let mut buffer0 = Box::new([AvxSseI32x8::default(); 1024]);
-    let mut buffer1 = Box::new([AvxSseI32x8::default(); 1024]);
-    let mut buffer2 = Box::new([AvxSseI32x8::default(); 1024]);
+    let mut full_buffer = Box::new([AvxSseI32x8::default(); 1024 * 3]);
+
+    let (buffer0, rem) = full_buffer.split_at_mut(1024);
+    let (buffer1, buffer2) = rem.split_at_mut(1024);
 
     let initial_sum = ((radius * radius) >> 1) as i32;
 
@@ -315,9 +316,10 @@ unsafe fn fg_vertical_pass_avx_u16_def<const CN: usize>(
     end: u32,
     edge_mode: EdgeMode,
 ) {
-    let mut buffer0 = Box::new([AvxSseI32x8::default(); 1024]);
-    let mut buffer1 = Box::new([AvxSseI32x8::default(); 1024]);
-    let mut buffer2 = Box::new([AvxSseI32x8::default(); 1024]);
+    let mut full_buffer = Box::new([AvxSseI32x8::default(); 1024 * 3]);
+
+    let (buffer0, rem) = full_buffer.split_at_mut(1024);
+    let (buffer1, buffer2) = rem.split_at_mut(1024);
 
     let initial_sum = ((radius * radius) >> 1) as i32;
 
