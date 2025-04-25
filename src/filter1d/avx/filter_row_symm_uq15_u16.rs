@@ -248,42 +248,6 @@ unsafe fn filter_row_avx_symm_uq15_u16_impl<const N: usize>(
     const K_PRECISION: u32 = 15;
     const RND: u32 = 1 << (K_PRECISION - 1);
 
-    while cx + 4 < max_width {
-        let coeff = *scanned_kernel.get_unchecked(half_len);
-        let shifted_src = local_src.get_unchecked(cx..);
-        let mut k0 = RND + *shifted_src.get_unchecked(half_len * N) as u32 * coeff.weight;
-        let mut k1 = RND + *shifted_src.get_unchecked(half_len * N + 1) as u32 * coeff.weight;
-        let mut k2 = RND + *shifted_src.get_unchecked(half_len * N + 2) as u32 * coeff.weight;
-        let mut k3 = RND + *shifted_src.get_unchecked(half_len * N + 3) as u32 * coeff.weight;
-
-        for i in 0..half_len {
-            let coeff = *scanned_kernel.get_unchecked(i);
-            let rollback = length - i - 1;
-
-            k0 += (*shifted_src.get_unchecked(i * N) as u32
-                + *shifted_src.get_unchecked(rollback * N) as u32)
-                * coeff.weight;
-
-            k1 += (*shifted_src.get_unchecked(i * N + 1) as u32
-                + *shifted_src.get_unchecked(rollback * N + 1) as u32)
-                * coeff.weight;
-
-            k2 += (*shifted_src.get_unchecked(i * N + 2) as u32
-                + *shifted_src.get_unchecked(rollback * N + 2) as u32)
-                * coeff.weight;
-
-            k3 += (*shifted_src.get_unchecked(i * N + 3) as u32
-                + *shifted_src.get_unchecked(rollback * N + 3) as u32)
-                * coeff.weight;
-        }
-
-        *dst.get_unchecked_mut(cx) = k0.to_approx_();
-        *dst.get_unchecked_mut(cx + 1) = k1.to_approx_();
-        *dst.get_unchecked_mut(cx + 2) = k2.to_approx_();
-        *dst.get_unchecked_mut(cx + 3) = k3.to_approx_();
-        cx += 4;
-    }
-
     for x in cx..max_width {
         let coeff = *scanned_kernel.get_unchecked(half_len);
         let shifted_src = local_src.get_unchecked(x..);
@@ -294,7 +258,7 @@ unsafe fn filter_row_avx_symm_uq15_u16_impl<const N: usize>(
             let rollback = length - i - 1;
 
             k0 += (*shifted_src.get_unchecked(i * N) as u32
-                + *shifted_src.get_unchecked(rollback * N) as u32) as u32
+                + *shifted_src.get_unchecked(rollback * N) as u32)
                 * coeff.weight;
         }
 

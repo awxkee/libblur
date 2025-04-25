@@ -122,6 +122,13 @@ impl Filter1DColumnHandlerApprox<u16, u32> for u16 {
     fn get_column_handler(
         is_kernel_symmetric: bool,
     ) -> fn(Arena, &[&[u16]], &mut [u16], ImageSize, FilterRegion, &[ScanPoint1d<u32>]) {
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        if std::arch::is_x86_feature_detected!("avx2") {
+            if is_kernel_symmetric {
+                use crate::filter1d::avx::filter_column_avx_symm_uq15_u16;
+                return filter_column_avx_symm_uq15_u16;
+            }
+        }
         if is_kernel_symmetric {
             filter_column_symmetric_approx
         } else {
