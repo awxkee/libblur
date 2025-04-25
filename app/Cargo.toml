@@ -7,7 +7,7 @@ edition = "2021"
 colorutils-rs = "0.7.0"
 half = "2.4.1"
 image = "0.25.5"
-libblur = { path = "../", features = ["image", "fft", "nightly_avx512", "rdm", "sse"], default-features = false }
+libblur = { path = "../", features = ["image", "fft", "nightly_avx512", "rdm", "sse", "avx"], default-features = false }
 accelerate = { path = "accelerate" }
 rayon = "1.10.0"
 fast_transpose = "0.2.3"
