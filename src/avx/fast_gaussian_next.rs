@@ -169,7 +169,7 @@ impl<const CN: usize> VerticalExecutionUnit<CN> {
                     let stored_21 =
                         _mm256_load_si256(buffer1.as_mut_ptr().add(d_arr_index_2) as *const _);
                     let stored_22 =
-                        _mm256_load_si256(buffer1.as_mut_ptr().add(d_arr_index_2) as *const _);
+                        _mm256_load_si256(buffer2.as_mut_ptr().add(d_arr_index_2) as *const _);
 
                     let k0 = _mm256_mul_by_3_epi32(j0);
                     let k1 = _mm256_mul_by_3_epi32(j1);

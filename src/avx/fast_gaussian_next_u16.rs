@@ -594,7 +594,7 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
 
                 _mm256_store_si256(buf_ptr0 as *mut _, px01);
                 _mm256_store_si256(buf_ptr1 as *mut _, px23);
-                _mm256_store_si256(buf_ptr2 as *mut _, px23);
+                _mm256_store_si256(buf_ptr2 as *mut _, px45);
 
                 ders0 = _mm256_add_epi32(ders0, diffs0);
                 ders1 = _mm256_add_epi32(ders1, diffs1);

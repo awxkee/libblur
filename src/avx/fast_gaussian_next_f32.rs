@@ -146,7 +146,7 @@ impl<const CN: usize, const FMA: bool> VerticalGaussianExecutorF32<CN, FMA> {
                     let dst_ptr0 = bytes.slice.as_ptr().add(current_y + current_px0) as *mut f32;
                     let dst_ptr1 = bytes.slice.as_ptr().add(current_y + current_px1) as *mut f32;
                     let dst_ptr2 = bytes.slice.as_ptr().add(current_y + current_px2) as *mut f32;
-                    let dst_ptr3 = bytes.slice.as_ptr().add(current_y + current_px2) as *mut f32;
+                    let dst_ptr3 = bytes.slice.as_ptr().add(current_y + current_px3) as *mut f32;
 
                     store_f32::<CN>(dst_ptr0, _mm256_castps256_ps128(r01));
                     store_f32::<CN>(dst_ptr1, _mm256_extractf128_ps::<1>(r01));
