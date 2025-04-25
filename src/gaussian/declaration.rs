@@ -138,6 +138,9 @@ pub fn gaussian_blur(
 /// * `threading_policy` - Threading policy according to *ThreadingPolicy*
 /// * `hint` - see [ConvolutionMode] for more info
 ///
+/// This method always clamp into [0, 65535], if other bit-depth is used 
+/// consider additional clamp into required range.
+///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided.
 /// Panics if sigma = 0.8 and kernel size = 0.
