@@ -27,7 +27,6 @@
 
 use crate::channels_configuration::FastBlurChannels;
 use crate::edge_mode::EdgeMode;
-use crate::filter1d::filter_1d_uq1p15_u16;
 use crate::gaussian::gaussian_kernel::gaussian_kernel_1d;
 use crate::gaussian::gaussian_util::kernel_size as get_kernel_size;
 use crate::{
@@ -190,11 +189,11 @@ pub fn gaussian_blur_u16(
             )
         }
         ConvolutionMode::FixedPoint => {
-            use crate::filter1d::filter_1d_uq1p15_u16;
+            use crate::filter1d::filter_1d_approx;
             let _dispatcher = match src.channels {
-                FastBlurChannels::Plane => filter_1d_uq1p15_u16::<1>,
-                FastBlurChannels::Channels3 => filter_1d_uq1p15_u16::<3>,
-                FastBlurChannels::Channels4 => filter_1d_uq1p15_u16::<4>,
+                FastBlurChannels::Plane => filter_1d_approx::<u16, f32, u32, 1>,
+                FastBlurChannels::Channels3 => filter_1d_approx::<u16, f32, u32, 3>,
+                FastBlurChannels::Channels4 => filter_1d_approx::<u16, f32, u32, 4>,
             };
             _dispatcher(
                 src,

@@ -226,7 +226,7 @@ pub(crate) fn filter_column_symm_neon_u8_i32_app(
         }
 
         for x in cx..image_width {
-            let coeff = *scanned_kernel.get_unchecked(0);
+            let coeff = *scanned_kernel.get_unchecked(half_len);
 
             let v_src = arena_src.get_unchecked(half_len).get_unchecked(x..);
 

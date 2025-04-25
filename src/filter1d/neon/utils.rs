@@ -113,6 +113,17 @@ pub(crate) unsafe fn vmullq_u8_by_i16(
 }
 
 #[inline(always)]
+pub(crate) unsafe fn vmullq_u16_by_u16(
+    input: uint16x8_t,
+    weight: uint16x8_t,
+) -> (uint32x4_t, uint32x4_t) {
+    (
+        vmull_u16(vget_low_u16(input), vget_low_u16(weight)),
+        vmull_high_u16(input, weight),
+    )
+}
+
+#[inline(always)]
 pub(crate) unsafe fn vmull_u8_by_i16(
     input: uint8x8_t,
     weight: int16x4_t,
@@ -335,6 +346,22 @@ pub(crate) unsafe fn vfmlaq_symm_u8_s16(
 }
 
 #[inline(always)]
+pub(crate) unsafe fn vfmlaq_symm_u16_u16(
+    store: (uint32x4_t, uint32x4_t),
+    input0: uint16x8_t,
+    input1: uint16x8_t,
+    weight: uint32x4_t,
+) -> (uint32x4_t, uint32x4_t) {
+    let lo_16 = vaddl_u16(vget_low_u16(input0), vget_low_u16(input1));
+    let hi_16 = vaddl_high_u16(input0, input1);
+
+    (
+        vmlaq_u32(store.0, lo_16, weight),
+        vmlaq_u32(store.1, hi_16, weight),
+    )
+}
+
+#[inline(always)]
 pub(crate) unsafe fn vfmla_u8_s16(
     store: (int32x4_t, int32x4_t),
     input: uint8x8_t,
@@ -411,6 +438,11 @@ pub(crate) unsafe fn vqmovnq_s32_u8(
     let hi_s = vcombine_u16(vqrshrun_n_s32::<15>(store.2), vqrshrun_n_s32::<15>(store.3));
     let lo_s = vcombine_u16(vqrshrun_n_s32::<15>(store.0), vqrshrun_n_s32::<15>(store.1));
     vcombine_u8(vqmovn_u16(lo_s), vqmovn_u16(hi_s))
+}
+
+#[inline(always)]
+pub(crate) unsafe fn vqmovnq_u32_u16(store: (uint32x4_t, uint32x4_t)) -> uint16x8_t {
+    vcombine_u16(vqrshrn_n_u32::<15>(store.0), vqrshrn_n_u32::<15>(store.1))
 }
 
 #[inline(always)]
@@ -493,6 +525,11 @@ pub(crate) unsafe fn xvld1q_u16_x4(a: *const u16) -> uint16x8x4_t {
 }
 
 #[inline(always)]
+pub(crate) unsafe fn xvld1q_u16_x3(a: *const u16) -> uint16x8x3_t {
+    uint16x8x3_t(vld1q_u16(a), vld1q_u16(a.add(8)), vld1q_u16(a.add(16)))
+}
+
+#[inline(always)]
 pub(crate) unsafe fn xvld1q_u16_x2(a: *const u16) -> uint16x8x2_t {
     uint16x8x2_t(vld1q_u16(a), vld1q_u16(a.add(8)))
 }
@@ -530,6 +567,13 @@ pub(crate) unsafe fn xvst1q_u16_x4(a: *mut u16, b: uint16x8x4_t) {
     vst1q_u16(a.add(8), b.1);
     vst1q_u16(a.add(16), b.2);
     vst1q_u16(a.add(24), b.3);
+}
+
+#[inline(always)]
+pub(crate) unsafe fn xvst1q_u16_x3(a: *mut u16, b: uint16x8x3_t) {
+    vst1q_u16(a, b.0);
+    vst1q_u16(a.add(8), b.1);
+    vst1q_u16(a.add(16), b.2);
 }
 
 #[inline(always)]

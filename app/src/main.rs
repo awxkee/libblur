@@ -107,6 +107,7 @@ fn main() {
         FastBlurChannels::Channels4,
     );
     let mut dst_image = BlurImageMut::default();
+    dst_image.data.borrow_mut().fill(255);
     //
     // libblur::fast_gaussian_next_f32(&mut dst_image, 10, ThreadingPolicy::Single, EdgeMode::Clamp)
     //     .unwrap();

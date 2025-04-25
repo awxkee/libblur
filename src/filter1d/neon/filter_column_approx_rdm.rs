@@ -53,9 +53,6 @@ pub(crate) fn filter_column_neon_u8_i32_i16_qrdm_app(
 
         let mut cx = 0usize;
 
-        const EXPAND: i32 = 6;
-        const PRECISION: i32 = 6;
-
         while cx + 64 < image_width {
             let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(0).weight as i16);
 
