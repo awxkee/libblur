@@ -33,9 +33,7 @@ use crate::filter1d::avx::utils::{
 };
 use crate::filter1d::filter_1d_column_handler::FilterBrows;
 use crate::filter1d::filter_scan::ScanPoint1d;
-use crate::filter1d::sse::utils::{
-    _mm_mul_add_symm_epi8_by_epi16_x4, _mm_mul_epi8_by_epi16_x4, _mm_pack_epi32_x2_epi8,
-};
+use crate::filter1d::sse::utils::_mm_pack_epi32_x2_epi8;
 use crate::filter1d::to_approx_storage::ToApproxStorage;
 use crate::img_size::ImageSize;
 #[cfg(target_arch = "x86")]
@@ -187,20 +185,21 @@ unsafe fn filter_column_avx_symm_u8_i32_impl_x2(
         }
 
         while cx + 16 < image_width {
-            let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(half_len).weight as i16);
+            let coeff = _mm256_set1_epi16(scanned_kernel.get_unchecked(half_len).weight as i16);
 
             let v_src0 = brows0.get_unchecked(half_len).get_unchecked(cx..);
             let v_src1 = brows1.get_unchecked(half_len).get_unchecked(cx..);
 
-            let source0 = _mm_loadu_si128(v_src0.as_ptr() as *const __m128i);
-            let source1 = _mm_loadu_si128(v_src1.as_ptr() as *const __m128i);
+            let s0 = _mm_loadu_si128(v_src0.as_ptr() as *const __m128i);
+            let s1 = _mm_loadu_si128(v_src1.as_ptr() as *const __m128i);
 
-            let mut k0 = _mm_mul_epi8_by_epi16_x4(source0, coeff);
-            let mut k1 = _mm_mul_epi8_by_epi16_x4(source1, coeff);
+            let source = _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(s0), s1);
+
+            let mut k0 = _mm256_mul_epi8_by_epi16_x4(source, coeff);
 
             for i in 0..half_len {
                 let rollback = length - i - 1;
-                let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(i).weight as i16);
+                let coeff = _mm256_set1_epi16(scanned_kernel.get_unchecked(i).weight as i16);
                 let v_source0_0 = _mm_loadu_si128(
                     brows0.get_unchecked(i).get_unchecked(cx..).as_ptr() as *const __m128i,
                 );
@@ -213,14 +212,32 @@ unsafe fn filter_column_avx_symm_u8_i32_impl_x2(
                 let v_source1_1 =
                     _mm_loadu_si128(brows1.get_unchecked(rollback).get_unchecked(cx..).as_ptr()
                         as *const __m128i);
-                k0 = _mm_mul_add_symm_epi8_by_epi16_x4(k0, v_source0_0, v_source1_0, coeff);
-                k1 = _mm_mul_add_symm_epi8_by_epi16_x4(k1, v_source0_1, v_source1_1, coeff);
+
+                let source0 =
+                    _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(v_source0_0), v_source1_0);
+                let source1 =
+                    _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(v_source0_1), v_source1_1);
+
+                k0 = _mm256_mul_add_symm_epi8_by_epi16_x4(k0, source0, source1, coeff);
             }
 
             let dst_ptr0 = dst0.get_unchecked_mut(cx..).as_mut_ptr();
             let dst_ptr1 = dst1.get_unchecked_mut(cx..).as_mut_ptr();
-            _mm_storeu_si128(dst_ptr0 as *mut __m128i, _mm_pack_epi32_x2_epi8(k0));
-            _mm_storeu_si128(dst_ptr1 as *mut __m128i, _mm_pack_epi32_x2_epi8(k1));
+
+            _mm_storeu_si128(
+                dst_ptr0 as *mut __m128i,
+                _mm_pack_epi32_x2_epi8((
+                    _mm256_castsi256_si128(k0.0),
+                    _mm256_extracti128_si256::<1>(k0.0),
+                )),
+            );
+            _mm_storeu_si128(
+                dst_ptr1 as *mut __m128i,
+                _mm_pack_epi32_x2_epi8((
+                    _mm256_castsi256_si128(k0.1),
+                    _mm256_extracti128_si256::<1>(k0.1),
+                )),
+            );
             cx += 16;
         }
 
