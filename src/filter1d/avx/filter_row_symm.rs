@@ -31,8 +31,9 @@ use crate::avx::{
 };
 use crate::filter1d::arena::Arena;
 use crate::filter1d::avx::sse_utils::{
-    _mm_mul_add_symm_epi8_by_ps_x2, _mm_mul_add_symm_epi8_by_ps_x4, _mm_mul_epi8_by_ps_x2,
-    _mm_mul_epi8_by_ps_x4, _mm_pack_ps_x2_epi8, _mm_pack_ps_x4_epi8,
+    _mm_mul_add_symm_epi8_by_ps, _mm_mul_add_symm_epi8_by_ps_x2, _mm_mul_add_symm_epi8_by_ps_x4,
+    _mm_mul_epi8_by_ps, _mm_mul_epi8_by_ps_x2, _mm_mul_epi8_by_ps_x4, _mm_pack_ps_epi8,
+    _mm_pack_ps_x2_epi8, _mm_pack_ps_x4_epi8,
 };
 use crate::filter1d::avx::utils::{
     _mm256_mul_add_symm_epi8_by_ps_x4, _mm256_mul_epi8_by_ps_x4, _mm256_pack_ps_x4_epi8,
@@ -266,7 +267,7 @@ impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
 
             let source =
                 _mm_loadu_si64(shifted_src.get_unchecked(half_len * N..).as_ptr() as *const _);
-            let mut k0 = _mm_mul_epi8_by_ps_x2::<FMA>(source, coeff);
+            let mut k0 = _mm_mul_epi8_by_ps_x2(source, coeff);
 
             for i in 0..half_len {
                 let rollback = length - i - 1;
@@ -285,49 +286,27 @@ impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
         }
 
         while cx + 4 < max_width {
-            let coeff = *scanned_kernel.get_unchecked(half_len);
+            let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
+
             let shifted_src = local_src.get_unchecked(cx..);
-            let mut k0 = *shifted_src.get_unchecked(half_len * N) as f32 * coeff.weight;
-            let mut k1 = *shifted_src.get_unchecked(half_len * N + 1) as f32 * coeff.weight;
-            let mut k2 = *shifted_src.get_unchecked(half_len * N + 2) as f32 * coeff.weight;
-            let mut k3 = *shifted_src.get_unchecked(half_len * N + 3) as f32 * coeff.weight;
+
+            let source =
+                _mm_loadu_si32(shifted_src.get_unchecked(half_len * N..).as_ptr() as *const _);
+            let mut k0 = _mm_mul_epi8_by_ps(source, coeff);
 
             for i in 0..half_len {
-                let coeff = *scanned_kernel.get_unchecked(i);
                 let rollback = length - i - 1;
-
-                k0 = mlaf(
-                    k0,
-                    *shifted_src.get_unchecked(i * N) as f32
-                        + *shifted_src.get_unchecked(rollback * N) as f32,
-                    coeff.weight,
+                let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(i).weight);
+                let v_source0 =
+                    _mm_loadu_si32(shifted_src.get_unchecked((i * N)..).as_ptr() as *const _);
+                let v_source1 = _mm_loadu_si32(
+                    shifted_src.get_unchecked((rollback * N)..).as_ptr() as *const _,
                 );
-
-                k1 = mlaf(
-                    k1,
-                    *shifted_src.get_unchecked(i * N + 1) as f32
-                        + *shifted_src.get_unchecked(rollback * N + 1) as f32,
-                    coeff.weight,
-                );
-
-                k2 = mlaf(
-                    k2,
-                    *shifted_src.get_unchecked(i * N + 2) as f32
-                        + *shifted_src.get_unchecked(rollback * N + 2) as f32,
-                    coeff.weight,
-                );
-                k3 = mlaf(
-                    k3,
-                    *shifted_src.get_unchecked(i * N + 3) as f32
-                        + *shifted_src.get_unchecked(rollback * N + 3) as f32,
-                    coeff.weight,
-                );
+                k0 = _mm_mul_add_symm_epi8_by_ps::<FMA>(k0, v_source0, v_source1, coeff);
             }
 
-            *dst.get_unchecked_mut(cx) = k0.to_();
-            *dst.get_unchecked_mut(cx + 1) = k1.to_();
-            *dst.get_unchecked_mut(cx + 2) = k2.to_();
-            *dst.get_unchecked_mut(cx + 3) = k3.to_();
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
+            _mm_storeu_si32(dst_ptr0 as *mut _, _mm_pack_ps_epi8(k0));
             cx += 4;
         }
 

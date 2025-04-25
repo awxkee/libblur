@@ -30,7 +30,8 @@ use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_1d_column_handler::FilterBrows;
 use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::neon::utils::{
-    vmlaq_symm_hi_u8_s16, vmullq_expand_i16, vqmovnq_s16x2_u8, xvld1q_u8_x2, xvst1q_u8_x2,
+    vmla_symm_hi_u8_s16, vmlaq_symm_hi_u8_s16, vmull_expand_i16, vmullq_expand_i16,
+    vqmovnq_s16x2_u8, xvld1q_u8_x2, xvld4u8, xvst1q_u8_x2, xvst_u8x4_q15,
 };
 use crate::filter1d::to_approx_storage::ToApproxStorage;
 use crate::img_size::ImageSize;
@@ -167,96 +168,44 @@ pub(crate) fn filter_column_symm_neon_u8_i32_rdm_x3(
         }
 
         while cx + 4 < image_width {
-            let coeff = *scanned_kernel.get_unchecked(half_len);
+            let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(half_len).weight as i16);
 
             let v_src0 = brows0.get_unchecked(half_len).get_unchecked(cx..);
             let v_src1 = brows1.get_unchecked(half_len).get_unchecked(cx..);
             let v_src2 = brows2.get_unchecked(half_len).get_unchecked(cx..);
 
-            let mut k0_0 = (*v_src0.get_unchecked(0) as i32).mul(coeff.weight);
-            let mut k1_0 = (*v_src0.get_unchecked(1) as i32).mul(coeff.weight);
-            let mut k2_0 = (*v_src0.get_unchecked(2) as i32).mul(coeff.weight);
-            let mut k3_0 = (*v_src0.get_unchecked(3) as i32).mul(coeff.weight);
+            let source0 = xvld4u8(v_src0.as_ptr());
+            let source1 = xvld4u8(v_src1.as_ptr());
+            let source2 = xvld4u8(v_src2.as_ptr());
 
-            let mut k0_1 = (*v_src1.get_unchecked(0) as i32).mul(coeff.weight);
-            let mut k1_1 = (*v_src1.get_unchecked(1) as i32).mul(coeff.weight);
-            let mut k2_1 = (*v_src1.get_unchecked(2) as i32).mul(coeff.weight);
-            let mut k3_1 = (*v_src1.get_unchecked(3) as i32).mul(coeff.weight);
-
-            let mut k0_2 = (*v_src2.get_unchecked(0) as i32).mul(coeff.weight);
-            let mut k1_2 = (*v_src2.get_unchecked(1) as i32).mul(coeff.weight);
-            let mut k2_2 = (*v_src2.get_unchecked(2) as i32).mul(coeff.weight);
-            let mut k3_2 = (*v_src2.get_unchecked(3) as i32).mul(coeff.weight);
+            let mut k0 = vmull_expand_i16(source0, coeff);
+            let mut k1 = vmull_expand_i16(source1, coeff);
+            let mut k2 = vmull_expand_i16(source2, coeff);
 
             for i in 0..half_len {
-                let coeff = *scanned_kernel.get_unchecked(i);
+                let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight as i16);
                 let rollback = length - i - 1;
-                k0_0 = ((*brows0.get_unchecked(i).get_unchecked(cx)) as i32)
-                    .add((*brows0.get_unchecked(rollback).get_unchecked(cx)) as i32)
-                    .mul(coeff.weight)
-                    .add(k0_0);
-                k1_0 = ((*brows0.get_unchecked(i).get_unchecked(cx + 1)) as i32)
-                    .add((*brows0.get_unchecked(rollback).get_unchecked(cx + 1)) as i32)
-                    .mul(coeff.weight)
-                    .add(k1_0);
-                k2_0 = ((*brows0.get_unchecked(i).get_unchecked(cx + 2)) as i32)
-                    .add((*brows0.get_unchecked(rollback).get_unchecked(cx + 2)) as i32)
-                    .mul(coeff.weight)
-                    .add(k2_0);
-                k3_0 = ((*brows0.get_unchecked(i).get_unchecked(cx + 3)) as i32)
-                    .add((*brows0.get_unchecked(rollback).get_unchecked(cx + 3)) as i32)
-                    .mul(coeff.weight)
-                    .add(k3_0);
-
-                k0_1 = ((*brows1.get_unchecked(i).get_unchecked(cx)) as i32)
-                    .add((*brows1.get_unchecked(rollback).get_unchecked(cx)) as i32)
-                    .mul(coeff.weight)
-                    .add(k0_1);
-                k1_1 = ((*brows1.get_unchecked(i).get_unchecked(cx + 1)) as i32)
-                    .add((*brows1.get_unchecked(rollback).get_unchecked(cx + 1)) as i32)
-                    .mul(coeff.weight)
-                    .add(k1_1);
-                k2_1 = ((*brows1.get_unchecked(i).get_unchecked(cx + 2)) as i32)
-                    .add((*brows1.get_unchecked(rollback).get_unchecked(cx + 2)) as i32)
-                    .mul(coeff.weight)
-                    .add(k2_1);
-                k3_1 = ((*brows1.get_unchecked(i).get_unchecked(cx + 3)) as i32)
-                    .add((*brows1.get_unchecked(rollback).get_unchecked(cx + 3)) as i32)
-                    .mul(coeff.weight)
-                    .add(k3_1);
-
-                k0_2 = ((*brows2.get_unchecked(i).get_unchecked(cx)) as i32)
-                    .add((*brows2.get_unchecked(rollback).get_unchecked(cx)) as i32)
-                    .mul(coeff.weight)
-                    .add(k0_2);
-                k1_2 = ((*brows2.get_unchecked(i).get_unchecked(cx + 1)) as i32)
-                    .add((*brows2.get_unchecked(rollback).get_unchecked(cx + 1)) as i32)
-                    .mul(coeff.weight)
-                    .add(k1_2);
-                k2_2 = ((*brows2.get_unchecked(i).get_unchecked(cx + 2)) as i32)
-                    .add((*brows2.get_unchecked(rollback).get_unchecked(cx + 2)) as i32)
-                    .mul(coeff.weight)
-                    .add(k2_2);
-                k3_2 = ((*brows2.get_unchecked(i).get_unchecked(cx + 3)) as i32)
-                    .add((*brows2.get_unchecked(rollback).get_unchecked(cx + 3)) as i32)
-                    .mul(coeff.weight)
-                    .add(k3_2);
+                let v_source0_0 = xvld4u8(brows0.get_unchecked(i).get_unchecked(cx..).as_ptr());
+                let v_source1_0 =
+                    xvld4u8(brows0.get_unchecked(rollback).get_unchecked(cx..).as_ptr());
+                let v_source0_1 = xvld4u8(brows1.get_unchecked(i).get_unchecked(cx..).as_ptr());
+                let v_source1_1 =
+                    xvld4u8(brows1.get_unchecked(rollback).get_unchecked(cx..).as_ptr());
+                let v_source0_2 = xvld4u8(brows2.get_unchecked(i).get_unchecked(cx..).as_ptr());
+                let v_source1_2 =
+                    xvld4u8(brows2.get_unchecked(rollback).get_unchecked(cx..).as_ptr());
+                k0 = vmla_symm_hi_u8_s16(k0, v_source0_0, v_source1_0, coeff);
+                k1 = vmla_symm_hi_u8_s16(k1, v_source0_1, v_source1_1, coeff);
+                k2 = vmla_symm_hi_u8_s16(k2, v_source0_2, v_source1_2, coeff);
             }
 
-            *dst0.get_unchecked_mut(cx) = k0_0.to_approx_();
-            *dst0.get_unchecked_mut(cx + 1) = k1_0.to_approx_();
-            *dst0.get_unchecked_mut(cx + 2) = k2_0.to_approx_();
-            *dst0.get_unchecked_mut(cx + 3) = k3_0.to_approx_();
+            let dst_ptr0 = dst0.get_unchecked_mut(cx..).as_mut_ptr();
+            let dst_ptr1 = dst1.get_unchecked_mut(cx..).as_mut_ptr();
+            let dst_ptr2 = dst2.get_unchecked_mut(cx..).as_mut_ptr();
 
-            *dst1.get_unchecked_mut(cx) = k0_1.to_approx_();
-            *dst1.get_unchecked_mut(cx + 1) = k1_1.to_approx_();
-            *dst1.get_unchecked_mut(cx + 2) = k2_1.to_approx_();
-            *dst1.get_unchecked_mut(cx + 3) = k3_1.to_approx_();
-
-            *dst2.get_unchecked_mut(cx) = k0_2.to_approx_();
-            *dst2.get_unchecked_mut(cx + 1) = k1_2.to_approx_();
-            *dst2.get_unchecked_mut(cx + 2) = k2_2.to_approx_();
-            *dst2.get_unchecked_mut(cx + 3) = k3_2.to_approx_();
+            xvst_u8x4_q15(dst_ptr0, k0);
+            xvst_u8x4_q15(dst_ptr1, k1);
+            xvst_u8x4_q15(dst_ptr2, k2);
             cx += 4;
         }
 

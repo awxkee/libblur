@@ -277,10 +277,10 @@ pub(crate) unsafe fn _mm256_pack_ps_x2_epi16(store: (__m256, __m256)) -> __m256i
 
 #[inline(always)]
 pub(crate) unsafe fn _mm256_pack_epi32_x4_epi8(store: (__m256i, __m256i)) -> __m256i {
-    let rnd = _mm256_set1_epi32((1 << 5) - 1);
+    let rnd = _mm256_set1_epi16((1 << 5) - 1);
     _mm256_packus_epi16(
-        _mm256_srai_epi16::<6>(_mm256_add_epi32(store.0, rnd)),
-        _mm256_srai_epi16::<6>(_mm256_add_epi32(store.1, rnd)),
+        _mm256_srai_epi16::<6>(_mm256_add_epi16(store.0, rnd)),
+        _mm256_srai_epi16::<6>(_mm256_add_epi16(store.1, rnd)),
     )
 }
 

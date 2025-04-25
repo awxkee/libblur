@@ -581,3 +581,14 @@ pub(crate) unsafe fn xvst1q_u16_x2(a: *mut u16, b: uint16x8x2_t) {
     vst1q_u16(a, b.0);
     vst1q_u16(a.add(8), b.1);
 }
+
+#[inline(always)]
+pub(crate) unsafe fn xvld4u8(a: *const u8) -> uint8x8_t {
+    vreinterpret_u8_u32(vld1_lane_u32::<0>(a as *const _, vdup_n_u32(0)))
+}
+
+#[inline(always)]
+pub(crate) unsafe fn xvst_u8x4_q15(a: *mut u8, v: int16x8_t) {
+    let shifted = vqrshrun_n_s16::<6>(v);
+    vst1_lane_u32::<0>(a as *mut _, vreinterpret_u32_u8(shifted));
+}

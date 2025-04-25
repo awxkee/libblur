@@ -30,7 +30,8 @@ use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::neon::utils::{
     vmla_symm_hi_u8_s16, vmlaq_symm_hi_u8_s16, vmull_expand_i16, vmullq_expand_i16, vqmovn_s16_u8,
-    vqmovnq_s16x2_u8, xvld1q_u8_x3, xvld1q_u8_x4, xvst1q_u8_x3, xvst1q_u8_x4,
+    vqmovnq_s16x2_u8, xvld1q_u8_x3, xvld1q_u8_x4, xvld4u8, xvst1q_u8_x3, xvst1q_u8_x4,
+    xvst_u8x4_q15,
 };
 use crate::filter1d::region::FilterRegion;
 use crate::filter1d::to_approx_storage::ToApproxStorage;
@@ -169,41 +170,23 @@ pub(crate) fn filter_row_symm_neon_u8_i32_rdm<const N: usize>(
         }
 
         while cx + 4 < max_width {
-            let coeff = *scanned_kernel.get_unchecked(half_len);
+            let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(half_len).weight as i16);
+
             let shifted_src = local_src.get_unchecked(cx..);
-            let mut k0 = *shifted_src.get_unchecked(half_len * N) as i32 * coeff.weight;
-            let mut k1 = *shifted_src.get_unchecked(half_len * N + 1) as i32 * coeff.weight;
-            let mut k2 = *shifted_src.get_unchecked(half_len * N + 2) as i32 * coeff.weight;
-            let mut k3 = *shifted_src.get_unchecked(half_len * N + 3) as i32 * coeff.weight;
+
+            let source = xvld4u8(shifted_src.get_unchecked(half_len * N..).as_ptr());
+            let mut k0 = vmull_expand_i16(source, coeff);
 
             for i in 0..half_len {
-                let coeff = *scanned_kernel.get_unchecked(i);
+                let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight as i16);
                 let rollback = length - i - 1;
-
-                k0 += (*shifted_src.get_unchecked(i * N) as i16
-                    + *shifted_src.get_unchecked(rollback * N) as i16) as i32
-                    * coeff.weight;
-
-                k1 += (*shifted_src.get_unchecked(i * N + 1) as i16
-                    + *shifted_src.get_unchecked(rollback * N + 1) as i16)
-                    as i32
-                    * coeff.weight;
-
-                k2 += (*shifted_src.get_unchecked(i * N + 2) as i16
-                    + *shifted_src.get_unchecked(rollback * N + 2) as i16)
-                    as i32
-                    * coeff.weight;
-
-                k3 += (*shifted_src.get_unchecked(i * N + 3) as i16
-                    + *shifted_src.get_unchecked(rollback * N + 3) as i16)
-                    as i32
-                    * coeff.weight;
+                let v_source0 = xvld4u8(shifted_src.get_unchecked((i * N)..).as_ptr());
+                let v_source1 = xvld4u8(shifted_src.get_unchecked((rollback * N)..).as_ptr());
+                k0 = vmla_symm_hi_u8_s16(k0, v_source0, v_source1, coeff);
             }
 
-            *dst.get_unchecked_mut(cx) = k0.to_approx_();
-            *dst.get_unchecked_mut(cx + 1) = k1.to_approx_();
-            *dst.get_unchecked_mut(cx + 2) = k2.to_approx_();
-            *dst.get_unchecked_mut(cx + 3) = k3.to_approx_();
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
+            xvst_u8x4_q15(dst_ptr0, k0);
             cx += 4;
         }
 

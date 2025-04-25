@@ -36,11 +36,6 @@ use crate::filter1d::avx::utils::_mm256_opt_fmlaf_ps;
 use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
-use crate::mlaf::mlaf;
-use crate::to_storage::ToStorage;
-#[cfg(target_arch = "x86")]
-use std::arch::x86::*;
-#[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
 pub(crate) fn filter_row_avx_f32_f32_symm<const N: usize>(
@@ -240,24 +235,25 @@ impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
             cx += 4;
         }
 
-        for x in cx..max_width {
-            let coeff = *scanned_kernel.get_unchecked(half_len);
-            let shifted_src = local_src.get_unchecked(x..);
-            let mut k0 = shifted_src.get_unchecked(half_len * N) * coeff.weight;
+        while cx < max_width {
+            let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
+
+            let shifted_src = local_src.get_unchecked(cx..);
+
+            let source_0 = _mm_load_ss(shifted_src.get_unchecked(half_len * N..).as_ptr());
+            let mut k0 = _mm_mul_ps(source_0, coeff);
 
             for i in 0..half_len {
                 let rollback = length - i - 1;
-                let coeff = *scanned_kernel.get_unchecked(i);
-
-                k0 = mlaf(
-                    k0,
-                    (*shifted_src.get_unchecked(i * N))
-                        + (*shifted_src.get_unchecked(rollback * N)),
-                    coeff.weight,
-                );
+                let coeff = _mm_set_ps1(scanned_kernel.get_unchecked(i).weight);
+                let v_source0 = _mm_load_ss(shifted_src.get_unchecked((i * N)..).as_ptr());
+                let v_source1 = _mm_load_ss(shifted_src.get_unchecked((rollback * N)..).as_ptr());
+                k0 = _mm_opt_fmlaf_ps::<FMA>(k0, _mm_add_ps(v_source0, v_source1), coeff);
             }
 
-            *dst.get_unchecked_mut(x) = k0.to_();
+            let dst_ptr = dst.get_unchecked_mut(cx..).as_mut_ptr();
+            _mm_store_ss(dst_ptr, k0);
+            cx += 1;
         }
     }
 }
