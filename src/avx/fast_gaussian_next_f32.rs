@@ -410,8 +410,10 @@ impl<const CN: usize, const FMA: bool> HorizontalAvxF32Executor<CN, FMA> {
         end: u32,
         edge_mode: EdgeMode,
     ) {
-        let mut bf0 = Box::new([AvxSseF32x8::default(); 1024]);
-        let mut bf1 = Box::new([AvxSseF32x8::default(); 1024]);
+        let mut full_buffer = Box::new([AvxSseF32x8::default(); 1024 * 3]);
+
+        let (bf0, rem) = full_buffer.split_at_mut(1024);
+        let (bf1, bf2) = rem.split_at_mut(1024);
 
         let width_wide = width as i64;
 
@@ -423,15 +425,18 @@ impl<const CN: usize, const FMA: bool> HorizontalAvxF32Executor<CN, FMA> {
 
         let mut yy = start as usize;
 
-        while yy + 4 < height.min(end) as usize {
+        while yy + 6 < height.min(end) as usize {
             let mut diffs0 = _mm256_setzero_ps();
             let mut diffs1 = _mm256_setzero_ps();
+            let mut diffs2 = _mm256_setzero_ps();
 
             let mut ders0 = _mm256_setzero_ps();
             let mut ders1 = _mm256_setzero_ps();
+            let mut ders2 = _mm256_setzero_ps();
 
             let mut summs0 = _mm256_setzero_ps();
             let mut summs1 = _mm256_setzero_ps();
+            let mut summs2 = _mm256_setzero_ps();
 
             let start_x = 0 - 3 * radius_64;
 
@@ -439,6 +444,8 @@ impl<const CN: usize, const FMA: bool> HorizontalAvxF32Executor<CN, FMA> {
             let current_y1 = (((yy + 1) as i64) * (stride as i64)) as usize;
             let current_y2 = (((yy + 2) as i64) * (stride as i64)) as usize;
             let current_y3 = (((yy + 3) as i64) * (stride as i64)) as usize;
+            let current_y4 = (((yy + 4) as i64) * (stride as i64)) as usize;
+            let current_y5 = (((yy + 5) as i64) * (stride as i64)) as usize;
 
             for x in start_x..(width as i64) {
                 if x >= 0 {
@@ -446,16 +453,21 @@ impl<const CN: usize, const FMA: bool> HorizontalAvxF32Executor<CN, FMA> {
 
                     let r01 = _mm256_mul_ps(summs0, v_weight);
                     let r23 = _mm256_mul_ps(summs1, v_weight);
+                    let r45 = _mm256_mul_ps(summs2, v_weight);
 
                     let dst_ptr0 = bytes.slice.as_ptr().add(current_y0 + current_px) as *mut f32;
                     let dst_ptr1 = bytes.slice.as_ptr().add(current_y1 + current_px) as *mut f32;
                     let dst_ptr2 = bytes.slice.as_ptr().add(current_y2 + current_px) as *mut f32;
                     let dst_ptr3 = bytes.slice.as_ptr().add(current_y3 + current_px) as *mut f32;
+                    let dst_ptr4 = bytes.slice.as_ptr().add(current_y4 + current_px) as *mut f32;
+                    let dst_ptr5 = bytes.slice.as_ptr().add(current_y5 + current_px) as *mut f32;
 
                     store_f32::<CN>(dst_ptr0, _mm256_castps256_ps128(r01));
                     store_f32::<CN>(dst_ptr1, _mm256_extractf128_ps::<1>(r01));
                     store_f32::<CN>(dst_ptr2, _mm256_castps256_ps128(r23));
                     store_f32::<CN>(dst_ptr3, _mm256_extractf128_ps::<1>(r23));
+                    store_f32::<CN>(dst_ptr4, _mm256_castps256_ps128(r45));
+                    store_f32::<CN>(dst_ptr5, _mm256_extractf128_ps::<1>(r45));
 
                     let d_a_1 = ((x + radius_64) & 1023) as usize;
                     let d_a_2 = ((x - radius_64) & 1023) as usize;
@@ -463,39 +475,50 @@ impl<const CN: usize, const FMA: bool> HorizontalAvxF32Executor<CN, FMA> {
 
                     let sd0 = _mm256_load_ps(bf0.as_mut_ptr().add(d_i) as *mut f32);
                     let sd1 = _mm256_load_ps(bf1.as_mut_ptr().add(d_i) as *mut f32);
+                    let sd2 = _mm256_load_ps(bf2.as_mut_ptr().add(d_i) as *mut f32);
 
                     let sd_1_0 = _mm256_load_ps(bf0.as_mut_ptr().add(d_a_1) as *mut f32);
                     let sd_1_1 = _mm256_load_ps(bf1.as_mut_ptr().add(d_a_1) as *mut f32);
+                    let sd_1_2 = _mm256_load_ps(bf2.as_mut_ptr().add(d_a_1) as *mut f32);
 
                     let j0 = _mm256_sub_ps(sd0, sd_1_0);
                     let j1 = _mm256_sub_ps(sd1, sd_1_1);
+                    let j2 = _mm256_sub_ps(sd2, sd_1_2);
 
                     let sd_2_0 = _mm256_load_ps(bf0.as_mut_ptr().add(d_a_2) as *mut f32);
                     let sd_2_1 = _mm256_load_ps(bf1.as_mut_ptr().add(d_a_2) as *mut f32);
+                    let sd_2_2 = _mm256_load_ps(bf2.as_mut_ptr().add(d_a_2) as *mut f32);
 
                     let new_diff0 = _mm256_opt_fnmlsf_ps::<FMA>(sd_2_0, j0, threes);
                     let new_diff1 = _mm256_opt_fnmlsf_ps::<FMA>(sd_2_1, j1, threes);
+                    let new_diff2 = _mm256_opt_fnmlsf_ps::<FMA>(sd_2_2, j2, threes);
 
                     diffs0 = _mm256_add_ps(diffs0, new_diff0);
                     diffs1 = _mm256_add_ps(diffs1, new_diff1);
+                    diffs2 = _mm256_add_ps(diffs2, new_diff2);
                 } else if x + radius_64 >= 0 {
                     let a_i = (x & 1023) as usize;
                     let a_i_1 = ((x + radius_64) & 1023) as usize;
                     let sd0 = _mm256_load_ps(bf0.as_mut_ptr().add(a_i) as *mut f32);
                     let sd1 = _mm256_load_ps(bf1.as_mut_ptr().add(a_i) as *mut f32);
+                    let sd2 = _mm256_load_ps(bf2.as_mut_ptr().add(a_i) as *mut f32);
 
                     let sd_1_0 = _mm256_load_ps(bf0.as_mut_ptr().add(a_i_1) as *mut f32);
                     let sd_1_1 = _mm256_load_ps(bf1.as_mut_ptr().add(a_i_1) as *mut f32);
+                    let sd_1_2 = _mm256_load_ps(bf2.as_mut_ptr().add(a_i_1) as *mut f32);
 
                     diffs0 = _mm256_opt_fmlaf_ps::<FMA>(diffs0, _mm256_sub_ps(sd0, sd_1_0), threes);
                     diffs1 = _mm256_opt_fmlaf_ps::<FMA>(diffs1, _mm256_sub_ps(sd1, sd_1_1), threes);
+                    diffs2 = _mm256_opt_fmlaf_ps::<FMA>(diffs2, _mm256_sub_ps(sd2, sd_1_2), threes);
                 } else if x + 2 * radius_64 >= 0 {
                     let arr_index = ((x + radius_64) & 1023) as usize;
                     let sd0 = _mm256_load_ps(bf0.as_mut_ptr().add(arr_index) as *mut f32);
                     let sd1 = _mm256_load_ps(bf1.as_mut_ptr().add(arr_index) as *mut f32);
+                    let sd2 = _mm256_load_ps(bf2.as_mut_ptr().add(arr_index) as *mut f32);
 
                     diffs0 = _mm256_opt_fnmlaf_ps::<FMA>(diffs0, sd0, threes);
                     diffs1 = _mm256_opt_fnmlaf_ps::<FMA>(diffs1, sd1, threes);
+                    diffs2 = _mm256_opt_fnmlaf_ps::<FMA>(diffs2, sd2, threes);
                 }
 
                 let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide);
@@ -505,11 +528,15 @@ impl<const CN: usize, const FMA: bool> HorizontalAvxF32Executor<CN, FMA> {
                 let s_ptr1 = bytes.slice.as_ptr().add(current_y1 + next_row_px) as *mut f32;
                 let s_ptr2 = bytes.slice.as_ptr().add(current_y2 + next_row_px) as *mut f32;
                 let s_ptr3 = bytes.slice.as_ptr().add(current_y3 + next_row_px) as *mut f32;
+                let s_ptr4 = bytes.slice.as_ptr().add(current_y4 + next_row_px) as *mut f32;
+                let s_ptr5 = bytes.slice.as_ptr().add(current_y5 + next_row_px) as *mut f32;
 
                 let pixel_color0 = load_f32::<CN>(s_ptr0);
                 let pixel_color1 = load_f32::<CN>(s_ptr1);
                 let pixel_color2 = load_f32::<CN>(s_ptr2);
                 let pixel_color3 = load_f32::<CN>(s_ptr3);
+                let pixel_color4 = load_f32::<CN>(s_ptr4);
+                let pixel_color5 = load_f32::<CN>(s_ptr5);
 
                 let a_i = ((x + 2 * radius_64) & 1023) as usize;
 
@@ -517,21 +544,27 @@ impl<const CN: usize, const FMA: bool> HorizontalAvxF32Executor<CN, FMA> {
                     _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(pixel_color0), pixel_color1);
                 let px23 =
                     _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(pixel_color2), pixel_color3);
+                let px45 =
+                    _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(pixel_color4), pixel_color5);
 
                 _mm256_store_ps(bf0.as_mut_ptr().add(a_i) as *mut f32, px01);
                 _mm256_store_ps(bf1.as_mut_ptr().add(a_i) as *mut f32, px23);
+                _mm256_store_ps(bf2.as_mut_ptr().add(a_i) as *mut f32, px45);
 
                 diffs0 = _mm256_add_ps(diffs0, px01);
                 diffs1 = _mm256_add_ps(diffs1, px23);
+                diffs2 = _mm256_add_ps(diffs2, px45);
 
                 ders0 = _mm256_add_ps(ders0, diffs0);
                 ders1 = _mm256_add_ps(ders1, diffs1);
+                ders2 = _mm256_add_ps(ders2, diffs2);
 
                 summs0 = _mm256_add_ps(summs0, ders0);
                 summs1 = _mm256_add_ps(summs1, ders1);
+                summs2 = _mm256_add_ps(summs2, ders2);
             }
 
-            yy += 4;
+            yy += 6;
         }
 
         for y in yy..height.min(end) as usize {
