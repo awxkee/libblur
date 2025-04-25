@@ -25,7 +25,6 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::avx::fast_gaussian_next::AvxSseI32x8;
 use crate::avx::fast_gaussian_next_f32::AvxSseF32x8;
 use crate::avx::utils::_mm256_opt_fnmlaf_ps;
 use crate::reflect_index;
