@@ -105,7 +105,7 @@ Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded
 
 |         | time(NEON) | time(SSE) |
 |---------|:----------:|:---------:|
-| libblur |   5.37ms   |  5.48ms   |
+| libblur |   5.31ms   |  5.48ms   |
 | OpenCV  |   8.00ms   |  8.55ms   |
 
 ### Fast gaussian
@@ -121,21 +121,21 @@ O(log R) complexity.
 
 ```rust
 let mut dst_image = BlurImageMut::borrow(&mut src_bytes, dyn_image.width(), dyn_image.height(), FastBlurChannels::Channels3)
-libblur::fast_gaussian(&mut dst_image,10, ThreadingPolicy::Single, EdgeMode::Wrap).unwrap();
+libblur::fast_gaussian(&mut dst_image, 10, ThreadingPolicy::Single, EdgeMode::Wrap).unwrap();
 ```
 
 Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded mode with 77 radius.
 
 |         | time(NEON) | time(SSE) | 
 |---------|:----------:|:---------:| 
-| libblur |   5.72ms   |  6.38ms   | 
+| libblur |   5.72ms   |  6.42ms   | 
 | OpenCV  |     -      |     -     | 
 
 Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded mode with 77 radius.
 
 |         | time(NEON) | time(SSE) |
 |---------|:----------:|:---------:|
-| libblur |   5.49ms   |  7.18ms   |
+| libblur |   5.49ms   |  5.77ms   |
 | OpenCV  |     --     |    --     |
 
 ### Fast gaussian next
@@ -147,21 +147,21 @@ O(log R) complexity.
 
 ```rust
 let mut dst_image = BlurImageMut::borrow(&mut src_bytes, dyn_image.width(), dyn_image.height(), FastBlurChannels::Channels3)
-libblur::fast_gaussian_next(&mut dst_image,10, ThreadingPolicy::Single, EdgeMode::Wrap).unwrap();
+libblur::fast_gaussian_next(&mut dst_image, 10, ThreadingPolicy::Single, EdgeMode::Wrap).unwrap();
 ```
 
 Example comparison time for blurring image 2828x4242 RGBA 8-bit in multithreaded mode with 35 radius.
 
 |         | time(NEON) | time(SSE) |
 |---------|:----------:|:---------:| 
-| libblur |   4.07ms   |  5.29ms   | 
+| libblur |   4.07ms   |  6.08ms   | 
 | OpenCV  |     -      |     -     | 
 
 Example comparison time for blurring image 3000x4000 RGB 8-bit in multithreaded mode with 77 radius.
 
 |         | time(NEON) | time(SSE) |
 |---------|:----------:|:---------:|
-| libblur |   4.71ms   |  5.39ms   |
+| libblur |   4.71ms   |  6.15ms   |
 | OpenCV  |     -      |     -     |
 
 ### Tent blur
