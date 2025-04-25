@@ -28,14 +28,14 @@
  */
 use crate::avx::{_mm256_load_pack_x2, _mm256_store_pack_x2};
 use crate::filter1d::arena::Arena;
+use crate::filter1d::avx::sse_utils::{
+    _mm_mul_add_symm_epu16_by_epu16_x4, _mm_mul_epu16_widen, _mm_pack_epi32_x2_epu16,
+};
 use crate::filter1d::avx::utils::{
     _mm256_mul_add_symm_epu16_by_epu16_x4, _mm256_mul_epu16_widen, _mm256_pack_epi32_x4_epu16,
 };
 use crate::filter1d::filter_1d_column_handler::FilterBrows;
 use crate::filter1d::filter_scan::ScanPoint1d;
-use crate::filter1d::sse::utils::{
-    _mm_mul_add_symm_epu16_by_epu16_x4, _mm_mul_epu16_widen, _mm_pack_epi32_x2_epu16,
-};
 use crate::filter1d::to_approx_storage::ToApproxStorage;
 use crate::img_size::ImageSize;
 use std::arch::x86_64::*;

@@ -30,14 +30,14 @@ use crate::avx::{
     _mm256_load_pack_x2, _mm256_load_pack_x4, _mm256_store_pack_x2, _mm256_store_pack_x4,
 };
 use crate::filter1d::arena::Arena;
+use crate::filter1d::avx::sse_utils::{
+    _mm_mul_add_symm_epu16_by_epu16_x4, _mm_mul_epu16_widen, _mm_pack_epi32_x2_epu16,
+};
 use crate::filter1d::avx::utils::{
     _mm256_mul_add_symm_epu16_by_epu16_x4, _mm256_mul_epu16_widen, _mm256_pack_epi32_x4_epu16,
 };
 use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::region::FilterRegion;
-use crate::filter1d::sse::utils::{
-    _mm_mul_add_symm_epu16_by_epu16_x4, _mm_mul_epu16_widen, _mm_pack_epi32_x2_epu16,
-};
 use crate::filter1d::to_approx_storage::ToApproxStorage;
 use crate::img_size::ImageSize;
 use std::arch::x86_64::*;
@@ -245,13 +245,10 @@ unsafe fn filter_row_avx_symm_uq15_u16_impl<const N: usize>(
         cx += 4;
     }
 
-    const K_PRECISION: u32 = 15;
-    const RND: u32 = 1 << (K_PRECISION - 1);
-
     for x in cx..max_width {
         let coeff = *scanned_kernel.get_unchecked(half_len);
         let shifted_src = local_src.get_unchecked(x..);
-        let mut k0 = RND + *shifted_src.get_unchecked(half_len * N) as u32 * coeff.weight;
+        let mut k0 = *shifted_src.get_unchecked(half_len * N) as u32 * coeff.weight;
 
         for i in 0..half_len {
             let coeff = *scanned_kernel.get_unchecked(i);

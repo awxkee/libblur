@@ -47,6 +47,7 @@ mod filter_row_symm;
 mod filter_row_symm_approx;
 mod filter_row_symm_u16;
 mod filter_row_symm_uq15_u16;
+mod sse_utils;
 mod utils;
 
 pub(crate) use filter_column::filter_column_avx_u8_f32;

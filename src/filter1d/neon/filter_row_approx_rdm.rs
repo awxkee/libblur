@@ -131,16 +131,13 @@ pub(crate) fn filter_row_neon_u8_i32_rdm<const N: usize>(
             cx += 16;
         }
 
-        const K_PRECISION: i32 = 15;
-        const RND: i32 = 1 << (K_PRECISION - 1);
-
         while cx + 4 < max_width {
             let coeff = *scanned_kernel.get_unchecked(0);
             let shifted_src = local_src.get_unchecked(cx..);
-            let mut k0 = RND + *shifted_src.get_unchecked(0) as i32 * coeff.weight;
-            let mut k1 = RND + *shifted_src.get_unchecked(1) as i32 * coeff.weight;
-            let mut k2 = RND + *shifted_src.get_unchecked(2) as i32 * coeff.weight;
-            let mut k3 = RND + *shifted_src.get_unchecked(3) as i32 * coeff.weight;
+            let mut k0 = *shifted_src.get_unchecked(0) as i32 * coeff.weight;
+            let mut k1 = *shifted_src.get_unchecked(1) as i32 * coeff.weight;
+            let mut k2 = *shifted_src.get_unchecked(2) as i32 * coeff.weight;
+            let mut k3 = *shifted_src.get_unchecked(3) as i32 * coeff.weight;
 
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
@@ -165,7 +162,7 @@ pub(crate) fn filter_row_neon_u8_i32_rdm<const N: usize>(
         for x in cx..max_width {
             let coeff = *scanned_kernel.get_unchecked(0);
             let shifted_src = local_src.get_unchecked(x..);
-            let mut k0 = RND + *shifted_src.get_unchecked(0) as i32 * coeff.weight;
+            let mut k0 = *shifted_src.get_unchecked(0) as i32 * coeff.weight;
 
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);

@@ -145,7 +145,7 @@ pub(crate) fn filter_symm_column_neon_uq15_u16_x3(
             let mut k2 = vmullq_u16_by_u16(source2, coeff);
 
             for i in 0..half_len {
-                let coeff = vdupq_n_u32(scanned_kernel.get_unchecked(i).weight as u32);
+                let coeff = vdupq_n_u32(scanned_kernel.get_unchecked(i).weight);
                 let rollback = length - i - 1;
                 let v_source0_0 = vld1q_u16(brows0.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 let v_source1_0 =
@@ -191,7 +191,7 @@ pub(crate) fn filter_symm_column_neon_uq15_u16_x3(
             let mut k2 = vmull_u16(source2, coeff);
 
             for i in 0..half_len {
-                let coeff = vdupq_n_u32(scanned_kernel.get_unchecked(i).weight as u32);
+                let coeff = vdupq_n_u32(scanned_kernel.get_unchecked(i).weight);
                 let rollback = length - i - 1;
                 let v_source0_0 = vld1_u16(brows0.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 let v_source1_0 =
