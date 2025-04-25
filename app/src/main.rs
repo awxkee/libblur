@@ -88,10 +88,10 @@ fn main() {
     let mut v_vec = src_bytes
         .to_vec()
         .iter()
-        .map(|&x| x)
-        // .map(|&x| (x as f32 / 255.))
+        // .map(|&x| x)
+        .map(|&x| (x as f32 / 255.))
         // .map(|&x| u16::from_ne_bytes([x, x]))
-        .collect::<Vec<u8>>();
+        .collect::<Vec<f32>>();
 
     let mut dst_image = BlurImageMut::borrow(
         &mut v_vec,
@@ -108,7 +108,8 @@ fn main() {
     // );
     // let mut dst_image = BlurImageMut::default();
     //
-    libblur::fast_gaussian_next( &mut dst_image, 10, ThreadingPolicy::Single, EdgeMode::Clamp).unwrap();
+    libblur::fast_gaussian_next_f32(&mut dst_image, 10, ThreadingPolicy::Single, EdgeMode::Clamp)
+        .unwrap();
 
     // libblur::gaussian_blur_f32(
     //     &image,
@@ -135,8 +136,8 @@ fn main() {
         .data
         .borrow()
         .iter()
-        .map(|&x| x)
-        // .map(|&x| (x * 255f32).round() as u8)
+        // .map(|&x| x)
+        .map(|&x| (x * 255f32).round() as u8)
         // .map(|&x| (x >> 8) as u8)
         .collect::<Vec<u8>>();
 
