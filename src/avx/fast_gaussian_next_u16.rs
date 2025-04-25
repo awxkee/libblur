@@ -394,10 +394,9 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
         end: u32,
         edge_mode: EdgeMode,
     ) {
-        let mut full_buffer = Box::new([AvxSseI32x8::default(); 1024 * 3]);
+        let mut full_buffer = Box::new([AvxSseI32x8::default(); 1024 * 2]);
 
-        let (buffer0, rem) = full_buffer.split_at_mut(1024);
-        let (buffer1, buffer2) = rem.split_at_mut(1024);
+        let (buffer0, buffer1) = full_buffer.split_at_mut(1024);
 
         let width_wide = width as i64;
 
@@ -411,22 +410,17 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
         while yy + 6 < height.min(end) {
             let mut diffs0 = _mm256_setzero_si256();
             let mut diffs1 = _mm256_setzero_si256();
-            let mut diffs2 = _mm256_setzero_si256();
 
             let mut ders0 = _mm256_setzero_si256();
             let mut ders1 = _mm256_setzero_si256();
-            let mut ders2 = _mm256_setzero_si256();
 
             let mut summs0 = _mm256_setzero_si256();
             let mut summs1 = _mm256_setzero_si256();
-            let mut summs2 = _mm256_setzero_si256();
 
             let current_y0 = ((yy as i64) * (stride as i64)) as usize;
             let current_y1 = ((yy as i64 + 1) * (stride as i64)) as usize;
             let current_y2 = ((yy as i64 + 2) * (stride as i64)) as usize;
             let current_y3 = ((yy as i64 + 3) * (stride as i64)) as usize;
-            let current_y4 = ((yy as i64 + 4) * (stride as i64)) as usize;
-            let current_y5 = ((yy as i64 + 5) * (stride as i64)) as usize;
 
             for x in (0 - 3 * radius_64)..(width as i64) {
                 if x >= 0 {
@@ -434,36 +428,27 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
 
                     let ps01 = _mm256_cvtepi32_ps(summs0);
                     let ps23 = _mm256_cvtepi32_ps(summs1);
-                    let ps45 = _mm256_cvtepi32_ps(summs2);
 
                     let r01 = _mm256_mul_ps(ps01, v_weight);
                     let r23 = _mm256_mul_ps(ps23, v_weight);
-                    let r45 = _mm256_mul_ps(ps45, v_weight);
 
                     let e01 = _mm256_cvtps_epi32(r01);
                     let e23 = _mm256_cvtps_epi32(r23);
-                    let e45 = _mm256_cvtps_epi32(r45);
 
                     let prepared_px0 = _mm256_castsi256_si128(e01);
                     let prepared_px1 = _mm256_extracti128_si256::<1>(e01);
                     let prepared_px2 = _mm256_castsi256_si128(e23);
                     let prepared_px3 = _mm256_extracti128_si256::<1>(e23);
-                    let prepared_px4 = _mm256_castsi256_si128(e45);
-                    let prepared_px5 = _mm256_extracti128_si256::<1>(e45);
 
                     let dst_ptr0 = (bytes.slice.as_ptr() as *mut u16).add(current_y0 + current_px);
                     let dst_ptr1 = (bytes.slice.as_ptr() as *mut u16).add(current_y1 + current_px);
                     let dst_ptr2 = (bytes.slice.as_ptr() as *mut u16).add(current_y2 + current_px);
                     let dst_ptr3 = (bytes.slice.as_ptr() as *mut u16).add(current_y3 + current_px);
-                    let dst_ptr4 = (bytes.slice.as_ptr() as *mut u16).add(current_y4 + current_px);
-                    let dst_ptr5 = (bytes.slice.as_ptr() as *mut u16).add(current_y5 + current_px);
 
                     store_u16_u32::<CN>(dst_ptr0, prepared_px0);
                     store_u16_u32::<CN>(dst_ptr1, prepared_px1);
                     store_u16_u32::<CN>(dst_ptr2, prepared_px2);
                     store_u16_u32::<CN>(dst_ptr3, prepared_px3);
-                    store_u16_u32::<CN>(dst_ptr4, prepared_px4);
-                    store_u16_u32::<CN>(dst_ptr5, prepared_px5);
 
                     let d_arr_index_1 = ((x + radius_64) & 1023) as usize;
                     let d_arr_index_2 = ((x - radius_64) & 1023) as usize;
@@ -473,38 +458,28 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
                         _mm256_load_si256(buffer0.as_mut_ptr().add(d_arr_index) as *const _);
                     let stored1 =
                         _mm256_load_si256(buffer1.as_mut_ptr().add(d_arr_index) as *const _);
-                    let stored2 =
-                        _mm256_load_si256(buffer2.as_mut_ptr().add(d_arr_index) as *const _);
 
                     let stored_10 =
                         _mm256_load_si256(buffer0.as_mut_ptr().add(d_arr_index_1) as *const _);
                     let stored_11 =
                         _mm256_load_si256(buffer1.as_mut_ptr().add(d_arr_index_1) as *const _);
-                    let stored_21 =
-                        _mm256_load_si256(buffer2.as_mut_ptr().add(d_arr_index_1) as *const _);
 
                     let j0 = _mm256_sub_epi32(stored0, stored_10);
                     let j1 = _mm256_sub_epi32(stored1, stored_11);
-                    let j2 = _mm256_sub_epi32(stored2, stored_21);
 
                     let stored_20 =
                         _mm256_load_si256(buffer0.as_mut_ptr().add(d_arr_index_2) as *const _);
                     let stored_21 =
                         _mm256_load_si256(buffer1.as_mut_ptr().add(d_arr_index_2) as *const _);
-                    let stored_22 =
-                        _mm256_load_si256(buffer2.as_mut_ptr().add(d_arr_index_2) as *const _);
 
                     let k0 = _mm256_mul_by_3_epi32(j0);
                     let k1 = _mm256_mul_by_3_epi32(j1);
-                    let k2 = _mm256_mul_by_3_epi32(j2);
 
                     let new_diff0 = _mm256_sub_epi32(k0, stored_20);
                     let new_diff1 = _mm256_sub_epi32(k1, stored_21);
-                    let new_diff2 = _mm256_sub_epi32(k2, stored_22);
 
                     diffs0 = _mm256_add_epi32(diffs0, new_diff0);
                     diffs1 = _mm256_add_epi32(diffs1, new_diff1);
-                    diffs2 = _mm256_add_epi32(diffs2, new_diff2);
                 } else if x + radius_64 >= 0 {
                     let arr_index = (x & 1023) as usize;
                     let arr_index_1 = ((x + radius_64) & 1023) as usize;
@@ -515,9 +490,6 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
                     let stored1 = _mm256_load_si256(
                         buffer1.get_unchecked_mut(arr_index).0.as_mut_ptr() as *const _,
                     );
-                    let stored2 = _mm256_load_si256(
-                        buffer2.get_unchecked_mut(arr_index).0.as_mut_ptr() as *const _,
-                    );
 
                     let stored_10 = _mm256_load_si256(
                         buffer0.get_unchecked_mut(arr_index_1).0.as_mut_ptr() as *const _,
@@ -525,17 +497,12 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
                     let stored_11 = _mm256_load_si256(
                         buffer1.get_unchecked_mut(arr_index_1).0.as_mut_ptr() as *const _,
                     );
-                    let stored_21 = _mm256_load_si256(
-                        buffer2.get_unchecked_mut(arr_index_1).0.as_mut_ptr() as *const _,
-                    );
 
                     let new_diff0 = _mm256_mul_by_3_epi32(_mm256_sub_epi32(stored0, stored_10));
                     let new_diff1 = _mm256_mul_by_3_epi32(_mm256_sub_epi32(stored1, stored_11));
-                    let new_diff2 = _mm256_mul_by_3_epi32(_mm256_sub_epi32(stored2, stored_21));
 
                     diffs0 = _mm256_add_epi32(diffs0, new_diff0);
                     diffs1 = _mm256_add_epi32(diffs1, new_diff1);
-                    diffs2 = _mm256_add_epi32(diffs2, new_diff2);
                 } else if x + 2 * radius_64 >= 0 {
                     let arr_index = ((x + radius_64) & 1023) as usize;
                     let stored0 = _mm256_load_si256(
@@ -544,13 +511,9 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
                     let stored1 = _mm256_load_si256(
                         buffer1.get_unchecked_mut(arr_index).0.as_mut_ptr() as *const _,
                     );
-                    let stored2 = _mm256_load_si256(
-                        buffer2.get_unchecked_mut(arr_index).0.as_mut_ptr() as *const _,
-                    );
 
                     diffs0 = _mm256_sub_epi32(diffs0, _mm256_mul_by_3_epi32(stored0));
                     diffs1 = _mm256_sub_epi32(diffs1, _mm256_mul_by_3_epi32(stored1));
-                    diffs2 = _mm256_sub_epi32(diffs2, _mm256_mul_by_3_epi32(stored2));
                 }
 
                 let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide);
@@ -560,20 +523,15 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
                 let s_ptr1 = bytes.slice.as_ptr().add(current_y1 + next_row_px) as *mut u16;
                 let s_ptr2 = bytes.slice.as_ptr().add(current_y2 + next_row_px) as *mut u16;
                 let s_ptr3 = bytes.slice.as_ptr().add(current_y3 + next_row_px) as *mut u16;
-                let s_ptr4 = bytes.slice.as_ptr().add(current_y4 + next_row_px) as *mut u16;
-                let s_ptr5 = bytes.slice.as_ptr().add(current_y5 + next_row_px) as *mut u16;
 
                 let pixel_color0 = load_u16_s32_fast::<CN>(s_ptr0);
                 let pixel_color1 = load_u16_s32_fast::<CN>(s_ptr1);
                 let pixel_color2 = load_u16_s32_fast::<CN>(s_ptr2);
                 let pixel_color3 = load_u16_s32_fast::<CN>(s_ptr3);
-                let pixel_color4 = load_u16_s32_fast::<CN>(s_ptr4);
-                let pixel_color5 = load_u16_s32_fast::<CN>(s_ptr5);
 
                 let arr_index = ((x + 2 * radius_64) & 1023) as usize;
                 let buf_ptr0 = buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr();
                 let buf_ptr1 = buffer1.get_unchecked_mut(arr_index).0.as_mut_ptr();
-                let buf_ptr2 = buffer2.get_unchecked_mut(arr_index).0.as_mut_ptr();
 
                 let px01 = _mm256_inserti128_si256::<1>(
                     _mm256_castsi128_si256(pixel_color0),
@@ -583,29 +541,21 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
                     _mm256_castsi128_si256(pixel_color2),
                     pixel_color3,
                 );
-                let px45 = _mm256_inserti128_si256::<1>(
-                    _mm256_castsi128_si256(pixel_color4),
-                    pixel_color5,
-                );
 
                 diffs0 = _mm256_add_epi32(diffs0, px01);
                 diffs1 = _mm256_add_epi32(diffs1, px23);
-                diffs2 = _mm256_add_epi32(diffs2, px45);
 
                 _mm256_store_si256(buf_ptr0 as *mut _, px01);
                 _mm256_store_si256(buf_ptr1 as *mut _, px23);
-                _mm256_store_si256(buf_ptr2 as *mut _, px45);
 
                 ders0 = _mm256_add_epi32(ders0, diffs0);
                 ders1 = _mm256_add_epi32(ders1, diffs1);
-                ders2 = _mm256_add_epi32(ders2, diffs2);
 
                 summs0 = _mm256_add_epi32(summs0, ders0);
                 summs1 = _mm256_add_epi32(summs1, ders1);
-                summs2 = _mm256_add_epi32(summs2, ders2);
             }
 
-            yy += 6;
+            yy += 4;
         }
 
         for y in yy..height.min(end) {
