@@ -27,7 +27,6 @@
 
 use crate::avx::fast_gaussian_next_f32::AvxSseF32x8;
 use crate::avx::utils::_mm256_opt_fnmlaf_ps;
-use crate::reflect_index;
 use crate::sse::{_mm_opt_fnmlaf_ps, load_f32, store_f32};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, EdgeMode};

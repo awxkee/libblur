@@ -129,11 +129,14 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
         let brows0 = brows.brows[0];
         let brows1 = brows.brows[1];
 
-        while cx + 32 < image_width {
-            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
+        let ref0 = brows0.get_unchecked(half_len);
+        let ref1 = brows1.get_unchecked(half_len);
 
-            let shifted_src0 = brows0.get_unchecked(half_len).get_unchecked(cx..);
-            let shifted_src1 = brows1.get_unchecked(half_len).get_unchecked(cx..);
+        let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
+
+        while cx + 32 < image_width {
+            let shifted_src0 = ref0.get_unchecked(cx..);
+            let shifted_src1 = ref1.get_unchecked(cx..);
 
             let source0 = _mm256_loadu_si256(shifted_src0.as_ptr() as *const __m256i);
             let source1 = _mm256_loadu_si256(shifted_src1.as_ptr() as *const __m256i);
@@ -170,16 +173,14 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
         }
 
         while cx + 16 < image_width {
-            let coeff = *scanned_kernel.get_unchecked(half_len);
-
-            let shifted_src0 = brows0.get_unchecked(half_len).get_unchecked(cx..);
-            let shifted_src1 = brows1.get_unchecked(half_len).get_unchecked(cx..);
+            let shifted_src0 = ref0.get_unchecked(cx..);
+            let shifted_src1 = ref1.get_unchecked(cx..);
 
             let source_0 = _mm_loadu_si128(shifted_src0.as_ptr() as *const __m128i);
             let source_1 = _mm_loadu_si128(shifted_src1.as_ptr() as *const __m128i);
 
-            let mut k0 = _mm_mul_epi8_by_ps_x4::<FMA>(source_0, _mm_set1_ps(coeff.weight));
-            let mut k1 = _mm_mul_epi8_by_ps_x4::<FMA>(source_1, _mm_set1_ps(coeff.weight));
+            let mut k0 = _mm_mul_epi8_by_ps_x4::<FMA>(source_0, _mm256_castps256_ps128(coeff));
+            let mut k1 = _mm_mul_epi8_by_ps_x4::<FMA>(source_1, _mm256_castps256_ps128(coeff));
 
             for i in 0..half_len {
                 let coeff = *scanned_kernel.get_unchecked(i);
@@ -220,16 +221,14 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
         }
 
         while cx + 4 < image_width {
-            let coeff = *scanned_kernel.get_unchecked(half_len);
-
-            let shifted_src0 = brows0.get_unchecked(half_len).get_unchecked(cx..);
-            let shifted_src1 = brows1.get_unchecked(half_len).get_unchecked(cx..);
+            let shifted_src0 = ref0.get_unchecked(cx..);
+            let shifted_src1 = ref1.get_unchecked(cx..);
 
             let source_0 = _mm_loadu_si32(shifted_src0.as_ptr() as *const _);
             let source_1 = _mm_loadu_si32(shifted_src1.as_ptr() as *const _);
 
-            let mut k0 = _mm_mul_epi8_by_ps(source_0, _mm_set1_ps(coeff.weight));
-            let mut k1 = _mm_mul_epi8_by_ps(source_1, _mm_set1_ps(coeff.weight));
+            let mut k0 = _mm_mul_epi8_by_ps(source_0, _mm256_castps256_ps128(coeff));
+            let mut k1 = _mm_mul_epi8_by_ps(source_1, _mm256_castps256_ps128(coeff));
 
             for i in 0..half_len {
                 let coeff = *scanned_kernel.get_unchecked(i);
@@ -269,11 +268,11 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
             cx += 4;
         }
 
+        let coeff = scanned_kernel.get_unchecked(half_len).weight;
+        
         for x in cx..image_width {
-            let coeff = scanned_kernel.get_unchecked(half_len).weight;
-
-            let v_src0 = brows0.get_unchecked(half_len).get_unchecked(x..);
-            let v_src1 = brows1.get_unchecked(half_len).get_unchecked(x..);
+            let v_src0 = ref0.get_unchecked(x..);
+            let v_src1 = ref1.get_unchecked(x..);
 
             let mut k0 = (*v_src0.get_unchecked(0) as f32).mul(coeff);
             let mut k1 = (*v_src1.get_unchecked(0) as f32).mul(coeff);

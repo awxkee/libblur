@@ -140,12 +140,14 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
         let length = scanned_kernel.len();
         let half_len = length / 2;
 
+        let ref0 = arena_src.get_unchecked(half_len);
+
         let mut cx = 0usize;
 
-        while cx + 64 < image_width {
-            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
+        let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
 
-            let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
+        while cx + 64 < image_width {
+            let v_src = ref0.get_unchecked(cx..);
 
             let source = _mm256_load_pack_x4(v_src.as_ptr() as *const _);
             let mut k0 = _mm256_mul_epi16_by_ps_x2::<FMA>(source.0, coeff);
@@ -185,9 +187,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
         }
 
         while cx + 48 < image_width {
-            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
-
-            let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
+            let v_src = ref0.get_unchecked(cx..);
 
             let source = _mm256_load_pack_x3(v_src.as_ptr() as *const _);
             let mut k0 = _mm256_mul_epi16_by_ps_x2::<FMA>(source.0, coeff);
@@ -224,9 +224,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
         }
 
         while cx + 32 < image_width {
-            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
-
-            let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
+            let v_src = ref0.get_unchecked(cx..);
 
             let source = _mm256_load_pack_x2(v_src.as_ptr() as *const _);
             let mut k0 = _mm256_mul_epi16_by_ps_x2::<FMA>(source.0, coeff);
@@ -257,9 +255,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
         }
 
         while cx + 16 < image_width {
-            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
-
-            let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
+            let v_src = ref0.get_unchecked(cx..);
 
             let source = _mm256_loadu_si256(v_src.as_ptr() as *const __m256i);
             let mut k0 = _mm256_mul_epi16_by_ps_x2::<FMA>(source, coeff);
@@ -285,12 +281,10 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
         }
 
         while cx + 8 < image_width {
-            let coeff = *scanned_kernel.get_unchecked(half_len);
-
-            let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
+            let v_src = ref0.get_unchecked(cx..);
 
             let source_0 = _mm_loadu_si128(v_src.as_ptr() as *const __m128i);
-            let mut k0 = _mm_mul_epi16_by_ps_x2::<FMA>(source_0, _mm_set1_ps(coeff.weight));
+            let mut k0 = _mm_mul_epi16_by_ps_x2::<FMA>(source_0, _mm256_castps256_ps128(coeff));
 
             for i in 0..half_len {
                 let coeff = *scanned_kernel.get_unchecked(i);
@@ -318,12 +312,10 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
         }
 
         while cx + 4 < image_width {
-            let coeff = *scanned_kernel.get_unchecked(half_len);
-
-            let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
+            let v_src = ref0.get_unchecked(cx..);
 
             let source_0 = _mm_loadu_si64(v_src.as_ptr() as *const _);
-            let mut k0 = _mm_mul_epi16_by_ps::<FMA>(source_0, _mm_set1_ps(coeff.weight));
+            let mut k0 = _mm_mul_epi16_by_ps::<FMA>(source_0, _mm256_castps256_ps128(coeff));
 
             for i in 0..half_len {
                 let coeff = *scanned_kernel.get_unchecked(i);
@@ -350,10 +342,10 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
             cx += 4;
         }
 
-        for x in cx..image_width {
-            let coeff = scanned_kernel.get_unchecked(half_len).weight;
+        let coeff = scanned_kernel.get_unchecked(half_len).weight;
 
-            let v_src = arena_src.get_unchecked(half_len).get_unchecked(x..);
+        for x in cx..image_width {
+            let v_src = ref0.get_unchecked(x..);
 
             let mut k0 = (*v_src.get_unchecked(0) as f32).mul(coeff);
 

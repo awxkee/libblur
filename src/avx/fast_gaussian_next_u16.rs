@@ -27,7 +27,6 @@
 
 use crate::avx::fast_gaussian_next::AvxSseI32x8;
 use crate::avx::utils::_mm256_mul_by_3_epi32;
-use crate::reflect_index;
 use crate::sse::utils::load_u16_s32_fast;
 use crate::sse::{_mm_mul_by_3_epi32, store_u16_u32};
 use crate::unsafe_slice::UnsafeSlice;

@@ -25,7 +25,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(target_arch = "aarch64", feature = "neon"))]
 use crate::stackblur::neon::{
     HorizontalNeonStackBlurPassFloat32, VerticalNeonStackBlurPassFloat32,
 };
@@ -55,13 +55,13 @@ fn stack_blur_worker_horizontal(
         thread_count: usize,
     ) {
         #[cfg(not(any(
-            all(target_arch = "aarch64", target_feature = "neon"),
+            all(target_arch = "aarch64", feature = "neon"),
             any(target_arch = "x86_64", target_arch = "x86"),
         )))]
         fn select_blur_pass<const N: usize>() -> impl StackBlurWorkingPass<f32, N> {
             HorizontalStackBlurPass::<f32, f32, f32, N>::default()
         }
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         fn select_blur_pass<const N: usize>() -> impl StackBlurWorkingPass<f32, N> {
             HorizontalNeonStackBlurPassFloat32::<f32, f32, N>::default()
         }
@@ -113,13 +113,13 @@ fn stack_blur_worker_vertical(
         thread_count: usize,
     ) {
         #[cfg(not(any(
-            all(target_arch = "aarch64", target_feature = "neon"),
+            all(target_arch = "aarch64", feature = "neon"),
             any(target_arch = "x86_64", target_arch = "x86"),
         )))]
         fn select_blur_pass<const N: usize>() -> impl StackBlurWorkingPass<f32, N> {
             VerticalStackBlurPass::<f32, f32, f32, N>::default()
         }
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         fn select_blur_pass<const N: usize>() -> impl StackBlurWorkingPass<f32, N> {
             VerticalNeonStackBlurPassFloat32::<f32, f32, N>::default()
         }
@@ -218,4 +218,30 @@ pub fn stack_blur_f32(
         }
     });
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_stack_blur_f32_q_k5() {
+        let width: usize = 148;
+        let height: usize = 148;
+        let mut dst = vec![0.32423f32; width * height * 3];
+        let mut dst_image = BlurImageMut::borrow(
+            &mut dst,
+            width as u32,
+            height as u32,
+            FastBlurChannels::Channels3,
+        );
+        stack_blur_f32(&mut dst_image, 5, ThreadingPolicy::Single).unwrap();
+        for (i, &cn) in dst.iter().enumerate() {
+            let diff = (cn - 0.32423f32).abs();
+            assert!(
+                diff <= 1e-4,
+                "Diff expected to be less than 1e-4 but it was {diff} at {i}"
+            );
+        }
+    }
 }

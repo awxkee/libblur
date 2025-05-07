@@ -25,9 +25,9 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(target_arch = "aarch64", feature = "neon"))]
 use crate::cpu_features::is_aarch_f16c_supported;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(target_arch = "aarch64", feature = "neon"))]
 use crate::neon::{
     fgn_horizontal_pass_neon_f16, fgn_horizontal_pass_neon_f32, fgn_horizontal_pass_neon_u8,
     fgn_vertical_pass_neon_f16, fgn_vertical_pass_neon_f32, fgn_vertical_pass_neon_u8,
@@ -44,8 +44,8 @@ use crate::unsafe_slice::UnsafeSlice;
 use crate::wasm32::{
     fast_gaussian_next_horizontal_pass_wasm_u8, fast_gaussian_next_vertical_pass_wasm_u8,
 };
+use crate::BlurError;
 use crate::{clamp_edge, BlurImageMut, EdgeMode, FastBlurChannels, ThreadingPolicy};
-use crate::{reflect_index, BlurError};
 use colorutils_rs::linear_to_planar::linear_to_plane;
 use colorutils_rs::planar_to_linear::plane_to_linear;
 use colorutils_rs::{
@@ -459,7 +459,7 @@ impl FastGaussianNextPassProvider<u16> for u16 {
     fn get_horizontal<const CN: usize>(
         radius: u32,
     ) -> fn(&UnsafeSlice<u16>, u32, u32, u32, u32, u32, u32, EdgeMode) {
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             if BASE_RADIUS_I64_CUTOFF > radius {
                 #[cfg(feature = "rdm")]
@@ -501,7 +501,7 @@ impl FastGaussianNextPassProvider<u16> for u16 {
     fn get_vertical<const CN: usize>(
         radius: u32,
     ) -> fn(&UnsafeSlice<u16>, u32, u32, u32, u32, u32, u32, EdgeMode) {
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             if BASE_RADIUS_I64_CUTOFF > radius {
                 #[cfg(feature = "rdm")]
@@ -579,7 +579,7 @@ impl FastGaussianNextPassProvider<u8> for u8 {
             }
         }
 
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             if BASE_RADIUS_I64_CUTOFF > radius {
                 _dispatcher_horizontal = fgn_horizontal_pass_neon_u8::<u8, CN>;
@@ -640,7 +640,7 @@ impl FastGaussianNextPassProvider<u8> for u8 {
             }
         }
 
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             if BASE_RADIUS_I64_CUTOFF > radius {
                 _dispatcher_vertical = fgn_vertical_pass_neon_u8::<u8, CN>;
@@ -698,7 +698,7 @@ impl FastGaussianNextPassProvider<f32> for f32 {
                 _dispatcher_horizontal = fgn_horizontal_pass_sse_f32::<f32, CN>;
             }
         }
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             if BASE_RADIUS_I64_CUTOFF > radius {
                 _dispatcher_horizontal = fgn_horizontal_pass_neon_f32::<f32, CN>;
@@ -740,7 +740,7 @@ impl FastGaussianNextPassProvider<f32> for f32 {
                 _dispatcher_vertical = fgn_vertical_pass_sse_f32::<f32, CN>;
             }
         }
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             if BASE_RADIUS_I64_CUTOFF > radius {
                 _dispatcher_vertical = fgn_vertical_pass_neon_f32::<f32, CN>;
@@ -776,7 +776,7 @@ impl FastGaussianNextPassProvider<f16> for f16 {
                 _dispatcher_horizontal = fast_gaussian_next_horizontal_pass_sse_f16::<f16, CN>;
             }
         }
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             if is_aarch_f16c_supported() {
                 _dispatcher_horizontal = fgn_horizontal_pass_neon_f16::<f16, CN>;
@@ -810,7 +810,7 @@ impl FastGaussianNextPassProvider<f16> for f16 {
                 _dispatcher_vertical = fast_gaussian_next_vertical_pass_sse_f16::<f16, CN>;
             }
         }
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             if is_aarch_f16c_supported() {
                 _dispatcher_vertical = fgn_vertical_pass_neon_f16::<f16, CN>;
@@ -1173,4 +1173,74 @@ pub fn fast_gaussian_next_in_linear(
         transfer_function,
     );
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_fast_gaussian_next_u8_q_k5() {
+        let width: usize = 148;
+        let height: usize = 148;
+        let mut dst = vec![126; width * height * 3];
+        let mut dst_image = BlurImageMut::borrow(
+            &mut dst,
+            width as u32,
+            height as u32,
+            FastBlurChannels::Channels3,
+        );
+        fast_gaussian_next(&mut dst_image, 5, ThreadingPolicy::Single, EdgeMode::Clamp).unwrap();
+        for (i, &cn) in dst.iter().enumerate() {
+            let diff = (cn as i32 - 126).abs();
+            assert!(
+                diff <= 3,
+                "Diff expected to be less than 3 but it was {diff} at {i}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_fast_gaussian_next_u16_fp_k25() {
+        let width: usize = 148;
+        let height: usize = 148;
+        let mut dst = vec![17234u16; width * height * 3];
+        let mut dst_image = BlurImageMut::borrow(
+            &mut dst,
+            width as u32,
+            height as u32,
+            FastBlurChannels::Channels3,
+        );
+        fast_gaussian_next_u16(&mut dst_image, 5, ThreadingPolicy::Single, EdgeMode::Clamp)
+            .unwrap();
+        for &cn in dst.iter() {
+            let diff = (cn as i32 - 17234i32).abs();
+            assert!(
+                diff <= 14,
+                "Diff expected to be less than 14 but it was {diff}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_fast_gaussian_next_f32_k25() {
+        let width: usize = 148;
+        let height: usize = 148;
+        let mut dst = vec![0.432; width * height * 3];
+        let mut dst_image = BlurImageMut::borrow(
+            &mut dst,
+            width as u32,
+            height as u32,
+            FastBlurChannels::Channels3,
+        );
+        fast_gaussian_next_f32(&mut dst_image, 5, ThreadingPolicy::Single, EdgeMode::Clamp)
+            .unwrap();
+        for &cn in dst.iter() {
+            let diff = (cn - 0.432).abs();
+            assert!(
+                diff <= 1e-4,
+                "Diff expected to be less than 1e-4 but it was {diff}"
+            );
+        }
+    }
 }

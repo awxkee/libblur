@@ -48,9 +48,11 @@ mod filter_row_approx;
 mod filter_row_symmetric;
 mod filter_row_symmetric_approx;
 mod filter_scan;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(target_arch = "aarch64", feature = "neon"))]
 pub(crate) mod neon;
 mod region;
+mod row_handler_small_approx;
+mod row_symm_approx_binter;
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 pub(crate) mod sse;
 mod to_approx_storage;

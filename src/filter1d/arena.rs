@@ -535,7 +535,7 @@ where
 
 /// Pads a column image with chosen border strategy
 #[inline(always)]
-fn make_arena_columns_exec<T, const COMPONENTS: usize>(
+fn make_arena_columns_exec<T, const CN: usize>(
     image: &[T],
     image_size: ImageSize,
     kernel_size: KernelShape,
@@ -548,26 +548,26 @@ where
 {
     check_slice_size(
         image,
-        image_size.width * COMPONENTS,
+        image_size.width * CN,
         image_size.width,
         image_size.height,
-        COMPONENTS,
+        CN,
     )?;
     let pad_h = kernel_size.height / 2;
 
-    let mut top_pad = vec![T::default(); pad_h * image_size.width * COMPONENTS];
-    let mut bottom_pad = vec![T::default(); pad_h * image_size.width * COMPONENTS];
+    let mut top_pad = vec![T::default(); pad_h * image_size.width * CN];
+    let mut bottom_pad = vec![T::default(); pad_h * image_size.width * CN];
 
-    let top_pad_stride = image_size.width * COMPONENTS;
+    let top_pad_stride = image_size.width * CN;
 
     for (ky, dst) in (0..pad_h).zip(top_pad.chunks_exact_mut(top_pad_stride)) {
-        for (kx, dst) in (0..image_size.width).zip(dst.chunks_exact_mut(COMPONENTS)) {
+        for (kx, dst) in (0..image_size.width).zip(dst.chunks_exact_mut(CN)) {
             match border_mode {
                 EdgeMode::Clamp => {
                     let y = ky.saturating_sub(pad_h).min(image_size.height - 1);
-                    let v_src = y * top_pad_stride + kx * COMPONENTS;
+                    let v_src = y * top_pad_stride + kx * CN;
 
-                    let src_iter = &image[v_src..(v_src + COMPONENTS)];
+                    let src_iter = &image[v_src..(v_src + CN)];
                     for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
                         *dst = *src;
                     }
@@ -575,16 +575,16 @@ where
                 EdgeMode::Wrap => {
                     let y =
                         (ky as i64 - pad_h as i64).rem_euclid(image_size.height as i64) as usize;
-                    let v_src = y * top_pad_stride + kx * COMPONENTS;
-                    let src_iter = &image[v_src..(v_src + COMPONENTS)];
+                    let v_src = y * top_pad_stride + kx * CN;
+                    let src_iter = &image[v_src..(v_src + CN)];
                     for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
                         *dst = *src;
                     }
                 }
                 EdgeMode::Reflect => {
                     let y = reflect_index(ky as isize - pad_h as isize, image_size.height as isize);
-                    let v_src = y * top_pad_stride + kx * COMPONENTS;
-                    let src_iter = &image[v_src..(v_src + COMPONENTS)];
+                    let v_src = y * top_pad_stride + kx * CN;
+                    let src_iter = &image[v_src..(v_src + CN)];
                     for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
                         *dst = *src;
                     }
@@ -592,8 +592,8 @@ where
                 EdgeMode::Reflect101 => {
                     let y =
                         reflect_index_101(ky as isize - pad_h as isize, image_size.height as isize);
-                    let v_src = y * top_pad_stride + kx * COMPONENTS;
-                    let src_iter = &image[v_src..(v_src + COMPONENTS)];
+                    let v_src = y * top_pad_stride + kx * CN;
+                    let src_iter = &image[v_src..(v_src + CN)];
                     for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
                         *dst = *src;
                     }
@@ -610,12 +610,12 @@ where
     let bottom_iter_dst = bottom_pad.chunks_exact_mut(top_pad_stride);
 
     for (ky, dst) in (0..pad_h).zip(bottom_iter_dst) {
-        for (kx, dst) in (0..image_size.width).zip(dst.chunks_exact_mut(COMPONENTS)) {
+        for (kx, dst) in (0..image_size.width).zip(dst.chunks_exact_mut(CN)) {
             match border_mode {
                 EdgeMode::Clamp => {
                     let y = (ky + image_size.height).min(image_size.height - 1);
-                    let v_src = y * top_pad_stride + kx * COMPONENTS;
-                    let src_iter = &image[v_src..(v_src + COMPONENTS)];
+                    let v_src = y * top_pad_stride + kx * CN;
+                    let src_iter = &image[v_src..(v_src + CN)];
                     for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
                         *dst = *src;
                     }
@@ -623,8 +623,8 @@ where
                 EdgeMode::Wrap => {
                     let y = (ky as i64 + image_size.height as i64)
                         .rem_euclid(image_size.height as i64) as usize;
-                    let v_src = y * top_pad_stride + kx * COMPONENTS;
-                    let src_iter = &image[v_src..(v_src + COMPONENTS)];
+                    let v_src = y * top_pad_stride + kx * CN;
+                    let src_iter = &image[v_src..(v_src + CN)];
                     for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
                         *dst = *src;
                     }
@@ -634,8 +634,8 @@ where
                         ky as isize + image_size.height as isize,
                         image_size.height as isize,
                     );
-                    let v_src = y * top_pad_stride + kx * COMPONENTS;
-                    let src_iter = &image[v_src..(v_src + COMPONENTS)];
+                    let v_src = y * top_pad_stride + kx * CN;
+                    let src_iter = &image[v_src..(v_src + CN)];
                     for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
                         *dst = *src;
                     }
@@ -645,8 +645,8 @@ where
                         ky as isize + image_size.height as isize,
                         image_size.height as isize,
                     );
-                    let v_src = y * top_pad_stride + kx * COMPONENTS;
-                    let src_iter = &image[v_src..(v_src + COMPONENTS)];
+                    let v_src = y * top_pad_stride + kx * CN;
+                    let src_iter = &image[v_src..(v_src + CN)];
                     for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
                         *dst = *src;
                     }

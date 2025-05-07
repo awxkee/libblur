@@ -25,7 +25,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(target_arch = "aarch64", feature = "neon"))]
 use crate::stackblur::neon::{
     HorizontalNeonStackBlurPassFloat16, VerticalNeonStackBlurPassFloat16,
 };
@@ -62,7 +62,7 @@ fn stack_blur_worker_horizontal(
                         Box::new(HorizontalSseStackBlurPassFloat16::<f16, f32, 1>::default());
                 }
             }
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            #[cfg(all(target_arch = "aarch64", feature = "neon"))]
             {
                 _executor = Box::new(HorizontalNeonStackBlurPassFloat16::<f16, f32, 1>::default());
             }
@@ -81,7 +81,7 @@ fn stack_blur_worker_horizontal(
                         Box::new(HorizontalSseStackBlurPassFloat16::<f16, f32, 3>::default());
                 }
             }
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            #[cfg(all(target_arch = "aarch64", feature = "neon"))]
             {
                 _executor = Box::new(HorizontalNeonStackBlurPassFloat16::<f16, f32, 3>::default());
             }
@@ -100,7 +100,7 @@ fn stack_blur_worker_horizontal(
                         Box::new(HorizontalSseStackBlurPassFloat16::<f16, f32, 4>::default());
                 }
             }
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            #[cfg(all(target_arch = "aarch64", feature = "neon"))]
             {
                 _executor = Box::new(HorizontalNeonStackBlurPassFloat16::<f16, f32, 4>::default());
             }
@@ -132,7 +132,7 @@ fn stack_blur_worker_vertical(
                     _executor = Box::new(VerticalSseStackBlurPassFloat16::<f16, f32, 1>::default());
                 }
             }
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            #[cfg(all(target_arch = "aarch64", feature = "neon"))]
             {
                 _executor = Box::new(VerticalNeonStackBlurPassFloat16::<f16, f32, 1>::default());
             }
@@ -150,7 +150,7 @@ fn stack_blur_worker_vertical(
                     _executor = Box::new(VerticalSseStackBlurPassFloat16::<f16, f32, 3>::default());
                 }
             }
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            #[cfg(all(target_arch = "aarch64", feature = "neon"))]
             {
                 _executor = Box::new(VerticalNeonStackBlurPassFloat16::<f16, f32, 3>::default());
             }
@@ -168,7 +168,7 @@ fn stack_blur_worker_vertical(
                     _executor = Box::new(VerticalSseStackBlurPassFloat16::<f16, f32, 4>::default());
                 }
             }
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            #[cfg(all(target_arch = "aarch64", feature = "neon"))]
             {
                 _executor = Box::new(VerticalNeonStackBlurPassFloat16::<f16, f32, 4>::default());
             }

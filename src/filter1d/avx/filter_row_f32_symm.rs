@@ -140,9 +140,9 @@ impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
 
         let half_len = length / 2;
 
-        while cx + 32 < max_width {
-            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
+        let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
 
+        while cx + 32 < max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source = _mm256_load_pack_ps_x4(shifted_src.get_unchecked(half_len * N..).as_ptr());
@@ -169,8 +169,6 @@ impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
         }
 
         while cx + 16 < max_width {
-            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
-
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source = _mm256_load_pack_ps_x2(shifted_src.get_unchecked(half_len * N..).as_ptr());
@@ -193,8 +191,6 @@ impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
         }
 
         while cx + 8 < max_width {
-            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
-
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source = _mm256_loadu_ps(shifted_src.get_unchecked(half_len * N..).as_ptr());
@@ -215,12 +211,10 @@ impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
         }
 
         while cx + 4 < max_width {
-            let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
-
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source_0 = _mm_loadu_ps(shifted_src.get_unchecked(half_len * N..).as_ptr());
-            let mut k0 = _mm_mul_ps(source_0, coeff);
+            let mut k0 = _mm_mul_ps(source_0, _mm256_castps256_ps128(coeff));
 
             for i in 0..half_len {
                 let rollback = length - i - 1;
@@ -236,12 +230,10 @@ impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
         }
 
         while cx < max_width {
-            let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
-
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source_0 = _mm_load_ss(shifted_src.get_unchecked(half_len * N..).as_ptr());
-            let mut k0 = _mm_mul_ps(source_0, coeff);
+            let mut k0 = _mm_mul_ps(source_0, _mm256_castps256_ps128(coeff));
 
             for i in 0..half_len {
                 let rollback = length - i - 1;

@@ -26,10 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::avx::_mm256_packus_four_epi32;
-#[cfg(target_arch = "x86")]
-use std::arch::x86::*;
-#[cfg(target_arch = "x86_64")]
+use crate::filter1d::avx::sse_utils::_mm256_packus_four_epi32;
 use std::arch::x86_64::*;
 
 #[inline(always)]
@@ -258,7 +255,8 @@ pub(crate) unsafe fn _mm256_mul_add_symm_epi16_by_ps_x2<const FMA: bool>(
     )
 }
 
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "avx2")]
 pub(crate) unsafe fn _mm256_pack_ps_x4_epi8(store: (__m256, __m256, __m256, __m256)) -> __m256i {
     let v0 = _mm256_cvtps_epi32(store.0);
     let v1 = _mm256_cvtps_epi32(store.1);
@@ -268,14 +266,16 @@ pub(crate) unsafe fn _mm256_pack_ps_x4_epi8(store: (__m256, __m256, __m256, __m2
     _mm256_packus_four_epi32(v0, v1, v2, v3)
 }
 
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "avx2")]
 pub(crate) unsafe fn _mm256_pack_ps_x2_epi16(store: (__m256, __m256)) -> __m256i {
     let v0 = _mm256_cvtps_epi32(store.0);
     let v1 = _mm256_cvtps_epi32(store.1);
     _mm256_packus_epi32(v0, v1)
 }
 
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "avx2")]
 pub(crate) unsafe fn _mm256_pack_epi32_x4_epi8(store: (__m256i, __m256i)) -> __m256i {
     let rnd = _mm256_set1_epi16((1 << 5) - 1);
     _mm256_packus_epi16(
@@ -284,7 +284,8 @@ pub(crate) unsafe fn _mm256_pack_epi32_x4_epi8(store: (__m256i, __m256i)) -> __m
     )
 }
 
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "avx2")]
 pub(crate) unsafe fn _mm256_pack_epi32_x4_epu16(store: (__m256i, __m256i)) -> __m256i {
     let rnd = _mm256_set1_epi32((1 << 14) - 1);
     _mm256_packus_epi32(

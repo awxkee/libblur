@@ -130,12 +130,14 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
             let length = scanned_kernel.len();
             let half_len = length / 2;
 
+            let ref0 = arena_src.get_unchecked(half_len);
+
+            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
+
             let mut cx = 0usize;
 
             while cx + 32 < dst_stride {
-                let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
-
-                let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
+                let v_src = ref0.get_unchecked(cx..);
 
                 let source = _mm256_load_pack_ps_x4(v_src.as_ptr());
                 let mut k0 = _mm256_mul_ps(source.0, coeff);
@@ -183,9 +185,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
             }
 
             while cx + 16 < dst_stride {
-                let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
-
-                let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
+                let v_src = ref0.get_unchecked(cx..);
 
                 let source = _mm256_load_pack_ps_x2(v_src.as_ptr());
                 let mut k0 = _mm256_mul_ps(source.0, coeff);
@@ -221,9 +221,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
             }
 
             while cx + 8 < dst_stride {
-                let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
-
-                let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
+                let v_src = ref0.get_unchecked(cx..);
 
                 let source = _mm256_loadu_ps(v_src.as_ptr());
                 let mut k0 = _mm256_mul_ps(source, coeff);
@@ -249,12 +247,10 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
             }
 
             while cx + 4 < dst_stride {
-                let coeff = *scanned_kernel.get_unchecked(half_len);
-
-                let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
+                let v_src = ref0.get_unchecked(cx..);
 
                 let source_0 = _mm_loadu_ps(v_src.as_ptr());
-                let mut k0 = _mm_mul_ps(source_0, _mm_set1_ps(coeff.weight));
+                let mut k0 = _mm_mul_ps(source_0, _mm256_castps256_ps128(coeff));
 
                 for i in 0..half_len {
                     let rollback = length - i - 1;
@@ -279,10 +275,10 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
                 cx += 4;
             }
 
-            while cx < dst_stride {
-                let coeff = *scanned_kernel.get_unchecked(half_len);
+            let coeff = *scanned_kernel.get_unchecked(half_len);
 
-                let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
+            while cx < dst_stride {
+                let v_src = ref0.get_unchecked(cx..);
 
                 let source_0 = _mm_load_ss(v_src.as_ptr());
                 let mut k0 = _mm_mul_ps(source_0, _mm_set1_ps(coeff.weight));

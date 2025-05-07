@@ -33,10 +33,10 @@ use colorutils_rs::{
 };
 use std::mem::size_of;
 
-/// Stack blur that will be performed in linear color space
+/// Stack blur that will be performed in scene linear color space.
 ///
 /// Blurs in linear color space produces most pleasant results and mathematically correct to do so however significantly slower.
-/// This method is significantly slower than regular `u8` stack blur in perceptual colorspace.
+/// This method is significantly slower than regular `u8` stack blur in perceptual/display colorspace.
 /// This is a very fast approximation using f32 accumulator size with radius less that *BASE_RADIUS_F64_CUTOFF*,
 /// after it to avoid overflowing fallback to f64 accumulator will be used with some computational slowdown with factor ~1.5-2
 ///
@@ -48,7 +48,6 @@ use std::mem::size_of;
 ///
 /// # Complexity
 /// O(1) complexity.
-#[allow(clippy::too_many_arguments)]
 pub fn stack_blur_in_linear(
     image: &mut BlurImageMut<u8>,
     radius: u32,

@@ -60,12 +60,14 @@ pub(crate) fn filter_column_symmetric_approx<T, I>(
 
         let mut cx = 0usize;
 
-        while cx + 32 < dst_stride {
-            let coeff = scanned_kernel[half_len].weight;
+        let ref0 = arena_src[half_len];
 
+        let coeff = scanned_kernel[half_len].weight;
+
+        while cx + 32 < dst_stride {
             let mut store: [I; 32] = [I::default(); 32];
 
-            let v_src = &arena_src[half_len][cx..(cx + 32)];
+            let v_src = &ref0[cx..(cx + 32)];
 
             for (dst, src) in store.iter_mut().zip(v_src) {
                 *dst = src.as_().mul(coeff);
@@ -89,11 +91,9 @@ pub(crate) fn filter_column_symmetric_approx<T, I>(
         }
 
         while cx + 16 < dst_stride {
-            let coeff = scanned_kernel[half_len].weight;
-
             let mut store: [I; 16] = [I::default(); 16];
 
-            let v_src = &arena_src[half_len][cx..(cx + 16)];
+            let v_src = &ref0[cx..(cx + 16)];
 
             for (dst, src) in store.iter_mut().zip(v_src) {
                 *dst = src.as_().mul(coeff);
@@ -117,9 +117,7 @@ pub(crate) fn filter_column_symmetric_approx<T, I>(
         }
 
         while cx + 4 < dst_stride {
-            let coeff = scanned_kernel[half_len].weight;
-
-            let v_src = &arena_src[half_len][cx..(cx + 4)];
+            let v_src = &ref0[cx..(cx + 4)];
 
             let mut k0 = v_src[0].as_().mul(coeff);
             let mut k1 = v_src[1].as_().mul(coeff);
@@ -143,18 +141,17 @@ pub(crate) fn filter_column_symmetric_approx<T, I>(
             cx += 4;
         }
 
+        #[allow(clippy::needless_range_loop)]
         for x in cx..dst_stride {
-            let coeff = scanned_kernel[half_len].weight;
+            let v_src = ref0[x];
 
-            let v_src = &arena_src[half_len][x..(x + 1)];
-
-            let mut k0 = v_src[0].as_().mul(coeff);
+            let mut k0 = v_src.as_().mul(coeff);
 
             for (i, coeff) in scanned_kernel.iter().take(half_len).enumerate() {
                 let rollback = length - i - 1;
-                let fw = &arena_src[i][x..(x + 1)];
-                let bw = &arena_src[rollback][x..(x + 1)];
-                k0 = fw[0].as_().add(bw[0].as_()).mul(coeff.weight).add(k0);
+                let fw = arena_src[i][x];
+                let bw = arena_src[rollback][x];
+                k0 = fw.as_().add(bw.as_()).mul(coeff.weight).add(k0);
             }
 
             *dst.get_unchecked_mut(x) = k0.to_approx_();

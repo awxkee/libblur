@@ -56,7 +56,7 @@ fn f16_to_f32(bytes: Vec<u16>) -> Vec<f32> {
 }
 
 fn main() {
-    let dyn_image = ImageReader::open("./assets/test_image_2.png")
+    let dyn_image = ImageReader::open("./assets/test_image_4.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -88,10 +88,10 @@ fn main() {
     let mut v_vec = src_bytes
         .to_vec()
         .iter()
-        // .map(|&x| x)
-        .map(|&x| (x as f32 / 255.))
+        .map(|&x| x)
+        // .map(|&x| (x as f32 / 255.))
         // .map(|&x| u16::from_ne_bytes([x, x]))
-        .collect::<Vec<f32>>();
+        .collect::<Vec<u8>>();
 
     // let mut dst_image = BlurImageMut::borrow(
     //     &mut v_vec,
@@ -107,18 +107,18 @@ fn main() {
         FastBlurChannels::Channels4,
     );
     let mut dst_image = BlurImageMut::default();
-    dst_image.data.borrow_mut().fill(1.);
     //
     // libblur::fast_gaussian_next_f32(&mut dst_image, 10, ThreadingPolicy::Single, EdgeMode::Clamp)
     //     .unwrap();
 
-    libblur::gaussian_blur_f32(
+    libblur::gaussian_blur(
         &image,
         &mut dst_image,
-        23,
+        55,
         0.,
         EdgeMode::Clamp,
-        ThreadingPolicy::Single,
+        ThreadingPolicy::Adaptive,
+        ConvolutionMode::FixedPoint,
     )
     .unwrap();
 
@@ -137,8 +137,8 @@ fn main() {
         .data
         .borrow()
         .iter()
-        // .map(|&x| x)
-        .map(|&x| (x * 255f32).round() as u8)
+        .map(|&x| x)
+        // .map(|&x| (x * 255f32).round() as u8)
         // .map(|&x| (x >> 8) as u8)
         .collect::<Vec<u8>>();
 

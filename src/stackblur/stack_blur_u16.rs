@@ -183,3 +183,29 @@ pub fn stack_blur_u16(
     });
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_stack_blur_u16_q_k5() {
+        let width: usize = 148;
+        let height: usize = 148;
+        let mut dst = vec![43231u16; width * height * 3];
+        let mut dst_image = BlurImageMut::borrow(
+            &mut dst,
+            width as u32,
+            height as u32,
+            FastBlurChannels::Channels3,
+        );
+        stack_blur_u16(&mut dst_image, 5, ThreadingPolicy::Single).unwrap();
+        for (i, &cn) in dst.iter().enumerate() {
+            let diff = (cn as i32 - 43231i32).abs();
+            assert!(
+                diff <= 20,
+                "Diff expected to be less than 20 but it was {diff} at {i}"
+            );
+        }
+    }
+}

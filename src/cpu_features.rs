@@ -28,7 +28,7 @@
  */
 
 #[cfg(any(
-    all(target_arch = "aarch64", target_feature = "neon"),
+    all(target_arch = "aarch64", feature = "neon"),
     any(target_arch = "x86", target_arch = "x86_64")
 ))]
 #[cfg(any(target_os = "macos", target_os = "ios", target_os = "tvos"))]
@@ -85,7 +85,7 @@ pub fn is_x86_avx512vl_supported() -> bool {
 }
 
 #[cfg(not(any(
-    all(target_arch = "aarch64", target_feature = "neon"),
+    all(target_arch = "aarch64", feature = "neon"),
     any(target_arch = "x86", target_arch = "x86_64")
 )))]
 #[cfg(not(any(target_os = "macos", target_os = "ios", target_os = "tvos")))]
@@ -96,7 +96,7 @@ fn apple_has_cpu_feature(_feature_name: &str) -> bool {
 
 /// Test aarch64 cpu with *fp16* check,
 /// on *Apple* platform [libc](https://developer.apple.com/documentation/kernel/1387446-sysctlbyname/determining_instruction_set_characteristics) be used
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(target_arch = "aarch64", feature = "neon"))]
 #[allow(dead_code)]
 pub(crate) fn is_aarch_f16_supported() -> bool {
     #[cfg(any(target_os = "macos", target_os = "ios", target_os = "tvos"))]
@@ -112,7 +112,7 @@ pub(crate) fn is_aarch_f16_supported() -> bool {
 /// Test aarch64 cpu with *f16 conversion* instructions.
 /// on *Apple* platform [libc](https://developer.apple.com/documentation/kernel/1387446-sysctlbyname/determining_instruction_set_characteristics) be used
 /// otherwise consider it is always available
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(target_arch = "aarch64", feature = "neon"))]
 #[allow(dead_code)]
 pub(crate) fn is_aarch_f16c_supported() -> bool {
     #[cfg(any(target_os = "macos", target_os = "ios", target_os = "tvos"))]
@@ -128,7 +128,7 @@ pub(crate) fn is_aarch_f16c_supported() -> bool {
 /// Test aarch64 cpu with *fhm conversion* instructions.
 /// on *Apple* platform [libc](https://developer.apple.com/documentation/kernel/1387446-sysctlbyname/determining_instruction_set_characteristics) be used
 /// otherwise consider it is always available
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(target_arch = "aarch64", feature = "neon"))]
 #[allow(dead_code)]
 pub(crate) fn is_aarch_fhm_supported() -> bool {
     #[cfg(any(target_os = "macos", target_os = "ios", target_os = "tvos"))]
@@ -143,7 +143,7 @@ pub(crate) fn is_aarch_fhm_supported() -> bool {
 
 /// Test aarch64 cpu with *rdm* check,
 /// on *Apple* platform [libc](https://developer.apple.com/documentation/kernel/1387446-sysctlbyname/determining_instruction_set_characteristics) be used
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(target_arch = "aarch64", feature = "neon"))]
 #[allow(dead_code)]
 pub(crate) fn is_aarch_rdm_supported() -> bool {
     #[cfg(any(target_os = "macos", target_os = "ios", target_os = "tvos"))]

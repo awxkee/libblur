@@ -30,7 +30,6 @@ use std::arch::aarch64::*;
 use half::f16;
 
 use crate::neon::{load_f32_f16, store_f32_f16};
-use crate::reflect_index;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, EdgeMode};
 

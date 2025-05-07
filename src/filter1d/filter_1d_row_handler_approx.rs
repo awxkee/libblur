@@ -72,7 +72,7 @@ macro_rules! default_1d_row_handler {
 
 impl Filter1DRowHandlerApprox<u8, i32> for u8 {
     #[cfg(not(any(
-        all(target_arch = "aarch64", target_feature = "neon"),
+        all(target_arch = "aarch64", feature = "neon"),
         any(target_arch = "x86_64", target_arch = "x86")
     )))]
     fn get_row_handler_apr<const N: usize>(
@@ -85,7 +85,7 @@ impl Filter1DRowHandlerApprox<u8, i32> for u8 {
         }
     }
 
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     fn get_row_handler_apr<const N: usize>(
         is_symmetric_kernel: bool,
     ) -> fn(Arena, &[u8], &mut [u8], ImageSize, FilterRegion, &[ScanPoint1d<i32>]) {
@@ -144,7 +144,7 @@ impl Filter1DRowHandlerApprox<u8, i32> for u8 {
 }
 
 impl Filter1DRowHandlerApprox<u16, u32> for u16 {
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     fn get_row_handler_apr<const N: usize>(
         is_kernel_symmetric: bool,
     ) -> fn(Arena, &[u16], &mut [u16], ImageSize, FilterRegion, &[ScanPoint1d<u32>]) {
@@ -178,7 +178,7 @@ impl Filter1DRowHandlerApprox<u16, u32> for u16 {
     }
 
     #[cfg(not(any(
-        all(target_arch = "aarch64", target_feature = "neon"),
+        all(target_arch = "aarch64", feature = "neon"),
         any(target_arch = "x86_64", target_arch = "x86")
     )))]
     fn get_row_handler_apr<const N: usize>(

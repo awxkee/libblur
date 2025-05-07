@@ -201,7 +201,7 @@ where
 
             let mut _dest_slice = destination.data.borrow_mut();
 
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            #[cfg(all(target_arch = "aarch64", feature = "neon"))]
             if let Some(column_multiple_rows) = _column_multiple_rows {
                 _dest_slice
                     .par_chunks_exact_mut(dst_stride * 3)
@@ -404,7 +404,7 @@ where
                 .into_remainder();
         }
 
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         if let Some(column_multiple_rows) =
             T::get_column_handler_multiple_rows(is_column_kernel_symmetrical)
         {

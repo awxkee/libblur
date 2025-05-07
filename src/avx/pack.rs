@@ -46,19 +46,6 @@ pub(crate) unsafe fn _mm256_pack_u16(s_1: __m256i, s_2: __m256i) -> __m256i {
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm256_packus_four_epi32(
-    a: __m256i,
-    b: __m256i,
-    c: __m256i,
-    d: __m256i,
-) -> __m256i {
-    let ab = _mm256_packs_epi32(a, b);
-    let cd = _mm256_packs_epi32(c, d);
-
-    _mm256_packus_epi16(ab, cd)
-}
-
-#[inline(always)]
 pub(crate) unsafe fn _mm256_deinterleave_rgba_epi8(
     rgba0: __m256i,
     rgba1: __m256i,

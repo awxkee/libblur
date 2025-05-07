@@ -34,7 +34,7 @@ use crate::filter1d::avx::{
 use crate::filter1d::filter_column::filter_column;
 use crate::filter1d::filter_column_symmetric::filter_symmetric_column;
 use crate::filter1d::filter_scan::ScanPoint1d;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(target_arch = "aarch64", feature = "neon"))]
 use crate::filter1d::neon::{
     filter_column_neon_f32_f32, filter_column_neon_symm_f32_f32, filter_column_neon_u8_f32,
     filter_column_neon_u8_i16, filter_column_symm_neon_u8_i16, filter_symm_column_neon_u8_f32,
@@ -84,7 +84,7 @@ pub trait Filter1DColumnHandler<T, F> {
 
 impl Filter1DColumnHandler<u8, f32> for u8 {
     #[cfg(not(any(
-        all(target_arch = "aarch64", target_feature = "neon"),
+        all(target_arch = "aarch64", feature = "neon"),
         any(target_arch = "x86_64", target_arch = "x86")
     )))]
     fn get_column_handler(
@@ -93,7 +93,7 @@ impl Filter1DColumnHandler<u8, f32> for u8 {
         filter_column
     }
 
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     fn get_column_handler(
         is_symmetric_kernel: bool,
     ) -> fn(Arena, &[&[u8]], &mut [u8], ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
@@ -128,7 +128,7 @@ impl Filter1DColumnHandler<u8, f32> for u8 {
 
 impl Filter1DColumnHandler<u8, i16> for u8 {
     #[cfg(not(any(
-        all(target_arch = "aarch64", target_feature = "neon"),
+        all(target_arch = "aarch64", feature = "neon"),
         any(target_arch = "x86_64", target_arch = "x86")
     )))]
     fn get_column_handler(
@@ -141,7 +141,7 @@ impl Filter1DColumnHandler<u8, i16> for u8 {
         }
     }
 
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     fn get_column_handler(
         is_symmetric_kernel: bool,
     ) -> fn(Arena, &[&[u8]], &mut [u8], ImageSize, FilterRegion, &[ScanPoint1d<i16>]) {
@@ -173,7 +173,7 @@ impl Filter1DColumnHandler<u8, i16> for u8 {
 
 impl Filter1DColumnHandler<f32, f32> for f32 {
     #[cfg(not(any(
-        all(target_arch = "aarch64", target_feature = "neon"),
+        all(target_arch = "aarch64", feature = "neon"),
         any(target_arch = "x86_64", target_arch = "x86")
     )))]
     fn get_column_handler(
@@ -186,7 +186,7 @@ impl Filter1DColumnHandler<f32, f32> for f32 {
         }
     }
 
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     fn get_column_handler(
         is_symmetric_kernel: bool,
     ) -> fn(Arena, &[&[f32]], &mut [f32], ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
@@ -222,7 +222,7 @@ impl Filter1DColumnHandler<f32, f32> for f32 {
 }
 
 impl Filter1DColumnHandler<u16, f32> for u16 {
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     fn get_column_handler(
         is_symmetric_kernel: bool,
     ) -> fn(Arena, &[&[u16]], &mut [u16], ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
@@ -256,7 +256,7 @@ impl Filter1DColumnHandler<u16, f32> for u16 {
     }
 
     #[cfg(not(any(
-        all(target_arch = "aarch64", target_feature = "neon"),
+        all(target_arch = "aarch64", feature = "neon"),
         any(target_arch = "x86_64", target_arch = "x86")
     )))]
     fn get_column_handler(
@@ -271,7 +271,7 @@ impl Filter1DColumnHandler<u16, f32> for u16 {
 }
 
 impl Filter1DColumnHandlerMultipleRows<u8, f32> for u8 {
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     fn get_column_handler_multiple_rows(
         is_symmetric_kernel: bool,
     ) -> Option<fn(Arena, FilterBrows<u8>, &mut [u8], ImageSize, usize, &[ScanPoint1d<f32>])> {
@@ -283,7 +283,7 @@ impl Filter1DColumnHandlerMultipleRows<u8, f32> for u8 {
     }
 
     #[cfg(not(any(
-        all(target_arch = "aarch64", target_feature = "neon"),
+        all(target_arch = "aarch64", feature = "neon"),
         any(target_arch = "x86_64", target_arch = "x86")
     )))]
     fn get_column_handler_multiple_rows(
@@ -308,7 +308,7 @@ impl Filter1DColumnHandlerMultipleRows<u8, f32> for u8 {
 }
 
 impl Filter1DColumnHandlerMultipleRows<u16, f32> for u16 {
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     fn get_column_handler_multiple_rows(
         is_symmetric_kernel: bool,
     ) -> Option<fn(Arena, FilterBrows<u16>, &mut [u16], ImageSize, usize, &[ScanPoint1d<f32>])>
@@ -321,7 +321,7 @@ impl Filter1DColumnHandlerMultipleRows<u16, f32> for u16 {
     }
 
     #[cfg(not(any(
-        all(target_arch = "aarch64", target_feature = "neon"),
+        all(target_arch = "aarch64", feature = "neon"),
         any(target_arch = "x86_64", target_arch = "x86")
     )))]
     fn get_column_handler_multiple_rows(
