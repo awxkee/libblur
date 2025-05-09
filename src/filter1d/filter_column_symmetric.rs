@@ -57,9 +57,9 @@ pub(crate) fn filter_symmetric_column<T, F>(
 
         let mut cx = 0usize;
 
-        while cx + 32 < dst_stride {
-            let coeff = scanned_kernel[half_len].weight;
+        let coeff = scanned_kernel[half_len].weight;
 
+        while cx + 32 < dst_stride {
             let mut store: [F; 32] = [F::default(); 32];
 
             let v_src = &arena_src[half_len][cx..(cx + 32)];
@@ -86,8 +86,6 @@ pub(crate) fn filter_symmetric_column<T, F>(
         }
 
         while cx + 16 < dst_stride {
-            let coeff = scanned_kernel[half_len].weight;
-
             let mut store: [F; 16] = [F::default(); 16];
 
             let v_src = &arena_src[half_len][cx..(cx + 16)];
@@ -114,8 +112,6 @@ pub(crate) fn filter_symmetric_column<T, F>(
         }
 
         while cx + 4 < dst_stride {
-            let coeff = scanned_kernel[half_len].weight;
-
             let v_src = &arena_src[half_len][cx..(cx + 4)];
 
             let mut k0 = v_src[0].as_().mul(coeff);
@@ -141,8 +137,6 @@ pub(crate) fn filter_symmetric_column<T, F>(
         }
 
         for x in cx..dst_stride {
-            let coeff = scanned_kernel[half_len].weight;
-
             let v_src = &arena_src[half_len][x..(x + 1)];
 
             let mut k0 = v_src[0].as_().mul(coeff);

@@ -30,7 +30,6 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-use crate::reflect_index;
 use crate::sse::{load_f32_f16, store_f32_f16};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, EdgeMode};

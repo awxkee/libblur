@@ -30,7 +30,7 @@
 mod avx;
 #[deny(unused, unreachable_pub)]
 mod horizontal;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(target_arch = "aarch64", feature = "neon"))]
 mod neon;
 mod sliding_window;
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]

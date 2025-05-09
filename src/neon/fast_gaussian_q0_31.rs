@@ -28,7 +28,7 @@
 use crate::neon::fast_gaussian::NeonI32x4;
 use crate::neon::{load_u8_s32_fast, store_u8_s32_x5, store_u8x8_m4};
 use crate::unsafe_slice::UnsafeSlice;
-use crate::{clamp_edge, reflect_index, EdgeMode};
+use crate::{clamp_edge, EdgeMode};
 use std::arch::aarch64::*;
 
 pub(crate) fn fg_horizontal_pass_neon_u8_rdm<T, const CHANNELS_COUNT: usize>(

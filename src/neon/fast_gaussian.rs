@@ -27,7 +27,7 @@
 
 use crate::neon::{load_u8_s32_fast, store_u8_s32_x4, store_u8x8_m4, vmulq_s32_f32};
 use crate::unsafe_slice::UnsafeSlice;
-use crate::{clamp_edge, reflect_index, EdgeMode};
+use crate::{clamp_edge, EdgeMode};
 use std::arch::aarch64::*;
 
 #[repr(C, align(16))]

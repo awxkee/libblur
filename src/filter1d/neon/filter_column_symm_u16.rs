@@ -55,12 +55,14 @@ pub(crate) fn filter_symm_column_neon_u16_f32(
         let length = scanned_kernel.len();
         let half_len = length / 2;
 
+        let ref0 = brows.get_unchecked(half_len);
+
         let mut cx = 0usize;
 
         while cx + 32 < image_width {
             let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(half_len).weight);
 
-            let shifted_src = brows.get_unchecked(half_len).get_unchecked(cx..);
+            let shifted_src = ref0.get_unchecked(cx..);
 
             let source = xvld1q_u16_x4(shifted_src.as_ptr());
             let mut k0 = vmulq_u16_by_f32(source.0, coeff);
@@ -96,7 +98,7 @@ pub(crate) fn filter_symm_column_neon_u16_f32(
         while cx + 16 < image_width {
             let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(half_len).weight);
 
-            let shifted_src = brows.get_unchecked(half_len).get_unchecked(cx..);
+            let shifted_src = ref0.get_unchecked(cx..);
 
             let source = xvld1q_u16_x2(shifted_src.as_ptr());
             let mut k0 = vmulq_u16_by_f32(source.0, coeff);
@@ -123,7 +125,7 @@ pub(crate) fn filter_symm_column_neon_u16_f32(
         while cx + 8 < image_width {
             let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(half_len).weight);
 
-            let shifted_src = brows.get_unchecked(half_len).get_unchecked(cx..);
+            let shifted_src = ref0.get_unchecked(cx..);
 
             let source = vld1q_u16(shifted_src.as_ptr());
             let mut k0 = vmulq_u16_by_f32(source, coeff);
@@ -145,10 +147,10 @@ pub(crate) fn filter_symm_column_neon_u16_f32(
         while cx + 4 < image_width {
             let coeff = scanned_kernel.get_unchecked(half_len).weight;
 
-            let mut k0 = (*brows.get_unchecked(half_len).get_unchecked(cx) as f32).mul(coeff);
-            let mut k1 = (*brows.get_unchecked(half_len).get_unchecked(cx + 1) as f32).mul(coeff);
-            let mut k2 = (*brows.get_unchecked(half_len).get_unchecked(cx + 2) as f32).mul(coeff);
-            let mut k3 = (*brows.get_unchecked(half_len).get_unchecked(cx + 3) as f32).mul(coeff);
+            let mut k0 = (*ref0.get_unchecked(cx) as f32).mul(coeff);
+            let mut k1 = (*ref0.get_unchecked(cx + 1) as f32).mul(coeff);
+            let mut k2 = (*ref0.get_unchecked(cx + 2) as f32).mul(coeff);
+            let mut k3 = (*ref0.get_unchecked(cx + 3) as f32).mul(coeff);
 
             for i in 0..half_len {
                 let coeff = *scanned_kernel.get_unchecked(i);
@@ -189,7 +191,7 @@ pub(crate) fn filter_symm_column_neon_u16_f32(
         for x in cx..dst_stride {
             let coeff = scanned_kernel.get_unchecked(half_len).weight;
 
-            let mut k0 = (*brows.get_unchecked(half_len).get_unchecked(x) as f32).mul(coeff);
+            let mut k0 = (*ref0.get_unchecked(x) as f32).mul(coeff);
 
             for i in 0..half_len {
                 let coeff = *scanned_kernel.get_unchecked(i);

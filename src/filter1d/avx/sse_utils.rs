@@ -631,3 +631,16 @@ pub(crate) unsafe fn _mm_pack_ps_epi8(store: __m128) -> __m128i {
 pub(crate) unsafe fn _mm_pack_ps_epi16(store: __m128) -> __m128i {
     _mm_packus_epi32(_mm_cvtps_epi32(store), _mm_setzero_si128())
 }
+
+#[inline(always)]
+pub(crate) unsafe fn _mm256_packus_four_epi32(
+    a: __m256i,
+    b: __m256i,
+    c: __m256i,
+    d: __m256i,
+) -> __m256i {
+    let ab = _mm256_packs_epi32(a, b);
+    let cd = _mm256_packs_epi32(c, d);
+
+    _mm256_packus_epi16(ab, cd)
+}

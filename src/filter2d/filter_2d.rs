@@ -119,9 +119,7 @@ where
 ///
 /// * `CN`: channels count.
 /// * `src`: Source planar image.
-/// * `src_stride`: Source image stride.
 /// * `dst`: Destination image.
-/// * `dst_stride`: Destination image stride.
 /// * `image_size`: Image size.
 /// * `kernel`: Kernel.
 /// * `kernel_shape`: Kernel size, see [KernelShape] for more info.

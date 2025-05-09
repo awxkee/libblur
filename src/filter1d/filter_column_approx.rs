@@ -58,9 +58,9 @@ pub(crate) fn filter_column_approx<T, I>(
 
         let mut cx = 0usize;
 
-        while cx + 4 < dst_stride {
-            let coeff = *scanned_kernel.get_unchecked(0);
+        let coeff = *scanned_kernel.get_unchecked(0);
 
+        while cx + 4 < dst_stride {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let mut k0 = v_src.get_unchecked(0).as_().mul(coeff.weight);
@@ -96,8 +96,6 @@ pub(crate) fn filter_column_approx<T, I>(
         }
 
         for x in cx..dst_stride {
-            let coeff = *scanned_kernel.get_unchecked(0);
-
             let v_src = arena_src.get_unchecked(0).get_unchecked(x..);
 
             let mut k0 = v_src.get_unchecked(0).as_().mul(coeff.weight);

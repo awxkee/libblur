@@ -50,7 +50,7 @@ pub trait Filter1DRowHandler<T, F> {
 
 impl Filter1DRowHandler<u8, f32> for u8 {
     #[cfg(not(any(
-        all(target_arch = "aarch64", target_feature = "neon"),
+        all(target_arch = "aarch64", feature = "neon"),
         any(target_arch = "x86_64", target_arch = "x86")
     )))]
     fn get_row_handler<const N: usize>(
@@ -64,7 +64,7 @@ impl Filter1DRowHandler<u8, f32> for u8 {
         }
     }
 
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     fn get_row_handler<const N: usize>(
         is_kernel_symmetric: bool,
     ) -> fn(Arena, &[u8], &mut [u8], ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
@@ -110,7 +110,7 @@ impl Filter1DRowHandler<u8, f32> for u8 {
 
 impl Filter1DRowHandler<f32, f32> for f32 {
     #[cfg(not(any(
-        all(target_arch = "aarch64", target_feature = "neon"),
+        all(target_arch = "aarch64", feature = "neon"),
         any(target_arch = "x86_64", target_arch = "x86")
     )))]
     fn get_row_handler<const N: usize>(
@@ -124,7 +124,7 @@ impl Filter1DRowHandler<f32, f32> for f32 {
         }
     }
 
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     fn get_row_handler<const N: usize>(
         is_kernel_symmetric: bool,
     ) -> fn(Arena, &[f32], &mut [f32], ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
@@ -169,7 +169,7 @@ impl Filter1DRowHandler<f32, f32> for f32 {
 }
 
 impl Filter1DRowHandler<u16, f32> for f32 {
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     fn get_row_handler<const N: usize>(
         is_symmetric_kernel: bool,
     ) -> fn(Arena, &[u16], &mut [u16], ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
@@ -205,7 +205,7 @@ impl Filter1DRowHandler<u16, f32> for f32 {
     }
 
     #[cfg(not(any(
-        all(target_arch = "aarch64", target_feature = "neon"),
+        all(target_arch = "aarch64", feature = "neon"),
         any(target_arch = "x86_64", target_arch = "x86")
     )))]
     fn get_row_handler<const N: usize>(
@@ -222,7 +222,7 @@ impl Filter1DRowHandler<u16, f32> for f32 {
 
 impl Filter1DRowHandler<u8, i16> for u8 {
     #[cfg(not(any(
-        all(target_arch = "aarch64", target_feature = "neon"),
+        all(target_arch = "aarch64", feature = "neon"),
         any(target_arch = "x86_64", target_arch = "x86")
     )))]
     fn get_row_handler<const N: usize>(
@@ -236,7 +236,7 @@ impl Filter1DRowHandler<u8, i16> for u8 {
         }
     }
 
-    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     fn get_row_handler<const N: usize>(
         is_symmetric_kernel: bool,
     ) -> fn(Arena, &[u8], &mut [u8], ImageSize, FilterRegion, &[ScanPoint1d<i16>]) {

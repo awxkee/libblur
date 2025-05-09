@@ -29,10 +29,10 @@
 
 #![no_main]
 
-use libblur::{fast_gaussian, BlurImageMut, EdgeMode, FastBlurChannels, ThreadingPolicy};
+use libblur::{fast_gaussian_next_u16, BlurImageMut, EdgeMode, FastBlurChannels, ThreadingPolicy};
 use libfuzzer_sys::fuzz_target;
 
-fuzz_target!(|data: (u8, u8, u8, u8, u8, u8)| {
+fuzz_target!(|data: (u8, u8, u8, u8, u16, u8)| {
     let edge_mode = match data.3 % 4 {
         0 => EdgeMode::Clamp,
         1 => EdgeMode::Wrap,
@@ -84,25 +84,19 @@ fn fuzz_image(
     radius: usize,
     channels: FastBlurChannels,
     edge_mode: EdgeMode,
-    data: u8,
+    value: u16,
 ) {
     if width == 0 || height == 0 || radius == 0 {
         return;
     }
-
     let mut dst_image = BlurImageMut::alloc(width as u32, height as u32, channels);
-    dst_image.data.borrow_mut().fill(data);
+    dst_image.data.borrow_mut().fill(value);
 
-    fast_gaussian(
+    fast_gaussian_next_u16(
         &mut dst_image,
         radius as u32,
         ThreadingPolicy::Single,
         edge_mode,
     )
     .unwrap();
-
-    for &v in dst_image.data.borrow() {
-        let diff = (v as i32 - data as i32).abs();
-        assert!(diff <= 4);
-    }
 }

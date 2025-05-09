@@ -141,9 +141,9 @@ impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
 
         let max_width = image_size.width * N;
 
-        while cx + 32 < max_width {
-            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(0).weight);
+        let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(0).weight);
 
+        while cx + 32 < max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source = _mm256_load_pack_ps_x4(shifted_src.as_ptr());
@@ -167,8 +167,6 @@ impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
         }
 
         while cx + 16 < max_width {
-            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(0).weight);
-
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source = _mm256_load_pack_ps_x2(shifted_src.as_ptr());
@@ -188,8 +186,6 @@ impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
         }
 
         while cx + 8 < max_width {
-            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(0).weight);
-
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source = _mm256_loadu_ps(shifted_src.as_ptr());
@@ -207,12 +203,10 @@ impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
         }
 
         while cx + 4 < max_width {
-            let coeff = *scanned_kernel.get_unchecked(0);
-
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source_0 = _mm_loadu_ps(shifted_src.as_ptr());
-            let mut k0 = _mm_mul_ps(source_0, _mm_set1_ps(coeff.weight));
+            let mut k0 = _mm_mul_ps(source_0, _mm256_castps256_ps128(coeff));
 
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
@@ -225,9 +219,9 @@ impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
             cx += 4;
         }
 
-        while cx < max_width {
-            let coeff = *scanned_kernel.get_unchecked(0);
+        let coeff = *scanned_kernel.get_unchecked(0);
 
+        while cx < max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source_0 = _mm_load_ss(shifted_src.as_ptr());

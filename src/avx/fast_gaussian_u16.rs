@@ -26,7 +26,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::avx::fast_gaussian_next::AvxSseI32x8;
-use crate::reflect_index;
 use crate::sse::store_u16_u32;
 use crate::sse::utils::load_u16_s32_fast;
 use crate::unsafe_slice::UnsafeSlice;

@@ -26,9 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::avx::{
-    _mm256_load_pack_x2, _mm256_load_pack_x4, _mm256_store_pack_x2, _mm256_store_pack_x4,
-};
+use crate::avx::{_mm256_load_pack_x2, _mm256_store_pack_x2};
 use crate::filter1d::arena::Arena;
 use crate::filter1d::avx::sse_utils::{
     _mm_mul_add_epi8_by_epi16_x4, _mm_mul_epi8_by_epi16_x4, _mm_pack_epi32_x2_epi8,
@@ -40,9 +38,6 @@ use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::region::FilterRegion;
 use crate::filter1d::to_approx_storage::ToApproxStorage;
 use crate::img_size::ImageSize;
-#[cfg(target_arch = "x86")]
-use std::arch::x86::*;
-#[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 use std::ops::{Add, Mul};
 
@@ -81,43 +76,17 @@ unsafe fn filter_column_avx_u8_i32_impl(
 
     let mut cx = 0usize;
 
-    while cx + 128 < image_width {
-        let coeff = _mm256_set1_epi16(scanned_kernel.get_unchecked(0).weight as i16);
+    let v_prepared = scanned_kernel
+        .iter()
+        .map(|&x| {
+            let z = x.weight.to_ne_bytes();
+            i32::from_ne_bytes([z[0], z[1], z[0], z[1]])
+        })
+        .collect::<Vec<_>>();
 
-        let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
-
-        let source = _mm256_load_pack_x4(v_src.as_ptr());
-        let mut k0 = _mm256_mul_epi8_by_epi16_x4(source.0, coeff);
-        let mut k1 = _mm256_mul_epi8_by_epi16_x4(source.1, coeff);
-        let mut k2 = _mm256_mul_epi8_by_epi16_x4(source.2, coeff);
-        let mut k3 = _mm256_mul_epi8_by_epi16_x4(source.3, coeff);
-
-        for i in 1..length {
-            let coeff = _mm256_set1_epi16(scanned_kernel.get_unchecked(i).weight as i16);
-            let v_source =
-                _mm256_load_pack_x4(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
-            k0 = _mm256_mul_add_epi8_by_epi16_x4(k0, v_source.0, coeff);
-            k1 = _mm256_mul_add_epi8_by_epi16_x4(k1, v_source.1, coeff);
-            k2 = _mm256_mul_add_epi8_by_epi16_x4(k2, v_source.2, coeff);
-            k3 = _mm256_mul_add_epi8_by_epi16_x4(k3, v_source.3, coeff);
-        }
-
-        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
-        _mm256_store_pack_x4(
-            dst_ptr0,
-            (
-                _mm256_pack_epi32_x4_epi8(k0),
-                _mm256_pack_epi32_x4_epi8(k1),
-                _mm256_pack_epi32_x4_epi8(k2),
-                _mm256_pack_epi32_x4_epi8(k3),
-            ),
-        );
-        cx += 128;
-    }
+    let coeff = _mm256_set1_epi32(*v_prepared.get_unchecked(0));
 
     while cx + 64 < image_width {
-        let coeff = _mm256_set1_epi16(scanned_kernel.get_unchecked(0).weight as i16);
-
         let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
         let source = _mm256_load_pack_x2(v_src.as_ptr());
@@ -125,7 +94,7 @@ unsafe fn filter_column_avx_u8_i32_impl(
         let mut k1 = _mm256_mul_epi8_by_epi16_x4(source.1, coeff);
 
         for i in 1..length {
-            let coeff = _mm256_set1_epi16(scanned_kernel.get_unchecked(i).weight as i16);
+            let coeff = _mm256_set1_epi32(*v_prepared.get_unchecked(i));
             let v_source =
                 _mm256_load_pack_x2(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
             k0 = _mm256_mul_add_epi8_by_epi16_x4(k0, v_source.0, coeff);
@@ -141,15 +110,13 @@ unsafe fn filter_column_avx_u8_i32_impl(
     }
 
     while cx + 32 < image_width {
-        let coeff = _mm256_set1_epi16(scanned_kernel.get_unchecked(0).weight as i16);
-
         let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
         let source = _mm256_loadu_si256(v_src.as_ptr() as *const __m256i);
         let mut k0 = _mm256_mul_epi8_by_epi16_x4(source, coeff);
 
         for i in 1..length {
-            let coeff = _mm256_set1_epi16(scanned_kernel.get_unchecked(i).weight as i16);
+            let coeff = _mm256_set1_epi32(*v_prepared.get_unchecked(i));
             let v_source = _mm256_loadu_si256(
                 arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr() as *const __m256i,
             );
@@ -162,15 +129,13 @@ unsafe fn filter_column_avx_u8_i32_impl(
     }
 
     while cx + 16 < image_width {
-        let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(0).weight as i16);
-
         let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
         let source = _mm_loadu_si128(v_src.as_ptr() as *const __m128i);
-        let mut k0 = _mm_mul_epi8_by_epi16_x4(source, coeff);
+        let mut k0 = _mm_mul_epi8_by_epi16_x4(source, _mm256_castsi256_si128(coeff));
 
         for i in 1..length {
-            let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(i).weight as i16);
+            let coeff = _mm_set1_epi32(*v_prepared.get_unchecked(i));
             let v_source = _mm_loadu_si128(
                 arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr() as *const __m128i
             );
@@ -182,9 +147,9 @@ unsafe fn filter_column_avx_u8_i32_impl(
         cx += 16;
     }
 
-    while cx + 4 < image_width {
-        let coeff = *scanned_kernel.get_unchecked(0);
+    let coeff = *scanned_kernel.get_unchecked(0);
 
+    while cx + 4 < image_width {
         let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
         let mut k0 = (*v_src.get_unchecked(0) as i32).mul(coeff.weight);
@@ -216,8 +181,6 @@ unsafe fn filter_column_avx_u8_i32_impl(
     }
 
     for x in cx..image_width {
-        let coeff = *scanned_kernel.get_unchecked(0);
-
         let v_src = arena_src.get_unchecked(0).get_unchecked(x..);
 
         let mut k0 = ((*v_src.get_unchecked(0)) as i32).mul(coeff.weight);

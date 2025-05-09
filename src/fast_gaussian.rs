@@ -35,10 +35,9 @@ use num_traits::cast::FromPrimitive;
 use num_traits::{AsPrimitive, Float};
 
 use crate::channels_configuration::FastBlurChannels;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(target_arch = "aarch64", feature = "neon"))]
 use crate::cpu_features::is_aarch_f16c_supported;
-use crate::edge_mode::reflect_index;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(target_arch = "aarch64", feature = "neon"))]
 use crate::neon::{
     fg_horizontal_pass_neon_f16, fg_horizontal_pass_neon_f32, fg_horizontal_pass_neon_u8,
     fg_vertical_pass_neon_f16, fg_vertical_pass_neon_f32, fg_vertical_pass_neon_u8,
@@ -428,7 +427,7 @@ impl FastGaussianDispatchProvider<u16> for u16 {
     fn get_vertical<const CN: usize>(
         radius: u32,
     ) -> fn(&UnsafeSlice<u16>, u32, u32, u32, u32, u32, u32, EdgeMode) {
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             use crate::neon::fg_vertical_pass_neon_u16;
             if BASE_RADIUS_I64_CUTOFF > radius {
@@ -461,7 +460,7 @@ impl FastGaussianDispatchProvider<u16> for u16 {
     fn get_horizontal<const CN: usize>(
         radius: u32,
     ) -> fn(&UnsafeSlice<u16>, u32, u32, u32, u32, u32, u32, EdgeMode) {
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             if BASE_RADIUS_I64_CUTOFF > radius {
                 use crate::neon::fg_horizontal_pass_neon_u16;
@@ -510,7 +509,7 @@ impl FastGaussianDispatchProvider<u8> for u8 {
         } else {
             fg_horizontal_pass::<u8, i64, f64, CN>
         };
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             if BASE_RADIUS_I64_CUTOFF > radius {
                 _dispatcher_horizontal = fg_horizontal_pass_neon_u8::<u8, CN>;
@@ -564,7 +563,7 @@ impl FastGaussianDispatchProvider<u8> for u8 {
         } else {
             fg_vertical_pass::<u8, i64, f64, CN>
         };
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             if BASE_RADIUS_I64_CUTOFF > radius {
                 _dispatcher_vertical = fg_vertical_pass_neon_u8::<u8, CN>;
@@ -635,7 +634,7 @@ impl FastGaussianDispatchProvider<f32> for f32 {
                 _dispatcher_vertical = fg_vertical_pass_sse_f32::<f32, CN>;
             }
         }
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             _dispatcher_vertical = fg_vertical_pass_neon_f32::<f32, CN>;
         }
@@ -674,7 +673,7 @@ impl FastGaussianDispatchProvider<f32> for f32 {
                 _dispatcher_horizontal = fg_horizontal_pass_sse_f32::<f32, CN>;
             }
         }
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             _dispatcher_horizontal = fg_horizontal_pass_neon_f32::<f32, CN>;
         }
@@ -700,7 +699,7 @@ impl FastGaussianDispatchProvider<f16> for f16 {
         } else {
             fg_vertical_pass::<f16, f64, f64, CN>
         };
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             if is_aarch_f16c_supported() {
                 _dispatcher_vertical = fg_vertical_pass_neon_f16::<f16, CN>;
@@ -734,7 +733,7 @@ impl FastGaussianDispatchProvider<f16> for f16 {
         } else {
             fg_horizontal_pass::<f16, f64, f64, CN>
         };
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             if is_aarch_f16c_supported() {
                 _dispatcher_horizontal = fg_horizontal_pass_neon_f16::<f16, CN>;
@@ -1099,4 +1098,72 @@ pub fn fast_gaussian_f16(
         threading_policy
     );
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_fast_gaussian_u8_q_k5() {
+        let width: usize = 148;
+        let height: usize = 148;
+        let mut dst = vec![126; width * height * 3];
+        let mut dst_image = BlurImageMut::borrow(
+            &mut dst,
+            width as u32,
+            height as u32,
+            FastBlurChannels::Channels3,
+        );
+        fast_gaussian(&mut dst_image, 5, ThreadingPolicy::Single, EdgeMode::Clamp).unwrap();
+        for (i, &cn) in dst.iter().enumerate() {
+            let diff = (cn as i32 - 126).abs();
+            assert!(
+                diff <= 3,
+                "Diff expected to be less than 3 but it was {diff} at {i}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_fast_gaussian_u16_fp_k25() {
+        let width: usize = 148;
+        let height: usize = 148;
+        let mut dst = vec![17234u16; width * height * 3];
+        let mut dst_image = BlurImageMut::borrow(
+            &mut dst,
+            width as u32,
+            height as u32,
+            FastBlurChannels::Channels3,
+        );
+        fast_gaussian_u16(&mut dst_image, 5, ThreadingPolicy::Single, EdgeMode::Clamp).unwrap();
+        for &cn in dst.iter() {
+            let diff = (cn as i32 - 17234i32).abs();
+            assert!(
+                diff <= 14,
+                "Diff expected to be less than 14 but it was {diff}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_fast_gaussian_f32_k25() {
+        let width: usize = 148;
+        let height: usize = 148;
+        let mut dst = vec![0.432; width * height * 3];
+        let mut dst_image = BlurImageMut::borrow(
+            &mut dst,
+            width as u32,
+            height as u32,
+            FastBlurChannels::Channels3,
+        );
+        fast_gaussian_f32(&mut dst_image, 5, ThreadingPolicy::Single, EdgeMode::Clamp).unwrap();
+        for &cn in dst.iter() {
+            let diff = (cn - 0.432).abs();
+            assert!(
+                diff <= 1e-4,
+                "Diff expected to be less than 1e-4 but it was {diff}"
+            );
+        }
+    }
 }

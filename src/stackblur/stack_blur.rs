@@ -25,7 +25,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(target_arch = "aarch64", feature = "neon"))]
 use crate::stackblur::neon::{HorizontalNeonStackBlurPass, VerticalNeonStackBlurPass};
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 use crate::stackblur::sse::{HorizontalSseStackBlurPass, VerticalSseStackBlurPass};
@@ -73,7 +73,7 @@ fn stack_blur_worker_horizontal(
             Box::new(HorizontalStackBlurPass::<u8, i32, f32, N>::default())
         }
 
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         fn select_blur_pass<const N: usize>() -> Box<dyn StackBlurWorkingPass<u8, N>> {
             #[cfg(feature = "rdm")]
             if std::arch::is_aarch64_feature_detected!("rdm") {
@@ -89,7 +89,7 @@ fn stack_blur_worker_horizontal(
         }
 
         #[cfg(not(any(
-            all(target_arch = "aarch64", target_feature = "neon"),
+            all(target_arch = "aarch64", feature = "neon"),
             all(target_arch = "wasm32", target_feature = "simd128"),
             target_arch = "x86_64",
             target_arch = "x86"
@@ -151,7 +151,7 @@ fn stack_blur_worker_vertical(
             Box::new(VerticalStackBlurPass::<u8, i32, f32, N>::default())
         }
 
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         fn select_blur_pass<const N: usize>() -> Box<dyn StackBlurWorkingPass<u8, N>> {
             #[cfg(feature = "rdm")]
             if std::arch::is_aarch64_feature_detected!("rdm") {
@@ -167,7 +167,7 @@ fn stack_blur_worker_vertical(
         }
 
         #[cfg(not(any(
-            all(target_arch = "aarch64", target_feature = "neon"),
+            all(target_arch = "aarch64", feature = "neon"),
             all(target_arch = "wasm32", target_feature = "simd128"),
             target_arch = "x86_64",
             target_arch = "x86"
@@ -261,4 +261,30 @@ pub fn stack_blur(
         }
     });
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_stack_blur_u8_q_k5() {
+        let width: usize = 148;
+        let height: usize = 148;
+        let mut dst = vec![126; width * height * 3];
+        let mut dst_image = BlurImageMut::borrow(
+            &mut dst,
+            width as u32,
+            height as u32,
+            FastBlurChannels::Channels3,
+        );
+        stack_blur(&mut dst_image, 5, ThreadingPolicy::Single).unwrap();
+        for (i, &cn) in dst.iter().enumerate() {
+            let diff = (cn as i32 - 126).abs();
+            assert!(
+                diff <= 3,
+                "Diff expected to be less than 3 but it was {diff} at {i}"
+            );
+        }
+    }
 }

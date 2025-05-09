@@ -34,14 +34,13 @@ pub enum EdgeMode {
     #[default]
     Clamp = 0,
     /// If kernel goes out of bounds it will be clipped, this is a slightly faster than clamp, however have different visual effects at the edge.
-    /// *Kernel clip is supported only for clear gaussian blur and not supported in any approximations!*
     Wrap = 1,
-    /// If filter goes out of bounds image will be replicated with rule `fedcba|abcdefgh|hgfedcb`
+    /// If filter goes out of bounds image will be replicated with rule `fedcba|abcdefgh|hgfedcb`.
     Reflect = 2,
-    /// If filter goes out of bounds image will be replicated with rule `gfedcb|abcdefgh|gfedcba`
+    /// If filter goes out of bounds image will be replicated with rule `gfedcb|abcdefgh|gfedcba`.
     Reflect101 = 3,
-    /// If filter goes out of bounds image will be replicated with provided constant
-    /// Works only for clear filter, otherwise ignored
+    /// If filter goes out of bounds image will be replicated with provided constant.
+    /// Works only for pure gaussian filter, otherwise ignored.
     Constant = 4,
 }
 
@@ -54,7 +53,7 @@ impl From<usize> for EdgeMode {
             3 => EdgeMode::Reflect101,
             4 => EdgeMode::Constant,
             _ => {
-                panic!("Unknown edge mode for value: {value}");
+                unreachable!("Unknown edge mode for value: {value}");
             }
         }
     }
@@ -77,10 +76,9 @@ pub(crate) fn reflect_index_101(i: isize, n: isize) -> usize {
 
 macro_rules! clamp_edge {
     ($edge_mode:expr, $value:expr, $min:expr, $max:expr) => {{
+        use crate::edge_mode::EdgeMode;
         match $edge_mode {
-            EdgeMode::Clamp | EdgeMode::Constant => {
-                (std::cmp::min(std::cmp::max($value, $min), $max - 1) as u32) as usize
-            }
+            EdgeMode::Clamp | EdgeMode::Constant => $value.max($min).min($max - 1) as usize,
             EdgeMode::Wrap => {
                 if $value < $min || $value >= $max {
                     $value.rem_euclid($max) as usize
@@ -90,6 +88,7 @@ macro_rules! clamp_edge {
             }
             EdgeMode::Reflect => {
                 if $value < $min || $value >= $max {
+                    use crate::reflect_index;
                     let cx = reflect_index($value as isize, $max as isize);
                     cx as usize
                 } else {
@@ -108,6 +107,57 @@ macro_rules! clamp_edge {
     }};
 }
 
+#[derive(Clone, Copy)]
+pub struct BorderHandle {
+    pub edge_mode: EdgeMode,
+    pub scalar: Scalar,
+}
+
+macro_rules! border_interpolate {
+    ($slice: expr, $edge_mode:expr, $value:expr, $min:expr, $max:expr, $scale: expr, $cn: expr) => {{
+        use crate::edge_mode::EdgeMode;
+        use num_traits::AsPrimitive;
+        match $edge_mode.edge_mode {
+            EdgeMode::Constant => {
+                if $value < $min || $value >= $max {
+                    $edge_mode.scalar[$cn].as_()
+                } else {
+                    *$slice.get_unchecked($value as usize * $scale + $cn)
+                }
+            }
+            EdgeMode::Clamp => {
+                *$slice.get_unchecked($value.max($min).min($max - 1) as usize * $scale + $cn)
+            }
+            EdgeMode::Wrap => {
+                if $value < $min || $value >= $max {
+                    *$slice.get_unchecked($value.rem_euclid($max) as usize * $scale + $cn)
+                } else {
+                    *$slice.get_unchecked($value as usize * $scale + $cn)
+                }
+            }
+            EdgeMode::Reflect => {
+                if $value < $min || $value >= $max {
+                    use crate::reflect_index;
+                    let cx = reflect_index($value as isize, $max as isize);
+                    *$slice.get_unchecked(cx as usize * $scale + $cn)
+                } else {
+                    *$slice.get_unchecked($value as usize * $scale + $cn)
+                }
+            }
+            EdgeMode::Reflect101 => {
+                if $value < $min || $value >= $max {
+                    use crate::reflect_index_101;
+                    let cx = reflect_index_101($value as isize, $max as isize);
+                    *$slice.get_unchecked(cx as usize * $scale + $cn)
+                } else {
+                    *$slice.get_unchecked($value as usize * $scale + $cn)
+                }
+            }
+        }
+    }};
+}
+
+pub(crate) use border_interpolate;
 pub(crate) use clamp_edge;
 
 #[repr(C)]

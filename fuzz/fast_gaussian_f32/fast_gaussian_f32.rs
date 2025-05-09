@@ -32,34 +32,50 @@
 use libblur::{fast_gaussian_f32, BlurImageMut, EdgeMode, FastBlurChannels, ThreadingPolicy};
 use libfuzzer_sys::fuzz_target;
 
-fuzz_target!(|data: (u8, u8, u8, u8)| {
+fuzz_target!(|data: (u8, u8, u8, u8, u16, u8)| {
     let edge_mode = match data.3 % 4 {
         0 => EdgeMode::Clamp,
         1 => EdgeMode::Wrap,
         2 => EdgeMode::Reflect,
         _ => EdgeMode::Reflect101,
     };
-    fuzz_image(
-        data.0 as usize,
-        data.1 as usize,
-        data.2 as usize,
-        FastBlurChannels::Channels4,
-        edge_mode,
-    );
-    fuzz_image(
-        data.0 as usize,
-        data.1 as usize,
-        data.2 as usize,
-        FastBlurChannels::Channels3,
-        edge_mode,
-    );
-    fuzz_image(
-        data.0 as usize,
-        data.1 as usize,
-        data.2 as usize,
-        FastBlurChannels::Plane,
-        edge_mode,
-    );
+    let plane_match = match data.5 % 3 {
+        0 => FastBlurChannels::Channels4,
+        1 => FastBlurChannels::Channels3,
+        _ => FastBlurChannels::Plane,
+    };
+    match plane_match {
+        FastBlurChannels::Plane => {
+            fuzz_image(
+                data.0 as usize,
+                data.1 as usize,
+                data.2 as usize,
+                FastBlurChannels::Plane,
+                edge_mode,
+                data.4 as f32 / 65535.0,
+            );
+        }
+        FastBlurChannels::Channels3 => {
+            fuzz_image(
+                data.0 as usize,
+                data.1 as usize,
+                data.2 as usize,
+                FastBlurChannels::Channels3,
+                edge_mode,
+                data.4 as f32 / 65535.0,
+            );
+        }
+        FastBlurChannels::Channels4 => {
+            fuzz_image(
+                data.0 as usize,
+                data.1 as usize,
+                data.2 as usize,
+                FastBlurChannels::Channels4,
+                edge_mode,
+                data.4 as f32 / 65535.0,
+            );
+        }
+    }
 });
 
 fn fuzz_image(
@@ -68,11 +84,13 @@ fn fuzz_image(
     radius: usize,
     channels: FastBlurChannels,
     edge_mode: EdgeMode,
+    value: f32,
 ) {
     if width == 0 || height == 0 || radius == 0 {
         return;
     }
     let mut dst_image = BlurImageMut::alloc(width as u32, height as u32, channels);
+    dst_image.data.borrow_mut().fill(value);
 
     fast_gaussian_f32(
         &mut dst_image,

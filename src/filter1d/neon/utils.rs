@@ -101,8 +101,8 @@ pub(crate) unsafe fn vmullq_u8_by_i16(
     input: uint8x16_t,
     weight: int16x8_t,
 ) -> (int32x4_t, int32x4_t, int32x4_t, int32x4_t) {
-    let lo_16 = vreinterpretq_s16_u16(vshll_n_u8::<6>(vget_low_u8(input)));
-    let hi_16 = vreinterpretq_s16_u16(vshll_high_n_u8::<6>(input));
+    let lo_16 = vreinterpretq_s16_u16(vmovl_u8(vget_low_u8(input)));
+    let hi_16 = vreinterpretq_s16_u16(vmovl_high_u8(input));
 
     (
         vmull_s16(vget_low_s16(lo_16), vget_low_s16(weight)),
@@ -335,7 +335,7 @@ pub(crate) unsafe fn vfmlaq_symm_u8_s16(
         vmovl_u8(vget_low_u8(input0)),
         vmovl_u8(vget_low_u8(input1)),
     ));
-    let hi_16 = vreinterpretq_s16_u16(vaddq_u16(vmovl_high_u8(input0), vmovl_high_u8(input1)));
+    let hi_16 = vreinterpretq_s16_u16(vaddl_u8(vget_high_u8(input0), vget_high_u8(input1)));
 
     (
         vmlal_s16(store.0, vget_low_s16(lo_16), vget_low_s16(weight)),
@@ -582,11 +582,13 @@ pub(crate) unsafe fn xvst1q_u16_x2(a: *mut u16, b: uint16x8x2_t) {
     vst1q_u16(a.add(8), b.1);
 }
 
+#[cfg(feature = "rdm")]
 #[inline(always)]
 pub(crate) unsafe fn xvld4u8(a: *const u8) -> uint8x8_t {
     vreinterpret_u8_u32(vld1_lane_u32::<0>(a as *const _, vdup_n_u32(0)))
 }
 
+#[cfg(feature = "rdm")]
 #[inline(always)]
 pub(crate) unsafe fn xvst_u8x4_q15(a: *mut u8, v: int16x8_t) {
     let shifted = vqrshrun_n_s16::<6>(v);

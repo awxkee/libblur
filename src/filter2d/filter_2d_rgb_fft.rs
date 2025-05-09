@@ -35,7 +35,7 @@ use rustfft::FftNum;
 use std::fmt::Debug;
 use std::ops::Mul;
 
-/// Performs 2D separable approximated convolution on RGB image.
+/// Performs 2D non-separable approximated convolution on RGB image using FFT.
 ///
 /// This method does convolution using spectrum multiplication via fft.
 ///

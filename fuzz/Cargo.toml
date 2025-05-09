@@ -9,12 +9,13 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-libblur = {path = "../", default-features = false}
+libblur = { path = "../", default-features = false }
 
 [features]
+neon = ["libblur/neon"]
 avx = ["libblur/avx"]
 sse = ["libblur/sse"]
-rdm = ["libblur/rdm"]
+rdm = ["libblur/rdm", "neon"]
 
 [[bin]]
 name = "motion"
@@ -82,6 +83,20 @@ bench = false
 [[bin]]
 name = "fast_gaussian_next"
 path = "fast_gaussian_next/fast_gaussian_next.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fast_gaussian_next_u16"
+path = "fast_gaussian_next_u16/fast_gaussian_next_u16.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fast_gaussian_next_f32"
+path = "fast_gaussian_next_f32/fast_gaussian_next_f32.rs"
 test = false
 doc = false
 bench = false

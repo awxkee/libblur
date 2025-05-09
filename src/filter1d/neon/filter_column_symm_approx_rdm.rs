@@ -69,10 +69,11 @@ unsafe fn executor_unit(
 
         let mut cx = 0usize;
 
-        while cx + 64 < image_width {
-            let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(half_len).weight as i16);
+        let ref0 = arena_src.get_unchecked(half_len);
+        let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(half_len).weight as i16);
 
-            let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
+        while cx + 64 < image_width {
+            let v_src = ref0.get_unchecked(cx..);
 
             let source = xvld1q_u8_x4(v_src.as_ptr());
             let mut k0 = vmullq_expand_i16(source.0, coeff);
@@ -111,9 +112,7 @@ unsafe fn executor_unit(
         }
 
         while cx + 48 < image_width {
-            let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(half_len).weight as i16);
-
-            let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
+            let v_src = ref0.get_unchecked(cx..);
 
             let source = xvld1q_u8_x3(v_src.as_ptr());
             let mut k0 = vmullq_expand_i16(source.0, coeff);
@@ -149,9 +148,7 @@ unsafe fn executor_unit(
         }
 
         while cx + 32 < image_width {
-            let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(half_len).weight as i16);
-
-            let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
+            let v_src = ref0.get_unchecked(cx..);
 
             let source = xvld1q_u8_x2(v_src.as_ptr());
             let mut k0 = vmullq_expand_i16(source.0, coeff);
@@ -181,9 +178,7 @@ unsafe fn executor_unit(
         }
 
         while cx + 16 < image_width {
-            let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(half_len).weight as i16);
-
-            let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
+            let v_src = ref0.get_unchecked(cx..);
 
             let source = vld1q_u8(v_src.as_ptr());
             let mut k0 = vmullq_expand_i16(source, coeff);
@@ -207,9 +202,7 @@ unsafe fn executor_unit(
         }
 
         while cx + 4 < image_width {
-            let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(half_len).weight as i16);
-
-            let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
+            let v_src = ref0.get_unchecked(cx..);
 
             let source = xvld4u8(v_src.as_ptr());
             let mut k0 = vmull_expand_i16(source, coeff);
@@ -232,10 +225,10 @@ unsafe fn executor_unit(
             cx += 4;
         }
 
-        for x in cx..image_width {
-            let coeff = *scanned_kernel.get_unchecked(0);
+        let coeff = *scanned_kernel.get_unchecked(half_len);
 
-            let v_src = arena_src.get_unchecked(half_len).get_unchecked(x..);
+        for x in cx..image_width {
+            let v_src = ref0.get_unchecked(x..);
 
             let mut k0 = ((*v_src.get_unchecked(0)) as i32).mul(coeff.weight);
 

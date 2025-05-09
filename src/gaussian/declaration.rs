@@ -39,11 +39,13 @@ use half::f16;
 ///
 /// This performs a gaussian kernel filter on the image producing beautiful looking result.
 /// Preferred if you need to perform an advanced signal analysis after.
+/// This is always perform accurate pure analytical gaussian filter.
 /// O(R) complexity.
 ///
 /// # Arguments
 ///
-/// * `stride` - Lane length, default is width * channels_count * size_of(PixelType) if not aligned
+/// * `src` - Source image.
+/// * `dst` - Destination image.
 /// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted. If zero, then sigma must be set.
 /// * `sigma` - Sigma for a gaussian kernel, corresponds to kernel flattening level. If zero of negative then *get_sigma_size* will be used
 /// * `edge_mode` - Rule to handle edge mode
@@ -125,12 +127,13 @@ pub fn gaussian_blur(
 ///
 /// This performs a gaussian kernel filter on the image producing beautiful looking result.
 /// Preferred if you need to perform an advanced signal analysis after.
+/// This is always perform accurate pure analytical gaussian filter.
 /// O(R) complexity.
 ///
 /// # Arguments
 ///
-/// * `width` - Width of the image
-/// * `height` - Height of the image
+/// * `src` - Source image.
+/// * `dst` - Destination image.
 /// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted. If zero, then sigma must be set.
 /// * `sigma` - Sigma for a gaussian kernel, corresponds to kernel flattening level. If zero of negative then *get_sigma_size* will be used
 /// * `channels` - Count of channels in the image
@@ -138,7 +141,7 @@ pub fn gaussian_blur(
 /// * `threading_policy` - Threading policy according to *ThreadingPolicy*
 /// * `hint` - see [ConvolutionMode] for more info
 ///
-/// This method always clamp into [0, 65535], if other bit-depth is used 
+/// This method always clamp into [0, 65535], if other bit-depth is used
 /// consider additional clamp into required range.
 ///
 /// # Panics
@@ -215,12 +218,13 @@ pub fn gaussian_blur_u16(
 ///
 /// This performs a gaussian kernel filter on the image producing beautiful looking result.
 /// Preferred if you need to perform an advanced signal analysis after.
+/// This is always perform accurate pure analytical gaussian filter.
 /// O(R) complexity.
 ///
 /// # Arguments
 ///
-/// * `width` - Width of the image
-/// * `height` - Height of the image
+/// * `src` - Source image.
+/// * `dst` - Destination image.
 /// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted. If zero, then sigma must be set.
 /// * `sigma` - Sigma for a gaussian kernel, corresponds to kernel flattening level. If zero of negative then *get_sigma_size* will be used
 /// * `channels` - Count of channels in the image
@@ -279,12 +283,13 @@ pub fn gaussian_blur_f32(
 ///
 /// This performs a gaussian kernel filter on the image producing beautiful looking result.
 /// Preferred if you need to perform an advanced signal analysis after.
+/// This is always perform accurate pure analytical gaussian filter.
 /// O(R) complexity.
 ///
 /// # Arguments
 ///
-/// * `width` - Width of the image
-/// * `height` - Height of the image
+/// * `src` - Source image.
+/// * `dst` - Destination image.
 /// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted. If zero, then sigma must be set.
 /// * `sigma` - Sigma for a gaussian kernel, corresponds to kernel flattening level. If zero of negative then *get_sigma_size* will be used
 /// * `channels` - Count of channels in the image
@@ -337,4 +342,287 @@ pub fn gaussian_blur_f16(
         Scalar::default(),
         threading_policy,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_gauss_u8_q_k5() {
+        let width: usize = 148;
+        let height: usize = 148;
+        let src = vec![126; width * height * 3];
+        let src_image = BlurImage::borrow(
+            &src,
+            width as u32,
+            height as u32,
+            FastBlurChannels::Channels3,
+        );
+        let mut dst = BlurImageMut::default();
+        gaussian_blur(
+            &src_image,
+            &mut dst,
+            5,
+            0.,
+            EdgeMode::Clamp,
+            ThreadingPolicy::Single,
+            ConvolutionMode::FixedPoint,
+        )
+        .unwrap();
+        for (i, &cn) in dst.data.borrow_mut().iter().enumerate() {
+            let diff = (cn as i32 - 126).abs();
+            assert!(
+                diff <= 3,
+                "Diff expected to be less than 3 but it was {diff} at {i}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_gauss_u8_q_k3() {
+        let width: usize = 148;
+        let height: usize = 148;
+        let src = vec![126; width * height * 3];
+        let src_image = BlurImage::borrow(
+            &src,
+            width as u32,
+            height as u32,
+            FastBlurChannels::Channels3,
+        );
+        let mut dst = BlurImageMut::default();
+        gaussian_blur(
+            &src_image,
+            &mut dst,
+            3,
+            0.,
+            EdgeMode::Clamp,
+            ThreadingPolicy::Single,
+            ConvolutionMode::FixedPoint,
+        )
+        .unwrap();
+        for (i, &cn) in dst.data.borrow_mut().iter().enumerate() {
+            let diff = (cn as i32 - 126).abs();
+            assert!(
+                diff <= 3,
+                "Diff expected to be less than 3 but it was {diff} at {i}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_gauss_u8_q_k7() {
+        let width: usize = 148;
+        let height: usize = 148;
+        let src = vec![126; width * height * 3];
+        let src_image = BlurImage::borrow(
+            &src,
+            width as u32,
+            height as u32,
+            FastBlurChannels::Channels3,
+        );
+        let mut dst = BlurImageMut::default();
+        gaussian_blur(
+            &src_image,
+            &mut dst,
+            7,
+            0.,
+            EdgeMode::Clamp,
+            ThreadingPolicy::Single,
+            ConvolutionMode::FixedPoint,
+        )
+        .unwrap();
+        for (i, &cn) in dst.data.borrow_mut().iter().enumerate() {
+            let diff = (cn as i32 - 126).abs();
+            assert!(
+                diff <= 3,
+                "Diff expected to be less than 3 but it was {diff} at {i}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_gauss_u8_fp_k5() {
+        let width: usize = 148;
+        let height: usize = 148;
+        let src = vec![126; width * height * 3];
+        let src_image = BlurImage::borrow(
+            &src,
+            width as u32,
+            height as u32,
+            FastBlurChannels::Channels3,
+        );
+        let mut dst = BlurImageMut::default();
+        gaussian_blur(
+            &src_image,
+            &mut dst,
+            5,
+            0.,
+            EdgeMode::Clamp,
+            ThreadingPolicy::Single,
+            ConvolutionMode::Exact,
+        )
+        .unwrap();
+        for &cn in dst.data.borrow_mut().iter() {
+            let diff = (cn as i32 - 126).abs();
+            assert!(
+                diff <= 3,
+                "Diff expected to be less than 3 but it was {diff}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_gauss_u8_q_k31() {
+        let width: usize = 148;
+        let height: usize = 148;
+        let src = vec![126; width * height * 3];
+        let src_image = BlurImage::borrow(
+            &src,
+            width as u32,
+            height as u32,
+            FastBlurChannels::Channels3,
+        );
+        let mut dst = BlurImageMut::default();
+        gaussian_blur(
+            &src_image,
+            &mut dst,
+            31,
+            0.,
+            EdgeMode::Clamp,
+            ThreadingPolicy::Single,
+            ConvolutionMode::FixedPoint,
+        )
+        .unwrap();
+        for (i, &cn) in dst.data.borrow_mut().iter().enumerate() {
+            let diff = (cn as i32 - 126).abs();
+            assert!(
+                diff <= 3,
+                "Diff expected to be less than 3 but it was {diff} at {i}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_gauss_u8_fp_k31() {
+        let width: usize = 148;
+        let height: usize = 148;
+        let src = vec![126; width * height * 3];
+        let src_image = BlurImage::borrow(
+            &src,
+            width as u32,
+            height as u32,
+            FastBlurChannels::Channels3,
+        );
+        let mut dst = BlurImageMut::default();
+        gaussian_blur(
+            &src_image,
+            &mut dst,
+            31,
+            0.,
+            EdgeMode::Clamp,
+            ThreadingPolicy::Single,
+            ConvolutionMode::Exact,
+        )
+        .unwrap();
+        for &cn in dst.data.borrow_mut().iter() {
+            let diff = (cn as i32 - 126).abs();
+            assert!(
+                diff <= 3,
+                "Diff expected to be less than 3 but it was {diff}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_gauss_u16_q_k31() {
+        let width: usize = 148;
+        let height: usize = 148;
+        let src = vec![17234u16; width * height * 3];
+        let src_image = BlurImage::borrow(
+            &src,
+            width as u32,
+            height as u32,
+            FastBlurChannels::Channels3,
+        );
+        let mut dst = BlurImageMut::default();
+        gaussian_blur_u16(
+            &src_image,
+            &mut dst,
+            31,
+            0.,
+            EdgeMode::Clamp,
+            ThreadingPolicy::Single,
+            ConvolutionMode::FixedPoint,
+        )
+        .unwrap();
+        for (i, &cn) in dst.data.borrow_mut().iter().enumerate() {
+            let diff = (cn as i32 - 17234i32).abs();
+            assert!(
+                diff <= 14,
+                "Diff expected to be less than 14 but it was {diff} at {i}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_gauss_u16_fp_k31() {
+        let width: usize = 148;
+        let height: usize = 148;
+        let src = vec![17234u16; width * height * 3];
+        let src_image = BlurImage::borrow(
+            &src,
+            width as u32,
+            height as u32,
+            FastBlurChannels::Channels3,
+        );
+        let mut dst = BlurImageMut::default();
+        gaussian_blur_u16(
+            &src_image,
+            &mut dst,
+            31,
+            0.,
+            EdgeMode::Clamp,
+            ThreadingPolicy::Single,
+            ConvolutionMode::Exact,
+        )
+        .unwrap();
+        for (i, &cn) in dst.data.borrow_mut().iter().enumerate() {
+            let diff = (cn as i32 - 17234i32).abs();
+            assert!(
+                diff <= 10,
+                "Diff expected to be less than 10 but it was {diff} at {i}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_gauss_f32_k31() {
+        let width: usize = 148;
+        let height: usize = 148;
+        let src = vec![0.532; width * height * 3];
+        let src_image = BlurImage::borrow(
+            &src,
+            width as u32,
+            height as u32,
+            FastBlurChannels::Channels3,
+        );
+        let mut dst = BlurImageMut::default();
+        gaussian_blur_f32(
+            &src_image,
+            &mut dst,
+            31,
+            0.,
+            EdgeMode::Clamp,
+            ThreadingPolicy::Single,
+        )
+        .unwrap();
+        for (i, &cn) in dst.data.borrow_mut().iter().enumerate() {
+            let diff = (cn - 0.532).abs();
+            assert!(
+                diff <= 1e-4,
+                "Diff expected to be less than 1e-4 but it was {diff} at {i}"
+            );
+        }
+    }
 }

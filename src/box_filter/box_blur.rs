@@ -35,7 +35,7 @@ use num_traits::cast::FromPrimitive;
 use num_traits::AsPrimitive;
 use rayon::ThreadPool;
 
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(target_arch = "aarch64", feature = "neon"))]
 use crate::box_filter::box_blur_neon::*;
 use crate::channels_configuration::FastBlurChannels;
 use crate::to_storage::ToStorage;
@@ -205,7 +205,7 @@ impl BoxBlurHorizontalPass<u8> for u8 {
             end_y: u32,
         ) = box_blur_horizontal_pass_impl::<u8, u32, CHANNEL_CONFIGURATION>;
         if CHANNEL_CONFIGURATION >= 3 {
-            #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+            #[cfg(all(target_arch = "aarch64", feature = "neon"))]
             {
                 _dispatcher_horizontal = box_blur_horizontal_pass_neon::<u8, CHANNEL_CONFIGURATION>;
                 #[cfg(feature = "rdm")]
@@ -468,7 +468,7 @@ impl BoxBlurVerticalPass<u8> for u8 {
                 _dispatcher_vertical = box_blur_vertical_pass_avx2::<u8>;
             }
         }
-        #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             _dispatcher_vertical = box_blur_vertical_pass_neon::<u8>;
             #[cfg(feature = "rdm")]

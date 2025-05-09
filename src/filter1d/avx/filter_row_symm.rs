@@ -26,9 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::avx::{
-    _mm256_load_pack_x2, _mm256_load_pack_x4, _mm256_store_pack_x2, _mm256_store_pack_x4,
-};
+use crate::avx::{_mm256_load_pack_x2, _mm256_store_pack_x2};
 use crate::filter1d::arena::Arena;
 use crate::filter1d::avx::sse_utils::{
     _mm_mul_add_symm_epi8_by_ps, _mm_mul_add_symm_epi8_by_ps_x2, _mm_mul_add_symm_epi8_by_ps_x4,
@@ -147,45 +145,9 @@ impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
 
         let mut cx = 0usize;
 
-        while cx + 128 < max_width {
-            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
-
-            let shifted_src = local_src.get_unchecked(cx..);
-
-            let source = _mm256_load_pack_x4(shifted_src.get_unchecked(half_len * N..).as_ptr());
-            let mut k0 = _mm256_mul_epi8_by_ps_x4::<FMA>(source.0, coeff);
-            let mut k1 = _mm256_mul_epi8_by_ps_x4::<FMA>(source.1, coeff);
-            let mut k2 = _mm256_mul_epi8_by_ps_x4::<FMA>(source.2, coeff);
-            let mut k3 = _mm256_mul_epi8_by_ps_x4::<FMA>(source.3, coeff);
-
-            for i in 0..half_len {
-                let rollback = length - i - 1;
-                let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(i).weight);
-                let v_source0 = _mm256_load_pack_x4(shifted_src.get_unchecked((i * N)..).as_ptr());
-                let v_source1 =
-                    _mm256_load_pack_x4(shifted_src.get_unchecked((rollback * N)..).as_ptr());
-                k0 = _mm256_mul_add_symm_epi8_by_ps_x4::<FMA>(k0, v_source0.0, v_source1.0, coeff);
-                k1 = _mm256_mul_add_symm_epi8_by_ps_x4::<FMA>(k1, v_source0.1, v_source1.1, coeff);
-                k2 = _mm256_mul_add_symm_epi8_by_ps_x4::<FMA>(k2, v_source0.2, v_source1.2, coeff);
-                k3 = _mm256_mul_add_symm_epi8_by_ps_x4::<FMA>(k3, v_source0.3, v_source1.3, coeff);
-            }
-
-            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
-            _mm256_store_pack_x4(
-                dst_ptr0,
-                (
-                    _mm256_pack_ps_x4_epi8(k0),
-                    _mm256_pack_ps_x4_epi8(k1),
-                    _mm256_pack_ps_x4_epi8(k2),
-                    _mm256_pack_ps_x4_epi8(k3),
-                ),
-            );
-            cx += 128;
-        }
+        let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
 
         while cx + 64 < max_width {
-            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
-
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source = _mm256_load_pack_x2(shifted_src.get_unchecked(half_len * N..).as_ptr());
@@ -211,8 +173,6 @@ impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
         }
 
         while cx + 32 < max_width {
-            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
-
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source =
@@ -236,13 +196,11 @@ impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
         }
 
         while cx + 16 < max_width {
-            let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
-
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source =
                 _mm_loadu_si128(shifted_src.get_unchecked(half_len * N..).as_ptr() as *const _);
-            let mut k0 = _mm_mul_epi8_by_ps_x4::<FMA>(source, coeff);
+            let mut k0 = _mm_mul_epi8_by_ps_x4::<FMA>(source, _mm256_castps256_ps128(coeff));
 
             for i in 0..half_len {
                 let rollback = length - i - 1;
@@ -261,13 +219,11 @@ impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
         }
 
         while cx + 8 < max_width {
-            let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
-
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source =
                 _mm_loadu_si64(shifted_src.get_unchecked(half_len * N..).as_ptr() as *const _);
-            let mut k0 = _mm_mul_epi8_by_ps_x2(source, coeff);
+            let mut k0 = _mm_mul_epi8_by_ps_x2(source, _mm256_castps256_ps128(coeff));
 
             for i in 0..half_len {
                 let rollback = length - i - 1;
@@ -286,13 +242,11 @@ impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
         }
 
         while cx + 4 < max_width {
-            let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
-
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source =
                 _mm_loadu_si32(shifted_src.get_unchecked(half_len * N..).as_ptr() as *const _);
-            let mut k0 = _mm_mul_epi8_by_ps(source, coeff);
+            let mut k0 = _mm_mul_epi8_by_ps(source, _mm256_castps256_ps128(coeff));
 
             for i in 0..half_len {
                 let rollback = length - i - 1;

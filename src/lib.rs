@@ -26,6 +26,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #![allow(clippy::too_many_arguments)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(
     all(
         feature = "nightly_avx512",
@@ -56,6 +57,7 @@
 )]
 
 #[cfg(feature = "fft")]
+#[cfg_attr(docsrs, doc(cfg(feature = "fft")))]
 mod adaptive_blur;
 #[cfg(all(target_arch = "x86_64", feature = "avx"))]
 mod avx;
@@ -65,17 +67,21 @@ mod cpu_features;
 mod edge_mode;
 mod fast_bilateral_filter;
 #[cfg(feature = "image")]
+#[cfg_attr(docsrs, doc(cfg(feature = "image")))]
 mod fast_bilateral_image;
 mod fast_gaussian;
 #[cfg(feature = "image")]
+#[cfg_attr(docsrs, doc(cfg(feature = "image")))]
 mod fast_gaussian_image;
 #[cfg(feature = "image")]
+#[cfg_attr(docsrs, doc(cfg(feature = "image")))]
 mod fast_gaussian_image_next;
 mod fast_gaussian_next;
 mod filter1d;
 mod filter2d;
 mod gaussian;
 #[cfg(feature = "image")]
+#[cfg_attr(docsrs, doc(cfg(feature = "image")))]
 mod gaussian_blur_image;
 mod image;
 mod img_size;
@@ -83,12 +89,13 @@ mod laplacian;
 mod median_blur;
 mod mlaf;
 mod motion_blur;
-#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+#[cfg(all(target_arch = "aarch64", feature = "neon"))]
 mod neon;
 mod sobel;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 mod sse;
 #[cfg(feature = "image")]
+#[cfg_attr(docsrs, doc(cfg(feature = "image")))]
 mod stack_blur_image;
 mod stack_blur_linear;
 mod stackblur;
@@ -100,6 +107,7 @@ mod util;
 mod wasm32;
 
 #[cfg(feature = "fft")]
+#[cfg_attr(docsrs, doc(cfg(feature = "fft")))]
 pub use adaptive_blur::adaptive_blur;
 pub use box_filter::box_blur;
 pub use box_filter::box_blur_f32;
@@ -120,13 +128,16 @@ pub use fast_bilateral_filter::{
     fast_bilateral_filter, fast_bilateral_filter_f32, fast_bilateral_filter_u16,
 };
 #[cfg(feature = "image")]
+#[cfg_attr(docsrs, doc(cfg(feature = "image")))]
 pub use fast_bilateral_image::fast_bilateral_filter_image;
 pub use fast_gaussian::{
     fast_gaussian, fast_gaussian_f16, fast_gaussian_f32, fast_gaussian_in_linear, fast_gaussian_u16,
 };
 #[cfg(feature = "image")]
+#[cfg_attr(docsrs, doc(cfg(feature = "image")))]
 pub use fast_gaussian_image::fast_gaussian_blur_image;
 #[cfg(feature = "image")]
+#[cfg_attr(docsrs, doc(cfg(feature = "image")))]
 pub use fast_gaussian_image_next::fast_gaussian_next_blur_image;
 pub use fast_gaussian_next::fast_gaussian_next;
 pub use fast_gaussian_next::fast_gaussian_next_f16;
@@ -135,6 +146,7 @@ pub use fast_gaussian_next::fast_gaussian_next_in_linear;
 pub use fast_gaussian_next::fast_gaussian_next_u16;
 pub use filter1d::{filter_1d_approx, filter_1d_exact, make_arena, Arena, ArenaPads, KernelShape};
 #[cfg(feature = "fft")]
+#[cfg_attr(docsrs, doc(cfg(feature = "fft")))]
 pub use filter2d::{fft_next_good_size, filter_2d_fft, filter_2d_rgb_fft, filter_2d_rgba_fft};
 pub use filter2d::{filter_2d, filter_2d_arbitrary, filter_2d_rgb, filter_2d_rgba};
 pub use gaussian::gaussian_blur;
@@ -146,6 +158,7 @@ pub use gaussian::gaussian_kernel_1d;
 pub use gaussian::sigma_size;
 pub use gaussian::ConvolutionMode;
 #[cfg(feature = "image")]
+#[cfg_attr(docsrs, doc(cfg(feature = "image")))]
 pub use gaussian_blur_image::gaussian_blur_image;
 pub use image::{BlurImage, BlurImageMut, BufferStore};
 pub use img_size::ImageSize;
@@ -154,6 +167,7 @@ pub use median_blur::median_blur;
 pub use motion_blur::{generate_motion_kernel, motion_blur};
 pub use sobel::sobel;
 #[cfg(feature = "image")]
+#[cfg_attr(docsrs, doc(cfg(feature = "image")))]
 pub use stack_blur_image::stack_blur_image;
 pub use stack_blur_linear::stack_blur_in_linear;
 pub use stackblur::stack_blur::stack_blur;

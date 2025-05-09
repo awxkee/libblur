@@ -25,7 +25,6 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::reflect_index;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::wasm32::utils::{
     i32x4_mul_by_3, load_u8_s32_fast, u16x8_pack_trunc_u8x16, u32x4_pack_trunc_u16x8,
@@ -34,7 +33,7 @@ use crate::wasm32::utils::{
 use crate::{clamp_edge, EdgeMode};
 use std::arch::wasm32::*;
 
-pub fn fast_gaussian_next_vertical_pass_wasm_u8<T, const CHANNELS_COUNT: usize>(
+pub fn fast_gaussian_next_vertical_pass_wasm_u8<T, const CN: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -45,7 +44,7 @@ pub fn fast_gaussian_next_vertical_pass_wasm_u8<T, const CHANNELS_COUNT: usize>(
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        fast_gaussian_next_vertical_pass_impl::<T, CHANNELS_COUNT>(
+        fast_gaussian_next_vertical_pass_impl::<T, CN>(
             undefined_slice,
             stride,
             width,
@@ -60,7 +59,7 @@ pub fn fast_gaussian_next_vertical_pass_wasm_u8<T, const CHANNELS_COUNT: usize>(
 
 #[inline]
 #[target_feature(enable = "simd128")]
-unsafe fn fast_gaussian_next_vertical_pass_impl<T, const CHANNELS_COUNT: usize>(
+unsafe fn fast_gaussian_next_vertical_pass_impl<T, const CN: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -88,8 +87,8 @@ unsafe fn fast_gaussian_next_vertical_pass_impl<T, const CHANNELS_COUNT: usize>(
             let current_y = (y * (stride as i64)) as usize;
 
             if y >= 0 {
-                let current_px = ((std::cmp::max(x, 0)) * CHANNELS_COUNT as u32) as usize;
-                let prepared_px_s32 = i32x4_trunc_sat_f32x4(f32x4_floor(f32x4_mul(
+                let current_px = ((std::cmp::max(x, 0)) * CN as u32) as usize;
+                let prepared_px_s32 = i32x4_trunc_sat_f32x4(f32x4_nearest(f32x4_mul(
                     f32x4_convert_i32x4(summs),
                     f_weight,
                 )));
@@ -99,7 +98,7 @@ unsafe fn fast_gaussian_next_vertical_pass_impl<T, const CHANNELS_COUNT: usize>(
                 let bytes_offset = current_y + current_px;
 
                 let dst_ptr = (bytes.slice.as_ptr() as *mut u8).add(bytes_offset);
-                w_store_u8x8_m4::<CHANNELS_COUNT>(dst_ptr, prepared_u8);
+                w_store_u8x8_m4::<CN>(dst_ptr, prepared_u8);
 
                 let d_arr_index_1 = ((y + radius_64) & 1023) as usize;
                 let d_arr_index_2 = ((y - radius_64) & 1023) as usize;
@@ -137,11 +136,11 @@ unsafe fn fast_gaussian_next_vertical_pass_impl<T, const CHANNELS_COUNT: usize>(
 
             let next_row_y = clamp_edge!(edge_mode, y + ((3 * radius_64) >> 1), 0, height_wide)
                 * (stride as usize);
-            let next_row_x = (x * CHANNELS_COUNT as u32) as usize;
+            let next_row_x = (x * CN as u32) as usize;
 
             let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_x) as *mut u8;
 
-            let pixel_color = load_u8_s32_fast::<CHANNELS_COUNT>(s_ptr);
+            let pixel_color = load_u8_s32_fast::<CN>(s_ptr);
 
             let arr_index = ((y + 2 * radius_64) & 1023) as usize;
             let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr();
@@ -209,7 +208,7 @@ unsafe fn fast_gaussian_next_horizontal_pass_impl<T, const CHANNELS_COUNT: usize
             if x >= 0 {
                 let current_px = x as usize * CHANNELS_COUNT;
 
-                let prepared_px_s32 = i32x4_trunc_sat_f32x4(f32x4_floor(f32x4_mul(
+                let prepared_px_s32 = i32x4_trunc_sat_f32x4(f32x4_nearest(f32x4_mul(
                     f32x4_convert_i32x4(summs),
                     f_weight,
                 )));

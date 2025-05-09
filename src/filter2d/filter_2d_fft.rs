@@ -73,7 +73,7 @@ fn transpose<T: Copy + Default>(
     transposed
 }
 
-/// Performs 2D separable approximated convolution on single plane image.
+/// Performs 2D non-separable approximated convolution on single plane image using FFT.
 ///
 /// This method does convolution using spectrum multiplication via fft.
 ///
