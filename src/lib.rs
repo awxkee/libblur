@@ -176,3 +176,74 @@ pub use stackblur::stack_blur_f32::stack_blur_f32;
 pub use stackblur::stack_blur_u16;
 pub use threading_policy::ThreadingPolicy;
 pub use util::{BlurError, MismatchedSize};
+
+#[cfg(test)]
+mod tests {
+
+    #[cfg(feature = "fft")]
+    fn gaussian_kernel_9x9(sigma: f32) -> Vec<f32> {
+        let mut kernel = [[0.0f32; 9]; 9];
+        let mut sum = 0.0;
+
+        let radius = 4; // (9 - 1) / 2
+
+        let two_sigma_sq = 2.0 * sigma * sigma;
+        let norm = 1.0 / (std::f32::consts::PI * two_sigma_sq);
+
+        for y in -radius..=radius {
+            for x in -radius..=radius {
+                let value = norm * ((-(x * x + y * y) as f32) / two_sigma_sq).exp();
+                kernel[(y + radius) as usize][(x + radius) as usize] = value;
+                sum += value;
+            }
+        }
+
+        // Normalize
+        for row in &mut kernel {
+            for v in row.iter_mut() {
+                *v /= sum;
+            }
+        }
+
+        kernel
+            .iter()
+            .flat_map(|x| x)
+            .map(|&x| x)
+            .collect::<Vec<f32>>()
+    }
+
+    #[cfg(feature = "fft")]
+    #[test]
+    fn test_fft_rgb() {
+        use super::*;
+        let width: usize = 188;
+        let height: usize = 188;
+        let src = vec![126u8; width * height * 3];
+        let src_image = BlurImage::borrow(
+            &src,
+            width as u32,
+            height as u32,
+            FastBlurChannels::Channels3,
+        );
+        let mut dst = BlurImageMut::default();
+
+        let kernel = gaussian_kernel_9x9(3.);
+
+        filter_2d_rgb_fft::<u8, f32, f32>(
+            &src_image,
+            &mut dst,
+            &kernel,
+            KernelShape::new(9, 9),
+            EdgeMode::Clamp,
+            Scalar::default(),
+        )
+        .unwrap();
+        for (i, &cn) in dst.data.borrow_mut().iter().enumerate() {
+            let diff = (cn as i32 - 126).abs();
+            assert!(
+                diff <= 3,
+                "Diff expected to be less than 3 but it was {diff} at {i}"
+            );
+        }
+    }
+}

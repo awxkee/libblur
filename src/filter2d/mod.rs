@@ -26,7 +26,10 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#[cfg(all(target_arch = "x86_64", feature = "avx"))]
+mod avx;
 mod convolve_op;
+mod convolve_op_fp;
 #[cfg(feature = "fft")]
 mod fft_utils;
 mod filter_2d;

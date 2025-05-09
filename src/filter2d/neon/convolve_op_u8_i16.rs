@@ -37,7 +37,7 @@ use num_traits::MulAdd;
 use std::arch::aarch64::*;
 use std::ops::Mul;
 
-pub fn convolve_segment_neon_2d_u8_i16(
+pub(crate) fn convolve_segment_neon_2d_u8_i16(
     arena: Arena,
     arena_source: &[u8],
     dst: &mut [u8],
@@ -66,9 +66,12 @@ pub fn convolve_segment_neon_2d_u8_i16(
 
         let mut cx = 0usize;
 
+        let k_weight = vdupq_n_s16(prepared_kernel.get_unchecked(0).weight);
+
+        let off0 = offsets.get_unchecked(0);
+
         while cx + 64 < total_width {
-            let k_weight = vdupq_n_s16(prepared_kernel.get_unchecked(0).weight);
-            let items0 = xvld1q_u8_x4(offsets.get_unchecked(0).get_unchecked(cx..).as_ptr());
+            let items0 = xvld1q_u8_x4(off0.get_unchecked(cx..).as_ptr());
             let mut k0 = vmulq_u8_by_i16(items0.0, k_weight);
             let mut k1 = vmulq_u8_by_i16(items0.1, k_weight);
             let mut k2 = vmulq_u8_by_i16(items0.2, k_weight);
@@ -96,8 +99,7 @@ pub fn convolve_segment_neon_2d_u8_i16(
         }
 
         while cx + 32 < total_width {
-            let k_weight = vdupq_n_s16(prepared_kernel.get_unchecked(0).weight);
-            let items0 = xvld1q_u8_x2(offsets.get_unchecked(0).get_unchecked(cx..).as_ptr());
+            let items0 = xvld1q_u8_x2(off0.get_unchecked(cx..).as_ptr());
             let mut k0 = vmulq_u8_by_i16(items0.0, k_weight);
             let mut k1 = vmulq_u8_by_i16(items0.1, k_weight);
             for i in 1..length {
@@ -119,8 +121,7 @@ pub fn convolve_segment_neon_2d_u8_i16(
         }
 
         while cx + 16 < total_width {
-            let k_weight = vdupq_n_s16(prepared_kernel.get_unchecked(0).weight);
-            let items0 = vld1q_u8(offsets.get_unchecked(0).get_unchecked(cx..).as_ptr());
+            let items0 = vld1q_u8(off0.get_unchecked(cx..).as_ptr());
             let mut k0 = vmulq_u8_by_i16(items0, k_weight);
             for i in 1..length {
                 let weight = vdupq_n_s16(prepared_kernel.get_unchecked(i).weight);
@@ -132,13 +133,13 @@ pub fn convolve_segment_neon_2d_u8_i16(
             cx += 16;
         }
 
-        while cx + 4 < total_width {
-            let k_weight = prepared_kernel.get_unchecked(0).weight;
+        let k_weight = prepared_kernel.get_unchecked(0).weight;
 
-            let mut k0 = ((*offsets.get_unchecked(0).get_unchecked(cx)) as i16).mul(k_weight);
-            let mut k1 = ((*offsets.get_unchecked(0).get_unchecked(cx + 1)) as i16).mul(k_weight);
-            let mut k2 = ((*offsets.get_unchecked(0).get_unchecked(cx + 2)) as i16).mul(k_weight);
-            let mut k3 = ((*offsets.get_unchecked(0).get_unchecked(cx + 3)) as i16).mul(k_weight);
+        while cx + 4 < total_width {
+            let mut k0 = ((*off0.get_unchecked(cx)) as i16).mul(k_weight);
+            let mut k1 = ((*off0.get_unchecked(cx + 1)) as i16).mul(k_weight);
+            let mut k2 = ((*off0.get_unchecked(cx + 2)) as i16).mul(k_weight);
+            let mut k3 = ((*off0.get_unchecked(cx + 3)) as i16).mul(k_weight);
 
             for i in 1..length {
                 let weight = prepared_kernel.get_unchecked(i).weight;
@@ -156,15 +157,13 @@ pub fn convolve_segment_neon_2d_u8_i16(
         }
 
         for x in cx..total_width {
-            let k_weight = prepared_kernel.get_unchecked(0).weight;
-
-            let mut k0 = ((*(*offsets.get_unchecked(0)).get_unchecked(x)) as i16).mul(k_weight);
+            let mut k0 = ((*(*off0).get_unchecked(x)) as i16).mul(k_weight);
 
             for i in 1..length {
                 let k_weight = prepared_kernel.get_unchecked(i).weight;
                 k0 = ((*offsets.get_unchecked(i).get_unchecked(x)) as i16).mul_add(k_weight, k0);
             }
-            *dst.get_unchecked_mut(cx) = k0.to_();
+            *dst.get_unchecked_mut(x) = k0.to_();
         }
     }
 }

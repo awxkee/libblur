@@ -66,7 +66,7 @@ pub fn filter_2d_rgba<T, F>(
 ) -> Result<(), BlurError>
 where
     T: Copy + AsPrimitive<F> + Default + Send + Sync + Filter2dHandler<T, F> + Debug,
-    F: ToStorage<T> + Mul<F> + MulAdd<F, Output = F> + Send + Sync + PartialEq,
+    F: ToStorage<T> + Mul<F> + MulAdd<F, Output = F> + Send + Sync + PartialEq + AsPrimitive<f64>,
     i32: AsPrimitive<F>,
     f64: AsPrimitive<T>,
 {

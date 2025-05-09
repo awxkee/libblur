@@ -163,3 +163,98 @@ pub fn motion_blur(
         threading_policy,
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::FastBlurChannels;
+
+    #[test]
+    fn test_motion_k25_a25_rgb() {
+        let width: usize = 188;
+        let height: usize = 188;
+        let src = vec![126; width * height * 3];
+        let src_image = BlurImage::borrow(
+            &src,
+            width as u32,
+            height as u32,
+            FastBlurChannels::Channels3,
+        );
+        let mut dst = BlurImageMut::default();
+        motion_blur(
+            &src_image,
+            &mut dst,
+            90.,
+            25,
+            EdgeMode::Clamp,
+            Scalar::default(),
+            ThreadingPolicy::Single,
+        )
+        .unwrap();
+        for (i, &cn) in dst.data.borrow_mut().iter().enumerate() {
+            let diff = (cn as i32 - 126).abs();
+            assert!(
+                diff <= 3,
+                "Diff expected to be less than 3 but it was {diff} at {i}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_motion_k25_a25_rgba() {
+        let width: usize = 188;
+        let height: usize = 188;
+        let src = vec![126; width * height * 4];
+        let src_image = BlurImage::borrow(
+            &src,
+            width as u32,
+            height as u32,
+            FastBlurChannels::Channels4,
+        );
+        let mut dst = BlurImageMut::default();
+        motion_blur(
+            &src_image,
+            &mut dst,
+            90.,
+            25,
+            EdgeMode::Clamp,
+            Scalar::default(),
+            ThreadingPolicy::Single,
+        )
+        .unwrap();
+        for (i, &cn) in dst.data.borrow_mut().iter().enumerate() {
+            let diff = (cn as i32 - 126).abs();
+            assert!(
+                diff <= 3,
+                "Diff expected to be less than 3 but it was {diff} at {i}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_motion_k25_a25_plane() {
+        let width: usize = 188;
+        let height: usize = 188;
+        let src = vec![126; width * height];
+        let src_image =
+            BlurImage::borrow(&src, width as u32, height as u32, FastBlurChannels::Plane);
+        let mut dst = BlurImageMut::default();
+        motion_blur(
+            &src_image,
+            &mut dst,
+            90.,
+            25,
+            EdgeMode::Clamp,
+            Scalar::default(),
+            ThreadingPolicy::Single,
+        )
+        .unwrap();
+        for (i, &cn) in dst.data.borrow_mut().iter().enumerate() {
+            let diff = (cn as i32 - 126).abs();
+            assert!(
+                diff <= 3,
+                "Diff expected to be less than 3 but it was {diff} at {i}"
+            );
+        }
+    }
+}

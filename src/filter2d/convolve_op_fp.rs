@@ -26,24 +26,24 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::filter1d::Arena;
+#![allow(dead_code)]
+use crate::filter1d::{Arena, ToApproxStorage};
 use crate::filter2d::scan_point_2d::ScanPoint2d;
 use crate::mlaf::mlaf;
-use crate::to_storage::ToStorage;
 use crate::ImageSize;
-use num_traits::{AsPrimitive, MulAdd};
-use std::ops::{Add, Mul};
+use num_traits::AsPrimitive;
+use std::ops::Mul;
 
-pub(crate) fn convolve_segment_2d<T, F>(
+pub(crate) fn convolve_segment_2d_fp<T>(
     arena: Arena,
     arena_source: &[T],
     dst: &mut [T],
     image_size: ImageSize,
-    prepared_kernel: &[ScanPoint2d<F>],
+    prepared_kernel: &[ScanPoint2d<i16>],
     y: usize,
 ) where
-    T: Copy + AsPrimitive<F>,
-    F: ToStorage<T> + Mul<Output = F> + MulAdd<F, Output = F> + Add<Output = F>,
+    T: Copy + AsPrimitive<i32>,
+    i32: ToApproxStorage<T>,
 {
     unsafe {
         let width = image_size.width;
@@ -74,43 +74,47 @@ pub(crate) fn convolve_segment_2d<T, F>(
             let mut k0 = (*offsets.get_unchecked(0))
                 .get_unchecked(cx)
                 .as_()
-                .mul(k_weight);
+                .mul(k_weight as i32);
             let mut k1 = (*offsets.get_unchecked(0))
                 .get_unchecked(cx + 1)
                 .as_()
-                .mul(k_weight);
+                .mul(k_weight as i32);
             let mut k2 = (*offsets.get_unchecked(0))
                 .get_unchecked(cx + 2)
                 .as_()
-                .mul(k_weight);
+                .mul(k_weight as i32);
             let mut k3 = (*offsets.get_unchecked(0).get_unchecked(cx + 3))
                 .as_()
-                .mul(k_weight);
+                .mul(k_weight as i32);
 
             for i in 1..length {
                 let weight = prepared_kernel.get_unchecked(i).weight;
-                k0 = mlaf(k0, offsets.get_unchecked(i).get_unchecked(cx).as_(), weight);
+                k0 = mlaf(
+                    k0,
+                    offsets.get_unchecked(i).get_unchecked(cx).as_(),
+                    weight as i32,
+                );
                 k1 = mlaf(
                     k1,
                     offsets.get_unchecked(i).get_unchecked(cx + 1).as_(),
-                    weight,
+                    weight as i32,
                 );
                 k2 = mlaf(
                     k2,
                     offsets.get_unchecked(i).get_unchecked(cx + 2).as_(),
-                    weight,
+                    weight as i32,
                 );
                 k3 = mlaf(
                     k3,
                     offsets.get_unchecked(i).get_unchecked(cx + 3).as_(),
-                    weight,
+                    weight as i32,
                 );
             }
 
-            *dst.get_unchecked_mut(cx) = k0.to_();
-            *dst.get_unchecked_mut(cx + 1) = k1.to_();
-            *dst.get_unchecked_mut(cx + 2) = k2.to_();
-            *dst.get_unchecked_mut(cx + 3) = k3.to_();
+            *dst.get_unchecked_mut(cx) = k0.to_approx_();
+            *dst.get_unchecked_mut(cx + 1) = k1.to_approx_();
+            *dst.get_unchecked_mut(cx + 2) = k2.to_approx_();
+            *dst.get_unchecked_mut(cx + 3) = k3.to_approx_();
             cx += 4;
         }
 
@@ -118,17 +122,17 @@ pub(crate) fn convolve_segment_2d<T, F>(
             let mut k0 = (*offsets.get_unchecked(0))
                 .get_unchecked(x)
                 .as_()
-                .mul(k_weight);
+                .mul(k_weight as i32);
 
             for i in 1..length {
                 let k_weight = prepared_kernel.get_unchecked(i).weight;
                 k0 = mlaf(
                     k0,
                     offsets.get_unchecked(i).get_unchecked(x).as_(),
-                    k_weight,
+                    k_weight as i32,
                 );
             }
-            *dst.get_unchecked_mut(cx) = k0.to_();
+            *dst.get_unchecked_mut(x) = k0.to_approx_();
         }
     }
 }
