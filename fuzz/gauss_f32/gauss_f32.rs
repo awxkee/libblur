@@ -29,10 +29,13 @@
 
 #![no_main]
 
-use libblur::{BlurImage, BlurImageMut, EdgeMode, FastBlurChannels, ThreadingPolicy};
+use libblur::{
+    filter_1d_exact, gaussian_kernel_1d_f64, sigma_size_d, BlurImage, BlurImageMut, EdgeMode,
+    FastBlurChannels, Scalar, ThreadingPolicy,
+};
 use libfuzzer_sys::fuzz_target;
 
-fuzz_target!(|data: (u8, u8, u8, u8)| {
+fuzz_target!(|data: (u8, u8, u8, u8, bool)| {
     let edge_mode = match data.3 % 4 {
         0 => EdgeMode::Clamp,
         1 => EdgeMode::Wrap,
@@ -45,6 +48,7 @@ fuzz_target!(|data: (u8, u8, u8, u8)| {
         data.2 as usize,
         FastBlurChannels::Channels4,
         edge_mode,
+        data.4,
     );
     fuzz_f32(
         data.0 as usize,
@@ -52,6 +56,7 @@ fuzz_target!(|data: (u8, u8, u8, u8)| {
         data.2 as usize,
         FastBlurChannels::Channels3,
         edge_mode,
+        data.4,
     );
     fuzz_f32(
         data.0 as usize,
@@ -59,6 +64,7 @@ fuzz_target!(|data: (u8, u8, u8, u8)| {
         data.2 as usize,
         FastBlurChannels::Plane,
         edge_mode,
+        data.4,
     );
 });
 
@@ -68,20 +74,64 @@ fn fuzz_f32(
     radius: usize,
     channels: FastBlurChannels,
     edge_mode: EdgeMode,
+    double_precision: bool,
 ) {
     if width == 0 || height == 0 || radius == 0 {
         return;
     }
     let src_image = BlurImage::alloc(width as u32, height as u32, channels);
     let mut dst_image = BlurImageMut::alloc(width as u32, height as u32, channels);
+    if double_precision {
+        let kernel =
+            gaussian_kernel_1d_f64(radius as u32 * 2 + 1, sigma_size_d(radius as f64 * 2. + 1.));
 
-    libblur::gaussian_blur_f32(
-        &src_image,
-        &mut dst_image,
-        radius as u32 * 2 + 1,
-        0.,
-        edge_mode,
-        ThreadingPolicy::Single,
-    )
-    .unwrap();
+        match channels {
+            FastBlurChannels::Plane => {
+                filter_1d_exact::<f32, f64, 1>(
+                    &src_image,
+                    &mut dst_image,
+                    &kernel,
+                    &kernel,
+                    EdgeMode::Clamp,
+                    Scalar::default(),
+                    ThreadingPolicy::Single,
+                )
+                .unwrap();
+            }
+            FastBlurChannels::Channels3 => {
+                filter_1d_exact::<f32, f64, 3>(
+                    &src_image,
+                    &mut dst_image,
+                    &kernel,
+                    &kernel,
+                    EdgeMode::Clamp,
+                    Scalar::default(),
+                    ThreadingPolicy::Single,
+                )
+                .unwrap();
+            }
+            FastBlurChannels::Channels4 => {
+                filter_1d_exact::<f32, f64, 4>(
+                    &src_image,
+                    &mut dst_image,
+                    &kernel,
+                    &kernel,
+                    EdgeMode::Clamp,
+                    Scalar::default(),
+                    ThreadingPolicy::Single,
+                )
+                .unwrap();
+            }
+        }
+    } else {
+        libblur::gaussian_blur_f32(
+            &src_image,
+            &mut dst_image,
+            radius as u32 * 2 + 1,
+            0.,
+            edge_mode,
+            ThreadingPolicy::Single,
+        )
+        .unwrap();
+    }
 }

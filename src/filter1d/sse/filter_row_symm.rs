@@ -51,74 +51,23 @@ pub(crate) fn filter_row_sse_symm_u8_f32<const N: usize>(
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
     unsafe {
-        let has_fma = std::arch::is_x86_feature_detected!("fma");
-        if has_fma {
-            filter_row_sse_symm_u8_f32_fma::<N>(
-                arena,
-                arena_src,
-                dst,
-                image_size,
-                filter_region,
-                scanned_kernel,
-            );
-        } else {
-            filter_row_sse_symm_u8_f32_def::<N>(
-                arena,
-                arena_src,
-                dst,
-                image_size,
-                filter_region,
-                scanned_kernel,
-            );
-        }
+        let unit = ExecutionUnit::<N>::default();
+        unit.pass(
+            arena,
+            arena_src,
+            dst,
+            image_size,
+            filter_region,
+            scanned_kernel,
+        );
     }
 }
 
-#[target_feature(enable = "sse4.1", enable = "fma")]
-unsafe fn filter_row_sse_symm_u8_f32_fma<const N: usize>(
-    arena: Arena,
-    arena_src: &[u8],
-    dst: &mut [u8],
-    image_size: ImageSize,
-    filter_region: FilterRegion,
-    scanned_kernel: &[ScanPoint1d<f32>],
-) {
-    let unit = ExecutionUnit::<true, N>::default();
-    unit.pass(
-        arena,
-        arena_src,
-        dst,
-        image_size,
-        filter_region,
-        scanned_kernel,
-    );
-}
-
-#[target_feature(enable = "sse4.1")]
-unsafe fn filter_row_sse_symm_u8_f32_def<const N: usize>(
-    arena: Arena,
-    arena_src: &[u8],
-    dst: &mut [u8],
-    image_size: ImageSize,
-    filter_region: FilterRegion,
-    scanned_kernel: &[ScanPoint1d<f32>],
-) {
-    let unit = ExecutionUnit::<false, N>::default();
-    unit.pass(
-        arena,
-        arena_src,
-        dst,
-        image_size,
-        filter_region,
-        scanned_kernel,
-    );
-}
-
 #[derive(Copy, Clone, Default)]
-struct ExecutionUnit<const FMA: bool, const N: usize> {}
+struct ExecutionUnit<const N: usize> {}
 
-impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
-    #[inline(always)]
+impl<const N: usize> ExecutionUnit<N> {
+    #[target_feature(enable = "sse4.1")]
     unsafe fn pass(
         &self,
         _: Arena,
@@ -146,10 +95,10 @@ impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source = _mm_load_pack_x4(shifted_src.get_unchecked(half_len * N..).as_ptr());
-            let mut k0 = _mm_mul_epi8_by_ps_x4::<FMA>(source.0, coeff);
-            let mut k1 = _mm_mul_epi8_by_ps_x4::<FMA>(source.1, coeff);
-            let mut k2 = _mm_mul_epi8_by_ps_x4::<FMA>(source.2, coeff);
-            let mut k3 = _mm_mul_epi8_by_ps_x4::<FMA>(source.3, coeff);
+            let mut k0 = _mm_mul_epi8_by_ps_x4(source.0, coeff);
+            let mut k1 = _mm_mul_epi8_by_ps_x4(source.1, coeff);
+            let mut k2 = _mm_mul_epi8_by_ps_x4(source.2, coeff);
+            let mut k3 = _mm_mul_epi8_by_ps_x4(source.3, coeff);
 
             for i in 0..half_len {
                 let rollback = length - i - 1;
@@ -157,10 +106,10 @@ impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
                 let v_source0 = _mm_load_pack_x4(shifted_src.get_unchecked((i * N)..).as_ptr());
                 let v_source1 =
                     _mm_load_pack_x4(shifted_src.get_unchecked((rollback * N)..).as_ptr());
-                k0 = _mm_mul_add_symm_epi8_by_ps_x4::<FMA>(k0, v_source0.0, v_source1.0, coeff);
-                k1 = _mm_mul_add_symm_epi8_by_ps_x4::<FMA>(k1, v_source0.1, v_source1.1, coeff);
-                k2 = _mm_mul_add_symm_epi8_by_ps_x4::<FMA>(k2, v_source0.2, v_source1.2, coeff);
-                k3 = _mm_mul_add_symm_epi8_by_ps_x4::<FMA>(k3, v_source0.3, v_source1.3, coeff);
+                k0 = _mm_mul_add_symm_epi8_by_ps_x4(k0, v_source0.0, v_source1.0, coeff);
+                k1 = _mm_mul_add_symm_epi8_by_ps_x4(k1, v_source0.1, v_source1.1, coeff);
+                k2 = _mm_mul_add_symm_epi8_by_ps_x4(k2, v_source0.2, v_source1.2, coeff);
+                k3 = _mm_mul_add_symm_epi8_by_ps_x4(k3, v_source0.3, v_source1.3, coeff);
             }
 
             let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
@@ -182,8 +131,8 @@ impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source = _mm_load_pack_x2(shifted_src.get_unchecked(half_len * N..).as_ptr());
-            let mut k0 = _mm_mul_epi8_by_ps_x4::<FMA>(source.0, coeff);
-            let mut k1 = _mm_mul_epi8_by_ps_x4::<FMA>(source.1, coeff);
+            let mut k0 = _mm_mul_epi8_by_ps_x4(source.0, coeff);
+            let mut k1 = _mm_mul_epi8_by_ps_x4(source.1, coeff);
 
             for i in 0..half_len {
                 let rollback = length - i - 1;
@@ -191,8 +140,8 @@ impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
                 let v_source0 = _mm_load_pack_x2(shifted_src.get_unchecked((i * N)..).as_ptr());
                 let v_source1 =
                     _mm_load_pack_x2(shifted_src.get_unchecked((rollback * N)..).as_ptr());
-                k0 = _mm_mul_add_symm_epi8_by_ps_x4::<FMA>(k0, v_source0.0, v_source1.0, coeff);
-                k1 = _mm_mul_add_symm_epi8_by_ps_x4::<FMA>(k1, v_source0.1, v_source1.1, coeff);
+                k0 = _mm_mul_add_symm_epi8_by_ps_x4(k0, v_source0.0, v_source1.0, coeff);
+                k1 = _mm_mul_add_symm_epi8_by_ps_x4(k1, v_source0.1, v_source1.1, coeff);
             }
 
             let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
@@ -207,7 +156,7 @@ impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
 
             let source =
                 _mm_loadu_si128(shifted_src.get_unchecked(half_len * N..).as_ptr() as *const _);
-            let mut k0 = _mm_mul_epi8_by_ps_x4::<FMA>(source, coeff);
+            let mut k0 = _mm_mul_epi8_by_ps_x4(source, coeff);
 
             for i in 0..half_len {
                 let rollback = length - i - 1;
@@ -217,7 +166,7 @@ impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
                 let v_source1 = _mm_loadu_si128(
                     shifted_src.get_unchecked((rollback * N)..).as_ptr() as *const _,
                 );
-                k0 = _mm_mul_add_symm_epi8_by_ps_x4::<FMA>(k0, v_source0, v_source1, coeff);
+                k0 = _mm_mul_add_symm_epi8_by_ps_x4(k0, v_source0, v_source1, coeff);
             }
 
             let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
@@ -232,7 +181,7 @@ impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
 
             let source =
                 _mm_loadu_si64(shifted_src.get_unchecked(half_len * N..).as_ptr() as *const _);
-            let mut k0 = _mm_mul_epi8_by_ps_x2::<FMA>(source, coeff);
+            let mut k0 = _mm_mul_epi8_by_ps_x2(source, coeff);
 
             for i in 0..half_len {
                 let rollback = length - i - 1;
@@ -242,7 +191,7 @@ impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
                 let v_source1 = _mm_loadu_si64(
                     shifted_src.get_unchecked((rollback * N)..).as_ptr() as *const _,
                 );
-                k0 = _mm_mul_add_symm_epi8_by_ps_x2::<FMA>(k0, v_source0, v_source1, coeff);
+                k0 = _mm_mul_add_symm_epi8_by_ps_x2(k0, v_source0, v_source1, coeff);
             }
 
             let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();

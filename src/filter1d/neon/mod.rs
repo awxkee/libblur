@@ -39,6 +39,7 @@ mod filter_column_symm_approx_rdm;
 #[cfg(feature = "rdm")]
 mod filter_column_symm_approx_rdm_x3;
 mod filter_column_symm_f32;
+mod filter_column_symm_f32_f64;
 mod filter_column_symm_u15_u16_x3;
 mod filter_column_symm_u16;
 mod filter_column_symm_u16_x3;
@@ -56,6 +57,7 @@ mod filter_row_symm_approx;
 #[cfg(feature = "rdm")]
 mod filter_row_symm_approx_rdm;
 mod filter_row_symm_f32;
+mod filter_row_symm_f32_f64;
 mod filter_row_symm_u16;
 mod filter_row_symm_u8_i16;
 mod filter_row_symm_uq15_u16;
@@ -77,6 +79,7 @@ pub(crate) use filter_column_symm_approx_rdm::filter_column_symm_neon_u8_i32_rdm
 #[cfg(feature = "rdm")]
 pub(crate) use filter_column_symm_approx_rdm_x3::filter_column_symm_neon_u8_i32_rdm_x3;
 pub(crate) use filter_column_symm_f32::filter_column_neon_symm_f32_f32;
+pub(crate) use filter_column_symm_f32_f64::filter_column_neon_symm_f32_f64;
 pub(crate) use filter_column_symm_u15_u16_x3::filter_symm_column_neon_uq15_u16_x3;
 pub(crate) use filter_column_symm_u16::filter_symm_column_neon_u16_f32;
 pub(crate) use filter_column_symm_u16_x3::filter_symm_column_neon_u16_f32_x3;
@@ -94,6 +97,7 @@ pub(crate) use filter_row_symm_approx::filter_row_symm_neon_u8_i32;
 #[cfg(feature = "rdm")]
 pub(crate) use filter_row_symm_approx_rdm::filter_row_symm_neon_u8_i32_rdm;
 pub(crate) use filter_row_symm_f32::filter_row_neon_symm_f32_f32;
+pub(crate) use filter_row_symm_f32_f64::filter_row_neon_symm_f32_f64;
 pub(crate) use filter_row_symm_u16::filter_row_symm_neon_u16_f32;
 pub(crate) use filter_row_symm_u8_i16::filter_rgb_row_symm_neon_u8_i16;
 pub(crate) use filter_row_symm_uq15_u16::filter_row_symm_neon_uq15_u16;

@@ -271,6 +271,40 @@ impl Filter1DRowHandler<u8, i16> for u8 {
     }
 }
 
+impl Filter1DRowHandler<f32, f64> for f32 {
+    fn get_row_handler<const N: usize>(
+        is_symmetric_kernel: bool,
+    ) -> fn(Arena, &[f32], &mut [f32], ImageSize, FilterRegion, &[ScanPoint1d<f64>]) {
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
+        {
+            if is_symmetric_kernel {
+                use crate::filter1d::neon::filter_row_neon_symm_f32_f64;
+                return filter_row_neon_symm_f32_f64::<N>;
+            }
+        }
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        {
+            if is_symmetric_kernel && std::arch::is_x86_feature_detected!("avx2") {
+                use crate::filter1d::avx::filter_row_avx_f32_f64_symm;
+                return filter_row_avx_f32_f64_symm::<N>;
+            }
+        }
+        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
+        {
+            if std::arch::is_x86_feature_detected!("sse4.1") {
+                use crate::filter1d::sse::filter_row_sse_f32_f64;
+                return filter_row_sse_f32_f64::<N>;
+            }
+        }
+        if is_symmetric_kernel {
+            filter_row_symmetrical::<f32, f64, N>
+        } else {
+            use crate::filter1d::filter_row::filter_row;
+            filter_row::<f32, f64, N>
+        }
+    }
+}
+
 macro_rules! default_1d_row_handler {
     ($store:ty, $intermediate:ty) => {
         impl Filter1DRowHandler<$store, $intermediate> for $store {
@@ -311,5 +345,4 @@ default_1d_row_handler!(i32, f32);
 default_1d_row_handler!(i32, f64);
 default_1d_row_handler!(f16, f32);
 default_1d_row_handler!(f16, f64);
-default_1d_row_handler!(f32, f64);
 default_1d_row_handler!(f64, f64);

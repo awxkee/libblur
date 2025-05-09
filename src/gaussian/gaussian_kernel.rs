@@ -32,13 +32,37 @@ pub fn gaussian_kernel_1d(width: u32, sigma: f32) -> Vec<f32> {
     let mean = (width / 2) as f32;
 
     for (x, item) in kernel.iter_mut().enumerate() {
-        let new_weight = f32::exp(-0.5f32 * f32::powf((x as f32 - mean) / sigma, 2.0f32)) * scale;
+        let dx = (x as f32 - mean) / sigma;
+        let new_weight = f32::exp(-0.5f32 * dx * dx) * scale;
         *item = new_weight;
         sum_norm += new_weight;
     }
 
     if sum_norm != 0f32 {
         let sum_scale = 1f32 / sum_norm;
+        for item in kernel.iter_mut() {
+            *item *= sum_scale;
+        }
+    }
+
+    kernel
+}
+
+pub fn gaussian_kernel_1d_f64(width: u32, sigma: f64) -> Vec<f64> {
+    let mut sum_norm: f64 = 0.;
+    let mut kernel: Vec<f64> = vec![0.; width as usize];
+    let scale = 1. / (f64::sqrt(2. * std::f64::consts::PI) * sigma);
+    let mean = (width / 2) as f64;
+
+    for (x, item) in kernel.iter_mut().enumerate() {
+        let dx = (x as f64 - mean) / sigma;
+        let new_weight = f64::exp(-0.5 * dx * dx) * scale;
+        *item = new_weight;
+        sum_norm += new_weight;
+    }
+
+    if sum_norm != 0. {
+        let sum_scale = 1. / sum_norm;
         for item in kernel.iter_mut() {
             *item *= sum_scale;
         }

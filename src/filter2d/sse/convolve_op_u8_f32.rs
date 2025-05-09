@@ -50,55 +50,12 @@ pub(crate) fn convolve_segment_sse_2d_u8_f32(
     y: usize,
 ) {
     unsafe {
-        let has_fma = std::arch::is_x86_feature_detected!("fma");
-        if has_fma {
-            convolve_segment_2d_u8_fma(arena, arena_source, dst, image_size, prepared_kernel, y);
-        } else {
-            convolve_segment_2d_u8_def(arena, arena_source, dst, image_size, prepared_kernel, y);
-        }
+        convolve_segment_2d_u8_f32_impl(arena, arena_source, dst, image_size, prepared_kernel, y);
     }
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn convolve_segment_2d_u8_def(
-    arena: Arena,
-    arena_source: &[u8],
-    dst: &mut [u8],
-    image_size: ImageSize,
-    prepared_kernel: &[ScanPoint2d<f32>],
-    y: usize,
-) {
-    convolve_segment_2d_u8_f32_impl::<false>(
-        arena,
-        arena_source,
-        dst,
-        image_size,
-        prepared_kernel,
-        y,
-    );
-}
-
-#[target_feature(enable = "sse4.1", enable = "fma")]
-unsafe fn convolve_segment_2d_u8_fma(
-    arena: Arena,
-    arena_source: &[u8],
-    dst: &mut [u8],
-    image_size: ImageSize,
-    prepared_kernel: &[ScanPoint2d<f32>],
-    y: usize,
-) {
-    convolve_segment_2d_u8_f32_impl::<true>(
-        arena,
-        arena_source,
-        dst,
-        image_size,
-        prepared_kernel,
-        y,
-    );
-}
-
-#[inline(always)]
-unsafe fn convolve_segment_2d_u8_f32_impl<const FMA: bool>(
+unsafe fn convolve_segment_2d_u8_f32_impl(
     arena: Arena,
     arena_source: &[u8],
     dst: &mut [u8],
@@ -135,18 +92,18 @@ unsafe fn convolve_segment_2d_u8_f32_impl<const FMA: bool>(
 
     while cx + 64 < total_width {
         let items0 = _mm_load_pack_x4(off0.get_unchecked(cx..).as_ptr());
-        let mut k0 = _mm_mul_epi8_by_ps_x4::<FMA>(items0.0, k_weight);
-        let mut k1 = _mm_mul_epi8_by_ps_x4::<FMA>(items0.1, k_weight);
-        let mut k2 = _mm_mul_epi8_by_ps_x4::<FMA>(items0.2, k_weight);
-        let mut k3 = _mm_mul_epi8_by_ps_x4::<FMA>(items0.3, k_weight);
+        let mut k0 = _mm_mul_epi8_by_ps_x4(items0.0, k_weight);
+        let mut k1 = _mm_mul_epi8_by_ps_x4(items0.1, k_weight);
+        let mut k2 = _mm_mul_epi8_by_ps_x4(items0.2, k_weight);
+        let mut k3 = _mm_mul_epi8_by_ps_x4(items0.3, k_weight);
         for i in 1..length {
             let weight = _mm_set1_ps(prepared_kernel.get_unchecked(i).weight);
             let s_ptr = offsets.get_unchecked(i);
             let items0 = _mm_load_pack_x4(s_ptr.get_unchecked(cx..).as_ptr());
-            k0 = _mm_mul_add_epi8_by_ps_x4::<FMA>(k0, items0.0, weight);
-            k1 = _mm_mul_add_epi8_by_ps_x4::<FMA>(k1, items0.1, weight);
-            k2 = _mm_mul_add_epi8_by_ps_x4::<FMA>(k2, items0.2, weight);
-            k3 = _mm_mul_add_epi8_by_ps_x4::<FMA>(k3, items0.3, weight);
+            k0 = _mm_mul_add_epi8_by_ps_x4(k0, items0.0, weight);
+            k1 = _mm_mul_add_epi8_by_ps_x4(k1, items0.1, weight);
+            k2 = _mm_mul_add_epi8_by_ps_x4(k2, items0.2, weight);
+            k3 = _mm_mul_add_epi8_by_ps_x4(k3, items0.3, weight);
         }
         let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
         _mm_store_pack_x4(
@@ -163,14 +120,14 @@ unsafe fn convolve_segment_2d_u8_f32_impl<const FMA: bool>(
 
     while cx + 32 < total_width {
         let items0 = _mm_load_pack_x2(off0.get_unchecked(cx..).as_ptr());
-        let mut k0 = _mm_mul_epi8_by_ps_x4::<FMA>(items0.0, k_weight);
-        let mut k1 = _mm_mul_epi8_by_ps_x4::<FMA>(items0.1, k_weight);
+        let mut k0 = _mm_mul_epi8_by_ps_x4(items0.0, k_weight);
+        let mut k1 = _mm_mul_epi8_by_ps_x4(items0.1, k_weight);
         for i in 1..length {
             let weight = _mm_set1_ps(prepared_kernel.get_unchecked(i).weight);
             let s_ptr = offsets.get_unchecked(i);
             let items0 = _mm_load_pack_x2(s_ptr.get_unchecked(cx..).as_ptr());
-            k0 = _mm_mul_add_epi8_by_ps_x4::<FMA>(k0, items0.0, weight);
-            k1 = _mm_mul_add_epi8_by_ps_x4::<FMA>(k1, items0.1, weight);
+            k0 = _mm_mul_add_epi8_by_ps_x4(k0, items0.0, weight);
+            k1 = _mm_mul_add_epi8_by_ps_x4(k1, items0.1, weight);
         }
         let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
         _mm_store_pack_x2(dst_ptr0, (_mm_pack_ps_x4_epi8(k0), _mm_pack_ps_x4_epi8(k1)));
@@ -179,13 +136,13 @@ unsafe fn convolve_segment_2d_u8_f32_impl<const FMA: bool>(
 
     while cx + 16 < total_width {
         let items0 = _mm_loadu_si128(off0.get_unchecked(cx..).as_ptr() as *const __m128i);
-        let mut k0 = _mm_mul_epi8_by_ps_x4::<FMA>(items0, k_weight);
+        let mut k0 = _mm_mul_epi8_by_ps_x4(items0, k_weight);
         for i in 1..length {
             let weight = _mm_set1_ps(prepared_kernel.get_unchecked(i).weight);
             let items0 = _mm_loadu_si128(
                 offsets.get_unchecked(i).get_unchecked(cx..).as_ptr() as *const __m128i
             );
-            k0 = _mm_mul_add_epi8_by_ps_x4::<FMA>(k0, items0, weight);
+            k0 = _mm_mul_add_epi8_by_ps_x4(k0, items0, weight);
         }
         let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
         _mm_storeu_si128(dst_ptr0 as *mut __m128i, _mm_pack_ps_x4_epi8(k0));

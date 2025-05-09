@@ -53,49 +53,7 @@ impl<T, J, const COMPONENTS: usize> Default for VerticalSseStackBlurPassFloat32<
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn vertical_pass_stack_def<const CN: usize>(
-    pixels: &UnsafeSlice<f32>,
-    stride: u32,
-    width: u32,
-    height: u32,
-    radius: u32,
-    thread: usize,
-    total_threads: usize,
-) {
-    stack_blur_pass_vert_sse::<CN, false>(
-        pixels,
-        stride,
-        width,
-        height,
-        radius,
-        thread,
-        total_threads,
-    );
-}
-
-#[target_feature(enable = "sse4.1", enable = "fma")]
-unsafe fn vertical_pass_stack_fma<const CN: usize>(
-    pixels: &UnsafeSlice<f32>,
-    stride: u32,
-    width: u32,
-    height: u32,
-    radius: u32,
-    thread: usize,
-    total_threads: usize,
-) {
-    stack_blur_pass_vert_sse::<CN, true>(
-        pixels,
-        stride,
-        width,
-        height,
-        radius,
-        thread,
-        total_threads,
-    );
-}
-
-#[inline(always)]
-unsafe fn stack_blur_pass_vert_sse<const CN: usize, const FMA: bool>(
+unsafe fn stack_blur_pass_vert_sse<const CN: usize>(
     pixels: &UnsafeSlice<f32>,
     stride: u32,
     width: u32,
@@ -136,7 +94,7 @@ unsafe fn stack_blur_pass_vert_sse<const CN: usize, const FMA: bool>(
             for i in 0..=radius {
                 let stack_ptr = stacks.as_mut_ptr().add(i as usize * 4);
                 _mm_storeu_ps(stack_ptr, src_pixel);
-                sums = _mm_opt_fmlaf_ps::<FMA>(sums, src_pixel, _mm_set1_ps((i + 1) as f32));
+                sums = _mm_opt_fmlaf_ps(sums, src_pixel, _mm_set1_ps((i + 1) as f32));
                 sum_out = _mm_add_ps(sum_out, src_pixel);
             }
 
@@ -149,8 +107,7 @@ unsafe fn stack_blur_pass_vert_sse<const CN: usize, const FMA: bool>(
                 let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f32;
                 let src_pixel = load_f32::<CN>(src_ld);
                 _mm_storeu_ps(stack_ptr, src_pixel);
-                sums =
-                    _mm_opt_fmlaf_ps::<FMA>(sums, src_pixel, _mm_set1_ps((radius + 1 - i) as f32));
+                sums = _mm_opt_fmlaf_ps(sums, src_pixel, _mm_set1_ps((radius + 1 - i) as f32));
 
                 sum_in = _mm_add_ps(sum_in, src_pixel);
             }
@@ -238,27 +195,15 @@ where
     ) {
         unsafe {
             let pixels: &UnsafeSlice<f32> = std::mem::transmute(pixels);
-            if std::arch::is_x86_feature_detected!("fma") {
-                vertical_pass_stack_fma::<COMPONENTS>(
-                    pixels,
-                    stride,
-                    width,
-                    height,
-                    radius,
-                    thread,
-                    total_threads,
-                );
-            } else {
-                vertical_pass_stack_def::<COMPONENTS>(
-                    pixels,
-                    stride,
-                    width,
-                    height,
-                    radius,
-                    thread,
-                    total_threads,
-                );
-            }
+            stack_blur_pass_vert_sse::<COMPONENTS>(
+                pixels,
+                stride,
+                width,
+                height,
+                radius,
+                thread,
+                total_threads,
+            );
         }
     }
 }

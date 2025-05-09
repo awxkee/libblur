@@ -347,9 +347,9 @@ impl Grayscale<u8> for u8 {
         let kg = 1. - kr - kb;
 
         const SCALE: f32 = (1i32 << 10i32) as f32;
-        let v_kr = (kr * SCALE).ceil() as i32;
-        let v_kb = (kb * SCALE).ceil() as i32;
-        let v_kg = (kg * SCALE).ceil() as i32;
+        let v_kr = (kr * SCALE).round() as i32;
+        let v_kb = (kb * SCALE).round() as i32;
+        let v_kg = (kg * SCALE).round() as i32;
 
         match channels {
             FastBlurChannels::Plane => source.to_vec(),

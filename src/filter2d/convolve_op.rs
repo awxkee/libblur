@@ -70,22 +70,13 @@ pub(crate) fn convolve_segment_2d<T, F>(
 
         let k_weight = prepared_kernel.get_unchecked(0).weight;
 
+        let off0 = offsets.get_unchecked(0);
+
         while cx + 4 < total_width {
-            let mut k0 = (*offsets.get_unchecked(0))
-                .get_unchecked(cx)
-                .as_()
-                .mul(k_weight);
-            let mut k1 = (*offsets.get_unchecked(0))
-                .get_unchecked(cx + 1)
-                .as_()
-                .mul(k_weight);
-            let mut k2 = (*offsets.get_unchecked(0))
-                .get_unchecked(cx + 2)
-                .as_()
-                .mul(k_weight);
-            let mut k3 = (*offsets.get_unchecked(0).get_unchecked(cx + 3))
-                .as_()
-                .mul(k_weight);
+            let mut k0 = (*off0).get_unchecked(cx).as_().mul(k_weight);
+            let mut k1 = (*off0).get_unchecked(cx + 1).as_().mul(k_weight);
+            let mut k2 = (*off0).get_unchecked(cx + 2).as_().mul(k_weight);
+            let mut k3 = (*off0.get_unchecked(cx + 3)).as_().mul(k_weight);
 
             for i in 1..length {
                 let weight = prepared_kernel.get_unchecked(i).weight;
@@ -115,10 +106,7 @@ pub(crate) fn convolve_segment_2d<T, F>(
         }
 
         for x in cx..total_width {
-            let mut k0 = (*offsets.get_unchecked(0))
-                .get_unchecked(x)
-                .as_()
-                .mul(k_weight);
+            let mut k0 = (*off0).get_unchecked(x).as_().mul(k_weight);
 
             for i in 1..length {
                 let k_weight = prepared_kernel.get_unchecked(i).weight;

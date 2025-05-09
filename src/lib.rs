@@ -149,14 +149,11 @@ pub use filter1d::{filter_1d_approx, filter_1d_exact, make_arena, Arena, ArenaPa
 #[cfg_attr(docsrs, doc(cfg(feature = "fft")))]
 pub use filter2d::{fft_next_good_size, filter_2d_fft, filter_2d_rgb_fft, filter_2d_rgba_fft};
 pub use filter2d::{filter_2d, filter_2d_arbitrary, filter_2d_rgb, filter_2d_rgba};
-pub use gaussian::gaussian_blur;
-pub use gaussian::gaussian_blur_f16;
-pub use gaussian::gaussian_blur_f32;
 pub use gaussian::gaussian_blur_in_linear;
-pub use gaussian::gaussian_blur_u16;
-pub use gaussian::gaussian_kernel_1d;
-pub use gaussian::sigma_size;
-pub use gaussian::ConvolutionMode;
+pub use gaussian::{
+    gaussian_blur, gaussian_blur_f16, gaussian_blur_f32, gaussian_blur_u16, gaussian_kernel_1d,
+    gaussian_kernel_1d_f64, sigma_size, sigma_size_d, ConvolutionMode,
+};
 #[cfg(feature = "image")]
 #[cfg_attr(docsrs, doc(cfg(feature = "image")))]
 pub use gaussian_blur_image::gaussian_blur_image;

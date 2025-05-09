@@ -1,8 +1,8 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use image::{GenericImageView, ImageReader};
 use libblur::{
-    filter_1d_exact, gaussian_kernel_1d, sigma_size, BlurImage, BlurImageMut, ConvolutionMode,
-    EdgeMode, FastBlurChannels, Scalar, ThreadingPolicy,
+    filter_1d_exact, gaussian_kernel_1d, gaussian_kernel_1d_f64, sigma_size, BlurImage,
+    BlurImageMut, ConvolutionMode, EdgeMode, FastBlurChannels, Scalar, ThreadingPolicy,
 };
 use opencv::core::{
     find_file, split, AlgorithmHint, Mat, Size, Vector, BORDER_DEFAULT, CV_16UC4, CV_32FC3,
