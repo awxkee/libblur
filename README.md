@@ -31,7 +31,7 @@ let blurred = gaussian_blur_image(
     61,
     0.,
     EdgeMode::Clamp,
-    GaussianPreciseLevel::INTEGRAL,
+    ConvolutionMode::FixedPoint,
     ThreadingPolicy::Adaptive,
 )
 .unwrap();

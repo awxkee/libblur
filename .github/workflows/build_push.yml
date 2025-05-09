@@ -61,7 +61,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
-      - run: cargo test --features "${{ matrix.feature }}" --no-default-features
+      - run: cargo test --features "${{ matrix.feature }}" --features fft --no-default-features
 
   tests_x86_64:
     name: Tests x86_64
@@ -72,7 +72,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
-      - run: cargo test --features "${{ matrix.feature }}" --no-default-features
+      - run: cargo test --features "${{ matrix.feature }}" --features fft --no-default-features
 
   fuzz_box_mac:
     name: Fuzzing Box
@@ -147,15 +147,15 @@ jobs:
     name: Fuzzing Stack Blur
     strategy:
       matrix:
-        feature: [ sse, avx ]
+        feature: [ sse, avx, "" ]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo install cargo-fuzz
-      - run: cargo fuzz run stack_blur --features ${{ matrix.feature }} -- -max_total_time=17
-      - run: cargo fuzz run stack_blur_u16 --features ${{ matrix.feature }} -- -max_total_time=17
-      - run: cargo fuzz run stack_blur_f32 --features ${{ matrix.feature }} -- -max_total_time=17
+      - run: cargo fuzz run stack_blur --features "${{ matrix.feature }}" -- -max_total_time=17
+      - run: cargo fuzz run stack_blur_u16 --features "${{ matrix.feature }}" -- -max_total_time=17
+      - run: cargo fuzz run stack_blur_f32 --features "${{ matrix.feature }}" -- -max_total_time=17
 
   fuzz_fast_gaussian_blur:
     name: Fuzzing Fast Gaussian Blur

@@ -1,5 +1,5 @@
 /*
- * // Copyright (c) Radzivon Bartoshyk. All rights reserved.
+ * // Copyright (c) Radzivon Bartoshyk 5/2025. All rights reserved.
  * //
  * // Redistribution and use in source and binary forms, with or without modification,
  * // are permitted provided that the following conditions are met:
@@ -26,8 +26,6 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-mod convolve_op_u8_f32;
-mod convolve_op_u8_i16;
+mod convolve_op_u8_i16_fp;
 
-pub(crate) use convolve_op_u8_f32::convolve_segment_sse_2d_u8_f32;
-pub(crate) use convolve_op_u8_i16::convolve_segment_sse_2d_u8_i16;
+pub(crate) use convolve_op_u8_i16_fp::convolve_segment_sse_2d_u8_i16_fp;

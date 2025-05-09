@@ -27,23 +27,22 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter1d::neon::utils::{
-    vfmlaq_u8_f32, vmulq_u8_by_f32, vqmovnq_f32_u8, xvld1q_u8_x2, xvld1q_u8_x4, xvst1q_u8_x2,
+    vfmlaq_u8_s16, vmullq_u8_by_i16, vqmovnq_s32_u8, xvld1q_u8_x2, xvld1q_u8_x4, xvst1q_u8_x2,
     xvst1q_u8_x4,
 };
-use crate::filter1d::Arena;
+use crate::filter1d::{Arena, ToApproxStorage};
 use crate::filter2d::scan_point_2d::ScanPoint2d;
 use crate::mlaf::mlaf;
-use crate::to_storage::ToStorage;
 use crate::ImageSize;
 use std::arch::aarch64::*;
 use std::ops::Mul;
 
-pub(crate) fn convolve_segment_neon_2d_u8_f32(
+pub fn convolve_segment_neon_2d_u8_i16_fp(
     arena: Arena,
     arena_source: &[u8],
     dst: &mut [u8],
     image_size: ImageSize,
-    prepared_kernel: &[ScanPoint2d<f32>],
+    prepared_kernel: &[ScanPoint2d<i16>],
     y: usize,
 ) {
     unsafe {
@@ -70,33 +69,33 @@ pub(crate) fn convolve_segment_neon_2d_u8_f32(
 
         let mut cx = 0usize;
 
-        let k_weight = vdupq_n_f32(prepared_kernel.get_unchecked(0).weight);
+        let k_weight = vdupq_n_s16(prepared_kernel.get_unchecked(0).weight);
 
         let off0 = offsets.get_unchecked(0);
 
         while cx + 64 < total_width {
             let items0 = xvld1q_u8_x4(off0.get_unchecked(cx..).as_ptr());
-            let mut k0 = vmulq_u8_by_f32(items0.0, k_weight);
-            let mut k1 = vmulq_u8_by_f32(items0.1, k_weight);
-            let mut k2 = vmulq_u8_by_f32(items0.2, k_weight);
-            let mut k3 = vmulq_u8_by_f32(items0.3, k_weight);
+            let mut k0 = vmullq_u8_by_i16(items0.0, k_weight);
+            let mut k1 = vmullq_u8_by_i16(items0.1, k_weight);
+            let mut k2 = vmullq_u8_by_i16(items0.2, k_weight);
+            let mut k3 = vmullq_u8_by_i16(items0.3, k_weight);
             for i in 1..length {
-                let weight = vdupq_n_f32(prepared_kernel.get_unchecked(i).weight);
+                let weight = vdupq_n_s16(prepared_kernel.get_unchecked(i).weight);
                 let s_ptr = offsets.get_unchecked(i);
                 let items0 = xvld1q_u8_x4(s_ptr.get_unchecked(cx..).as_ptr());
-                k0 = vfmlaq_u8_f32(k0, items0.0, weight);
-                k1 = vfmlaq_u8_f32(k1, items0.1, weight);
-                k2 = vfmlaq_u8_f32(k2, items0.2, weight);
-                k3 = vfmlaq_u8_f32(k3, items0.3, weight);
+                k0 = vfmlaq_u8_s16(k0, items0.0, weight);
+                k1 = vfmlaq_u8_s16(k1, items0.1, weight);
+                k2 = vfmlaq_u8_s16(k2, items0.2, weight);
+                k3 = vfmlaq_u8_s16(k3, items0.3, weight);
             }
             let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
             xvst1q_u8_x4(
                 dst_ptr0,
                 uint8x16x4_t(
-                    vqmovnq_f32_u8(k0),
-                    vqmovnq_f32_u8(k1),
-                    vqmovnq_f32_u8(k2),
-                    vqmovnq_f32_u8(k3),
+                    vqmovnq_s32_u8(k0),
+                    vqmovnq_s32_u8(k1),
+                    vqmovnq_s32_u8(k2),
+                    vqmovnq_s32_u8(k3),
                 ),
             );
             cx += 64;
@@ -104,87 +103,87 @@ pub(crate) fn convolve_segment_neon_2d_u8_f32(
 
         while cx + 32 < total_width {
             let items0 = xvld1q_u8_x2(off0.get_unchecked(cx..).as_ptr());
-            let mut k0 = vmulq_u8_by_f32(items0.0, k_weight);
-            let mut k1 = vmulq_u8_by_f32(items0.1, k_weight);
+            let mut k0 = vmullq_u8_by_i16(items0.0, k_weight);
+            let mut k1 = vmullq_u8_by_i16(items0.1, k_weight);
             for i in 1..length {
-                let weight = vdupq_n_f32(prepared_kernel.get_unchecked(i).weight);
+                let weight = vdupq_n_s16(prepared_kernel.get_unchecked(i).weight);
                 let s_ptr = offsets.get_unchecked(i);
                 let items0 = xvld1q_u8_x2(s_ptr.get_unchecked(cx..).as_ptr());
-                k0 = vfmlaq_u8_f32(k0, items0.0, weight);
-                k1 = vfmlaq_u8_f32(k1, items0.1, weight);
+                k0 = vfmlaq_u8_s16(k0, items0.0, weight);
+                k1 = vfmlaq_u8_s16(k1, items0.1, weight);
             }
             let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
             xvst1q_u8_x2(
                 dst_ptr0,
-                uint8x16x2_t(vqmovnq_f32_u8(k0), vqmovnq_f32_u8(k1)),
+                uint8x16x2_t(vqmovnq_s32_u8(k0), vqmovnq_s32_u8(k1)),
             );
             cx += 32;
         }
 
         while cx + 16 < total_width {
             let items0 = vld1q_u8(off0.get_unchecked(cx..).as_ptr());
-            let mut k0 = vmulq_u8_by_f32(items0, k_weight);
+            let mut k0 = vmullq_u8_by_i16(items0, k_weight);
             for i in 1..length {
-                let weight = vdupq_n_f32(prepared_kernel.get_unchecked(i).weight);
+                let weight = vdupq_n_s16(prepared_kernel.get_unchecked(i).weight);
                 let items0 = vld1q_u8(offsets.get_unchecked(i).get_unchecked(cx..).as_ptr());
-                k0 = vfmlaq_u8_f32(k0, items0, weight);
+                k0 = vfmlaq_u8_s16(k0, items0, weight);
             }
             let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
-            vst1q_u8(dst_ptr0, vqmovnq_f32_u8(k0));
+            vst1q_u8(dst_ptr0, vqmovnq_s32_u8(k0));
             cx += 16;
         }
 
         let k_weight = prepared_kernel.get_unchecked(0).weight;
 
         while cx + 4 < total_width {
-            let mut k0 = ((*off0.get_unchecked(cx)) as f32).mul(k_weight);
-            let mut k1 = ((*off0.get_unchecked(cx + 1)) as f32).mul(k_weight);
-            let mut k2 = ((*off0.get_unchecked(cx + 2)) as f32).mul(k_weight);
-            let mut k3 = ((*off0.get_unchecked(cx + 3)) as f32).mul(k_weight);
+            let mut k0 = ((*off0.get_unchecked(cx)) as i32).mul(k_weight as i32);
+            let mut k1 = ((*off0.get_unchecked(cx + 1)) as i32).mul(k_weight as i32);
+            let mut k2 = ((*off0.get_unchecked(cx + 2)) as i32).mul(k_weight as i32);
+            let mut k3 = ((*off0.get_unchecked(cx + 3)) as i32).mul(k_weight as i32);
 
             for i in 1..length {
                 let weight = prepared_kernel.get_unchecked(i).weight;
                 k0 = mlaf(
                     k0,
-                    (*offsets.get_unchecked(i).get_unchecked(cx)) as f32,
-                    weight,
+                    (*offsets.get_unchecked(i).get_unchecked(cx)) as i32,
+                    weight as i32,
                 );
                 k1 = mlaf(
                     k1,
-                    (*offsets.get_unchecked(i).get_unchecked(cx + 1)) as f32,
-                    weight,
+                    (*offsets.get_unchecked(i).get_unchecked(cx + 1)) as i32,
+                    weight as i32,
                 );
                 k2 = mlaf(
                     k2,
-                    (*offsets.get_unchecked(i).get_unchecked(cx + 2)) as f32,
-                    weight,
+                    (*offsets.get_unchecked(i).get_unchecked(cx + 2)) as i32,
+                    weight as i32,
                 );
                 k3 = mlaf(
                     k3,
-                    (*offsets.get_unchecked(i).get_unchecked(cx + 3)) as f32,
-                    weight,
+                    (*offsets.get_unchecked(i).get_unchecked(cx + 3)) as i32,
+                    weight as i32,
                 );
             }
 
-            *dst.get_unchecked_mut(cx) = k0.to_();
-            *dst.get_unchecked_mut(cx + 1) = k1.to_();
-            *dst.get_unchecked_mut(cx + 2) = k2.to_();
-            *dst.get_unchecked_mut(cx + 3) = k3.to_();
+            *dst.get_unchecked_mut(cx) = k0.to_approx_();
+            *dst.get_unchecked_mut(cx + 1) = k1.to_approx_();
+            *dst.get_unchecked_mut(cx + 2) = k2.to_approx_();
+            *dst.get_unchecked_mut(cx + 3) = k3.to_approx_();
             cx += 4;
         }
 
         for x in cx..total_width {
-            let mut k0 = ((*(*off0).get_unchecked(x)) as f32).mul(k_weight);
+            let mut k0 = ((*(*off0).get_unchecked(x)) as i32).mul(k_weight as i32);
 
             for i in 1..length {
                 let k_weight = prepared_kernel.get_unchecked(i).weight;
                 k0 = mlaf(
                     k0,
-                    (*offsets.get_unchecked(i).get_unchecked(x)) as f32,
-                    k_weight,
+                    (*offsets.get_unchecked(i).get_unchecked(x)) as i32,
+                    k_weight as i32,
                 );
             }
-            *dst.get_unchecked_mut(x) = k0.to_();
+            *dst.get_unchecked_mut(x) = k0.to_approx_();
         }
     }
 }

@@ -61,3 +61,4 @@ pub use arena::{make_arena, Arena, ArenaPads};
 pub use filter::filter_1d_exact;
 pub use filter_1d_approx::filter_1d_approx;
 pub use filter_element::KernelShape;
+pub use to_approx_storage::ToApproxStorage;

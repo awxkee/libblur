@@ -28,6 +28,7 @@
  */
 use crate::filter1d::{make_arena, ArenaPads, KernelShape};
 use crate::filter2d::filter_2d_handler::Filter2dHandler;
+use crate::filter2d::scan_point_2d::ScanPoint2d;
 use crate::filter2d::scan_se_2d::scan_se_2d;
 use crate::to_storage::ToStorage;
 use crate::{
@@ -74,7 +75,7 @@ pub fn filter_2d<T, F>(
 ) -> Result<(), BlurError>
 where
     T: Copy + AsPrimitive<F> + Default + Send + Sync + Filter2dHandler<T, F> + Debug,
-    F: ToStorage<T> + Mul<F> + MulAdd<F, Output = F> + Send + Sync + PartialEq,
+    F: ToStorage<T> + Mul<F> + MulAdd<F, Output = F> + Send + Sync + PartialEq + AsPrimitive<f64>,
     i32: AsPrimitive<F>,
     f64: AsPrimitive<T>,
 {
@@ -144,7 +145,7 @@ pub fn filter_2d_arbitrary<T, F, const CN: usize>(
 ) -> Result<(), BlurError>
 where
     T: Copy + AsPrimitive<F> + Default + Send + Sync + Filter2dHandler<T, F> + Debug,
-    F: ToStorage<T> + Mul<F> + MulAdd<F, Output = F> + Send + Sync + PartialEq,
+    F: ToStorage<T> + Mul<F> + MulAdd<F, Output = F> + Send + Sync + PartialEq + AsPrimitive<f64>,
     i32: AsPrimitive<F>,
     f64: AsPrimitive<T>,
 {
@@ -178,8 +179,6 @@ where
 
     let image_size = ImageSize::new(src.width as usize, src.height as usize);
 
-    let filter = Arc::new(T::get_executor());
-
     let (arena_source, arena) = make_arena::<T, CN>(
         src.data.as_ref(),
         src.row_stride() as usize,
@@ -204,27 +203,68 @@ where
     let arena_source_slice = arena_source.as_slice();
     let kernel_slice = analyzed_se.as_slice();
 
-    if let Some(pool) = &pool {
-        pool.install(|| {
+    let fp_executor_test = T::get_fp_executor();
+
+    if T::FIXED_POINT_REPRESENTABLE && fp_executor_test.is_some() {
+        let filter = Arc::new(T::get_fp_executor().unwrap());
+        const S: f64 = ((1 << 15) - 1) as f64;
+        let fp_slice = kernel_slice
+            .iter()
+            .map(|&x| {
+                let w: f64 = x.weight.as_();
+                ScanPoint2d::<i16> {
+                    x: x.x,
+                    y: x.y,
+                    weight: (w * S).round().min(i16::MAX as f64).max(i16::MIN as f64) as i16,
+                }
+            })
+            .collect::<Vec<ScanPoint2d<i16>>>();
+
+        if let Some(pool) = &pool {
+            pool.install(|| {
+                dst.data
+                    .borrow_mut()
+                    .par_chunks_exact_mut(dst_stride)
+                    .enumerate()
+                    .for_each(|(y, row)| {
+                        let row = &mut row[..image_size.width * CN];
+                        filter(arena, arena_source_slice, row, image_size, &fp_slice, y);
+                    });
+            })
+        } else {
             dst.data
                 .borrow_mut()
-                .par_chunks_exact_mut(dst_stride)
+                .chunks_exact_mut(dst_stride)
+                .enumerate()
+                .for_each(|(y, row)| {
+                    let row = &mut row[..image_size.width * CN];
+                    filter(arena, arena_source_slice, row, image_size, &fp_slice, y);
+                });
+        }
+    } else {
+        let filter = Arc::new(T::get_executor());
+
+        if let Some(pool) = &pool {
+            pool.install(|| {
+                dst.data
+                    .borrow_mut()
+                    .par_chunks_exact_mut(dst_stride)
+                    .enumerate()
+                    .for_each(|(y, row)| {
+                        let row = &mut row[..image_size.width * CN];
+                        filter(arena, arena_source_slice, row, image_size, kernel_slice, y);
+                    });
+            })
+        } else {
+            dst.data
+                .borrow_mut()
+                .chunks_exact_mut(dst_stride)
                 .enumerate()
                 .for_each(|(y, row)| {
                     let row = &mut row[..image_size.width * CN];
                     filter(arena, arena_source_slice, row, image_size, kernel_slice, y);
                 });
-        })
-    } else {
-        dst.data
-            .borrow_mut()
-            .chunks_exact_mut(dst_stride)
-            .enumerate()
-            .for_each(|(y, row)| {
-                let row = &mut row[..image_size.width * CN];
-                filter(arena, arena_source_slice, row, image_size, kernel_slice, y);
-            });
+        }
     }
-
     Ok(())
 }
