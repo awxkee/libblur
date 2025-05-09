@@ -79,7 +79,7 @@ impl<const CN: usize> VerticalExecutionUnit<CN> {
 
         let mut xx = start;
 
-        while xx + 4 < width.min(end) {
+        while xx + 6 < width.min(end) {
             let mut diffs0 = _mm256_setzero_si256();
             let mut diffs1 = _mm256_setzero_si256();
             let mut diffs2 = _mm256_setzero_si256();

@@ -122,7 +122,11 @@ impl Filter1DColumnHandler<u8, f32> for u8 {
             }
             return filter_column_sse_u8_f32;
         }
-        filter_column
+        if is_symmetric_kernel {
+            filter_symmetric_column
+        } else {
+            filter_column
+        }
     }
 }
 

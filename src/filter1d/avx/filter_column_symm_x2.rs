@@ -269,7 +269,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
         }
 
         let coeff = scanned_kernel.get_unchecked(half_len).weight;
-        
+
         for x in cx..image_width {
             let v_src0 = ref0.get_unchecked(x..);
             let v_src1 = ref1.get_unchecked(x..);
