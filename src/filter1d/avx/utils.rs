@@ -172,6 +172,19 @@ pub(crate) unsafe fn _mm256_opt_fmlaf_ps<const FMA: bool>(
 }
 
 #[inline(always)]
+pub(crate) unsafe fn _mm256_opt_fmla_pd<const FMA: bool>(
+    a: __m256d,
+    b: __m256d,
+    c: __m256d,
+) -> __m256d {
+    if FMA {
+        _mm256_fmadd_pd(b, c, a)
+    } else {
+        _mm256_add_pd(_mm256_mul_pd(b, c), a)
+    }
+}
+
+#[inline(always)]
 pub(crate) unsafe fn _mm256_mul_add_epi8_by_ps_x4<const FMA: bool>(
     accumulator: (__m256, __m256, __m256, __m256),
     input: __m256i,

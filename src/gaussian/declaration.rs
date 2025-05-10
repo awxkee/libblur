@@ -347,12 +347,40 @@ pub fn gaussian_blur_f16(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{gaussian_kernel_1d_f64, sigma_size_d};
+
+    macro_rules! compare_u8_stat {
+        ($dst: expr) => {
+            for (i, cn) in $dst.data.borrow_mut().chunks_exact(3).enumerate() {
+                let diff0 = (cn[0] as i32 - 126).abs();
+                assert!(
+                    diff0 <= 3,
+                    "Diff expected to be less than 3, but it was {diff0} at {i} in channel 0"
+                );
+                let diff1 = (cn[1] as i32 - 66).abs();
+                assert!(
+                    diff1 <= 3,
+                    "Diff expected to be less than 3, but it was {diff1} at {i} in channel 1"
+                );
+                let diff2 = (cn[2] as i32 - 77).abs();
+                assert!(
+                    diff2 <= 3,
+                    "Diff expected to be less than 3, but it was {diff2} at {i} in channel 2"
+                );
+            }
+        };
+    }
 
     #[test]
     fn test_gauss_u8_q_k5() {
         let width: usize = 148;
         let height: usize = 148;
-        let src = vec![126; width * height * 3];
+        let mut src = vec![126; width * height * 3];
+        for dst in src.chunks_exact_mut(3) {
+            dst[0] = 126;
+            dst[1] = 66;
+            dst[2] = 77;
+        }
         let src_image = BlurImage::borrow(
             &src,
             width as u32,
@@ -370,20 +398,19 @@ mod tests {
             ConvolutionMode::FixedPoint,
         )
         .unwrap();
-        for (i, &cn) in dst.data.borrow_mut().iter().enumerate() {
-            let diff = (cn as i32 - 126).abs();
-            assert!(
-                diff <= 3,
-                "Diff expected to be less than 3 but it was {diff} at {i}"
-            );
-        }
+        compare_u8_stat!(dst);
     }
 
     #[test]
     fn test_gauss_u8_q_k3() {
         let width: usize = 148;
         let height: usize = 148;
-        let src = vec![126; width * height * 3];
+        let mut src = vec![126; width * height * 3];
+        for dst in src.chunks_exact_mut(3) {
+            dst[0] = 126;
+            dst[1] = 66;
+            dst[2] = 77;
+        }
         let src_image = BlurImage::borrow(
             &src,
             width as u32,
@@ -401,20 +428,19 @@ mod tests {
             ConvolutionMode::FixedPoint,
         )
         .unwrap();
-        for (i, &cn) in dst.data.borrow_mut().iter().enumerate() {
-            let diff = (cn as i32 - 126).abs();
-            assert!(
-                diff <= 3,
-                "Diff expected to be less than 3 but it was {diff} at {i}"
-            );
-        }
+        compare_u8_stat!(dst);
     }
 
     #[test]
     fn test_gauss_u8_q_k7() {
         let width: usize = 148;
         let height: usize = 148;
-        let src = vec![126; width * height * 3];
+        let mut src = vec![126; width * height * 3];
+        for dst in src.chunks_exact_mut(3) {
+            dst[0] = 126;
+            dst[1] = 66;
+            dst[2] = 77;
+        }
         let src_image = BlurImage::borrow(
             &src,
             width as u32,
@@ -432,20 +458,19 @@ mod tests {
             ConvolutionMode::FixedPoint,
         )
         .unwrap();
-        for (i, &cn) in dst.data.borrow_mut().iter().enumerate() {
-            let diff = (cn as i32 - 126).abs();
-            assert!(
-                diff <= 3,
-                "Diff expected to be less than 3 but it was {diff} at {i}"
-            );
-        }
+        compare_u8_stat!(dst);
     }
 
     #[test]
     fn test_gauss_u8_fp_k5() {
         let width: usize = 148;
         let height: usize = 148;
-        let src = vec![126; width * height * 3];
+        let mut src = vec![126; width * height * 3];
+        for dst in src.chunks_exact_mut(3) {
+            dst[0] = 126;
+            dst[1] = 66;
+            dst[2] = 77;
+        }
         let src_image = BlurImage::borrow(
             &src,
             width as u32,
@@ -463,20 +488,19 @@ mod tests {
             ConvolutionMode::Exact,
         )
         .unwrap();
-        for &cn in dst.data.borrow_mut().iter() {
-            let diff = (cn as i32 - 126).abs();
-            assert!(
-                diff <= 3,
-                "Diff expected to be less than 3 but it was {diff}"
-            );
-        }
+        compare_u8_stat!(dst);
     }
 
     #[test]
     fn test_gauss_u8_q_k31() {
         let width: usize = 148;
         let height: usize = 148;
-        let src = vec![126; width * height * 3];
+        let mut src = vec![126; width * height * 3];
+        for dst in src.chunks_exact_mut(3) {
+            dst[0] = 126;
+            dst[1] = 66;
+            dst[2] = 77;
+        }
         let src_image = BlurImage::borrow(
             &src,
             width as u32,
@@ -494,20 +518,19 @@ mod tests {
             ConvolutionMode::FixedPoint,
         )
         .unwrap();
-        for (i, &cn) in dst.data.borrow_mut().iter().enumerate() {
-            let diff = (cn as i32 - 126).abs();
-            assert!(
-                diff <= 3,
-                "Diff expected to be less than 3 but it was {diff} at {i}"
-            );
-        }
+        compare_u8_stat!(dst);
     }
 
     #[test]
     fn test_gauss_u8_fp_k31() {
         let width: usize = 148;
         let height: usize = 148;
-        let src = vec![126; width * height * 3];
+        let mut src = vec![126; width * height * 3];
+        for dst in src.chunks_exact_mut(3) {
+            dst[0] = 126;
+            dst[1] = 66;
+            dst[2] = 77;
+        }
         let src_image = BlurImage::borrow(
             &src,
             width as u32,
@@ -525,20 +548,41 @@ mod tests {
             ConvolutionMode::Exact,
         )
         .unwrap();
-        for &cn in dst.data.borrow_mut().iter() {
-            let diff = (cn as i32 - 126).abs();
-            assert!(
-                diff <= 3,
-                "Diff expected to be less than 3 but it was {diff}"
-            );
-        }
+        compare_u8_stat!(dst);
+    }
+
+    macro_rules! compare_u16_stat {
+        ($dst: expr) => {
+            for (i, cn) in $dst.data.borrow_mut().chunks_exact(3).enumerate() {
+                let diff0 = (cn[0] as i32 - 17234i32).abs();
+                assert!(
+                    diff0 <= 16,
+                    "Diff expected to be less than 16, but it was {diff0} at {i} in channel 0"
+                );
+                let diff1 = (cn[1] as i32 - 5322).abs();
+                assert!(
+                    diff1 <= 16,
+                    "Diff expected to be less than 16, but it was {diff1} at {i} in channel 1"
+                );
+                let diff2 = (cn[2] as i32 - 7652).abs();
+                assert!(
+                    diff2 <= 16,
+                    "Diff expected to be less than 16, but it was {diff2} at {i} in channel 2"
+                );
+            }
+        };
     }
 
     #[test]
     fn test_gauss_u16_q_k31() {
         let width: usize = 148;
         let height: usize = 148;
-        let src = vec![17234u16; width * height * 3];
+        let mut src = vec![17234u16; width * height * 3];
+        for dst in src.chunks_exact_mut(3) {
+            dst[0] = 17234u16;
+            dst[1] = 5322;
+            dst[2] = 7652;
+        }
         let src_image = BlurImage::borrow(
             &src,
             width as u32,
@@ -556,20 +600,19 @@ mod tests {
             ConvolutionMode::FixedPoint,
         )
         .unwrap();
-        for (i, &cn) in dst.data.borrow_mut().iter().enumerate() {
-            let diff = (cn as i32 - 17234i32).abs();
-            assert!(
-                diff <= 14,
-                "Diff expected to be less than 14 but it was {diff} at {i}"
-            );
-        }
+        compare_u16_stat!(dst);
     }
 
     #[test]
     fn test_gauss_u16_fp_k31() {
         let width: usize = 148;
         let height: usize = 148;
-        let src = vec![17234u16; width * height * 3];
+        let mut src = vec![17234u16; width * height * 3];
+        for dst in src.chunks_exact_mut(3) {
+            dst[0] = 17234u16;
+            dst[1] = 5322;
+            dst[2] = 7652;
+        }
         let src_image = BlurImage::borrow(
             &src,
             width as u32,
@@ -587,20 +630,41 @@ mod tests {
             ConvolutionMode::Exact,
         )
         .unwrap();
-        for (i, &cn) in dst.data.borrow_mut().iter().enumerate() {
-            let diff = (cn as i32 - 17234i32).abs();
-            assert!(
-                diff <= 10,
-                "Diff expected to be less than 10 but it was {diff} at {i}"
-            );
-        }
+        compare_u16_stat!(dst);
+    }
+
+    macro_rules! compare_f32_stat {
+        ($dst: expr) => {
+            for (i, cn) in $dst.data.borrow_mut().chunks_exact(3).enumerate() {
+                let diff0 = (cn[0] as f32 - 0.532).abs();
+                assert!(
+                    diff0 <= 1e-4,
+                    "Diff expected to be less than 1e-4, but it was {diff0} at {i} in channel 0"
+                );
+                let diff1 = (cn[1] as f32 - 0.123).abs();
+                assert!(
+                    diff1 <= 1e-4,
+                    "Diff expected to be less than 1e-4, but it was {diff1} at {i} in channel 1"
+                );
+                let diff2 = (cn[2] as f32 - 0.654).abs();
+                assert!(
+                    diff2 <= 1e-4,
+                    "Diff expected to be less than 1e-4, but it was {diff2} at {i} in channel 2"
+                );
+            }
+        };
     }
 
     #[test]
     fn test_gauss_f32_k31() {
         let width: usize = 148;
         let height: usize = 148;
-        let src = vec![0.532; width * height * 3];
+        let mut src = vec![0.532; width * height * 3];
+        for dst in src.chunks_exact_mut(3) {
+            dst[0] = 0.532;
+            dst[1] = 0.123;
+            dst[2] = 0.654;
+        }
         let src_image = BlurImage::borrow(
             &src,
             width as u32,
@@ -617,12 +681,39 @@ mod tests {
             ThreadingPolicy::Single,
         )
         .unwrap();
-        for (i, &cn) in dst.data.borrow_mut().iter().enumerate() {
-            let diff = (cn - 0.532).abs();
-            assert!(
-                diff <= 1e-4,
-                "Diff expected to be less than 1e-4 but it was {diff} at {i}"
-            );
+        compare_f32_stat!(dst);
+    }
+
+    #[test]
+    fn test_gauss_f32_f64_k31() {
+        let width: usize = 148;
+        let height: usize = 148;
+        let mut src = vec![0.532; width * height * 3];
+        for dst in src.chunks_exact_mut(3) {
+            dst[0] = 0.532;
+            dst[1] = 0.123;
+            dst[2] = 0.654;
         }
+        let src_image = BlurImage::borrow(
+            &src,
+            width as u32,
+            height as u32,
+            FastBlurChannels::Channels3,
+        );
+
+        let kernel = gaussian_kernel_1d_f64(31, sigma_size_d(2.5));
+
+        let mut dst = BlurImageMut::default();
+        filter_1d_exact::<f32, f64, 3>(
+            &src_image,
+            &mut dst,
+            &kernel,
+            &kernel,
+            EdgeMode::Clamp,
+            Scalar::default(),
+            ThreadingPolicy::Adaptive,
+        )
+        .unwrap();
+        compare_f32_stat!(dst);
     }
 }

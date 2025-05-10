@@ -55,7 +55,7 @@ pub(crate) unsafe fn _mm_mul_epu16_widen(input: __m128i, weight: __m128i) -> (__
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_mul_epi8_by_ps_x4<const FMA: bool>(
+pub(crate) unsafe fn _mm_mul_epi8_by_ps_x4(
     input: __m128i,
     weight: __m128,
 ) -> (__m128, __m128, __m128, __m128) {
@@ -118,10 +118,7 @@ pub(crate) unsafe fn _mm_mull_epi8_by_epi16_x2(input: __m128i, weight: __m128i) 
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_mul_epi8_by_ps_x2<const FMA: bool>(
-    input: __m128i,
-    weight: __m128,
-) -> (__m128, __m128) {
+pub(crate) unsafe fn _mm_mul_epi8_by_ps_x2(input: __m128i, weight: __m128) -> (__m128, __m128) {
     let zeros = _mm_setzero_si128();
     let lo_16 = _mm_unpacklo_epi8(input, zeros);
 
@@ -153,16 +150,17 @@ pub(crate) unsafe fn _mm_mul_epi8_by_epi16_x2(input: __m128i, weight: __m128i) -
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_opt_fmlaf_ps<const FMA: bool>(a: __m128, b: __m128, c: __m128) -> __m128 {
-    if FMA {
-        _mm_fmadd_ps(b, c, a)
-    } else {
-        _mm_add_ps(_mm_mul_ps(b, c), a)
-    }
+pub(crate) unsafe fn _mm_opt_fmlaf_ps(a: __m128, b: __m128, c: __m128) -> __m128 {
+    _mm_add_ps(_mm_mul_ps(b, c), a)
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_mul_add_epi8_by_ps_x4<const FMA: bool>(
+pub(crate) unsafe fn _mm_fmla_pd(a: __m128d, b: __m128d, c: __m128d) -> __m128d {
+    _mm_add_pd(_mm_mul_pd(b, c), a)
+}
+
+#[inline(always)]
+pub(crate) unsafe fn _mm_mul_add_epi8_by_ps_x4(
     accumulator: (__m128, __m128, __m128, __m128),
     input: __m128i,
     weight: __m128,
@@ -182,10 +180,10 @@ pub(crate) unsafe fn _mm_mul_add_epi8_by_ps_x4<const FMA: bool>(
     let a3 = _mm_cvtepi32_ps(k3);
 
     (
-        _mm_opt_fmlaf_ps::<FMA>(accumulator.0, a0, weight),
-        _mm_opt_fmlaf_ps::<FMA>(accumulator.1, a1, weight),
-        _mm_opt_fmlaf_ps::<FMA>(accumulator.2, a2, weight),
-        _mm_opt_fmlaf_ps::<FMA>(accumulator.3, a3, weight),
+        _mm_opt_fmlaf_ps(accumulator.0, a0, weight),
+        _mm_opt_fmlaf_ps(accumulator.1, a1, weight),
+        _mm_opt_fmlaf_ps(accumulator.2, a2, weight),
+        _mm_opt_fmlaf_ps(accumulator.3, a3, weight),
     )
 }
 
@@ -302,7 +300,7 @@ pub(crate) unsafe fn _mm_madd_epi8_by_epi16_x4(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_mul_add_symm_epi8_by_ps_x4<const FMA: bool>(
+pub(crate) unsafe fn _mm_mul_add_symm_epi8_by_ps_x4(
     accumulator: (__m128, __m128, __m128, __m128),
     input0: __m128i,
     input1: __m128i,
@@ -329,10 +327,10 @@ pub(crate) unsafe fn _mm_mul_add_symm_epi8_by_ps_x4<const FMA: bool>(
     let a3 = _mm_cvtepi32_ps(k3);
 
     (
-        _mm_opt_fmlaf_ps::<FMA>(accumulator.0, a0, weight),
-        _mm_opt_fmlaf_ps::<FMA>(accumulator.1, a1, weight),
-        _mm_opt_fmlaf_ps::<FMA>(accumulator.2, a2, weight),
-        _mm_opt_fmlaf_ps::<FMA>(accumulator.3, a3, weight),
+        _mm_opt_fmlaf_ps(accumulator.0, a0, weight),
+        _mm_opt_fmlaf_ps(accumulator.1, a1, weight),
+        _mm_opt_fmlaf_ps(accumulator.2, a2, weight),
+        _mm_opt_fmlaf_ps(accumulator.3, a3, weight),
     )
 }
 
@@ -357,13 +355,13 @@ pub(crate) unsafe fn _mm_mul_add_symm_epi16_by_ps_x2<const FMA: bool>(
     let a1 = _mm_cvtepi32_ps(h32);
 
     (
-        _mm_opt_fmlaf_ps::<FMA>(accumulator.0, a0, weight),
-        _mm_opt_fmlaf_ps::<FMA>(accumulator.1, a1, weight),
+        _mm_opt_fmlaf_ps(accumulator.0, a0, weight),
+        _mm_opt_fmlaf_ps(accumulator.1, a1, weight),
     )
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_mul_add_epi8_by_ps_x2<const FMA: bool>(
+pub(crate) unsafe fn _mm_mul_add_epi8_by_ps_x2(
     accumulator: (__m128, __m128),
     input: __m128i,
     weight: __m128,
@@ -378,13 +376,13 @@ pub(crate) unsafe fn _mm_mul_add_epi8_by_ps_x2<const FMA: bool>(
     let a1 = _mm_cvtepi32_ps(k1);
 
     (
-        _mm_opt_fmlaf_ps::<FMA>(accumulator.0, a0, weight),
-        _mm_opt_fmlaf_ps::<FMA>(accumulator.1, a1, weight),
+        _mm_opt_fmlaf_ps(accumulator.0, a0, weight),
+        _mm_opt_fmlaf_ps(accumulator.1, a1, weight),
     )
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_mul_add_symm_epi8_by_ps_x2<const FMA: bool>(
+pub(crate) unsafe fn _mm_mul_add_symm_epi8_by_ps_x2(
     accumulator: (__m128, __m128),
     input0: __m128i,
     input1: __m128i,
@@ -403,8 +401,8 @@ pub(crate) unsafe fn _mm_mul_add_symm_epi8_by_ps_x2<const FMA: bool>(
     let a1 = _mm_cvtepi32_ps(k1);
 
     (
-        _mm_opt_fmlaf_ps::<FMA>(accumulator.0, a0, weight),
-        _mm_opt_fmlaf_ps::<FMA>(accumulator.1, a1, weight),
+        _mm_opt_fmlaf_ps(accumulator.0, a0, weight),
+        _mm_opt_fmlaf_ps(accumulator.1, a1, weight),
     )
 }
 
@@ -423,7 +421,7 @@ pub(crate) unsafe fn _mm_mul_add_symm_epi16_by_ps<const FMA: bool>(
 
     let a0 = _mm_cvtepi32_ps(lo_16);
 
-    _mm_opt_fmlaf_ps::<FMA>(accumulator, a0, weight)
+    _mm_opt_fmlaf_ps(accumulator, a0, weight)
 }
 
 #[inline(always)]

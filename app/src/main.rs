@@ -33,9 +33,9 @@ mod split;
 use colorutils_rs::TransferFunction;
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use libblur::{
-    filter_1d_exact, gaussian_kernel_1d, generate_motion_kernel, motion_blur, sigma_size,
-    BlurImage, BlurImageMut, BufferStore, ConvolutionMode, EdgeMode, FastBlurChannels, ImageSize,
-    Scalar, ThreadingPolicy,
+    filter_1d_exact, gaussian_kernel_1d, gaussian_kernel_1d_f64, generate_motion_kernel,
+    motion_blur, sigma_size, sigma_size_d, BlurImage, BlurImageMut, BufferStore, ConvolutionMode,
+    EdgeMode, FastBlurChannels, ImageSize, Scalar, ThreadingPolicy,
 };
 use std::time::Instant;
 
@@ -110,16 +110,29 @@ fn main() {
     //
     // libblur::fast_gaussian_next_u16(&mut dst_image, 37, ThreadingPolicy::Single, EdgeMode::Clamp)
     //     .unwrap();
+    let kernel = gaussian_kernel_1d_f64(5, sigma_size_d(2.5));
 
-    libblur::gaussian_blur_f32(
+    filter_1d_exact::<f32, f64, 4>(
         &image,
         &mut dst_image,
-        11,
-        0.,
+        &kernel,
+        &kernel,
         EdgeMode::Clamp,
+        Scalar::default(),
         ThreadingPolicy::Adaptive,
     )
     .unwrap();
+
+    //
+    // libblur::gaussian_blur_f32(
+    //     &image,
+    //     &mut dst_image,
+    //     11,
+    //     0.,
+    //     EdgeMode::Clamp,
+    //     ThreadingPolicy::Adaptive,
+    // )
+    // .unwrap();
 
     // libblur::motion_blur(
     //     &image,

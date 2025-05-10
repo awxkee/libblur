@@ -351,6 +351,39 @@ impl Filter1DColumnHandlerMultipleRows<u16, f32> for u16 {
     }
 }
 
+impl Filter1DColumnHandler<f32, f64> for f32 {
+    fn get_column_handler(
+        is_symmetric_kernel: bool,
+    ) -> fn(Arena, &[&[f32]], &mut [f32], ImageSize, FilterRegion, &[ScanPoint1d<f64>]) {
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
+        {
+            if is_symmetric_kernel {
+                use crate::filter1d::neon::filter_column_neon_symm_f32_f64;
+                return filter_column_neon_symm_f32_f64;
+            }
+        }
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        {
+            if is_symmetric_kernel && std::arch::is_x86_feature_detected!("avx2") {
+                use crate::filter1d::avx::filter_column_avx_symm_f32_f64;
+                return filter_column_avx_symm_f32_f64;
+            }
+        }
+        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
+        {
+            if std::arch::is_x86_feature_detected!("sse4.1") {
+                use crate::filter1d::sse::filter_column_sse_f32_f64;
+                return filter_column_sse_f32_f64;
+            }
+        }
+        if is_symmetric_kernel {
+            filter_symmetric_column
+        } else {
+            filter_column
+        }
+    }
+}
+
 macro_rules! default_1d_column_handler {
     ($store:ty, $intermediate:ty) => {
         impl Filter1DColumnHandler<$store, $intermediate> for $store {
@@ -410,7 +443,6 @@ default_1d_column_handler!(i32, f32);
 default_1d_column_handler!(i32, f64);
 default_1d_column_handler!(f16, f32);
 default_1d_column_handler!(f16, f64);
-default_1d_column_handler!(f32, f64);
 default_1d_column_handler!(f64, f64);
 
 default_1d_column_multiple_rows!(i8, f32);
