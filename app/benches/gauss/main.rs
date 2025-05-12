@@ -1,8 +1,8 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use image::{GenericImageView, ImageReader};
 use libblur::{
-    filter_1d_exact, gaussian_kernel_1d, gaussian_kernel_1d_f64, sigma_size, BlurImage,
-    BlurImageMut, ConvolutionMode, EdgeMode, FastBlurChannels, Scalar, ThreadingPolicy,
+    filter_1d_exact, gaussian_kernel_1d, sigma_size, BlurImage, BlurImageMut, ConvolutionMode,
+    EdgeMode, FastBlurChannels, Scalar, ThreadingPolicy,
 };
 use opencv::core::{
     find_file, split, AlgorithmHint, Mat, Size, Vector, BORDER_DEFAULT, CV_16UC4, CV_32FC3,
@@ -51,6 +51,54 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         FastBlurChannels::Channels4,
     );
 
+    c.bench_function("RGBA gauss blur kernel clip: 3", |b| {
+        let mut dst_bytes =
+            BlurImageMut::alloc(img.width(), img.height(), FastBlurChannels::Channels4);
+        b.iter(|| {
+            libblur::gaussian_blur(
+                &src_image,
+                &mut dst_bytes,
+                3,
+                0.,
+                EdgeMode::Clamp,
+                ThreadingPolicy::Adaptive,
+                ConvolutionMode::FixedPoint,
+            )
+            .unwrap();
+        })
+    });
+
+    let src0 = imread(
+        &find_file(&"../assets/test_image_4.png", false, false).unwrap(),
+        IMREAD_COLOR,
+    )
+    .unwrap();
+    let mut src = Mat::default();
+    opencv::imgproc::cvt_color(
+        &src0,
+        &mut src,
+        CV_8UC3,
+        CV_8UC4,
+        AlgorithmHint::ALGO_HINT_DEFAULT,
+    )
+    .unwrap();
+
+    c.bench_function("OpenCV RGBA Gaussian: 3", |b| {
+        b.iter(|| {
+            let mut dst = Mat::default();
+            opencv::imgproc::gaussian_blur(
+                &src,
+                &mut dst,
+                Size::new(3, 3),
+                3.,
+                3.,
+                BORDER_DEFAULT,
+                AlgorithmHint::ALGO_HINT_ACCURATE,
+            )
+            .unwrap();
+        })
+    });
+
     c.bench_function("RGBA gauss blur kernel clip exact: 13", |b| {
         let mut dst_bytes =
             BlurImageMut::alloc(img.width(), img.height(), FastBlurChannels::Channels4);
@@ -80,6 +128,22 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 EdgeMode::Clamp,
                 ThreadingPolicy::Adaptive,
                 ConvolutionMode::FixedPoint,
+            )
+            .unwrap();
+        })
+    });
+
+    c.bench_function("OpenCV RGBA Gaussian: 13", |b| {
+        b.iter(|| {
+            let mut dst = Mat::default();
+            opencv::imgproc::gaussian_blur(
+                &src,
+                &mut dst,
+                Size::new(13, 13),
+                3.,
+                3.,
+                BORDER_DEFAULT,
+                AlgorithmHint::ALGO_HINT_ACCURATE,
             )
             .unwrap();
         })

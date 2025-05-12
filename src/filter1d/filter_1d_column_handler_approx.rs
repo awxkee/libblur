@@ -56,6 +56,7 @@ pub trait Filter1DColumnHandlerApprox<T, F> {
 pub trait Filter1DColumnMultipleRowsApprox<T, F> {
     fn get_column_multiple_rows(
         is_symmetric_kernel: bool,
+        kernel: &[ScanPoint1d<F>],
     ) -> Option<
         fn(
             arena: Arena,
@@ -214,6 +215,7 @@ impl Filter1DColumnMultipleRowsApprox<u8, i32> for u8 {
     #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     fn get_column_multiple_rows(
         is_symmetric_kernel: bool,
+        _: &[ScanPoint1d<i32>],
     ) -> Option<fn(Arena, FilterBrows<u8>, &mut [u8], ImageSize, usize, &[ScanPoint1d<i32>])> {
         if is_symmetric_kernel {
             #[cfg(feature = "rdm")]
@@ -229,11 +231,12 @@ impl Filter1DColumnMultipleRowsApprox<u8, i32> for u8 {
 
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     fn get_column_multiple_rows(
-        _: bool,
+        _is_symmetric: bool,
+        _: &[ScanPoint1d<i32>],
     ) -> Option<fn(Arena, FilterBrows<u8>, &mut [u8], ImageSize, usize, &[ScanPoint1d<i32>])> {
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]
         {
-            if std::arch::is_x86_feature_detected!("avx2") {
+            if _is_symmetric && std::arch::is_x86_feature_detected!("avx2") {
                 use crate::filter1d::avx::filter_column_avx_symm_u8_i32_app_x2;
                 return Some(filter_column_avx_symm_u8_i32_app_x2);
             }
@@ -247,6 +250,7 @@ impl Filter1DColumnMultipleRowsApprox<u8, i32> for u8 {
     )))]
     fn get_column_multiple_rows(
         _: bool,
+        _: &[ScanPoint1d<i32>],
     ) -> Option<fn(Arena, FilterBrows<u8>, &mut [u8], ImageSize, usize, &[ScanPoint1d<i32>])> {
         None
     }
@@ -256,6 +260,7 @@ impl Filter1DColumnMultipleRowsApprox<u16, u32> for u16 {
     #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     fn get_column_multiple_rows(
         is_symmetric_kernel: bool,
+        _: &[ScanPoint1d<u32>],
     ) -> Option<fn(Arena, FilterBrows<u16>, &mut [u16], ImageSize, usize, &[ScanPoint1d<u32>])>
     {
         if is_symmetric_kernel {
@@ -271,6 +276,7 @@ impl Filter1DColumnMultipleRowsApprox<u16, u32> for u16 {
     )))]
     fn get_column_multiple_rows(
         _: bool,
+        _: &[ScanPoint1d<u32>],
     ) -> Option<fn(Arena, FilterBrows<u16>, &mut [u16], ImageSize, usize, &[ScanPoint1d<u32>])>
     {
         None
@@ -279,6 +285,7 @@ impl Filter1DColumnMultipleRowsApprox<u16, u32> for u16 {
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     fn get_column_multiple_rows(
         _is_kernel_symmetric: bool,
+        _: &[ScanPoint1d<u32>],
     ) -> Option<fn(Arena, FilterBrows<u16>, &mut [u16], ImageSize, usize, &[ScanPoint1d<u32>])>
     {
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]
@@ -309,6 +316,7 @@ macro_rules! default_1d_column_multiple_rows {
         impl Filter1DColumnMultipleRowsApprox<$store, $intermediate> for $store {
             fn get_column_multiple_rows(
                 _: bool,
+                _: &[ScanPoint1d<$intermediate>],
             ) -> Option<
                 fn(
                     Arena,

@@ -28,6 +28,7 @@
  */
 use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_scan::ScanPoint1d;
+use crate::filter1d::neon::filter_column_symm_approx_uq0_7::filter_column_symm_neon_u8_uq0_7;
 use crate::filter1d::neon::utils::{
     vmla_symm_hi_u8_s16, vmlaq_symm_hi_u8_s16, vmull_expand_i16, vmullq_expand_i16,
     vqmovnq_s16x2_u8, xvld1q_u8_x2, xvld1q_u8_x3, xvld1q_u8_x4, xvld4u8, xvst1q_u8_x2,
@@ -48,6 +49,19 @@ pub(crate) fn filter_column_symm_neon_u8_i32_rdm(
     scanned_kernel: &[ScanPoint1d<i32>],
 ) {
     unsafe {
+        if scanned_kernel.len() <= 7 {
+            let is_all_positive = scanned_kernel.iter().all(|&x| x.weight > 0);
+            if is_all_positive {
+                return filter_column_symm_neon_u8_uq0_7(
+                    arena,
+                    arena_src,
+                    dst,
+                    image_size,
+                    r,
+                    scanned_kernel,
+                );
+            }
+        }
         executor_unit(arena, arena_src, dst, image_size, r, scanned_kernel);
     }
 }

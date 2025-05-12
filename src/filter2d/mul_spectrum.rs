@@ -31,7 +31,7 @@ use rustfft::num_complex::Complex;
 use rustfft::FftNum;
 use std::ops::Mul;
 
-pub(crate) fn mul_spectrum_in_place<V: FftNum + Mul<V>>(
+pub(crate) fn mul_spectrum_in_place<V: FftNum + Mul<V> + SpectrumMultiplier<V>>(
     value1: &mut [Complex<V>],
     other: &[Complex<V>],
     width: usize,
@@ -55,7 +55,40 @@ pub(crate) fn mul_spectrum_in_place<V: FftNum + Mul<V>>(
             }
         }
     }
-    mul_spectrum_in_place_impl(value1, other, width, height)
+    V::mul_spectrum(value1, other, width, height);
+}
+
+pub trait SpectrumMultiplier<V> {
+    fn mul_spectrum(value1: &mut [Complex<V>], other: &[Complex<V>], width: usize, height: usize);
+}
+
+impl SpectrumMultiplier<f32> for f32 {
+    fn mul_spectrum(
+        value1: &mut [Complex<f32>],
+        other: &[Complex<f32>],
+        width: usize,
+        height: usize,
+    ) {
+        #[cfg(all(target_arch = "aarch64", feature = "nightly_fcma"))]
+        {
+            if std::arch::is_aarch64_feature_detected!("fcma") {
+                use crate::filter2d::neon::neon_mul_spectrum_in_place_f32;
+                return neon_mul_spectrum_in_place_f32(value1, other, width, height);
+            }
+        }
+        mul_spectrum_in_place_impl(value1, other, width, height);
+    }
+}
+
+impl SpectrumMultiplier<f64> for f64 {
+    fn mul_spectrum(
+        value1: &mut [Complex<f64>],
+        other: &[Complex<f64>],
+        width: usize,
+        height: usize,
+    ) {
+        mul_spectrum_in_place_impl(value1, other, width, height);
+    }
 }
 
 #[inline(always)]

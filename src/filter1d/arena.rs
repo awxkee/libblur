@@ -346,6 +346,31 @@ where
 
     let arena_width = image_size.width * COMPONENTS + pad_w * 2 * COMPONENTS;
     let mut row = vec![T::default(); arena_width];
+    write_arena_row::<T, COMPONENTS>(&mut row, image, source_y, kernel_size, border_mode, scalar)?;
+    Ok((row, image_size.width + pad_w * 2))
+}
+
+pub(crate) fn write_arena_row<T, const COMPONENTS: usize>(
+    row: &mut [T],
+    image: &BlurImage<T>,
+    source_y: usize,
+    kernel_size: KernelShape,
+    border_mode: EdgeMode,
+    scalar: Scalar,
+) -> Result<(), BlurError>
+where
+    T: Default + Copy + Send + Sync + 'static + Debug,
+    f64: AsPrimitive<T>,
+{
+    image.check_layout()?;
+    let pad_w = kernel_size.width / 2;
+
+    let image_size = image.size();
+
+    let arena_width = image_size.width * COMPONENTS + pad_w * 2 * COMPONENTS;
+    if row.len() < arena_width {
+        return Err(BlurError::ImagesMustMatch);
+    }
 
     let source_offset = source_y * image.row_stride() as usize;
 
@@ -446,7 +471,7 @@ where
         }
     }
 
-    Ok((row, image_size.width + pad_w * 2))
+    Ok(())
 }
 
 #[derive(Clone)]

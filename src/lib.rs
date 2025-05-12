@@ -28,6 +28,10 @@
 #![allow(clippy::too_many_arguments)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(
+    all(feature = "nightly_fcma", target_arch = "aarch64"),
+    feature(stdarch_neon_fcma)
+)]
+#![cfg_attr(
     all(
         feature = "nightly_avx512",
         any(target_arch = "x86", target_arch = "x86_64")

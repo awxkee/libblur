@@ -33,9 +33,10 @@ mod split;
 use colorutils_rs::TransferFunction;
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use libblur::{
-    filter_1d_exact, gaussian_kernel_1d, gaussian_kernel_1d_f64, generate_motion_kernel,
-    motion_blur, sigma_size, sigma_size_d, BlurImage, BlurImageMut, BufferStore, ConvolutionMode,
-    EdgeMode, FastBlurChannels, ImageSize, Scalar, ThreadingPolicy,
+    filter_1d_exact, filter_2d_rgba_fft, gaussian_kernel_1d, gaussian_kernel_1d_f64,
+    generate_motion_kernel, motion_blur, sigma_size, sigma_size_d, BlurImage, BlurImageMut,
+    BufferStore, ConvolutionMode, EdgeMode, FastBlurChannels, ImageSize, KernelShape, Scalar,
+    ThreadingPolicy,
 };
 use std::time::Instant;
 
@@ -88,10 +89,10 @@ fn main() {
     let mut v_vec = src_bytes
         .to_vec()
         .iter()
-        // .map(|&x| x)
-        .map(|&x| (x as f32 / 255.))
+        .map(|&x| x)
+        // .map(|&x| (x as f32 / 255.))
         // .map(|&x| u16::from_ne_bytes([x, x]))
-        .collect::<Vec<f32>>();
+        .collect::<Vec<u8>>();
 
     // let mut dst_image = BlurImageMut::borrow(
     //     &mut v_vec,
@@ -110,29 +111,31 @@ fn main() {
     //
     // libblur::fast_gaussian_next_u16(&mut dst_image, 37, ThreadingPolicy::Single, EdgeMode::Clamp)
     //     .unwrap();
-    let kernel = gaussian_kernel_1d_f64(5, sigma_size_d(2.5));
-
-    filter_1d_exact::<f32, f64, 4>(
-        &image,
-        &mut dst_image,
-        &kernel,
-        &kernel,
-        EdgeMode::Clamp,
-        Scalar::default(),
-        ThreadingPolicy::Adaptive,
-    )
-    .unwrap();
-
+    // let kernel = gaussian_kernel_1d_f64(5, sigma_size_d(2.5));
+    // let motion = generate_motion_kernel(15, 24.);
     //
-    // libblur::gaussian_blur_f32(
+    // let start = Instant::now();
+    // filter_2d_rgba_fft::<f32, f32, f32>(
     //     &image,
     //     &mut dst_image,
-    //     11,
-    //     0.,
+    //     &motion,
+    //     KernelShape::new(15, 15),
     //     EdgeMode::Clamp,
-    //     ThreadingPolicy::Adaptive,
+    //     Scalar::default(),
     // )
     // .unwrap();
+    // println!("libblur::filter_2d_rgba_fft: {:?}", start_time.elapsed());
+
+    libblur::gaussian_blur(
+        &image,
+        &mut dst_image,
+        5,
+        0.,
+        EdgeMode::Clamp,
+        ThreadingPolicy::Single,
+        ConvolutionMode::FixedPoint,
+    )
+    .unwrap();
 
     // libblur::motion_blur(
     //     &image,
@@ -149,8 +152,8 @@ fn main() {
         .data
         .borrow()
         .iter()
-        // .map(|&x| x)
-        .map(|&x| (x * 255f32).round() as u8)
+        .map(|&x| x)
+        // .map(|&x| (x * 255f32).round() as u8)
         // .map(|&x| (x >> 8) as u8)
         .collect::<Vec<u8>>();
 
@@ -189,7 +192,7 @@ fn main() {
         .unwrap();
     } else {
         image::save_buffer(
-            "blurred_stack_next_f.png",
+            "blurred_stack_next_fz.png",
             bytes.as_bytes(),
             dimensions.0,
             dimensions.1,

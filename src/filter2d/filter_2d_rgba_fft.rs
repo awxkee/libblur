@@ -28,6 +28,7 @@
  */
 use crate::filter2d::filter_2d_fft::filter_2d_fft;
 use crate::filter2d::gather_channel::{gather_channel, squash_channel};
+use crate::filter2d::mul_spectrum::SpectrumMultiplier;
 use crate::to_storage::ToStorage;
 use crate::{BlurError, BlurImage, BlurImageMut, EdgeMode, FastBlurChannels, KernelShape, Scalar};
 use num_traits::AsPrimitive;
@@ -62,7 +63,11 @@ pub fn filter_2d_rgba_fft<T, F, FftIntermediate>(
 where
     T: Copy + AsPrimitive<F> + Default + Send + Sync + AsPrimitive<FftIntermediate> + Debug,
     F: ToStorage<T> + Mul<F> + Send + Sync + PartialEq + AsPrimitive<FftIntermediate>,
-    FftIntermediate: FftNum + Default + Mul<FftIntermediate> + ToStorage<T>,
+    FftIntermediate: FftNum
+        + Default
+        + Mul<FftIntermediate>
+        + ToStorage<T>
+        + SpectrumMultiplier<FftIntermediate>,
     i32: AsPrimitive<F>,
     f64: AsPrimitive<T> + AsPrimitive<FftIntermediate>,
 {

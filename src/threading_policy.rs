@@ -46,6 +46,8 @@ pub enum ThreadingPolicy {
 impl ThreadingPolicy {
     /// Returns the number of threads to use for the given image dimensions under the
     /// selected policy variant.
+    ///
+    /// Must return at least 1.
     pub fn thread_count(&self, width: u32, height: u32) -> usize {
         match self {
             ThreadingPolicy::Single => 1,

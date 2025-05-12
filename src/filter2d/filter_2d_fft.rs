@@ -30,7 +30,7 @@
 
 use crate::filter1d::{make_arena, ArenaPads};
 use crate::filter2d::fft_utils::fft_next_good_size;
-use crate::filter2d::mul_spectrum::mul_spectrum_in_place;
+use crate::filter2d::mul_spectrum::{mul_spectrum_in_place, SpectrumMultiplier};
 use crate::filter2d::scan_se_2d::scan_se_2d;
 use crate::to_storage::ToStorage;
 use crate::{
@@ -100,7 +100,11 @@ pub fn filter_2d_fft<T, F, FftIntermediate>(
 where
     T: Copy + AsPrimitive<F> + Default + Send + Sync + AsPrimitive<FftIntermediate> + Debug,
     F: ToStorage<T> + Mul<F> + Send + Sync + PartialEq + AsPrimitive<FftIntermediate>,
-    FftIntermediate: FftNum + Default + Mul<FftIntermediate> + ToStorage<T>,
+    FftIntermediate: FftNum
+        + Default
+        + Mul<FftIntermediate>
+        + ToStorage<T>
+        + SpectrumMultiplier<FftIntermediate>,
     i32: AsPrimitive<F>,
     f64: AsPrimitive<T> + AsPrimitive<FftIntermediate>,
 {

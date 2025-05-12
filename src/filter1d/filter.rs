@@ -26,7 +26,8 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::filter1d::arena::{make_arena_columns, make_arena_row, Arena};
+use crate::edge_mode::clamp_edge;
+use crate::filter1d::arena::{make_arena_columns, make_arena_row, write_arena_row, Arena};
 use crate::filter1d::filter_1d_column_handler::{
     Filter1DColumnHandler, Filter1DColumnHandlerMultipleRows,
 };
@@ -86,6 +87,18 @@ where
     i32: AsPrimitive<F>,
     f64: AsPrimitive<T>,
 {
+    const SMALL_KERNEL_CUTOFF: usize = 61;
+    if column_kernel.len() <= SMALL_KERNEL_CUTOFF {
+        return filter_1d_exact_sliding_buffer::<T, F, N>(
+            image,
+            destination,
+            row_kernel,
+            column_kernel,
+            border_mode,
+            border_constant,
+            threading_policy,
+        );
+    }
     image.check_layout_channels(N)?;
     destination.check_layout_channels(N, Some(image))?;
     image.only_size_matches_mut(destination)?;
@@ -496,6 +509,267 @@ where
                     scanned_column_kernel_slice,
                 );
             });
+    }
+
+    Ok(())
+}
+
+fn filter_1d_exact_sliding_buffer<T, F, const N: usize>(
+    image: &BlurImage<T>,
+    destination: &mut BlurImageMut<T>,
+    row_kernel: &[F],
+    column_kernel: &[F],
+    border_mode: EdgeMode,
+    border_constant: Scalar,
+    threading_policy: ThreadingPolicy,
+) -> Result<(), BlurError>
+where
+    T: Copy
+        + AsPrimitive<F>
+        + Default
+        + Send
+        + Sync
+        + Filter1DRowHandler<T, F>
+        + Filter1DColumnHandler<T, F>
+        + Debug
+        + Filter1DColumnHandlerMultipleRows<T, F>,
+    F: ToStorage<T> + Mul<F> + MulAdd<F, Output = F> + Send + Sync + PartialEq + Default,
+    i32: AsPrimitive<F>,
+    f64: AsPrimitive<T>,
+{
+    image.check_layout_channels(N)?;
+    destination.check_layout_channels(N, Some(image))?;
+    image.only_size_matches_mut(destination)?;
+    if row_kernel.len() & 1 == 0 {
+        return Err(BlurError::OddKernel(row_kernel.len()));
+    }
+    if column_kernel.len() & 1 == 0 {
+        return Err(BlurError::OddKernel(column_kernel.len()));
+    }
+
+    let scanned_row_kernel = scan_se_1d(row_kernel);
+    let scanned_row_kernel_slice = scanned_row_kernel.as_slice();
+    let scanned_column_kernel = scan_se_1d(column_kernel);
+    let scanned_column_kernel_slice = scanned_column_kernel.as_slice();
+    let is_column_kernel_symmetrical = is_symmetric_1d(column_kernel);
+    let is_row_kernel_symmetrical = is_symmetric_1d(row_kernel);
+
+    let image_size = image.size();
+
+    let thread_count =
+        threading_policy.thread_count(image_size.width as u32, image_size.height as u32) as u32;
+    let pool = if thread_count == 1 {
+        None
+    } else {
+        let hold = rayon::ThreadPoolBuilder::new()
+            .num_threads(thread_count as usize)
+            .build()
+            .unwrap();
+        Some(hold)
+    };
+
+    let tile_size = (image_size.height as u32 / thread_count).clamp(1, image_size.height as u32);
+
+    let row_handler = T::get_row_handler::<N>(is_row_kernel_symmetrical);
+    let column_handler = T::get_column_handler(is_column_kernel_symmetrical);
+
+    let row_stride = image_size.width * N;
+
+    let dest_stride = destination.row_stride() as usize;
+
+    if let Some(pool) = &pool {
+        pool.install(|| {
+            destination
+                .data
+                .borrow_mut()
+                .par_chunks_mut(dest_stride * tile_size as usize)
+                .enumerate()
+                .for_each(|(cy, dst_rows)| {
+                    let source_y = cy * tile_size as usize;
+                    let mut buffer = vec![T::default(); row_stride * scanned_column_kernel.len()];
+
+                    let pad_w = scanned_row_kernel.len() / 2;
+                    let mut row_buffer = vec![T::default(); image_size.width * N + pad_w * 2 * N];
+
+                    // preload top edge
+                    let pad_w = scanned_row_kernel.len() / 2;
+                    if row_buffer.is_empty() {
+                        row_buffer = vec![T::default(); image_size.width * N + pad_w * 2 * N];
+                    }
+                    write_arena_row::<T, N>(
+                        &mut row_buffer,
+                        image,
+                        source_y,
+                        KernelShape::new(row_kernel.len(), 0),
+                        border_mode,
+                        border_constant,
+                    )
+                    .unwrap();
+                    row_handler(
+                        Arena::new(image_size.width, 1, row_kernel.len() / 2, 0, N),
+                        &row_buffer,
+                        &mut buffer[..row_stride],
+                        image_size,
+                        FilterRegion::new(0, 1),
+                        scanned_row_kernel_slice,
+                    );
+
+                    let column_kernel_len = scanned_column_kernel.len();
+
+                    let half_kernel = column_kernel_len / 2;
+
+                    let (src_row, rest) = buffer.split_at_mut(row_stride);
+                    for dst in rest.chunks_exact_mut(row_stride).take(half_kernel) {
+                        for (dst, src) in dst.iter_mut().zip(src_row.iter()) {
+                            *dst = *src;
+                        }
+                    }
+
+                    let mut start_ky = column_kernel_len / 2 + 1;
+
+                    let rows_count = dst_rows.len() / dest_stride;
+
+                    for (y, dy) in (source_y..source_y + rows_count + half_kernel)
+                        .zip(1..rows_count + half_kernel)
+                    {
+                        let new_y = if y < image_size.height {
+                            y
+                        } else {
+                            clamp_edge!(border_mode, y as i64, 0i64, image_size.height as i64)
+                        };
+
+                        write_arena_row::<T, N>(
+                            &mut row_buffer,
+                            image,
+                            new_y,
+                            KernelShape::new(row_kernel.len(), 0),
+                            border_mode,
+                            border_constant,
+                        )
+                        .unwrap();
+                        row_handler(
+                            Arena::new(image_size.width, 1, row_kernel.len() / 2, 0, N),
+                            &row_buffer,
+                            &mut buffer[start_ky * row_stride..(start_ky + 1) * row_stride],
+                            image_size,
+                            FilterRegion::new(0, 1),
+                            scanned_row_kernel_slice,
+                        );
+
+                        if dy >= half_kernel {
+                            let mut brows = vec![image.data.as_ref(); column_kernel_len];
+
+                            for (i, brow) in brows.iter_mut().enumerate() {
+                                let ky = (i + start_ky + 1) % column_kernel_len;
+                                *brow = &buffer[ky * row_stride..(ky + 1) * row_stride];
+                            }
+
+                            let dy = dy - half_kernel;
+
+                            let dst = &mut dst_rows[dy * dest_stride..(dy + 1) * dest_stride];
+
+                            column_handler(
+                                Arena::new(image_size.width, half_kernel, 0, half_kernel, N),
+                                &brows,
+                                dst,
+                                image_size,
+                                FilterRegion::new(0, 1),
+                                scanned_column_kernel_slice,
+                            );
+                        }
+
+                        start_ky += 1;
+                        start_ky %= column_kernel_len;
+                    }
+                });
+        });
+    } else {
+        let mut buffer = vec![T::default(); row_stride * scanned_column_kernel.len()];
+
+        let pad_w = scanned_row_kernel.len() / 2;
+        let mut row_buffer = vec![T::default(); image_size.width * N + pad_w * 2 * N];
+
+        // preload top edge
+        write_arena_row::<T, N>(
+            &mut row_buffer,
+            image,
+            0,
+            KernelShape::new(row_kernel.len(), 0),
+            border_mode,
+            border_constant,
+        )?;
+        row_handler(
+            Arena::new(image_size.width, 1, row_kernel.len() / 2, 0, N),
+            &row_buffer,
+            &mut buffer[..row_stride],
+            image_size,
+            FilterRegion::new(0, 1),
+            scanned_row_kernel_slice,
+        );
+
+        let column_kernel_len = scanned_column_kernel.len();
+
+        let half_kernel = column_kernel_len / 2;
+
+        let (src_row, rest) = buffer.split_at_mut(row_stride);
+        for dst in rest.chunks_exact_mut(row_stride).take(half_kernel) {
+            for (dst, src) in dst.iter_mut().zip(src_row.iter()) {
+                *dst = *src;
+            }
+        }
+
+        let mut start_ky = column_kernel_len / 2 + 1;
+
+        for y in 1..image_size.height + half_kernel {
+            let new_y = if y < image_size.height {
+                y
+            } else {
+                clamp_edge!(border_mode, y as i64, 0i64, image_size.height as i64)
+            };
+
+            write_arena_row::<T, N>(
+                &mut row_buffer,
+                image,
+                new_y,
+                KernelShape::new(row_kernel.len(), 0),
+                border_mode,
+                border_constant,
+            )?;
+            row_handler(
+                Arena::new(image_size.width, 1, row_kernel.len() / 2, 0, N),
+                &row_buffer,
+                &mut buffer[start_ky * row_stride..(start_ky + 1) * row_stride],
+                image_size,
+                FilterRegion::new(0, 1),
+                scanned_row_kernel_slice,
+            );
+
+            if y >= half_kernel {
+                let mut brows = vec![image.data.as_ref(); column_kernel_len];
+
+                for (i, brow) in brows.iter_mut().enumerate() {
+                    let ky = (i + start_ky + 1) % column_kernel_len;
+                    *brow = &buffer[ky * row_stride..(ky + 1) * row_stride];
+                }
+
+                let dy = y - half_kernel;
+
+                let dst =
+                    &mut destination.data.borrow_mut()[dy * dest_stride..(dy + 1) * dest_stride];
+
+                column_handler(
+                    Arena::new(image_size.width, half_kernel, 0, half_kernel, N),
+                    &brows,
+                    dst,
+                    image_size,
+                    FilterRegion::new(0, 1),
+                    scanned_column_kernel_slice,
+                );
+            }
+
+            start_ky += 1;
+            start_ky %= column_kernel_len;
+        }
     }
 
     Ok(())
