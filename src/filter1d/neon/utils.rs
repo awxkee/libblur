@@ -582,7 +582,6 @@ pub(crate) unsafe fn xvst1q_u16_x2(a: *mut u16, b: uint16x8x2_t) {
     vst1q_u16(a.add(8), b.1);
 }
 
-#[cfg(feature = "rdm")]
 #[inline(always)]
 pub(crate) unsafe fn xvld4u8(a: *const u8) -> uint8x8_t {
     vreinterpret_u8_u32(vld1_lane_u32::<0>(a as *const _, vdup_n_u32(0)))

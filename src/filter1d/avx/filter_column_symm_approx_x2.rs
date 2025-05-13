@@ -230,7 +230,7 @@ unsafe fn filter_column_avx_symm_u8_i32_impl_x2(
             let dst_ptr1 = dst1.get_unchecked_mut(cx..).as_mut_ptr();
 
             _mm_storeu_si128(dst_ptr0 as *mut __m128i, _mm_pack_epi32_x2_epi8(k0));
-            _mm_storeu_si128(dst_ptr1 as *mut __m128i, _mm_pack_epi32_x2_epi8(k0));
+            _mm_storeu_si128(dst_ptr1 as *mut __m128i, _mm_pack_epi32_x2_epi8(k1));
             cx += 16;
         }
 
@@ -268,7 +268,7 @@ unsafe fn filter_column_avx_symm_u8_i32_impl_x2(
             let dst_ptr1 = dst1.get_unchecked_mut(cx..).as_mut_ptr();
 
             _mm_storeu_si64(dst_ptr0 as *mut _, _mm_pack_epi32_epi8(k0));
-            _mm_storeu_si64(dst_ptr1 as *mut _, _mm_pack_epi32_epi8(k0));
+            _mm_storeu_si64(dst_ptr1 as *mut _, _mm_pack_epi32_epi8(k1));
             cx += 8;
         }
 
@@ -306,7 +306,7 @@ unsafe fn filter_column_avx_symm_u8_i32_impl_x2(
             let dst_ptr1 = dst1.get_unchecked_mut(cx..).as_mut_ptr();
 
             _mm_storeu_si32(dst_ptr0 as *mut _, _mm_pack_epi32_epi8(k0));
-            _mm_storeu_si32(dst_ptr1 as *mut _, _mm_pack_epi32_epi8(k0));
+            _mm_storeu_si32(dst_ptr1 as *mut _, _mm_pack_epi32_epi8(k1));
             cx += 4;
         }
 

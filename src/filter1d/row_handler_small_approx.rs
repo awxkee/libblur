@@ -51,19 +51,52 @@ type BInterpolateHandler<T, F> = fn(
 pub trait Filter1DRowHandlerBInterpolateApr<T, F> {
     fn get_row_handler_binter_apr<const N: usize>(
         is_kernel_symmetric: bool,
+        kernel: &[ScanPoint1d<F>],
     ) -> Option<BInterpolateHandler<T, F>>;
 }
 
 impl Filter1DRowHandlerBInterpolateApr<u8, i32> for u8 {
     fn get_row_handler_binter_apr<const N: usize>(
         is_kernel_symmetric: bool,
+        _kernel: &[ScanPoint1d<i32>],
     ) -> Option<BInterpolateHandler<u8, i32>> {
         if is_kernel_symmetric {
             #[cfg(all(target_arch = "x86_64", feature = "avx"))]
             {
                 if std::arch::is_x86_feature_detected!("avx2") {
+                    if _kernel.len() == 5 {
+                        let all_positive = _kernel.iter().all(|&x| x.weight > 0);
+                        if all_positive {
+                            use crate::filter1d::avx::filter_row_avx_symm_u8_uq0_7_k5;
+                            return Some(filter_row_avx_symm_u8_uq0_7_k5::<N>);
+                        }
+                    }
+                    if _kernel.len() < 9 {
+                        let all_positive = _kernel.iter().all(|&x| x.weight > 0);
+                        if all_positive {
+                            use crate::filter1d::avx::filter_row_avx_symm_u8_uq0_7_any;
+                            return Some(filter_row_avx_symm_u8_uq0_7_any::<N>);
+                        }
+                    }
                     use crate::filter1d::avx::filter_row_avx_symm_u8_i32_app_binter;
                     return Some(filter_row_avx_symm_u8_i32_app_binter::<N>);
+                }
+            }
+            #[cfg(all(target_arch = "aarch64", feature = "neon"))]
+            {
+                if _kernel.len() == 5 {
+                    let all_positive = _kernel.iter().all(|&x| x.weight > 0);
+                    if all_positive {
+                        use crate::filter1d::neon::filter_row_symm_neon_binter_u8_uq0_7_x5;
+                        return Some(filter_row_symm_neon_binter_u8_uq0_7_x5::<N>);
+                    }
+                }
+                if _kernel.len() < 9 {
+                    let all_positive = _kernel.iter().all(|&x| x.weight > 0);
+                    if all_positive {
+                        use crate::filter1d::neon::filter_row_symm_neon_binter_u8_u0_7;
+                        return Some(filter_row_symm_neon_binter_u8_u0_7::<N>);
+                    }
                 }
             }
             #[cfg(all(target_arch = "aarch64", feature = "rdm"))]
@@ -88,6 +121,7 @@ macro_rules! d_binter {
         impl Filter1DRowHandlerBInterpolateApr<$store, $intermediate> for $store {
             fn get_row_handler_binter_apr<const N: usize>(
                 _: bool,
+                _: &[ScanPoint1d<$intermediate>],
             ) -> Option<BInterpolateHandler<$store, $intermediate>> {
                 None
             }

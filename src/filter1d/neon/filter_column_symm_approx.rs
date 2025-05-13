@@ -28,6 +28,7 @@
  */
 use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_scan::ScanPoint1d;
+use crate::filter1d::neon::filter_column_symm_approx_uq0_7::filter_column_symm_neon_u8_uq0_7;
 use crate::filter1d::neon::utils::{
     vfmlaq_symm_u8_s16, vmullq_u8_by_i16, vqmovnq_s32_u8, xvld1q_u8_x2, xvld1q_u8_x3, xvld1q_u8_x4,
     xvst1q_u8_x2, xvst1q_u8_x3, xvst1q_u8_x4,
@@ -43,9 +44,22 @@ pub(crate) fn filter_column_symm_neon_u8_i32_app(
     arena_src: &[&[u8]],
     dst: &mut [u8],
     image_size: ImageSize,
-    _: FilterRegion,
+    zfr: FilterRegion,
     scanned_kernel: &[ScanPoint1d<i32>],
 ) {
+    if scanned_kernel.len() <= 7 {
+        let is_all_positive = scanned_kernel.iter().all(|&x| x.weight > 0);
+        if is_all_positive {
+            return filter_column_symm_neon_u8_uq0_7(
+                arena,
+                arena_src,
+                dst,
+                image_size,
+                zfr,
+                scanned_kernel,
+            );
+        }
+    }
     unsafe {
         let image_width = image_size.width * arena.components;
 

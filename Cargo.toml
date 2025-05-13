@@ -33,10 +33,17 @@ fast_transpose = { version = "0.2", optional = true }
 default = ["avx", "sse", "rdm", "neon"]
 image = ["dep:image"]
 fft = ["dep:rustfft", "dep:fast_transpose"]
+# Enables NEON RDM intrinsics
 rdm = ["neon"]
+# Enables AVX-512. Requires nightly on rust compiler before 1.88.
 nightly_avx512 = []
+# Enables NEON fcma, used in FFT only. Requires nightly.
+nightly_fcma = []
+# Enables AVX intrinsics
 avx = []
+# Enables SSE4.1 intrinsics
 sse = []
+# Enables NEON intrinsics
 neon = []
 
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
