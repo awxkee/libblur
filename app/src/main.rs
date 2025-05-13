@@ -132,8 +132,8 @@ fn main() {
         5,
         0.,
         EdgeMode::Clamp,
-        ThreadingPolicy::Single,
-        ConvolutionMode::FixedPoint,
+        ThreadingPolicy::Adaptive,
+        ConvolutionMode::Exact,
     )
     .unwrap();
 
