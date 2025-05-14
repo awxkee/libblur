@@ -126,16 +126,24 @@ fn main() {
     // .unwrap();
     // println!("libblur::filter_2d_rgba_fft: {:?}", start_time.elapsed());
 
-    libblur::gaussian_blur(
+    // libblur::gaussian_blur(
+    //     &image,
+    //     &mut dst_image,
+    //     5,
+    //     0.,
+    //     EdgeMode::Clamp,
+    //     ThreadingPolicy::Single,
+    //     ConvolutionMode::FixedPoint,
+    // )
+    // .unwrap();
+
+    libblur::box_blur(
         &image,
         &mut dst_image,
         5,
-        0.,
-        EdgeMode::Clamp,
         ThreadingPolicy::Single,
-        ConvolutionMode::FixedPoint,
     )
-    .unwrap();
+        .unwrap();
 
     // libblur::motion_blur(
     //     &image,
