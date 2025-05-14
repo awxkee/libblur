@@ -47,6 +47,20 @@ doc = false
 bench = false
 
 [[bin]]
+name = "box_u16"
+path = "box_u16/box_u16.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "box_f32"
+path = "box_f32/box_f32.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "gauss_u16"
 path = "gauss_u16/gauss_u16.rs"
 test = false

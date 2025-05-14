@@ -80,26 +80,24 @@ unsafe fn mul_set_low_u16_v4(
     (m1, m2, m3, m4)
 }
 
-pub(crate) fn box_blur_horizontal_pass_neon_rdm<T, const CN: usize>(
-    undefined_src: &[T],
+pub(crate) fn box_blur_horizontal_pass_neon_rdm<const CN: usize>(
+    src: &[u8],
     src_stride: u32,
-    undefined_dst: &UnsafeSlice<T>,
+    dst: &UnsafeSlice<u8>,
     dst_stride: u32,
     width: u32,
     radius: u32,
     start_y: u32,
     end_y: u32,
 ) {
-    let src: &[u8] = unsafe { std::mem::transmute(undefined_src) };
-    let unsafe_dst: &UnsafeSlice<'_, u8> = unsafe { std::mem::transmute(undefined_dst) };
     unsafe {
         if radius < 240 {
             box_blur_horizontal_pass_neon_impl_low_rad::<CN>(
-                src, src_stride, unsafe_dst, dst_stride, width, radius, start_y, end_y,
+                src, src_stride, dst, dst_stride, width, radius, start_y, end_y,
             );
         } else {
             box_blur_horizontal_pass_neon_impl::<CN>(
-                src, src_stride, unsafe_dst, dst_stride, width, radius, start_y, end_y,
+                src, src_stride, dst, dst_stride, width, radius, start_y, end_y,
             );
         }
     }
@@ -641,10 +639,10 @@ unsafe fn box_blur_horizontal_pass_neon_impl<const CN: usize>(
     }
 }
 
-pub(crate) fn box_blur_vertical_pass_neon_rdm<T>(
-    undefined_src: &[T],
+pub(crate) fn box_blur_vertical_pass_neon_rdm(
+    src: &[u8],
     src_stride: u32,
-    undefined_unsafe_dst: &UnsafeSlice<T>,
+    dst: &UnsafeSlice<u8>,
     dst_stride: u32,
     w: u32,
     height: u32,
@@ -653,15 +651,13 @@ pub(crate) fn box_blur_vertical_pass_neon_rdm<T>(
     end_x: u32,
 ) {
     unsafe {
-        let src: &[u8] = std::mem::transmute(undefined_src);
-        let unsafe_dst: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_unsafe_dst);
         if radius < 240 {
             box_blur_vertical_pass_neon_low_rad(
-                src, src_stride, unsafe_dst, dst_stride, w, height, radius, start_x, end_x,
+                src, src_stride, dst, dst_stride, w, height, radius, start_x, end_x,
             );
         } else {
             box_blur_vertical_pass_neon_any(
-                src, src_stride, unsafe_dst, dst_stride, w, height, radius, start_x, end_x,
+                src, src_stride, dst, dst_stride, w, height, radius, start_x, end_x,
             );
         }
     }

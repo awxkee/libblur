@@ -66,19 +66,18 @@ pub(crate) unsafe fn load_u8_s16_fast<const CN: usize>(ptr: *const u8) -> __m128
 
 #[inline(always)]
 pub(crate) unsafe fn load_u16_s32_fast<const CN: usize>(ptr: *const u16) -> __m128i {
-    let sh1 = _mm_setr_epi8(0, 1, -1, -1, 2, 3, -1, -1, 4, 5, -1, -1, 6, 7, -1, -1);
     if CN == 4 {
         let v = _mm_loadu_si64(ptr as *const _);
-        _mm_shuffle_epi8(v, sh1)
+        _mm_unpacklo_epi16(v, _mm_setzero_si128())
     } else if CN == 3 {
         let mut v0 = _mm_loadu_si32(ptr as *const _);
         v0 = _mm_insert_epi16::<2>(v0, ptr.add(2).read_unaligned() as i32);
-        _mm_shuffle_epi8(v0, sh1)
+        _mm_unpacklo_epi16(v0, _mm_setzero_si128())
     } else if CN == 2 {
         let v0 = _mm_loadu_si32(ptr as *const _);
-        _mm_shuffle_epi8(v0, sh1)
+        _mm_unpacklo_epi16(v0, _mm_setzero_si128())
     } else {
-        _mm_shuffle_epi8(_mm_loadu_si16(ptr as *const _), sh1)
+        _mm_unpacklo_epi16(_mm_loadu_si16(ptr as *const _), _mm_setzero_si128())
     }
 }
 
@@ -224,7 +223,7 @@ pub(crate) unsafe fn store_u16_u32<const CN: usize>(dst_ptr: *mut u16, regi: __m
 }
 
 #[inline(always)]
-#[cfg(feature = "sse")]
+#[cfg(any(feature = "sse", feature = "avx"))]
 pub(crate) unsafe fn write_u8<const CN: usize>(dst_ptr: *mut u8, v8: __m128i) {
     if CN == 4 {
         _mm_storeu_si32(dst_ptr as *mut _, v8);
