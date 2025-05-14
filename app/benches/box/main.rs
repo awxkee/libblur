@@ -33,7 +33,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 &src_image,
                 &mut dst_image,
                 77 / 2,
-                ThreadingPolicy::Adaptive,
+                ThreadingPolicy::Single,
             )
             .unwrap();
         })

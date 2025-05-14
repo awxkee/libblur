@@ -25,6 +25,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use std::time::Instant;
 use colorutils_rs::linear_to_planar::linear_to_plane;
 use colorutils_rs::planar_to_linear::plane_to_linear;
 use colorutils_rs::{
@@ -602,6 +603,7 @@ where
         CN,
     )?;
     let mut transient: Vec<T> = vec![T::default(); dst_stride as usize * height as usize];
+    let start = Instant::now();
     box_blur_horizontal_pass::<T, CN>(
         src,
         src_stride,
@@ -613,6 +615,9 @@ where
         pool,
         thread_count,
     );
+    println!("Horizontal {:?}", start.elapsed());
+    let start = Instant::now();
+
     box_blur_vertical_pass::<T, CN>(
         &transient,
         src_stride,
@@ -624,6 +629,8 @@ where
         pool,
         thread_count,
     );
+    println!("Vertical {:?}", start.elapsed());
+
     Ok(())
 }
 

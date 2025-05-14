@@ -27,7 +27,9 @@
 
 use std::arch::aarch64::*;
 
-use crate::neon::{load_u8, load_u8_u16, store_u8_u32, vmulq_u16_low_f32, vmulq_u32_f32};
+use crate::neon::{
+    load_u8, load_u8_u16, store_u8_s32_x4, store_u8_u32, vmulq_u16_low_f32, vmulq_u32_f32,
+};
 use crate::unsafe_slice::UnsafeSlice;
 
 #[inline(always)]
@@ -548,52 +550,27 @@ fn box_blur_horizontal_pass_neon_impl<const CN: usize>(
             let px = x as usize * CN;
 
             unsafe {
-                let (scale_store0, scale_store1, scale_store2, scale_store3) =
-                    mul_set_v4(store_0, store_1, store_2, store_3, v_weight);
-
-                let px_160 = vqmovn_u32(scale_store0);
-                let px_161 = vqmovn_u32(scale_store1);
-                let px_162 = vqmovn_u32(scale_store2);
-                let px_163 = vqmovn_u32(scale_store3);
-
-                let px_80 = vqmovn_u16(vcombine_u16(px_160, px_160));
-                let px_81 = vqmovn_u16(vcombine_u16(px_161, px_161));
-                let px_82 = vqmovn_u16(vcombine_u16(px_162, px_162));
-                let px_83 = vqmovn_u16(vcombine_u16(px_163, px_163));
+                let (ss0, ss1, ss2, ss3) = mul_set_v4(store_0, store_1, store_2, store_3, v_weight);
 
                 let bytes_offset_0 = y_dst_shift + px;
                 let bytes_offset_1 = y_dst_shift + dst_stride as usize + px;
                 let bytes_offset_2 = y_dst_shift + dst_stride as usize * 2 + px;
                 let bytes_offset_3 = y_dst_shift + dst_stride as usize * 3 + px;
-                if CN == 4 {
-                    let dst_ptr_0 = unsafe_dst.slice.as_ptr().add(bytes_offset_0) as *mut u32;
-                    vst1_lane_u32::<0>(dst_ptr_0, vreinterpret_u32_u8(px_80));
 
-                    let dst_ptr_1 = unsafe_dst.slice.as_ptr().add(bytes_offset_1) as *mut u32;
-                    vst1_lane_u32::<0>(dst_ptr_1, vreinterpret_u32_u8(px_81));
-
-                    let dst_ptr_2 = unsafe_dst.slice.as_ptr().add(bytes_offset_2) as *mut u32;
-                    vst1_lane_u32::<0>(dst_ptr_2, vreinterpret_u32_u8(px_82));
-
-                    let dst_ptr_3 = unsafe_dst.slice.as_ptr().add(bytes_offset_3) as *mut u32;
-                    vst1_lane_u32::<0>(dst_ptr_3, vreinterpret_u32_u8(px_83));
-                } else {
-                    let dst_ptr_0 = unsafe_dst.slice.as_ptr().add(bytes_offset_0) as *mut u8;
-                    vst1_lane_u16::<0>(dst_ptr_0 as *mut u16, vreinterpret_u16_u8(px_80));
-                    vst1_lane_u8::<2>(dst_ptr_0.add(2), px_80);
-
-                    let dst_ptr_1 = unsafe_dst.slice.as_ptr().add(bytes_offset_1) as *mut u8;
-                    vst1_lane_u16::<0>(dst_ptr_1 as *mut u16, vreinterpret_u16_u8(px_81));
-                    vst1_lane_u8::<2>(dst_ptr_1.add(2), px_81);
-
-                    let dst_ptr_2 = unsafe_dst.slice.as_ptr().add(bytes_offset_2) as *mut u8;
-                    vst1_lane_u16::<0>(dst_ptr_2 as *mut u16, vreinterpret_u16_u8(px_82));
-                    vst1_lane_u8::<2>(dst_ptr_2.add(2), px_82);
-
-                    let dst_ptr_3 = unsafe_dst.slice.as_ptr().add(bytes_offset_3) as *mut u8;
-                    vst1_lane_u16::<0>(dst_ptr_3 as *mut u16, vreinterpret_u16_u8(px_83));
-                    vst1_lane_u8::<2>(dst_ptr_3.add(2), px_83);
-                }
+                store_u8_s32_x4::<CN>(
+                    (
+                        unsafe_dst.slice.as_ptr().add(bytes_offset_0) as *mut _,
+                        unsafe_dst.slice.as_ptr().add(bytes_offset_1) as *mut _,
+                        unsafe_dst.slice.as_ptr().add(bytes_offset_2) as *mut _,
+                        unsafe_dst.slice.as_ptr().add(bytes_offset_3) as *mut _,
+                    ),
+                    int32x4x4_t(
+                        vreinterpretq_s32_u32(ss0),
+                        vreinterpretq_s32_u32(ss1),
+                        vreinterpretq_s32_u32(ss2),
+                        vreinterpretq_s32_u32(ss3),
+                    ),
+                );
             }
         }
 
