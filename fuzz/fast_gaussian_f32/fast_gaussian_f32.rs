@@ -29,53 +29,46 @@
 
 #![no_main]
 
+use arbitrary::Arbitrary;
 use libblur::{fast_gaussian_f32, BlurImageMut, EdgeMode, FastBlurChannels, ThreadingPolicy};
 use libfuzzer_sys::fuzz_target;
 
-fuzz_target!(|data: (u8, u8, u8, u8, u16, u8)| {
-    let edge_mode = match data.3 % 4 {
+#[derive(Clone, Debug, Arbitrary)]
+pub struct SrcImage {
+    pub src_width: u16,
+    pub src_height: u16,
+    pub value: u16,
+    pub edge_mode: u8,
+    pub radius: u8,
+    pub plane: u8,
+}
+
+fuzz_target!(|data: SrcImage| {
+    let edge_mode = match data.edge_mode % 4 {
         0 => EdgeMode::Clamp,
         1 => EdgeMode::Wrap,
         2 => EdgeMode::Reflect,
         _ => EdgeMode::Reflect101,
     };
-    let plane_match = match data.5 % 3 {
+    let plane_match = match data.plane % 3 {
         0 => FastBlurChannels::Channels4,
         1 => FastBlurChannels::Channels3,
         _ => FastBlurChannels::Plane,
     };
-    match plane_match {
-        FastBlurChannels::Plane => {
-            fuzz_image(
-                data.0 as usize,
-                data.1 as usize,
-                data.2 as usize,
-                FastBlurChannels::Plane,
-                edge_mode,
-                data.4 as f32 / 65535.0,
-            );
-        }
-        FastBlurChannels::Channels3 => {
-            fuzz_image(
-                data.0 as usize,
-                data.1 as usize,
-                data.2 as usize,
-                FastBlurChannels::Channels3,
-                edge_mode,
-                data.4 as f32 / 65535.0,
-            );
-        }
-        FastBlurChannels::Channels4 => {
-            fuzz_image(
-                data.0 as usize,
-                data.1 as usize,
-                data.2 as usize,
-                FastBlurChannels::Channels4,
-                edge_mode,
-                data.4 as f32 / 65535.0,
-            );
-        }
+    if data.src_width > 250 || data.src_height > 250 {
+        return;
     }
+    if data.radius == 0 {
+        return;
+    }
+    fuzz_image(
+        data.src_width as usize,
+        data.src_height as usize,
+        data.radius as usize,
+        plane_match,
+        edge_mode,
+        data.value as f32 / 65535.0,
+    );
 });
 
 fn fuzz_image(

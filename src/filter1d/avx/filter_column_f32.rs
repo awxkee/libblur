@@ -131,9 +131,9 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
 
             let mut cx = 0usize;
 
-            while cx + 32 < dst_stride {
-                let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(0).weight);
+            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(0).weight);
 
+            while cx + 32 < dst_stride {
                 let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
                 let source = _mm256_load_pack_ps_x4(v_src.as_ptr());
@@ -159,8 +159,6 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
             }
 
             while cx + 16 < dst_stride {
-                let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(0).weight);
-
                 let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
                 let source = _mm256_load_pack_ps_x2(v_src.as_ptr());
@@ -182,8 +180,6 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
             }
 
             while cx + 8 < dst_stride {
-                let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(0).weight);
-
                 let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
                 let source = _mm256_loadu_ps(v_src.as_ptr());
@@ -203,12 +199,10 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
             }
 
             while cx + 4 < dst_stride {
-                let coeff = *scanned_kernel.get_unchecked(0);
-
                 let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
                 let source_0 = _mm_loadu_ps(v_src.as_ptr());
-                let mut k0 = _mm_mul_ps(source_0, _mm_set1_ps(coeff.weight));
+                let mut k0 = _mm_mul_ps(source_0, _mm256_castps256_ps128(coeff));
 
                 for i in 1..length {
                     let coeff = *scanned_kernel.get_unchecked(i);
@@ -223,12 +217,10 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
             }
 
             while cx < dst_stride {
-                let coeff = *scanned_kernel.get_unchecked(0);
-
                 let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
                 let source_0 = _mm_load_ss(v_src.as_ptr());
-                let mut k0 = _mm_mul_ps(source_0, _mm_set1_ps(coeff.weight));
+                let mut k0 = _mm_mul_ps(source_0, _mm256_castps256_ps128(coeff));
 
                 for i in 1..length {
                     let coeff = *scanned_kernel.get_unchecked(i);

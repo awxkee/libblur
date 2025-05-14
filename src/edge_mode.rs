@@ -74,6 +74,7 @@ pub(crate) fn reflect_index_101(i: isize, n: isize) -> usize {
     (n_r - i.rem_euclid(n_r)) as usize
 }
 
+#[allow(clippy::int_plus_one)]
 macro_rules! clamp_edge {
     ($edge_mode:expr, $value:expr, $min:expr, $max:expr) => {{
         use crate::edge_mode::EdgeMode;

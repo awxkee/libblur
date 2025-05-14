@@ -64,6 +64,13 @@ impl Filter1DRowHandlerBInterpolateApr<u8, i32> for u8 {
             #[cfg(all(target_arch = "x86_64", feature = "avx"))]
             {
                 if std::arch::is_x86_feature_detected!("avx2") {
+                    if _kernel.len() == 3 {
+                        let all_positive = _kernel.iter().all(|&x| x.weight > 0);
+                        if all_positive {
+                            use crate::filter1d::avx::filter_row_avx_symm_u8_uq0_7_k3;
+                            return Some(filter_row_avx_symm_u8_uq0_7_k3::<N>);
+                        }
+                    }
                     if _kernel.len() == 5 {
                         let all_positive = _kernel.iter().all(|&x| x.weight > 0);
                         if all_positive {
@@ -82,8 +89,25 @@ impl Filter1DRowHandlerBInterpolateApr<u8, i32> for u8 {
                     return Some(filter_row_avx_symm_u8_i32_app_binter::<N>);
                 }
             }
+            #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
+            {
+                if _kernel.len() < 9 {
+                    let all_positive = _kernel.iter().all(|&x| x.weight > 0);
+                    if all_positive {
+                        use crate::filter1d::sse::filter_row_sse_symm_u8_uq0_7_any;
+                        return Some(filter_row_sse_symm_u8_uq0_7_any::<N>);
+                    }
+                }
+            }
             #[cfg(all(target_arch = "aarch64", feature = "neon"))]
             {
+                if _kernel.len() == 3 {
+                    let all_positive = _kernel.iter().all(|&x| x.weight > 0);
+                    if all_positive {
+                        use crate::filter1d::neon::filter_row_symm_neon_binter_u8_uq0_7_k3;
+                        return Some(filter_row_symm_neon_binter_u8_uq0_7_k3::<N>);
+                    }
+                }
                 if _kernel.len() == 5 {
                     let all_positive = _kernel.iter().all(|&x| x.weight > 0);
                     if all_positive {

@@ -79,9 +79,9 @@ unsafe fn filter_column_symm_sse_u8_i16_impl(
 
     let mut cx = 0usize;
 
-    while cx + 64 < image_width {
-        let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(half_len).weight);
+    let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(half_len).weight);
 
+    while cx + 64 < image_width {
         let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
 
         let source = _mm_load_pack_x4(v_src.as_ptr());
@@ -121,8 +121,6 @@ unsafe fn filter_column_symm_sse_u8_i16_impl(
     }
 
     while cx + 48 < image_width {
-        let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(half_len).weight);
-
         let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
 
         let source = _mm_load_pack_x3(v_src.as_ptr());
@@ -159,8 +157,6 @@ unsafe fn filter_column_symm_sse_u8_i16_impl(
     }
 
     while cx + 32 < image_width {
-        let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(half_len).weight);
-
         let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
 
         let source = _mm_load_pack_x2(v_src.as_ptr());
@@ -192,12 +188,10 @@ unsafe fn filter_column_symm_sse_u8_i16_impl(
     }
 
     while cx + 16 < image_width {
-        let coeff = *scanned_kernel.get_unchecked(half_len);
-
         let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
 
         let source_0 = _mm_loadu_si128(v_src.as_ptr() as *const __m128i);
-        let mut k0 = _mm_madd_epi8_by_epi16_x4(source_0, _mm_set1_epi16(coeff.weight));
+        let mut k0 = _mm_madd_epi8_by_epi16_x4(source_0, coeff);
 
         for i in 0..half_len {
             let coeff = *scanned_kernel.get_unchecked(i);
@@ -224,9 +218,9 @@ unsafe fn filter_column_symm_sse_u8_i16_impl(
         cx += 16;
     }
 
-    while cx + 4 < image_width {
-        let coeff = scanned_kernel.get_unchecked(half_len).weight;
+    let coeff = scanned_kernel.get_unchecked(half_len).weight;
 
+    while cx + 4 < image_width {
         let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
 
         let mut k0 = (*v_src.get_unchecked(0) as i16).mul(coeff);
@@ -271,8 +265,6 @@ unsafe fn filter_column_symm_sse_u8_i16_impl(
     }
 
     for x in cx..image_width {
-        let coeff = scanned_kernel.get_unchecked(half_len).weight;
-
         let v_src = arena_src.get_unchecked(half_len).get_unchecked(x..);
 
         let mut k0 = (*v_src.get_unchecked(0) as i16).mul(coeff);

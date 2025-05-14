@@ -52,9 +52,9 @@ pub(crate) fn filter_column_neon_f32_f32(
 
         let mut cx = 0usize;
 
-        while cx + 16 < dst_stride {
-            let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(0).weight);
+        let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(0).weight);
 
+        while cx + 16 < dst_stride {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let source = xvld1q_f32_x4(v_src.as_ptr());
@@ -79,8 +79,6 @@ pub(crate) fn filter_column_neon_f32_f32(
         }
 
         while cx + 8 < dst_stride {
-            let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(0).weight);
-
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let source = xvld1q_f32_x2(v_src.as_ptr());
@@ -102,12 +100,10 @@ pub(crate) fn filter_column_neon_f32_f32(
         }
 
         while cx + 4 < dst_stride {
-            let coeff = *scanned_kernel.get_unchecked(0);
-
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let source_0 = vld1q_f32(v_src.as_ptr());
-            let mut k0 = vmulq_f32(source_0, vdupq_n_f32(coeff.weight));
+            let mut k0 = vmulq_f32(source_0, coeff);
 
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
@@ -121,12 +117,10 @@ pub(crate) fn filter_column_neon_f32_f32(
         }
 
         while cx + 2 < dst_stride {
-            let coeff = *scanned_kernel.get_unchecked(0);
-
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let source_0 = vld1_f32(v_src.as_ptr());
-            let mut k0 = vmul_f32(source_0, vdup_n_f32(coeff.weight));
+            let mut k0 = vmul_f32(source_0, vget_low_f32(coeff));
 
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
@@ -139,9 +133,9 @@ pub(crate) fn filter_column_neon_f32_f32(
             cx += 2;
         }
 
-        for x in cx..dst_stride {
-            let coeff = *scanned_kernel.get_unchecked(0);
+        let coeff = *scanned_kernel.get_unchecked(0);
 
+        for x in cx..dst_stride {
             let v_src = arena_src.get_unchecked(0).get_unchecked(x..);
 
             let mut k0 = (*v_src.get_unchecked(0)).mul(coeff.weight);

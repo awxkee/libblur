@@ -133,9 +133,9 @@ unsafe fn filter_row_sse_symm_u16_f32_impl<const FMA: bool, const N: usize>(
 
     let max_width = width * N;
 
-    while cx + 32 < max_width {
-        let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
+    let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
 
+    while cx + 32 < max_width {
         let shifted_src = local_src.get_unchecked(cx..);
 
         let source =
@@ -172,8 +172,6 @@ unsafe fn filter_row_sse_symm_u16_f32_impl<const FMA: bool, const N: usize>(
     }
 
     while cx + 16 < max_width {
-        let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
-
         let shifted_src = local_src.get_unchecked(cx..);
 
         let source =
@@ -201,8 +199,6 @@ unsafe fn filter_row_sse_symm_u16_f32_impl<const FMA: bool, const N: usize>(
     }
 
     while cx + 8 < max_width {
-        let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
-
         let shifted_src = local_src.get_unchecked(cx..);
 
         let source =
@@ -225,8 +221,6 @@ unsafe fn filter_row_sse_symm_u16_f32_impl<const FMA: bool, const N: usize>(
     }
 
     while cx + 4 < max_width {
-        let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
-
         let shifted_src = local_src.get_unchecked(cx..);
 
         let source = _mm_loadu_si64(shifted_src.get_unchecked(half_len * N..).as_ptr() as *const _);
@@ -247,8 +241,9 @@ unsafe fn filter_row_sse_symm_u16_f32_impl<const FMA: bool, const N: usize>(
         cx += 4;
     }
 
+    let coeff = *scanned_kernel.get_unchecked(half_len);
+
     for x in cx..max_width {
-        let coeff = *scanned_kernel.get_unchecked(half_len);
         let shifted_src = local_src.get_unchecked(x..);
         let mut k0 = *shifted_src.get_unchecked(half_len * N) as f32 * coeff.weight;
 

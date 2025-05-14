@@ -1,5 +1,5 @@
 /*
- * // Copyright (c) Radzivon Bartoshyk. All rights reserved.
+ * // Copyright (c) Radzivon Bartoshyk 3/2025. All rights reserved.
  * //
  * // Redistribution and use in source and binary forms, with or without modification,
  * // are permitted provided that the following conditions are met:
@@ -26,55 +26,51 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::BlurError;
+use std::ops::Add;
 
-#![no_main]
-
-use arbitrary::Arbitrary;
-use libblur::{stack_blur, BlurImageMut, FastBlurChannels, ThreadingPolicy};
-use libfuzzer_sys::fuzz_target;
-
-#[derive(Clone, Debug, Arbitrary)]
-pub struct SrcImage {
-    pub src_width: u16,
-    pub src_height: u16,
-    pub value: u8,
-    pub edge_mode: u8,
-    pub radius: u8,
+pub(crate) trait SafeAdd<T: Copy + Add<T, Output = T>> {
+    fn safe_add(&self, other: T) -> Result<T, BlurError>;
 }
 
-fuzz_target!(|data: SrcImage| {
-    if data.src_width > 250 || data.src_height > 250 {
-        return;
-    }
-    if data.radius == 0 {
-        return;
-    }
-    fuzz_image(
-        data.src_width as usize,
-        data.src_height as usize,
-        data.radius as usize,
-        FastBlurChannels::Channels4,
-    );
-    fuzz_image(
-        data.src_width as usize,
-        data.src_height as usize,
-        data.radius as usize,
-        FastBlurChannels::Channels3,
-    );
-    fuzz_image(
-        data.src_width as usize,
-        data.src_height as usize,
-        data.radius as usize,
-        FastBlurChannels::Plane,
-    );
-});
-
-fn fuzz_image(width: usize, height: usize, radius: usize, channels: FastBlurChannels) {
-    if width == 0 || height == 0 || radius == 0 {
-        return;
-    }
-
-    let mut dst_image = BlurImageMut::alloc(width as u32, height as u32, channels);
-
-    stack_blur(&mut dst_image, radius as u32, ThreadingPolicy::Single).unwrap();
+pub(crate) trait SafeMul<T: Copy + Add<T, Output = T>> {
+    fn safe_mul(&self, other: T) -> Result<T, BlurError>;
 }
+
+macro_rules! safe_add_impl {
+    ($type_name: ident) => {
+        impl SafeAdd<$type_name> for $type_name {
+            #[inline(always)]
+            fn safe_add(&self, other: $type_name) -> Result<$type_name, BlurError> {
+                if let Some(result) = self.checked_add(other) {
+                    return Ok(result);
+                }
+                Err(BlurError::ExceedingPointerSize)
+            }
+        }
+    };
+}
+
+safe_add_impl!(u32);
+safe_add_impl!(i32);
+safe_add_impl!(usize);
+safe_add_impl!(isize);
+
+macro_rules! safe_mul_impl {
+    ($type_name: ident) => {
+        impl SafeMul<$type_name> for $type_name {
+            #[inline(always)]
+            fn safe_mul(&self, other: $type_name) -> Result<$type_name, BlurError> {
+                if let Some(result) = self.checked_mul(other) {
+                    return Ok(result);
+                }
+                Err(BlurError::ExceedingPointerSize)
+            }
+        }
+    };
+}
+
+safe_mul_impl!(u32);
+safe_mul_impl!(i32);
+safe_mul_impl!(usize);
+safe_mul_impl!(isize);

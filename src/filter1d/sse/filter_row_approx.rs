@@ -79,9 +79,9 @@ unsafe fn filter_row_sse_u8_i32_impl<const N: usize>(
 
     let max_width = image_size.width * N;
 
-    while cx + 64 < max_width {
-        let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(0).weight as i16);
+    let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(0).weight as i16);
 
+    while cx + 64 < max_width {
         let shifted_src = local_src.get_unchecked(cx..);
 
         let source = _mm_load_pack_x4(shifted_src.as_ptr());
@@ -113,8 +113,6 @@ unsafe fn filter_row_sse_u8_i32_impl<const N: usize>(
     }
 
     while cx + 32 < max_width {
-        let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(0).weight as i16);
-
         let shifted_src = local_src.get_unchecked(cx..);
 
         let source = _mm_load_pack_x2(shifted_src.as_ptr());
@@ -137,8 +135,6 @@ unsafe fn filter_row_sse_u8_i32_impl<const N: usize>(
     }
 
     while cx + 16 < max_width {
-        let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(0).weight as i16);
-
         let shifted_src = local_src.get_unchecked(cx..);
 
         let source = _mm_loadu_si128(shifted_src.as_ptr() as *const __m128i);
@@ -156,8 +152,9 @@ unsafe fn filter_row_sse_u8_i32_impl<const N: usize>(
         cx += 16;
     }
 
+    let coeff = *scanned_kernel.get_unchecked(0);
+
     while cx + 4 < max_width {
-        let coeff = *scanned_kernel.get_unchecked(0);
         let shifted_src = local_src.get_unchecked(cx..);
 
         let mut k0 = *shifted_src.get_unchecked(0) as i32 * coeff.weight;
@@ -182,7 +179,6 @@ unsafe fn filter_row_sse_u8_i32_impl<const N: usize>(
     }
 
     for x in cx..max_width {
-        let coeff = *scanned_kernel.get_unchecked(0);
         let shifted_src = local_src.get_unchecked(x..);
         let mut k0 = *shifted_src.get_unchecked(0) as i32 * coeff.weight;
 

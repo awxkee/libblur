@@ -29,30 +29,44 @@
 
 #![no_main]
 
+use arbitrary::Arbitrary;
 use libblur::{BlurImage, BlurImageMut, EdgeMode, FastBlurChannels, Scalar, ThreadingPolicy};
 use libfuzzer_sys::fuzz_target;
 
-fuzz_target!(|data: (u8, u8, u8, u8, f32)| {
-    let edge_mode = match data.3 % 4 {
+#[derive(Clone, Debug, Arbitrary)]
+pub struct SrcImage {
+    pub src_width: u16,
+    pub src_height: u16,
+    pub edge_mode: u8,
+    pub channels: u8,
+    pub kernel_size: u8,
+    pub angle: f32,
+}
+
+fuzz_target!(|data: SrcImage| {
+    if data.src_width > 250 || data.src_height > 250 {
+        return;
+    }
+    if data.kernel_size % 2 == 0 || data.kernel_size > 35 || data.kernel_size == 0 {
+        return;
+    }
+    let edge_mode = match data.edge_mode % 4 {
         0 => EdgeMode::Clamp,
         1 => EdgeMode::Wrap,
         2 => EdgeMode::Reflect,
         _ => EdgeMode::Reflect101,
     };
+    let channels = match data.channels % 3 {
+        0 => FastBlurChannels::Channels4,
+        1 => FastBlurChannels::Channels3,
+        _ => FastBlurChannels::Plane,
+    };
     fuzz_8bit(
-        data.0 as usize,
-        data.1 as usize,
-        data.2 as usize,
-        data.4,
-        FastBlurChannels::Channels4,
-        edge_mode,
-    );
-    fuzz_8bit(
-        data.0 as usize,
-        data.1 as usize,
-        data.2 as usize,
-        data.4,
-        FastBlurChannels::Channels3,
+        data.src_width as usize,
+        data.src_height as usize,
+        data.kernel_size as usize,
+        data.angle,
+        channels,
         edge_mode,
     );
 });

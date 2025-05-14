@@ -65,9 +65,9 @@ pub(crate) fn filter_symm_column_neon_u8_f32_x3(
 
         let mut cx = 0usize;
 
-        while cx + 32 < image_width {
-            let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(half_len).weight);
+        let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(half_len).weight);
 
+        while cx + 32 < image_width {
             let shifted_src0 = ref0.get_unchecked(cx..);
             let shifted_src1 = ref1.get_unchecked(cx..);
             let shifted_src2 = ref2.get_unchecked(cx..);
@@ -134,8 +134,6 @@ pub(crate) fn filter_symm_column_neon_u8_f32_x3(
         }
 
         while cx + 16 < image_width {
-            let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(half_len).weight);
-
             let shifted_src0 = ref0.get_unchecked(cx..);
             let shifted_src1 = ref1.get_unchecked(cx..);
             let shifted_src2 = ref2.get_unchecked(cx..);
@@ -180,9 +178,9 @@ pub(crate) fn filter_symm_column_neon_u8_f32_x3(
             cx += 16;
         }
 
-        while cx + 4 < image_width {
-            let coeff = scanned_kernel.get_unchecked(half_len).weight;
+        let coeff = scanned_kernel.get_unchecked(half_len).weight;
 
+        while cx + 4 < image_width {
             let mut k0_0 = (*ref0.get_unchecked(cx) as f32).mul(coeff);
             let mut k1_0 = (*ref0.get_unchecked(cx + 1) as f32).mul(coeff);
             let mut k2_0 = (*ref0.get_unchecked(cx + 2) as f32).mul(coeff);
@@ -296,8 +294,6 @@ pub(crate) fn filter_symm_column_neon_u8_f32_x3(
         }
 
         for x in cx..image_width {
-            let coeff = scanned_kernel.get_unchecked(half_len).weight;
-
             let mut k0 = (*ref0.get_unchecked(x) as f32).mul(coeff);
             let mut k1 = (*ref1.get_unchecked(x) as f32).mul(coeff);
             let mut k2 = (*ref2.get_unchecked(x) as f32).mul(coeff);

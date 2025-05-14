@@ -53,9 +53,9 @@ pub(crate) fn filter_column_neon_u8_i16(
         let length = scanned_kernel.len();
         let mut cx = 0usize;
 
-        while cx + 64 < max_width {
-            let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(0).weight);
+        let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(0).weight);
 
+        while cx + 64 < max_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let source = xvld1q_u8_x4(v_src.as_ptr());
@@ -88,8 +88,6 @@ pub(crate) fn filter_column_neon_u8_i16(
         }
 
         while cx + 48 < max_width {
-            let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(0).weight);
-
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let source = xvld1q_u8_x3(v_src.as_ptr());
@@ -119,8 +117,6 @@ pub(crate) fn filter_column_neon_u8_i16(
         }
 
         while cx + 32 < max_width {
-            let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(0).weight);
-
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let source = xvld1q_u8_x2(v_src.as_ptr());
@@ -148,12 +144,10 @@ pub(crate) fn filter_column_neon_u8_i16(
         }
 
         while cx + 16 < max_width {
-            let coeff = *scanned_kernel.get_unchecked(0);
-
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let source_0 = vld1q_u8(v_src.as_ptr());
-            let mut k0 = vmulq_u8_by_i16(source_0, vdupq_n_s16(coeff.weight));
+            let mut k0 = vmulq_u8_by_i16(source_0, coeff);
 
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
@@ -166,9 +160,9 @@ pub(crate) fn filter_column_neon_u8_i16(
             cx += 16;
         }
 
-        while cx + 4 < max_width {
-            let coeff = *scanned_kernel.get_unchecked(0);
+        let coeff = *scanned_kernel.get_unchecked(0);
 
+        while cx + 4 < max_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let mut k0 = (*v_src.get_unchecked(0) as i16).mul(coeff.weight);
@@ -208,8 +202,6 @@ pub(crate) fn filter_column_neon_u8_i16(
         }
 
         for x in cx..max_width {
-            let coeff = *scanned_kernel.get_unchecked(0);
-
             let v_src = arena_src.get_unchecked(0).get_unchecked(x..);
 
             let mut k0 = ((*v_src.get_unchecked(0)) as i16).mul(coeff.weight);

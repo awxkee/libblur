@@ -25,7 +25,7 @@
 // CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#![allow(clippy::too_many_arguments)]
+#![allow(clippy::too_many_arguments, clippy::int_plus_one)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(
     all(feature = "nightly_fcma", target_arch = "aarch64"),
@@ -109,6 +109,7 @@ mod unsafe_slice;
 mod util;
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 mod wasm32;
+mod safe_math;
 
 #[cfg(feature = "fft")]
 #[cfg_attr(docsrs, doc(cfg(feature = "fft")))]

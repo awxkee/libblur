@@ -297,22 +297,6 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
-    c.bench_function("OpenCV RGBA Gaussian: 13", |b| {
-        b.iter(|| {
-            let mut dst = Mat::default();
-            opencv::imgproc::gaussian_blur(
-                &src,
-                &mut dst,
-                Size::new(13, 13),
-                5.,
-                5.,
-                BORDER_DEFAULT,
-                AlgorithmHint::ALGO_HINT_ACCURATE,
-            )
-            .unwrap();
-        })
-    });
-
     c.bench_function("RGBA gauss blur edge clamp: rad 151", |b| {
         let mut dst_bytes =
             BlurImageMut::alloc(img.width(), img.height(), FastBlurChannels::Channels4);

@@ -58,9 +58,9 @@ pub(crate) fn filter_row_neon_u8_f32<const N: usize>(
 
         let max_width = image_size.width * arena.components;
 
-        while cx + 64 < max_width {
-            let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(0).weight);
+        let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(0).weight);
 
+        while cx + 64 < max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source = xvld1q_u8_x4(shifted_src.as_ptr());
@@ -92,8 +92,6 @@ pub(crate) fn filter_row_neon_u8_f32<const N: usize>(
         }
 
         while cx + 32 < max_width {
-            let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(0).weight);
-
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source = xvld1q_u8_x2(shifted_src.as_ptr());
@@ -116,12 +114,10 @@ pub(crate) fn filter_row_neon_u8_f32<const N: usize>(
         }
 
         while cx + 16 < max_width {
-            let coeff = *scanned_kernel.get_unchecked(0);
-
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source_0 = vld1q_u8(shifted_src.as_ptr());
-            let mut k0 = vmulq_u8_by_f32(source_0, vdupq_n_f32(coeff.weight));
+            let mut k0 = vmulq_u8_by_f32(source_0, coeff);
 
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
@@ -134,9 +130,9 @@ pub(crate) fn filter_row_neon_u8_f32<const N: usize>(
             cx += 16;
         }
 
-        while cx + 4 < max_width {
-            let coeff = *scanned_kernel.get_unchecked(0);
+        let coeff = *scanned_kernel.get_unchecked(0);
 
+        while cx + 4 < max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let mut k0 = ((*shifted_src.get_unchecked(0)) as f32).mul(coeff.weight);
@@ -172,7 +168,6 @@ pub(crate) fn filter_row_neon_u8_f32<const N: usize>(
         }
 
         for x in cx..max_width {
-            let coeff = *scanned_kernel.get_unchecked(0);
             let shifted_src = local_src.get_unchecked(x..);
             let mut k0 = ((*shifted_src.get_unchecked(0)) as f32).mul(coeff.weight);
 

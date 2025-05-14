@@ -29,26 +29,42 @@
 
 #![no_main]
 
+use arbitrary::Arbitrary;
 use libblur::{stack_blur_f32, BlurImageMut, FastBlurChannels, ThreadingPolicy};
 use libfuzzer_sys::fuzz_target;
 
-fuzz_target!(|data: (u8, u8, u8)| {
+#[derive(Clone, Debug, Arbitrary)]
+pub struct SrcImage {
+    pub src_width: u16,
+    pub src_height: u16,
+    pub value: u8,
+    pub edge_mode: u8,
+    pub radius: u8,
+}
+
+fuzz_target!(|data: SrcImage| {
+    if data.src_width > 250 || data.src_height > 250 {
+        return;
+    }
+    if data.radius == 0 {
+        return;
+    }
     fuzz_image(
-        data.0 as usize,
-        data.1 as usize,
-        data.2 as usize,
+        data.src_width as usize,
+        data.src_height as usize,
+        data.radius as usize,
         FastBlurChannels::Channels4,
     );
     fuzz_image(
-        data.0 as usize,
-        data.1 as usize,
-        data.2 as usize,
+        data.src_width as usize,
+        data.src_height as usize,
+        data.radius as usize,
         FastBlurChannels::Channels3,
     );
     fuzz_image(
-        data.0 as usize,
-        data.1 as usize,
-        data.2 as usize,
+        data.src_width as usize,
+        data.src_height as usize,
+        data.radius as usize,
         FastBlurChannels::Plane,
     );
 });

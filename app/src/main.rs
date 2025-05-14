@@ -132,8 +132,8 @@ fn main() {
         5,
         0.,
         EdgeMode::Clamp,
-        ThreadingPolicy::Adaptive,
-        ConvolutionMode::Exact,
+        ThreadingPolicy::Single,
+        ConvolutionMode::FixedPoint,
     )
     .unwrap();
 
@@ -192,7 +192,7 @@ fn main() {
         .unwrap();
     } else {
         image::save_buffer(
-            "blurred_stack_next_fz.png",
+            "blurred_stack_next_f.png",
             bytes.as_bytes(),
             dimensions.0,
             dimensions.1,

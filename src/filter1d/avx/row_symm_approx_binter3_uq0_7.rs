@@ -33,7 +33,7 @@ use crate::img_size::ImageSize;
 use crate::BorderHandle;
 use std::arch::x86_64::*;
 
-pub(crate) fn filter_row_avx_symm_u8_uq0_7_k5<const N: usize>(
+pub(crate) fn filter_row_avx_symm_u8_uq0_7_k3<const N: usize>(
     edge_mode: BorderHandle,
     m_src: &RowsHolder<u8>,
     m_dst: &mut RowsHolderMut<u8>,
@@ -79,18 +79,17 @@ impl<const N: usize> ExecutionUnit<N> {
     ) {
         let width = image_size.width;
 
-        let half_len = 5 / 2;
+        let length = scanned_kernel.len();
+        let half_len = length / 2;
 
         let min_left = half_len.min(width);
         let s_kernel = half_len as i64;
 
         let c0 = scanned_kernel[0];
         let c1 = scanned_kernel[1];
-        let c2 = scanned_kernel[2];
 
         let vc0 = _mm256_set1_epi8(scanned_kernel[0]);
         let vc1 = _mm256_set1_epi8(scanned_kernel[1]);
-        let vc2 = _mm256_set1_epi8(scanned_kernel[2]);
 
         let rnd = _mm256_set1_epi16(1i16 << 6);
 
@@ -101,21 +100,15 @@ impl<const N: usize> ExecutionUnit<N> {
             while f_cx < min_left {
                 let mx = f_cx as i64 - s_kernel;
                 let e0 = clamp_edge!(edge_mode.edge_mode, mx, 0, width as i64);
-                let e1 = clamp_edge!(edge_mode.edge_mode, 4i64 + mx, 0, width as i64);
-                let e2 = clamp_edge!(edge_mode.edge_mode, mx + 1, 0, width as i64);
-                let e3 = clamp_edge!(edge_mode.edge_mode, 3i64 + mx, 0, width as i64);
+                let e1 = clamp_edge!(edge_mode.edge_mode, 2i64 + mx, 0, width as i64);
 
                 for c in 0..N {
-                    let mut k0: u16 = *src.get_unchecked(f_cx * N + c) as u16 * c2 as u16;
+                    let mut k0: u16 = *src.get_unchecked(f_cx * N + c) as u16 * c1 as u16;
 
                     let src0 = *src.get_unchecked(e0 * N + c);
                     let src1 = *src.get_unchecked(e1 * N + c);
 
-                    let src2 = *src.get_unchecked(e2 * N + c);
-                    let src3 = *src.get_unchecked(e3 * N + c);
-
                     k0 += (src0 as u16 + src1 as u16) * c0 as u16;
-                    k0 += (src2 as u16 + src3 as u16) * c1 as u16;
 
                     *dst.get_unchecked_mut(f_cx * N + c) = ((k0 + (1 << 6)) >> 7).min(255) as u8;
                 }
@@ -134,23 +127,18 @@ impl<const N: usize> ExecutionUnit<N> {
 
                 let v_source0 =
                     _mm256_loadu_si256(shifted_src.get_unchecked(0..).as_ptr() as *const _);
-                let source = _mm256_loadu_si256(
-                    shifted_src.get_unchecked(half_len * N..).as_ptr() as *const _
-                );
-                let v_source4 =
-                    _mm256_loadu_si256(shifted_src.get_unchecked((4 * N)..).as_ptr() as *const _);
-                let v_source2 =
+                let source =
                     _mm256_loadu_si256(shifted_src.get_unchecked(N..).as_ptr() as *const _);
-                let v_source3 =
-                    _mm256_loadu_si256(shifted_src.get_unchecked((3 * N)..).as_ptr() as *const _);
+                let v_source4 =
+                    _mm256_loadu_si256(shifted_src.get_unchecked((2 * N)..).as_ptr() as *const _);
 
                 let mut k0 = _mm256_add_epi16(
                     rnd,
-                    _mm256_maddubs_epi16(_mm256_unpacklo_epi8(source, _mm256_setzero_si256()), vc2),
+                    _mm256_maddubs_epi16(_mm256_unpacklo_epi8(source, _mm256_setzero_si256()), vc1),
                 );
                 let mut k1 = _mm256_add_epi16(
                     rnd,
-                    _mm256_maddubs_epi16(_mm256_unpackhi_epi8(source, _mm256_setzero_si256()), vc2),
+                    _mm256_maddubs_epi16(_mm256_unpackhi_epi8(source, _mm256_setzero_si256()), vc1),
                 );
 
                 k0 = _mm256_add_epi16(
@@ -160,15 +148,6 @@ impl<const N: usize> ExecutionUnit<N> {
                 k1 = _mm256_add_epi16(
                     k1,
                     _mm256_maddubs_epi16(_mm256_unpackhi_epi8(v_source0, v_source4), vc0),
-                );
-
-                k0 = _mm256_add_epi16(
-                    k0,
-                    _mm256_maddubs_epi16(_mm256_unpacklo_epi8(v_source2, v_source3), vc1),
-                );
-                k1 = _mm256_add_epi16(
-                    k1,
-                    _mm256_maddubs_epi16(_mm256_unpackhi_epi8(v_source2, v_source3), vc1),
                 );
 
                 k0 = _mm256_srai_epi16::<7>(k0);
@@ -185,27 +164,22 @@ impl<const N: usize> ExecutionUnit<N> {
 
                 let v_source0 =
                     _mm_loadu_si128(shifted_src.get_unchecked(0..).as_ptr() as *const _);
-                let source =
-                    _mm_loadu_si128(shifted_src.get_unchecked(half_len * N..).as_ptr() as *const _);
+                let source = _mm_loadu_si128(shifted_src.get_unchecked(N..).as_ptr() as *const _);
                 let v_source4 =
-                    _mm_loadu_si128(shifted_src.get_unchecked((4 * N)..).as_ptr() as *const _);
-                let v_source2 =
-                    _mm_loadu_si128(shifted_src.get_unchecked(N..).as_ptr() as *const _);
-                let v_source3 =
-                    _mm_loadu_si128(shifted_src.get_unchecked((3 * N)..).as_ptr() as *const _);
+                    _mm_loadu_si128(shifted_src.get_unchecked((2 * N)..).as_ptr() as *const _);
 
                 let mut k0 = _mm_add_epi16(
                     _mm256_castsi256_si128(rnd),
                     _mm_maddubs_epi16(
                         _mm_unpacklo_epi8(source, _mm_setzero_si128()),
-                        _mm256_castsi256_si128(vc2),
+                        _mm256_castsi256_si128(vc1),
                     ),
                 );
                 let mut k1 = _mm_add_epi16(
                     _mm256_castsi256_si128(rnd),
                     _mm_maddubs_epi16(
                         _mm_unpackhi_epi8(source, _mm_setzero_si128()),
-                        _mm256_castsi256_si128(vc2),
+                        _mm256_castsi256_si128(vc1),
                     ),
                 );
 
@@ -224,21 +198,6 @@ impl<const N: usize> ExecutionUnit<N> {
                     ),
                 );
 
-                k0 = _mm_add_epi16(
-                    k0,
-                    _mm_maddubs_epi16(
-                        _mm_unpacklo_epi8(v_source2, v_source3),
-                        _mm256_castsi256_si128(vc1),
-                    ),
-                );
-                k1 = _mm_add_epi16(
-                    k1,
-                    _mm_maddubs_epi16(
-                        _mm_unpackhi_epi8(v_source2, v_source3),
-                        _mm256_castsi256_si128(vc1),
-                    ),
-                );
-
                 k0 = _mm_srai_epi16::<7>(k0);
                 k1 = _mm_srai_epi16::<7>(k1);
 
@@ -251,37 +210,24 @@ impl<const N: usize> ExecutionUnit<N> {
                 let cx = m_cx - s_half;
                 let shifted_src = src.get_unchecked(cx..);
 
-                let source =
-                    _mm_loadu_si64(shifted_src.get_unchecked(half_len * N..).as_ptr() as *const _);
+                let source = _mm_loadu_si64(shifted_src.get_unchecked(N..).as_ptr() as *const _);
                 let mut k0 = _mm_add_epi16(
                     _mm256_castsi256_si128(rnd),
                     _mm_maddubs_epi16(
                         _mm_unpacklo_epi8(source, _mm_setzero_si128()),
-                        _mm256_castsi256_si128(vc2),
+                        _mm256_castsi256_si128(vc1),
                     ),
                 );
 
                 let v_source0 = _mm_loadu_si64(shifted_src.get_unchecked(..).as_ptr() as *const _);
                 let v_source1 =
-                    _mm_loadu_si64(shifted_src.get_unchecked((4 * N)..).as_ptr() as *const _);
+                    _mm_loadu_si64(shifted_src.get_unchecked((2 * N)..).as_ptr() as *const _);
 
                 k0 = _mm_add_epi16(
                     k0,
                     _mm_maddubs_epi16(
                         _mm_unpacklo_epi8(v_source0, v_source1),
                         _mm256_castsi256_si128(vc0),
-                    ),
-                );
-
-                let v_source2 = _mm_loadu_si64(shifted_src.get_unchecked(N..).as_ptr() as *const _);
-                let v_source3 =
-                    _mm_loadu_si64(shifted_src.get_unchecked((3 * N)..).as_ptr() as *const _);
-
-                k0 = _mm_add_epi16(
-                    k0,
-                    _mm_maddubs_epi16(
-                        _mm_unpacklo_epi8(v_source2, v_source3),
-                        _mm256_castsi256_si128(vc1),
                     ),
                 );
 
@@ -299,19 +245,18 @@ impl<const N: usize> ExecutionUnit<N> {
                 let cx = m_cx - s_half;
                 let shifted_src = src.get_unchecked(cx..);
 
-                let source =
-                    _mm_loadu_si32(shifted_src.get_unchecked(half_len * N..).as_ptr() as *const _);
+                let source = _mm_loadu_si32(shifted_src.get_unchecked(N..).as_ptr() as *const _);
                 let mut k0 = _mm_add_epi16(
                     _mm256_castsi256_si128(rnd),
                     _mm_maddubs_epi16(
                         _mm_unpacklo_epi8(source, _mm_setzero_si128()),
-                        _mm256_castsi256_si128(vc2),
+                        _mm256_castsi256_si128(vc1),
                     ),
                 );
 
                 let v_source0 = _mm_loadu_si32(shifted_src.get_unchecked(..).as_ptr() as *const _);
                 let v_source1 =
-                    _mm_loadu_si32(shifted_src.get_unchecked((4 * N)..).as_ptr() as *const _);
+                    _mm_loadu_si32(shifted_src.get_unchecked((2 * N)..).as_ptr() as *const _);
 
                 k0 = _mm_add_epi16(
                     k0,
@@ -321,19 +266,8 @@ impl<const N: usize> ExecutionUnit<N> {
                     ),
                 );
 
-                let v_source2 = _mm_loadu_si32(shifted_src.get_unchecked(N..).as_ptr() as *const _);
-                let v_source3 =
-                    _mm_loadu_si32(shifted_src.get_unchecked((3 * N)..).as_ptr() as *const _);
-
-                k0 = _mm_add_epi16(
-                    k0,
-                    _mm_maddubs_epi16(
-                        _mm_unpacklo_epi8(v_source2, v_source3),
-                        _mm256_castsi256_si128(vc1),
-                    ),
-                );
-
                 k0 = _mm_srai_epi16::<7>(k0);
+
                 let dst_ptr0 = dst.get_unchecked_mut(m_cx..).as_mut_ptr();
                 _mm_storeu_si32(
                     dst_ptr0 as *mut _,
@@ -346,15 +280,11 @@ impl<const N: usize> ExecutionUnit<N> {
                 let x = zx - s_half;
 
                 let shifted_src = src.get_unchecked(x..);
-                let mut k0: u16 = *shifted_src.get_unchecked(half_len * N) as u16 * c2 as u16;
+                let mut k0: u16 = *shifted_src.get_unchecked(N) as u16 * c1 as u16;
 
                 k0 += (*shifted_src.get_unchecked(0) as u16
-                    + *shifted_src.get_unchecked(4 * N) as u16)
+                    + *shifted_src.get_unchecked(2 * N) as u16)
                     * c0 as u16;
-
-                k0 += (*shifted_src.get_unchecked(N) as u16
-                    + *shifted_src.get_unchecked(3 * N) as u16)
-                    * c1 as u16;
 
                 *dst.get_unchecked_mut(zx) = ((k0 + (1 << 6)) >> 7).min(255) as u8;
             }
@@ -364,21 +294,15 @@ impl<const N: usize> ExecutionUnit<N> {
             while f_cx < width {
                 let mx = f_cx as i64 - s_kernel;
                 let e0 = clamp_edge!(edge_mode.edge_mode, mx, 0, width as i64);
-                let e1 = clamp_edge!(edge_mode.edge_mode, 4i64 + mx, 0, width as i64);
-                let e2 = clamp_edge!(edge_mode.edge_mode, mx + 1, 0, width as i64);
-                let e3 = clamp_edge!(edge_mode.edge_mode, 3i64 + mx, 0, width as i64);
+                let e1 = clamp_edge!(edge_mode.edge_mode, 2i64 + mx, 0, width as i64);
 
                 for c in 0..N {
-                    let mut k0: u16 = *src.get_unchecked(f_cx * N + c) as u16 * c2 as u16;
+                    let mut k0: u16 = *src.get_unchecked(f_cx * N + c) as u16 * c1 as u16;
 
                     let src0 = *src.get_unchecked(e0 * N + c);
                     let src1 = *src.get_unchecked(e1 * N + c);
 
-                    let src2 = *src.get_unchecked(e2 * N + c);
-                    let src3 = *src.get_unchecked(e3 * N + c);
-
                     k0 += (src0 as u16 + src1 as u16) * c0 as u16;
-                    k0 += (src2 as u16 + src3 as u16) * c1 as u16;
 
                     *dst.get_unchecked_mut(f_cx * N + c) = ((k0 + (1 << 6)) >> 7).min(255) as u8;
                 }

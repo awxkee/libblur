@@ -56,9 +56,9 @@ pub(crate) fn filter_column_symm_neon_uq15_u16(
 
         let ref0 = arena_src.get_unchecked(half_len);
 
-        while cx + 32 < image_width {
-            let coeff = vdupq_n_u16(scanned_kernel.get_unchecked(half_len).weight as u16);
+        let coeff = vdupq_n_u16(scanned_kernel.get_unchecked(half_len).weight as u16);
 
+        while cx + 32 < image_width {
             let v_src = ref0.get_unchecked(cx..);
 
             let source = xvld1q_u16_x4(v_src.as_ptr());
@@ -98,8 +98,6 @@ pub(crate) fn filter_column_symm_neon_uq15_u16(
         }
 
         while cx + 24 < image_width {
-            let coeff = vdupq_n_u16(scanned_kernel.get_unchecked(half_len).weight as u16);
-
             let v_src = ref0.get_unchecked(cx..);
 
             let source = xvld1q_u16_x3(v_src.as_ptr());
@@ -136,8 +134,6 @@ pub(crate) fn filter_column_symm_neon_uq15_u16(
         }
 
         while cx + 16 < image_width {
-            let coeff = vdupq_n_u16(scanned_kernel.get_unchecked(half_len).weight as u16);
-
             let v_src = ref0.get_unchecked(cx..);
 
             let source = xvld1q_u16_x2(v_src.as_ptr());
@@ -168,8 +164,6 @@ pub(crate) fn filter_column_symm_neon_uq15_u16(
         }
 
         while cx + 8 < image_width {
-            let coeff = vdupq_n_u16(scanned_kernel.get_unchecked(half_len).weight as u16);
-
             let v_src = ref0.get_unchecked(cx..);
 
             let source = vld1q_u16(v_src.as_ptr());
@@ -194,12 +188,10 @@ pub(crate) fn filter_column_symm_neon_uq15_u16(
         }
 
         while cx + 4 < image_width {
-            let coeff = vdup_n_u16(scanned_kernel.get_unchecked(half_len).weight as u16);
-
             let v_src = ref0.get_unchecked(cx..);
 
             let source = vld1_u16(v_src.as_ptr());
-            let mut k0 = vmull_u16(source, coeff);
+            let mut k0 = vmull_u16(source, vget_low_u16(coeff));
 
             for i in 0..half_len {
                 let coeff = vdupq_n_u32(scanned_kernel.get_unchecked(i).weight);
@@ -219,9 +211,9 @@ pub(crate) fn filter_column_symm_neon_uq15_u16(
             cx += 4;
         }
 
-        for x in cx..image_width {
-            let coeff = *scanned_kernel.get_unchecked(half_len);
+        let coeff = *scanned_kernel.get_unchecked(half_len);
 
+        for x in cx..image_width {
             let v_src = ref0.get_unchecked(x..);
 
             let mut k0 = ((*v_src.get_unchecked(0)) as u32).mul(coeff.weight);
