@@ -137,10 +137,10 @@ fn main() {
     // )
     // .unwrap();
 
-    libblur::box_blur(
+    libblur::gaussian_box_blur(
         &image,
         &mut dst_image,
-        5,
+        7.,
         ThreadingPolicy::Single,
     )
         .unwrap();
