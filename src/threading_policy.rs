@@ -25,6 +25,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use std::fmt::Display;
 use std::{num::NonZeroUsize, thread::available_parallelism};
 
 #[repr(C)]
@@ -41,6 +42,19 @@ pub enum ThreadingPolicy {
     AdaptiveReserve(NonZeroUsize),
     /// Use specified number of threads.
     Fixed(NonZeroUsize),
+}
+
+impl Display for ThreadingPolicy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ThreadingPolicy::Single => f.write_str("Single"),
+            ThreadingPolicy::Adaptive => f.write_fmt(format_args!("Adaptive")),
+            ThreadingPolicy::AdaptiveReserve(size) => {
+                f.write_fmt(format_args!("AdaptiveReserve({size})"))
+            }
+            ThreadingPolicy::Fixed(fixed) => f.write_fmt(format_args!("Fixed({})", fixed.get())),
+        }
+    }
 }
 
 impl ThreadingPolicy {

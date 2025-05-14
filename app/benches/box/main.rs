@@ -33,7 +33,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 &src_image,
                 &mut dst_image,
                 77 / 2,
-                ThreadingPolicy::Single,
+                ThreadingPolicy::Adaptive,
             )
             .unwrap();
         })
@@ -126,6 +126,29 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| {
             libblur::box_blur_f32(&src_image, &mut dst_image, 77 / 2, ThreadingPolicy::Single)
                 .unwrap();
+        })
+    });
+
+    c.bench_function("libblur: RGBA16 box blur (15) Single Thread", |b| {
+        let src_bytes: Vec<u16> = src_bytes.to_vec().iter().map(|v| *v as u16).collect();
+        let mut dst_bytes: Vec<u16> = src_bytes.to_vec().iter().map(|v| *v).collect();
+
+        let src_image = BlurImage::borrow(
+            &src_bytes,
+            dimensions.0,
+            dimensions.1,
+            FastBlurChannels::Channels4,
+        );
+
+        let mut dst_image = BlurImageMut::borrow(
+            &mut dst_bytes,
+            dimensions.0,
+            dimensions.1,
+            FastBlurChannels::Channels4,
+        );
+
+        b.iter(|| {
+            libblur::box_blur_u16(&src_image, &mut dst_image, 15, ThreadingPolicy::Single).unwrap();
         })
     });
 

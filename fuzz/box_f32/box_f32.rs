@@ -56,7 +56,7 @@ fuzz_target!(|data: SrcImage| {
         1 => FastBlurChannels::Channels3,
         _ => FastBlurChannels::Plane,
     };
-    fuzz_8bit(
+    fuzz_16bit(
         data.src_width as usize,
         data.src_height as usize,
         data.kernel_size as usize,
@@ -69,12 +69,12 @@ fuzz_target!(|data: SrcImage| {
     );
 });
 
-fn fuzz_8bit(
+fn fuzz_16bit(
     width: usize,
     height: usize,
     kernel_size: usize,
     channels: FastBlurChannels,
-    threading: ThreadingPolicy,
+    threading_policy: ThreadingPolicy,
 ) {
     if width == 0 || height == 0 || kernel_size == 0 {
         return;
@@ -82,11 +82,11 @@ fn fuzz_8bit(
     let mut dst_image = BlurImageMut::alloc(width as u32, height as u32, channels);
     let src_image = BlurImage::alloc(width as u32, height as u32, channels);
 
-    libblur::box_blur(
+    libblur::box_blur_f32(
         &src_image,
         &mut dst_image,
         kernel_size as u32,
-        ThreadingPolicy::Single,
+        threading_policy,
     )
     .unwrap();
 }

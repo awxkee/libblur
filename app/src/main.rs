@@ -129,21 +129,15 @@ fn main() {
     // libblur::gaussian_blur(
     //     &image,
     //     &mut dst_image,
-    //     5,
-    //     0.,
+    //     0,
+    //     17.,
     //     EdgeMode::Clamp,
     //     ThreadingPolicy::Single,
     //     ConvolutionMode::FixedPoint,
     // )
     // .unwrap();
 
-    libblur::gaussian_box_blur(
-        &image,
-        &mut dst_image,
-        7.,
-        ThreadingPolicy::Single,
-    )
-        .unwrap();
+    libblur::box_blur(&image, &mut dst_image, 5, ThreadingPolicy::Single).unwrap();
 
     // libblur::motion_blur(
     //     &image,
