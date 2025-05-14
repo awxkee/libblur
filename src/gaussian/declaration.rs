@@ -428,6 +428,7 @@ mod tests {
             ConvolutionMode::FixedPoint,
         )
         .unwrap();
+        println!("{}", dst.data.borrow_mut()[0]);
         compare_u8_stat!(dst);
     }
 

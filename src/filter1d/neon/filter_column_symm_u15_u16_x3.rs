@@ -65,9 +65,9 @@ pub(crate) fn filter_symm_column_neon_uq15_u16_x3(
 
         let mut cx = 0usize;
 
-        while cx + 16 < image_width {
-            let coeff = vdupq_n_u16(scanned_kernel.get_unchecked(half_len).weight as u16);
+        let coeff = vdupq_n_u16(scanned_kernel.get_unchecked(half_len).weight as u16);
 
+        while cx + 16 < image_width {
             let v_src0 = ref0.get_unchecked(cx..);
             let v_src1 = ref1.get_unchecked(cx..);
             let v_src2 = ref2.get_unchecked(cx..);
@@ -134,8 +134,6 @@ pub(crate) fn filter_symm_column_neon_uq15_u16_x3(
         }
 
         while cx + 8 < image_width {
-            let coeff = vdupq_n_u16(scanned_kernel.get_unchecked(half_len).weight as u16);
-
             let v_src0 = ref0.get_unchecked(cx..);
             let v_src1 = ref1.get_unchecked(cx..);
             let v_src2 = ref2.get_unchecked(cx..);
@@ -180,8 +178,6 @@ pub(crate) fn filter_symm_column_neon_uq15_u16_x3(
         }
 
         while cx + 4 < image_width {
-            let coeff = vdup_n_u16(scanned_kernel.get_unchecked(half_len).weight as u16);
-
             let v_src0 = ref0.get_unchecked(cx..);
             let v_src1 = ref1.get_unchecked(cx..);
             let v_src2 = ref2.get_unchecked(cx..);
@@ -190,9 +186,9 @@ pub(crate) fn filter_symm_column_neon_uq15_u16_x3(
             let source1 = vld1_u16(v_src1.as_ptr());
             let source2 = vld1_u16(v_src2.as_ptr());
 
-            let mut k0 = vmull_u16(source0, coeff);
-            let mut k1 = vmull_u16(source1, coeff);
-            let mut k2 = vmull_u16(source2, coeff);
+            let mut k0 = vmull_u16(source0, vget_low_u16(coeff));
+            let mut k1 = vmull_u16(source1, vget_low_u16(coeff));
+            let mut k2 = vmull_u16(source2, vget_low_u16(coeff));
 
             for i in 0..half_len {
                 let coeff = vdupq_n_u32(scanned_kernel.get_unchecked(i).weight);
@@ -225,9 +221,9 @@ pub(crate) fn filter_symm_column_neon_uq15_u16_x3(
             cx += 4;
         }
 
-        for x in cx..dst_stride {
-            let coeff = scanned_kernel.get_unchecked(half_len).weight;
+        let coeff = scanned_kernel.get_unchecked(half_len).weight;
 
+        for x in cx..dst_stride {
             let mut k0 = (*ref0.get_unchecked(x) as u32).mul(coeff);
             let mut k1 = (*ref1.get_unchecked(x) as u32).mul(coeff);
             let mut k2 = (*ref2.get_unchecked(x) as u32).mul(coeff);

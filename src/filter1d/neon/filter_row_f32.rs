@@ -56,9 +56,9 @@ pub(crate) fn filter_row_neon_f32_f32<const N: usize>(
 
         let mut cx = 0usize;
 
-        while cx + 16 < max_width {
-            let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(0).weight);
+        let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(0).weight);
 
+        while cx + 16 < max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source = xvld1q_f32_x4(shifted_src.as_ptr());
@@ -82,8 +82,6 @@ pub(crate) fn filter_row_neon_f32_f32<const N: usize>(
         }
 
         while cx + 8 < max_width {
-            let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(0).weight);
-
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source = xvld1q_f32_x2(shifted_src.as_ptr());
@@ -103,12 +101,10 @@ pub(crate) fn filter_row_neon_f32_f32<const N: usize>(
         }
 
         while cx + 4 < max_width {
-            let coeff = *scanned_kernel.get_unchecked(0);
-
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source_0 = vld1q_f32(shifted_src.as_ptr());
-            let mut k0 = vmulq_f32(source_0, vdupq_n_f32(coeff.weight));
+            let mut k0 = vmulq_f32(source_0, coeff);
 
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
@@ -122,12 +118,10 @@ pub(crate) fn filter_row_neon_f32_f32<const N: usize>(
         }
 
         while cx + 2 < max_width {
-            let coeff = *scanned_kernel.get_unchecked(0);
-
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source_0 = vld1_f32(shifted_src.as_ptr());
-            let mut k0 = vmul_f32(source_0, vdup_n_f32(coeff.weight));
+            let mut k0 = vmul_f32(source_0, vget_low_f32(coeff));
 
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
@@ -140,8 +134,9 @@ pub(crate) fn filter_row_neon_f32_f32<const N: usize>(
             cx += 2;
         }
 
+        let coeff = *scanned_kernel.get_unchecked(0);
+
         for x in cx..max_width {
-            let coeff = *scanned_kernel.get_unchecked(0);
             let shifted_src = local_src.get_unchecked(x..);
             let mut k0 = (*shifted_src.get_unchecked(0)).mul(coeff.weight);
 

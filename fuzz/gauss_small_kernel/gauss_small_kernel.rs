@@ -30,7 +30,9 @@
 #![no_main]
 
 use arbitrary::Arbitrary;
-use libblur::{fast_gaussian, BlurImageMut, EdgeMode, FastBlurChannels, ThreadingPolicy};
+use libblur::{
+    BlurImage, BlurImageMut, ConvolutionMode, EdgeMode, FastBlurChannels, ThreadingPolicy,
+};
 use libfuzzer_sys::fuzz_target;
 
 #[derive(Clone, Debug, Arbitrary)]
@@ -39,8 +41,9 @@ pub struct SrcImage {
     pub src_height: u16,
     pub value: u8,
     pub edge_mode: u8,
-    pub radius: u8,
-    pub plane: u8,
+    pub kernel_size: u8,
+    pub channels: u8,
+    pub multithreaded: bool,
 }
 
 fuzz_target!(|data: SrcImage| {
@@ -50,7 +53,7 @@ fuzz_target!(|data: SrcImage| {
         2 => EdgeMode::Reflect,
         _ => EdgeMode::Reflect101,
     };
-    let plane_match = match data.plane % 3 {
+    let channels = match data.channels % 3 {
         0 => FastBlurChannels::Channels4,
         1 => FastBlurChannels::Channels3,
         _ => FastBlurChannels::Plane,
@@ -58,44 +61,60 @@ fuzz_target!(|data: SrcImage| {
     if data.src_width > 250 || data.src_height > 250 {
         return;
     }
-    if data.radius == 0 {
+    if data.kernel_size % 2 == 0 || data.kernel_size > 13 || data.kernel_size == 0 {
         return;
     }
-    fuzz_image(
+    fuzz_8bit(
         data.src_width as usize,
         data.src_height as usize,
-        data.radius as usize,
-        plane_match,
+        data.kernel_size as usize,
+        channels,
         edge_mode,
-        data.value,
+        data.multithreaded,
     );
 });
 
-fn fuzz_image(
+fn fuzz_8bit(
     width: usize,
     height: usize,
-    radius: usize,
+    kernel_size: usize,
     channels: FastBlurChannels,
     edge_mode: EdgeMode,
-    data: u8,
+    multithreaded: bool,
 ) {
-    if width == 0 || height == 0 || radius == 0 {
+    if width == 0 || height == 0 {
         return;
     }
-
+    let src_image = BlurImage::alloc(width as u32, height as u32, channels);
     let mut dst_image = BlurImageMut::alloc(width as u32, height as u32, channels);
-    dst_image.data.borrow_mut().fill(data);
 
-    fast_gaussian(
+    libblur::gaussian_blur(
+        &src_image,
         &mut dst_image,
-        radius as u32,
-        ThreadingPolicy::Single,
+        kernel_size as u32,
+        0.,
         edge_mode,
+        if multithreaded {
+            ThreadingPolicy::Adaptive
+        } else {
+            ThreadingPolicy::Single
+        },
+        ConvolutionMode::FixedPoint,
     )
     .unwrap();
 
-    for &v in dst_image.data.borrow() {
-        let diff = (v as i32 - data as i32).abs();
-        assert!(diff <= 4);
-    }
+    libblur::gaussian_blur(
+        &src_image,
+        &mut dst_image,
+        kernel_size as u32,
+        0.,
+        edge_mode,
+        if multithreaded {
+            ThreadingPolicy::Adaptive
+        } else {
+            ThreadingPolicy::Single
+        },
+        ConvolutionMode::Exact,
+    )
+    .unwrap();
 }

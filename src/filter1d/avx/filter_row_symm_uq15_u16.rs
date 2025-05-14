@@ -84,9 +84,9 @@ unsafe fn filter_row_avx_symm_uq15_u16_impl<const N: usize>(
 
     let max_width = width * arena.components;
 
-    while cx + 64 < max_width {
-        let coeff = _mm256_set1_epi32(scanned_kernel.get_unchecked(half_len).weight as i32);
+    let coeff = _mm256_set1_epi32(scanned_kernel.get_unchecked(half_len).weight as i32);
 
+    while cx + 64 < max_width {
         let shifted_src = local_src.get_unchecked(cx..);
 
         let source =
@@ -124,8 +124,6 @@ unsafe fn filter_row_avx_symm_uq15_u16_impl<const N: usize>(
     }
 
     while cx + 32 < max_width {
-        let coeff = _mm256_set1_epi32(scanned_kernel.get_unchecked(half_len).weight as i32);
-
         let shifted_src = local_src.get_unchecked(cx..);
 
         let source =
@@ -157,8 +155,6 @@ unsafe fn filter_row_avx_symm_uq15_u16_impl<const N: usize>(
     }
 
     while cx + 16 < max_width {
-        let coeff = _mm256_set1_epi32(scanned_kernel.get_unchecked(half_len).weight as i32);
-
         let shifted_src = local_src.get_unchecked(cx..);
 
         let source =
@@ -182,13 +178,11 @@ unsafe fn filter_row_avx_symm_uq15_u16_impl<const N: usize>(
     }
 
     while cx + 8 < max_width {
-        let coeff = _mm_set1_epi32(scanned_kernel.get_unchecked(half_len).weight as i32);
-
         let shifted_src = local_src.get_unchecked(cx..);
 
         let source =
             _mm_loadu_si128(shifted_src.get_unchecked(half_len * N..).as_ptr() as *const _);
-        let mut k0 = _mm_mul_epu16_widen(source, coeff);
+        let mut k0 = _mm_mul_epu16_widen(source, _mm256_castsi256_si128(coeff));
 
         for i in 0..half_len {
             let rollback = length - i - 1;
@@ -206,12 +200,13 @@ unsafe fn filter_row_avx_symm_uq15_u16_impl<const N: usize>(
     }
 
     while cx + 4 < max_width {
-        let coeff = _mm_set1_epi32(scanned_kernel.get_unchecked(half_len).weight as i32);
-
         let shifted_src = local_src.get_unchecked(cx..);
 
         let source = _mm_loadu_si64(shifted_src.get_unchecked(half_len * N..).as_ptr() as *const _);
-        let mut k0 = _mm_mullo_epi32(_mm_unpacklo_epi16(source, _mm_setzero_si128()), coeff);
+        let mut k0 = _mm_mullo_epi32(
+            _mm_unpacklo_epi16(source, _mm_setzero_si128()),
+            _mm256_castsi256_si128(coeff),
+        );
 
         for i in 0..half_len {
             let rollback = length - i - 1;
@@ -245,8 +240,9 @@ unsafe fn filter_row_avx_symm_uq15_u16_impl<const N: usize>(
         cx += 4;
     }
 
+    let coeff = *scanned_kernel.get_unchecked(half_len);
+
     for x in cx..max_width {
-        let coeff = *scanned_kernel.get_unchecked(half_len);
         let shifted_src = local_src.get_unchecked(x..);
         let mut k0 = *shifted_src.get_unchecked(half_len * N) as u32 * coeff.weight;
 

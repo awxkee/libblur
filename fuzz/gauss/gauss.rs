@@ -29,58 +29,74 @@
 
 #![no_main]
 
+use arbitrary::Arbitrary;
 use libblur::{
     filter_1d_approx, filter_1d_exact, gaussian_kernel_1d, sigma_size, BlurImage, BlurImageMut,
     ConvolutionMode, EdgeMode, FastBlurChannels, Scalar, ThreadingPolicy,
 };
 use libfuzzer_sys::fuzz_target;
 
-fuzz_target!(|data: (u8, u8, u8, u8)| {
-    let edge_mode = match data.3 % 4 {
+#[derive(Clone, Debug, Arbitrary)]
+pub struct SrcImage {
+    pub src_width: u16,
+    pub src_height: u16,
+    pub value: u8,
+    pub edge_mode: u8,
+    pub kernel_size: u8,
+}
+
+fuzz_target!(|data: SrcImage| {
+    if data.src_width > 250 || data.src_height > 250 {
+        return;
+    }
+    if data.kernel_size % 2 == 0 || data.kernel_size > 45 || data.kernel_size == 0 {
+        return;
+    }
+    let edge_mode = match data.edge_mode % 4 {
         0 => EdgeMode::Clamp,
         1 => EdgeMode::Wrap,
         2 => EdgeMode::Reflect,
         _ => EdgeMode::Reflect101,
     };
     fuzz_8bit(
-        data.0 as usize,
-        data.1 as usize,
-        data.2 as usize,
+        data.src_width as usize,
+        data.src_height as usize,
+        data.kernel_size as usize,
         FastBlurChannels::Channels4,
         edge_mode,
     );
     fuzz_8bit_non_symmetry(
-        data.0 as usize,
-        data.1 as usize,
-        data.2 as usize,
+        data.src_width as usize,
+        data.src_height as usize,
+        data.kernel_size as usize,
         FastBlurChannels::Channels4,
         edge_mode,
     );
     fuzz_8bit(
-        data.0 as usize,
-        data.1 as usize,
-        data.2 as usize,
+        data.src_width as usize,
+        data.src_height as usize,
+        data.kernel_size as usize,
         FastBlurChannels::Channels3,
         edge_mode,
     );
     fuzz_8bit_non_symmetry(
-        data.0 as usize,
-        data.1 as usize,
-        data.2 as usize,
+        data.src_width as usize,
+        data.src_height as usize,
+        data.kernel_size as usize,
         FastBlurChannels::Channels3,
         edge_mode,
     );
     fuzz_8bit(
-        data.0 as usize,
-        data.1 as usize,
-        data.2 as usize,
+        data.src_width as usize,
+        data.src_height as usize,
+        data.kernel_size as usize,
         FastBlurChannels::Plane,
         edge_mode,
     );
     fuzz_8bit_non_symmetry(
-        data.0 as usize,
-        data.1 as usize,
-        data.2 as usize,
+        data.src_width as usize,
+        data.src_height as usize,
+        data.kernel_size as usize,
         FastBlurChannels::Plane,
         edge_mode,
     );
@@ -89,11 +105,11 @@ fuzz_target!(|data: (u8, u8, u8, u8)| {
 fn fuzz_8bit(
     width: usize,
     height: usize,
-    radius: usize,
+    kernel_size: usize,
     channels: FastBlurChannels,
     edge_mode: EdgeMode,
 ) {
-    if width == 0 || height == 0 || radius == 0 {
+    if width == 0 || height == 0 || kernel_size == 0 {
         return;
     }
     let src_image = BlurImage::alloc(width as u32, height as u32, channels);
@@ -102,7 +118,7 @@ fn fuzz_8bit(
     libblur::gaussian_blur(
         &src_image,
         &mut dst_image,
-        radius as u32 * 2 + 1,
+        kernel_size as u32,
         0.,
         edge_mode,
         ThreadingPolicy::Single,
@@ -113,7 +129,7 @@ fn fuzz_8bit(
     libblur::gaussian_blur(
         &src_image,
         &mut dst_image,
-        radius as u32 * 2 + 1,
+        kernel_size as u32,
         0.,
         edge_mode,
         ThreadingPolicy::Single,
@@ -125,17 +141,15 @@ fn fuzz_8bit(
 fn fuzz_8bit_non_symmetry(
     width: usize,
     height: usize,
-    radius: usize,
+    kernel_size: usize,
     channels: FastBlurChannels,
     edge_mode: EdgeMode,
 ) {
-    if width == 0 || height == 0 || radius == 0 {
+    if width == 0 || height == 0 || kernel_size == 0 {
         return;
     }
     let src_image = BlurImage::alloc(width as u32, height as u32, channels);
     let mut dst_image = BlurImageMut::alloc(width as u32, height as u32, channels);
-
-    let kernel_size = radius * 2 + 1;
 
     let kernel = gaussian_kernel_1d(kernel_size as u32, sigma_size(kernel_size as f32));
 

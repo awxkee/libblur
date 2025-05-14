@@ -39,9 +39,6 @@ use crate::filter1d::filter_1d_column_handler::FilterBrows;
 use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::to_approx_storage::ToApproxStorage;
 use crate::img_size::ImageSize;
-#[cfg(target_arch = "x86")]
-use std::arch::x86::*;
-#[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 use std::ops::{Add, Mul};
 

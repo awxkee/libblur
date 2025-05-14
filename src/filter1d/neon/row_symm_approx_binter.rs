@@ -56,9 +56,10 @@ pub(crate) fn filter_row_symm_neon_binter_u8_i32<const N: usize>(
         for (src, dst) in m_src.holder.iter().zip(m_dst.holder.iter_mut()) {
             let mut f_cx = 0usize;
 
+            let coeff = *scanned_kernel.get_unchecked(half_len);
+
             while f_cx < min_left {
                 for c in 0..N {
-                    let coeff = *scanned_kernel.get_unchecked(half_len);
                     let mx = f_cx as i64 - s_kernel;
                     let mut k0: i32 = *src.get_unchecked(f_cx * N + c) as i32 * coeff.weight;
 
@@ -204,8 +205,9 @@ pub(crate) fn filter_row_symm_neon_binter_u8_i32<const N: usize>(
                 m_cx += 8;
             }
 
+            let coeff = *scanned_kernel.get_unchecked(half_len);
+
             while m_cx + 4 < max_width {
-                let coeff = *scanned_kernel.get_unchecked(half_len);
                 let cx = m_cx - s_half;
                 let shifted_src = src.get_unchecked(cx..);
                 let mut k0 = *shifted_src.get_unchecked(half_len * N) as i32 * coeff.weight;
@@ -246,7 +248,6 @@ pub(crate) fn filter_row_symm_neon_binter_u8_i32<const N: usize>(
             }
 
             for zx in m_cx..max_width {
-                let coeff = *scanned_kernel.get_unchecked(half_len);
                 let x = zx - s_half;
                 let shifted_src = src.get_unchecked(x..);
                 let mut k0 = *shifted_src.get_unchecked(half_len * N) as i32 * coeff.weight;
@@ -268,7 +269,6 @@ pub(crate) fn filter_row_symm_neon_binter_u8_i32<const N: usize>(
 
             while f_cx < width {
                 for c in 0..N {
-                    let coeff = *scanned_kernel.get_unchecked(half_len);
                     let mx = f_cx as i64 - s_kernel;
                     let mut k0 = *src.get_unchecked(f_cx * N + c) as i32 * coeff.weight;
 

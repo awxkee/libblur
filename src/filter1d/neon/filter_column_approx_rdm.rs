@@ -67,9 +67,9 @@ unsafe fn executor_unit(
 
         let mut cx = 0usize;
 
-        while cx + 64 < image_width {
-            let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(0).weight as i16);
+        let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(0).weight as i16);
 
+        while cx + 64 < image_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let source = xvld1q_u8_x4(v_src.as_ptr());
@@ -103,8 +103,6 @@ unsafe fn executor_unit(
         }
 
         while cx + 48 < image_width {
-            let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(0).weight as i16);
-
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let source = xvld1q_u8_x3(v_src.as_ptr());
@@ -134,8 +132,6 @@ unsafe fn executor_unit(
         }
 
         while cx + 32 < image_width {
-            let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(0).weight as i16);
-
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let source = xvld1q_u8_x2(v_src.as_ptr());
@@ -159,8 +155,6 @@ unsafe fn executor_unit(
         }
 
         while cx + 16 < image_width {
-            let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(0).weight as i16);
-
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let source = vld1q_u8(v_src.as_ptr());
@@ -177,9 +171,9 @@ unsafe fn executor_unit(
             cx += 16;
         }
 
-        while cx + 4 < image_width {
-            let coeff = *scanned_kernel.get_unchecked(0);
+        let coeff = *scanned_kernel.get_unchecked(0);
 
+        while cx + 4 < image_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let mut k0 = (*v_src.get_unchecked(0) as i32).mul(coeff.weight);
@@ -211,8 +205,6 @@ unsafe fn executor_unit(
         }
 
         for x in cx..image_width {
-            let coeff = *scanned_kernel.get_unchecked(0);
-
             let v_src = arena_src.get_unchecked(0).get_unchecked(x..);
 
             let mut k0 = ((*v_src.get_unchecked(0)) as i32).mul(coeff.weight);

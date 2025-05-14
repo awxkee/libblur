@@ -29,61 +29,67 @@
 
 #![no_main]
 
+use arbitrary::Arbitrary;
 use libblur::{
     filter_1d_exact, gaussian_kernel_1d_f64, sigma_size_d, BlurImage, BlurImageMut, EdgeMode,
     FastBlurChannels, Scalar, ThreadingPolicy,
 };
 use libfuzzer_sys::fuzz_target;
 
-fuzz_target!(|data: (u8, u8, u8, u8, bool)| {
-    let edge_mode = match data.3 % 4 {
+#[derive(Clone, Debug, Arbitrary)]
+pub struct SrcImage {
+    pub src_width: u16,
+    pub src_height: u16,
+    pub value: u8,
+    pub edge_mode: u8,
+    pub channels: u8,
+    pub kernel_size: u8,
+    pub double_precision: bool,
+}
+
+fuzz_target!(|data: SrcImage| {
+    if data.src_width > 250 || data.src_height > 250 {
+        return;
+    }
+    if data.kernel_size % 2 == 0 || data.kernel_size > 45 || data.kernel_size == 0 {
+        return;
+    }
+    let edge_mode = match data.edge_mode % 4 {
         0 => EdgeMode::Clamp,
         1 => EdgeMode::Wrap,
         2 => EdgeMode::Reflect,
         _ => EdgeMode::Reflect101,
     };
+    let channels = match data.channels % 3 {
+        0 => FastBlurChannels::Channels4,
+        1 => FastBlurChannels::Channels3,
+        _ => FastBlurChannels::Plane,
+    };
     fuzz_f32(
-        data.0 as usize,
-        data.1 as usize,
-        data.2 as usize,
-        FastBlurChannels::Channels4,
+        data.src_width as usize,
+        data.src_height as usize,
+        data.kernel_size as usize,
+        channels,
         edge_mode,
-        data.4,
-    );
-    fuzz_f32(
-        data.0 as usize,
-        data.1 as usize,
-        data.2 as usize,
-        FastBlurChannels::Channels3,
-        edge_mode,
-        data.4,
-    );
-    fuzz_f32(
-        data.0 as usize,
-        data.1 as usize,
-        data.2 as usize,
-        FastBlurChannels::Plane,
-        edge_mode,
-        data.4,
+        data.double_precision,
     );
 });
 
 fn fuzz_f32(
     width: usize,
     height: usize,
-    radius: usize,
+    kernel_size: usize,
     channels: FastBlurChannels,
     edge_mode: EdgeMode,
     double_precision: bool,
 ) {
-    if width == 0 || height == 0 || radius == 0 {
+    if width == 0 || height == 0 || kernel_size == 0 {
         return;
     }
     let src_image = BlurImage::alloc(width as u32, height as u32, channels);
     let mut dst_image = BlurImageMut::alloc(width as u32, height as u32, channels);
     if double_precision {
-        let kernel =
-            gaussian_kernel_1d_f64(radius as u32 * 2 + 1, sigma_size_d(radius as f64 * 2. + 1.));
+        let kernel = gaussian_kernel_1d_f64(kernel_size as u32, sigma_size_d(kernel_size as f64));
 
         match channels {
             FastBlurChannels::Plane => {
@@ -127,7 +133,7 @@ fn fuzz_f32(
         libblur::gaussian_blur_f32(
             &src_image,
             &mut dst_image,
-            radius as u32 * 2 + 1,
+            kernel_size as u32,
             0.,
             edge_mode,
             ThreadingPolicy::Single,

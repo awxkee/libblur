@@ -10,6 +10,7 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 libblur = { path = "../", default-features = false }
+arbitrary = { version = "1.4.1", features = ["derive"] }
 
 [features]
 neon = ["libblur/neon"]
@@ -27,6 +28,13 @@ bench = false
 [[bin]]
 name = "gauss"
 path = "gauss/gauss.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "gauss_small_kernel"
+path = "gauss_small_kernel/gauss_small_kernel.rs"
 test = false
 doc = false
 bench = false

@@ -66,9 +66,10 @@ pub(crate) fn filter_row_symmetric_approx_binter<T, I, const N: usize>(
 
         let width = width as i64;
 
+        let coeff = *scanned_kernel.get_unchecked(half_len);
+
         while cx < min_left {
             for c in 0..N {
-                let coeff = *scanned_kernel.get_unchecked(half_len);
                 let mx = cx as i64 - s_kernel;
                 let mut k0 = src.get_unchecked(cx * N + c).as_() * coeff.weight;
 
@@ -96,7 +97,6 @@ pub(crate) fn filter_row_symmetric_approx_binter<T, I, const N: usize>(
         let mut f_cx = cx * N;
 
         while f_cx + 4 < flat_max {
-            let coeff = *scanned_kernel.get_unchecked(half_len);
             let mx = f_cx - half_len * N;
             let shifted_src = src.get_unchecked(mx..);
             let mut k0 = shifted_src.get_unchecked(half_len * N).as_() * coeff.weight;
@@ -137,7 +137,6 @@ pub(crate) fn filter_row_symmetric_approx_binter<T, I, const N: usize>(
         }
 
         while f_cx < flat_max {
-            let coeff = *scanned_kernel.get_unchecked(half_len);
             let mx = f_cx - half_len * N;
             let shifted_src = src.get_unchecked(mx..);
             let mut k0 = shifted_src.get_unchecked(half_len * N).as_() * coeff.weight;

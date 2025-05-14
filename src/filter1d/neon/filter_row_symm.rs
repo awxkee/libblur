@@ -60,9 +60,9 @@ pub(crate) fn filter_row_symm_neon_u8_f32<const N: usize>(
 
         let max_width = width * N;
 
-        while cx + 64 < max_width {
-            let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(half_len).weight);
+        let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(half_len).weight);
 
+        while cx + 64 < max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source = xvld1q_u8_x4(shifted_src.get_unchecked(half_len * N..).as_ptr());
@@ -96,8 +96,6 @@ pub(crate) fn filter_row_symm_neon_u8_f32<const N: usize>(
         }
 
         while cx + 48 < max_width {
-            let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(half_len).weight);
-
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source = xvld1q_u8_x3(shifted_src.get_unchecked(half_len * N..).as_ptr());
@@ -124,8 +122,6 @@ pub(crate) fn filter_row_symm_neon_u8_f32<const N: usize>(
         }
 
         while cx + 16 < max_width {
-            let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(half_len).weight);
-
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source = vld1q_u8(shifted_src.get_unchecked(half_len * N..).as_ptr());
@@ -145,8 +141,6 @@ pub(crate) fn filter_row_symm_neon_u8_f32<const N: usize>(
         }
 
         while cx + 8 < max_width {
-            let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(half_len).weight);
-
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source = vld1_u8(shifted_src.get_unchecked(half_len * N..).as_ptr());
@@ -165,8 +159,9 @@ pub(crate) fn filter_row_symm_neon_u8_f32<const N: usize>(
             cx += 8;
         }
 
+        let coeff = *scanned_kernel.get_unchecked(half_len);
+
         while cx + 4 < max_width {
-            let coeff = *scanned_kernel.get_unchecked(half_len);
             let shifted_src = local_src.get_unchecked(cx..);
             let mut k0 = *shifted_src.get_unchecked(half_len * N) as f32 * coeff.weight;
             let mut k1 = *shifted_src.get_unchecked(half_len * N + 1) as f32 * coeff.weight;
@@ -213,7 +208,6 @@ pub(crate) fn filter_row_symm_neon_u8_f32<const N: usize>(
         }
 
         for x in cx..max_width {
-            let coeff = *scanned_kernel.get_unchecked(half_len);
             let shifted_src = local_src.get_unchecked(x..);
             let mut k0 = *shifted_src.get_unchecked(half_len * N) as f32 * coeff.weight;
 

@@ -143,9 +143,9 @@ impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
 
         let mut cx = 0usize;
 
-        while cx + 128 < max_width {
-            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(0).weight);
+        let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(0).weight);
 
+        while cx + 128 < max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source = _mm256_load_pack_x4(shifted_src.as_ptr());
@@ -177,8 +177,6 @@ impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
         }
 
         while cx + 64 < max_width {
-            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(0).weight);
-
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source = _mm256_load_pack_x2(shifted_src.as_ptr());
@@ -201,8 +199,6 @@ impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
         }
 
         while cx + 32 < max_width {
-            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(0).weight);
-
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source = _mm256_loadu_si256(shifted_src.as_ptr() as *const __m256i);
@@ -222,12 +218,10 @@ impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
         }
 
         while cx + 16 < max_width {
-            let coeff = *scanned_kernel.get_unchecked(0);
-
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source_0 = _mm_loadu_si128(shifted_src.as_ptr() as *const __m128i);
-            let mut k0 = _mm_mul_epi8_by_ps_x4::<FMA>(source_0, _mm_set1_ps(coeff.weight));
+            let mut k0 = _mm_mul_epi8_by_ps_x4::<FMA>(source_0, _mm256_castps256_ps128(coeff));
 
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
@@ -241,9 +235,9 @@ impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
             cx += 16;
         }
 
-        while cx + 4 < max_width {
-            let coeff = *scanned_kernel.get_unchecked(0);
+        let coeff = *scanned_kernel.get_unchecked(0);
 
+        while cx + 4 < max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let mut k0 = ((*shifted_src.get_unchecked(0)) as f32).mul(coeff.weight);
@@ -279,7 +273,6 @@ impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
         }
 
         for x in cx..max_width {
-            let coeff = *scanned_kernel.get_unchecked(0);
             let shifted_src = local_src.get_unchecked(x..);
             let mut k0 = ((*shifted_src.get_unchecked(0)) as f32).mul(coeff.weight);
 

@@ -29,41 +29,58 @@
 
 #![no_main]
 
+use arbitrary::Arbitrary;
 use libblur::{stack_blur_u16, BlurImageMut, FastBlurChannels, ThreadingPolicy};
 use libfuzzer_sys::fuzz_target;
 
-fuzz_target!(|data: (u8, u8, u8, u8, u16)| {
-    let plane_match = match data.3 % 3 {
+#[derive(Clone, Debug, Arbitrary)]
+pub struct SrcImage {
+    pub src_width: u16,
+    pub src_height: u16,
+    pub value: u16,
+    pub edge_mode: u8,
+    pub radius: u8,
+    pub plane: u8,
+}
+
+fuzz_target!(|data: SrcImage| {
+    let plane_match = match data.plane % 3 {
         0 => FastBlurChannels::Channels4,
         1 => FastBlurChannels::Channels3,
         _ => FastBlurChannels::Plane,
     };
+    if data.src_width > 250 || data.src_height > 250 {
+        return;
+    }
+    if data.radius == 0 {
+        return;
+    }
     match plane_match {
         FastBlurChannels::Plane => {
             fuzz_image(
-                data.0 as usize,
-                data.1 as usize,
-                data.2 as usize,
+                data.src_width as usize,
+                data.src_height as usize,
+                data.radius as usize,
                 FastBlurChannels::Plane,
-                data.4,
+                data.value,
             );
         }
         FastBlurChannels::Channels3 => {
             fuzz_image(
-                data.0 as usize,
-                data.1 as usize,
-                data.2 as usize,
+                data.src_width as usize,
+                data.src_height as usize,
+                data.radius as usize,
                 FastBlurChannels::Channels3,
-                data.4,
+                data.value,
             );
         }
         FastBlurChannels::Channels4 => {
             fuzz_image(
-                data.0 as usize,
-                data.1 as usize,
-                data.2 as usize,
+                data.src_width as usize,
+                data.src_height as usize,
+                data.radius as usize,
                 FastBlurChannels::Channels4,
-                data.4,
+                data.value,
             );
         }
     }

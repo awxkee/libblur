@@ -41,6 +41,7 @@ use crate::filter1d::row_handler_small_approx::{
     Filter1DRowHandlerBInterpolateApr, RowsHolder, RowsHolderMut,
 };
 use crate::filter1d::to_approx_storage::{ApproxLevel, ToApproxStorage};
+use crate::safe_math::{SafeAdd, SafeMul};
 use crate::to_storage::ToStorage;
 use crate::{BlurError, BlurImage, BlurImageMut, EdgeMode, Scalar, ThreadingPolicy};
 use num_traits::{AsPrimitive, Float, MulAdd};
@@ -129,6 +130,19 @@ where
         return Err(BlurError::OddKernel(column_kernel.len()));
     }
 
+    _ = column_kernel.len().safe_mul(image.height as usize)?;
+
+    let pad_w = (row_kernel.len() / 2).max(1);
+    _ = (image.width as usize)
+        .safe_mul(N)?
+        .safe_add(pad_w.safe_mul(2 * N)?);
+
+    _ = (image.width as usize)
+        .safe_mul(image.height as usize)?
+        .safe_mul(N)?;
+
+    _ = (destination.stride as usize).safe_mul(3)?;
+
     let one_i: I = 1.as_();
     let base_level: I = one_i << I::approx_level().as_();
     let initial_scale: F = base_level.as_();
@@ -163,192 +177,35 @@ where
         Some(hold)
     };
 
-    const B_INTER_CUTOFF: usize = 29;
-
-    let row_handler_binter =
-        T::get_row_handler_binter_apr::<N>(is_row_kernel_symmetric, &scanned_row_kernel);
-
     let mut transient_image = vec![T::default(); image_size.width * image_size.height * N];
 
     if let Some(pool) = &pool {
         let row_handler = T::get_row_handler_apr::<N>(is_row_kernel_symmetric);
         pool.install(|| {
-            if row_kernel.len() < B_INTER_CUTOFF
-                && row_handler_binter.is_some()
-                && border_mode != EdgeMode::Constant
-            {
-                let handler = row_handler_binter.unwrap();
+            transient_image
+                .par_chunks_exact_mut(image_size.width * N)
+                .enumerate()
+                .for_each(|(y, dst_row)| {
+                    let pad_w = scanned_row_kernel.len() / 2;
+                    let (row, arena_width) = make_arena_row::<T, N>(
+                        image,
+                        y,
+                        KernelShape::new(row_kernel.len(), 0),
+                        border_mode,
+                        border_constant,
+                    )
+                    .unwrap();
 
-                transient_image
-                    .par_chunks_exact_mut(image_size.width * N * 12)
-                    .enumerate()
-                    .for_each(|(y, dst_row)| {
-                        let jy = y * 12 * image.row_stride() as usize;
-                        let mut src_ref_box = vec![image.data.as_ref(); 12];
-                        let src_row =
-                            &image.data.as_ref()[jy..(jy + image.row_stride() as usize * 12)];
-                        for (dst, src) in src_ref_box
-                            .iter_mut()
-                            .zip(src_row.chunks_exact(image.row_stride() as usize))
-                        {
-                            *dst = src;
-                        }
-
-                        let ref_mut = dst_row
-                            .chunks_exact_mut(image_size.width * N)
-                            .collect::<Vec<&mut [T]>>();
-
-                        let src_rows = RowsHolder {
-                            holder: src_ref_box,
-                        };
-                        let mut dst_rows = RowsHolderMut { holder: ref_mut };
-                        handler(
-                            BorderHandle {
-                                edge_mode: border_mode,
-                                scalar: border_constant,
-                            },
-                            &src_rows,
-                            &mut dst_rows,
-                            image_size,
-                            scanned_row_kernel_slice,
-                        );
-                    });
-
-                let last_y = transient_image
-                    .chunks_exact_mut(image_size.width * N * 12)
-                    .count()
-                    * 12;
-
-                let rem = transient_image
-                    .chunks_exact_mut(image_size.width * N * 12)
-                    .into_remainder();
-
-                rem.par_chunks_exact_mut(image_size.width * N)
-                    .enumerate()
-                    .for_each(|(y, dst_row)| {
-                        let jy = (last_y + y) * image.row_stride() as usize;
-                        let src_row = &image.data.as_ref()[jy..(jy + image.row_stride() as usize)];
-
-                        let ref_mut = dst_row
-                            .chunks_exact_mut(image_size.width * N)
-                            .collect::<Vec<&mut [T]>>();
-
-                        let src_rows = RowsHolder {
-                            holder: vec![src_row],
-                        };
-                        let mut dst_rows = RowsHolderMut { holder: ref_mut };
-                        handler(
-                            BorderHandle {
-                                edge_mode: border_mode,
-                                scalar: border_constant,
-                            },
-                            &src_rows,
-                            &mut dst_rows,
-                            image_size,
-                            scanned_row_kernel_slice,
-                        );
-                    });
-            } else {
-                transient_image
-                    .par_chunks_exact_mut(image_size.width * N)
-                    .enumerate()
-                    .for_each(|(y, dst_row)| {
-                        let pad_w = scanned_row_kernel.len() / 2;
-                        let (row, arena_width) = make_arena_row::<T, N>(
-                            image,
-                            y,
-                            KernelShape::new(row_kernel.len(), 0),
-                            border_mode,
-                            border_constant,
-                        )
-                        .unwrap();
-
-                        row_handler(
-                            Arena::new(arena_width, 1, pad_w, 0, N),
-                            &row,
-                            dst_row,
-                            image_size,
-                            FilterRegion::new(y, y + 1),
-                            scanned_row_kernel_slice,
-                        );
-                    });
-            }
+                    row_handler(
+                        Arena::new(arena_width, 1, pad_w, 0, N),
+                        &row,
+                        dst_row,
+                        image_size,
+                        FilterRegion::new(y, y + 1),
+                        scanned_row_kernel_slice,
+                    );
+                });
         });
-    } else if row_kernel.len() < B_INTER_CUTOFF
-        && row_handler_binter.is_some()
-        && border_mode != EdgeMode::Constant
-    {
-        let handler = row_handler_binter.unwrap();
-
-        transient_image
-            .chunks_exact_mut(image_size.width * N * 12)
-            .enumerate()
-            .for_each(|(y, dst_row)| {
-                let jy = y * 12 * image.row_stride() as usize;
-                let mut src_ref_box = vec![image.data.as_ref(); 12];
-                let src_row = &image.data.as_ref()[jy..(jy + image.row_stride() as usize * 12)];
-                for (dst, src) in src_ref_box
-                    .iter_mut()
-                    .zip(src_row.chunks_exact(image.row_stride() as usize))
-                {
-                    *dst = src;
-                }
-
-                let ref_mut = dst_row
-                    .chunks_exact_mut(image_size.width * N)
-                    .collect::<Vec<&mut [T]>>();
-
-                let src_rows = RowsHolder {
-                    holder: src_ref_box,
-                };
-                let mut dst_rows = RowsHolderMut { holder: ref_mut };
-                handler(
-                    BorderHandle {
-                        edge_mode: border_mode,
-                        scalar: border_constant,
-                    },
-                    &src_rows,
-                    &mut dst_rows,
-                    image_size,
-                    scanned_row_kernel_slice,
-                );
-            });
-
-        let last_y = transient_image
-            .chunks_exact_mut(image_size.width * N * 12)
-            .count()
-            * 12;
-        let rem = transient_image
-            .chunks_exact_mut(image_size.width * N * 12)
-            .into_remainder();
-
-        if !rem.is_empty() {
-            let jy = last_y * image.row_stride() as usize;
-            let src_ref = &image.data.as_ref()[jy..];
-
-            let src_ref_box = src_ref
-                .chunks_exact(image.row_stride() as usize)
-                .collect::<Vec<&[T]>>();
-
-            let ref_mut = rem
-                .chunks_exact_mut(image_size.width * N)
-                .collect::<Vec<&mut [T]>>();
-
-            let src_rows = RowsHolder {
-                holder: src_ref_box,
-            };
-            let mut dst_rows = RowsHolderMut { holder: ref_mut };
-            handler(
-                BorderHandle {
-                    edge_mode: border_mode,
-                    scalar: border_constant,
-                },
-                &src_rows,
-                &mut dst_rows,
-                image_size,
-                scanned_row_kernel_slice,
-            );
-        }
     } else {
         let row_handler = T::get_row_handler_apr::<N>(is_row_kernel_symmetric);
         transient_image
@@ -751,6 +608,13 @@ where
         return Err(BlurError::OddKernel(column_kernel.len()));
     }
 
+    _ = column_kernel.len().safe_mul(image.height as usize)?;
+
+    let pad_w = (row_kernel.len() / 2).max(1);
+    _ = (image.width as usize)
+        .safe_mul(N)?
+        .safe_add(pad_w.safe_mul(2 * N)?);
+
     const B_INTER_CUTOFF: usize = 29;
 
     let one_i: I = 1.as_();
@@ -929,6 +793,8 @@ where
 
                     let mut start_ky = column_kernel_len / 2 + 1;
 
+                    start_ky %= column_kernel_len;
+
                     let rows_count = dst_rows.len() / dest_stride;
 
                     for (y, dy) in (source_y..source_y + rows_count + half_kernel)
@@ -1072,6 +938,8 @@ where
         }
 
         let mut start_ky = column_kernel_len / 2 + 1;
+
+        start_ky %= column_kernel_len;
 
         for y in 1..image_size.height + half_kernel {
             let new_y = if y < image_size.height {

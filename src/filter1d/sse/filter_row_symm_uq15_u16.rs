@@ -82,9 +82,9 @@ unsafe fn filter_row_sse_symm_uq15_u16_impl<const N: usize>(
 
     let max_width = width * arena.components;
 
-    while cx + 16 < max_width {
-        let coeff = _mm_set1_epi32(scanned_kernel.get_unchecked(half_len).weight as i32);
+    let coeff = _mm_set1_epi32(scanned_kernel.get_unchecked(half_len).weight as i32);
 
+    while cx + 16 < max_width {
         let shifted_src = local_src.get_unchecked(cx..);
 
         let src0 = shifted_src.get_unchecked(half_len * N..);
@@ -119,8 +119,6 @@ unsafe fn filter_row_sse_symm_uq15_u16_impl<const N: usize>(
     }
 
     while cx + 8 < max_width {
-        let coeff = _mm_set1_epi32(scanned_kernel.get_unchecked(half_len).weight as i32);
-
         let shifted_src = local_src.get_unchecked(cx..);
 
         let source =
@@ -143,8 +141,6 @@ unsafe fn filter_row_sse_symm_uq15_u16_impl<const N: usize>(
     }
 
     while cx + 4 < max_width {
-        let coeff = _mm_set1_epi32(scanned_kernel.get_unchecked(half_len).weight as i32);
-
         let shifted_src = local_src.get_unchecked(cx..);
 
         let source = _mm_loadu_si64(shifted_src.get_unchecked(half_len * N..).as_ptr() as *const _);

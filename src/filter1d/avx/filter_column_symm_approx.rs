@@ -280,9 +280,9 @@ unsafe fn filter_column_avx_symm_u8_i32_impl(
             cx += 4;
         }
 
-        for x in cx..image_width {
-            let coeff = *scanned_kernel.get_unchecked(half_len);
+        let coeff = *scanned_kernel.get_unchecked(half_len);
 
+        for x in cx..image_width {
             let v_src = ref0.get_unchecked(x..);
 
             let mut k0 = ((*v_src.get_unchecked(0)) as i32).mul(coeff.weight);

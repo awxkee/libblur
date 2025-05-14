@@ -145,9 +145,9 @@ impl<const FMA: bool, const N: usize> RowSymmExecutionUnit<FMA, N> {
 
         let mut cx = 0usize;
 
-        while cx + 64 < max_width {
-            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
+        let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
 
+        while cx + 64 < max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source =
@@ -185,8 +185,6 @@ impl<const FMA: bool, const N: usize> RowSymmExecutionUnit<FMA, N> {
         }
 
         while cx + 32 < max_width {
-            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
-
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source =
@@ -215,8 +213,6 @@ impl<const FMA: bool, const N: usize> RowSymmExecutionUnit<FMA, N> {
         }
 
         while cx + 16 < max_width {
-            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
-
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source =
@@ -240,13 +236,11 @@ impl<const FMA: bool, const N: usize> RowSymmExecutionUnit<FMA, N> {
         }
 
         while cx + 8 < max_width {
-            let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
-
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source =
                 _mm_loadu_si128(shifted_src.get_unchecked(half_len * N..).as_ptr() as *const _);
-            let mut k0 = _mm_mul_epi16_by_ps_x2::<FMA>(source, coeff);
+            let mut k0 = _mm_mul_epi16_by_ps_x2::<FMA>(source, _mm256_castps256_ps128(coeff));
 
             for i in 0..half_len {
                 let rollback = length - i - 1;
@@ -265,13 +259,11 @@ impl<const FMA: bool, const N: usize> RowSymmExecutionUnit<FMA, N> {
         }
 
         while cx + 4 < max_width {
-            let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
-
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source =
                 _mm_loadu_si64(shifted_src.get_unchecked(half_len * N..).as_ptr() as *const _);
-            let mut k0 = _mm_mul_epi16_by_ps::<FMA>(source, coeff);
+            let mut k0 = _mm_mul_epi16_by_ps::<FMA>(source, _mm256_castps256_ps128(coeff));
 
             for i in 0..half_len {
                 let rollback = length - i - 1;
@@ -289,8 +281,9 @@ impl<const FMA: bool, const N: usize> RowSymmExecutionUnit<FMA, N> {
             cx += 4;
         }
 
+        let coeff = *scanned_kernel.get_unchecked(half_len);
+
         for x in cx..max_width {
-            let coeff = *scanned_kernel.get_unchecked(half_len);
             let shifted_src = local_src.get_unchecked(x..);
             let mut k0 = *shifted_src.get_unchecked(half_len * N) as f32 * coeff.weight;
 

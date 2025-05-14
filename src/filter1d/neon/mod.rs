@@ -63,6 +63,7 @@ mod filter_row_symm_u16;
 mod filter_row_symm_u8_i16;
 mod filter_row_symm_uq15_u16;
 mod filter_row_u8_i16;
+mod rom_symm_approx3;
 mod rom_symm_approx5;
 #[cfg(feature = "rdm")]
 mod row_symm_app_binter_rdm;
@@ -105,6 +106,7 @@ pub(crate) use filter_row_symm_u16::filter_row_symm_neon_u16_f32;
 pub(crate) use filter_row_symm_u8_i16::filter_rgb_row_symm_neon_u8_i16;
 pub(crate) use filter_row_symm_uq15_u16::filter_row_symm_neon_uq15_u16;
 pub(crate) use filter_row_u8_i16::filter_rgb_row_neon_u8_i16;
+pub(crate) use rom_symm_approx3::filter_row_symm_neon_binter_u8_uq0_7_k3;
 pub(crate) use rom_symm_approx5::filter_row_symm_neon_binter_u8_uq0_7_x5;
 #[cfg(feature = "rdm")]
 pub(crate) use row_symm_app_binter_rdm::filter_row_symm_neon_binter_u8_i32_rdm;

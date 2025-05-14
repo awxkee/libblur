@@ -35,6 +35,7 @@ use crate::filter1d::filter_1d_row_handler::Filter1DRowHandler;
 use crate::filter1d::filter_element::KernelShape;
 use crate::filter1d::filter_scan::{is_symmetric_1d, scan_se_1d};
 use crate::filter1d::region::FilterRegion;
+use crate::safe_math::{SafeAdd, SafeMul};
 use crate::to_storage::ToStorage;
 use crate::{BlurError, BlurImage, BlurImageMut, EdgeMode, ImageSize, Scalar, ThreadingPolicy};
 use num_traits::{AsPrimitive, MulAdd};
@@ -108,6 +109,19 @@ where
     if column_kernel.len() & 1 == 0 {
         return Err(BlurError::OddKernel(column_kernel.len()));
     }
+
+    _ = column_kernel.len().safe_mul(image.height as usize)?;
+
+    let pad_w = (row_kernel.len() / 2).max(1);
+    _ = (image.width as usize)
+        .safe_mul(N)?
+        .safe_add(pad_w.safe_mul(2 * N)?);
+
+    _ = (image.width as usize)
+        .safe_mul(image.height as usize)?
+        .safe_mul(N)?;
+
+    _ = (destination.stride as usize).safe_mul(3)?;
 
     let scanned_row_kernel = scan_se_1d(row_kernel);
     let scanned_row_kernel_slice = scanned_row_kernel.as_slice();
@@ -547,6 +561,13 @@ where
         return Err(BlurError::OddKernel(column_kernel.len()));
     }
 
+    _ = column_kernel.len().safe_mul(image.height as usize)?;
+
+    let pad_w = (row_kernel.len() / 2).max(1);
+    _ = (image.width as usize)
+        .safe_mul(N)?
+        .safe_add(pad_w.safe_mul(2 * N)?);
+
     let scanned_row_kernel = scan_se_1d(row_kernel);
     let scanned_row_kernel_slice = scanned_row_kernel.as_slice();
     let scanned_column_kernel = scan_se_1d(column_kernel);
@@ -594,6 +615,9 @@ where
                     let column_kernel_len = scanned_column_kernel.len();
 
                     let mut start_ky = column_kernel_len / 2 + 1;
+
+                    start_ky %= column_kernel_len;
+
                     let half_kernel = column_kernel_len / 2;
 
                     // preload top edge
@@ -751,6 +775,8 @@ where
         }
 
         let mut start_ky = column_kernel_len / 2 + 1;
+
+        start_ky %= column_kernel_len;
 
         for y in 1..image_size.height + half_kernel {
             let new_y = if y < image_size.height {

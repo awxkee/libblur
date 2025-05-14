@@ -28,12 +28,15 @@
  */
 use crate::edge_mode::clamp_edge;
 use crate::filter1d::filter_scan::ScanPoint1d;
-use crate::filter1d::neon::utils::xvld4u8;
+use crate::filter1d::neon::rom_symm_approx5::xvst_u8x4_q0_7;
+use crate::filter1d::neon::utils::{
+    xvld1q_u8_x2, xvld1q_u8_x4, xvld4u8, xvst1q_u8_x2, xvst1q_u8_x4,
+};
 use crate::filter1d::row_handler_small_approx::{RowsHolder, RowsHolderMut};
 use crate::{BorderHandle, ImageSize};
 use std::arch::aarch64::*;
 
-pub(crate) fn filter_row_symm_neon_binter_u8_uq0_7_x5<const N: usize>(
+pub(crate) fn filter_row_symm_neon_binter_u8_uq0_7_k3<const N: usize>(
     edge_mode: BorderHandle,
     m_src: &RowsHolder<u8>,
     m_dst: &mut RowsHolderMut<u8>,
@@ -59,16 +62,10 @@ pub(crate) fn filter_row_symm_neon_binter_u8_uq0_7_x5<const N: usize>(
             sum += 1;
         }
     }
-    executor_unit_5_q0_u8::<N>(edge_mode, m_src, m_dst, image_size, &shifted);
+    executor_unit_3_q0_u8::<N>(edge_mode, m_src, m_dst, image_size, &shifted);
 }
 
-#[inline(always)]
-pub(crate) unsafe fn xvst_u8x4_q0_7(a: *mut u8, v: uint16x8_t) {
-    let shifted = vqrshrn_n_u16::<7>(v);
-    vst1_lane_u32::<0>(a as *mut _, vreinterpret_u32_u8(shifted));
-}
-
-fn executor_unit_5_q0_u8<const N: usize>(
+fn executor_unit_3_q0_u8<const N: usize>(
     edge_mode: BorderHandle,
     m_src: &RowsHolder<u8>,
     m_dst: &mut RowsHolderMut<u8>,
@@ -78,7 +75,7 @@ fn executor_unit_5_q0_u8<const N: usize>(
     unsafe {
         let width = image_size.width;
 
-        let half_len = 5 / 2;
+        let half_len = 3 / 2;
 
         let min_left = half_len.min(width);
         let s_kernel = half_len as i64;
@@ -89,25 +86,18 @@ fn executor_unit_5_q0_u8<const N: usize>(
 
             let c0 = scanned_kernel[0];
             let c1 = scanned_kernel[1];
-            let c2 = scanned_kernel[2];
             while f_cx < min_left {
                 let mx = f_cx as i64 - s_kernel;
                 let e0 = clamp_edge!(edge_mode.edge_mode, mx, 0, width as i64);
-                let e1 = clamp_edge!(edge_mode.edge_mode, 4i64 + mx, 0, width as i64);
-                let e2 = clamp_edge!(edge_mode.edge_mode, mx + 1, 0, width as i64);
-                let e3 = clamp_edge!(edge_mode.edge_mode, 3i64 + mx, 0, width as i64);
+                let e1 = clamp_edge!(edge_mode.edge_mode, 2i64 + mx, 0, width as i64);
 
                 for c in 0..N {
-                    let mut k0: u16 = *src.get_unchecked(f_cx * N + c) as u16 * c2 as u16;
+                    let mut k0: u16 = *src.get_unchecked(f_cx * N + c) as u16 * c1 as u16;
 
                     let src0 = *src.get_unchecked(e0 * N + c);
                     let src1 = *src.get_unchecked(e1 * N + c);
 
-                    let src2 = *src.get_unchecked(e2 * N + c);
-                    let src3 = *src.get_unchecked(e3 * N + c);
-
                     k0 += (src0 as u16 + src1 as u16) * c0 as u16;
-                    k0 += (src2 as u16 + src3 as u16) * c1 as u16;
 
                     *dst.get_unchecked_mut(f_cx * N + c) = ((k0 + (1 << 6)) >> 7).min(255) as u8;
                 }
@@ -121,22 +111,117 @@ fn executor_unit_5_q0_u8<const N: usize>(
             let max_width = m_right * N;
 
             let c0 = vdupq_n_u16(scanned_kernel[0] as u16);
-            let c1 = vdupq_n_u16(scanned_kernel[1] as u16);
-            let c2 = vdupq_n_u8(scanned_kernel[2]);
+            let c1 = vdupq_n_u8(scanned_kernel[1]);
+
+            while m_cx + 64 < max_width {
+                let cx = m_cx - s_half;
+
+                let shifted_src = src.get_unchecked(cx..);
+
+                let source = xvld1q_u8_x4(shifted_src.get_unchecked(N..).as_ptr());
+                let v_source0 = xvld1q_u8_x4(shifted_src.get_unchecked(0..).as_ptr());
+                let v_source4 = xvld1q_u8_x4(shifted_src.get_unchecked((2 * N)..).as_ptr());
+
+                let mut k0 = vmull_u8(vget_low_u8(source.0), vget_low_u8(c1));
+                let mut k1 = vmull_high_u8(source.0, c1);
+                let mut k2 = vmull_u8(vget_low_u8(source.1), vget_low_u8(c1));
+                let mut k3 = vmull_high_u8(source.1, c1);
+                let mut k4 = vmull_u8(vget_low_u8(source.2), vget_low_u8(c1));
+                let mut k5 = vmull_high_u8(source.2, c1);
+                let mut k6 = vmull_u8(vget_low_u8(source.3), vget_low_u8(c1));
+                let mut k7 = vmull_high_u8(source.3, c1);
+
+                k0 = vmlaq_u16(
+                    k0,
+                    vaddl_u8(vget_low_u8(v_source0.0), vget_low_u8(v_source4.0)),
+                    c0,
+                );
+                k1 = vmlaq_u16(k1, vaddl_high_u8(v_source0.0, v_source4.0), c0);
+
+                k2 = vmlaq_u16(
+                    k2,
+                    vaddl_u8(vget_low_u8(v_source0.1), vget_low_u8(v_source4.1)),
+                    c0,
+                );
+                k3 = vmlaq_u16(k3, vaddl_high_u8(v_source0.1, v_source4.1), c0);
+
+                k4 = vmlaq_u16(
+                    k4,
+                    vaddl_u8(vget_low_u8(v_source0.2), vget_low_u8(v_source4.2)),
+                    c0,
+                );
+                k5 = vmlaq_u16(k5, vaddl_high_u8(v_source0.2, v_source4.2), c0);
+
+                k6 = vmlaq_u16(
+                    k6,
+                    vaddl_u8(vget_low_u8(v_source0.3), vget_low_u8(v_source4.3)),
+                    c0,
+                );
+                k7 = vmlaq_u16(k7, vaddl_high_u8(v_source0.3, v_source4.3), c0);
+
+                let dst_ptr0 = dst.get_unchecked_mut(m_cx..).as_mut_ptr();
+                xvst1q_u8_x4(
+                    dst_ptr0,
+                    uint8x16x4_t(
+                        vcombine_u8(vqrshrn_n_u16::<7>(k0), vqrshrn_n_u16::<7>(k1)),
+                        vcombine_u8(vqrshrn_n_u16::<7>(k2), vqrshrn_n_u16::<7>(k3)),
+                        vcombine_u8(vqrshrn_n_u16::<7>(k4), vqrshrn_n_u16::<7>(k5)),
+                        vcombine_u8(vqrshrn_n_u16::<7>(k6), vqrshrn_n_u16::<7>(k7)),
+                    ),
+                );
+                m_cx += 64;
+            }
+
+            while m_cx + 32 < max_width {
+                let cx = m_cx - s_half;
+
+                let shifted_src = src.get_unchecked(cx..);
+
+                let source = xvld1q_u8_x2(shifted_src.get_unchecked(N..).as_ptr());
+                let v_source0 = xvld1q_u8_x2(shifted_src.get_unchecked(0..).as_ptr());
+                let v_source4 = xvld1q_u8_x2(shifted_src.get_unchecked((2 * N)..).as_ptr());
+
+                let mut k0 = vmull_u8(vget_low_u8(source.0), vget_low_u8(c1));
+                let mut k1 = vmull_high_u8(source.0, c1);
+                let mut k2 = vmull_u8(vget_low_u8(source.1), vget_low_u8(c1));
+                let mut k3 = vmull_high_u8(source.1, c1);
+
+                k0 = vmlaq_u16(
+                    k0,
+                    vaddl_u8(vget_low_u8(v_source0.0), vget_low_u8(v_source4.0)),
+                    c0,
+                );
+                k1 = vmlaq_u16(k1, vaddl_high_u8(v_source0.0, v_source4.0), c0);
+
+                k2 = vmlaq_u16(
+                    k2,
+                    vaddl_u8(vget_low_u8(v_source0.1), vget_low_u8(v_source4.1)),
+                    c0,
+                );
+                k3 = vmlaq_u16(k3, vaddl_high_u8(v_source0.1, v_source4.1), c0);
+
+                let dst_ptr0 = dst.get_unchecked_mut(m_cx..).as_mut_ptr();
+                xvst1q_u8_x2(
+                    dst_ptr0,
+                    uint8x16x2_t(
+                        vcombine_u8(vqrshrn_n_u16::<7>(k0), vqrshrn_n_u16::<7>(k1)),
+                        vcombine_u8(vqrshrn_n_u16::<7>(k2), vqrshrn_n_u16::<7>(k3)),
+                    ),
+                );
+                m_cx += 32;
+            }
 
             while m_cx + 16 < max_width {
                 let cx = m_cx - s_half;
 
                 let shifted_src = src.get_unchecked(cx..);
 
-                let source = vld1q_u8(shifted_src.get_unchecked(half_len * N..).as_ptr());
+                let source = vld1q_u8(shifted_src.get_unchecked(N..).as_ptr());
                 let v_source0 = vld1q_u8(shifted_src.get_unchecked(0..).as_ptr());
-                let v_source4 = vld1q_u8(shifted_src.get_unchecked((4 * N)..).as_ptr());
-                let v_source2 = vld1q_u8(shifted_src.get_unchecked(N..).as_ptr());
-                let v_source3 = vld1q_u8(shifted_src.get_unchecked((3 * N)..).as_ptr());
+                let v_source4 = vld1q_u8(shifted_src.get_unchecked((2 * N)..).as_ptr());
 
-                let mut k0 = vmull_u8(vget_low_u8(source), vget_low_u8(c2));
-                let mut k1 = vmull_high_u8(source, c2);
+                let mut k0 = vmull_u8(vget_low_u8(source), vget_low_u8(c1));
+                let mut k1 = vmull_high_u8(source, c1);
 
                 k0 = vmlaq_u16(
                     k0,
@@ -144,13 +229,6 @@ fn executor_unit_5_q0_u8<const N: usize>(
                     c0,
                 );
                 k1 = vmlaq_u16(k1, vaddl_high_u8(v_source0, v_source4), c0);
-
-                k0 = vmlaq_u16(
-                    k0,
-                    vaddl_u8(vget_low_u8(v_source2), vget_low_u8(v_source3)),
-                    c1,
-                );
-                k1 = vmlaq_u16(k1, vaddl_high_u8(v_source2, v_source3), c1);
 
                 let dst_ptr0 = dst.get_unchecked_mut(m_cx..).as_mut_ptr();
                 vst1q_u8(
@@ -166,16 +244,12 @@ fn executor_unit_5_q0_u8<const N: usize>(
                 let shifted_src = src.get_unchecked(cx..);
 
                 let v_source0 = vld1_u8(shifted_src.get_unchecked(0..).as_ptr());
-                let source = vld1_u8(shifted_src.get_unchecked(half_len * N..).as_ptr());
-                let v_source1 = vld1_u8(shifted_src.get_unchecked((4 * N)..).as_ptr());
-                let v_source2 = vld1_u8(shifted_src.get_unchecked(N..).as_ptr());
-                let v_source3 = vld1_u8(shifted_src.get_unchecked((3 * N)..).as_ptr());
+                let source = vld1_u8(shifted_src.get_unchecked(N..).as_ptr());
+                let v_source1 = vld1_u8(shifted_src.get_unchecked((2 * N)..).as_ptr());
 
-                let mut k0 = vmull_u8(source, vget_low_u8(c2));
+                let mut k0 = vmull_u8(source, vget_low_u8(c1));
 
                 k0 = vmlaq_u16(k0, vaddl_u8(v_source0, v_source1), c0);
-
-                k0 = vmlaq_u16(k0, vaddl_u8(v_source2, v_source3), c1);
 
                 let dst_ptr0 = dst.get_unchecked_mut(m_cx..).as_mut_ptr();
                 vst1_u8(dst_ptr0, vqrshrn_n_u16::<7>(k0));
@@ -187,16 +261,12 @@ fn executor_unit_5_q0_u8<const N: usize>(
 
                 let shifted_src = src.get_unchecked(cx..);
 
-                let source = xvld4u8(shifted_src.get_unchecked(half_len * N..).as_ptr());
-                let mut k0 = vmull_u8(source, vget_low_u8(c2));
+                let source = xvld4u8(shifted_src.get_unchecked(N..).as_ptr());
+                let mut k0 = vmull_u8(source, vget_low_u8(c1));
 
                 let v_source0 = xvld4u8(shifted_src.get_unchecked(0..).as_ptr());
-                let v_source1 = xvld4u8(shifted_src.get_unchecked((4 * N)..).as_ptr());
+                let v_source1 = xvld4u8(shifted_src.get_unchecked((2 * N)..).as_ptr());
                 k0 = vmlaq_u16(k0, vaddl_u8(v_source0, v_source1), c0);
-
-                let v_source2 = xvld4u8(shifted_src.get_unchecked(N..).as_ptr());
-                let v_source3 = xvld4u8(shifted_src.get_unchecked((3 * N)..).as_ptr());
-                k0 = vmlaq_u16(k0, vaddl_u8(v_source2, v_source3), c1);
 
                 let dst_ptr0 = dst.get_unchecked_mut(m_cx..).as_mut_ptr();
                 xvst_u8x4_q0_7(dst_ptr0, k0);
@@ -205,21 +275,16 @@ fn executor_unit_5_q0_u8<const N: usize>(
 
             let c0 = scanned_kernel[0];
             let c1 = scanned_kernel[1];
-            let c2 = scanned_kernel[2];
 
             for zx in m_cx..max_width {
                 let x = zx - s_half;
 
                 let shifted_src = src.get_unchecked(x..);
-                let mut k0: u16 = *shifted_src.get_unchecked(half_len * N) as u16 * c2 as u16;
+                let mut k0: u16 = *shifted_src.get_unchecked(half_len * N) as u16 * c1 as u16;
 
                 k0 += (*shifted_src.get_unchecked(0) as u16
-                    + *shifted_src.get_unchecked(4 * N) as u16)
+                    + *shifted_src.get_unchecked(2 * N) as u16)
                     * c0 as u16;
-
-                k0 += (*shifted_src.get_unchecked(N) as u16
-                    + *shifted_src.get_unchecked(3 * N) as u16)
-                    * c1 as u16;
 
                 *dst.get_unchecked_mut(zx) = ((k0 + (1 << 6)) >> 7).min(255) as u8;
             }
@@ -229,21 +294,15 @@ fn executor_unit_5_q0_u8<const N: usize>(
             while f_cx < width {
                 let mx = f_cx as i64 - s_kernel;
                 let e0 = clamp_edge!(edge_mode.edge_mode, mx, 0, width as i64);
-                let e1 = clamp_edge!(edge_mode.edge_mode, 4i64 + mx, 0, width as i64);
-                let e2 = clamp_edge!(edge_mode.edge_mode, mx + 1, 0, width as i64);
-                let e3 = clamp_edge!(edge_mode.edge_mode, 3i64 + mx, 0, width as i64);
+                let e1 = clamp_edge!(edge_mode.edge_mode, 2i64 + mx, 0, width as i64);
 
                 for c in 0..N {
-                    let mut k0: u16 = *src.get_unchecked(f_cx * N + c) as u16 * c2 as u16;
+                    let mut k0: u16 = *src.get_unchecked(f_cx * N + c) as u16 * c1 as u16;
 
                     let src0 = *src.get_unchecked(e0 * N + c);
                     let src1 = *src.get_unchecked(e1 * N + c);
 
-                    let src2 = *src.get_unchecked(e2 * N + c);
-                    let src3 = *src.get_unchecked(e3 * N + c);
-
                     k0 += (src0 as u16 + src1 as u16) * c0 as u16;
-                    k0 += (src2 as u16 + src3 as u16) * c1 as u16;
 
                     *dst.get_unchecked_mut(f_cx * N + c) = ((k0 + (1 << 6)) >> 7).min(255) as u8;
                 }
