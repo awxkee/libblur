@@ -95,6 +95,7 @@ mod mlaf;
 mod motion_blur;
 #[cfg(all(target_arch = "aarch64", feature = "neon"))]
 mod neon;
+mod safe_math;
 mod sobel;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
 mod sse;
@@ -109,7 +110,6 @@ mod unsafe_slice;
 mod util;
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 mod wasm32;
-mod safe_math;
 
 #[cfg(feature = "fft")]
 #[cfg_attr(docsrs, doc(cfg(feature = "fft")))]

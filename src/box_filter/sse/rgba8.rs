@@ -1,29 +1,31 @@
-// Copyright (c) Radzivon Bartoshyk. All rights reserved.
-//
-// Redistribution and use in source and binary forms, with or without modification,
-// are permitted provided that the following conditions are met:
-//
-// 1.  Redistributions of source code must retain the above copyright notice, this
-// list of conditions and the following disclaimer.
-//
-// 2.  Redistributions in binary form must reproduce the above copyright notice,
-// this list of conditions and the following disclaimer in the documentation
-// and/or other materials provided with the distribution.
-//
-// 3.  Neither the name of the copyright holder nor the names of its
-// contributors may be used to endorse or promote products derived from
-// this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-// OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+/*
+ * // Copyright (c) Radzivon Bartoshyk 5/2025. All rights reserved.
+ * //
+ * // Redistribution and use in source and binary forms, with or without modification,
+ * // are permitted provided that the following conditions are met:
+ * //
+ * // 1.  Redistributions of source code must retain the above copyright notice, this
+ * // list of conditions and the following disclaimer.
+ * //
+ * // 2.  Redistributions in binary form must reproduce the above copyright notice,
+ * // this list of conditions and the following disclaimer in the documentation
+ * // and/or other materials provided with the distribution.
+ * //
+ * // 3.  Neither the name of the copyright holder nor the names of its
+ * // contributors may be used to endorse or promote products derived from
+ * // this software without specific prior written permission.
+ * //
+ * // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * // AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * // IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * // DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * // FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * // DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * // SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * // CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
@@ -33,10 +35,10 @@ use std::arch::x86_64::*;
 use crate::sse::{_mm_mul_ps_epi32, load_u8_s32_fast, store_u8_u32, write_u8};
 use crate::unsafe_slice::UnsafeSlice;
 
-pub(crate) fn box_blur_horizontal_pass_sse<T, const CHANNELS: usize>(
-    undefined_src: &[T],
+pub(crate) fn box_blur_horizontal_pass_sse<const CHANNELS: usize>(
+    src: &[u8],
     src_stride: u32,
-    undefined_unsafe_dst: &UnsafeSlice<T>,
+    dst: &UnsafeSlice<u8>,
     dst_stride: u32,
     width: u32,
     radius: u32,
@@ -44,32 +46,14 @@ pub(crate) fn box_blur_horizontal_pass_sse<T, const CHANNELS: usize>(
     end_y: u32,
 ) {
     unsafe {
-        let src: &[u8] = std::mem::transmute(undefined_src);
-        let unsafe_dst: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_unsafe_dst);
-        box_blur_horizontal_pass_def::<CHANNELS>(
-            src, src_stride, unsafe_dst, dst_stride, width, radius, start_y, end_y,
+        box_blur_horizontal_pass_impl::<CHANNELS>(
+            src, src_stride, dst, dst_stride, width, radius, start_y, end_y,
         );
     }
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn box_blur_horizontal_pass_def<const CHANNELS: usize>(
-    src: &[u8],
-    src_stride: u32,
-    unsafe_dst: &UnsafeSlice<u8>,
-    dst_stride: u32,
-    width: u32,
-    radius: u32,
-    start_y: u32,
-    end_y: u32,
-) {
-    box_blur_horizontal_pass_impl::<CHANNELS, false>(
-        src, src_stride, unsafe_dst, dst_stride, width, radius, start_y, end_y,
-    )
-}
-
-#[inline(always)]
-unsafe fn box_blur_horizontal_pass_impl<const CHANNELS: usize, const FMA: bool>(
+unsafe fn box_blur_horizontal_pass_impl<const CHANNELS: usize>(
     src: &[u8],
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<u8>,
@@ -432,10 +416,10 @@ unsafe fn box_blur_horizontal_pass_impl<const CHANNELS: usize, const FMA: bool>(
     }
 }
 
-pub(crate) fn box_blur_vertical_pass_sse<T>(
-    undefined_src: &[T],
+pub(crate) fn box_blur_vertical_pass_sse(
+    src: &[u8],
     src_stride: u32,
-    undefined_unsafe_dst: &UnsafeSlice<T>,
+    dst: &UnsafeSlice<u8>,
     dst_stride: u32,
     w: u32,
     height: u32,
@@ -444,11 +428,8 @@ pub(crate) fn box_blur_vertical_pass_sse<T>(
     end_x: u32,
 ) {
     unsafe {
-        let src: &[u8] = std::mem::transmute(undefined_src);
-        let unsafe_dst: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_unsafe_dst);
-
         box_blur_vertical_pass_sse_impl(
-            src, src_stride, unsafe_dst, dst_stride, w, height, radius, start_x, end_x,
+            src, src_stride, dst, dst_stride, w, height, radius, start_x, end_x,
         )
     }
 }

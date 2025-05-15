@@ -81,12 +81,14 @@ jobs:
     runs-on: macos-latest
     strategy:
       matrix:
-        feature: [ neon, rdm ]
+        feature: [ neon, rdm, "" ]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo install cargo-fuzz
-      - run: cargo fuzz run box  --features ${{ matrix.feature }} -- -max_total_time=17
+      - run: cargo fuzz run box --features "${{ matrix.feature }}" -- -max_total_time=14
+      - run: cargo fuzz run box_u16 --features "${{ matrix.feature }}" -- -max_total_time=14
+      - run: cargo fuzz run box_f32 --features "${{ matrix.feature }}" -- -max_total_time=14
 
   fuzz_box_x86:
     name: Fuzzing Box
@@ -98,7 +100,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo install cargo-fuzz
-      - run: cargo fuzz run box --features ${{ matrix.feature }} -- -max_total_time=17
+      - run: cargo fuzz run box --features "${{ matrix.feature }}" -- -max_total_time=14
+      - run: cargo fuzz run box_u16 --features "${{ matrix.feature }}" -- -max_total_time=14
+      - run: cargo fuzz run box_f32 --features "${{ matrix.feature }}" -- -max_total_time=14
 
   fuzz_filters_arm:
     name: Fuzzing Filter 1D/2D ARM

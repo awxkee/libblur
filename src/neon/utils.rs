@@ -294,13 +294,13 @@ pub(crate) unsafe fn vmulq_by_3_s32(k: int32x4_t) -> int32x4_t {
 }
 
 #[inline(always)]
-pub unsafe fn load_u8<const CHANNELS_COUNT: usize>(ptr: *const u8) -> uint8x8_t {
-    if CHANNELS_COUNT == 4 {
+pub unsafe fn load_u8<const CN: usize>(ptr: *const u8) -> uint8x8_t {
+    if CN == 4 {
         vreinterpret_u8_u32(vld1_lane_u32::<0>(ptr as *mut u32, vdup_n_u32(0)))
-    } else if CHANNELS_COUNT == 3 {
+    } else if CN == 3 {
         let a0 = vreinterpret_u8_u16(vld1_lane_u16::<0>(ptr as *const _, vdup_n_u16(0)));
         vld1_lane_u8::<2>(ptr.add(2) as *const _, a0)
-    } else if CHANNELS_COUNT == 2 {
+    } else if CN == 2 {
         vreinterpret_u8_u16(vld1_lane_u16::<0>(ptr as *const _, vdup_n_u16(0)))
     } else {
         vld1_lane_u8::<0>(ptr as *const _, vdup_n_u8(0))
@@ -308,7 +308,21 @@ pub unsafe fn load_u8<const CHANNELS_COUNT: usize>(ptr: *const u8) -> uint8x8_t 
 }
 
 #[inline(always)]
-pub unsafe fn p_vfmaq_f32(a: float32x4_t, b: float32x4_t, c: float32x4_t) -> float32x4_t {
+pub(crate) unsafe fn load_u16<const CN: usize>(ptr: *const u16) -> uint16x4_t {
+    if CN == 4 {
+        vld1_u16(ptr)
+    } else if CN == 3 {
+        let v0 = vreinterpret_u16_u32(vld1_lane_u32::<0>(ptr as *const u32, vdup_n_u32(0)));
+        vld1_lane_u16::<2>(ptr.add(2), v0)
+    } else if CN == 2 {
+        vreinterpret_u16_u32(vld1_lane_u32::<0>(ptr as *const u32, vdup_n_u32(0)))
+    } else {
+        vld1_lane_u16::<0>(ptr, vdup_n_u16(0))
+    }
+}
+
+#[inline(always)]
+pub(crate) unsafe fn p_vfmaq_f32(a: float32x4_t, b: float32x4_t, c: float32x4_t) -> float32x4_t {
     #[cfg(target_arch = "aarch64")]
     {
         vfmaq_f32(a, b, c)
@@ -320,7 +334,11 @@ pub unsafe fn p_vfmaq_f32(a: float32x4_t, b: float32x4_t, c: float32x4_t) -> flo
 }
 
 #[inline(always)]
-pub unsafe fn prefer_vfma_f32(a: float32x2_t, b: float32x2_t, c: float32x2_t) -> float32x2_t {
+pub(crate) unsafe fn prefer_vfma_f32(
+    a: float32x2_t,
+    b: float32x2_t,
+    c: float32x2_t,
+) -> float32x2_t {
     #[cfg(target_arch = "aarch64")]
     {
         vfma_f32(a, b, c)
@@ -417,6 +435,42 @@ pub unsafe fn store_u16_s32_x4<const CN: usize>(
     let a1 = vqmovun_s32(regi.1);
     let a2 = vqmovun_s32(regi.2);
     let a3 = vqmovun_s32(regi.3);
+    if CN == 4 {
+        vst1_u16(dst_ptr.0, a0);
+        vst1_u16(dst_ptr.1, a1);
+        vst1_u16(dst_ptr.2, a2);
+        vst1_u16(dst_ptr.3, a3);
+    } else if CN == 3 {
+        vst1_lane_u32::<0>(dst_ptr.0 as *mut _, vreinterpret_u32_u16(a0));
+        vst1_lane_u16::<2>(dst_ptr.0.add(2) as *mut _, a0);
+        vst1_lane_u32::<0>(dst_ptr.1 as *mut _, vreinterpret_u32_u16(a1));
+        vst1_lane_u16::<2>(dst_ptr.1.add(2) as *mut _, a1);
+        vst1_lane_u32::<0>(dst_ptr.2 as *mut _, vreinterpret_u32_u16(a2));
+        vst1_lane_u16::<2>(dst_ptr.2.add(2) as *mut _, a2);
+        vst1_lane_u32::<0>(dst_ptr.3 as *mut _, vreinterpret_u32_u16(a3));
+        vst1_lane_u16::<2>(dst_ptr.3.add(2) as *mut _, a3);
+    } else if CN == 2 {
+        vst1_lane_u32::<0>(dst_ptr.0 as *mut _, vreinterpret_u32_u16(a0));
+        vst1_lane_u32::<0>(dst_ptr.1 as *mut _, vreinterpret_u32_u16(a1));
+        vst1_lane_u32::<0>(dst_ptr.2 as *mut _, vreinterpret_u32_u16(a2));
+        vst1_lane_u32::<0>(dst_ptr.3 as *mut _, vreinterpret_u32_u16(a3));
+    } else {
+        vst1_lane_u16::<0>(dst_ptr.0 as *mut _, a0);
+        vst1_lane_u16::<0>(dst_ptr.1 as *mut _, a1);
+        vst1_lane_u16::<0>(dst_ptr.2 as *mut _, a2);
+        vst1_lane_u16::<0>(dst_ptr.3 as *mut _, a3);
+    }
+}
+
+#[inline(always)]
+pub unsafe fn store_u16_u32_x4<const CN: usize>(
+    dst_ptr: (*mut u16, *mut u16, *mut u16, *mut u16),
+    regi: uint32x4x4_t,
+) {
+    let a0 = vqmovn_u32(regi.0);
+    let a1 = vqmovn_u32(regi.1);
+    let a2 = vqmovn_u32(regi.2);
+    let a3 = vqmovn_u32(regi.3);
     if CN == 4 {
         vst1_u16(dst_ptr.0, a0);
         vst1_u16(dst_ptr.1, a1);

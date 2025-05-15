@@ -25,6 +25,11 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use crate::channels_configuration::FastBlurChannels;
+use crate::to_storage::ToStorage;
+use crate::unsafe_slice::UnsafeSlice;
+use crate::util::check_slice_size;
+use crate::{BlurError, BlurImage, BlurImageMut, ThreadingPolicy};
 use colorutils_rs::linear_to_planar::linear_to_plane;
 use colorutils_rs::planar_to_linear::plane_to_linear;
 use colorutils_rs::{
@@ -33,15 +38,10 @@ use colorutils_rs::{
 use half::f16;
 use num_traits::cast::FromPrimitive;
 use num_traits::AsPrimitive;
+use rayon::iter::{IndexedParallelIterator, ParallelIterator};
+use rayon::prelude::ParallelSliceMut;
 use rayon::ThreadPool;
-
-#[cfg(all(target_arch = "aarch64", feature = "neon"))]
-use crate::box_filter::box_blur_neon::*;
-use crate::channels_configuration::FastBlurChannels;
-use crate::to_storage::ToStorage;
-use crate::unsafe_slice::UnsafeSlice;
-use crate::util::check_slice_size;
-use crate::{BlurError, BlurImage, BlurImageMut, ThreadingPolicy};
+use std::fmt::Debug;
 
 fn box_blur_horizontal_pass_impl<T, J, const CN: usize>(
     src: &[T],
@@ -168,9 +168,24 @@ trait BoxBlurHorizontalPass<T> {
 
 impl BoxBlurHorizontalPass<f32> for f32 {
     #[allow(clippy::type_complexity)]
-    fn get_horizontal_pass<const CHANNEL_CONFIGURATION: usize>(
+    fn get_horizontal_pass<const CN: usize>(
     ) -> fn(&[f32], u32, &UnsafeSlice<f32>, u32, u32, u32, u32, u32) {
-        box_blur_horizontal_pass_impl::<f32, f32, CHANNEL_CONFIGURATION>
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
+        {
+            use crate::box_filter::neon::box_blur_horizontal_pass_neon_rgba_f32;
+            box_blur_horizontal_pass_neon_rgba_f32::<CN>
+        }
+        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
+        {
+            if std::arch::is_x86_feature_detected!("sse4.1") {
+                use crate::box_filter::sse::box_blur_horizontal_pass_sse_f32;
+                return box_blur_horizontal_pass_sse_f32::<CN>;
+            }
+        }
+        #[cfg(not(all(target_arch = "aarch64", feature = "neon")))]
+        {
+            box_blur_horizontal_pass_impl::<f32, f32, CN>
+        }
     }
 }
 
@@ -184,15 +199,30 @@ impl BoxBlurHorizontalPass<f16> for f16 {
 
 impl BoxBlurHorizontalPass<u16> for u16 {
     #[allow(clippy::type_complexity)]
-    fn get_horizontal_pass<const CHANNEL_CONFIGURATION: usize>(
+    fn get_horizontal_pass<const CN: usize>(
     ) -> fn(&[u16], u32, &UnsafeSlice<u16>, u32, u32, u32, u32, u32) {
-        box_blur_horizontal_pass_impl::<u16, u32, CHANNEL_CONFIGURATION>
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
+        {
+            use crate::box_filter::neon::box_blur_horizontal_pass_neon_rgba16;
+            box_blur_horizontal_pass_neon_rgba16::<CN>
+        }
+        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
+        {
+            if std::arch::is_x86_feature_detected!("sse4.1") {
+                use crate::box_filter::sse::box_blur_horizontal_pass_sse16;
+                return box_blur_horizontal_pass_sse16::<CN>;
+            }
+        }
+        #[cfg(not(all(target_arch = "aarch64", feature = "neon")))]
+        {
+            box_blur_horizontal_pass_impl::<u16, u32, CN>
+        }
     }
 }
 
 impl BoxBlurHorizontalPass<u8> for u8 {
     #[allow(clippy::type_complexity)]
-    fn get_horizontal_pass<const CHANNEL_CONFIGURATION: usize>(
+    fn get_horizontal_pass<const CN: usize>(
     ) -> fn(&[u8], u32, &UnsafeSlice<u8>, u32, u32, u32, u32, u32) {
         let mut _dispatcher_horizontal: fn(
             src: &[u8],
@@ -203,30 +233,32 @@ impl BoxBlurHorizontalPass<u8> for u8 {
             radius: u32,
             start_y: u32,
             end_y: u32,
-        ) = box_blur_horizontal_pass_impl::<u8, u32, CHANNEL_CONFIGURATION>;
-        if CHANNEL_CONFIGURATION >= 3 {
+        ) = box_blur_horizontal_pass_impl::<u8, u32, CN>;
+        if CN >= 3 {
             #[cfg(all(target_arch = "aarch64", feature = "neon"))]
             {
-                _dispatcher_horizontal = box_blur_horizontal_pass_neon::<u8, CHANNEL_CONFIGURATION>;
+                use crate::box_filter::neon::box_blur_horizontal_pass_neon;
+                _dispatcher_horizontal = box_blur_horizontal_pass_neon::<CN>;
                 #[cfg(feature = "rdm")]
                 {
+                    use crate::box_filter::neon::box_blur_horizontal_pass_neon_rdm;
                     if std::arch::is_aarch64_feature_detected!("rdm") {
-                        use crate::box_filter::box_blur_neon_q0_31::box_blur_horizontal_pass_neon_rdm;
-                        _dispatcher_horizontal =
-                            box_blur_horizontal_pass_neon_rdm::<u8, CHANNEL_CONFIGURATION>;
+                        _dispatcher_horizontal = box_blur_horizontal_pass_neon_rdm::<CN>;
                     }
                 }
             }
-            #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
+            #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
             {
-                #[cfg(feature = "sse")]
-                {
-                    let is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
-                    if is_sse_available {
-                        use crate::box_filter::box_blur_sse::box_blur_horizontal_pass_sse;
-                        _dispatcher_horizontal =
-                            box_blur_horizontal_pass_sse::<u8, { CHANNEL_CONFIGURATION }>;
-                    }
+                if std::arch::is_x86_feature_detected!("sse4.1") {
+                    use crate::box_filter::sse::box_blur_horizontal_pass_sse;
+                    _dispatcher_horizontal = box_blur_horizontal_pass_sse::<{ CN }>;
+                }
+            }
+            #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+            {
+                if std::arch::is_x86_feature_detected!("avx2") {
+                    use crate::box_filter::avx::box_blur_horizontal_pass_avx;
+                    _dispatcher_horizontal = box_blur_horizontal_pass_avx::<{ CN }>;
                 }
             }
         }
@@ -248,7 +280,7 @@ fn box_blur_horizontal_pass<
         + AsPrimitive<f32>
         + AsPrimitive<f64>
         + BoxBlurHorizontalPass<T>,
-    const CHANNEL_CONFIGURATION: usize,
+    const CN: usize,
 >(
     src: &[T],
     src_stride: u32,
@@ -262,7 +294,7 @@ fn box_blur_horizontal_pass<
 ) where
     f32: ToStorage<T>,
 {
-    let _dispatcher_horizontal = T::get_horizontal_pass::<CHANNEL_CONFIGURATION>();
+    let _dispatcher_horizontal = T::get_horizontal_pass::<CN>();
     let unsafe_dst = UnsafeSlice::new(dst);
     if let Some(pool) = pool {
         pool.scope(|scope| {
@@ -420,23 +452,46 @@ impl BoxBlurVerticalPass<f16> for f16 {
 
 impl BoxBlurVerticalPass<f32> for f32 {
     #[allow(clippy::type_complexity)]
-    fn get_box_vertical_pass<const CHANNELS_CONFIGURATION: usize>(
+    fn get_box_vertical_pass<const CN: usize>(
     ) -> fn(&[f32], u32, &UnsafeSlice<f32>, u32, u32, u32, u32, u32, u32) {
-        box_blur_vertical_pass_impl::<f32, f32>
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
+        {
+            use crate::box_filter::neon::box_blur_vertical_pass_neon_rgba_f32;
+            box_blur_vertical_pass_neon_rgba_f32
+        }
+        #[cfg(not(all(target_arch = "aarch64", feature = "neon")))]
+        {
+            box_blur_vertical_pass_impl::<f32, f32>
+        }
     }
 }
 
 impl BoxBlurVerticalPass<u16> for u16 {
     #[allow(clippy::type_complexity)]
-    fn get_box_vertical_pass<const CHANNELS_CONFIGURATION: usize>(
+    fn get_box_vertical_pass<const CN: usize>(
     ) -> fn(&[u16], u32, &UnsafeSlice<u16>, u32, u32, u32, u32, u32, u32) {
-        box_blur_vertical_pass_impl::<u16, u32>
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
+        {
+            use crate::box_filter::neon::box_blur_vertical_pass_neon_rgba16;
+            box_blur_vertical_pass_neon_rgba16
+        }
+        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
+        {
+            if std::arch::is_x86_feature_detected!("sse4.1") {
+                use crate::box_filter::sse::box_blur_vertical_pass_sse16;
+                return box_blur_vertical_pass_sse16;
+            }
+        }
+        #[cfg(not(all(target_arch = "aarch64", feature = "neon")))]
+        {
+            box_blur_vertical_pass_impl::<u16, u32>
+        }
     }
 }
 
 impl BoxBlurVerticalPass<u8> for u8 {
     #[allow(clippy::type_complexity)]
-    fn get_box_vertical_pass<const CHANNELS_CONFIGURATION: usize>(
+    fn get_box_vertical_pass<const CN: usize>(
     ) -> fn(&[u8], u32, &UnsafeSlice<u8>, u32, u32, u32, u32, u32, u32) {
         let mut _dispatcher_vertical: fn(
             src: &[u8],
@@ -455,8 +510,8 @@ impl BoxBlurVerticalPass<u8> for u8 {
             {
                 let is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
                 if is_sse_available {
-                    use crate::box_filter::box_blur_sse::box_blur_vertical_pass_sse;
-                    _dispatcher_vertical = box_blur_vertical_pass_sse::<u8>;
+                    use crate::box_filter::sse::box_blur_vertical_pass_sse;
+                    _dispatcher_vertical = box_blur_vertical_pass_sse;
                 }
             }
         }
@@ -464,18 +519,19 @@ impl BoxBlurVerticalPass<u8> for u8 {
         {
             let is_avx_available = std::arch::is_x86_feature_detected!("avx2");
             if is_avx_available {
-                use crate::box_filter::box_blur_avx::box_blur_vertical_pass_avx2;
-                _dispatcher_vertical = box_blur_vertical_pass_avx2::<u8>;
+                use crate::box_filter::avx::box_blur_vertical_pass_avx2;
+                _dispatcher_vertical = box_blur_vertical_pass_avx2;
             }
         }
         #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
-            _dispatcher_vertical = box_blur_vertical_pass_neon::<u8>;
+            use crate::box_filter::neon::box_blur_vertical_pass_neon;
+            _dispatcher_vertical = box_blur_vertical_pass_neon;
             #[cfg(feature = "rdm")]
             {
                 if std::arch::is_aarch64_feature_detected!("rdm") {
-                    use crate::box_filter::box_blur_neon_q0_31::box_blur_vertical_pass_neon_rdm;
-                    _dispatcher_vertical = box_blur_vertical_pass_neon_rdm::<u8>;
+                    use crate::box_filter::neon::box_blur_vertical_pass_neon_rdm;
+                    _dispatcher_vertical = box_blur_vertical_pass_neon_rdm;
                 }
             }
         }
@@ -557,6 +613,546 @@ fn box_blur_vertical_pass<
     }
 }
 
+trait RingBufferHandler<T> {
+    fn box_filter_ring_buffer<const CN: usize>(
+        src: &[T],
+        src_stride: u32,
+        dst: &mut [T],
+        dst_stride: u32,
+        width: u32,
+        height: u32,
+        radius: u32,
+        pool: &Option<ThreadPool>,
+        thread_count: u32,
+    ) -> Result<(), BlurError>;
+    const BOX_RING_IN_SINGLE_THREAD: bool;
+}
+
+impl RingBufferHandler<u8> for u8 {
+    fn box_filter_ring_buffer<const CN: usize>(
+        src: &[u8],
+        src_stride: u32,
+        dst: &mut [u8],
+        dst_stride: u32,
+        width: u32,
+        height: u32,
+        radius: u32,
+        pool: &Option<ThreadPool>,
+        thread_count: u32,
+    ) -> Result<(), BlurError>
+    where
+        (): VRowSum<u8, u32>,
+    {
+        ring_box_filter::<u8, u32, CN>(
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+            width,
+            height,
+            radius,
+            pool,
+            thread_count,
+        )
+    }
+    const BOX_RING_IN_SINGLE_THREAD: bool = false;
+}
+
+impl RingBufferHandler<u16> for u16 {
+    fn box_filter_ring_buffer<const CN: usize>(
+        src: &[u16],
+        src_stride: u32,
+        dst: &mut [u16],
+        dst_stride: u32,
+        width: u32,
+        height: u32,
+        radius: u32,
+        pool: &Option<ThreadPool>,
+        thread_count: u32,
+    ) -> Result<(), BlurError>
+    where
+        (): VRowSum<u16, u32>,
+    {
+        ring_box_filter::<u16, u32, CN>(
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+            width,
+            height,
+            radius,
+            pool,
+            thread_count,
+        )
+    }
+    #[cfg(target_arch = "aarch64")]
+    const BOX_RING_IN_SINGLE_THREAD: bool = false;
+    #[cfg(not(target_arch = "aarch64"))]
+    const BOX_RING_IN_SINGLE_THREAD: bool = true;
+}
+
+impl RingBufferHandler<f32> for f32 {
+    fn box_filter_ring_buffer<const CN: usize>(
+        src: &[f32],
+        src_stride: u32,
+        dst: &mut [f32],
+        dst_stride: u32,
+        width: u32,
+        height: u32,
+        radius: u32,
+        pool: &Option<ThreadPool>,
+        thread_count: u32,
+    ) -> Result<(), BlurError>
+    where
+        (): VRowSum<f32, f32>,
+    {
+        ring_box_filter::<f32, f32, CN>(
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+            width,
+            height,
+            radius,
+            pool,
+            thread_count,
+        )
+    }
+    const BOX_RING_IN_SINGLE_THREAD: bool = true;
+}
+
+impl RingBufferHandler<f16> for f16 {
+    fn box_filter_ring_buffer<const CN: usize>(
+        src: &[f16],
+        src_stride: u32,
+        dst: &mut [f16],
+        dst_stride: u32,
+        width: u32,
+        height: u32,
+        radius: u32,
+        pool: &Option<ThreadPool>,
+        thread_count: u32,
+    ) -> Result<(), BlurError>
+    where
+        (): VRowSum<f16, f32>,
+    {
+        ring_box_filter::<f16, f32, CN>(
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+            width,
+            height,
+            radius,
+            pool,
+            thread_count,
+        )
+    }
+    const BOX_RING_IN_SINGLE_THREAD: bool = true;
+}
+
+trait VRowSum<T, J> {
+    #[allow(clippy::type_complexity)]
+    fn ring_vertical_row_summ(
+    ) -> fn(src: &[&[T]; 2], dst: &mut [T], working_row: &mut [J], radius: u32);
+}
+
+impl VRowSum<u8, u32> for () {
+    fn ring_vertical_row_summ() -> fn(&[&[u8]; 2], &mut [u8], &mut [u32], u32) {
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
+        {
+            use crate::box_filter::neon::neon_ring_vertical_row_summ;
+            neon_ring_vertical_row_summ
+        }
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        {
+            if std::arch::is_x86_feature_detected!("avx2") {
+                use crate::box_filter::avx::avx_ring_vertical_row_summ;
+                return avx_ring_vertical_row_summ;
+            }
+        }
+        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
+        {
+            if std::arch::is_x86_feature_detected!("sse4.1") {
+                use crate::box_filter::sse::sse_ring_vertical_row_summ;
+                return sse_ring_vertical_row_summ;
+            }
+        }
+        #[cfg(not(all(target_arch = "aarch64", feature = "neon")))]
+        ring_vertical_row_summ
+    }
+}
+
+impl VRowSum<u16, u32> for () {
+    fn ring_vertical_row_summ() -> fn(&[&[u16]; 2], &mut [u16], &mut [u32], u32) {
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
+        {
+            use crate::box_filter::neon::neon_ring_vertical_row_summ16;
+            neon_ring_vertical_row_summ16
+        }
+        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
+        {
+            if std::arch::is_x86_feature_detected!("sse4.1") {
+                use crate::box_filter::sse::sse_ring_vertical_row_summ16;
+                return sse_ring_vertical_row_summ16;
+            }
+        }
+        #[cfg(not(all(target_arch = "aarch64", feature = "neon")))]
+        ring_vertical_row_summ
+    }
+}
+
+impl VRowSum<f32, f32> for () {
+    fn ring_vertical_row_summ() -> fn(&[&[f32]; 2], &mut [f32], &mut [f32], u32) {
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
+        {
+            use crate::box_filter::neon::neon_ring_vertical_row_summ_f32;
+            neon_ring_vertical_row_summ_f32
+        }
+        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
+        {
+            if std::arch::is_x86_feature_detected!("sse4.1") {
+                use crate::box_filter::sse::sse_ring_vertical_row_summ_f32;
+                return sse_ring_vertical_row_summ_f32;
+            }
+        }
+        #[cfg(not(all(target_arch = "aarch64", feature = "neon")))]
+        ring_vertical_row_summ
+    }
+}
+
+impl VRowSum<f16, f32> for () {
+    fn ring_vertical_row_summ() -> fn(&[&[f16]; 2], &mut [f16], &mut [f32], u32) {
+        ring_vertical_row_summ
+    }
+}
+
+fn ring_vertical_row_summ<
+    T: Sync + Send + Copy + AsPrimitive<J>,
+    J: FromPrimitive
+        + Default
+        + Sync
+        + Send
+        + Copy
+        + std::ops::AddAssign
+        + std::ops::SubAssign
+        + Copy
+        + AsPrimitive<f32>,
+>(
+    src: &[&[T]; 2],
+    dst: &mut [T],
+    working_row: &mut [J],
+    radius: u32,
+) where
+    f32: ToStorage<T>,
+{
+    let next_row = src[1];
+    let previous_row = src[0];
+    let weight = 1. / (radius as f32 * 2.);
+    for (((src_next, src_previous), buffer), dst) in next_row
+        .iter()
+        .zip(previous_row.iter())
+        .zip(working_row.iter_mut())
+        .zip(dst.iter_mut())
+    {
+        let mut weight0 = *buffer;
+
+        weight0 += src_next.as_();
+        weight0 -= src_previous.as_();
+
+        *buffer = weight0;
+
+        *dst = (weight0.as_() * weight).to_();
+    }
+}
+
+fn ring_box_filter<
+    T: FromPrimitive
+        + Default
+        + Sync
+        + Send
+        + Debug
+        + Copy
+        + std::ops::AddAssign
+        + std::ops::SubAssign
+        + Copy
+        + AsPrimitive<u32>
+        + AsPrimitive<u64>
+        + AsPrimitive<f32>
+        + AsPrimitive<f64>
+        + BoxBlurHorizontalPass<T>
+        + BoxBlurVerticalPass<T>
+        + AsPrimitive<J>,
+    J: FromPrimitive
+        + Default
+        + Sync
+        + Send
+        + Copy
+        + std::ops::AddAssign
+        + std::ops::SubAssign
+        + Copy
+        + AsPrimitive<f32>,
+    const CN: usize,
+>(
+    src: &[T],
+    src_stride: u32,
+    dst: &mut [T],
+    dst_stride: u32,
+    width: u32,
+    height: u32,
+    radius: u32,
+    pool: &Option<ThreadPool>,
+    thread_count: u32,
+) -> Result<(), BlurError>
+where
+    f32: ToStorage<T>,
+    (): VRowSum<T, J>,
+{
+    let kernel_size = radius as usize * 2 + 1;
+    let working_stride = width as usize * CN;
+
+    let horizontal_handler = T::get_horizontal_pass::<CN>();
+    let ring_vsum = <() as VRowSum<T, J>>::ring_vertical_row_summ();
+
+    if let Some(pool) = &pool {
+        let tile_size = height as usize / thread_count as usize;
+
+        pool.install(|| {
+            dst.par_chunks_mut(dst_stride as usize * tile_size)
+                .enumerate()
+                .for_each(|(cy, dst_rows)| {
+                    let source_y = cy * tile_size;
+
+                    let mut working_row = vec![J::default(); working_stride];
+                    let mut buffer = vec![T::default(); working_stride * kernel_size];
+
+                    let half_kernel = kernel_size / 2;
+
+                    if source_y == 0 {
+                        let dst0 = UnsafeSlice::new(&mut buffer[..working_stride]);
+                        let src0 = &src
+                            [source_y * src_stride as usize..(source_y + 1) * src_stride as usize];
+
+                        horizontal_handler(
+                            &src0[..width as usize * CN],
+                            src_stride,
+                            &dst0,
+                            working_stride as u32,
+                            width,
+                            radius,
+                            0,
+                            1,
+                        );
+
+                        let (src_row, rest) = buffer.split_at_mut(working_stride);
+                        for dst in rest.chunks_exact_mut(working_stride).take(half_kernel) {
+                            for (dst, src) in dst.iter_mut().zip(src_row.iter()) {
+                                *dst = *src;
+                            }
+                        }
+                    } else if source_y as i64 - half_kernel as i64 - 1 >= 0 {
+                        let s_y = (source_y as i64 - half_kernel as i64 - 1)
+                            .clamp(0, height as i64 - 1) as usize;
+
+                        let dst0 = UnsafeSlice::new(
+                            &mut buffer[working_stride..(half_kernel + 1) * working_stride],
+                        );
+                        let src0 = &src[s_y * src_stride as usize
+                            ..(s_y + half_kernel + 1) * src_stride as usize];
+
+                        horizontal_handler(
+                            src0,
+                            src_stride,
+                            &dst0,
+                            working_stride as u32,
+                            width,
+                            radius,
+                            0,
+                            half_kernel as u32,
+                        );
+                    } else {
+                        for src_y in 0..=half_kernel {
+                            let s_y = (src_y as i64 + source_y as i64 - half_kernel as i64 - 1)
+                                .clamp(0, height as i64 - 1)
+                                as usize;
+
+                            let dst0 = UnsafeSlice::new(
+                                &mut buffer[src_y * working_stride..(src_y + 1) * working_stride],
+                            );
+                            let src0 =
+                                &src[s_y * src_stride as usize..(s_y + 1) * src_stride as usize];
+
+                            horizontal_handler(
+                                &src0[..width as usize * CN],
+                                src_stride,
+                                &dst0,
+                                working_stride as u32,
+                                width,
+                                radius,
+                                0,
+                                1,
+                            );
+                        }
+                    }
+
+                    let mut start_ky = kernel_size / 2 + 1;
+
+                    start_ky %= kernel_size;
+
+                    let mut has_warmed_up = false;
+
+                    let rows_count = dst_rows.len() / dst_stride as usize;
+
+                    for (y, dy) in (source_y..source_y + rows_count + half_kernel)
+                        .zip(0..rows_count + half_kernel)
+                    {
+                        let new_y = y.min(height as usize - 1);
+
+                        let src0 =
+                            &src[new_y * src_stride as usize..(new_y + 1) * src_stride as usize];
+
+                        let dst0 = UnsafeSlice::new(
+                            &mut buffer[start_ky * working_stride..(start_ky + 1) * working_stride],
+                        );
+
+                        horizontal_handler(
+                            &src0[..width as usize * CN],
+                            src_stride,
+                            &dst0,
+                            working_stride as u32,
+                            width,
+                            radius,
+                            0,
+                            1,
+                        );
+
+                        if dy >= half_kernel {
+                            if !has_warmed_up {
+                                for row in buffer.chunks_exact(working_stride).take(kernel_size - 1)
+                                {
+                                    for (dst, src) in working_row.iter_mut().zip(row.iter()) {
+                                        *dst += src.as_();
+                                    }
+                                }
+                                has_warmed_up = true;
+                            }
+
+                            let ky0 = (start_ky + 1) % kernel_size;
+                            let ky1 = (start_ky + kernel_size) % kernel_size;
+
+                            let brow0 = &buffer[ky0 * working_stride..(ky0 + 1) * working_stride];
+                            let brow1 = &buffer[ky1 * working_stride..(ky1 + 1) * working_stride];
+
+                            let capture = [brow0, brow1];
+
+                            let dy = dy - half_kernel;
+
+                            let dst0 = &mut dst_rows
+                                [dy * dst_stride as usize..(dy + 1) * dst_stride as usize];
+
+                            ring_vsum(
+                                &capture,
+                                &mut dst0[..width as usize * CN],
+                                &mut working_row,
+                                radius,
+                            );
+                        }
+
+                        start_ky += 1;
+                        start_ky %= kernel_size;
+                    }
+                });
+        });
+    } else {
+        let mut working_row = vec![J::default(); working_stride];
+        let mut buffer = vec![T::default(); working_stride * kernel_size];
+
+        let dst0 = UnsafeSlice::new(&mut buffer[..working_stride]);
+
+        horizontal_handler(
+            &src[..width as usize * CN],
+            src_stride,
+            &dst0,
+            working_stride as u32,
+            width,
+            radius,
+            0,
+            1,
+        );
+
+        let half_kernel = kernel_size / 2;
+
+        let (src_row, rest) = buffer.split_at_mut(working_stride);
+        for dst in rest.chunks_exact_mut(working_stride).take(half_kernel) {
+            for (dst, src) in dst.iter_mut().zip(src_row.iter()) {
+                *dst = *src;
+            }
+        }
+
+        let mut start_ky = kernel_size / 2 + 1;
+
+        start_ky %= kernel_size;
+
+        let mut has_warmed_up = false;
+
+        for y in 1..height as usize + half_kernel {
+            let new_y = y.min(height as usize - 1);
+
+            let src0 = &src[new_y * src_stride as usize..(new_y + 1) * src_stride as usize];
+
+            let dst0 = UnsafeSlice::new(
+                &mut buffer[start_ky * working_stride..(start_ky + 1) * working_stride],
+            );
+
+            horizontal_handler(
+                &src0[..width as usize * CN],
+                src_stride,
+                &dst0,
+                working_stride as u32,
+                width,
+                radius,
+                0,
+                1,
+            );
+
+            if y >= half_kernel {
+                if !has_warmed_up {
+                    for row in buffer.chunks_exact(working_stride).take(kernel_size - 1) {
+                        for (dst, src) in working_row.iter_mut().zip(row.iter()) {
+                            *dst += src.as_();
+                        }
+                    }
+                    has_warmed_up = true;
+                }
+
+                let ky0 = (start_ky + 1) % kernel_size;
+                let ky1 = (start_ky + kernel_size) % kernel_size;
+
+                let brow0 = &buffer[ky0 * working_stride..(ky0 + 1) * working_stride];
+                let brow1 = &buffer[ky1 * working_stride..(ky1 + 1) * working_stride];
+
+                let capture = [brow0, brow1];
+
+                let dy = y - half_kernel;
+
+                let dst0 = &mut dst[dy * dst_stride as usize..(dy + 1) * dst_stride as usize];
+
+                ring_vsum(
+                    &capture,
+                    &mut dst0[..width as usize * CN],
+                    &mut working_row,
+                    radius,
+                );
+            }
+
+            start_ky += 1;
+            start_ky %= kernel_size;
+        }
+    }
+
+    Ok(())
+}
+
 fn box_blur_impl<
     T: FromPrimitive
         + Default
@@ -571,7 +1167,8 @@ fn box_blur_impl<
         + AsPrimitive<f32>
         + AsPrimitive<f64>
         + BoxBlurHorizontalPass<T>
-        + BoxBlurVerticalPass<T>,
+        + BoxBlurVerticalPass<T>
+        + RingBufferHandler<T>,
     const CN: usize,
 >(
     src: &[T],
@@ -601,6 +1198,20 @@ where
         height as usize,
         CN,
     )?;
+    // Ring buffer is less effective in Single Threaded mode.
+    if radius < 55 && (thread_count > 1 || T::BOX_RING_IN_SINGLE_THREAD) {
+        return T::box_filter_ring_buffer::<CN>(
+            src,
+            src_stride,
+            dst,
+            dst_stride,
+            width,
+            height,
+            radius,
+            pool,
+            thread_count,
+        );
+    }
     let mut transient: Vec<T> = vec![T::default(); dst_stride as usize * height as usize];
     box_blur_horizontal_pass::<T, CN>(
         src,
@@ -929,7 +1540,8 @@ fn tent_blur_impl<
         + AsPrimitive<f32>
         + AsPrimitive<f64>
         + BoxBlurHorizontalPass<T>
-        + BoxBlurVerticalPass<T>,
+        + BoxBlurVerticalPass<T>
+        + RingBufferHandler<T>,
     const CN: usize,
 >(
     src: &[T],
@@ -1223,8 +1835,9 @@ fn gaussian_box_blur_impl<
         + AsPrimitive<f32>
         + AsPrimitive<f64>
         + BoxBlurHorizontalPass<T>
-        + BoxBlurVerticalPass<T>,
-    const CHANNEL_CONFIGURATION: usize,
+        + BoxBlurVerticalPass<T>
+        + RingBufferHandler<T>,
+    const CN: usize,
 >(
     src: &[T],
     src_stride: u32,
@@ -1252,7 +1865,7 @@ where
     };
     let mut transient: Vec<T> = vec![T::default(); dst_stride as usize * height as usize];
     let boxes = create_box_gauss(sigma, 3);
-    box_blur_impl::<T, CHANNEL_CONFIGURATION>(
+    box_blur_impl::<T, CN>(
         src,
         src_stride,
         dst,
@@ -1263,7 +1876,7 @@ where
         &pool,
         thread_count,
     )?;
-    box_blur_impl::<T, CHANNEL_CONFIGURATION>(
+    box_blur_impl::<T, CN>(
         dst,
         dst_stride,
         &mut transient,
@@ -1274,7 +1887,7 @@ where
         &pool,
         thread_count,
     )?;
-    box_blur_impl::<T, CHANNEL_CONFIGURATION>(
+    box_blur_impl::<T, CN>(
         &transient,
         dst_stride,
         dst,
