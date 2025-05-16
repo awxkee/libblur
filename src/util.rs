@@ -46,6 +46,7 @@ pub enum BlurError {
     StrideIsNotSupported,
     FftChannelsNotSupported,
     ExceedingPointerSize,
+    NegativeOrZeroSigma,
 }
 
 impl Error for BlurError {}
@@ -76,6 +77,9 @@ impl std::fmt::Display for BlurError {
             BlurError::FftChannelsNotSupported => f.write_str("Fft supports only planar images"),
             BlurError::ExceedingPointerSize => {
                 f.write_str("Image bounds and blurring kernel/radius exceeds pointer capacity")
+            }
+            BlurError::NegativeOrZeroSigma => {
+                f.write_str("Negative or zero sigma is not supported")
             }
         }
     }

@@ -25,9 +25,10 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use crate::gaussian::gaussian_hint::IeeeBinaryConvolutionMode;
 use crate::{
-    gaussian_blur_f32, sigma_size, BlurError, BlurImage, BlurImageMut, EdgeMode, FastBlurChannels,
-    ThreadingPolicy,
+    gaussian_blur_f32, BlurError, BlurImage, BlurImageMut, EdgeMode, FastBlurChannels,
+    GaussianBlurParams, ThreadingPolicy,
 };
 use colorutils_rs::linear_to_planar::linear_to_plane;
 use colorutils_rs::planar_to_linear::plane_to_linear;
@@ -57,8 +58,7 @@ use std::mem::size_of;
 pub fn gaussian_blur_in_linear(
     src: &BlurImage<u8>,
     dst: &mut BlurImageMut<u8>,
-    kernel_size: u32,
-    sigma: f32,
+    params: GaussianBlurParams,
     edge_mode: EdgeMode,
     threading_policy: ThreadingPolicy,
     transfer_function: TransferFunction,
@@ -94,22 +94,15 @@ pub fn gaussian_blur_in_linear(
         height,
         transfer_function,
     );
-
-    let sigma = if sigma <= 0. {
-        sigma_size(kernel_size as f32)
-    } else {
-        sigma
-    };
-
     let lin_data = linear_data.to_immutable_ref();
 
     gaussian_blur_f32(
         &lin_data,
         &mut linear_data_1,
-        kernel_size,
-        sigma,
+        params,
         edge_mode,
         threading_policy,
+        IeeeBinaryConvolutionMode::Normal,
     )?;
 
     let dst_stride = dst.row_stride();

@@ -27,13 +27,26 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/// Declares requested precision level, this is supported only for *u8*
-#[repr(C)]
+/// Declares preferred convolution precision mode for integer storage types.
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Default)]
 pub enum ConvolutionMode {
-    /// Exact precision, f32 accumulator and weights will be used
+    /// Exact precision, f32 accumulator and weights will be used.
     Exact = 0,
-    /// Convolution in numerical approximation, this is faster than exact convolution but may change result. Estimated error not less than 1-2%
+    /// Convolution in numerical approximation,
+    /// this is faster than exact convolution but may change result.
+    ///
+    /// Estimated error not less than 1-2%.
     #[default]
     FixedPoint = 1,
+}
+
+/// Specifies the preferred convolution precision mode for IEEE 754 binary32 (`f32`) data.
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Default)]
+pub enum IeeeBinaryConvolutionMode {
+    /// Exact precision, f32 accumulator and weights will be used.
+    Normal = 0,
+    /// High precision using `f64` for intermediate accumulation.
+    /// This significantly reduces numerical error in convolution results.
+    #[default]
+    Zealous = 1,
 }

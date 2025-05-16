@@ -1,7 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use image::{EncodableLayout, GenericImageView, ImageReader};
 
-use libblur::{BlurImageMut, EdgeMode, FastBlurChannels, ThreadingPolicy};
+use libblur::{AnisotropicRadius, BlurImageMut, EdgeMode, FastBlurChannels, ThreadingPolicy};
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     let img = ImageReader::open("../assets/test_image_4.png")
@@ -22,7 +22,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| {
             libblur::fast_gaussian(
                 &mut dst_image,
-                77,
+                AnisotropicRadius::new(77),
                 ThreadingPolicy::Adaptive,
                 EdgeMode::Clamp,
             )
@@ -39,8 +39,13 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             FastBlurChannels::Channels4,
         );
         b.iter(|| {
-            libblur::fast_gaussian(&mut dst_image, 77, ThreadingPolicy::Single, EdgeMode::Clamp)
-                .unwrap();
+            libblur::fast_gaussian(
+                &mut dst_image,
+                AnisotropicRadius::new(77),
+                ThreadingPolicy::Single,
+                EdgeMode::Clamp,
+            )
+            .unwrap();
         })
     });
 
@@ -57,7 +62,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| {
             libblur::fast_gaussian_f32(
                 &mut dst_image,
-                77,
+                AnisotropicRadius::new(77),
                 ThreadingPolicy::Single,
                 EdgeMode::Clamp,
             )
@@ -78,7 +83,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| {
             libblur::fast_gaussian_u16(
                 &mut dst_image,
-                77,
+                AnisotropicRadius::new(77),
                 ThreadingPolicy::Single,
                 EdgeMode::Clamp,
             )
@@ -105,7 +110,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| {
             libblur::fast_gaussian(
                 &mut dst_image,
-                77,
+                AnisotropicRadius::new(77),
                 ThreadingPolicy::Adaptive,
                 EdgeMode::Clamp,
             )
@@ -122,8 +127,13 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             FastBlurChannels::Channels3,
         );
         b.iter(|| {
-            libblur::fast_gaussian(&mut dst_image, 77, ThreadingPolicy::Single, EdgeMode::Clamp)
-                .unwrap();
+            libblur::fast_gaussian(
+                &mut dst_image,
+                AnisotropicRadius::new(77),
+                ThreadingPolicy::Single,
+                EdgeMode::Clamp,
+            )
+            .unwrap();
         })
     });
 }

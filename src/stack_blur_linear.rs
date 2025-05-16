@@ -25,7 +25,7 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use crate::{BlurError, BlurImageMut, FastBlurChannels, ThreadingPolicy};
+use crate::{AnisotropicRadius, BlurError, BlurImageMut, FastBlurChannels, ThreadingPolicy};
 use colorutils_rs::linear_to_planar::linear_to_plane;
 use colorutils_rs::planar_to_linear::plane_to_linear;
 use colorutils_rs::{
@@ -50,7 +50,7 @@ use std::mem::size_of;
 /// O(1) complexity.
 pub fn stack_blur_in_linear(
     image: &mut BlurImageMut<u8>,
-    radius: u32,
+    radius: AnisotropicRadius,
     threading_policy: ThreadingPolicy,
     transfer_function: TransferFunction,
 ) -> Result<(), BlurError> {

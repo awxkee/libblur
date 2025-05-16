@@ -1,6 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use image::{EncodableLayout, GenericImageView, ImageReader};
-use libblur::{BlurImage, BlurImageMut, FastBlurChannels, ThreadingPolicy};
+use libblur::{BlurImage, BlurImageMut, BoxBlurParameters, FastBlurChannels, ThreadingPolicy};
 use opencv::core::{find_file, Mat, Point, Size, BORDER_DEFAULT};
 use opencv::imgcodecs::{imread, IMREAD_COLOR};
 
@@ -32,7 +32,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             libblur::box_blur(
                 &src_image,
                 &mut dst_image,
-                77 / 2,
+                BoxBlurParameters::new(77),
                 ThreadingPolicy::Adaptive,
             )
             .unwrap();
@@ -61,7 +61,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             libblur::box_blur_u16(
                 &src_image,
                 &mut dst_image,
-                77 / 2,
+                BoxBlurParameters::new(77),
                 ThreadingPolicy::Adaptive,
             )
             .unwrap();
@@ -94,7 +94,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             libblur::box_blur_f32(
                 &src_image,
                 &mut dst_image,
-                77 / 2,
+                BoxBlurParameters::new(77),
                 ThreadingPolicy::Adaptive,
             )
             .unwrap();
@@ -124,8 +124,13 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         );
 
         b.iter(|| {
-            libblur::box_blur_f32(&src_image, &mut dst_image, 77 / 2, ThreadingPolicy::Single)
-                .unwrap();
+            libblur::box_blur_f32(
+                &src_image,
+                &mut dst_image,
+                BoxBlurParameters::new(77),
+                ThreadingPolicy::Single,
+            )
+            .unwrap();
         })
     });
 
@@ -148,7 +153,13 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         );
 
         b.iter(|| {
-            libblur::box_blur_u16(&src_image, &mut dst_image, 15, ThreadingPolicy::Single).unwrap();
+            libblur::box_blur_u16(
+                &src_image,
+                &mut dst_image,
+                BoxBlurParameters::new(15),
+                ThreadingPolicy::Single,
+            )
+            .unwrap();
         })
     });
 
@@ -170,7 +181,13 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         );
 
         b.iter(|| {
-            libblur::box_blur(&src_image, &mut dst_image, 15, ThreadingPolicy::Single).unwrap();
+            libblur::box_blur(
+                &src_image,
+                &mut dst_image,
+                BoxBlurParameters::new(15),
+                ThreadingPolicy::Single,
+            )
+            .unwrap();
         })
     });
 
@@ -211,7 +228,13 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         );
 
         b.iter(|| {
-            libblur::box_blur(&src_image, &mut dst_image, 15, ThreadingPolicy::Adaptive).unwrap();
+            libblur::box_blur(
+                &src_image,
+                &mut dst_image,
+                BoxBlurParameters::new(15),
+                ThreadingPolicy::Adaptive,
+            )
+            .unwrap();
         })
     });
 
@@ -285,7 +308,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             libblur::box_blur(
                 &src_image,
                 &mut dst_image,
-                77 / 2,
+                BoxBlurParameters::new(77),
                 ThreadingPolicy::Adaptive,
             )
             .unwrap();

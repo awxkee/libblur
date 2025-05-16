@@ -43,6 +43,70 @@ use rayon::prelude::ParallelSliceMut;
 use rayon::ThreadPool;
 use std::fmt::Debug;
 
+/// Both kernels are expected to be odd.
+#[derive(Copy, Clone, Debug)]
+pub struct BoxBlurParameters {
+    /// X-axis kernel size
+    pub x_axis_kernel: u32,
+    /// Y-axis kernel size
+    pub y_axis_kernel: u32,
+}
+
+/// Central limit theorem based blurs parameters.
+pub struct CLTParameters {
+    /// X-axis sigma
+    pub x_sigma: f32,
+    /// Y-axis sigma
+    pub y_sigma: f32,
+}
+
+impl CLTParameters {
+    pub fn new(sigma: f32) -> CLTParameters {
+        CLTParameters {
+            x_sigma: sigma,
+            y_sigma: sigma,
+        }
+    }
+
+    fn validate(&self) -> Result<(), BlurError> {
+        if self.x_sigma <= 0. {
+            return Err(BlurError::NegativeOrZeroSigma);
+        }
+        if self.y_sigma <= 0. {
+            return Err(BlurError::NegativeOrZeroSigma);
+        }
+        Ok(())
+    }
+}
+
+impl BoxBlurParameters {
+    /// Kernel is expected to be odd.
+    pub fn new(kernel: u32) -> BoxBlurParameters {
+        BoxBlurParameters {
+            x_axis_kernel: kernel,
+            y_axis_kernel: kernel,
+        }
+    }
+
+    fn x_radius(&self) -> u32 {
+        (self.x_axis_kernel / 2).max(1)
+    }
+
+    fn y_radius(&self) -> u32 {
+        (self.y_axis_kernel / 2).max(1)
+    }
+
+    fn validate(&self) -> Result<(), BlurError> {
+        if self.x_axis_kernel % 2 == 0 {
+            return Err(BlurError::OddKernel(self.x_axis_kernel as usize));
+        }
+        if self.y_axis_kernel % 2 == 0 {
+            return Err(BlurError::OddKernel(self.y_axis_kernel as usize));
+        }
+        Ok(())
+    }
+}
+
 fn box_blur_horizontal_pass_impl<T, J, const CN: usize>(
     src: &[T],
     src_stride: u32,
@@ -174,6 +238,13 @@ impl BoxBlurHorizontalPass<f32> for f32 {
         {
             use crate::box_filter::neon::box_blur_horizontal_pass_neon_rgba_f32;
             box_blur_horizontal_pass_neon_rgba_f32::<CN>
+        }
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        {
+            if std::arch::is_x86_feature_detected!("avx2") {
+                use crate::box_filter::avx::box_blur_horizontal_pass_avx_f32;
+                return box_blur_horizontal_pass_avx_f32::<CN>;
+            }
         }
         #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
@@ -621,7 +692,7 @@ trait RingBufferHandler<T> {
         dst_stride: u32,
         width: u32,
         height: u32,
-        radius: u32,
+        parameters: BoxBlurParameters,
         pool: &Option<ThreadPool>,
         thread_count: u32,
     ) -> Result<(), BlurError>;
@@ -636,7 +707,7 @@ impl RingBufferHandler<u8> for u8 {
         dst_stride: u32,
         width: u32,
         height: u32,
-        radius: u32,
+        parameters: BoxBlurParameters,
         pool: &Option<ThreadPool>,
         thread_count: u32,
     ) -> Result<(), BlurError>
@@ -650,7 +721,7 @@ impl RingBufferHandler<u8> for u8 {
             dst_stride,
             width,
             height,
-            radius,
+            parameters,
             pool,
             thread_count,
         )
@@ -666,7 +737,7 @@ impl RingBufferHandler<u16> for u16 {
         dst_stride: u32,
         width: u32,
         height: u32,
-        radius: u32,
+        parameters: BoxBlurParameters,
         pool: &Option<ThreadPool>,
         thread_count: u32,
     ) -> Result<(), BlurError>
@@ -680,7 +751,7 @@ impl RingBufferHandler<u16> for u16 {
             dst_stride,
             width,
             height,
-            radius,
+            parameters,
             pool,
             thread_count,
         )
@@ -699,7 +770,7 @@ impl RingBufferHandler<f32> for f32 {
         dst_stride: u32,
         width: u32,
         height: u32,
-        radius: u32,
+        parameters: BoxBlurParameters,
         pool: &Option<ThreadPool>,
         thread_count: u32,
     ) -> Result<(), BlurError>
@@ -713,7 +784,7 @@ impl RingBufferHandler<f32> for f32 {
             dst_stride,
             width,
             height,
-            radius,
+            parameters,
             pool,
             thread_count,
         )
@@ -729,7 +800,7 @@ impl RingBufferHandler<f16> for f16 {
         dst_stride: u32,
         width: u32,
         height: u32,
-        radius: u32,
+        parameters: BoxBlurParameters,
         pool: &Option<ThreadPool>,
         thread_count: u32,
     ) -> Result<(), BlurError>
@@ -743,7 +814,7 @@ impl RingBufferHandler<f16> for f16 {
             dst_stride,
             width,
             height,
-            radius,
+            parameters,
             pool,
             thread_count,
         )
@@ -900,7 +971,7 @@ fn ring_box_filter<
     dst_stride: u32,
     width: u32,
     height: u32,
-    radius: u32,
+    parameters: BoxBlurParameters,
     pool: &Option<ThreadPool>,
     thread_count: u32,
 ) -> Result<(), BlurError>
@@ -908,7 +979,9 @@ where
     f32: ToStorage<T>,
     (): VRowSum<T, J>,
 {
-    let kernel_size = radius as usize * 2 + 1;
+    let y_kernel_size = parameters.y_axis_kernel as usize;
+    let x_radius = parameters.x_radius();
+    let y_radius = parameters.y_radius();
     let working_stride = width as usize * CN;
 
     let horizontal_handler = T::get_horizontal_pass::<CN>();
@@ -924,9 +997,9 @@ where
                     let source_y = cy * tile_size;
 
                     let mut working_row = vec![J::default(); working_stride];
-                    let mut buffer = vec![T::default(); working_stride * kernel_size];
+                    let mut buffer = vec![T::default(); working_stride * y_kernel_size];
 
-                    let half_kernel = kernel_size / 2;
+                    let half_kernel = y_kernel_size / 2;
 
                     if source_y == 0 {
                         let dst0 = UnsafeSlice::new(&mut buffer[..working_stride]);
@@ -939,7 +1012,7 @@ where
                             &dst0,
                             working_stride as u32,
                             width,
-                            radius,
+                            x_radius,
                             0,
                             1,
                         );
@@ -966,7 +1039,7 @@ where
                             &dst0,
                             working_stride as u32,
                             width,
-                            radius,
+                            x_radius,
                             0,
                             half_kernel as u32,
                         );
@@ -988,16 +1061,16 @@ where
                                 &dst0,
                                 working_stride as u32,
                                 width,
-                                radius,
+                                x_radius,
                                 0,
                                 1,
                             );
                         }
                     }
 
-                    let mut start_ky = kernel_size / 2 + 1;
+                    let mut start_ky = y_kernel_size / 2 + 1;
 
-                    start_ky %= kernel_size;
+                    start_ky %= y_kernel_size;
 
                     let mut has_warmed_up = false;
 
@@ -1021,14 +1094,15 @@ where
                             &dst0,
                             working_stride as u32,
                             width,
-                            radius,
+                            x_radius,
                             0,
                             1,
                         );
 
                         if dy >= half_kernel {
                             if !has_warmed_up {
-                                for row in buffer.chunks_exact(working_stride).take(kernel_size - 1)
+                                for row in
+                                    buffer.chunks_exact(working_stride).take(y_kernel_size - 1)
                                 {
                                     for (dst, src) in working_row.iter_mut().zip(row.iter()) {
                                         *dst += src.as_();
@@ -1037,8 +1111,8 @@ where
                                 has_warmed_up = true;
                             }
 
-                            let ky0 = (start_ky + 1) % kernel_size;
-                            let ky1 = (start_ky + kernel_size) % kernel_size;
+                            let ky0 = (start_ky + 1) % y_kernel_size;
+                            let ky1 = (start_ky + y_kernel_size) % y_kernel_size;
 
                             let brow0 = &buffer[ky0 * working_stride..(ky0 + 1) * working_stride];
                             let brow1 = &buffer[ky1 * working_stride..(ky1 + 1) * working_stride];
@@ -1054,18 +1128,18 @@ where
                                 &capture,
                                 &mut dst0[..width as usize * CN],
                                 &mut working_row,
-                                radius,
+                                y_radius,
                             );
                         }
 
                         start_ky += 1;
-                        start_ky %= kernel_size;
+                        start_ky %= y_kernel_size;
                     }
                 });
         });
     } else {
         let mut working_row = vec![J::default(); working_stride];
-        let mut buffer = vec![T::default(); working_stride * kernel_size];
+        let mut buffer = vec![T::default(); working_stride * y_kernel_size];
 
         let dst0 = UnsafeSlice::new(&mut buffer[..working_stride]);
 
@@ -1075,12 +1149,12 @@ where
             &dst0,
             working_stride as u32,
             width,
-            radius,
+            x_radius,
             0,
             1,
         );
 
-        let half_kernel = kernel_size / 2;
+        let half_kernel = y_kernel_size / 2;
 
         let (src_row, rest) = buffer.split_at_mut(working_stride);
         for dst in rest.chunks_exact_mut(working_stride).take(half_kernel) {
@@ -1089,9 +1163,9 @@ where
             }
         }
 
-        let mut start_ky = kernel_size / 2 + 1;
+        let mut start_ky = y_kernel_size / 2 + 1;
 
-        start_ky %= kernel_size;
+        start_ky %= y_kernel_size;
 
         let mut has_warmed_up = false;
 
@@ -1110,14 +1184,14 @@ where
                 &dst0,
                 working_stride as u32,
                 width,
-                radius,
+                x_radius,
                 0,
                 1,
             );
 
             if y >= half_kernel {
                 if !has_warmed_up {
-                    for row in buffer.chunks_exact(working_stride).take(kernel_size - 1) {
+                    for row in buffer.chunks_exact(working_stride).take(y_kernel_size - 1) {
                         for (dst, src) in working_row.iter_mut().zip(row.iter()) {
                             *dst += src.as_();
                         }
@@ -1125,8 +1199,8 @@ where
                     has_warmed_up = true;
                 }
 
-                let ky0 = (start_ky + 1) % kernel_size;
-                let ky1 = (start_ky + kernel_size) % kernel_size;
+                let ky0 = (start_ky + 1) % y_kernel_size;
+                let ky1 = (start_ky + y_kernel_size) % y_kernel_size;
 
                 let brow0 = &buffer[ky0 * working_stride..(ky0 + 1) * working_stride];
                 let brow1 = &buffer[ky1 * working_stride..(ky1 + 1) * working_stride];
@@ -1141,12 +1215,12 @@ where
                     &capture,
                     &mut dst0[..width as usize * CN],
                     &mut working_row,
-                    radius,
+                    y_radius,
                 );
             }
 
             start_ky += 1;
-            start_ky %= kernel_size;
+            start_ky %= y_kernel_size;
         }
     }
 
@@ -1177,7 +1251,7 @@ fn box_blur_impl<
     dst_stride: u32,
     width: u32,
     height: u32,
-    radius: u32,
+    parameters: BoxBlurParameters,
     pool: &Option<ThreadPool>,
     thread_count: u32,
 ) -> Result<(), BlurError>
@@ -1199,7 +1273,7 @@ where
         CN,
     )?;
     // Ring buffer is less effective in Single Threaded mode.
-    if radius < 55 && (thread_count > 1 || T::BOX_RING_IN_SINGLE_THREAD) {
+    if parameters.y_radius() < 55 && (thread_count > 1 || T::BOX_RING_IN_SINGLE_THREAD) {
         return T::box_filter_ring_buffer::<CN>(
             src,
             src_stride,
@@ -1207,7 +1281,7 @@ where
             dst_stride,
             width,
             height,
-            radius,
+            parameters,
             pool,
             thread_count,
         );
@@ -1220,7 +1294,7 @@ where
         dst_stride,
         width,
         height,
-        radius,
+        parameters.x_radius(),
         pool,
         thread_count,
     );
@@ -1232,7 +1306,7 @@ where
         dst_stride,
         width,
         height,
-        radius,
+        parameters.y_radius(),
         pool,
         thread_count,
     );
@@ -1250,20 +1324,21 @@ where
 ///
 /// * `image` - Source immutable image, see [BlurImage] for more info.
 /// * `dst_image` - Destination mutable image, see [BlurImageMut] for more info.
-/// * `radius` - almost any radius is supported.
+/// * `parameters` - see [BoxBlurParameters] for more info.
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn box_blur(
     image: &BlurImage<u8>,
     dst_image: &mut BlurImageMut<u8>,
-    radius: u32,
+    parameters: BoxBlurParameters,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
     image.check_layout()?;
     dst_image.check_layout(Some(image))?;
     image.size_matches_mut(dst_image)?;
-    if radius == 1 {
+    parameters.validate()?;
+    if parameters.x_axis_kernel == 1 && parameters.y_axis_kernel == 1 {
         return image.copy_to_mut(dst_image);
     }
     let width = image.width;
@@ -1293,7 +1368,7 @@ pub fn box_blur(
         dst_stride,
         width,
         height,
-        radius,
+        parameters,
         &pool,
         thread_count,
     )?;
@@ -1310,20 +1385,20 @@ pub fn box_blur(
 ///
 /// * `image` - Source immutable image, see [BlurImage] for more info.
 /// * `dst_image` - Destination mutable image, see [BlurImageMut] for more info.
-/// * `radius` - almost any radius is supported.
+/// * `parameters` - see [BoxBlurParameters] for more info.
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn box_blur_u16(
     image: &BlurImage<u16>,
     dst_image: &mut BlurImageMut<u16>,
-    radius: u32,
+    parameters: BoxBlurParameters,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
     image.check_layout()?;
     dst_image.check_layout(Some(image))?;
     image.size_matches_mut(dst_image)?;
-    if radius == 1 {
+    if parameters.x_axis_kernel == 1 && parameters.y_axis_kernel == 1 {
         return image.copy_to_mut(dst_image);
     }
     let width = image.width;
@@ -1353,7 +1428,7 @@ pub fn box_blur_u16(
         dst_stride,
         width,
         height,
-        radius,
+        parameters,
         &pool,
         thread_count,
     )?;
@@ -1370,20 +1445,21 @@ pub fn box_blur_u16(
 ///
 /// * `image` - Source immutable image, see [BlurImage] for more info.
 /// * `dst_image` - Destination mutable image, see [BlurImageMut] for more info.
-/// * `radius` - almost any radius is supported.
+/// * `parameters` - see [BoxBlurParameters] for more info.
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn box_blur_f32(
     image: &BlurImage<f32>,
     dst_image: &mut BlurImageMut<f32>,
-    radius: u32,
+    parameters: BoxBlurParameters,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
     image.check_layout()?;
     dst_image.check_layout(Some(image))?;
     image.size_matches_mut(dst_image)?;
-    if radius == 1 {
+    parameters.validate()?;
+    if parameters.x_axis_kernel == 1 && parameters.y_axis_kernel == 1 {
         return image.copy_to_mut(dst_image);
     }
     let width = image.width;
@@ -1413,7 +1489,7 @@ pub fn box_blur_f32(
         dst_stride,
         width,
         height,
-        radius,
+        parameters,
         &pool,
         thread_count,
     )
@@ -1429,7 +1505,7 @@ pub fn box_blur_f32(
 ///
 /// * `image` - Source immutable image, see [BlurImage] for more info.
 /// * `dst_image` - Destination mutable image, see [BlurImageMut] for more info.
-/// * `radius` - almost any radius is supported.
+/// * `parameters` - see [BoxBlurParameters] for more info.
 /// * `threading_policy` - Threads usage policy.
 /// * `transfer_function` - Transfer function in linear colorspace.
 ///
@@ -1438,14 +1514,15 @@ pub fn box_blur_f32(
 pub fn box_blur_in_linear(
     image: &BlurImage<u8>,
     dst_image: &mut BlurImageMut<u8>,
-    radius: u32,
+    parameters: BoxBlurParameters,
     threading_policy: ThreadingPolicy,
     transfer_function: TransferFunction,
 ) -> Result<(), BlurError> {
     image.check_layout()?;
     dst_image.check_layout(Some(image))?;
     image.size_matches_mut(dst_image)?;
-    if radius == 1 {
+    parameters.validate()?;
+    if parameters.x_axis_kernel == 1 && parameters.y_axis_kernel == 1 {
         return image.copy_to_mut(dst_image);
     }
     let mut linear_data = BlurImageMut::alloc(image.width, image.height, image.channels);
@@ -1480,7 +1557,12 @@ pub fn box_blur_in_linear(
 
     let linear_close = linear_data.to_immutable_ref();
 
-    box_blur_f32(&linear_close, &mut linear_data_2, radius, threading_policy)?;
+    box_blur_f32(
+        &linear_close,
+        &mut linear_data_2,
+        parameters,
+        threading_policy,
+    )?;
 
     inverse_transformer(
         linear_data_2.data.borrow_mut(),
@@ -1561,13 +1643,13 @@ fn tent_blur_impl<
     dst_stride: u32,
     width: u32,
     height: u32,
-    sigma: f32,
+    parameters: CLTParameters,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError>
 where
     f32: ToStorage<T>,
 {
-    assert!(sigma > 0.0, "Sigma can't be 0");
+    parameters.validate()?;
     let thread_count = threading_policy.thread_count(width, height) as u32;
     let pool = if thread_count == 1 {
         None
@@ -1581,7 +1663,8 @@ where
     };
     let mut transient: Vec<T> =
         vec![T::from_u32(0).unwrap_or_default(); width as usize * height as usize * CN];
-    let boxes = create_box_gauss(sigma, 2);
+    let boxes_horizontal = create_box_gauss(parameters.x_sigma, 2);
+    let boxes_vertical = create_box_gauss(parameters.y_sigma, 2);
     box_blur_impl::<T, CN>(
         src,
         src_stride,
@@ -1589,7 +1672,10 @@ where
         width * CN as u32,
         width,
         height,
-        boxes[0],
+        BoxBlurParameters {
+            x_axis_kernel: boxes_horizontal[0] * 2 + 1,
+            y_axis_kernel: boxes_vertical[0] * 2 + 1,
+        },
         &pool,
         thread_count,
     )?;
@@ -1600,7 +1686,10 @@ where
         dst_stride,
         width,
         height,
-        boxes[1],
+        BoxBlurParameters {
+            x_axis_kernel: boxes_horizontal[1] * 2 + 1,
+            y_axis_kernel: boxes_vertical[1] * 2 + 1,
+        },
         &pool,
         thread_count,
     )
@@ -1619,19 +1708,20 @@ where
 ///
 /// * `image` - Source immutable image, see [BlurImage] for more info.
 /// * `dst_image` - Destination mutable image, see [BlurImageMut] for more info.
-/// * `radius` - almost any radius is supported.
+/// * `parameters` - See [CLTParameters] for more info.
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn tent_blur(
     image: &BlurImage<u8>,
     dst_image: &mut BlurImageMut<u8>,
-    sigma: f32,
+    parameters: CLTParameters,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
     image.check_layout()?;
     dst_image.check_layout(Some(image))?;
     image.size_matches_mut(dst_image)?;
+    parameters.validate()?;
     let dispatcher = match image.channels {
         FastBlurChannels::Plane => tent_blur_impl::<u8, 1>,
         FastBlurChannels::Channels3 => tent_blur_impl::<u8, 3>,
@@ -1650,7 +1740,7 @@ pub fn tent_blur(
         dst_stride,
         width,
         height,
-        sigma,
+        parameters,
         threading_policy,
     )
 }
@@ -1668,19 +1758,20 @@ pub fn tent_blur(
 ///
 /// * `image` - Source immutable image, see [BlurImage] for more info.
 /// * `dst_image` - Destination mutable image, see [BlurImageMut] for more info.
-/// * `radius` - almost any radius is supported.
+/// * `parameters` - See [CLTParameters] for more info.
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn tent_blur_u16(
     image: &BlurImage<u16>,
     dst_image: &mut BlurImageMut<u16>,
-    sigma: f32,
+    parameters: CLTParameters,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
     image.check_layout()?;
     dst_image.check_layout(Some(image))?;
     image.size_matches_mut(dst_image)?;
+    parameters.validate()?;
     let dispatcher = match image.channels {
         FastBlurChannels::Plane => tent_blur_impl::<u16, 1>,
         FastBlurChannels::Channels3 => tent_blur_impl::<u16, 3>,
@@ -1699,7 +1790,7 @@ pub fn tent_blur_u16(
         dst_stride,
         width,
         height,
-        sigma,
+        parameters,
         threading_policy,
     )
 }
@@ -1715,19 +1806,20 @@ pub fn tent_blur_u16(
 ///
 /// * `image` - Source immutable image, see [BlurImage] for more info.
 /// * `dst_image` - Destination mutable image, see [BlurImageMut] for more info.
-/// * `radius` - almost any radius is supported.
+/// * `parameters` - See [CLTParameters] for more info.
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn tent_blur_f32(
     image: &BlurImage<f32>,
     dst_image: &mut BlurImageMut<f32>,
-    sigma: f32,
+    parameters: CLTParameters,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
     image.check_layout()?;
     dst_image.check_layout(Some(image))?;
     image.size_matches_mut(dst_image)?;
+    parameters.validate()?;
     let dispatcher = match image.channels {
         FastBlurChannels::Plane => tent_blur_impl::<f32, 1>,
         FastBlurChannels::Channels3 => tent_blur_impl::<f32, 3>,
@@ -1746,7 +1838,7 @@ pub fn tent_blur_f32(
         dst_stride,
         width,
         height,
-        sigma,
+        parameters,
         threading_policy,
     )
 }
@@ -1764,20 +1856,21 @@ pub fn tent_blur_f32(
 ///
 /// * `image` - Source immutable image, see [BlurImage] for more info.
 /// * `dst_image` - Destination mutable image, see [BlurImageMut] for more info.
-/// * `radius` - almost any radius is supported.
+/// * `parameters` - See [CLTParameters] for more info.
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn tent_blur_in_linear(
     image: &BlurImage<u8>,
     dst_image: &mut BlurImageMut<u8>,
-    sigma: f32,
+    parameters: CLTParameters,
     threading_policy: ThreadingPolicy,
     transfer_function: TransferFunction,
 ) -> Result<(), BlurError> {
     image.check_layout()?;
     dst_image.check_layout(Some(image))?;
     image.size_matches_mut(dst_image)?;
+    parameters.validate()?;
 
     let mut linear_data = BlurImageMut::alloc(image.width, image.height, image.channels);
     let mut linear_data_2 = BlurImageMut::alloc(image.width, image.height, image.channels);
@@ -1812,7 +1905,7 @@ pub fn tent_blur_in_linear(
     tent_blur_f32(
         &immutable_linear_ref,
         &mut linear_data_2,
-        sigma,
+        parameters,
         threading_policy,
     )?;
 
@@ -1855,13 +1948,13 @@ fn gaussian_box_blur_impl<
     dst_stride: u32,
     width: u32,
     height: u32,
-    sigma: f32,
+    parameters: CLTParameters,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError>
 where
     f32: ToStorage<T>,
 {
-    assert!(sigma > 0.0, "Sigma can't be 0");
+    parameters.validate()?;
     let thread_count = threading_policy.thread_count(width, height) as u32;
     let pool = if thread_count == 1 {
         None
@@ -1874,7 +1967,8 @@ where
         )
     };
     let mut transient: Vec<T> = vec![T::default(); dst_stride as usize * height as usize];
-    let boxes = create_box_gauss(sigma, 3);
+    let boxes_horizontal = create_box_gauss(parameters.x_sigma, 3);
+    let boxes_vertical = create_box_gauss(parameters.y_sigma, 3);
     box_blur_impl::<T, CN>(
         src,
         src_stride,
@@ -1882,7 +1976,10 @@ where
         dst_stride,
         width,
         height,
-        boxes[0],
+        BoxBlurParameters {
+            x_axis_kernel: boxes_horizontal[0] * 2 + 1,
+            y_axis_kernel: boxes_vertical[0] * 2 + 1,
+        },
         &pool,
         thread_count,
     )?;
@@ -1893,7 +1990,10 @@ where
         dst_stride,
         width,
         height,
-        boxes[1],
+        BoxBlurParameters {
+            x_axis_kernel: boxes_horizontal[1] * 2 + 1,
+            y_axis_kernel: boxes_vertical[1] * 2 + 1,
+        },
         &pool,
         thread_count,
     )?;
@@ -1904,7 +2004,10 @@ where
         dst_stride,
         width,
         height,
-        boxes[2],
+        BoxBlurParameters {
+            x_axis_kernel: boxes_horizontal[2] * 2 + 1,
+            y_axis_kernel: boxes_vertical[2] * 2 + 1,
+        },
         &pool,
         thread_count,
     )
@@ -1924,19 +2027,20 @@ where
 ///
 /// * `image` - Source immutable image, see [BlurImage] for more info.
 /// * `dst_image` - Destination mutable image, see [BlurImageMut] for more info.
-/// * `sigma` - Flattening level.
+/// * `parameters` - See [CLTParameters] for more info.
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn gaussian_box_blur(
     image: &BlurImage<u8>,
     dst_image: &mut BlurImageMut<u8>,
-    sigma: f32,
+    parameters: CLTParameters,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
     image.check_layout()?;
     dst_image.check_layout(Some(image))?;
     image.size_matches_mut(dst_image)?;
+    parameters.validate()?;
     let dispatcher = match image.channels {
         FastBlurChannels::Plane => gaussian_box_blur_impl::<u8, 1>,
         FastBlurChannels::Channels3 => gaussian_box_blur_impl::<u8, 3>,
@@ -1955,7 +2059,7 @@ pub fn gaussian_box_blur(
         dst_stride,
         width,
         height,
-        sigma,
+        parameters,
         threading_policy,
     )
 }
@@ -1974,7 +2078,7 @@ pub fn gaussian_box_blur(
 ///
 /// * `image` - Source immutable image, see [BlurImage] for more info.
 /// * `dst_image` - Destination mutable image, see [BlurImageMut] for more info.
-/// * `sigma` - Flattening level.
+/// * `parameters` - See [CLTParameters] for more info.
 /// * `threading_policy` - Threading policy, see [ThreadingPolicy] for more info.
 ///
 /// # Panics
@@ -1982,12 +2086,13 @@ pub fn gaussian_box_blur(
 pub fn gaussian_box_blur_u16(
     image: &BlurImage<u16>,
     dst_image: &mut BlurImageMut<u16>,
-    sigma: f32,
+    parameters: CLTParameters,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
     image.check_layout()?;
     dst_image.check_layout(Some(image))?;
     image.size_matches_mut(dst_image)?;
+    parameters.validate()?;
     let channels = image.channels;
     let executor = match channels {
         FastBlurChannels::Plane => gaussian_box_blur_impl::<u16, 1>,
@@ -2007,7 +2112,7 @@ pub fn gaussian_box_blur_u16(
         dst_stride,
         width,
         height,
-        sigma,
+        parameters,
         threading_policy,
     )
 }
@@ -2026,7 +2131,7 @@ pub fn gaussian_box_blur_u16(
 ///
 /// * `image` - Source immutable image, see [BlurImage] for more info.
 /// * `dst_image` - Destination mutable image, see [BlurImageMut] for more info.
-/// * `sigma` - Flattening level.
+/// * `parameters` - See [CLTParameters] for more info.
 /// * `threading_policy` - Threading policy, see [ThreadingPolicy] for more info.
 ///
 /// # Panics
@@ -2034,12 +2139,13 @@ pub fn gaussian_box_blur_u16(
 pub fn gaussian_box_blur_f32(
     image: &BlurImage<f32>,
     dst_image: &mut BlurImageMut<f32>,
-    sigma: f32,
+    parameters: CLTParameters,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
     image.check_layout()?;
     dst_image.check_layout(Some(image))?;
     image.size_matches_mut(dst_image)?;
+    parameters.validate()?;
     let channels = image.channels;
     let dispatcher = match channels {
         FastBlurChannels::Plane => gaussian_box_blur_impl::<f32, 1>,
@@ -2059,7 +2165,7 @@ pub fn gaussian_box_blur_f32(
         dst_stride,
         width,
         height,
-        sigma,
+        parameters,
         threading_policy,
     )
 }
@@ -2077,7 +2183,7 @@ pub fn gaussian_box_blur_f32(
 ///
 /// * `image` - Source immutable image, see [BlurImage] for more info.
 /// * `dst_image` - Destination mutable image, see [BlurImageMut] for more info.
-/// * `sigma` - Flattening level.
+/// * `parameters` - See [CLTParameters] for more info.
 /// * `threading_policy` - Threading policy, see [ThreadingPolicy] for more info.
 ///
 /// # Panics
@@ -2085,13 +2191,14 @@ pub fn gaussian_box_blur_f32(
 pub fn gaussian_box_blur_in_linear(
     image: &BlurImage<u8>,
     dst_image: &mut BlurImageMut<u8>,
-    sigma: f32,
+    parameters: CLTParameters,
     threading_policy: ThreadingPolicy,
     transfer_function: TransferFunction,
 ) -> Result<(), BlurError> {
     image.check_layout()?;
     dst_image.check_layout(Some(image))?;
     image.size_matches_mut(dst_image)?;
+    parameters.validate()?;
     let mut linear_data = BlurImageMut::alloc(image.width, image.height, image.channels);
     let mut linear_data_2 = BlurImageMut::alloc(image.width, image.height, image.channels);
 
@@ -2123,7 +2230,12 @@ pub fn gaussian_box_blur_in_linear(
 
     let immutable_ref = linear_data.to_immutable_ref();
 
-    gaussian_box_blur_f32(&immutable_ref, &mut linear_data_2, sigma, threading_policy)?;
+    gaussian_box_blur_f32(
+        &immutable_ref,
+        &mut linear_data_2,
+        parameters,
+        threading_policy,
+    )?;
 
     let dst_stride = dst_image.row_stride();
 

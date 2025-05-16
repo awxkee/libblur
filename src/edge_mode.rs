@@ -40,7 +40,7 @@ pub enum EdgeMode {
     /// If filter goes out of bounds image will be replicated with rule `gfedcb|abcdefgh|gfedcba`.
     Reflect101 = 3,
     /// If filter goes out of bounds image will be replicated with provided constant.
-    /// Works only for pure gaussian filter, otherwise ignored.
+    /// Works only for filter APIs.
     Constant = 4,
 }
 

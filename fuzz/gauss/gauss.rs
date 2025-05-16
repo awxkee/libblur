@@ -31,8 +31,8 @@
 
 use arbitrary::Arbitrary;
 use libblur::{
-    filter_1d_approx, filter_1d_exact, gaussian_kernel_1d, sigma_size, BlurImage, BlurImageMut,
-    ConvolutionMode, EdgeMode, FastBlurChannels, Scalar, ThreadingPolicy,
+    BlurImage, BlurImageMut, ConvolutionMode, EdgeMode, FastBlurChannels, GaussianBlurParams,
+    ThreadingPolicy,
 };
 use libfuzzer_sys::fuzz_target;
 
@@ -42,14 +42,18 @@ pub struct SrcImage {
     pub src_height: u16,
     pub value: u8,
     pub edge_mode: u8,
-    pub kernel_size: u8,
+    pub x_kernel_size: u8,
+    pub y_kernel_size: u8,
 }
 
 fuzz_target!(|data: SrcImage| {
     if data.src_width > 250 || data.src_height > 250 {
         return;
     }
-    if data.kernel_size % 2 == 0 || data.kernel_size > 45 || data.kernel_size == 0 {
+    if data.x_kernel_size > 45 || data.x_kernel_size == 0 {
+        return;
+    }
+    if data.y_kernel_size > 45 || data.y_kernel_size == 0 {
         return;
     }
     let edge_mode = match data.edge_mode % 4 {
@@ -61,42 +65,24 @@ fuzz_target!(|data: SrcImage| {
     fuzz_8bit(
         data.src_width as usize,
         data.src_height as usize,
-        data.kernel_size as usize,
-        FastBlurChannels::Channels4,
-        edge_mode,
-    );
-    fuzz_8bit_non_symmetry(
-        data.src_width as usize,
-        data.src_height as usize,
-        data.kernel_size as usize,
+        data.x_kernel_size as usize,
+        data.y_kernel_size as usize,
         FastBlurChannels::Channels4,
         edge_mode,
     );
     fuzz_8bit(
         data.src_width as usize,
         data.src_height as usize,
-        data.kernel_size as usize,
-        FastBlurChannels::Channels3,
-        edge_mode,
-    );
-    fuzz_8bit_non_symmetry(
-        data.src_width as usize,
-        data.src_height as usize,
-        data.kernel_size as usize,
+        data.x_kernel_size as usize,
+        data.y_kernel_size as usize,
         FastBlurChannels::Channels3,
         edge_mode,
     );
     fuzz_8bit(
         data.src_width as usize,
         data.src_height as usize,
-        data.kernel_size as usize,
-        FastBlurChannels::Plane,
-        edge_mode,
-    );
-    fuzz_8bit_non_symmetry(
-        data.src_width as usize,
-        data.src_height as usize,
-        data.kernel_size as usize,
+        data.x_kernel_size as usize,
+        data.y_kernel_size as usize,
         FastBlurChannels::Plane,
         edge_mode,
     );
@@ -105,11 +91,12 @@ fuzz_target!(|data: SrcImage| {
 fn fuzz_8bit(
     width: usize,
     height: usize,
-    kernel_size: usize,
+    x_kernel_size: usize,
+    y_kernel_size: usize,
     channels: FastBlurChannels,
     edge_mode: EdgeMode,
 ) {
-    if width == 0 || height == 0 || kernel_size == 0 {
+    if width == 0 || height == 0 || x_kernel_size == 0 || y_kernel_size == 0 {
         return;
     }
     let src_image = BlurImage::alloc(width as u32, height as u32, channels);
@@ -118,8 +105,7 @@ fn fuzz_8bit(
     libblur::gaussian_blur(
         &src_image,
         &mut dst_image,
-        kernel_size as u32,
-        0.,
+        GaussianBlurParams::new_asymmetric_from_kernels(x_kernel_size as f64, y_kernel_size as f64),
         edge_mode,
         ThreadingPolicy::Single,
         ConvolutionMode::FixedPoint,
@@ -129,96 +115,10 @@ fn fuzz_8bit(
     libblur::gaussian_blur(
         &src_image,
         &mut dst_image,
-        kernel_size as u32,
-        0.,
+        GaussianBlurParams::new_asymmetric_from_kernels(x_kernel_size as f64, y_kernel_size as f64),
         edge_mode,
         ThreadingPolicy::Single,
         ConvolutionMode::Exact,
     )
     .unwrap();
-}
-
-fn fuzz_8bit_non_symmetry(
-    width: usize,
-    height: usize,
-    kernel_size: usize,
-    channels: FastBlurChannels,
-    edge_mode: EdgeMode,
-) {
-    if width == 0 || height == 0 || kernel_size == 0 {
-        return;
-    }
-    let src_image = BlurImage::alloc(width as u32, height as u32, channels);
-    let mut dst_image = BlurImageMut::alloc(width as u32, height as u32, channels);
-
-    let kernel = gaussian_kernel_1d(kernel_size as u32, sigma_size(kernel_size as f32));
-
-    match channels {
-        FastBlurChannels::Plane => {
-            filter_1d_exact::<u8, f32, 1>(
-                &src_image,
-                &mut dst_image,
-                &kernel,
-                &kernel,
-                edge_mode,
-                Scalar::default(),
-                ThreadingPolicy::Single,
-            )
-            .unwrap();
-            filter_1d_approx::<u8, f32, i32, 1>(
-                &src_image,
-                &mut dst_image,
-                &kernel,
-                &kernel,
-                edge_mode,
-                Scalar::default(),
-                ThreadingPolicy::Single,
-            )
-            .unwrap();
-        }
-        FastBlurChannels::Channels3 => {
-            filter_1d_exact::<u8, f32, 3>(
-                &src_image,
-                &mut dst_image,
-                &kernel,
-                &kernel,
-                edge_mode,
-                Scalar::default(),
-                ThreadingPolicy::Single,
-            )
-            .unwrap();
-            filter_1d_approx::<u8, f32, i32, 3>(
-                &src_image,
-                &mut dst_image,
-                &kernel,
-                &kernel,
-                edge_mode,
-                Scalar::default(),
-                ThreadingPolicy::Single,
-            )
-            .unwrap();
-        }
-        FastBlurChannels::Channels4 => {
-            filter_1d_exact::<u8, f32, 4>(
-                &src_image,
-                &mut dst_image,
-                &kernel,
-                &kernel,
-                edge_mode,
-                Scalar::default(),
-                ThreadingPolicy::Single,
-            )
-            .unwrap();
-            filter_1d_approx::<u8, f32, i32, 4>(
-                &src_image,
-                &mut dst_image,
-                &kernel,
-                &kernel,
-                edge_mode,
-                Scalar::default(),
-                ThreadingPolicy::Single,
-            )
-            .unwrap();
-        }
-    }
 }

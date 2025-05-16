@@ -30,7 +30,7 @@
 #![no_main]
 
 use arbitrary::Arbitrary;
-use libblur::{stack_blur_u16, BlurImageMut, FastBlurChannels, ThreadingPolicy};
+use libblur::{stack_blur_u16, AnisotropicRadius, BlurImageMut, FastBlurChannels, ThreadingPolicy};
 use libfuzzer_sys::fuzz_target;
 
 #[derive(Clone, Debug, Arbitrary)]
@@ -39,7 +39,8 @@ pub struct SrcImage {
     pub src_height: u16,
     pub value: u16,
     pub edge_mode: u8,
-    pub radius: u8,
+    pub x_radius: u8,
+    pub y_radius: u8,
     pub plane: u8,
 }
 
@@ -52,15 +53,13 @@ fuzz_target!(|data: SrcImage| {
     if data.src_width > 250 || data.src_height > 250 {
         return;
     }
-    if data.radius == 0 {
-        return;
-    }
     match plane_match {
         FastBlurChannels::Plane => {
             fuzz_image(
                 data.src_width as usize,
                 data.src_height as usize,
-                data.radius as usize,
+                data.x_radius as usize,
+                data.y_radius as usize,
                 FastBlurChannels::Plane,
                 data.value,
             );
@@ -69,7 +68,8 @@ fuzz_target!(|data: SrcImage| {
             fuzz_image(
                 data.src_width as usize,
                 data.src_height as usize,
-                data.radius as usize,
+                data.x_radius as usize,
+                data.y_radius as usize,
                 FastBlurChannels::Channels3,
                 data.value,
             );
@@ -78,7 +78,8 @@ fuzz_target!(|data: SrcImage| {
             fuzz_image(
                 data.src_width as usize,
                 data.src_height as usize,
-                data.radius as usize,
+                data.x_radius as usize,
+                data.y_radius as usize,
                 FastBlurChannels::Channels4,
                 data.value,
             );
@@ -86,13 +87,30 @@ fuzz_target!(|data: SrcImage| {
     }
 });
 
-fn fuzz_image(width: usize, height: usize, radius: usize, channels: FastBlurChannels, value: u16) {
-    if width == 0 || height == 0 || radius == 0 {
+fn fuzz_image(
+    width: usize,
+    height: usize,
+    x_radius: usize,
+    y_radius: usize,
+    channels: FastBlurChannels,
+    value: u16,
+) {
+    if width == 0 || height == 0 {
         return;
     }
     let mut dst_image = BlurImageMut::alloc(width as u32, height as u32, channels);
     dst_image.data.borrow_mut().fill(value);
 
-    stack_blur_u16(&mut dst_image, radius as u32, ThreadingPolicy::Single).unwrap();
-    stack_blur_u16(&mut dst_image, radius as u32 + 500, ThreadingPolicy::Single).unwrap();
+    stack_blur_u16(
+        &mut dst_image,
+        AnisotropicRadius::create(x_radius as u32, y_radius as u32),
+        ThreadingPolicy::Single,
+    )
+    .unwrap();
+    stack_blur_u16(
+        &mut dst_image,
+        AnisotropicRadius::create(x_radius as u32 + 500, y_radius as u32 + 500),
+        ThreadingPolicy::Single,
+    )
+    .unwrap();
 }

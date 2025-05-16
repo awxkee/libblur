@@ -28,7 +28,7 @@
  */
 use crate::{
     gaussian_blur, gaussian_blur_f32, gaussian_blur_u16, BlurImage, BlurImageMut, ConvolutionMode,
-    EdgeMode, FastBlurChannels, ThreadingPolicy,
+    EdgeMode, FastBlurChannels, GaussianBlurParams, IeeeBinaryConvolutionMode, ThreadingPolicy,
 };
 use image::{
     DynamicImage, GrayAlphaImage, GrayImage, ImageBuffer, Luma, LumaA, Rgb, Rgb32FImage, RgbImage,
@@ -41,17 +41,16 @@ use image::{
 ///
 /// # Arguments
 ///
-/// * `image`: Dynamic image provided by image crate
-/// * `radius`: radius limited
-/// * `edge_mode` - Rule to handle edge mode
-/// * `precise_level` - Gaussian precise level, precise level works only on u8
-/// * `threading_policy` - Threads usage policy
+/// * `image`: Dynamic image provided by image crate.
+/// * `params`: See [GaussianBlurParams] for more info.
+/// * `edge_mode` - Rule to handle edge mode.
+/// * `precise_level` - Gaussian precise level, precise level works only on u8/u16.
+/// * `threading_policy` - Threads usage policy.
 ///
 #[must_use]
 pub fn gaussian_blur_image(
     image: DynamicImage,
-    kernel_size: u32,
-    sigma: f32,
+    params: GaussianBlurParams,
     edge_mode: EdgeMode,
     precise_level: ConvolutionMode,
     threading_policy: ThreadingPolicy,
@@ -66,8 +65,7 @@ pub fn gaussian_blur_image(
             gaussian_blur(
                 &gray_image,
                 &mut new_image,
-                kernel_size,
-                sigma,
+                params,
                 edge_mode,
                 threading_policy,
                 precise_level,
@@ -121,8 +119,7 @@ pub fn gaussian_blur_image(
             gaussian_blur(
                 &int,
                 &mut new_intensity_plane,
-                kernel_size,
-                sigma,
+                params,
                 edge_mode,
                 threading_policy,
                 precise_level,
@@ -132,8 +129,7 @@ pub fn gaussian_blur_image(
             gaussian_blur(
                 &alp,
                 &mut new_alpha_plane,
-                kernel_size,
-                sigma,
+                params,
                 edge_mode,
                 threading_policy,
                 precise_level,
@@ -173,8 +169,7 @@ pub fn gaussian_blur_image(
             gaussian_blur(
                 &gray_image,
                 &mut new_image,
-                kernel_size,
-                sigma,
+                params,
                 edge_mode,
                 threading_policy,
                 precise_level,
@@ -193,8 +188,7 @@ pub fn gaussian_blur_image(
             gaussian_blur(
                 &gray_image,
                 &mut new_image,
-                kernel_size,
-                sigma,
+                params,
                 edge_mode,
                 threading_policy,
                 precise_level,
@@ -213,8 +207,7 @@ pub fn gaussian_blur_image(
             gaussian_blur_u16(
                 &gray_image,
                 &mut new_image,
-                kernel_size,
-                sigma,
+                params,
                 edge_mode,
                 threading_policy,
                 precise_level,
@@ -269,8 +262,7 @@ pub fn gaussian_blur_image(
             gaussian_blur_u16(
                 &int,
                 &mut new_intensity_plane,
-                kernel_size,
-                sigma,
+                params,
                 edge_mode,
                 threading_policy,
                 precise_level,
@@ -280,8 +272,7 @@ pub fn gaussian_blur_image(
             gaussian_blur_u16(
                 &alp,
                 &mut new_alpha_plane,
-                kernel_size,
-                sigma,
+                params,
                 edge_mode,
                 threading_policy,
                 precise_level,
@@ -321,8 +312,7 @@ pub fn gaussian_blur_image(
             gaussian_blur_u16(
                 &gray_image,
                 &mut new_image,
-                kernel_size,
-                sigma,
+                params,
                 edge_mode,
                 threading_policy,
                 precise_level,
@@ -344,8 +334,7 @@ pub fn gaussian_blur_image(
             gaussian_blur_u16(
                 &gray_image,
                 &mut new_image,
-                kernel_size,
-                sigma,
+                params,
                 edge_mode,
                 threading_policy,
                 precise_level,
@@ -367,10 +356,10 @@ pub fn gaussian_blur_image(
             gaussian_blur_f32(
                 &gray_image,
                 &mut new_image,
-                kernel_size,
-                sigma,
+                params,
                 edge_mode,
                 threading_policy,
+                IeeeBinaryConvolutionMode::Normal,
             )
             .unwrap();
             let new_rgb_image =
@@ -385,10 +374,10 @@ pub fn gaussian_blur_image(
             gaussian_blur_f32(
                 &gray_image,
                 &mut new_image,
-                kernel_size,
-                sigma,
+                params,
                 edge_mode,
                 threading_policy,
+                IeeeBinaryConvolutionMode::Normal,
             )
             .unwrap();
             let new_rgb_image = Rgba32FImage::from_raw(

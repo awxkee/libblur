@@ -31,7 +31,8 @@
 
 use arbitrary::Arbitrary;
 use libblur::{
-    BlurImage, BlurImageMut, ConvolutionMode, EdgeMode, FastBlurChannels, ThreadingPolicy,
+    BlurImage, BlurImageMut, ConvolutionMode, EdgeMode, FastBlurChannels, GaussianBlurParams,
+    ThreadingPolicy,
 };
 use libfuzzer_sys::fuzz_target;
 
@@ -42,7 +43,8 @@ pub struct SrcImage {
     pub value: u8,
     pub edge_mode: u8,
     pub channels: u8,
-    pub kernel_size: u8,
+    pub x_kernel_size: u8,
+    pub y_kernel_size: u8,
     pub fixed_point: bool,
 }
 
@@ -50,7 +52,10 @@ fuzz_target!(|data: SrcImage| {
     if data.src_width > 250 || data.src_height > 250 {
         return;
     }
-    if data.kernel_size % 2 == 0 || data.kernel_size > 35 {
+    if data.x_kernel_size > 35 {
+        return;
+    }
+    if data.y_kernel_size > 35 {
         return;
     }
     let edge_mode = match data.edge_mode % 4 {
@@ -67,7 +72,8 @@ fuzz_target!(|data: SrcImage| {
     fuzz_16bit(
         data.src_width as usize,
         data.src_height as usize,
-        data.kernel_size as usize,
+        data.x_kernel_size as usize,
+        data.y_kernel_size as usize,
         edge_mode,
         channels,
         data.fixed_point,
@@ -77,12 +83,13 @@ fuzz_target!(|data: SrcImage| {
 fn fuzz_16bit(
     width: usize,
     height: usize,
-    radius: usize,
+    x_kernel: usize,
+    y_kernel: usize,
     edge_mode: EdgeMode,
     channels: FastBlurChannels,
     fixed_point: bool,
 ) {
-    if width == 0 || height == 0 || radius == 0 {
+    if width == 0 || height == 0 || x_kernel == 0 || y_kernel == 0 {
         return;
     }
     let src_image = BlurImage::alloc(width as u32, height as u32, channels);
@@ -91,8 +98,7 @@ fn fuzz_16bit(
     libblur::gaussian_blur_u16(
         &src_image,
         &mut dst_image,
-        radius as u32 * 2 + 1,
-        0.,
+        GaussianBlurParams::new_asymmetric_from_kernels(x_kernel as f64, y_kernel as f64),
         edge_mode,
         ThreadingPolicy::Single,
         if fixed_point {

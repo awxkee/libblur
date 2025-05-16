@@ -1,0 +1,316 @@
+/*
+ * // Copyright (c) Radzivon Bartoshyk 5/2025. All rights reserved.
+ * //
+ * // Redistribution and use in source and binary forms, with or without modification,
+ * // are permitted provided that the following conditions are met:
+ * //
+ * // 1.  Redistributions of source code must retain the above copyright notice, this
+ * // list of conditions and the following disclaimer.
+ * //
+ * // 2.  Redistributions in binary form must reproduce the above copyright notice,
+ * // this list of conditions and the following disclaimer in the documentation
+ * // and/or other materials provided with the distribution.
+ * //
+ * // 3.  Neither the name of the copyright holder nor the names of its
+ * // contributors may be used to endorse or promote products derived from
+ * // this software without specific prior written permission.
+ * //
+ * // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * // AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * // IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * // DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * // FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * // DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * // SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * // CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+use crate::sse::{load_f32, store_f32};
+use crate::unsafe_slice::UnsafeSlice;
+use std::arch::x86_64::*;
+
+pub(crate) fn box_blur_horizontal_pass_avx_f32<const CN: usize>(
+    src: &[f32],
+    src_stride: u32,
+    dst: &UnsafeSlice<f32>,
+    dst_stride: u32,
+    width: u32,
+    radius: u32,
+    start_y: u32,
+    end_y: u32,
+) {
+    unsafe {
+        let unit = HorizontalExecutionUnit::<CN>::default();
+        unit.pass(
+            src, src_stride, dst, dst_stride, width, radius, start_y, end_y,
+        );
+    }
+}
+
+#[inline(always)]
+pub(crate) unsafe fn load_f32_x2<const CN: usize>(ptr0: *const f32, ptr1: *const f32) -> __m256 {
+    if CN == 4 {
+        let x0 = _mm_loadu_ps(ptr0);
+        let x1 = _mm_loadu_ps(ptr1);
+        _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(x0), x1)
+    } else if CN == 3 {
+        let mut j0 = _mm_loadu_si64(ptr0 as *const _);
+        let mut j1 = _mm_loadu_si64(ptr1 as *const _);
+        j0 = _mm_insert_epi32::<2>(j0, ptr0.add(2).read_unaligned().to_bits() as i32);
+        j1 = _mm_insert_epi32::<2>(j1, ptr1.add(2).read_unaligned().to_bits() as i32);
+        _mm256_insertf128_ps::<1>(
+            _mm256_castps128_ps256(_mm_castsi128_ps(j0)),
+            _mm_castsi128_ps(j1),
+        )
+    } else if CN == 2 {
+        let j0 = _mm_loadu_si64(ptr0 as *const _);
+        let j1 = _mm_loadu_si64(ptr1 as *const _);
+        _mm256_insertf128_ps::<1>(
+            _mm256_castps128_ps256(_mm_castsi128_ps(j0)),
+            _mm_castsi128_ps(j1),
+        )
+    } else {
+        let x0 = _mm_load_ss(ptr0 as *const _);
+        let x1 = _mm_load_ss(ptr1 as *const _);
+        _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(x0), x1)
+    }
+}
+
+#[derive(Default, Copy, Clone)]
+struct HorizontalExecutionUnit<const CN: usize> {}
+
+impl<const CN: usize> HorizontalExecutionUnit<CN> {
+    #[target_feature(enable = "avx2")]
+    unsafe fn pass(
+        &self,
+        src: &[f32],
+        src_stride: u32,
+        unsafe_dst: &UnsafeSlice<f32>,
+        dst_stride: u32,
+        width: u32,
+        radius: u32,
+        start_y: u32,
+        end_y: u32,
+    ) {
+        let kernel_size = radius * 2 + 1;
+        let edge_count = (kernel_size / 2) + 1;
+        let v_edge_count = _mm256_set1_ps(edge_count as f32);
+
+        let v_weight = _mm256_set1_ps(1f32 / (radius * 2) as f32);
+
+        let half_kernel = kernel_size / 2;
+
+        let mut yy = start_y;
+
+        while yy + 6 < end_y {
+            let y = yy;
+            let y_src_shift = y as usize * src_stride as usize;
+            let y_dst_shift = y as usize * dst_stride as usize;
+
+            let mut store_0: __m256;
+            let mut store_1: __m256;
+            let mut store_2: __m256;
+
+            unsafe {
+                let s_ptr_0 = src.as_ptr().add(y_src_shift);
+                let s_ptr_1 = src.as_ptr().add(y_src_shift + src_stride as usize);
+                let s_ptr_2 = src.as_ptr().add(y_src_shift + src_stride as usize * 2);
+                let s_ptr_3 = src.as_ptr().add(y_src_shift + src_stride as usize * 3);
+                let s_ptr_4 = src.as_ptr().add(y_src_shift + src_stride as usize * 4);
+                let s_ptr_5 = src.as_ptr().add(y_src_shift + src_stride as usize * 5);
+
+                let edge_colors_0 = load_f32_x2::<CN>(s_ptr_0, s_ptr_1);
+                let edge_colors_1 = load_f32_x2::<CN>(s_ptr_2, s_ptr_3);
+                let edge_colors_2 = load_f32_x2::<CN>(s_ptr_4, s_ptr_5);
+
+                store_0 = _mm256_mul_ps(edge_colors_0, v_edge_count);
+                store_1 = _mm256_mul_ps(edge_colors_1, v_edge_count);
+                store_2 = _mm256_mul_ps(edge_colors_2, v_edge_count);
+            }
+
+            unsafe {
+                for x in 1usize..half_kernel as usize {
+                    let px = x.min(width as usize - 1) * CN;
+
+                    let s_ptr_0 = src.as_ptr().add(y_src_shift + px);
+                    let s_ptr_1 = src.as_ptr().add(y_src_shift + src_stride as usize + px);
+                    let s_ptr_2 = src.as_ptr().add(y_src_shift + src_stride as usize * 2 + px);
+                    let s_ptr_3 = src.as_ptr().add(y_src_shift + src_stride as usize * 3 + px);
+                    let s_ptr_4 = src.as_ptr().add(y_src_shift + src_stride as usize * 4 + px);
+                    let s_ptr_5 = src.as_ptr().add(y_src_shift + src_stride as usize * 5 + px);
+
+                    let edge_colors_0 = load_f32_x2::<CN>(s_ptr_0, s_ptr_1);
+                    let edge_colors_1 = load_f32_x2::<CN>(s_ptr_2, s_ptr_3);
+                    let edge_colors_2 = load_f32_x2::<CN>(s_ptr_4, s_ptr_5);
+
+                    store_0 = _mm256_add_ps(store_0, edge_colors_0);
+                    store_1 = _mm256_add_ps(store_1, edge_colors_1);
+                    store_2 = _mm256_add_ps(store_2, edge_colors_2);
+                }
+            }
+
+            for x in 0..width {
+                // preload edge pixels
+
+                // subtract previous
+                unsafe {
+                    let previous_x = (x as i64 - half_kernel as i64).max(0) as usize;
+                    let previous = previous_x * CN;
+
+                    let s_ptr_0 = src.as_ptr().add(y_src_shift + previous);
+                    let s_ptr_1 = src
+                        .as_ptr()
+                        .add(y_src_shift + src_stride as usize + previous);
+                    let s_ptr_2 = src
+                        .as_ptr()
+                        .add(y_src_shift + src_stride as usize * 2 + previous);
+                    let s_ptr_3 = src
+                        .as_ptr()
+                        .add(y_src_shift + src_stride as usize * 3 + previous);
+                    let s_ptr_4 = src
+                        .as_ptr()
+                        .add(y_src_shift + src_stride as usize * 4 + previous);
+                    let s_ptr_5 = src
+                        .as_ptr()
+                        .add(y_src_shift + src_stride as usize * 5 + previous);
+
+                    let edge_colors_0 = load_f32_x2::<CN>(s_ptr_0, s_ptr_1);
+                    let edge_colors_1 = load_f32_x2::<CN>(s_ptr_2, s_ptr_3);
+                    let edge_colors_2 = load_f32_x2::<CN>(s_ptr_4, s_ptr_5);
+
+                    store_0 = _mm256_sub_ps(store_0, edge_colors_0);
+                    store_1 = _mm256_sub_ps(store_1, edge_colors_1);
+                    store_2 = _mm256_sub_ps(store_2, edge_colors_2);
+                }
+
+                // add next
+                unsafe {
+                    let next_x = (x + half_kernel).min(width - 1) as usize;
+
+                    let next = next_x * CN;
+
+                    let s_ptr_0 = src.as_ptr().add(y_src_shift + next);
+                    let s_ptr_1 = src.as_ptr().add(y_src_shift + src_stride as usize + next);
+                    let s_ptr_2 = src
+                        .as_ptr()
+                        .add(y_src_shift + src_stride as usize * 2 + next);
+                    let s_ptr_3 = src
+                        .as_ptr()
+                        .add(y_src_shift + src_stride as usize * 3 + next);
+                    let s_ptr_4 = src
+                        .as_ptr()
+                        .add(y_src_shift + src_stride as usize * 4 + next);
+                    let s_ptr_5 = src
+                        .as_ptr()
+                        .add(y_src_shift + src_stride as usize * 5 + next);
+
+                    let edge_colors_0 = load_f32_x2::<CN>(s_ptr_0, s_ptr_1);
+                    let edge_colors_1 = load_f32_x2::<CN>(s_ptr_2, s_ptr_3);
+                    let edge_colors_2 = load_f32_x2::<CN>(s_ptr_4, s_ptr_5);
+
+                    store_0 = _mm256_add_ps(store_0, edge_colors_0);
+                    store_1 = _mm256_add_ps(store_1, edge_colors_1);
+                    store_2 = _mm256_add_ps(store_2, edge_colors_2);
+                }
+
+                let px = x as usize * CN;
+
+                unsafe {
+                    let r0 = _mm256_mul_ps(store_0, v_weight);
+                    let r1 = _mm256_mul_ps(store_1, v_weight);
+                    let r2 = _mm256_mul_ps(store_2, v_weight);
+
+                    let bytes_offset_0 = y_dst_shift + px;
+                    let bytes_offset_1 = y_dst_shift + dst_stride as usize + px;
+                    let bytes_offset_2 = y_dst_shift + dst_stride as usize * 2 + px;
+                    let bytes_offset_3 = y_dst_shift + dst_stride as usize * 3 + px;
+                    let bytes_offset_4 = y_dst_shift + dst_stride as usize * 4 + px;
+                    let bytes_offset_5 = y_dst_shift + dst_stride as usize * 5 + px;
+                    store_f32::<CN>(
+                        unsafe_dst.slice.as_ptr().add(bytes_offset_0) as *mut _,
+                        _mm256_castps256_ps128(r0),
+                    );
+                    store_f32::<CN>(
+                        unsafe_dst.slice.as_ptr().add(bytes_offset_1) as *mut _,
+                        _mm256_extractf128_ps::<1>(r0),
+                    );
+                    store_f32::<CN>(
+                        unsafe_dst.slice.as_ptr().add(bytes_offset_2) as *mut _,
+                        _mm256_castps256_ps128(r1),
+                    );
+                    store_f32::<CN>(
+                        unsafe_dst.slice.as_ptr().add(bytes_offset_3) as *mut _,
+                        _mm256_extractf128_ps::<1>(r1),
+                    );
+                    store_f32::<CN>(
+                        unsafe_dst.slice.as_ptr().add(bytes_offset_4) as *mut _,
+                        _mm256_castps256_ps128(r2),
+                    );
+                    store_f32::<CN>(
+                        unsafe_dst.slice.as_ptr().add(bytes_offset_5) as *mut _,
+                        _mm256_extractf128_ps::<1>(r2),
+                    );
+                }
+            }
+
+            yy += 6;
+        }
+
+        for y in yy..end_y {
+            let y_src_shift = y as usize * src_stride as usize;
+            let y_dst_shift = y as usize * dst_stride as usize;
+
+            let mut store;
+
+            unsafe {
+                let s_ptr = src.as_ptr().add(y_src_shift);
+                let edge_colors = load_f32::<CN>(s_ptr);
+                store = _mm_mul_ps(edge_colors, _mm256_castps256_ps128(v_edge_count));
+            }
+
+            unsafe {
+                for x in 1usize..half_kernel as usize {
+                    let px = x.min(width as usize - 1) * CN;
+                    let s_ptr = src.as_ptr().add(y_src_shift + px);
+                    let edge_colors = load_f32::<CN>(s_ptr);
+                    store = _mm_add_ps(store, edge_colors);
+                }
+            }
+
+            for x in 0..width {
+                // preload edge pixels
+
+                // subtract previous
+                unsafe {
+                    let previous_x = (x as i64 - half_kernel as i64).max(0) as usize;
+                    let previous = previous_x * CN;
+                    let s_ptr = src.as_ptr().add(y_src_shift + previous);
+                    let edge_colors = load_f32::<CN>(s_ptr);
+                    store = _mm_sub_ps(store, edge_colors);
+                }
+
+                // add next
+                unsafe {
+                    let next_x = (x + half_kernel).min(width - 1) as usize;
+
+                    let next = next_x * CN;
+
+                    let s_ptr = src.as_ptr().add(y_src_shift + next);
+                    let edge_colors = load_f32::<CN>(s_ptr);
+                    store = _mm_add_ps(store, edge_colors);
+                }
+
+                let px = x as usize * CN;
+
+                unsafe {
+                    let r0 = _mm_mul_ps(store, _mm256_castps256_ps128(v_weight));
+                    let bytes_offset = y_dst_shift + px;
+                    let ptr = unsafe_dst.slice.as_ptr().add(bytes_offset) as *mut f32;
+                    store_f32::<CN>(ptr, r0);
+                }
+            }
+        }
+    }
+}

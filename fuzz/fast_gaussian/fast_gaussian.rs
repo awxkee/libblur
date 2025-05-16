@@ -30,7 +30,9 @@
 #![no_main]
 
 use arbitrary::Arbitrary;
-use libblur::{fast_gaussian, BlurImageMut, EdgeMode, FastBlurChannels, ThreadingPolicy};
+use libblur::{
+    fast_gaussian, AnisotropicRadius, BlurImageMut, EdgeMode, FastBlurChannels, ThreadingPolicy,
+};
 use libfuzzer_sys::fuzz_target;
 
 #[derive(Clone, Debug, Arbitrary)]
@@ -39,7 +41,8 @@ pub struct SrcImage {
     pub src_height: u16,
     pub value: u8,
     pub edge_mode: u8,
-    pub radius: u8,
+    pub x_radius: u8,
+    pub y_radius: u8,
     pub plane: u8,
 }
 
@@ -58,13 +61,11 @@ fuzz_target!(|data: SrcImage| {
     if data.src_width > 250 || data.src_height > 250 {
         return;
     }
-    if data.radius == 0 {
-        return;
-    }
     fuzz_image(
         data.src_width as usize,
         data.src_height as usize,
-        data.radius as usize,
+        data.x_radius as usize,
+        data.y_radius as usize,
         plane_match,
         edge_mode,
         data.value,
@@ -74,12 +75,13 @@ fuzz_target!(|data: SrcImage| {
 fn fuzz_image(
     width: usize,
     height: usize,
-    radius: usize,
+    x_radius: usize,
+    y_radius: usize,
     channels: FastBlurChannels,
     edge_mode: EdgeMode,
     data: u8,
 ) {
-    if width == 0 || height == 0 || radius == 0 {
+    if width == 0 || height == 0 {
         return;
     }
 
@@ -88,7 +90,7 @@ fn fuzz_image(
 
     fast_gaussian(
         &mut dst_image,
-        radius as u32,
+        AnisotropicRadius::create(x_radius as u32, y_radius as u32),
         ThreadingPolicy::Single,
         edge_mode,
     )

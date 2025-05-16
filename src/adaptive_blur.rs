@@ -29,8 +29,9 @@
 #![allow(clippy::manual_clamp)]
 
 use crate::{
-    filter_2d, filter_2d_fft, gaussian_blur, stack_blur, BlurError, BlurImage, BlurImageMut,
-    ConvolutionMode, EdgeMode, FastBlurChannels, KernelShape, Scalar, ThreadingPolicy,
+    filter_2d, filter_2d_fft, gaussian_blur, stack_blur, AnisotropicRadius, BlurError, BlurImage,
+    BlurImageMut, ConvolutionMode, EdgeMode, FastBlurChannels, GaussianBlurParams, KernelShape,
+    Scalar, ThreadingPolicy,
 };
 use colorutils_rs::TransferFunction;
 use num_traits::AsPrimitive;
@@ -93,7 +94,12 @@ impl BlurEdges<u8> for u8 {
     fn blur_edges(image: &mut [u8], width: usize, height: usize, radius: u32) {
         let mut blur_img =
             BlurImageMut::borrow(image, width as u32, height as u32, FastBlurChannels::Plane);
-        stack_blur(&mut blur_img, radius, ThreadingPolicy::Adaptive).unwrap();
+        stack_blur(
+            &mut blur_img,
+            AnisotropicRadius::new(radius),
+            ThreadingPolicy::Adaptive,
+        )
+        .unwrap();
     }
 }
 
@@ -126,8 +132,7 @@ impl Blur<u8> for u8 {
         gaussian_blur(
             &src,
             &mut dst,
-            rad,
-            0.,
+            GaussianBlurParams::new_from_kernel(rad as f64),
             EdgeMode::Clamp,
             ThreadingPolicy::Adaptive,
             ConvolutionMode::FixedPoint,

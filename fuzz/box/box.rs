@@ -30,7 +30,7 @@
 #![no_main]
 
 use arbitrary::Arbitrary;
-use libblur::{BlurImage, BlurImageMut, FastBlurChannels, ThreadingPolicy};
+use libblur::{BlurImage, BlurImageMut, BoxBlurParameters, FastBlurChannels, ThreadingPolicy};
 use libfuzzer_sys::fuzz_target;
 
 #[derive(Clone, Debug, Arbitrary)]
@@ -39,7 +39,8 @@ pub struct SrcImage {
     pub src_height: u16,
     pub value: u16,
     pub edge_mode: u8,
-    pub kernel_size: u8,
+    pub x_kernel_size: u8,
+    pub y_kernel_size: u8,
     pub plane: u8,
     pub threading: bool,
 }
@@ -48,7 +49,10 @@ fuzz_target!(|data: SrcImage| {
     if data.src_width > 250 || data.src_height > 250 {
         return;
     }
-    if data.kernel_size == 0 || data.kernel_size % 2 == 0 {
+    if data.x_kernel_size == 0 || data.x_kernel_size % 2 == 0 {
+        return;
+    }
+    if data.y_kernel_size == 0 || data.y_kernel_size % 2 == 0 {
         return;
     }
     let plane_match = match data.plane % 3 {
@@ -59,7 +63,8 @@ fuzz_target!(|data: SrcImage| {
     fuzz_8bit(
         data.src_width as usize,
         data.src_height as usize,
-        data.kernel_size as usize,
+        data.x_kernel_size as usize,
+        data.y_kernel_size as usize,
         plane_match,
         if data.threading {
             ThreadingPolicy::Adaptive
@@ -72,11 +77,12 @@ fuzz_target!(|data: SrcImage| {
 fn fuzz_8bit(
     width: usize,
     height: usize,
-    kernel_size: usize,
+    x_kernel_size: usize,
+    y_kernel_size: usize,
     channels: FastBlurChannels,
     threading: ThreadingPolicy,
 ) {
-    if width == 0 || height == 0 || kernel_size == 0 {
+    if width == 0 || height == 0 || x_kernel_size == 0 || y_kernel_size == 0 {
         return;
     }
     let mut dst_image = BlurImageMut::alloc(width as u32, height as u32, channels);
@@ -85,8 +91,11 @@ fn fuzz_8bit(
     libblur::box_blur(
         &src_image,
         &mut dst_image,
-        kernel_size as u32,
-        ThreadingPolicy::Single,
+        BoxBlurParameters {
+            x_axis_kernel: x_kernel_size as u32,
+            y_axis_kernel: y_kernel_size as u32,
+        },
+        threading,
     )
     .unwrap();
 }

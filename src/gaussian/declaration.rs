@@ -27,13 +27,169 @@
 
 use crate::channels_configuration::FastBlurChannels;
 use crate::edge_mode::EdgeMode;
+use crate::gaussian::gaussian_hint::IeeeBinaryConvolutionMode;
 use crate::gaussian::gaussian_kernel::gaussian_kernel_1d;
-use crate::gaussian::gaussian_util::kernel_size as get_kernel_size;
+use crate::gaussian::gaussian_util::{kernel_size as get_kernel_size, kernel_size_d};
 use crate::{
-    filter_1d_approx, filter_1d_exact, sigma_size, BlurError, BlurImage, BlurImageMut,
-    ConvolutionMode, Scalar, ThreadingPolicy,
+    filter_1d_approx, filter_1d_exact, gaussian_kernel_1d_f64, sigma_size, sigma_size_d, BlurError,
+    BlurImage, BlurImageMut, ConvolutionMode, Scalar, ThreadingPolicy,
 };
 use half::f16;
+
+#[derive(Copy, Clone, Debug)]
+pub struct GaussianBlurParams {
+    /// X-axis kernel size
+    pub x_kernel: u32,
+    /// X-axis sigma
+    pub x_sigma: f64,
+    /// Y-axis kernel size
+    pub y_kernel: u32,
+    /// Y-axis sigma
+    pub y_sigma: f64,
+}
+
+#[inline]
+fn round_to_nearest_odd(x: f64) -> i64 {
+    let n = x.round() as i64;
+    if n % 2 != 0 {
+        n
+    } else {
+        // Check which odd integer is closer
+        let lower = n - 1;
+        let upper = n + 1;
+
+        let dist_lower = (x - lower as f64).abs();
+        let dist_upper = (x - upper as f64).abs();
+
+        if dist_lower <= dist_upper {
+            lower
+        } else {
+            upper
+        }
+    }
+}
+impl GaussianBlurParams {
+    /// Kernel expected to be odd.
+    /// Sigma must be > 0.
+    pub fn new(kernel: u32, sigma: f64) -> GaussianBlurParams {
+        GaussianBlurParams {
+            x_kernel: kernel,
+            x_sigma: sigma,
+            y_kernel: kernel,
+            y_sigma: sigma,
+        }
+    }
+
+    /// Sigma must be > 0 and not equal to `0.8`.
+    pub fn new_from_sigma(sigma: f64) -> GaussianBlurParams {
+        assert!(sigma > 0.);
+        let kernel_size = kernel_size_d(sigma);
+        Self::new(kernel_size, sigma)
+    }
+
+    /// Kernel must be > 0.
+    /// Kernel will be rounded to nearest odd, it is safe to pass any kernel here.
+    pub fn new_from_kernel(kernel: f64) -> GaussianBlurParams {
+        assert!(kernel > 0.);
+        let sigma = sigma_size_d(kernel);
+        Self::new(round_to_nearest_odd(kernel) as u32, sigma)
+    }
+
+    /// Kernel must be > 0.
+    /// Kernel will be rounded to nearest odd, it is safe to pass any kernel here.
+    pub fn new_asymmetric_from_kernels(x_kernel: f64, y_kernel: f64) -> GaussianBlurParams {
+        assert!(x_kernel > 0.);
+        assert!(y_kernel > 0.);
+        let x_sigma = sigma_size_d(x_kernel);
+        let y_sigma = sigma_size_d(y_kernel);
+        Self::new_asymmetric(
+            round_to_nearest_odd(x_kernel) as u32,
+            x_sigma,
+            round_to_nearest_odd(y_kernel) as u32,
+            y_sigma,
+        )
+    }
+
+    /// Kernel expected to be odd.
+    /// Sigma must be > 0.
+    pub fn new_asymmetric(
+        x_kernel: u32,
+        x_sigma: f64,
+        y_kernel: u32,
+        y_sigma: f64,
+    ) -> GaussianBlurParams {
+        GaussianBlurParams {
+            x_kernel,
+            x_sigma,
+            y_kernel,
+            y_sigma,
+        }
+    }
+
+    /// Sigma must be > 0 and not equal to `0.8`.
+    pub fn new_asymmetric_from_sigma(x_sigma: f64, y_sigma: f64) -> GaussianBlurParams {
+        GaussianBlurParams {
+            x_kernel: kernel_size_d(x_sigma),
+            x_sigma,
+            y_kernel: kernel_size_d(y_sigma),
+            y_sigma,
+        }
+    }
+
+    fn make_f32_kernel(&self, kernel_size: u32, sigma: f32) -> Vec<f32> {
+        assert!(
+            kernel_size != 0 || sigma > 0.0,
+            "Either sigma or kernel size must be set"
+        );
+        if kernel_size != 0 {
+            assert_ne!(kernel_size % 2, 0, "Kernel size must be odd");
+        }
+        let sigma = if sigma <= 0. {
+            sigma_size(kernel_size as f32)
+        } else {
+            sigma
+        };
+        let kernel_size = if kernel_size == 0 {
+            get_kernel_size(sigma)
+        } else {
+            kernel_size
+        };
+        gaussian_kernel_1d(kernel_size, sigma)
+    }
+
+    fn make_f64_kernel(&self, kernel_size: u32, sigma: f64) -> Vec<f64> {
+        assert!(
+            kernel_size != 0 || sigma > 0.0,
+            "Either sigma or kernel size must be set"
+        );
+        if kernel_size != 0 {
+            assert_ne!(kernel_size % 2, 0, "Kernel size must be odd");
+        }
+        let sigma = if sigma <= 0. {
+            sigma_size_d(kernel_size as f64)
+        } else {
+            sigma
+        };
+        let kernel_size = if kernel_size == 0 {
+            kernel_size_d(sigma)
+        } else {
+            kernel_size
+        };
+        gaussian_kernel_1d_f64(kernel_size, sigma)
+    }
+
+    fn make_f32_kernels(&self) -> (Vec<f32>, Vec<f32>) {
+        let vx_kernel = self.make_f32_kernel(self.x_kernel, self.x_sigma as f32);
+        let vy_kernel = self.make_f32_kernel(self.y_kernel, self.y_sigma as f32);
+        (vx_kernel, vy_kernel)
+    }
+
+    fn make_f64_kernels(&self) -> (Vec<f64>, Vec<f64>) {
+        let vx_kernel = self.make_f64_kernel(self.x_kernel, self.x_sigma);
+        let vy_kernel = self.make_f64_kernel(self.y_kernel, self.y_sigma);
+        (vx_kernel, vy_kernel)
+    }
+}
 
 /// Performs gaussian blur on the image.
 ///
@@ -46,21 +202,18 @@ use half::f16;
 ///
 /// * `src` - Source image.
 /// * `dst` - Destination image.
-/// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted. If zero, then sigma must be set.
-/// * `sigma` - Sigma for a gaussian kernel, corresponds to kernel flattening level. If zero of negative then *get_sigma_size* will be used
-/// * `edge_mode` - Rule to handle edge mode
-/// * `threading_policy` - Threading policy according to *ThreadingPolicy*
-/// * `hint` - see [ConvolutionMode] for more info
+/// * `params` - See [GaussianBlurParams] for more info.
+/// * `edge_mode` - Rule to handle edge mode, sse [EdgeMode] for more info.
+/// * `threading_policy` - Threading policy according to [ThreadingPolicy].
+/// * `hint` - see [ConvolutionMode] for more info.
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided.
 /// Panics if sigma = 0.8 and kernel size = 0.
-#[allow(clippy::too_many_arguments)]
 pub fn gaussian_blur(
     src: &BlurImage<u8>,
     dst: &mut BlurImageMut<u8>,
-    kernel_size: u32,
-    sigma: f32,
+    params: GaussianBlurParams,
     edge_mode: EdgeMode,
     threading_policy: ThreadingPolicy,
     hint: ConvolutionMode,
@@ -68,24 +221,7 @@ pub fn gaussian_blur(
     src.check_layout()?;
     dst.check_layout(Some(src))?;
     src.size_matches_mut(dst)?;
-    assert!(
-        kernel_size != 0 || sigma > 0.0,
-        "Either sigma or kernel size must be set"
-    );
-    if kernel_size != 0 {
-        assert_ne!(kernel_size % 2, 0, "Kernel size must be odd");
-    }
-    let sigma = if sigma <= 0. {
-        sigma_size(kernel_size as f32)
-    } else {
-        sigma
-    };
-    let kernel_size = if kernel_size == 0 {
-        get_kernel_size(sigma)
-    } else {
-        kernel_size
-    };
-    let kernel = gaussian_kernel_1d(kernel_size, sigma);
+    let (x_kernel, y_kernel) = params.make_f32_kernels();
     match hint {
         ConvolutionMode::Exact => {
             let _dispatcher = match src.channels {
@@ -96,8 +232,8 @@ pub fn gaussian_blur(
             _dispatcher(
                 src,
                 dst,
-                &kernel,
-                &kernel,
+                &x_kernel,
+                &y_kernel,
                 edge_mode,
                 Scalar::default(),
                 threading_policy,
@@ -112,8 +248,8 @@ pub fn gaussian_blur(
             _dispatcher(
                 src,
                 dst,
-                &kernel,
-                &kernel,
+                &x_kernel,
+                &y_kernel,
                 edge_mode,
                 Scalar::default(),
                 threading_policy,
@@ -134,12 +270,10 @@ pub fn gaussian_blur(
 ///
 /// * `src` - Source image.
 /// * `dst` - Destination image.
-/// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted. If zero, then sigma must be set.
-/// * `sigma` - Sigma for a gaussian kernel, corresponds to kernel flattening level. If zero of negative then *get_sigma_size* will be used
-/// * `channels` - Count of channels in the image
-/// * `edge_mode` - Rule to handle edge mode
-/// * `threading_policy` - Threading policy according to *ThreadingPolicy*
-/// * `hint` - see [ConvolutionMode] for more info
+/// * `params` - See [GaussianBlurParams] for more info.
+/// * `edge_mode` - Rule to handle edge mode, sse [EdgeMode] for more info.
+/// * `threading_policy` - Threading policy according to [ThreadingPolicy].
+/// * `hint` - see [ConvolutionMode] for more info.
 ///
 /// This method always clamp into [0, 65535], if other bit-depth is used
 /// consider additional clamp into required range.
@@ -150,8 +284,7 @@ pub fn gaussian_blur(
 pub fn gaussian_blur_u16(
     src: &BlurImage<u16>,
     dst: &mut BlurImageMut<u16>,
-    kernel_size: u32,
-    sigma: f32,
+    params: GaussianBlurParams,
     edge_mode: EdgeMode,
     threading_policy: ThreadingPolicy,
     hint: ConvolutionMode,
@@ -159,24 +292,7 @@ pub fn gaussian_blur_u16(
     src.check_layout()?;
     dst.check_layout(Some(src))?;
     src.size_matches_mut(dst)?;
-    assert!(
-        kernel_size != 0 || sigma > 0.0,
-        "Either sigma or kernel size must be set"
-    );
-    if kernel_size != 0 {
-        assert_ne!(kernel_size % 2, 0, "Kernel size must be odd");
-    }
-    let sigma = if sigma <= 0. {
-        sigma_size(kernel_size as f32)
-    } else {
-        sigma
-    };
-    let kernel_size = if kernel_size == 0 {
-        get_kernel_size(sigma)
-    } else {
-        kernel_size
-    };
-    let kernel = gaussian_kernel_1d(kernel_size, sigma);
+    let (x_kernel, y_kernel) = params.make_f32_kernels();
     match hint {
         ConvolutionMode::Exact => {
             let _dispatcher = match src.channels {
@@ -187,8 +303,8 @@ pub fn gaussian_blur_u16(
             _dispatcher(
                 src,
                 dst,
-                &kernel,
-                &kernel,
+                &x_kernel,
+                &y_kernel,
                 edge_mode,
                 Scalar::default(),
                 threading_policy,
@@ -204,8 +320,8 @@ pub fn gaussian_blur_u16(
             _dispatcher(
                 src,
                 dst,
-                &kernel,
-                &kernel,
+                &x_kernel,
+                &y_kernel,
                 edge_mode,
                 Scalar::default(),
                 threading_policy,
@@ -225,11 +341,10 @@ pub fn gaussian_blur_u16(
 ///
 /// * `src` - Source image.
 /// * `dst` - Destination image.
-/// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted. If zero, then sigma must be set.
-/// * `sigma` - Sigma for a gaussian kernel, corresponds to kernel flattening level. If zero of negative then *get_sigma_size* will be used
-/// * `channels` - Count of channels in the image
-/// * `edge_mode` - Rule to handle edge mode
-/// * `threading_policy` - Threading policy according to *ThreadingPolicy*
+/// * `params` - See [GaussianBlurParams] for more info.
+/// * `edge_mode` - Rule to handle edge mode, sse [EdgeMode] for more info.
+/// * `threading_policy` - Threading policy according to [ThreadingPolicy].
+/// * `convolution_mode` - See [IeeeBinaryConvolutionMode] for more info.
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided.
@@ -237,46 +352,50 @@ pub fn gaussian_blur_u16(
 pub fn gaussian_blur_f32(
     src: &BlurImage<f32>,
     dst: &mut BlurImageMut<f32>,
-    kernel_size: u32,
-    sigma: f32,
+    params: GaussianBlurParams,
     edge_mode: EdgeMode,
     threading_policy: ThreadingPolicy,
+    convolution_mode: IeeeBinaryConvolutionMode,
 ) -> Result<(), BlurError> {
     src.check_layout()?;
     dst.check_layout(Some(src))?;
     src.size_matches_mut(dst)?;
-    assert!(
-        kernel_size != 0 || sigma > 0.0,
-        "Either sigma or kernel size must be set"
-    );
-    if kernel_size != 0 {
-        assert_ne!(kernel_size % 2, 0, "Kernel size must be odd");
+    match convolution_mode {
+        IeeeBinaryConvolutionMode::Normal => {
+            let (x_kernel, y_kernel) = params.make_f32_kernels();
+            let _dispatcher = match src.channels {
+                FastBlurChannels::Plane => filter_1d_exact::<f32, f32, 1>,
+                FastBlurChannels::Channels3 => filter_1d_exact::<f32, f32, 3>,
+                FastBlurChannels::Channels4 => filter_1d_exact::<f32, f32, 4>,
+            };
+            _dispatcher(
+                src,
+                dst,
+                &x_kernel,
+                &y_kernel,
+                edge_mode,
+                Scalar::default(),
+                threading_policy,
+            )
+        }
+        IeeeBinaryConvolutionMode::Zealous => {
+            let (x_kernel, y_kernel) = params.make_f64_kernels();
+            let _dispatcher = match src.channels {
+                FastBlurChannels::Plane => filter_1d_exact::<f32, f64, 1>,
+                FastBlurChannels::Channels3 => filter_1d_exact::<f32, f64, 3>,
+                FastBlurChannels::Channels4 => filter_1d_exact::<f32, f64, 4>,
+            };
+            _dispatcher(
+                src,
+                dst,
+                &x_kernel,
+                &y_kernel,
+                edge_mode,
+                Scalar::default(),
+                threading_policy,
+            )
+        }
     }
-    let sigma = if sigma <= 0. {
-        sigma_size(kernel_size as f32)
-    } else {
-        sigma
-    };
-    let kernel_size = if kernel_size == 0 {
-        get_kernel_size(sigma)
-    } else {
-        kernel_size
-    };
-    let kernel = gaussian_kernel_1d(kernel_size, sigma);
-    let _dispatcher = match src.channels {
-        FastBlurChannels::Plane => filter_1d_exact::<f32, f32, 1>,
-        FastBlurChannels::Channels3 => filter_1d_exact::<f32, f32, 3>,
-        FastBlurChannels::Channels4 => filter_1d_exact::<f32, f32, 4>,
-    };
-    _dispatcher(
-        src,
-        dst,
-        &kernel,
-        &kernel,
-        edge_mode,
-        Scalar::default(),
-        threading_policy,
-    )
 }
 
 /// Performs gaussian blur on the image.
@@ -290,11 +409,9 @@ pub fn gaussian_blur_f32(
 ///
 /// * `src` - Source image.
 /// * `dst` - Destination image.
-/// * `kernel_size` - Length of gaussian kernel. Panic if kernel size is not odd, even kernels with unbalanced center is not accepted. If zero, then sigma must be set.
-/// * `sigma` - Sigma for a gaussian kernel, corresponds to kernel flattening level. If zero of negative then *get_sigma_size* will be used
-/// * `channels` - Count of channels in the image
-/// * `edge_mode` - Rule to handle edge mode
-/// * `threading_policy` - Threading policy according to *ThreadingPolicy*
+/// * `params` - See [GaussianBlurParams] for more info.
+/// * `edge_mode` - Rule to handle edge mode, sse [EdgeMode] for more info.
+/// * `threading_policy` - Threading policy according to [ThreadingPolicy].
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
@@ -302,32 +419,14 @@ pub fn gaussian_blur_f32(
 pub fn gaussian_blur_f16(
     src: &BlurImage<f16>,
     dst: &mut BlurImageMut<f16>,
-    kernel_size: u32,
-    sigma: f32,
+    params: GaussianBlurParams,
     edge_mode: EdgeMode,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
     src.check_layout()?;
     dst.check_layout(Some(src))?;
     src.size_matches_mut(dst)?;
-    assert!(
-        kernel_size != 0 || sigma > 0.0,
-        "Either sigma or kernel size must be set"
-    );
-    if kernel_size != 0 {
-        assert_ne!(kernel_size % 2, 0, "Kernel size must be odd");
-    }
-    let sigma = if sigma <= 0. {
-        sigma_size(kernel_size as f32)
-    } else {
-        sigma
-    };
-    let kernel_size = if kernel_size == 0 {
-        get_kernel_size(sigma)
-    } else {
-        kernel_size
-    };
-    let kernel = gaussian_kernel_1d(kernel_size, sigma);
+    let (x_kernel, y_kernel) = params.make_f32_kernels();
     let _dispatcher = match src.channels {
         FastBlurChannels::Plane => filter_1d_exact::<f16, f32, 1>,
         FastBlurChannels::Channels3 => filter_1d_exact::<f16, f32, 3>,
@@ -336,8 +435,8 @@ pub fn gaussian_blur_f16(
     _dispatcher(
         src,
         dst,
-        &kernel,
-        &kernel,
+        &x_kernel,
+        &y_kernel,
         edge_mode,
         Scalar::default(),
         threading_policy,
@@ -391,8 +490,7 @@ mod tests {
         gaussian_blur(
             &src_image,
             &mut dst,
-            5,
-            0.,
+            GaussianBlurParams::new_from_kernel(5.),
             EdgeMode::Clamp,
             ThreadingPolicy::Single,
             ConvolutionMode::FixedPoint,
@@ -421,8 +519,7 @@ mod tests {
         gaussian_blur(
             &src_image,
             &mut dst,
-            3,
-            0.,
+            GaussianBlurParams::new_from_kernel(3.),
             EdgeMode::Clamp,
             ThreadingPolicy::Single,
             ConvolutionMode::FixedPoint,
@@ -452,8 +549,7 @@ mod tests {
         gaussian_blur(
             &src_image,
             &mut dst,
-            7,
-            0.,
+            GaussianBlurParams::new_from_kernel(7.),
             EdgeMode::Clamp,
             ThreadingPolicy::Single,
             ConvolutionMode::FixedPoint,
@@ -482,8 +578,7 @@ mod tests {
         gaussian_blur(
             &src_image,
             &mut dst,
-            5,
-            0.,
+            GaussianBlurParams::new_from_kernel(5.),
             EdgeMode::Clamp,
             ThreadingPolicy::Single,
             ConvolutionMode::Exact,
@@ -512,8 +607,7 @@ mod tests {
         gaussian_blur(
             &src_image,
             &mut dst,
-            31,
-            0.,
+            GaussianBlurParams::new_from_kernel(31.),
             EdgeMode::Clamp,
             ThreadingPolicy::Single,
             ConvolutionMode::FixedPoint,
@@ -542,8 +636,7 @@ mod tests {
         gaussian_blur(
             &src_image,
             &mut dst,
-            31,
-            0.,
+            GaussianBlurParams::new_from_kernel(31.),
             EdgeMode::Clamp,
             ThreadingPolicy::Single,
             ConvolutionMode::Exact,
@@ -594,8 +687,7 @@ mod tests {
         gaussian_blur_u16(
             &src_image,
             &mut dst,
-            31,
-            0.,
+            GaussianBlurParams::new_from_kernel(31.),
             EdgeMode::Clamp,
             ThreadingPolicy::Single,
             ConvolutionMode::FixedPoint,
@@ -624,8 +716,7 @@ mod tests {
         gaussian_blur_u16(
             &src_image,
             &mut dst,
-            31,
-            0.,
+            GaussianBlurParams::new_from_kernel(31.),
             EdgeMode::Clamp,
             ThreadingPolicy::Single,
             ConvolutionMode::Exact,
@@ -676,10 +767,21 @@ mod tests {
         gaussian_blur_f32(
             &src_image,
             &mut dst,
-            31,
-            0.,
+            GaussianBlurParams::new_from_kernel(31.),
             EdgeMode::Clamp,
             ThreadingPolicy::Single,
+            IeeeBinaryConvolutionMode::Normal,
+        )
+        .unwrap();
+        compare_f32_stat!(dst);
+        dst.data.borrow_mut().fill(0.);
+        gaussian_blur_f32(
+            &src_image,
+            &mut dst,
+            GaussianBlurParams::new_from_kernel(31.),
+            EdgeMode::Clamp,
+            ThreadingPolicy::Single,
+            IeeeBinaryConvolutionMode::Zealous,
         )
         .unwrap();
         compare_f32_stat!(dst);
