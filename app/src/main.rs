@@ -137,7 +137,7 @@ fn main() {
     // )
     // .unwrap();
 
-    libblur::box_blur(&image, &mut dst_image, 5, ThreadingPolicy::Single).unwrap();
+    libblur::box_blur(&image, &mut dst_image, 1, ThreadingPolicy::Single).unwrap();
 
     // libblur::motion_blur(
     //     &image,

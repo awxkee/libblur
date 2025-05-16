@@ -1263,6 +1263,9 @@ pub fn box_blur(
     image.check_layout()?;
     dst_image.check_layout(Some(image))?;
     image.size_matches_mut(dst_image)?;
+    if radius == 1 {
+        return image.copy_to_mut(dst_image);
+    }
     let width = image.width;
     let height = image.height;
     let thread_count = threading_policy.thread_count(width, height) as u32;
@@ -1320,6 +1323,9 @@ pub fn box_blur_u16(
     image.check_layout()?;
     dst_image.check_layout(Some(image))?;
     image.size_matches_mut(dst_image)?;
+    if radius == 1 {
+        return image.copy_to_mut(dst_image);
+    }
     let width = image.width;
     let height = image.height;
     let thread_count = threading_policy.thread_count(width, height) as u32;
@@ -1377,6 +1383,9 @@ pub fn box_blur_f32(
     image.check_layout()?;
     dst_image.check_layout(Some(image))?;
     image.size_matches_mut(dst_image)?;
+    if radius == 1 {
+        return image.copy_to_mut(dst_image);
+    }
     let width = image.width;
     let height = image.height;
     let thread_count = threading_policy.thread_count(width, height) as u32;
@@ -1436,7 +1445,9 @@ pub fn box_blur_in_linear(
     image.check_layout()?;
     dst_image.check_layout(Some(image))?;
     image.size_matches_mut(dst_image)?;
-
+    if radius == 1 {
+        return image.copy_to_mut(dst_image);
+    }
     let mut linear_data = BlurImageMut::alloc(image.width, image.height, image.channels);
     let mut linear_data_2 = BlurImageMut::alloc(image.width, image.height, image.channels);
 
@@ -1592,8 +1603,7 @@ where
         boxes[1],
         &pool,
         thread_count,
-    )?;
-    Ok(())
+    )
 }
 
 /// Performs tent blur on the image.
@@ -1897,8 +1907,7 @@ where
         boxes[2],
         &pool,
         thread_count,
-    )?;
-    Ok(())
+    )
 }
 
 /// Performs gaussian box blur approximation on the image.
