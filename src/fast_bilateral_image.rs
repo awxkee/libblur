@@ -44,11 +44,11 @@ use image::{
 ///
 /// # Arguments
 ///
-/// * `img`: Source image
-/// * `dst`: Destination image
-/// * `kernel_size`: Convolution kernel size, must be odd
-/// * `spatial_sigma`: Spatial sigma
-/// * `range_sigma`: Range sigma
+/// * `img`: Source image.
+/// * `dst`: Destination image.
+/// * `kernel_size`: Convolution kernel size, must be odd.
+/// * `spatial_sigma`: Spatial sigma.
+/// * `range_sigma`: Range sigma.
 ///
 #[must_use]
 pub fn fast_bilateral_filter_image(

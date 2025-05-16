@@ -47,6 +47,7 @@ pub enum BlurError {
     FftChannelsNotSupported,
     ExceedingPointerSize,
     NegativeOrZeroSigma,
+    InvalidArguments,
 }
 
 impl Error for BlurError {}
@@ -81,6 +82,7 @@ impl std::fmt::Display for BlurError {
             BlurError::NegativeOrZeroSigma => {
                 f.write_str("Negative or zero sigma is not supported")
             }
+            BlurError::InvalidArguments => f.write_str("Invalid arguments"),
         }
     }
 }

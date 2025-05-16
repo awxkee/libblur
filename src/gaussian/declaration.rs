@@ -189,6 +189,25 @@ impl GaussianBlurParams {
         let vy_kernel = self.make_f64_kernel(self.y_kernel, self.y_sigma);
         (vx_kernel, vy_kernel)
     }
+
+    fn validate(&self) -> Result<(), BlurError> {
+        if self.x_sigma < 0. || self.y_sigma < 0. {
+            return Err(BlurError::NegativeOrZeroSigma);
+        }
+        if self.x_kernel > 0 && self.x_kernel % 2 == 0 {
+            return Err(BlurError::OddKernel(self.x_kernel as usize));
+        }
+        if self.y_kernel > 0 && self.y_kernel % 2 == 0 {
+            return Err(BlurError::OddKernel(self.y_kernel as usize));
+        }
+        if self.x_sigma == 0. && self.x_kernel == 0 {
+            return Err(BlurError::InvalidArguments);
+        }
+        if self.y_sigma == 0. && self.y_kernel == 0 {
+            return Err(BlurError::InvalidArguments);
+        }
+        Ok(())
+    }
 }
 
 /// Performs gaussian blur on the image.
@@ -221,6 +240,7 @@ pub fn gaussian_blur(
     src.check_layout()?;
     dst.check_layout(Some(src))?;
     src.size_matches_mut(dst)?;
+    params.validate()?;
     let (x_kernel, y_kernel) = params.make_f32_kernels();
     match hint {
         ConvolutionMode::Exact => {
@@ -292,6 +312,7 @@ pub fn gaussian_blur_u16(
     src.check_layout()?;
     dst.check_layout(Some(src))?;
     src.size_matches_mut(dst)?;
+    params.validate()?;
     let (x_kernel, y_kernel) = params.make_f32_kernels();
     match hint {
         ConvolutionMode::Exact => {
@@ -360,6 +381,7 @@ pub fn gaussian_blur_f32(
     src.check_layout()?;
     dst.check_layout(Some(src))?;
     src.size_matches_mut(dst)?;
+    params.validate()?;
     match convolution_mode {
         IeeeBinaryConvolutionMode::Normal => {
             let (x_kernel, y_kernel) = params.make_f32_kernels();
@@ -426,6 +448,7 @@ pub fn gaussian_blur_f16(
     src.check_layout()?;
     dst.check_layout(Some(src))?;
     src.size_matches_mut(dst)?;
+    params.validate()?;
     let (x_kernel, y_kernel) = params.make_f32_kernels();
     let _dispatcher = match src.channels {
         FastBlurChannels::Plane => filter_1d_exact::<f16, f32, 1>,
