@@ -541,7 +541,10 @@ impl ExecutionUnit {
                 let set0 = _mm256_packus_epi32(scale_store_0, scale_store_1);
 
                 let full_set0 = _mm256_packus_epi16(set0, set0);
-                _mm_storeu_si128(ptr as *mut _, _mm256_castsi256_si128(full_set0));
+                _mm_storeu_si128(
+                    ptr as *mut _,
+                    _mm256_castsi256_si128(_mm256_permute4x64_epi64::<MASK>(full_set0)),
+                );
 
                 cx += 16;
                 buf_cx += 16;
