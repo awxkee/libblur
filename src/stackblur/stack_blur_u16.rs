@@ -28,7 +28,7 @@
  */
 use crate::stackblur::{HorizontalStackBlurPass, StackBlurWorkingPass, VerticalStackBlurPass};
 use crate::unsafe_slice::UnsafeSlice;
-use crate::{BlurError, BlurImageMut, FastBlurChannels, ThreadingPolicy};
+use crate::{AnisotropicRadius, BlurError, BlurImageMut, FastBlurChannels, ThreadingPolicy};
 
 const LARGE_RADIUS_CUTOFF: u32 = 135;
 
@@ -126,7 +126,7 @@ fn stack_blur_worker_vertical(
 /// O(1) complexity.
 pub fn stack_blur_u16(
     image: &mut BlurImageMut<u16>,
-    radius: u32,
+    radius: AnisotropicRadius,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
     let radius = radius.max(1);
@@ -134,13 +134,12 @@ pub fn stack_blur_u16(
     let width = image.width;
     let height = image.height;
     let channels = image.channels;
-    #[allow(clippy::manual_clamp)]
-    let radius = radius.max(1).min(2000);
+    let radius = radius.clamp(1, 2000);
     let thread_count = threading_policy.thread_count(width, height) as u32;
     if thread_count == 1 {
         let slice = UnsafeSlice::new(image.data.borrow_mut());
-        stack_blur_worker_horizontal(&slice, stride, width, height, radius, channels, 0, 1);
-        stack_blur_worker_vertical(&slice, stride, width, height, radius, channels, 0, 1);
+        stack_blur_worker_horizontal(&slice, stride, width, height, radius.x_axis, channels, 0, 1);
+        stack_blur_worker_vertical(&slice, stride, width, height, radius.y_axis, channels, 0, 1);
         return Ok(());
     }
     let pool = rayon::ThreadPoolBuilder::new()
@@ -156,7 +155,7 @@ pub fn stack_blur_u16(
                     stride,
                     width,
                     height,
-                    radius,
+                    radius.x_axis,
                     channels,
                     i as usize,
                     thread_count as usize,
@@ -173,7 +172,7 @@ pub fn stack_blur_u16(
                     stride,
                     width,
                     height,
-                    radius,
+                    radius.y_axis,
                     channels,
                     i as usize,
                     thread_count as usize,
@@ -199,7 +198,12 @@ mod tests {
             height as u32,
             FastBlurChannels::Channels3,
         );
-        stack_blur_u16(&mut dst_image, 5, ThreadingPolicy::Single).unwrap();
+        stack_blur_u16(
+            &mut dst_image,
+            AnisotropicRadius::new(5),
+            ThreadingPolicy::Single,
+        )
+        .unwrap();
         for (i, &cn) in dst.iter().enumerate() {
             let diff = (cn as i32 - 43231i32).abs();
             assert!(

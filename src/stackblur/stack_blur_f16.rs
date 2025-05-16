@@ -33,7 +33,7 @@ use crate::stackblur::neon::{
 use crate::stackblur::sse::{HorizontalSseStackBlurPassFloat16, VerticalSseStackBlurPassFloat16};
 use crate::stackblur::{HorizontalStackBlurPass, StackBlurWorkingPass, VerticalStackBlurPass};
 use crate::unsafe_slice::UnsafeSlice;
-use crate::{BlurError, BlurImageMut, FastBlurChannels, ThreadingPolicy};
+use crate::{AnisotropicRadius, BlurError, BlurImageMut, FastBlurChannels, ThreadingPolicy};
 use half::f16;
 
 fn stack_blur_worker_horizontal(
@@ -190,12 +190,11 @@ fn stack_blur_worker_vertical(
 /// O(1) complexity.
 pub fn stack_blur_f16(
     image: &mut BlurImageMut<f16>,
-    radius: u32,
+    radius: AnisotropicRadius,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
     image.check_layout(None)?;
-    #[allow(clippy::manual_clamp)]
-    let radius = radius.max(1).min(1449);
+    let radius = radius.clamp(1, 1449);
     let stride = image.row_stride();
     let width = image.width;
     let height = image.height;
@@ -203,8 +202,8 @@ pub fn stack_blur_f16(
     let thread_count = threading_policy.thread_count(width, height) as u32;
     if thread_count == 1 {
         let slice = UnsafeSlice::new(image.data.borrow_mut());
-        stack_blur_worker_horizontal(&slice, stride, width, height, radius, channels, 0, 1);
-        stack_blur_worker_vertical(&slice, stride, width, height, radius, channels, 0, 1);
+        stack_blur_worker_horizontal(&slice, stride, width, height, radius.x_axis, channels, 0, 1);
+        stack_blur_worker_vertical(&slice, stride, width, height, radius.y_axis, channels, 0, 1);
         return Ok(());
     }
     let pool = rayon::ThreadPoolBuilder::new()
@@ -220,7 +219,7 @@ pub fn stack_blur_f16(
                     stride,
                     width,
                     height,
-                    radius,
+                    radius.x_axis,
                     channels,
                     i as usize,
                     thread_count as usize,
@@ -237,7 +236,7 @@ pub fn stack_blur_f16(
                     stride,
                     width,
                     height,
-                    radius,
+                    radius.y_axis,
                     channels,
                     i as usize,
                     thread_count as usize,

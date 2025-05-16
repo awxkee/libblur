@@ -27,7 +27,8 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::{
-    stack_blur, stack_blur_f32, stack_blur_u16, BlurImageMut, FastBlurChannels, ThreadingPolicy,
+    stack_blur, stack_blur_f32, stack_blur_u16, AnisotropicRadius, BlurImageMut, FastBlurChannels,
+    ThreadingPolicy,
 };
 use image::{
     DynamicImage, GrayAlphaImage, GrayImage, ImageBuffer, Luma, LumaA, Rgb, RgbImage, Rgba,
@@ -41,13 +42,13 @@ use image::{
 /// # Arguments
 ///
 /// * `image`: Dynamic image provided by image crate
-/// * `radius`: radius limited into 2..254
+/// * `radius`: radius limited into 2..1449
 /// * `threading_policy` - Threads usage policy
 ///
 #[must_use]
 pub fn stack_blur_image(
     image: DynamicImage,
-    radius: u32,
+    radius: AnisotropicRadius,
     threading_policy: ThreadingPolicy,
 ) -> Option<DynamicImage> {
     match image {

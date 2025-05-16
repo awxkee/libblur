@@ -88,7 +88,7 @@ mod tests {
         };
     }
 
-    fn test_box_rgb8(radius: u32, threading_policy: ThreadingPolicy) {
+    fn test_box_rgb8(k_size: u32, threading_policy: ThreadingPolicy) {
         let width: usize = 148;
         let height: usize = 148;
         let mut src = vec![126; width * height * 3];
@@ -104,11 +104,17 @@ mod tests {
             FastBlurChannels::Channels3,
         );
         let mut dst = BlurImageMut::default();
-        box_blur(&src_image, &mut dst, radius, threading_policy).unwrap();
-        compare_u8_stat!(dst, radius, threading_policy);
+        box_blur(
+            &src_image,
+            &mut dst,
+            BoxBlurParameters::new(k_size),
+            threading_policy,
+        )
+        .unwrap();
+        compare_u8_stat!(dst, k_size, threading_policy);
     }
 
-    fn test_box_rgb16(radius: u32, threading_policy: ThreadingPolicy) {
+    fn test_box_rgb16(k_size: u32, threading_policy: ThreadingPolicy) {
         let width: usize = 148;
         let height: usize = 148;
         let mut src = vec![126u16; width * height * 3];
@@ -124,11 +130,17 @@ mod tests {
             FastBlurChannels::Channels3,
         );
         let mut dst = BlurImageMut::default();
-        box_blur_u16(&src_image, &mut dst, radius, threading_policy).unwrap();
-        compare_u8_stat!(dst, radius, threading_policy);
+        box_blur_u16(
+            &src_image,
+            &mut dst,
+            BoxBlurParameters::new(k_size),
+            threading_policy,
+        )
+        .unwrap();
+        compare_u8_stat!(dst, k_size, threading_policy);
     }
 
-    fn test_box_rgb_f32(radius: u32, threading_policy: ThreadingPolicy) {
+    fn test_box_rgb_f32(k_size: u32, threading_policy: ThreadingPolicy) {
         let width: usize = 148;
         let height: usize = 148;
         let mut src = vec![126.; width * height * 3];
@@ -144,31 +156,37 @@ mod tests {
             FastBlurChannels::Channels3,
         );
         let mut dst = BlurImageMut::default();
-        box_blur_f32(&src_image, &mut dst, radius, threading_policy).unwrap();
-        compare_f32_stat!(dst, radius, threading_policy);
+        box_blur_f32(
+            &src_image,
+            &mut dst,
+            BoxBlurParameters::new(k_size),
+            threading_policy,
+        )
+        .unwrap();
+        compare_f32_stat!(dst, k_size, threading_policy);
     }
 
     #[test]
     fn test_box_u8() {
         test_box_rgb8(5, ThreadingPolicy::Single);
-        test_box_rgb8(70, ThreadingPolicy::Single);
+        test_box_rgb8(71, ThreadingPolicy::Single);
         test_box_rgb8(5, ThreadingPolicy::Adaptive);
-        test_box_rgb8(70, ThreadingPolicy::Adaptive);
+        test_box_rgb8(71, ThreadingPolicy::Adaptive);
     }
 
     #[test]
     fn test_box_u16() {
         test_box_rgb16(5, ThreadingPolicy::Single);
-        test_box_rgb16(70, ThreadingPolicy::Single);
+        test_box_rgb16(71, ThreadingPolicy::Single);
         test_box_rgb16(5, ThreadingPolicy::Adaptive);
-        test_box_rgb16(70, ThreadingPolicy::Adaptive);
+        test_box_rgb16(71, ThreadingPolicy::Adaptive);
     }
 
     #[test]
     fn test_box_f32() {
         test_box_rgb_f32(5, ThreadingPolicy::Single);
-        test_box_rgb_f32(70, ThreadingPolicy::Single);
+        test_box_rgb_f32(71, ThreadingPolicy::Single);
         test_box_rgb_f32(5, ThreadingPolicy::Adaptive);
-        test_box_rgb_f32(70, ThreadingPolicy::Adaptive);
+        test_box_rgb_f32(71, ThreadingPolicy::Adaptive);
     }
 }

@@ -67,7 +67,6 @@ mod adaptive_blur;
 mod avx;
 mod box_filter;
 mod channels_configuration;
-mod cpu_features;
 mod edge_mode;
 mod fast_bilateral_filter;
 #[cfg(feature = "image")]
@@ -114,18 +113,11 @@ mod wasm32;
 #[cfg(feature = "fft")]
 #[cfg_attr(docsrs, doc(cfg(feature = "fft")))]
 pub use adaptive_blur::adaptive_blur;
-pub use box_filter::box_blur;
-pub use box_filter::box_blur_f32;
-pub use box_filter::box_blur_in_linear;
-pub use box_filter::box_blur_u16;
-pub use box_filter::gaussian_box_blur;
-pub use box_filter::gaussian_box_blur_f32;
-pub use box_filter::gaussian_box_blur_in_linear;
-pub use box_filter::gaussian_box_blur_u16;
-pub use box_filter::tent_blur;
-pub use box_filter::tent_blur_f32;
-pub use box_filter::tent_blur_in_linear;
-pub use box_filter::tent_blur_u16;
+pub use box_filter::{
+    box_blur, box_blur_f32, box_blur_in_linear, box_blur_u16, gaussian_box_blur,
+    gaussian_box_blur_f32, gaussian_box_blur_in_linear, gaussian_box_blur_u16, tent_blur,
+    tent_blur_f32, tent_blur_in_linear, tent_blur_u16, BoxBlurParameters, CLTParameters,
+};
 pub use channels_configuration::FastBlurChannels;
 pub use colorutils_rs::TransferFunction;
 pub use edge_mode::*;
@@ -157,7 +149,8 @@ pub use filter2d::{filter_2d, filter_2d_arbitrary, filter_2d_rgb, filter_2d_rgba
 pub use gaussian::gaussian_blur_in_linear;
 pub use gaussian::{
     gaussian_blur, gaussian_blur_f16, gaussian_blur_f32, gaussian_blur_u16, gaussian_kernel_1d,
-    gaussian_kernel_1d_f64, sigma_size, sigma_size_d, ConvolutionMode,
+    gaussian_kernel_1d_f64, sigma_size, sigma_size_d, ConvolutionMode, GaussianBlurParams,
+    IeeeBinaryConvolutionMode,
 };
 #[cfg(feature = "image")]
 #[cfg_attr(docsrs, doc(cfg(feature = "image")))]
@@ -178,6 +171,43 @@ pub use stackblur::stack_blur_f32::stack_blur_f32;
 pub use stackblur::stack_blur_u16;
 pub use threading_policy::ThreadingPolicy;
 pub use util::{BlurError, MismatchedSize};
+
+/// Asymmetric radius container
+#[derive(Copy, Clone, Default, PartialOrd, PartialEq, Debug)]
+pub struct AnisotropicRadius {
+    pub x_axis: u32,
+    pub y_axis: u32,
+}
+
+impl AnisotropicRadius {
+    pub fn new(radius: u32) -> AnisotropicRadius {
+        AnisotropicRadius {
+            x_axis: radius,
+            y_axis: radius,
+        }
+    }
+
+    pub fn create(x: u32, y: u32) -> AnisotropicRadius {
+        AnisotropicRadius {
+            x_axis: x,
+            y_axis: y,
+        }
+    }
+
+    pub fn clamp(&self, min: u32, max: u32) -> AnisotropicRadius {
+        AnisotropicRadius {
+            x_axis: self.x_axis.clamp(min, max),
+            y_axis: self.y_axis.clamp(min, max),
+        }
+    }
+
+    pub fn max(&self, max: u32) -> AnisotropicRadius {
+        AnisotropicRadius {
+            x_axis: self.x_axis.max(max),
+            y_axis: self.y_axis.max(max),
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {

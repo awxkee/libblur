@@ -31,7 +31,8 @@
 
 use arbitrary::Arbitrary;
 use libblur::{
-    BlurImage, BlurImageMut, ConvolutionMode, EdgeMode, FastBlurChannels, ThreadingPolicy,
+    BlurImage, BlurImageMut, ConvolutionMode, EdgeMode, FastBlurChannels, GaussianBlurParams,
+    ThreadingPolicy,
 };
 use libfuzzer_sys::fuzz_target;
 
@@ -41,7 +42,8 @@ pub struct SrcImage {
     pub src_height: u16,
     pub value: u8,
     pub edge_mode: u8,
-    pub kernel_size: u8,
+    pub x_kernel_size: u8,
+    pub y_kernel_size: u8,
     pub channels: u8,
     pub multithreaded: bool,
 }
@@ -61,13 +63,17 @@ fuzz_target!(|data: SrcImage| {
     if data.src_width > 250 || data.src_height > 250 {
         return;
     }
-    if data.kernel_size % 2 == 0 || data.kernel_size > 13 || data.kernel_size == 0 {
+    if data.x_kernel_size > 13 || data.x_kernel_size == 0 {
+        return;
+    }
+    if data.y_kernel_size > 13 || data.y_kernel_size == 0 {
         return;
     }
     fuzz_8bit(
         data.src_width as usize,
         data.src_height as usize,
-        data.kernel_size as usize,
+        data.x_kernel_size as usize,
+        data.y_kernel_size as usize,
         channels,
         edge_mode,
         data.multithreaded,
@@ -77,7 +83,8 @@ fuzz_target!(|data: SrcImage| {
 fn fuzz_8bit(
     width: usize,
     height: usize,
-    kernel_size: usize,
+    x_kernel_size: usize,
+    y_kernel_size: usize,
     channels: FastBlurChannels,
     edge_mode: EdgeMode,
     multithreaded: bool,
@@ -91,8 +98,7 @@ fn fuzz_8bit(
     libblur::gaussian_blur(
         &src_image,
         &mut dst_image,
-        kernel_size as u32,
-        0.,
+        GaussianBlurParams::new_asymmetric_from_kernels(x_kernel_size as f64, y_kernel_size as f64),
         edge_mode,
         if multithreaded {
             ThreadingPolicy::Adaptive
@@ -106,8 +112,7 @@ fn fuzz_8bit(
     libblur::gaussian_blur(
         &src_image,
         &mut dst_image,
-        kernel_size as u32,
-        0.,
+        GaussianBlurParams::new_asymmetric_from_kernels(x_kernel_size as f64, y_kernel_size as f64),
         edge_mode,
         if multithreaded {
             ThreadingPolicy::Adaptive

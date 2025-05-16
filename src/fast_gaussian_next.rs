@@ -26,8 +26,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #[cfg(all(target_arch = "aarch64", feature = "neon"))]
-use crate::cpu_features::is_aarch_f16c_supported;
-#[cfg(all(target_arch = "aarch64", feature = "neon"))]
 use crate::neon::{
     fgn_horizontal_pass_neon_f16, fgn_horizontal_pass_neon_f32, fgn_horizontal_pass_neon_u8,
     fgn_vertical_pass_neon_f16, fgn_vertical_pass_neon_f32, fgn_vertical_pass_neon_u8,
@@ -44,8 +42,8 @@ use crate::unsafe_slice::UnsafeSlice;
 use crate::wasm32::{
     fast_gaussian_next_horizontal_pass_wasm_u8, fast_gaussian_next_vertical_pass_wasm_u8,
 };
-use crate::BlurError;
 use crate::{clamp_edge, BlurImageMut, EdgeMode, FastBlurChannels, ThreadingPolicy};
+use crate::{AnisotropicRadius, BlurError};
 use colorutils_rs::linear_to_planar::linear_to_plane;
 use colorutils_rs::planar_to_linear::plane_to_linear;
 use colorutils_rs::{
@@ -429,7 +427,7 @@ fn fgn_horizontal_pass<
 }
 
 trait FastGaussianNextPassProvider<T> {
-    fn get_horizontal<const CHANNEL_CONFIGURATION: usize>(
+    fn get_horizontal<const CN: usize>(
         radius: u32,
     ) -> fn(
         bytes: &UnsafeSlice<T>,
@@ -442,7 +440,7 @@ trait FastGaussianNextPassProvider<T> {
         EdgeMode,
     );
 
-    fn get_vertical<const CHANNEL_CONFIGURATION: usize>(
+    fn get_vertical<const CN: usize>(
         radius: u32,
     ) -> fn(
         bytes: &UnsafeSlice<T>,
@@ -779,9 +777,7 @@ impl FastGaussianNextPassProvider<f16> for f16 {
         }
         #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
-            if is_aarch_f16c_supported() {
-                _dispatcher_horizontal = fgn_horizontal_pass_neon_f16::<f16, CN>;
-            }
+            _dispatcher_horizontal = fgn_horizontal_pass_neon_f16::<f16, CN>;
         }
         _dispatcher_horizontal
     }
@@ -813,9 +809,7 @@ impl FastGaussianNextPassProvider<f16> for f16 {
         }
         #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
-            if is_aarch_f16c_supported() {
-                _dispatcher_vertical = fgn_vertical_pass_neon_f16::<f16, CN>;
-            }
+            _dispatcher_vertical = fgn_vertical_pass_neon_f16::<f16, CN>;
         }
         _dispatcher_vertical
     }
@@ -840,7 +834,7 @@ fn fast_gaussian_next_impl<
     stride: u32,
     width: u32,
     height: u32,
-    radius: u32,
+    radius: AnisotropicRadius,
     threading_policy: ThreadingPolicy,
     edge_mode: EdgeMode,
 ) where
@@ -857,7 +851,7 @@ fn fast_gaussian_next_impl<
         start: u32,
         end: u32,
         EdgeMode,
-    ) = T::get_vertical::<CN>(radius);
+    ) = T::get_vertical::<CN>(radius.y_axis);
     let mut _dispatcher_horizontal: fn(
         bytes: &UnsafeSlice<T>,
         stride: u32,
@@ -867,7 +861,7 @@ fn fast_gaussian_next_impl<
         start: u32,
         end: u32,
         EdgeMode,
-    ) = T::get_horizontal::<CN>(radius);
+    ) = T::get_horizontal::<CN>(radius.x_axis);
     let thread_count = threading_policy.thread_count(width, height) as u32;
     if thread_count == 1 {
         let unsafe_image = UnsafeSlice::new(bytes);
@@ -876,7 +870,7 @@ fn fast_gaussian_next_impl<
             stride,
             width,
             height,
-            radius,
+            radius.y_axis,
             0,
             width,
             edge_mode,
@@ -886,7 +880,7 @@ fn fast_gaussian_next_impl<
             stride,
             width,
             height,
-            radius,
+            radius.x_axis,
             0,
             height,
             edge_mode,
@@ -913,7 +907,7 @@ fn fast_gaussian_next_impl<
                         stride,
                         width,
                         height,
-                        radius,
+                        radius.y_axis,
                         start_x,
                         end_x,
                         edge_mode,
@@ -937,7 +931,7 @@ fn fast_gaussian_next_impl<
                         stride,
                         width,
                         height,
-                        radius,
+                        radius.x_axis,
                         start_y,
                         end_y,
                         edge_mode,
@@ -965,12 +959,12 @@ fn fast_gaussian_next_impl<
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn fast_gaussian_next(
     image: &mut BlurImageMut<u8>,
-    radius: u32,
+    radius: AnisotropicRadius,
     threading_policy: ThreadingPolicy,
     edge_mode: EdgeMode,
 ) -> Result<(), BlurError> {
     image.check_layout(None)?;
-    let radius = std::cmp::min(radius, 280);
+    let radius = radius.clamp(1, 280);
     let stride = image.row_stride();
     let width = image.width;
     let height = image.height;
@@ -1006,7 +1000,7 @@ pub fn fast_gaussian_next(
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn fast_gaussian_next_u16(
     image: &mut BlurImageMut<u16>,
-    radius: u32,
+    radius: AnisotropicRadius,
     threading_policy: ThreadingPolicy,
     edge_mode: EdgeMode,
 ) -> Result<(), BlurError> {
@@ -1015,7 +1009,7 @@ pub fn fast_gaussian_next_u16(
     let width = image.width;
     let height = image.height;
     let channels = image.channels;
-    let acq_radius = std::cmp::min(radius, 152);
+    let acq_radius = radius.clamp(1, 152);
     impl_margin_call!(
         u16,
         channels,
@@ -1046,7 +1040,7 @@ pub fn fast_gaussian_next_u16(
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn fast_gaussian_next_f32(
     image: &mut BlurImageMut<f32>,
-    radius: u32,
+    radius: AnisotropicRadius,
     threading_policy: ThreadingPolicy,
     edge_mode: EdgeMode,
 ) -> Result<(), BlurError> {
@@ -1055,6 +1049,7 @@ pub fn fast_gaussian_next_f32(
     let width = image.width;
     let height = image.height;
     let channels = image.channels;
+    let radius = AnisotropicRadius::create(radius.x_axis.max(1), radius.y_axis.max(1));
     impl_margin_call!(
         f32,
         channels,
@@ -1085,7 +1080,7 @@ pub fn fast_gaussian_next_f32(
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn fast_gaussian_next_f16(
     in_place: &mut BlurImageMut<f16>,
-    radius: u32,
+    radius: AnisotropicRadius,
     threading_policy: ThreadingPolicy,
     edge_mode: EdgeMode,
 ) -> Result<(), BlurError> {
@@ -1094,6 +1089,7 @@ pub fn fast_gaussian_next_f16(
     let stride = in_place.row_stride();
     let width = in_place.width;
     let height = in_place.height;
+    let radius = AnisotropicRadius::create(radius.x_axis.max(1), radius.y_axis.max(1));
     impl_margin_call!(
         half::f16,
         channels,
@@ -1126,7 +1122,7 @@ pub fn fast_gaussian_next_f16(
 /// Panic is stride/width/height/channel configuration do not match provided
 pub fn fast_gaussian_next_in_linear(
     in_place: &mut BlurImageMut<u8>,
-    radius: u32,
+    radius: AnisotropicRadius,
     threading_policy: ThreadingPolicy,
     transfer_function: TransferFunction,
     edge_mode: EdgeMode,
@@ -1191,7 +1187,13 @@ mod tests {
             height as u32,
             FastBlurChannels::Channels3,
         );
-        fast_gaussian_next(&mut dst_image, 5, ThreadingPolicy::Single, EdgeMode::Clamp).unwrap();
+        fast_gaussian_next(
+            &mut dst_image,
+            AnisotropicRadius::new(5),
+            ThreadingPolicy::Single,
+            EdgeMode::Clamp,
+        )
+        .unwrap();
         for (i, &cn) in dst.iter().enumerate() {
             let diff = (cn as i32 - 126).abs();
             assert!(
@@ -1212,8 +1214,13 @@ mod tests {
             height as u32,
             FastBlurChannels::Channels3,
         );
-        fast_gaussian_next_u16(&mut dst_image, 5, ThreadingPolicy::Single, EdgeMode::Clamp)
-            .unwrap();
+        fast_gaussian_next_u16(
+            &mut dst_image,
+            AnisotropicRadius::new(5),
+            ThreadingPolicy::Single,
+            EdgeMode::Clamp,
+        )
+        .unwrap();
         for &cn in dst.iter() {
             let diff = (cn as i32 - 17234i32).abs();
             assert!(
@@ -1234,8 +1241,13 @@ mod tests {
             height as u32,
             FastBlurChannels::Channels3,
         );
-        fast_gaussian_next_f32(&mut dst_image, 5, ThreadingPolicy::Single, EdgeMode::Clamp)
-            .unwrap();
+        fast_gaussian_next_f32(
+            &mut dst_image,
+            AnisotropicRadius::new(5),
+            ThreadingPolicy::Single,
+            EdgeMode::Clamp,
+        )
+        .unwrap();
         for &cn in dst.iter() {
             let diff = (cn - 0.432).abs();
             assert!(

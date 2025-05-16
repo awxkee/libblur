@@ -33,7 +33,7 @@ use crate::stackblur::neon::{
 use crate::stackblur::sse::{HorizontalSseStackBlurPassFloat32, VerticalSseStackBlurPassFloat32};
 use crate::stackblur::*;
 use crate::unsafe_slice::UnsafeSlice;
-use crate::{BlurError, BlurImageMut, FastBlurChannels, ThreadingPolicy};
+use crate::{AnisotropicRadius, BlurError, BlurImageMut, FastBlurChannels, ThreadingPolicy};
 
 fn stack_blur_worker_horizontal(
     slice: &UnsafeSlice<f32>,
@@ -163,7 +163,7 @@ fn stack_blur_worker_vertical(
 /// O(1) complexity.
 pub fn stack_blur_f32(
     image: &mut BlurImageMut<f32>,
-    radius: u32,
+    radius: AnisotropicRadius,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
     image.check_layout(None)?;
@@ -175,8 +175,8 @@ pub fn stack_blur_f32(
     let channels = image.channels;
     if thread_count == 1 {
         let slice = UnsafeSlice::new(image.data.borrow_mut());
-        stack_blur_worker_horizontal(&slice, stride, width, height, radius, channels, 0, 1);
-        stack_blur_worker_vertical(&slice, stride, width, height, radius, channels, 0, 1);
+        stack_blur_worker_horizontal(&slice, stride, width, height, radius.x_axis, channels, 0, 1);
+        stack_blur_worker_vertical(&slice, stride, width, height, radius.y_axis, channels, 0, 1);
         return Ok(());
     }
     let pool = rayon::ThreadPoolBuilder::new()
@@ -192,7 +192,7 @@ pub fn stack_blur_f32(
                     stride,
                     width,
                     height,
-                    radius,
+                    radius.x_axis,
                     channels,
                     i as usize,
                     thread_count as usize,
@@ -209,7 +209,7 @@ pub fn stack_blur_f32(
                     stride,
                     width,
                     height,
-                    radius,
+                    radius.y_axis,
                     channels,
                     i as usize,
                     thread_count as usize,
@@ -235,7 +235,12 @@ mod tests {
             height as u32,
             FastBlurChannels::Channels3,
         );
-        stack_blur_f32(&mut dst_image, 5, ThreadingPolicy::Single).unwrap();
+        stack_blur_f32(
+            &mut dst_image,
+            AnisotropicRadius::new(5),
+            ThreadingPolicy::Single,
+        )
+        .unwrap();
         for (i, &cn) in dst.iter().enumerate() {
             let diff = (cn - 0.32423f32).abs();
             assert!(

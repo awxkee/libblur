@@ -92,8 +92,7 @@ impl Filter1DRowHandlerApprox<u8, i32> for u8 {
         if is_symmetric_kernel {
             #[cfg(feature = "rdm")]
             {
-                use crate::cpu_features::is_aarch_rdm_supported;
-                if is_aarch_rdm_supported() {
+                if std::arch::is_aarch64_feature_detected!("rdm") {
                     use crate::filter1d::neon::filter_row_symm_neon_u8_i32_rdm;
                     return filter_row_symm_neon_u8_i32_rdm::<N>;
                 }
@@ -103,8 +102,7 @@ impl Filter1DRowHandlerApprox<u8, i32> for u8 {
         }
         #[cfg(feature = "rdm")]
         {
-            use crate::cpu_features::is_aarch_rdm_supported;
-            if is_aarch_rdm_supported() {
+            if std::arch::is_aarch64_feature_detected!("rdm") {
                 use crate::filter1d::neon::filter_row_neon_u8_i32_rdm;
                 return filter_row_neon_u8_i32_rdm::<N>;
             }

@@ -27,8 +27,8 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::{
-    fast_gaussian_next, fast_gaussian_next_f32, fast_gaussian_next_u16, BlurImageMut, EdgeMode,
-    FastBlurChannels, ThreadingPolicy,
+    fast_gaussian_next, fast_gaussian_next_f32, fast_gaussian_next_u16, AnisotropicRadius,
+    BlurImageMut, EdgeMode, FastBlurChannels, ThreadingPolicy,
 };
 use image::{
     DynamicImage, GrayAlphaImage, GrayImage, ImageBuffer, Luma, LumaA, Rgb, Rgb32FImage, RgbImage,
@@ -41,15 +41,15 @@ use image::{
 ///
 /// # Arguments
 ///
-/// * `image`: Dynamic image provided by image crate
-/// * `radius`: radius limited
-/// * `edge_mode` - Rule to handle edge mode
-/// * `threading_policy` - Threads usage policy
+/// * `image`: Dynamic image provided by image crate.
+/// * `radius`: radius.
+/// * `edge_mode` - Rule to handle edge mode.
+/// * `threading_policy` - Threads usage policy.
 ///
 #[must_use]
 pub fn fast_gaussian_next_blur_image(
     image: DynamicImage,
-    radius: u32,
+    radius: AnisotropicRadius,
     edge_mode: EdgeMode,
     threading_policy: ThreadingPolicy,
 ) -> Option<DynamicImage> {

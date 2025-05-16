@@ -2,7 +2,8 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use image::{GenericImageView, ImageReader};
 use libblur::{
     filter_1d_exact, gaussian_kernel_1d, sigma_size, BlurImage, BlurImageMut, ConvolutionMode,
-    EdgeMode, FastBlurChannels, Scalar, ThreadingPolicy,
+    EdgeMode, FastBlurChannels, GaussianBlurParams, IeeeBinaryConvolutionMode, Scalar,
+    ThreadingPolicy,
 };
 use opencv::core::{
     find_file, split, AlgorithmHint, Mat, Size, Vector, BORDER_DEFAULT, CV_16UC4, CV_32FC3,
@@ -58,8 +59,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             libblur::gaussian_blur(
                 &src_image,
                 &mut dst_bytes,
-                3,
-                0.,
+                GaussianBlurParams::new_from_kernel(3.),
                 EdgeMode::Clamp,
                 ThreadingPolicy::Adaptive,
                 ConvolutionMode::FixedPoint,
@@ -106,8 +106,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             libblur::gaussian_blur(
                 &src_image,
                 &mut dst_bytes,
-                13,
-                0.,
+                GaussianBlurParams::new_from_kernel(13.),
                 EdgeMode::Clamp,
                 ThreadingPolicy::Adaptive,
                 ConvolutionMode::Exact,
@@ -123,8 +122,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             libblur::gaussian_blur(
                 &src_image,
                 &mut dst_bytes,
-                13,
-                0.,
+                GaussianBlurParams::new_from_kernel(13.),
                 EdgeMode::Clamp,
                 ThreadingPolicy::Adaptive,
                 ConvolutionMode::FixedPoint,
@@ -167,10 +165,10 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             libblur::gaussian_blur_f32(
                 &src_image,
                 &mut dst_bytes,
-                25 * 2 + 1,
-                0.,
+                GaussianBlurParams::new_from_kernel((25 * 2 + 1) as f64),
                 EdgeMode::Clamp,
                 ThreadingPolicy::Adaptive,
+                IeeeBinaryConvolutionMode::Normal,
             )
             .unwrap();
         })
@@ -209,8 +207,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             libblur::gaussian_blur_u16(
                 &src_image,
                 &mut dst_bytes,
-                151 * 2 + 1,
-                0.,
+                GaussianBlurParams::new_from_kernel((151 * 2 + 1) as f64),
                 EdgeMode::Clamp,
                 ThreadingPolicy::Adaptive,
                 ConvolutionMode::Exact,
@@ -237,8 +234,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             libblur::gaussian_blur_u16(
                 &src_image,
                 &mut dst_bytes,
-                151 * 2 + 1,
-                0.,
+                GaussianBlurParams::new_from_kernel((151 * 2 + 1) as f64),
                 EdgeMode::Clamp,
                 ThreadingPolicy::Adaptive,
                 ConvolutionMode::FixedPoint,
@@ -304,8 +300,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             libblur::gaussian_blur(
                 &src_image,
                 &mut dst_bytes,
-                77 * 2 + 1,
-                (77f32 * 2f32 + 1f32) / 6f32,
+                GaussianBlurParams::new((77 * 2 + 1) as u32, (77. * 2. + 1.) / 6.),
                 EdgeMode::Clamp,
                 ThreadingPolicy::Adaptive,
                 ConvolutionMode::Exact,
@@ -321,8 +316,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             libblur::gaussian_blur(
                 &src_image,
                 &mut dst_bytes,
-                77 * 2 + 1,
-                (77f32 * 2f32 + 1f32) / 6f32,
+                GaussianBlurParams::new((77 * 2 + 1) as u32, (77. * 2. + 1.) / 6.),
                 EdgeMode::Clamp,
                 ThreadingPolicy::Adaptive,
                 ConvolutionMode::FixedPoint,
@@ -365,8 +359,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 libblur::gaussian_blur(
                     &src_image,
                     &mut dst_bytes,
-                    77 * 2 + 1,
-                    (77f32 * 2f32 + 1f32) / 6f32,
+                    GaussianBlurParams::new((77 * 2 + 1) as u32, (77. * 2. + 1.) / 6.),
                     EdgeMode::Clamp,
                     ThreadingPolicy::Adaptive,
                     ConvolutionMode::Exact,
@@ -382,8 +375,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 libblur::gaussian_blur(
                     &src_image,
                     &mut dst_bytes,
-                    21,
-                    0.,
+                    GaussianBlurParams::new_from_kernel(21.),
                     EdgeMode::Clamp,
                     ThreadingPolicy::Adaptive,
                     ConvolutionMode::Exact,
@@ -435,8 +427,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 libblur::gaussian_blur(
                     &src_image,
                     &mut dst_bytes,
-                    77 * 2 + 1,
-                    (77f32 * 2f32 + 1f32) / 6f32,
+                    GaussianBlurParams::new((77 * 2 + 1) as u32, (77. * 2. + 1.) / 6.),
                     EdgeMode::Clamp,
                     ThreadingPolicy::Adaptive,
                     ConvolutionMode::FixedPoint,
@@ -499,8 +490,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 libblur::gaussian_blur(
                     &src_image,
                     &mut dst_bytes,
-                    151,
-                    0.,
+                    GaussianBlurParams::new_from_kernel(151.),
                     EdgeMode::Clamp,
                     ThreadingPolicy::Adaptive,
                     ConvolutionMode::Exact,
@@ -516,8 +506,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 libblur::gaussian_blur(
                     &src_image,
                     &mut dst_bytes,
-                    77 * 2 + 1,
-                    (77f32 * 2f32 + 1f32) / 6f32,
+                    GaussianBlurParams::new((77 * 2 + 1) as u32, (77. * 2. + 1.) / 6.),
                     EdgeMode::Clamp,
                     ThreadingPolicy::Adaptive,
                     ConvolutionMode::FixedPoint,

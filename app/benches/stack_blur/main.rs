@@ -1,6 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use image::{EncodableLayout, GenericImageView, ImageReader};
-use libblur::{BlurImageMut, FastBlurChannels, ThreadingPolicy};
+use libblur::{AnisotropicRadius, BlurImageMut, FastBlurChannels, ThreadingPolicy};
 use opencv::core::{find_file, AlgorithmHint, Mat, Size, CV_8UC3, CV_8UC4};
 use opencv::imgcodecs::{imread, IMREAD_COLOR};
 
@@ -20,7 +20,30 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             FastBlurChannels::Channels4,
         );
         b.iter(|| {
-            libblur::stack_blur(&mut dst_image, 77, ThreadingPolicy::Adaptive).unwrap();
+            libblur::stack_blur(
+                &mut dst_image,
+                AnisotropicRadius::new(77),
+                ThreadingPolicy::Adaptive,
+            )
+            .unwrap();
+        })
+    });
+
+    c.bench_function("libblur: RGBA stack blur (Single Thread)", |b| {
+        let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
+        let mut dst_image = BlurImageMut::borrow(
+            &mut dst_bytes,
+            dimensions.0,
+            dimensions.1,
+            FastBlurChannels::Channels4,
+        );
+        b.iter(|| {
+            libblur::stack_blur(
+                &mut dst_image,
+                AnisotropicRadius::new(77),
+                ThreadingPolicy::Single,
+            )
+            .unwrap();
         })
     });
 
@@ -63,7 +86,30 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             FastBlurChannels::Channels3,
         );
         b.iter(|| {
-            libblur::stack_blur(&mut dst_image, 77, ThreadingPolicy::Adaptive).unwrap();
+            libblur::stack_blur(
+                &mut dst_image,
+                AnisotropicRadius::new(77),
+                ThreadingPolicy::Adaptive,
+            )
+            .unwrap();
+        });
+    });
+
+    c.bench_function("libblur: RGB stack blur ( Single Thread )", |b| {
+        let mut dst = rgb_image.to_vec();
+        let mut dst_image = BlurImageMut::borrow(
+            &mut dst,
+            dimensions.0,
+            dimensions.1,
+            FastBlurChannels::Channels3,
+        );
+        b.iter(|| {
+            libblur::stack_blur(
+                &mut dst_image,
+                AnisotropicRadius::new(77),
+                ThreadingPolicy::Single,
+            )
+            .unwrap();
         });
     });
 
@@ -73,10 +119,10 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     )
     .unwrap();
 
-    let mut src = Mat::default();
+    let mut src_rgb0 = Mat::default();
     opencv::imgproc::cvt_color(
         &src_rgb,
-        &mut src,
+        &mut src_rgb0,
         CV_8UC3,
         CV_8UC4,
         AlgorithmHint::ALGO_HINT_DEFAULT,
@@ -86,7 +132,23 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("OpenCV: RGB stack blur", |b| {
         b.iter(|| {
             let mut dst = Mat::default();
+            opencv::imgproc::stack_blur(&src_rgb0, &mut dst, Size::new(77, 77)).unwrap();
+        })
+    });
+
+    opencv::core::set_num_threads(1).unwrap();
+
+    c.bench_function("OpenCV: RGBA stack blur (Single Thread)", |b| {
+        b.iter(|| {
+            let mut dst = Mat::default();
             opencv::imgproc::stack_blur(&src, &mut dst, Size::new(77, 77)).unwrap();
+        })
+    });
+
+    c.bench_function("OpenCV: RGB stack blur (Single Thread)", |b| {
+        b.iter(|| {
+            let mut dst = Mat::default();
+            opencv::imgproc::stack_blur(&src_rgb0, &mut dst, Size::new(77, 77)).unwrap();
         })
     });
 }

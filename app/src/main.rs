@@ -34,9 +34,9 @@ use colorutils_rs::TransferFunction;
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use libblur::{
     filter_1d_exact, filter_2d_rgba_fft, gaussian_kernel_1d, gaussian_kernel_1d_f64,
-    generate_motion_kernel, motion_blur, sigma_size, sigma_size_d, BlurImage, BlurImageMut,
-    BufferStore, ConvolutionMode, EdgeMode, FastBlurChannels, ImageSize, KernelShape, Scalar,
-    ThreadingPolicy,
+    generate_motion_kernel, motion_blur, sigma_size, sigma_size_d, AnisotropicRadius, BlurImage,
+    BlurImageMut, BufferStore, CLTParameters, ConvolutionMode, EdgeMode, FastBlurChannels,
+    GaussianBlurParams, ImageSize, KernelShape, Scalar, ThreadingPolicy,
 };
 use std::time::Instant;
 
@@ -89,25 +89,25 @@ fn main() {
     let mut v_vec = src_bytes
         .to_vec()
         .iter()
-        .map(|&x| x)
-        // .map(|&x| (x as f32 / 255.))
+        // .map(|&x| x)
+        .map(|&x| (x as f32 / 255.))
         // .map(|&x| u16::from_ne_bytes([x, x]))
-        .collect::<Vec<u8>>();
+        .collect::<Vec<f32>>();
 
-    // let mut dst_image = BlurImageMut::borrow(
-    //     &mut v_vec,
-    //     dyn_image.width(),
-    //     dyn_image.height(),
-    //     FastBlurChannels::Channels4,
-    // );
-
-    let image = BlurImage::borrow(
-        &v_vec,
+    let mut dst_image = BlurImageMut::borrow(
+        &mut v_vec,
         dyn_image.width(),
         dyn_image.height(),
         FastBlurChannels::Channels4,
     );
-    let mut dst_image = BlurImageMut::default();
+
+    // let image = BlurImage::borrow(
+    //     &v_vec,
+    //     dyn_image.width(),
+    //     dyn_image.height(),
+    //     FastBlurChannels::Channels4,
+    // );
+    // let mut dst_image = BlurImageMut::default();
     //
     // libblur::fast_gaussian_next_u16(&mut dst_image, 37, ThreadingPolicy::Single, EdgeMode::Clamp)
     //     .unwrap();
@@ -137,7 +137,13 @@ fn main() {
     // )
     // .unwrap();
 
-    libblur::box_blur(&image, &mut dst_image, 5, ThreadingPolicy::Single).unwrap();
+    libblur::fast_gaussian_next_f32(
+        &mut dst_image,
+        AnisotropicRadius::create(8, 35),
+        ThreadingPolicy::Single,
+        EdgeMode::Clamp,
+    )
+    .unwrap();
 
     // libblur::motion_blur(
     //     &image,
@@ -154,8 +160,8 @@ fn main() {
         .data
         .borrow()
         .iter()
-        .map(|&x| x)
-        // .map(|&x| (x * 255f32).round() as u8)
+        // .map(|&x| x)
+        .map(|&x| (x * 255f32).round() as u8)
         // .map(|&x| (x >> 8) as u8)
         .collect::<Vec<u8>>();
 

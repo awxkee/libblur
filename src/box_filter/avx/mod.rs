@@ -27,10 +27,12 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 mod hrgba8;
+mod rgba_f32;
 mod vrgba8;
 mod vrgba8_low_radius;
 mod vsum8;
 
 pub(crate) use hrgba8::box_blur_horizontal_pass_avx;
+pub(crate) use rgba_f32::box_blur_horizontal_pass_avx_f32;
 pub(crate) use vrgba8::box_blur_vertical_pass_avx2;
 pub(crate) use vsum8::avx_ring_vertical_row_summ;

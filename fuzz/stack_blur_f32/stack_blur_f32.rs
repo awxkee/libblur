@@ -30,7 +30,7 @@
 #![no_main]
 
 use arbitrary::Arbitrary;
-use libblur::{stack_blur_f32, BlurImageMut, FastBlurChannels, ThreadingPolicy};
+use libblur::{stack_blur_f32, AnisotropicRadius, BlurImageMut, FastBlurChannels, ThreadingPolicy};
 use libfuzzer_sys::fuzz_target;
 
 #[derive(Clone, Debug, Arbitrary)]
@@ -39,42 +39,54 @@ pub struct SrcImage {
     pub src_height: u16,
     pub value: u8,
     pub edge_mode: u8,
-    pub radius: u8,
+    pub x_radius: u8,
+    pub y_radius: u8,
 }
 
 fuzz_target!(|data: SrcImage| {
     if data.src_width > 250 || data.src_height > 250 {
         return;
     }
-    if data.radius == 0 {
-        return;
-    }
     fuzz_image(
         data.src_width as usize,
         data.src_height as usize,
-        data.radius as usize,
+        data.x_radius as usize,
+        data.y_radius as usize,
         FastBlurChannels::Channels4,
     );
     fuzz_image(
         data.src_width as usize,
         data.src_height as usize,
-        data.radius as usize,
+        data.x_radius as usize,
+        data.y_radius as usize,
         FastBlurChannels::Channels3,
     );
     fuzz_image(
         data.src_width as usize,
         data.src_height as usize,
-        data.radius as usize,
+        data.x_radius as usize,
+        data.y_radius as usize,
         FastBlurChannels::Plane,
     );
 });
 
-fn fuzz_image(width: usize, height: usize, radius: usize, channels: FastBlurChannels) {
-    if width == 0 || height == 0 || radius == 0 {
+fn fuzz_image(
+    width: usize,
+    height: usize,
+    x_radius: usize,
+    y_radius: usize,
+    channels: FastBlurChannels,
+) {
+    if width == 0 || height == 0 {
         return;
     }
 
     let mut dst_image = BlurImageMut::alloc(width as u32, height as u32, channels);
 
-    stack_blur_f32(&mut dst_image, radius as u32, ThreadingPolicy::Single).unwrap();
+    stack_blur_f32(
+        &mut dst_image,
+        AnisotropicRadius::create(x_radius as u32, y_radius as u32),
+        ThreadingPolicy::Single,
+    )
+    .unwrap();
 }
