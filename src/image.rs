@@ -123,6 +123,30 @@ impl<'a, T: Clone + Copy + Default + Debug> BlurImage<'a, T> {
         }
     }
 
+    /// Deep copy immutable image to mutable
+    pub fn copy_to_mut(&self, dst: &mut BlurImageMut<T>) -> Result<(), BlurError> {
+        self.check_layout()?;
+        dst.check_layout(Some(self))?;
+        self.size_matches_mut(dst)?;
+        for (src, dst) in self
+            .data
+            .as_ref()
+            .chunks_exact(self.row_stride() as usize)
+            .zip(
+                dst.data
+                    .borrow_mut()
+                    .chunks_exact_mut(self.row_stride() as usize),
+            )
+        {
+            let src = &src[..self.width as usize * self.channels.channels()];
+            let dst = &mut dst[..self.width as usize * self.channels.channels()];
+            for (src, dst) in src.iter().zip(dst.iter_mut()) {
+                *dst = *src;
+            }
+        }
+        Ok(())
+    }
+
     /// Checks if it is matches the size of the other image
     #[inline]
     pub fn size_matches(&self, other: &BlurImage<'_, T>) -> Result<(), BlurError> {
