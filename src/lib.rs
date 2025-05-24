@@ -25,7 +25,7 @@
 // CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#![allow(clippy::too_many_arguments, clippy::int_plus_one)]
+#![allow(clippy::too_many_arguments, clippy::int_plus_one, stable_features)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(
     all(feature = "nightly_fcma", target_arch = "aarch64"),
@@ -89,6 +89,7 @@ mod gaussian_blur_image;
 mod image;
 mod img_size;
 mod laplacian;
+mod lens;
 mod median_blur;
 mod mlaf;
 mod motion_blur;
@@ -144,7 +145,10 @@ pub use fast_gaussian_next::fast_gaussian_next_u16;
 pub use filter1d::{filter_1d_approx, filter_1d_exact, make_arena, Arena, ArenaPads, KernelShape};
 #[cfg(feature = "fft")]
 #[cfg_attr(docsrs, doc(cfg(feature = "fft")))]
-pub use filter2d::{fft_next_good_size, filter_2d_fft, filter_2d_rgb_fft, filter_2d_rgba_fft};
+pub use filter2d::{
+    fft_next_good_size, filter_2d_fft, filter_2d_fft_complex, filter_2d_rgb_fft,
+    filter_2d_rgb_fft_complex, filter_2d_rgba_fft, filter_2d_rgba_fft_complex,
+};
 pub use filter2d::{filter_2d, filter_2d_arbitrary, filter_2d_rgb, filter_2d_rgba};
 pub use gaussian::gaussian_blur_in_linear;
 pub use gaussian::{
@@ -158,6 +162,7 @@ pub use gaussian_blur_image::gaussian_blur_image;
 pub use image::{BlurImage, BlurImageMut, BufferStore};
 pub use img_size::ImageSize;
 pub use laplacian::{laplacian, laplacian_kernel};
+pub use lens::lens_kernel;
 pub use median_blur::median_blur;
 pub use motion_blur::{generate_motion_kernel, motion_blur};
 pub use sobel::sobel;
@@ -268,6 +273,7 @@ mod tests {
             KernelShape::new(9, 9),
             EdgeMode::Clamp,
             Scalar::default(),
+            ThreadingPolicy::Single,
         )
         .unwrap();
         for (i, &cn) in dst.data.borrow_mut().iter().enumerate() {

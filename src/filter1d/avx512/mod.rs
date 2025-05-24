@@ -1,5 +1,5 @@
 /*
- * // Copyright (c) Radzivon Bartoshyk. All rights reserved.
+ * // Copyright (c) Radzivon Bartoshyk 5/2025. All rights reserved.
  * //
  * // Redistribution and use in source and binary forms, with or without modification,
  * // are permitted provided that the following conditions are met:
@@ -26,41 +26,18 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#![allow(clippy::type_complexity)]
-mod arena;
-mod arena_roi;
-#[cfg(all(target_arch = "x86_64", feature = "avx"))]
-mod avx;
-#[cfg(all(target_arch = "x86_64", feature = "nightly_avx512"))]
-mod avx512;
-mod color_group;
-mod filter;
-mod filter_1d_approx;
-mod filter_1d_column_handler;
-mod filter_1d_column_handler_approx;
-mod filter_1d_row_handler;
-mod filter_1d_row_handler_approx;
-mod filter_column;
-mod filter_column_approx;
-mod filter_column_approx_symmetric;
-mod filter_column_symmetric;
-mod filter_element;
-mod filter_row;
-mod filter_row_approx;
-mod filter_row_symmetric;
-mod filter_row_symmetric_approx;
-mod filter_scan;
-#[cfg(all(target_arch = "aarch64", feature = "neon"))]
-pub(crate) mod neon;
-mod region;
-mod row_handler_small_approx;
+mod filter_column_symm_approx;
+mod filter_column_symm_approx_uq0_7;
+mod filter_row_symm_uq15_u16;
+mod pack;
 mod row_symm_approx_binter;
-#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
-pub(crate) mod sse;
-mod to_approx_storage;
+mod row_symm_approx_binter3_uq0_7;
+mod sse_utils;
+mod utils;
+mod v_load;
+mod v_store;
 
-pub use arena::{make_arena, Arena, ArenaPads};
-pub use filter::filter_1d_exact;
-pub use filter_1d_approx::filter_1d_approx;
-pub use filter_element::KernelShape;
-pub use to_approx_storage::ToApproxStorage;
+pub(crate) use filter_column_symm_approx::filter_column_avx512_symm_u8_i32_app;
+pub(crate) use filter_row_symm_uq15_u16::filter_row_avx512_symm_uq15_u16;
+pub(crate) use row_symm_approx_binter::filter_row_avx512_symm_u8_i32_app_binter;
+pub(crate) use row_symm_approx_binter3_uq0_7::filter_row_avx512_symm_u8_uq0_7_k3;

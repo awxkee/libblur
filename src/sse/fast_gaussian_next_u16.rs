@@ -35,7 +35,7 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-pub(crate) fn fgn_vertical_pass_sse_u16<const CHANNELS_COUNT: usize>(
+pub(crate) fn fgn_vertical_pass_sse_u16<const CN: usize>(
     bytes: &UnsafeSlice<u16>,
     stride: u32,
     width: u32,
@@ -46,7 +46,7 @@ pub(crate) fn fgn_vertical_pass_sse_u16<const CHANNELS_COUNT: usize>(
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        fgn_vertical_pass_sse_u16_def::<CHANNELS_COUNT>(
+        fgn_vertical_pass_sse_u16_def::<CN>(
             bytes, stride, width, height, radius, start, end, edge_mode,
         );
     }

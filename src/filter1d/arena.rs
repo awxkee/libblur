@@ -129,7 +129,7 @@ where
 
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]
 #[target_feature(enable = "avx2")]
-unsafe fn make_arena_avx2<T, const COMPONENTS: usize>(
+unsafe fn make_arena_avx2<T, const CN: usize>(
     image: &[T],
     image_stride: usize,
     image_size: ImageSize,
@@ -141,12 +141,12 @@ where
     T: Default + Copy + Send + Sync + 'static,
     f64: AsPrimitive<T>,
 {
-    make_arena_exec::<T, COMPONENTS>(image, image_stride, image_size, pads, border_mode, scalar)
+    make_arena_exec::<T, CN>(image, image_stride, image_size, pads, border_mode, scalar)
 }
 
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 #[target_feature(enable = "sse4.1")]
-unsafe fn make_arena_sse4_1<T, const COMPONENTS: usize>(
+unsafe fn make_arena_sse4_1<T, const CN: usize>(
     image: &[T],
     image_stride: usize,
     image_size: ImageSize,
@@ -158,7 +158,7 @@ where
     T: Default + Copy + Send + Sync + 'static,
     f64: AsPrimitive<T>,
 {
-    make_arena_exec::<T, COMPONENTS>(image, image_stride, image_size, pads, border_mode, scalar)
+    make_arena_exec::<T, CN>(image, image_stride, image_size, pads, border_mode, scalar)
 }
 
 /// Pads an image with chosen border strategy
@@ -328,7 +328,7 @@ where
 }
 
 /// Pads an image with chosen border strategy
-pub fn make_arena_row<T, const COMPONENTS: usize>(
+pub fn make_arena_row<T, const CN: usize>(
     image: &BlurImage<T>,
     source_y: usize,
     kernel_size: KernelShape,
@@ -344,13 +344,13 @@ where
 
     let image_size = image.size();
 
-    let arena_width = image_size.width * COMPONENTS + pad_w * 2 * COMPONENTS;
+    let arena_width = image_size.width * CN + pad_w * 2 * CN;
     let mut row = vec![T::default(); arena_width];
-    write_arena_row::<T, COMPONENTS>(&mut row, image, source_y, kernel_size, border_mode, scalar)?;
+    write_arena_row::<T, CN>(&mut row, image, source_y, kernel_size, border_mode, scalar)?;
     Ok((row, image_size.width + pad_w * 2))
 }
 
-pub(crate) fn write_arena_row<T, const COMPONENTS: usize>(
+pub(crate) fn write_arena_row<T, const CN: usize>(
     row: &mut [T],
     image: &BlurImage<T>,
     source_y: usize,
@@ -367,45 +367,43 @@ where
 
     let image_size = image.size();
 
-    let arena_width = image_size.width * COMPONENTS + pad_w * 2 * COMPONENTS;
+    let arena_width = image_size.width * CN + pad_w * 2 * CN;
     if row.len() < arena_width {
         return Err(BlurError::ImagesMustMatch);
     }
 
     let source_offset = source_y * image.row_stride() as usize;
 
-    let source_row =
-        &image.data.as_ref()[source_offset..(source_offset + image_size.width * COMPONENTS)];
+    let source_row = &image.data.as_ref()[source_offset..(source_offset + image_size.width * CN)];
 
-    let row_dst =
-        &mut row[pad_w * COMPONENTS..(pad_w * COMPONENTS + image_size.width * COMPONENTS)];
+    let row_dst = &mut row[pad_w * CN..(pad_w * CN + image_size.width * CN)];
 
     for (dst, src) in row_dst.iter_mut().zip(source_row.iter()) {
         *dst = *src;
     }
 
-    for (x, dst) in (0..pad_w).zip(row.chunks_exact_mut(COMPONENTS)) {
+    for (x, dst) in (0..pad_w).zip(row.chunks_exact_mut(CN)) {
         match border_mode {
             EdgeMode::Clamp => {
                 let old_x = x.saturating_sub(pad_w).min(image_size.width - 1);
-                let old_px = old_x * COMPONENTS;
-                let src_iter = &source_row[old_px..(old_px + COMPONENTS)];
+                let old_px = old_x * CN;
+                let src_iter = &source_row[old_px..(old_px + CN)];
                 for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
                     *dst = *src;
                 }
             }
             EdgeMode::Wrap => {
                 let old_x = (x as i64 - pad_w as i64).rem_euclid(image_size.width as i64) as usize;
-                let old_px = old_x * COMPONENTS;
-                let src_iter = &source_row[old_px..(old_px + COMPONENTS)];
+                let old_px = old_x * CN;
+                let src_iter = &source_row[old_px..(old_px + CN)];
                 for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
                     *dst = *src;
                 }
             }
             EdgeMode::Reflect => {
                 let old_x = reflect_index(x as isize - pad_w as isize, image_size.width as isize);
-                let old_px = old_x * COMPONENTS;
-                let src_iter = &source_row[old_px..(old_px + COMPONENTS)];
+                let old_px = old_x * CN;
+                let src_iter = &source_row[old_px..(old_px + CN)];
                 for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
                     *dst = *src;
                 }
@@ -413,8 +411,8 @@ where
             EdgeMode::Reflect101 => {
                 let old_x =
                     reflect_index_101(x as isize - pad_w as isize, image_size.width as isize);
-                let old_px = old_x * COMPONENTS;
-                let src_iter = &source_row[old_px..(old_px + COMPONENTS)];
+                let old_px = old_x * CN;
+                let src_iter = &source_row[old_px..(old_px + CN)];
                 for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
                     *dst = *src;
                 }
@@ -428,37 +426,37 @@ where
     }
 
     for (x, dst) in
-        (image_size.width..(image_size.width + pad_w)).zip(row.chunks_exact_mut(COMPONENTS).rev())
+        (image_size.width..(image_size.width + pad_w)).zip(row.chunks_exact_mut(CN).rev())
     {
         match border_mode {
             EdgeMode::Clamp => {
                 let old_x = x.max(0).min(image_size.width - 1);
-                let old_px = old_x * COMPONENTS;
-                let src_iter = &source_row[old_px..(old_px + COMPONENTS)];
+                let old_px = old_x * CN;
+                let src_iter = &source_row[old_px..(old_px + CN)];
                 for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
                     *dst = *src;
                 }
             }
             EdgeMode::Wrap => {
                 let old_x = (x as i64).rem_euclid(image_size.width as i64) as usize;
-                let old_px = old_x * COMPONENTS;
-                let src_iter = &source_row[old_px..(old_px + COMPONENTS)];
+                let old_px = old_x * CN;
+                let src_iter = &source_row[old_px..(old_px + CN)];
                 for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
                     *dst = *src;
                 }
             }
             EdgeMode::Reflect => {
                 let old_x = reflect_index(x as isize, image_size.width as isize);
-                let old_px = old_x * COMPONENTS;
-                let src_iter = &source_row[old_px..(old_px + COMPONENTS)];
+                let old_px = old_x * CN;
+                let src_iter = &source_row[old_px..(old_px + CN)];
                 for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
                     *dst = *src;
                 }
             }
             EdgeMode::Reflect101 => {
                 let old_x = reflect_index_101(x as isize, image_size.width as isize);
-                let old_px = old_x * COMPONENTS;
-                let src_iter = &source_row[old_px..(old_px + COMPONENTS)];
+                let old_px = old_x * CN;
+                let src_iter = &source_row[old_px..(old_px + CN)];
                 for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
                     *dst = *src;
                 }
@@ -496,7 +494,7 @@ where
 }
 
 /// Pads a column image with chosen border strategy
-pub fn make_arena_columns<T, const COMPONENTS: usize>(
+pub fn make_arena_columns<T, const CN: usize>(
     image: &[T],
     image_size: ImageSize,
     kernel_size: KernelShape,
@@ -511,7 +509,7 @@ where
     {
         if std::arch::is_x86_feature_detected!("avx2") {
             return unsafe {
-                mac_avx2::<T, COMPONENTS>(image, image_size, kernel_size, border_mode, scalar)
+                mac_avx2::<T, CN>(image, image_size, kernel_size, border_mode, scalar)
             };
         }
     }
@@ -519,11 +517,11 @@ where
     {
         if std::arch::is_x86_feature_detected!("sse4.1") {
             return unsafe {
-                mac_sse_4_1::<T, COMPONENTS>(image, image_size, kernel_size, border_mode, scalar)
+                mac_sse_4_1::<T, CN>(image, image_size, kernel_size, border_mode, scalar)
             };
         }
     }
-    make_arena_columns_exec::<T, COMPONENTS>(image, image_size, kernel_size, border_mode, scalar)
+    make_arena_columns_exec::<T, CN>(image, image_size, kernel_size, border_mode, scalar)
 }
 
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]

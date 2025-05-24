@@ -34,14 +34,14 @@ use std::arch::x86_64::*;
 use std::marker::PhantomData;
 use std::ops::{AddAssign, Mul, Shr, Sub, SubAssign};
 
-pub(crate) struct VerticalAvxStackBlurPass<T, J, const COMPONENTS: usize> {
+pub(crate) struct VerticalAvxStackBlurPass<T, J, const CN: usize> {
     _phantom_t: PhantomData<T>,
     _phantom_j: PhantomData<J>,
 }
 
-impl<T, J, const COMPONENTS: usize> Default for VerticalAvxStackBlurPass<T, J, COMPONENTS> {
+impl<T, J, const CN: usize> Default for VerticalAvxStackBlurPass<T, J, CN> {
     fn default() -> Self {
-        VerticalAvxStackBlurPass::<T, J, COMPONENTS> {
+        VerticalAvxStackBlurPass::<T, J, CN> {
             _phantom_t: Default::default(),
             _phantom_j: Default::default(),
         }
@@ -708,8 +708,7 @@ unsafe fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
     }
 }
 
-impl<T, J, const COMPONENTS: usize> StackBlurWorkingPass<T, COMPONENTS>
-    for VerticalAvxStackBlurPass<T, J, COMPONENTS>
+impl<T, J, const CN: usize> StackBlurWorkingPass<T, CN> for VerticalAvxStackBlurPass<T, J, CN>
 where
     J: Copy
         + 'static
@@ -740,7 +739,7 @@ where
     ) {
         unsafe {
             let pixels: &UnsafeSlice<u8> = std::mem::transmute(pixels);
-            stack_blur_avx_vertical_def::<COMPONENTS>(
+            stack_blur_avx_vertical_def::<CN>(
                 pixels,
                 stride,
                 width,

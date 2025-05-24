@@ -29,6 +29,8 @@
 use crate::filter1d::KernelShape;
 use crate::filter2d::scan_point_2d::ScanPoint2d;
 use num_traits::AsPrimitive;
+#[cfg(feature = "fft")]
+use rustfft::num_complex::Complex;
 
 pub(crate) fn scan_se_2d<F>(
     structuring_element: &[F],
@@ -53,6 +55,42 @@ where
             for (x, &element) in row.iter().enumerate() {
                 let zero_f = 0i32.as_();
                 if element.ne(&zero_f) {
+                    left_front.push(ScanPoint2d::new(
+                        x as i64 - horizontal_anchor,
+                        y as i64 - half_kernel_height,
+                        element,
+                    ));
+                }
+            }
+        });
+
+    left_front
+}
+
+#[cfg(feature = "fft")]
+pub(crate) fn scan_se_2d_complex<F>(
+    structuring_element: &[Complex<F>],
+    structuring_element_size: KernelShape,
+) -> Vec<ScanPoint2d<Complex<F>>>
+where
+    F: Copy + PartialEq + 'static,
+    f64: AsPrimitive<F>,
+{
+    let mut left_front = vec![];
+
+    let kernel_width = structuring_element_size.width;
+    let kernel_height = structuring_element_size.height;
+
+    let horizontal_anchor = kernel_width as i64 / 2;
+    let half_kernel_height = kernel_height as i64 / 2;
+
+    structuring_element
+        .chunks_exact(kernel_width)
+        .enumerate()
+        .for_each(|(y, row)| {
+            for (x, &element) in row.iter().enumerate() {
+                let zero_f = 0f64.as_();
+                if element.re.ne(&zero_f) || element.im.ne(&zero_f) {
                     left_front.push(ScanPoint2d::new(
                         x as i64 - horizontal_anchor,
                         y as i64 - half_kernel_height,

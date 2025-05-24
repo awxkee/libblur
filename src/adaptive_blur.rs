@@ -273,6 +273,7 @@ impl Edges<u8> for u8 {
                 KernelShape::new(radius, radius),
                 border_mode,
                 border_constant,
+                ThreadingPolicy::Adaptive,
             )
             .unwrap();
         } else {

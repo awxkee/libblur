@@ -36,21 +36,21 @@ use std::arch::wasm32::*;
 use std::marker::PhantomData;
 use std::ops::{AddAssign, Mul, Shr, Sub, SubAssign};
 
-pub struct VerticalWasmStackBlurPass<T, J, const COMPONENTS: usize> {
+pub struct VerticalWasmStackBlurPass<T, J, const CN: usize> {
     _phantom_t: PhantomData<T>,
     _phantom_j: PhantomData<J>,
 }
 
-impl<T, J, const COMPONENTS: usize> Default for VerticalWasmStackBlurPass<T, J, COMPONENTS> {
+impl<T, J, const CN: usize> Default for VerticalWasmStackBlurPass<T, J, CN> {
     fn default() -> Self {
-        VerticalWasmStackBlurPass::<T, J, COMPONENTS> {
+        VerticalWasmStackBlurPass::<T, J, CN> {
             _phantom_t: Default::default(),
             _phantom_j: Default::default(),
         }
     }
 }
 
-impl<T, J, const COMPONENTS: usize> VerticalWasmStackBlurPass<T, J, COMPONENTS>
+impl<T, J, const CN: usize> VerticalWasmStackBlurPass<T, J, CN>
 where
     J: Copy
         + 'static
@@ -103,11 +103,11 @@ where
             let mut sum_in = i32x4_splat(0i32);
             let mut sum_out = i32x4_splat(0i32);
 
-            src_ptr = COMPONENTS * x; // x,0
+            src_ptr = CN * x; // x,0
 
             let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
 
-            let src_pixel = load_u8_s32_fast::<COMPONENTS>(src_ld as *const u8);
+            let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
 
             for i in 0..=radius {
                 let stack_ptr = stacks.as_mut_ptr().add(i as usize * 4);
@@ -123,7 +123,7 @@ where
 
                 let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4);
                 let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
-                let src_pixel = load_u8_s32_fast::<COMPONENTS>(src_ld as *const u8);
+                let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
                 v128_store(stack_ptr as *mut v128, src_pixel);
                 sums = i32x4_add(
                     sums,
@@ -138,14 +138,14 @@ where
             if yp > hm {
                 yp = hm;
             }
-            src_ptr = COMPONENTS * x + yp as usize * stride as usize;
-            dst_ptr = COMPONENTS * x;
+            src_ptr = CN * x + yp as usize * stride as usize;
+            dst_ptr = CN * x;
             for _ in 0..height {
                 let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
                 let blurred = f32x4_ceil(f32x4_mul(f32x4_convert_i32x4(sums), v_mul_value));
                 let prepared_u16 = u32x4_pack_trunc_u16x8(blurred, blurred);
                 let blurred = u16x8_pack_trunc_u8x16(prepared_u16, prepared_u16);
-                w_store_u8x8_m4::<COMPONENTS>(store_ld, blurred);
+                w_store_u8x8_m4::<CN>(store_ld, blurred);
 
                 dst_ptr += stride as usize;
 
@@ -166,7 +166,7 @@ where
                 }
 
                 let src_ld = pixels.slice.as_ptr().add(src_ptr);
-                let src_pixel = load_u8_s32_fast::<COMPONENTS>(src_ld as *const u8);
+                let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
                 v128_store(stack_ptr as *mut v128, src_pixel);
 
                 sum_in = i32x4_add(sum_in, src_pixel);
@@ -187,8 +187,7 @@ where
     }
 }
 
-impl<T, J, const COMPONENTS: usize> StackBlurWorkingPass<T, COMPONENTS>
-    for VerticalWasmStackBlurPass<T, J, COMPONENTS>
+impl<T, J, const CN: usize> StackBlurWorkingPass<T, CN> for VerticalWasmStackBlurPass<T, J, CN>
 where
     J: Copy
         + 'static

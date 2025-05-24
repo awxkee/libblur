@@ -33,13 +33,13 @@ use num_traits::{AsPrimitive, FromPrimitive};
 use std::marker::PhantomData;
 use std::ops::{AddAssign, Mul, Sub, SubAssign};
 
-pub struct VerticalStackBlurPass<T, J, F, const COMPONENTS: usize> {
+pub struct VerticalStackBlurPass<T, J, F, const CN: usize> {
     _phantom_t: PhantomData<T>,
     _phantom_j: PhantomData<J>,
     _phantom_f: PhantomData<F>,
 }
 
-impl<T, J, F, const COMPONENTS: usize> Default for VerticalStackBlurPass<T, J, F, COMPONENTS> {
+impl<T, J, F, const CN: usize> Default for VerticalStackBlurPass<T, J, F, CN> {
     fn default() -> Self {
         VerticalStackBlurPass {
             _phantom_t: Default::default(),
@@ -49,7 +49,7 @@ impl<T, J, F, const COMPONENTS: usize> Default for VerticalStackBlurPass<T, J, F
     }
 }
 
-impl<T, J, F, const COMPONENTS: usize> VerticalStackBlurPass<T, J, F, COMPONENTS>
+impl<T, J, F, const CN: usize> VerticalStackBlurPass<T, J, F, CN>
 where
     J: Copy
         + 'static
@@ -84,11 +84,11 @@ where
         let mut _yp;
         let mut sp;
         let mut stack_start;
-        let mut stacks = vec![SlidingWindow::<COMPONENTS, J>::new(); div];
+        let mut stacks = vec![SlidingWindow::<CN, J>::new(); div];
 
-        let mut sum: SlidingWindow<COMPONENTS, J>;
-        let mut sum_in: SlidingWindow<COMPONENTS, J>;
-        let mut sum_out: SlidingWindow<COMPONENTS, J>;
+        let mut sum: SlidingWindow<CN, J>;
+        let mut sum_in: SlidingWindow<CN, J>;
+        let mut sum_out: SlidingWindow<CN, J>;
 
         let hm = height - 1;
         let div = (radius * 2) + 1;
@@ -106,7 +106,7 @@ where
             sum_in = SlidingWindow::default();
             sum_out = SlidingWindow::default();
 
-            src_ptr = COMPONENTS * x;
+            src_ptr = CN * x;
 
             let src = SlidingWindow::from_store(pixels, src_ptr);
 
@@ -137,11 +137,11 @@ where
             if _yp > hm {
                 _yp = hm;
             }
-            src_ptr = COMPONENTS * x + _yp as usize * stride as usize;
-            dst_ptr = COMPONENTS * x;
+            src_ptr = CN * x + _yp as usize * stride as usize;
+            dst_ptr = CN * x;
             for _ in 0..height {
-                let sum_intermediate: SlidingWindow<COMPONENTS, f32> = sum.cast();
-                let finalized: SlidingWindow<COMPONENTS, J> = (sum_intermediate * mul_value).cast();
+                let sum_intermediate: SlidingWindow<CN, f32> = sum.cast();
+                let finalized: SlidingWindow<CN, J> = (sum_intermediate * mul_value).cast();
                 finalized.to_store(pixels, dst_ptr);
 
                 dst_ptr += stride as usize;
@@ -182,8 +182,7 @@ where
     }
 }
 
-impl<T, J, F, const COMPONENTS: usize> StackBlurWorkingPass<T, COMPONENTS>
-    for VerticalStackBlurPass<T, J, F, COMPONENTS>
+impl<T, J, F, const CN: usize> StackBlurWorkingPass<T, CN> for VerticalStackBlurPass<T, J, F, CN>
 where
     J: Copy
         + 'static

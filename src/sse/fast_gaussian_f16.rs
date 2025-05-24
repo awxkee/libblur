@@ -35,7 +35,7 @@ use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, EdgeMode};
 use half::f16;
 
-pub(crate) fn fg_horizontal_pass_sse_f16<T, const CHANNELS_COUNT: usize>(
+pub(crate) fn fg_horizontal_pass_sse_f16<T, const CN: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -46,7 +46,7 @@ pub(crate) fn fg_horizontal_pass_sse_f16<T, const CHANNELS_COUNT: usize>(
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        fast_gaussian_horizontal_pass_sse_f16_impl::<T, CHANNELS_COUNT>(
+        fast_gaussian_horizontal_pass_sse_f16_impl::<T, CN>(
             undefined_slice,
             stride,
             width,
@@ -61,7 +61,7 @@ pub(crate) fn fg_horizontal_pass_sse_f16<T, const CHANNELS_COUNT: usize>(
 
 #[inline]
 #[target_feature(enable = "sse4.1,f16c")]
-unsafe fn fast_gaussian_horizontal_pass_sse_f16_impl<T, const CHANNELS_COUNT: usize>(
+unsafe fn fast_gaussian_horizontal_pass_sse_f16_impl<T, const CN: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -89,14 +89,14 @@ unsafe fn fast_gaussian_horizontal_pass_sse_f16_impl<T, const CHANNELS_COUNT: us
         let start_x = 0 - 2 * radius_64;
         for x in start_x..(width as i64) {
             if x >= 0 {
-                let current_px = x as usize * CHANNELS_COUNT;
+                let current_px = x as usize * CN;
 
                 let pixel = _mm_mul_ps(summs, v_weight);
 
                 let bytes_offset = current_y + current_px;
 
                 let dst_ptr = bytes.slice.as_ptr().add(bytes_offset) as *mut f16;
-                store_f32_f16::<CHANNELS_COUNT>(dst_ptr, pixel);
+                store_f32_f16::<CN>(dst_ptr, pixel);
 
                 let arr_index = ((x - radius_64) & 1023) as usize;
                 let d_arr_index = (x & 1023) as usize;
@@ -119,10 +119,10 @@ unsafe fn fast_gaussian_horizontal_pass_sse_f16_impl<T, const CHANNELS_COUNT: us
 
             let next_row_y = (y as usize) * (stride as usize);
             let next_row_x = clamp_edge!(edge_mode, x + radius_64, 0, width_wide);
-            let next_row_px = next_row_x * CHANNELS_COUNT;
+            let next_row_px = next_row_x * CN;
 
             let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut f16;
-            let pixel_color = load_f32_f16::<CHANNELS_COUNT>(s_ptr);
+            let pixel_color = load_f32_f16::<CN>(s_ptr);
 
             let arr_index = ((x + radius_64) & 1023) as usize;
             let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr();

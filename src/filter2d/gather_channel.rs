@@ -28,18 +28,18 @@
  */
 #![forbid(unsafe_code)]
 
-use crate::{BlurImage, BlurImageMut, FastBlurChannels};
+use crate::{BlurImage, BlurImageMut};
 use std::fmt::Debug;
 
-pub fn gather_channel<'a, T: Copy + Default + Debug, const CN: usize>(
+pub(crate) fn gather_channel<'a, T: Copy + Default + Debug, const CN: usize>(
     image: &BlurImage<'a, T>,
+    dest: &mut BlurImageMut<'a, T>,
     order: usize,
-) -> BlurImageMut<'a, T> {
+) {
     assert!(order < CN);
-    let mut channel =
-        BlurImageMut::<'a, T>::alloc(image.width, image.height, FastBlurChannels::Plane);
-    let dst_stride = channel.row_stride() as usize;
-    for (dst, src) in channel.data.borrow_mut().chunks_exact_mut(dst_stride).zip(
+    image.only_size_matches_mut(dest).unwrap();
+    let dst_stride = dest.row_stride() as usize;
+    for (dst, src) in dest.data.borrow_mut().chunks_exact_mut(dst_stride).zip(
         image
             .data
             .as_ref()
@@ -49,7 +49,6 @@ pub fn gather_channel<'a, T: Copy + Default + Debug, const CN: usize>(
             *dst = src[order];
         }
     }
-    channel
 }
 
 pub fn squash_channel<T: Copy + Default + Debug, const CN: usize>(

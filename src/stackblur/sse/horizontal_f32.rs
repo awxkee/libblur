@@ -38,16 +38,14 @@ use std::arch::x86_64::*;
 use std::marker::PhantomData;
 use std::ops::{AddAssign, Mul, Sub, SubAssign};
 
-pub(crate) struct HorizontalSseStackBlurPassFloat32<T, J, const COMPONENTS: usize> {
+pub(crate) struct HorizontalSseStackBlurPassFloat32<T, J, const CN: usize> {
     _phantom_t: PhantomData<T>,
     _phantom_j: PhantomData<J>,
 }
 
-impl<T, J, const COMPONENTS: usize> Default
-    for HorizontalSseStackBlurPassFloat32<T, J, COMPONENTS>
-{
+impl<T, J, const CN: usize> Default for HorizontalSseStackBlurPassFloat32<T, J, CN> {
     fn default() -> Self {
-        HorizontalSseStackBlurPassFloat32::<T, J, COMPONENTS> {
+        HorizontalSseStackBlurPassFloat32::<T, J, CN> {
             _phantom_t: Default::default(),
             _phantom_j: Default::default(),
         }

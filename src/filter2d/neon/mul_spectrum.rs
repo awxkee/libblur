@@ -72,9 +72,9 @@ unsafe fn mul_spectrum_in_place_f32_impl(
             let p3 = vmulq_f32(vcmlaq_f32(zero, vd3, vk3), v_norm_factor);
 
             vst1q_f32(dst.as_mut_ptr() as *mut f32, p0);
-            vst1q_f32(dst.as_mut_ptr().add(2) as *mut f32, p1);
-            vst1q_f32(dst.as_mut_ptr().add(4) as *mut f32, p2);
-            vst1q_f32(dst.as_mut_ptr().add(6) as *mut f32, p3);
+            vst1q_f32(dst.get_unchecked_mut(2..).as_mut_ptr() as *mut f32, p1);
+            vst1q_f32(dst.get_unchecked_mut(4..).as_mut_ptr() as *mut f32, p2);
+            vst1q_f32(dst.get_unchecked_mut(6..).as_mut_ptr() as *mut f32, p3);
         }
 
         let dst_rem = value1.chunks_exact_mut(8).into_remainder();

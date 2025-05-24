@@ -37,14 +37,14 @@ use std::arch::x86_64::*;
 use std::marker::PhantomData;
 use std::ops::{AddAssign, Mul, Shr, Sub, SubAssign};
 
-pub(crate) struct HorizontalSseStackBlurPass<T, J, const COMPONENTS: usize> {
+pub(crate) struct HorizontalSseStackBlurPass<T, J, const CN: usize> {
     _phantom_t: PhantomData<T>,
     _phantom_j: PhantomData<J>,
 }
 
-impl<T, J, const COMPONENTS: usize> Default for HorizontalSseStackBlurPass<T, J, COMPONENTS> {
+impl<T, J, const CN: usize> Default for HorizontalSseStackBlurPass<T, J, CN> {
     fn default() -> Self {
-        HorizontalSseStackBlurPass::<T, J, COMPONENTS> {
+        HorizontalSseStackBlurPass::<T, J, CN> {
             _phantom_t: Default::default(),
             _phantom_j: Default::default(),
         }
@@ -315,8 +315,7 @@ unsafe fn sse_horiz_pass_impl_def<const CN: usize>(
     sse_horiz_pass_impl::<CN>(pixels, stride, width, height, radius, thread, total_threads);
 }
 
-impl<T, J, const COMPONENTS: usize> StackBlurWorkingPass<T, COMPONENTS>
-    for HorizontalSseStackBlurPass<T, J, COMPONENTS>
+impl<T, J, const CN: usize> StackBlurWorkingPass<T, CN> for HorizontalSseStackBlurPass<T, J, CN>
 where
     J: Copy
         + 'static
@@ -347,7 +346,7 @@ where
     ) {
         unsafe {
             let pixels: &UnsafeSlice<u8> = std::mem::transmute(pixels);
-            sse_horiz_pass_impl_def::<COMPONENTS>(
+            sse_horiz_pass_impl_def::<CN>(
                 pixels,
                 stride,
                 width,

@@ -7,13 +7,13 @@ edition = "2021"
 colorutils-rs = "0.7.0"
 half = "2.4.1"
 image = "0.25.5"
-libblur = { path = "../", features = ["image", "fft", "rdm", "neon", "sse", "avx"], default-features = false }
+libblur = { path = "../", features = ["image", "fft", "rdm", "neon", "sse", "avx", "nightly_avx512", "nightly_fcma"], default-features = false }
 accelerate = { path = "accelerate" }
 rayon = "1.10.0"
-fast_transpose = "0.2.3"
+fast_transpose = "0.2.5"
 
 [dev-dependencies]
-criterion = "0.5.1"
+criterion = "0.6.0"
 opencv = { version = "0.94.2", default-features = false, features = ["imgcodecs", "imgproc", "clang-runtime"] }
 
 [[bench]]
@@ -38,4 +38,8 @@ harness = false
 
 [[bench]]
 name = "fast_gaussian_next"
+harness = false
+
+[[bench]]
+name = "non_sep_2d"
 harness = false

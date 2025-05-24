@@ -34,22 +34,21 @@ use std::arch::aarch64::*;
 use std::marker::PhantomData;
 use std::ops::{AddAssign, Mul, Shr, Sub, SubAssign};
 
-pub(crate) struct HorizontalNeonStackBlurPass<T, J, const COMPONENTS: usize> {
+pub(crate) struct HorizontalNeonStackBlurPass<T, J, const CN: usize> {
     _phantom_t: PhantomData<T>,
     _phantom_j: PhantomData<J>,
 }
 
-impl<T, J, const COMPONENTS: usize> Default for HorizontalNeonStackBlurPass<T, J, COMPONENTS> {
+impl<T, J, const CN: usize> Default for HorizontalNeonStackBlurPass<T, J, CN> {
     fn default() -> Self {
-        HorizontalNeonStackBlurPass::<T, J, COMPONENTS> {
+        HorizontalNeonStackBlurPass::<T, J, CN> {
             _phantom_t: Default::default(),
             _phantom_j: Default::default(),
         }
     }
 }
 
-impl<T, J, const COMPONENTS: usize> StackBlurWorkingPass<T, COMPONENTS>
-    for HorizontalNeonStackBlurPass<T, J, COMPONENTS>
+impl<T, J, const CN: usize> StackBlurWorkingPass<T, CN> for HorizontalNeonStackBlurPass<T, J, CN>
 where
     J: Copy
         + 'static
@@ -118,13 +117,13 @@ where
                 let mut src_ptr3 = stride as usize * (yy + 3);
 
                 let src_pixel0 =
-                    load_u8_s32_fast::<COMPONENTS>(pixels.slice.as_ptr().add(src_ptr0) as *const _);
+                    load_u8_s32_fast::<CN>(pixels.slice.as_ptr().add(src_ptr0) as *const _);
                 let src_pixel1 =
-                    load_u8_s32_fast::<COMPONENTS>(pixels.slice.as_ptr().add(src_ptr1) as *const _);
+                    load_u8_s32_fast::<CN>(pixels.slice.as_ptr().add(src_ptr1) as *const _);
                 let src_pixel2 =
-                    load_u8_s32_fast::<COMPONENTS>(pixels.slice.as_ptr().add(src_ptr2) as *const _);
+                    load_u8_s32_fast::<CN>(pixels.slice.as_ptr().add(src_ptr2) as *const _);
                 let src_pixel3 =
-                    load_u8_s32_fast::<COMPONENTS>(pixels.slice.as_ptr().add(src_ptr3) as *const _);
+                    load_u8_s32_fast::<CN>(pixels.slice.as_ptr().add(src_ptr3) as *const _);
 
                 for i in 0..=radius {
                     let stack_value = stacks0.as_mut_ptr().add(i as usize * 4 * 4);
@@ -148,25 +147,21 @@ where
 
                 for i in 1..=radius {
                     if i <= wm {
-                        src_ptr0 += COMPONENTS;
-                        src_ptr1 += COMPONENTS;
-                        src_ptr2 += COMPONENTS;
-                        src_ptr3 += COMPONENTS;
+                        src_ptr0 += CN;
+                        src_ptr1 += CN;
+                        src_ptr2 += CN;
+                        src_ptr3 += CN;
                     }
                     let stack_ptr = stacks0.as_mut_ptr().add((i + radius) as usize * 4 * 4);
 
-                    let src_pixel0 = load_u8_s32_fast::<COMPONENTS>(
-                        pixels.slice.as_ptr().add(src_ptr0) as *const u8,
-                    );
-                    let src_pixel1 = load_u8_s32_fast::<COMPONENTS>(
-                        pixels.slice.as_ptr().add(src_ptr1) as *const u8,
-                    );
-                    let src_pixel2 = load_u8_s32_fast::<COMPONENTS>(
-                        pixels.slice.as_ptr().add(src_ptr2) as *const u8,
-                    );
-                    let src_pixel3 = load_u8_s32_fast::<COMPONENTS>(
-                        pixels.slice.as_ptr().add(src_ptr3) as *const u8,
-                    );
+                    let src_pixel0 =
+                        load_u8_s32_fast::<CN>(pixels.slice.as_ptr().add(src_ptr0) as *const u8);
+                    let src_pixel1 =
+                        load_u8_s32_fast::<CN>(pixels.slice.as_ptr().add(src_ptr1) as *const u8);
+                    let src_pixel2 =
+                        load_u8_s32_fast::<CN>(pixels.slice.as_ptr().add(src_ptr2) as *const u8);
+                    let src_pixel3 =
+                        load_u8_s32_fast::<CN>(pixels.slice.as_ptr().add(src_ptr3) as *const u8);
 
                     vst1q_s32(stack_ptr, src_pixel0);
                     vst1q_s32(stack_ptr.add(4), src_pixel1);
@@ -192,10 +187,10 @@ where
                     _xp = wm;
                 }
 
-                src_ptr0 = COMPONENTS * _xp as usize + yy * stride as usize;
-                src_ptr1 = COMPONENTS * _xp as usize + (yy + 1) * stride as usize;
-                src_ptr2 = COMPONENTS * _xp as usize + (yy + 2) * stride as usize;
-                src_ptr3 = COMPONENTS * _xp as usize + (yy + 3) * stride as usize;
+                src_ptr0 = CN * _xp as usize + yy * stride as usize;
+                src_ptr1 = CN * _xp as usize + (yy + 1) * stride as usize;
+                src_ptr2 = CN * _xp as usize + (yy + 2) * stride as usize;
+                src_ptr3 = CN * _xp as usize + (yy + 3) * stride as usize;
 
                 let mut dst_ptr0 = yy * stride as usize;
                 let mut dst_ptr1 = (yy + 1) * stride as usize;
@@ -218,7 +213,7 @@ where
                     let scaled_val2 = vcvtaq_s32_f32(j2);
                     let scaled_val3 = vcvtaq_s32_f32(j3);
 
-                    store_u8_s32_x4::<COMPONENTS>(
+                    store_u8_s32_x4::<CN>(
                         (
                             pixels.slice.as_ptr().add(dst_ptr0) as *mut u8,
                             pixels.slice.as_ptr().add(dst_ptr1) as *mut u8,
@@ -228,10 +223,10 @@ where
                         int32x4x4_t(scaled_val0, scaled_val1, scaled_val2, scaled_val3),
                     );
 
-                    dst_ptr0 += COMPONENTS;
-                    dst_ptr1 += COMPONENTS;
-                    dst_ptr2 += COMPONENTS;
-                    dst_ptr3 += COMPONENTS;
+                    dst_ptr0 += CN;
+                    dst_ptr1 += CN;
+                    dst_ptr2 += CN;
+                    dst_ptr3 += CN;
 
                     sums0 = vsubq_s32(sums0, sum_out0);
                     sums1 = vsubq_s32(sums1, sum_out1);
@@ -255,26 +250,22 @@ where
                     sum_out3 = vsubq_s32(sum_out3, stack_val3);
 
                     if _xp < wm {
-                        src_ptr0 += COMPONENTS;
-                        src_ptr1 += COMPONENTS;
-                        src_ptr2 += COMPONENTS;
-                        src_ptr3 += COMPONENTS;
+                        src_ptr0 += CN;
+                        src_ptr1 += CN;
+                        src_ptr2 += CN;
+                        src_ptr3 += CN;
 
                         _xp += 1;
                     }
 
-                    let src_pixel0 = load_u8_s32_fast::<COMPONENTS>(
-                        pixels.slice.as_ptr().add(src_ptr0) as *const u8,
-                    );
-                    let src_pixel1 = load_u8_s32_fast::<COMPONENTS>(
-                        pixels.slice.as_ptr().add(src_ptr1) as *const u8,
-                    );
-                    let src_pixel2 = load_u8_s32_fast::<COMPONENTS>(
-                        pixels.slice.as_ptr().add(src_ptr2) as *const u8,
-                    );
-                    let src_pixel3 = load_u8_s32_fast::<COMPONENTS>(
-                        pixels.slice.as_ptr().add(src_ptr3) as *const u8,
-                    );
+                    let src_pixel0 =
+                        load_u8_s32_fast::<CN>(pixels.slice.as_ptr().add(src_ptr0) as *const u8);
+                    let src_pixel1 =
+                        load_u8_s32_fast::<CN>(pixels.slice.as_ptr().add(src_ptr1) as *const u8);
+                    let src_pixel2 =
+                        load_u8_s32_fast::<CN>(pixels.slice.as_ptr().add(src_ptr2) as *const u8);
+                    let src_pixel3 =
+                        load_u8_s32_fast::<CN>(pixels.slice.as_ptr().add(src_ptr3) as *const u8);
 
                     vst1q_s32(stack, src_pixel0);
                     vst1q_s32(stack.add(4), src_pixel1);
@@ -323,7 +314,7 @@ where
                 let mut src_ptr = stride as usize * y; // start of line (0,y)
 
                 let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
-                let src_pixel = load_u8_s32_fast::<COMPONENTS>(src_ld as *const u8);
+                let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
 
                 for i in 0..=radius {
                     let stack_value = stacks0.as_mut_ptr().add(i as usize * 4);
@@ -334,11 +325,11 @@ where
 
                 for i in 1..=radius {
                     if i <= wm {
-                        src_ptr += COMPONENTS;
+                        src_ptr += CN;
                     }
                     let stack_ptr = stacks0.as_mut_ptr().add((i + radius) as usize * 4);
                     let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
-                    let src_pixel = load_u8_s32_fast::<COMPONENTS>(src_ld as *const u8);
+                    let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
                     vst1q_s32(stack_ptr, src_pixel);
                     sums = vmlaq_s32(sums, src_pixel, vdupq_n_s32(radius as i32 + 1 - i as i32));
 
@@ -351,15 +342,15 @@ where
                     _xp = wm;
                 }
 
-                src_ptr = COMPONENTS * _xp as usize + y * stride as usize;
+                src_ptr = CN * _xp as usize + y * stride as usize;
 
                 let mut dst_ptr = y * stride as usize;
                 for _ in 0..width {
                     let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
                     let casted_sum = vcvtq_f32_s32(sums);
                     let scaled_val = vcvtaq_s32_f32(vmulq_f32(casted_sum, mul_value));
-                    store_u8_s32::<COMPONENTS>(store_ld, scaled_val);
-                    dst_ptr += COMPONENTS;
+                    store_u8_s32::<CN>(store_ld, scaled_val);
+                    dst_ptr += CN;
 
                     sums = vsubq_s32(sums, sum_out);
 
@@ -374,12 +365,12 @@ where
                     sum_out = vsubq_s32(sum_out, stack_val);
 
                     if _xp < wm {
-                        src_ptr += COMPONENTS;
+                        src_ptr += CN;
                         _xp += 1;
                     }
 
                     let src_ld = pixels.slice.as_ptr().add(src_ptr);
-                    let src_pixel = load_u8_s32_fast::<COMPONENTS>(src_ld as *const u8);
+                    let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
                     vst1q_s32(stack, src_pixel);
 
                     sum_in = vaddq_s32(sum_in, src_pixel);

@@ -17,6 +17,7 @@ neon = ["libblur/neon"]
 avx = ["libblur/avx"]
 sse = ["libblur/sse"]
 rdm = ["libblur/rdm", "neon"]
+avx512 = ["libblur/nightly_avx512"]
 
 [[bin]]
 name = "motion"

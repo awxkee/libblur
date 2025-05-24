@@ -76,6 +76,26 @@ impl SpectrumMultiplier<f32> for f32 {
                 return neon_mul_spectrum_in_place_f32(value1, other, width, height);
             }
         }
+        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]
+        {
+            if std::arch::is_x86_feature_detected!("avx2") {
+                if std::arch::is_x86_feature_detected!("fma") {
+                    use crate::filter2d::avx::avx_fma_mul_spectrum_in_place_f32;
+                    return avx_fma_mul_spectrum_in_place_f32(value1, other, width, height);
+                }
+                unsafe {
+                    return mul_spectrum_in_place_avx2(value1, other, width, height);
+                }
+            }
+        }
+        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
+        {
+            if std::arch::is_x86_feature_detected!("sse4.1") {
+                unsafe {
+                    return mul_spectrum_in_place_sse_4_1(value1, other, width, height);
+                }
+            }
+        }
         mul_spectrum_in_place_impl(value1, other, width, height);
     }
 }
@@ -87,7 +107,7 @@ impl SpectrumMultiplier<f64> for f64 {
         width: usize,
         height: usize,
     ) {
-        mul_spectrum_in_place_impl(value1, other, width, height);
+        mul_spectrum_in_place(value1, other, width, height);
     }
 }
 
