@@ -29,7 +29,8 @@
 use crate::avx::{_mm256_load_pack_x2, _mm256_store_pack_x2};
 use crate::filter1d::arena::Arena;
 use crate::filter1d::avx::sse_utils::{
-    _mm_mul_add_epi8_by_epi16_x4, _mm_mul_epi8_by_epi16_x4, _mm_pack_epi32_x2_epi8,
+    _mm_mul_add_epi8_by_epi16_x2, _mm_mul_add_epi8_by_epi16_x4, _mm_mul_epi8_by_epi16_x2,
+    _mm_mul_epi8_by_epi16_x4, _mm_pack_epi32_epi8, _mm_pack_epi32_x2_epi8,
 };
 use crate::filter1d::avx::utils::{
     _mm256_mul_add_epi8_by_epi16_x4, _mm256_mul_epi8_by_epi16_x4, _mm256_pack_epi32_x4_epi8,
@@ -147,38 +148,25 @@ unsafe fn filter_column_avx_u8_i32_impl(
         cx += 16;
     }
 
-    let coeff = *scanned_kernel.get_unchecked(0);
-
     while cx + 4 < image_width {
         let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
-        let mut k0 = (*v_src.get_unchecked(0) as i32).mul(coeff.weight);
-        let mut k1 = (*v_src.get_unchecked(1) as i32).mul(coeff.weight);
-        let mut k2 = (*v_src.get_unchecked(2) as i32).mul(coeff.weight);
-        let mut k3 = (*v_src.get_unchecked(3) as i32).mul(coeff.weight);
+        let source = _mm_loadu_si32(v_src.as_ptr() as *const _);
+        let mut k0 = _mm_mul_epi8_by_epi16_x2(source, _mm256_castsi256_si128(coeff));
 
         for i in 1..length {
-            let coeff = *scanned_kernel.get_unchecked(i);
-            k0 = ((*arena_src.get_unchecked(i).get_unchecked(cx)) as i32)
-                .mul(coeff.weight)
-                .add(k0);
-            k1 = ((*arena_src.get_unchecked(i).get_unchecked(cx + 1)) as i32)
-                .mul(coeff.weight)
-                .add(k1);
-            k2 = ((*arena_src.get_unchecked(i).get_unchecked(cx + 2)) as i32)
-                .mul(coeff.weight)
-                .add(k2);
-            k3 = ((*arena_src.get_unchecked(i).get_unchecked(cx + 3)) as i32)
-                .mul(coeff.weight)
-                .add(k3);
+            let coeff = _mm_set1_epi32(*v_prepared.get_unchecked(i));
+            let v_source =
+                _mm_loadu_si32(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr() as *const _);
+            k0 = _mm_mul_add_epi8_by_epi16_x2(k0, v_source, coeff);
         }
 
-        *dst.get_unchecked_mut(cx) = k0.to_approx_();
-        *dst.get_unchecked_mut(cx + 1) = k1.to_approx_();
-        *dst.get_unchecked_mut(cx + 2) = k2.to_approx_();
-        *dst.get_unchecked_mut(cx + 3) = k3.to_approx_();
+        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
+        _mm_storeu_si32(dst_ptr0 as *mut _, _mm_pack_epi32_epi8(k0));
         cx += 4;
     }
+
+    let coeff = *scanned_kernel.get_unchecked(0);
 
     for x in cx..image_width {
         let v_src = arena_src.get_unchecked(0).get_unchecked(x..);

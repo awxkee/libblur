@@ -1,0 +1,194 @@
+/*
+ * // Copyright (c) Radzivon Bartoshyk. All rights reserved.
+ * //
+ * // Redistribution and use in source and binary forms, with or without modification,
+ * // are permitted provided that the following conditions are met:
+ * //
+ * // 1.  Redistributions of source code must retain the above copyright notice, this
+ * // list of conditions and the following disclaimer.
+ * //
+ * // 2.  Redistributions in binary form must reproduce the above copyright notice,
+ * // this list of conditions and the following disclaimer in the documentation
+ * // and/or other materials provided with the distribution.
+ * //
+ * // 3.  Neither the name of the copyright holder nor the names of its
+ * // contributors may be used to endorse or promote products derived from
+ * // this software without specific prior written permission.
+ * //
+ * // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * // AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * // IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * // DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * // FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * // DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * // SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * // CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+use crate::filter1d::arena::Arena;
+use crate::filter1d::avx512::utils::_mm512_fmla_pd;
+use crate::filter1d::avx512::v_load::_mm256_load_pack_ps_x2;
+use crate::filter1d::avx512::v_store::_mm256_store_pack_ps_x2;
+use crate::filter1d::filter_scan::ScanPoint1d;
+use crate::filter1d::region::FilterRegion;
+use crate::filter1d::sse::utils::_mm_fmla_pd;
+use crate::img_size::ImageSize;
+use std::arch::x86_64::*;
+
+pub(crate) fn filter_row_avx512_f32_f64_symm<const N: usize>(
+    arena: Arena,
+    arena_src: &[f32],
+    dst: &mut [f32],
+    image_size: ImageSize,
+    filter_region: FilterRegion,
+    scanned_kernel: &[ScanPoint1d<f64>],
+) {
+    unsafe {
+        let unit = ExecutionUnit::<N>::default();
+        unit.pass(
+            arena,
+            arena_src,
+            dst,
+            image_size,
+            filter_region,
+            scanned_kernel,
+        );
+    }
+}
+
+#[derive(Debug, Default, Copy, Clone)]
+struct ExecutionUnit<const N: usize> {}
+
+impl<const N: usize> ExecutionUnit<N> {
+    #[target_feature(enable = "avx2", enable = "fma")]
+    unsafe fn pass(
+        &self,
+        _: Arena,
+        arena_src: &[f32],
+        dst: &mut [f32],
+        image_size: ImageSize,
+        _: FilterRegion,
+        scanned_kernel: &[ScanPoint1d<f64>],
+    ) {
+        let src = arena_src;
+
+        let local_src = src;
+
+        let length = scanned_kernel.len();
+
+        let mut cx = 0usize;
+
+        let max_width = image_size.width * N;
+
+        let half_len = length / 2;
+
+        let coeff = _mm512_set1_pd(scanned_kernel.get_unchecked(half_len).weight);
+
+        while cx + 16 < max_width {
+            let shifted_src = local_src.get_unchecked(cx..);
+
+            let source = _mm256_load_pack_ps_x2(shifted_src.get_unchecked(half_len * N..).as_ptr());
+            let mut k0 = _mm512_mul_pd(_mm512_cvtps_pd(source.0), coeff);
+            let mut k1 = _mm512_mul_pd(_mm512_cvtps_pd(source.1), coeff);
+
+            for i in 0..half_len {
+                let rollback = length - i - 1;
+                let coeff = _mm512_set1_pd(scanned_kernel.get_unchecked(i).weight);
+                let v_source0 = _mm256_load_pack_ps_x2(shifted_src.get_unchecked(i * N..).as_ptr());
+                let v_source1 =
+                    _mm256_load_pack_ps_x2(shifted_src.get_unchecked(rollback * N..).as_ptr());
+                k0 = _mm512_fmla_pd(
+                    k0,
+                    _mm512_add_pd(_mm512_cvtps_pd(v_source0.0), _mm512_cvtps_pd(v_source1.0)),
+                    coeff,
+                );
+                k1 = _mm512_fmla_pd(
+                    k1,
+                    _mm512_add_pd(_mm512_cvtps_pd(v_source0.1), _mm512_cvtps_pd(v_source1.1)),
+                    coeff,
+                );
+            }
+
+            let z0 = _mm512_cvtpd_ps(k0);
+            let z1 = _mm512_cvtpd_ps(k1);
+
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
+            _mm256_store_pack_ps_x2(dst_ptr0, (z0, z1));
+            cx += 16;
+        }
+
+        while cx + 8 < max_width {
+            let shifted_src = local_src.get_unchecked(cx..);
+
+            let source = _mm256_loadu_ps(shifted_src.get_unchecked(half_len * N..).as_ptr());
+            let mut k0 = _mm512_mul_pd(_mm512_cvtps_pd(source), coeff);
+
+            for i in 0..half_len {
+                let rollback = length - i - 1;
+                let coeff = _mm512_set1_pd(scanned_kernel.get_unchecked(i).weight);
+                let v_source0 = _mm256_loadu_ps(shifted_src.get_unchecked(i * N..).as_ptr());
+                let v_source1 =
+                    _mm256_loadu_ps(shifted_src.get_unchecked((rollback * N)..).as_ptr());
+                k0 = _mm512_fmla_pd(
+                    k0,
+                    _mm512_add_pd(_mm512_cvtps_pd(v_source0), _mm512_cvtps_pd(v_source1)),
+                    coeff,
+                );
+            }
+
+            let z0 = _mm512_cvtpd_ps(k0);
+
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
+            _mm256_storeu_ps(dst_ptr0, z0);
+            cx += 8;
+        }
+
+        while cx + 4 < max_width {
+            let shifted_src = local_src.get_unchecked(cx..);
+
+            let source_0 = _mm_loadu_ps(shifted_src.get_unchecked(half_len * N..).as_ptr());
+            let mut k0 = _mm_mul_pd(_mm_cvtps_pd(source_0), _mm512_castpd512_pd128(coeff));
+
+            for i in 0..half_len {
+                let rollback = length - i - 1;
+                let coeff = _mm_set_pd1(scanned_kernel.get_unchecked(i).weight);
+                let v_source0 = _mm_loadu_ps(shifted_src.get_unchecked((i * N)..).as_ptr());
+                let v_source1 = _mm_loadu_ps(shifted_src.get_unchecked((rollback * N)..).as_ptr());
+                k0 = _mm_fmla_pd(
+                    k0,
+                    _mm_add_pd(_mm_cvtps_pd(v_source0), _mm_cvtps_pd(v_source1)),
+                    coeff,
+                );
+            }
+
+            let dst_ptr = dst.get_unchecked_mut(cx..).as_mut_ptr();
+            _mm_storeu_ps(dst_ptr, _mm_cvtpd_ps(k0));
+            cx += 4;
+        }
+
+        while cx < max_width {
+            let shifted_src = local_src.get_unchecked(cx..);
+
+            let source_0 = _mm_load_ss(shifted_src.get_unchecked(half_len * N..).as_ptr());
+            let mut k0 = _mm_mul_pd(_mm_cvtps_pd(source_0), _mm512_castpd512_pd128(coeff));
+
+            for i in 0..half_len {
+                let rollback = length - i - 1;
+                let coeff = _mm_set1_pd(scanned_kernel.get_unchecked(i).weight);
+                let v_source0 = _mm_load_ss(shifted_src.get_unchecked((i * N)..).as_ptr());
+                let v_source1 = _mm_load_ss(shifted_src.get_unchecked((rollback * N)..).as_ptr());
+                k0 = _mm_fmla_pd(
+                    k0,
+                    _mm_add_pd(_mm_cvtps_pd(v_source0), _mm_cvtps_pd(v_source1)),
+                    coeff,
+                );
+            }
+
+            let dst_ptr = dst.get_unchecked_mut(cx..).as_mut_ptr();
+            _mm_store_ss(dst_ptr, _mm_cvtpd_ps(k0));
+
+            cx += 1;
+        }
+    }
+}

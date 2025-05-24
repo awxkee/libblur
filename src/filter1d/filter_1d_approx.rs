@@ -681,6 +681,7 @@ where
 
                     // preload top edge
                     if source_y == 0 {
+                        #[allow(clippy::unnecessary_unwrap)]
                         if row_kernel.len() < B_INTER_CUTOFF
                             && row_handler_binter.is_some()
                             && border_mode != EdgeMode::Constant
@@ -739,6 +740,7 @@ where
                                 0i64,
                                 image_size.height as i64
                             );
+                            #[allow(clippy::unnecessary_unwrap)]
                             if row_kernel.len() < B_INTER_CUTOFF
                                 && row_handler_binter.is_some()
                                 && border_mode != EdgeMode::Constant
@@ -806,6 +808,7 @@ where
                             clamp_edge!(border_mode, y as i64, 0i64, image_size.height as i64)
                         };
 
+                        #[allow(clippy::unnecessary_unwrap)]
                         if row_kernel.len() < B_INTER_CUTOFF
                             && row_handler_binter.is_some()
                             && border_mode != EdgeMode::Constant
@@ -883,6 +886,7 @@ where
 
         let mut row_buffer: Vec<T> = vec![];
 
+        #[allow(clippy::unnecessary_unwrap)]
         // preload top edge
         if row_kernel.len() < B_INTER_CUTOFF
             && row_handler_binter.is_some()
@@ -948,6 +952,7 @@ where
                 clamp_edge!(border_mode, y as i64, 0i64, image_size.height as i64)
             };
 
+            #[allow(clippy::unnecessary_unwrap)]
             if row_kernel.len() < B_INTER_CUTOFF
                 && row_handler_binter.is_some()
                 && border_mode != EdgeMode::Constant

@@ -34,12 +34,12 @@ use std::arch::aarch64::*;
 use std::marker::PhantomData;
 use std::ops::{AddAssign, Mul, Shr, Sub, SubAssign};
 
-pub(crate) struct VerticalNeonStackBlurPass<T, J, const COMPONENTS: usize> {
+pub(crate) struct VerticalNeonStackBlurPass<T, J, const CN: usize> {
     _phantom_t: PhantomData<T>,
     _phantom_j: PhantomData<J>,
 }
 
-impl<T, J, const COMPONENTS: usize> Default for VerticalNeonStackBlurPass<T, J, COMPONENTS> {
+impl<T, J, const CN: usize> Default for VerticalNeonStackBlurPass<T, J, CN> {
     fn default() -> Self {
         VerticalNeonStackBlurPass {
             _phantom_t: Default::default(),

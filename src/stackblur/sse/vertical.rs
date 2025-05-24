@@ -37,14 +37,14 @@ use std::arch::x86_64::*;
 use std::marker::PhantomData;
 use std::ops::{AddAssign, Mul, Shr, Sub, SubAssign};
 
-pub(crate) struct VerticalSseStackBlurPass<T, J, const COMPONENTS: usize> {
+pub(crate) struct VerticalSseStackBlurPass<T, J, const CN: usize> {
     _phantom_t: PhantomData<T>,
     _phantom_j: PhantomData<J>,
 }
 
-impl<T, J, const COMPONENTS: usize> Default for VerticalSseStackBlurPass<T, J, COMPONENTS> {
+impl<T, J, const CN: usize> Default for VerticalSseStackBlurPass<T, J, CN> {
     fn default() -> Self {
-        VerticalSseStackBlurPass::<T, J, COMPONENTS> {
+        VerticalSseStackBlurPass::<T, J, CN> {
             _phantom_t: Default::default(),
             _phantom_j: Default::default(),
         }
@@ -436,8 +436,7 @@ where
     }
 }
 
-impl<T, J, const COMPONENTS: usize> StackBlurWorkingPass<T, COMPONENTS>
-    for VerticalSseStackBlurPass<T, J, COMPONENTS>
+impl<T, J, const CN: usize> StackBlurWorkingPass<T, CN> for VerticalSseStackBlurPass<T, J, CN>
 where
     J: Copy
         + 'static

@@ -33,15 +33,15 @@ use num_traits::{AsPrimitive, FromPrimitive};
 use std::marker::PhantomData;
 use std::ops::{AddAssign, Mul, Sub, SubAssign};
 
-pub(crate) struct HorizontalStackBlurPass<T, J, F, const COMPONENTS: usize> {
+pub(crate) struct HorizontalStackBlurPass<T, J, F, const CN: usize> {
     _phantom_t: PhantomData<T>,
     _phantom_j: PhantomData<J>,
     _phantom_f: PhantomData<F>,
 }
 
-impl<T, J, F, const COMPONENTS: usize> Default for HorizontalStackBlurPass<T, J, F, COMPONENTS> {
+impl<T, J, F, const CN: usize> Default for HorizontalStackBlurPass<T, J, F, CN> {
     fn default() -> Self {
-        HorizontalStackBlurPass::<T, J, F, COMPONENTS> {
+        HorizontalStackBlurPass::<T, J, F, CN> {
             _phantom_t: Default::default(),
             _phantom_j: Default::default(),
             _phantom_f: Default::default(),
@@ -52,7 +52,7 @@ impl<T, J, F, const COMPONENTS: usize> Default for HorizontalStackBlurPass<T, J,
 /// # Generics
 /// `T` - data type
 /// `J` - accumulator type
-impl<T, J, F, const COMPONENTS: usize> HorizontalStackBlurPass<T, J, F, COMPONENTS>
+impl<T, J, F, const CN: usize> HorizontalStackBlurPass<T, J, F, CN>
 where
     J: Copy
         + 'static
@@ -86,7 +86,7 @@ where
         let mut xp;
         let mut sp;
         let mut stack_start;
-        let mut stacks0 = vec![SlidingWindow::<COMPONENTS, J>::new(); div];
+        let mut stacks0 = vec![SlidingWindow::<CN, J>::new(); div];
 
         let rad_p_1 = radius as f32 + 1.;
         let scale_filter_value = (1. / (rad_p_1 * rad_p_1)).as_();
@@ -117,7 +117,7 @@ where
 
             for i in 1..=radius {
                 if i <= wm {
-                    src_ptr += COMPONENTS;
+                    src_ptr += CN;
                 }
 
                 let src = SlidingWindow::from_store(pixels, src_ptr);
@@ -135,15 +135,15 @@ where
                 xp = wm;
             }
 
-            src_ptr = COMPONENTS * xp as usize + y * stride as usize;
+            src_ptr = CN * xp as usize + y * stride as usize;
             let mut dst_ptr = y * stride as usize;
             for _ in 0..width {
-                let sum_intermediate: SlidingWindow<COMPONENTS, F> = sum.cast();
-                let finalized: SlidingWindow<COMPONENTS, J> =
+                let sum_intermediate: SlidingWindow<CN, F> = sum.cast();
+                let finalized: SlidingWindow<CN, J> =
                     (sum_intermediate * scale_filter_value).cast();
                 finalized.to_store(pixels, dst_ptr);
 
-                dst_ptr += COMPONENTS;
+                dst_ptr += CN;
 
                 sum -= sum_out;
 
@@ -156,7 +156,7 @@ where
                 sum_out -= *stack;
 
                 if xp < wm {
-                    src_ptr += COMPONENTS;
+                    src_ptr += CN;
                     xp += 1;
                 }
 
@@ -178,8 +178,7 @@ where
     }
 }
 
-impl<T, J, F, const COMPONENTS: usize> StackBlurWorkingPass<T, COMPONENTS>
-    for HorizontalStackBlurPass<T, J, F, COMPONENTS>
+impl<T, J, F, const CN: usize> StackBlurWorkingPass<T, CN> for HorizontalStackBlurPass<T, J, F, CN>
 where
     J: Copy
         + 'static

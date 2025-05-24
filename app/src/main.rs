@@ -132,7 +132,7 @@ fn main() {
         GaussianBlurParams {
             x_kernel: 25,
             x_sigma: 0.,
-            y_kernel: 5,
+            y_kernel: 25,
             y_sigma: 0.,
         },
         EdgeMode::Clamp,

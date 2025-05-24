@@ -29,7 +29,7 @@
 use crate::unsafe_slice::UnsafeSlice;
 use num_traits::{AsPrimitive, FromPrimitive};
 
-pub(crate) trait StackBlurWorkingPass<T, const COMPONENTS: usize>
+pub(crate) trait StackBlurWorkingPass<T, const CN: usize>
 where
     T: Copy + FromPrimitive + 'static,
     f32: AsPrimitive<T>,
@@ -37,7 +37,7 @@ where
     ///
     ///
     /// # Generics
-    /// `T` - buffer type u8, u16 etc, this method expected only integral types
+    /// `T` - buffer type u8, u16 etc., this method expected only integral types
     /// `J` - accumulator type, i32, i64
     /// `I` - intermediate multiplication type, when sum will be adopting into higher it may overflow, use this parameter to control overflowing
     fn pass(

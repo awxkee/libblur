@@ -205,6 +205,14 @@ impl Filter1DColumnHandler<f32, f32> for f32 {
     fn get_column_handler(
         is_symmetric_kernel: bool,
     ) -> fn(Arena, &[&[f32]], &mut [f32], ImageSize, FilterRegion, &[ScanPoint1d<f32>]) {
+        #[cfg(all(target_arch = "x86_64", feature = "nightly_avx512"))]
+        if std::arch::is_x86_feature_detected!("avx512bw")
+            && std::arch::is_x86_feature_detected!("fma")
+            && is_symmetric_kernel
+        {
+            use crate::filter1d::avx512::filter_column_avx512_symm_f32_f32;
+            return filter_column_avx512_symm_f32_f32;
+        }
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]
         if std::arch::is_x86_feature_detected!("avx2") {
             if is_symmetric_kernel {
@@ -361,6 +369,14 @@ impl Filter1DColumnHandler<f32, f64> for f32 {
                 use crate::filter1d::neon::filter_column_neon_symm_f32_f64;
                 return filter_column_neon_symm_f32_f64;
             }
+        }
+        #[cfg(all(target_arch = "x86_64", feature = "nightly_avx512"))]
+        if std::arch::is_x86_feature_detected!("avx512bw")
+            && std::arch::is_x86_feature_detected!("fma")
+            && is_symmetric_kernel
+        {
+            use crate::filter1d::avx512::filter_column_avx512_symm_f32_f64;
+            return filter_column_avx512_symm_f32_f64;
         }
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]
         {

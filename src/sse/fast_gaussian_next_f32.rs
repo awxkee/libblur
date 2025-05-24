@@ -33,7 +33,7 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-pub(crate) fn fgn_vertical_pass_sse_f32<T, const CHANNELS_COUNT: usize>(
+pub(crate) fn fgn_vertical_pass_sse_f32<T, const CN: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -46,11 +46,11 @@ pub(crate) fn fgn_vertical_pass_sse_f32<T, const CHANNELS_COUNT: usize>(
     unsafe {
         let bytes: &UnsafeSlice<'_, f32> = std::mem::transmute(undefined_slice);
         if std::arch::is_x86_feature_detected!("fma") {
-            fgn_vertical_pass_sse_f32_fma::<CHANNELS_COUNT>(
+            fgn_vertical_pass_sse_f32_fma::<CN>(
                 bytes, stride, width, height, radius, start, end, edge_mode,
             );
         } else {
-            fgn_vertical_pass_sse_f32_def::<CHANNELS_COUNT>(
+            fgn_vertical_pass_sse_f32_def::<CN>(
                 bytes, stride, width, height, radius, start, end, edge_mode,
             );
         }
@@ -58,7 +58,7 @@ pub(crate) fn fgn_vertical_pass_sse_f32<T, const CHANNELS_COUNT: usize>(
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn fgn_vertical_pass_sse_f32_def<const CHANNELS_COUNT: usize>(
+unsafe fn fgn_vertical_pass_sse_f32_def<const CN: usize>(
     bytes: &UnsafeSlice<f32>,
     stride: u32,
     width: u32,
@@ -68,7 +68,7 @@ unsafe fn fgn_vertical_pass_sse_f32_def<const CHANNELS_COUNT: usize>(
     end: u32,
     edge_mode: EdgeMode,
 ) {
-    fgn_vertical_pass_sse_f32_impl::<CHANNELS_COUNT, false>(
+    fgn_vertical_pass_sse_f32_impl::<CN, false>(
         bytes, stride, width, height, radius, start, end, edge_mode,
     );
 }
@@ -90,7 +90,7 @@ unsafe fn fgn_vertical_pass_sse_f32_fma<const CHANNELS_COUNT: usize>(
 }
 
 #[inline(always)]
-unsafe fn fgn_vertical_pass_sse_f32_impl<const CHANNELS_COUNT: usize, const FMA: bool>(
+unsafe fn fgn_vertical_pass_sse_f32_impl<const CN: usize, const FMA: bool>(
     bytes: &UnsafeSlice<f32>,
     stride: u32,
     width: u32,
@@ -127,9 +127,9 @@ unsafe fn fgn_vertical_pass_sse_f32_impl<const CHANNELS_COUNT: usize, const FMA:
         let mut summs1 = _mm_setzero_ps();
         let mut summs2 = _mm_setzero_ps();
 
-        let current_px0 = xx * CHANNELS_COUNT;
-        let current_px1 = (xx + 1) * CHANNELS_COUNT;
-        let current_px2 = (xx + 2) * CHANNELS_COUNT;
+        let current_px0 = xx * CN;
+        let current_px1 = (xx + 1) * CN;
+        let current_px2 = (xx + 2) * CN;
 
         let start_y = 0 - 3 * radius as i64;
         for y in start_y..height_wide {
@@ -144,9 +144,9 @@ unsafe fn fgn_vertical_pass_sse_f32_impl<const CHANNELS_COUNT: usize, const FMA:
                 let dst_ptr1 = bytes.slice.as_ptr().add(current_y + current_px1) as *mut f32;
                 let dst_ptr2 = bytes.slice.as_ptr().add(current_y + current_px2) as *mut f32;
 
-                store_f32::<CHANNELS_COUNT>(dst_ptr0, prepared_px0);
-                store_f32::<CHANNELS_COUNT>(dst_ptr1, prepared_px1);
-                store_f32::<CHANNELS_COUNT>(dst_ptr2, prepared_px2);
+                store_f32::<CN>(dst_ptr0, prepared_px0);
+                store_f32::<CN>(dst_ptr1, prepared_px1);
+                store_f32::<CN>(dst_ptr2, prepared_px2);
 
                 let d_a_1 = ((y + radius_64) & 1023) as usize;
                 let d_a_2 = ((y - radius_64) & 1023) as usize;
@@ -207,9 +207,9 @@ unsafe fn fgn_vertical_pass_sse_f32_impl<const CHANNELS_COUNT: usize, const FMA:
             let s_ptr1 = bytes.slice.as_ptr().add(next_row_y + current_px1) as *mut f32;
             let s_ptr2 = bytes.slice.as_ptr().add(next_row_y + current_px2) as *mut f32;
 
-            let pixel_color0 = load_f32::<CHANNELS_COUNT>(s_ptr0);
-            let pixel_color1 = load_f32::<CHANNELS_COUNT>(s_ptr1);
-            let pixel_color2 = load_f32::<CHANNELS_COUNT>(s_ptr2);
+            let pixel_color0 = load_f32::<CN>(s_ptr0);
+            let pixel_color1 = load_f32::<CN>(s_ptr1);
+            let pixel_color2 = load_f32::<CN>(s_ptr2);
 
             let a_i = ((y + 2 * radius_64) & 1023) as usize;
 
@@ -238,7 +238,7 @@ unsafe fn fgn_vertical_pass_sse_f32_impl<const CHANNELS_COUNT: usize, const FMA:
         let mut ders = _mm_setzero_ps();
         let mut summs = _mm_setzero_ps();
 
-        let current_px = x * CHANNELS_COUNT;
+        let current_px = x * CN;
 
         let start_y = 0 - 3 * radius as i64;
         for y in start_y..height_wide {
@@ -248,7 +248,7 @@ unsafe fn fgn_vertical_pass_sse_f32_impl<const CHANNELS_COUNT: usize, const FMA:
 
                 let pixel = _mm_mul_ps(summs, v_weight);
                 let dst_ptr = bytes.slice.as_ptr().add(bytes_offset) as *mut f32;
-                store_f32::<CHANNELS_COUNT>(dst_ptr, pixel);
+                store_f32::<CN>(dst_ptr, pixel);
 
                 let d_arr_index_1 = ((y + radius_64) & 1023) as usize;
                 let d_arr_index_2 = ((y - radius_64) & 1023) as usize;
@@ -285,11 +285,11 @@ unsafe fn fgn_vertical_pass_sse_f32_impl<const CHANNELS_COUNT: usize, const FMA:
 
             let next_row_y = clamp_edge!(edge_mode, y + ((3 * radius_64) >> 1), 0, height_wide)
                 * (stride as usize);
-            let next_row_x = x * CHANNELS_COUNT;
+            let next_row_x = x * CN;
 
             let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_x) as *mut f32;
 
-            let pixel_color = load_f32::<CHANNELS_COUNT>(s_ptr);
+            let pixel_color = load_f32::<CN>(s_ptr);
 
             let arr_index = ((y + 2 * radius_64) & 1023) as usize;
             let buf_ptr = bf0.get_unchecked_mut(arr_index).as_mut_ptr();
@@ -302,7 +302,7 @@ unsafe fn fgn_vertical_pass_sse_f32_impl<const CHANNELS_COUNT: usize, const FMA:
     }
 }
 
-pub(crate) fn fgn_horizontal_pass_sse_f32<T, const CHANNELS_COUNT: usize>(
+pub(crate) fn fgn_horizontal_pass_sse_f32<T, const CN: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -315,11 +315,11 @@ pub(crate) fn fgn_horizontal_pass_sse_f32<T, const CHANNELS_COUNT: usize>(
     unsafe {
         let bytes: &UnsafeSlice<'_, f32> = std::mem::transmute(undefined_slice);
         if std::arch::is_x86_feature_detected!("fma") {
-            fgn_horizontal_pass_sse_f32_fma::<CHANNELS_COUNT>(
+            fgn_horizontal_pass_sse_f32_fma::<CN>(
                 bytes, stride, width, height, radius, start, end, edge_mode,
             );
         } else {
-            fgn_horizontal_pass_sse_f32_def::<CHANNELS_COUNT>(
+            fgn_horizontal_pass_sse_f32_def::<CN>(
                 bytes, stride, width, height, radius, start, end, edge_mode,
             );
         }
@@ -327,7 +327,7 @@ pub(crate) fn fgn_horizontal_pass_sse_f32<T, const CHANNELS_COUNT: usize>(
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn fgn_horizontal_pass_sse_f32_def<const CHANNELS_COUNT: usize>(
+unsafe fn fgn_horizontal_pass_sse_f32_def<const CN: usize>(
     bytes: &UnsafeSlice<f32>,
     stride: u32,
     width: u32,
@@ -337,13 +337,13 @@ unsafe fn fgn_horizontal_pass_sse_f32_def<const CHANNELS_COUNT: usize>(
     end: u32,
     edge_mode: EdgeMode,
 ) {
-    fgn_horizontal_pass_sse_f32_impl::<CHANNELS_COUNT, false>(
+    fgn_horizontal_pass_sse_f32_impl::<CN, false>(
         bytes, stride, width, height, radius, start, end, edge_mode,
     );
 }
 
 #[target_feature(enable = "sse4.1", enable = "fma")]
-unsafe fn fgn_horizontal_pass_sse_f32_fma<const CHANNELS_COUNT: usize>(
+unsafe fn fgn_horizontal_pass_sse_f32_fma<const CN: usize>(
     bytes: &UnsafeSlice<f32>,
     stride: u32,
     width: u32,
@@ -353,7 +353,7 @@ unsafe fn fgn_horizontal_pass_sse_f32_fma<const CHANNELS_COUNT: usize>(
     end: u32,
     edge_mode: EdgeMode,
 ) {
-    fgn_horizontal_pass_sse_f32_impl::<CHANNELS_COUNT, true>(
+    fgn_horizontal_pass_sse_f32_impl::<CN, true>(
         bytes, stride, width, height, radius, start, end, edge_mode,
     );
 }
