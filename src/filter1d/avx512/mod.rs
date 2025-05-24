@@ -26,6 +26,8 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+mod filter_column_symm_approx;
+mod filter_column_symm_approx_uq0_7;
 mod filter_column_symm_f32;
 mod filter_column_symm_f32_f64;
 mod filter_row_f32_f64_symm;
@@ -35,6 +37,7 @@ mod utils;
 mod v_load;
 mod v_store;
 
+pub(crate) use filter_column_symm_approx::filter_column_avx512_symm_u8_i32_app;
 pub(crate) use filter_column_symm_f32::filter_column_avx512_symm_f32_f32;
 pub(crate) use filter_column_symm_f32_f64::filter_column_avx512_symm_f32_f64;
 pub(crate) use filter_row_f32_f64_symm::filter_row_avx512_f32_f64_symm;
