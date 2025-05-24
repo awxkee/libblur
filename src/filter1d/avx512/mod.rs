@@ -33,9 +33,11 @@ mod filter_column_symm_f32_f64;
 mod filter_row_f32_f64_symm;
 mod filter_row_f32_symm;
 mod filter_row_symm_uq15_u16;
+mod row_symm_approx_binter;
 mod utils;
 mod v_load;
 mod v_store;
+mod row_symm_approx_binter3_uq0_7;
 
 pub(crate) use filter_column_symm_approx::filter_column_avx512_symm_u8_i32_app;
 pub(crate) use filter_column_symm_f32::filter_column_avx512_symm_f32_f32;
@@ -43,3 +45,5 @@ pub(crate) use filter_column_symm_f32_f64::filter_column_avx512_symm_f32_f64;
 pub(crate) use filter_row_f32_f64_symm::filter_row_avx512_f32_f64_symm;
 pub(crate) use filter_row_f32_symm::filter_row_avx512_f32_f32_symm;
 pub(crate) use filter_row_symm_uq15_u16::filter_row_avx512_symm_uq15_u16;
+pub(crate) use row_symm_approx_binter::filter_row_avx512_symm_u8_i32_app_binter;
+pub(crate) use row_symm_approx_binter3_uq0_7::filter_row_avx512_symm_u8_uq0_7_k3;

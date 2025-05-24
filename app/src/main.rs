@@ -61,7 +61,7 @@ fn main() {
         .unwrap()
         .decode()
         .unwrap();
-
+    
     let dimensions = dyn_image.dimensions();
     println!("dimensions {:?}", dyn_image.dimensions());
     println!("type {:?}", dyn_image.color());

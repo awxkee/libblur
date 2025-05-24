@@ -61,6 +61,34 @@ impl Filter1DRowHandlerBInterpolateApr<u8, i32> for u8 {
         _kernel: &[ScanPoint1d<i32>],
     ) -> Option<BInterpolateHandler<u8, i32>> {
         if is_kernel_symmetric {
+            #[cfg(all(target_arch = "x86_64", feature = "nightly_avx512"))]
+            {
+                if std::arch::is_x86_feature_detected!("avx512bw") {
+                    if _kernel.len() == 3 {
+                        let all_positive = _kernel.iter().all(|&x| x.weight > 0);
+                        if all_positive {
+                            use crate::filter1d::avx512::filter_row_avx512_symm_u8_uq0_7_k3;
+                            return Some(filter_row_avx512_symm_u8_uq0_7_k3::<N>);
+                        }
+                    }
+                    // if _kernel.len() == 5 {
+                    //     let all_positive = _kernel.iter().all(|&x| x.weight > 0);
+                    //     if all_positive {
+                    //         use crate::filter1d::avx::filter_row_avx_symm_u8_uq0_7_k5;
+                    //         return Some(filter_row_avx_symm_u8_uq0_7_k5::<N>);
+                    //     }
+                    // }
+                    // if _kernel.len() < 9 {
+                    //     let all_positive = _kernel.iter().all(|&x| x.weight > 0);
+                    //     if all_positive {
+                    //         use crate::filter1d::avx::filter_row_avx_symm_u8_uq0_7_any;
+                    //         return Some(filter_row_avx_symm_u8_uq0_7_any::<N>);
+                    //     }
+                    // }
+                    use crate::filter1d::avx512::filter_row_avx512_symm_u8_i32_app_binter;
+                    return Some(filter_row_avx512_symm_u8_i32_app_binter::<N>);
+                }
+            }
             #[cfg(all(target_arch = "x86_64", feature = "avx"))]
             {
                 if std::arch::is_x86_feature_detected!("avx2") {
