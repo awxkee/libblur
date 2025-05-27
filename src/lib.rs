@@ -82,11 +82,13 @@ mod fast_gaussian_image_next;
 mod fast_gaussian_next;
 mod filter1d;
 mod filter2d;
+mod gamma_curves;
 mod gaussian;
 #[cfg(feature = "image")]
 #[cfg_attr(docsrs, doc(cfg(feature = "image")))]
 mod gaussian_blur_image;
 mod image;
+mod image_linearization;
 mod img_size;
 mod laplacian;
 mod lens;
@@ -102,7 +104,6 @@ mod sse;
 #[cfg(feature = "image")]
 #[cfg_attr(docsrs, doc(cfg(feature = "image")))]
 mod stack_blur_image;
-mod stack_blur_linear;
 mod stackblur;
 mod threading_policy;
 mod to_storage;
@@ -115,12 +116,11 @@ mod wasm32;
 #[cfg_attr(docsrs, doc(cfg(feature = "fft")))]
 pub use adaptive_blur::adaptive_blur;
 pub use box_filter::{
-    box_blur, box_blur_f32, box_blur_in_linear, box_blur_u16, gaussian_box_blur,
-    gaussian_box_blur_f32, gaussian_box_blur_in_linear, gaussian_box_blur_u16, tent_blur,
-    tent_blur_f32, tent_blur_in_linear, tent_blur_u16, BoxBlurParameters, CLTParameters,
+    box_blur, box_blur_f32, box_blur_u16, gaussian_box_blur, gaussian_box_blur_f32,
+    gaussian_box_blur_u16, tent_blur, tent_blur_f32, tent_blur_u16, BoxBlurParameters,
+    CLTParameters,
 };
 pub use channels_configuration::FastBlurChannels;
-pub use colorutils_rs::TransferFunction;
 pub use edge_mode::*;
 pub use fast_bilateral_filter::{
     fast_bilateral_filter, fast_bilateral_filter_f32, fast_bilateral_filter_u16,
@@ -128,9 +128,7 @@ pub use fast_bilateral_filter::{
 #[cfg(feature = "image")]
 #[cfg_attr(docsrs, doc(cfg(feature = "image")))]
 pub use fast_bilateral_image::fast_bilateral_filter_image;
-pub use fast_gaussian::{
-    fast_gaussian, fast_gaussian_f16, fast_gaussian_f32, fast_gaussian_in_linear, fast_gaussian_u16,
-};
+pub use fast_gaussian::{fast_gaussian, fast_gaussian_f16, fast_gaussian_f32, fast_gaussian_u16};
 #[cfg(feature = "image")]
 #[cfg_attr(docsrs, doc(cfg(feature = "image")))]
 pub use fast_gaussian_image::fast_gaussian_blur_image;
@@ -140,7 +138,6 @@ pub use fast_gaussian_image_next::fast_gaussian_next_blur_image;
 pub use fast_gaussian_next::fast_gaussian_next;
 pub use fast_gaussian_next::fast_gaussian_next_f16;
 pub use fast_gaussian_next::fast_gaussian_next_f32;
-pub use fast_gaussian_next::fast_gaussian_next_in_linear;
 pub use fast_gaussian_next::fast_gaussian_next_u16;
 pub use filter1d::{filter_1d_approx, filter_1d_exact, make_arena, Arena, ArenaPads, KernelShape};
 #[cfg(feature = "fft")]
@@ -150,7 +147,7 @@ pub use filter2d::{
     filter_2d_rgb_fft_complex, filter_2d_rgba_fft, filter_2d_rgba_fft_complex,
 };
 pub use filter2d::{filter_2d, filter_2d_arbitrary, filter_2d_rgb, filter_2d_rgba};
-pub use gaussian::gaussian_blur_in_linear;
+pub use gamma_curves::TransferFunction;
 pub use gaussian::{
     gaussian_blur, gaussian_blur_f16, gaussian_blur_f32, gaussian_blur_u16, gaussian_kernel_1d,
     gaussian_kernel_1d_f64, sigma_size, sigma_size_d, ConvolutionMode, GaussianBlurParams,
@@ -169,7 +166,6 @@ pub use sobel::sobel;
 #[cfg(feature = "image")]
 #[cfg_attr(docsrs, doc(cfg(feature = "image")))]
 pub use stack_blur_image::stack_blur_image;
-pub use stack_blur_linear::stack_blur_in_linear;
 pub use stackblur::stack_blur::stack_blur;
 pub use stackblur::stack_blur_f16::stack_blur_f16;
 pub use stackblur::stack_blur_f32::stack_blur_f32;

@@ -41,6 +41,26 @@ blurred
 .unwrap();
 ```
 
+### Transfer function
+
+All blur methods assume that data is already linearized.
+If additional linearization is needed use API:
+
+```rust
+let cvt = BlurImage::borrow(
+    &v_vec,
+    dyn_image.width(),
+    dyn_image.height(),
+    FastBlurChannels::Channels4,
+);
+let image = cvt
+    .linearize(libblur::TransferFunction::Srgb, true)
+    .unwrap();
+// perform blur
+let dst_ref = dst_image.to_immutable_ref();
+let back_in_gamma = dst_ref.gamma8(libblur::TransferFunction::Srgb, true);
+```
+
 ### Gaussian blur
 
 Excellent results. Have significant improvements, however, much slower than any approximations. Use when use need gaussian

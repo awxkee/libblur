@@ -30,17 +30,13 @@
 mod merge;
 mod split;
 
-use colorutils_rs::{linear_to_rgba, rgba_to_linear, TransferFunction};
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use libblur::{
-    filter_1d_exact, filter_2d_rgba_fft, filter_2d_rgba_fft_complex, gaussian_kernel_1d,
-    gaussian_kernel_1d_f64, generate_motion_kernel, lens_kernel, motion_blur, sigma_size,
-    sigma_size_d, AnisotropicRadius, BlurImage, BlurImageMut, BufferStore, CLTParameters,
-    ConvolutionMode, EdgeMode, FastBlurChannels, GaussianBlurParams, ImageSize, KernelShape,
-    Scalar, ThreadingPolicy,
+    filter_2d_rgba_fft, lens_kernel, BlurImage, BlurImageMut, EdgeMode, FastBlurChannels,
+    KernelShape, Scalar, ThreadingPolicy,
 };
 use std::any::Any;
-use std::io::{BufReader, Cursor, Read};
+use std::io::Read;
 use std::time::Instant;
 
 #[allow(dead_code)]
@@ -100,12 +96,15 @@ fn main() {
     //     FastBlurChannels::Channels4,
     // );
 
-    let image = BlurImage::borrow(
+    let cvt = BlurImage::borrow(
         &v_vec,
         dyn_image.width(),
         dyn_image.height(),
         FastBlurChannels::Channels4,
     );
+    let image = cvt
+        .linearize(libblur::TransferFunction::Srgb, true)
+        .unwrap();
     let mut dst_image = BlurImageMut::default();
     //
     // libblur::fast_gaussian_next_u16(&mut dst_image, 37, ThreadingPolicy::Single, EdgeMode::Clamp)
@@ -114,16 +113,16 @@ fn main() {
     let start_time = Instant::now();
 
     // for i in 0..10 {
-    let motion = lens_kernel(KernelShape::new(511, 511), 35., 15., 0.6, 0.5).unwrap();
+    let motion = lens_kernel(KernelShape::new(151, 151), 10., 3., 0.3, 0.5).unwrap();
     // let motion = lens_kernel(KernelShape::new(35, 35), 15., 6., 0.5,0.2).unwrap();
     // let bokeh = generate_complex_bokeh_kernel(35, 30.);
     let start_time = Instant::now();
-    filter_2d_rgba_fft::<u8, f32, f32>(
+    filter_2d_rgba_fft::<u16, f32, f32>(
         &image,
         &mut dst_image,
         &motion,
-        KernelShape::new(511, 511),
-        EdgeMode::Wrap,
+        KernelShape::new(151, 151),
+        EdgeMode::Clamp,
         Scalar::default(),
         ThreadingPolicy::Adaptive,
     )
@@ -173,9 +172,13 @@ fn main() {
     // )
     // .unwrap();
 
-    dst_bytes = dst_image
+    let dst_ref = dst_image.to_immutable_ref();
+    let back_in_gamma = dst_ref.gamma8(libblur::TransferFunction::Srgb, true);
+
+    dst_bytes = back_in_gamma
+        .unwrap()
         .data
-        .borrow()
+        .as_ref()
         .iter()
         .map(|&x| x)
         // .map(|&x| (x * 255f32).round() as u8)
