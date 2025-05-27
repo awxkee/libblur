@@ -25,11 +25,6 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use colorutils_rs::linear_to_planar::linear_to_plane;
-use colorutils_rs::planar_to_linear::plane_to_linear;
-use colorutils_rs::{
-    linear_to_rgb, linear_to_rgba, rgb_to_linear, rgba_to_linear, TransferFunction,
-};
 use half::f16;
 use num_traits::cast::FromPrimitive;
 use num_traits::{AsPrimitive, Float};
@@ -984,72 +979,6 @@ pub fn fast_gaussian_f32(
         height,
         radius,
         threading_policy
-    );
-    Ok(())
-}
-
-/// Performs gaussian approximation on the image in linear colorspace
-///
-/// This is fast approximation that first converts in linear colorspace, performs blur and converts back,
-/// operation will be performed in f32 so its cost is significant.
-/// O(1) complexity.
-///
-/// # Arguments
-///
-/// * `image` - Image to work in place, see [BlurImageMut] for more info.
-/// * `radius` - Almost any reasonable radius is supported.
-/// * `threading_policy` - Threads usage policy.
-/// * `transfer_function` - Transfer function in linear colorspace.
-/// * `edge_mode` - Edge handling mode, *Kernel clip* is not supported!
-///
-/// # Panics
-/// Panic is stride/width/height/channel configuration do not match provided
-pub fn fast_gaussian_in_linear(
-    image: &mut BlurImageMut<u8>,
-    radius: AnisotropicRadius,
-    threading_policy: ThreadingPolicy,
-    transfer_function: TransferFunction,
-    edge_mode: EdgeMode,
-) -> Result<(), BlurError> {
-    image.check_layout(None)?;
-    let mut linear_data = BlurImageMut::alloc(image.width, image.height, image.channels);
-
-    let forward_transformer = match image.channels {
-        FastBlurChannels::Plane => plane_to_linear,
-        FastBlurChannels::Channels3 => rgb_to_linear,
-        FastBlurChannels::Channels4 => rgba_to_linear,
-    };
-
-    let inverse_transformer = match image.channels {
-        FastBlurChannels::Plane => linear_to_plane,
-        FastBlurChannels::Channels3 => linear_to_rgb,
-        FastBlurChannels::Channels4 => linear_to_rgba,
-    };
-
-    let width = image.width;
-    let height = image.height;
-    let stride = image.row_stride();
-
-    forward_transformer(
-        image.data.borrow(),
-        stride,
-        linear_data.data.borrow_mut(),
-        width * std::mem::size_of::<f32>() as u32 * image.channels.channels() as u32,
-        width,
-        height,
-        transfer_function,
-    );
-
-    fast_gaussian_f32(&mut linear_data, radius, threading_policy, edge_mode)?;
-
-    inverse_transformer(
-        linear_data.data.borrow(),
-        width * std::mem::size_of::<f32>() as u32 * image.channels.channels() as u32,
-        image.data.borrow_mut(),
-        stride,
-        width,
-        height,
-        transfer_function,
     );
     Ok(())
 }

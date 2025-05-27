@@ -28,7 +28,6 @@
 mod declaration;
 mod gaussian_hint;
 mod gaussian_kernel;
-mod gaussian_linear;
 mod gaussian_util;
 
 pub use declaration::{
@@ -36,5 +35,4 @@ pub use declaration::{
 };
 pub use gaussian_hint::{ConvolutionMode, IeeeBinaryConvolutionMode};
 pub use gaussian_kernel::{gaussian_kernel_1d, gaussian_kernel_1d_f64};
-pub use gaussian_linear::gaussian_blur_in_linear;
 pub use gaussian_util::{sigma_size, sigma_size_d};

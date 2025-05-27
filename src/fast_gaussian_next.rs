@@ -44,14 +44,8 @@ use crate::wasm32::{
 };
 use crate::{clamp_edge, BlurImageMut, EdgeMode, FastBlurChannels, ThreadingPolicy};
 use crate::{AnisotropicRadius, BlurError};
-use colorutils_rs::linear_to_planar::linear_to_plane;
-use colorutils_rs::planar_to_linear::plane_to_linear;
-use colorutils_rs::{
-    linear_to_rgb, linear_to_rgba, rgb_to_linear, rgba_to_linear, TransferFunction,
-};
 use half::f16;
 use num_traits::{AsPrimitive, Float, FromPrimitive};
-use std::mem::size_of;
 
 const BASE_RADIUS_I64_CUTOFF: u32 = 150;
 const BASE_RADIUS_I64_CUTOFF_U16: u32 = 32;
@@ -1102,72 +1096,6 @@ pub fn fast_gaussian_next_f16(
         height,
         radius,
         threading_policy
-    );
-    Ok(())
-}
-
-/// Performs gaussian approximation on the image in linear color space
-///
-/// This is fast approximation that first converts in linear colorspace, performs blur and converts back,
-/// operation will be performed in f32 so its cost is significant
-/// Approximation based on binomial filter.
-/// O(1) complexity.
-///
-/// * `image` - Image to blur in-place, see [BlurImageMut] for more info.
-/// * `threading_policy` - Threads usage policy.
-/// * `transfer_function` - Transfer function in linear colorspace.
-/// * `edge_mode` - Edge handling mode, *Kernel clip* is not supported!
-///
-/// # Panics
-/// Panic is stride/width/height/channel configuration do not match provided
-pub fn fast_gaussian_next_in_linear(
-    in_place: &mut BlurImageMut<u8>,
-    radius: AnisotropicRadius,
-    threading_policy: ThreadingPolicy,
-    transfer_function: TransferFunction,
-    edge_mode: EdgeMode,
-) -> Result<(), BlurError> {
-    in_place.check_layout(None)?;
-    let mut linear_data = BlurImageMut::alloc(in_place.width, in_place.height, in_place.channels);
-
-    let forward_transformer = match in_place.channels {
-        FastBlurChannels::Plane => plane_to_linear,
-        FastBlurChannels::Channels3 => rgb_to_linear,
-        FastBlurChannels::Channels4 => rgba_to_linear,
-    };
-
-    let inverse_transformer = match in_place.channels {
-        FastBlurChannels::Plane => linear_to_plane,
-        FastBlurChannels::Channels3 => linear_to_rgb,
-        FastBlurChannels::Channels4 => linear_to_rgba,
-    };
-
-    let width = in_place.width;
-    let channels = in_place.channels;
-    let height = in_place.height;
-
-    forward_transformer(
-        in_place.data.borrow(),
-        in_place.row_stride(),
-        linear_data.data.borrow_mut(),
-        width * size_of::<f32>() as u32 * channels.channels() as u32,
-        width,
-        height,
-        transfer_function,
-    );
-
-    fast_gaussian_next_f32(&mut linear_data, radius, threading_policy, edge_mode)?;
-
-    let dst_stride = in_place.row_stride();
-
-    inverse_transformer(
-        linear_data.data.borrow(),
-        width * size_of::<f32>() as u32 * channels.channels() as u32,
-        in_place.data.borrow_mut(),
-        dst_stride,
-        width,
-        height,
-        transfer_function,
     );
     Ok(())
 }

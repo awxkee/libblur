@@ -31,9 +31,8 @@
 use crate::{
     filter_2d, filter_2d_fft, gaussian_blur, stack_blur, AnisotropicRadius, BlurError, BlurImage,
     BlurImageMut, ConvolutionMode, EdgeMode, FastBlurChannels, GaussianBlurParams, KernelShape,
-    Scalar, ThreadingPolicy,
+    Scalar, ThreadingPolicy, TransferFunction,
 };
-use colorutils_rs::TransferFunction;
 use num_traits::AsPrimitive;
 use std::fmt::Debug;
 
