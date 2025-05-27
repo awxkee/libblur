@@ -30,14 +30,17 @@
 mod merge;
 mod split;
 
-use colorutils_rs::TransferFunction;
+use colorutils_rs::{linear_to_rgba, rgba_to_linear, TransferFunction};
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use libblur::{
-    filter_1d_exact, filter_2d_rgba_fft, gaussian_kernel_1d, gaussian_kernel_1d_f64,
-    generate_motion_kernel, motion_blur, sigma_size, sigma_size_d, AnisotropicRadius, BlurImage,
-    BlurImageMut, BufferStore, CLTParameters, ConvolutionMode, EdgeMode, FastBlurChannels,
-    GaussianBlurParams, ImageSize, KernelShape, Scalar, ThreadingPolicy,
+    filter_1d_exact, filter_2d_rgba_fft, filter_2d_rgba_fft_complex, gaussian_kernel_1d,
+    gaussian_kernel_1d_f64, generate_motion_kernel, lens_kernel, motion_blur, sigma_size,
+    sigma_size_d, AnisotropicRadius, BlurImage, BlurImageMut, BufferStore, CLTParameters,
+    ConvolutionMode, EdgeMode, FastBlurChannels, GaussianBlurParams, ImageSize, KernelShape,
+    Scalar, ThreadingPolicy,
 };
+use std::any::Any;
+use std::io::{BufReader, Cursor, Read};
 use std::time::Instant;
 
 #[allow(dead_code)]
@@ -57,7 +60,7 @@ fn f16_to_f32(bytes: Vec<u16>) -> Vec<f32> {
 }
 
 fn main() {
-    let dyn_image = ImageReader::open("./assets/test_image_2.png")
+    let mut dyn_image = ImageReader::open("./assets/sonderland.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -79,10 +82,6 @@ fn main() {
     let stride = dimensions.0 as usize * components;
     let mut bytes: Vec<u8> = src_bytes.to_vec();
     let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
-
-    let start_time = Instant::now();
-
-    println!("libblur::stack_blur: {:?}", start_time.elapsed());
 
     let start = Instant::now();
 
@@ -112,34 +111,48 @@ fn main() {
     // libblur::fast_gaussian_next_u16(&mut dst_image, 37, ThreadingPolicy::Single, EdgeMode::Clamp)
     //     .unwrap();
     // let kernel = gaussian_kernel_1d_f64(5, sigma_size_d(2.5));
-    // let motion = generate_motion_kernel(15, 24.);
-    //
-    // let start = Instant::now();
-    // filter_2d_rgba_fft::<f32, f32, f32>(
-    //     &image,
-    //     &mut dst_image,
-    //     &motion,
-    //     KernelShape::new(15, 15),
-    //     EdgeMode::Clamp,
-    //     Scalar::default(),
-    // )
-    // .unwrap();
-    // println!("libblur::filter_2d_rgba_fft: {:?}", start_time.elapsed());
+    let start_time = Instant::now();
 
-    libblur::gaussian_blur(
+    // for i in 0..10 {
+    let motion = lens_kernel(KernelShape::new(511, 511), 35., 15., 0.6, 0.5).unwrap();
+    // let motion = lens_kernel(KernelShape::new(35, 35), 15., 6., 0.5,0.2).unwrap();
+    // let bokeh = generate_complex_bokeh_kernel(35, 30.);
+    let start_time = Instant::now();
+    filter_2d_rgba_fft::<u8, f32, f32>(
         &image,
         &mut dst_image,
-        GaussianBlurParams {
-            x_kernel: 25,
-            x_sigma: 0.,
-            y_kernel: 5,
-            y_sigma: 0.,
-        },
-        EdgeMode::Clamp,
-        ThreadingPolicy::Single,
-        ConvolutionMode::FixedPoint,
+        &motion,
+        KernelShape::new(511, 511),
+        EdgeMode::Wrap,
+        Scalar::default(),
+        ThreadingPolicy::Adaptive,
     )
     .unwrap();
+    // for dst in dst_image.data.borrow_mut().chunks_exact_mut(4) {
+    //     dst[3] = 255;
+    // }
+
+    println!(
+        "libblur::filter_2d_rgba_fft MultiThreading: {:?}",
+        start_time.elapsed()
+    );
+
+    // }
+
+    // libblur::gaussian_blur(
+    //     &image,
+    //     &mut dst_image,
+    //     GaussianBlurParams {
+    //         x_kernel: 7,
+    //         x_sigma: 0.,
+    //         y_kernel: 9,
+    //         y_sigma: 0.,
+    //     },
+    //     EdgeMode::Clamp,
+    //     ThreadingPolicy::Single,
+    //     ConvolutionMode::FixedPoint,
+    // )
+    // .unwrap();
 
     // libblur::fast_gaussian_next_f32(
     //     &mut dst_image,
@@ -171,7 +184,7 @@ fn main() {
 
     // dst_bytes = dst_image.data.borrow().to_vec();
     //
-    // filter_2d_rgba_approx::<u8, f32, i32>(
+    // filter_2d_rgba_fft::<u8, f32, i32>(
     //     &bytes,
     //     &mut dst_bytes,
     //     ImageSize::new(dimensions.0 as usize, dimensions.1 as usize),

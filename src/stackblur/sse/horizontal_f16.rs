@@ -54,7 +54,7 @@ impl<T, J, const COMPONENTS: usize> Default
     }
 }
 
-impl<T, J, const COMPONENTS: usize> HorizontalSseStackBlurPassFloat16<T, J, COMPONENTS>
+impl<T, J, const CN: usize> HorizontalSseStackBlurPassFloat16<T, J, CN>
 where
     J: Copy
         + 'static
@@ -109,7 +109,7 @@ where
                 src_ptr = stride as usize * y; // start of line (0,y)
 
                 let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f16;
-                let src_pixel = load_f32_f16::<COMPONENTS>(src_ld);
+                let src_pixel = load_f32_f16::<CN>(src_ld);
 
                 for i in 0..=radius {
                     let stack_value = stacks.as_mut_ptr().add(i as usize * 4);
@@ -120,11 +120,11 @@ where
 
                 for i in 1..=radius {
                     if i <= wm {
-                        src_ptr += COMPONENTS;
+                        src_ptr += CN;
                     }
                     let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4);
                     let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f16;
-                    let src_pixel = load_f32_f16::<COMPONENTS>(src_ld);
+                    let src_pixel = load_f32_f16::<CN>(src_ld);
                     _mm_storeu_ps(stack_ptr, src_pixel);
                     sums = _mm_add_ps(
                         sums,
@@ -140,13 +140,13 @@ where
                     xp = wm;
                 }
 
-                src_ptr = COMPONENTS * xp as usize + y * stride as usize;
+                src_ptr = CN * xp as usize + y * stride as usize;
                 dst_ptr = y * stride as usize;
                 for _ in 0..width {
                     let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut f16;
                     let blurred = _mm_mul_ps(sums, v_mul_value);
-                    store_f32_f16::<COMPONENTS>(store_ld, blurred);
-                    dst_ptr += COMPONENTS;
+                    store_f32_f16::<CN>(store_ld, blurred);
+                    dst_ptr += CN;
 
                     sums = _mm_sub_ps(sums, sum_out);
 
@@ -161,12 +161,12 @@ where
                     sum_out = _mm_sub_ps(sum_out, stack_val);
 
                     if xp < wm {
-                        src_ptr += COMPONENTS;
+                        src_ptr += CN;
                         xp += 1;
                     }
 
                     let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f16;
-                    let src_pixel = load_f32_f16::<COMPONENTS>(src_ld);
+                    let src_pixel = load_f32_f16::<CN>(src_ld);
                     _mm_storeu_ps(stack, src_pixel);
 
                     sum_in = _mm_add_ps(sum_in, src_pixel);
@@ -187,8 +187,8 @@ where
     }
 }
 
-impl<T, J, const COMPONENTS: usize> StackBlurWorkingPass<T, COMPONENTS>
-    for HorizontalSseStackBlurPassFloat16<T, J, COMPONENTS>
+impl<T, J, const CN: usize> StackBlurWorkingPass<T, CN>
+    for HorizontalSseStackBlurPassFloat16<T, J, CN>
 where
     J: Copy
         + 'static

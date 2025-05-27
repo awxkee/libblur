@@ -97,9 +97,9 @@ where
             let max_x = (thread + 1) * width as usize / total_threads;
 
             for x in min_x..max_x {
-                let mut sums = vdupq_n_f32(0f32);
-                let mut sum_in = vdupq_n_f32(0f32);
-                let mut sum_out = vdupq_n_f32(0f32);
+                let mut sums = vdupq_n_f32(0.);
+                let mut sum_in = vdupq_n_f32(0.);
+                let mut sum_out = vdupq_n_f32(0.);
 
                 src_ptr = COMPONENTS * x; // x,0
 

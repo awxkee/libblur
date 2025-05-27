@@ -189,7 +189,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     )
     .unwrap();
 
-    c.bench_function("RGBA16 gauss blur edge clamp: rad 151", |b| {
+    c.bench_function("RGBA16 gauss blur edge clamp: rad 51", |b| {
         let mut dst_bytes =
             BlurImageMut::alloc(img.width(), img.height(), FastBlurChannels::Channels4);
         let src_bytes = img
@@ -207,7 +207,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             libblur::gaussian_blur_u16(
                 &src_image,
                 &mut dst_bytes,
-                GaussianBlurParams::new_from_kernel((151 * 2 + 1) as f64),
+                GaussianBlurParams::new_from_kernel((51 * 2 + 1) as f64),
                 EdgeMode::Clamp,
                 ThreadingPolicy::Adaptive,
                 ConvolutionMode::Exact,
@@ -216,7 +216,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
-    c.bench_function("RGBA16 (Fixed Point) gauss blur edge clamp: rad 151", |b| {
+    c.bench_function("RGBA16 (Fixed Point) gauss blur edge clamp: rad 51", |b| {
         let mut dst_bytes =
             BlurImageMut::alloc(img.width(), img.height(), FastBlurChannels::Channels4);
         let src_bytes = img
@@ -234,7 +234,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             libblur::gaussian_blur_u16(
                 &src_image,
                 &mut dst_bytes,
-                GaussianBlurParams::new_from_kernel((151 * 2 + 1) as f64),
+                GaussianBlurParams::new_from_kernel((51 * 2 + 1) as f64),
                 EdgeMode::Clamp,
                 ThreadingPolicy::Adaptive,
                 ConvolutionMode::FixedPoint,
@@ -243,7 +243,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
-    c.bench_function("OpenCV RGBA16 gauss blur: rad 151", |b| {
+    c.bench_function("OpenCV RGBA16 gauss blur: rad 51", |b| {
         let mut cvt_dst = Mat::default();
         opencv::imgproc::cvt_color(
             &src0,
@@ -258,7 +258,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             opencv::imgproc::gaussian_blur(
                 &cvt_dst,
                 &mut dst,
-                Size::new(151 * 2 + 1, 151 * 2 + 1),
+                Size::new(51 * 2 + 1, 51 * 2 + 1),
                 5.,
                 5.,
                 BORDER_DEFAULT,

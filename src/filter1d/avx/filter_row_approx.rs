@@ -167,26 +167,20 @@ unsafe fn filter_row_neon_u8_i32_impl<const N: usize>(
     }
 
     while cx + 4 < max_width {
-        let coeff = *scanned_kernel.get_unchecked(0);
         let shifted_src = local_src.get_unchecked(cx..);
-        let mut k0 = *shifted_src.get_unchecked(0) as i32 * coeff.weight;
-        let mut k1 = *shifted_src.get_unchecked(1) as i32 * coeff.weight;
-        let mut k2 = *shifted_src.get_unchecked(2) as i32 * coeff.weight;
-        let mut k3 = *shifted_src.get_unchecked(3) as i32 * coeff.weight;
+
+        let source = _mm_loadu_si32(shifted_src.as_ptr() as *const _);
+        let mut k0 = _mm_mul_epi8_by_epi16_x2(source, _mm256_castsi256_si128(coeff));
 
         for i in 1..length {
-            let coeff = *scanned_kernel.get_unchecked(i);
-
-            k0 += *shifted_src.get_unchecked(i * N) as i32 * coeff.weight;
-            k1 += *shifted_src.get_unchecked(i * N + 1) as i32 * coeff.weight;
-            k2 += *shifted_src.get_unchecked(i * N + 2) as i32 * coeff.weight;
-            k3 += *shifted_src.get_unchecked(i * N + 3) as i32 * coeff.weight;
+            let coeff = _mm_set1_epi32(*v_prepared.get_unchecked(i));
+            let v_source =
+                _mm_loadu_si32(shifted_src.get_unchecked((i * N)..).as_ptr() as *const _);
+            k0 = _mm_mul_add_epi8_by_epi16_x2(k0, v_source, coeff);
         }
 
-        *dst.get_unchecked_mut(cx) = k0.to_approx_();
-        *dst.get_unchecked_mut(cx + 1) = k1.to_approx_();
-        *dst.get_unchecked_mut(cx + 2) = k2.to_approx_();
-        *dst.get_unchecked_mut(cx + 3) = k3.to_approx_();
+        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
+        _mm_storeu_si32(dst_ptr0 as *mut _, _mm_pack_epi32_epi8(k0));
         cx += 4;
     }
 

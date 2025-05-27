@@ -34,23 +34,21 @@ use std::arch::aarch64::*;
 use std::marker::PhantomData;
 use std::ops::{AddAssign, Mul, Sub, SubAssign};
 
-pub(crate) struct HorizontalNeonStackBlurPassFloat32<T, J, const COMPONENTS: usize> {
+pub(crate) struct HorizontalNeonStackBlurPassFloat32<T, J, const CN: usize> {
     _phantom_t: PhantomData<T>,
     _phantom_j: PhantomData<J>,
 }
 
-impl<T, J, const COMPONENTS: usize> Default
-    for HorizontalNeonStackBlurPassFloat32<T, J, COMPONENTS>
-{
+impl<T, J, const CN: usize> Default for HorizontalNeonStackBlurPassFloat32<T, J, CN> {
     fn default() -> Self {
-        HorizontalNeonStackBlurPassFloat32::<T, J, COMPONENTS> {
+        HorizontalNeonStackBlurPassFloat32::<T, J, CN> {
             _phantom_t: Default::default(),
             _phantom_j: Default::default(),
         }
     }
 }
 
-impl<T, J, const COMPONENTS: usize> HorizontalNeonStackBlurPassFloat32<T, J, COMPONENTS>
+impl<T, J, const CN: usize> HorizontalNeonStackBlurPassFloat32<T, J, CN>
 where
     J: Copy
         + 'static
@@ -98,14 +96,14 @@ where
             let max_y = (thread + 1) * height as usize / total_threads;
 
             for y in min_y..max_y {
-                let mut sums = vdupq_n_f32(0f32);
-                let mut sum_in = vdupq_n_f32(0f32);
-                let mut sum_out = vdupq_n_f32(0f32);
+                let mut sums = vdupq_n_f32(0.);
+                let mut sum_in = vdupq_n_f32(0.);
+                let mut sum_out = vdupq_n_f32(0.);
 
                 src_ptr = stride as usize * y;
 
                 let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f32;
-                let src_pixel = load_f32_fast::<COMPONENTS>(src_ld);
+                let src_pixel = load_f32_fast::<CN>(src_ld);
 
                 for i in 0..=radius {
                     let stack_value = stacks.as_mut_ptr().add(i as usize * 4);
@@ -116,11 +114,11 @@ where
 
                 for i in 1..=radius {
                     if i <= wm {
-                        src_ptr += COMPONENTS;
+                        src_ptr += CN;
                     }
                     let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4);
                     let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f32;
-                    let src_pixel = load_f32_fast::<COMPONENTS>(src_ld);
+                    let src_pixel = load_f32_fast::<CN>(src_ld);
                     vst1q_f32(stack_ptr, src_pixel);
                     sums = p_vfmaq_f32(sums, src_pixel, vdupq_n_f32((radius + 1 - i) as f32));
 
@@ -133,13 +131,13 @@ where
                     xp = wm;
                 }
 
-                src_ptr = COMPONENTS * xp as usize + y * stride as usize;
+                src_ptr = CN * xp as usize + y * stride as usize;
                 dst_ptr = y * stride as usize;
                 for _ in 0..width {
                     let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut f32;
                     let blurred = vmulq_f32(sums, v_mul_value);
-                    store_f32::<COMPONENTS>(store_ld, blurred);
-                    dst_ptr += COMPONENTS;
+                    store_f32::<CN>(store_ld, blurred);
+                    dst_ptr += CN;
 
                     sums = vsubq_f32(sums, sum_out);
 
@@ -154,12 +152,12 @@ where
                     sum_out = vsubq_f32(sum_out, stack_val);
 
                     if xp < wm {
-                        src_ptr += COMPONENTS;
+                        src_ptr += CN;
                         xp += 1;
                     }
 
                     let src_ld = pixels.slice.as_ptr().add(src_ptr);
-                    let src_pixel = load_f32_fast::<COMPONENTS>(src_ld as *const f32);
+                    let src_pixel = load_f32_fast::<CN>(src_ld as *const f32);
                     vst1q_f32(stack, src_pixel);
 
                     sum_in = vaddq_f32(sum_in, src_pixel);
@@ -180,8 +178,8 @@ where
     }
 }
 
-impl<T, J, const COMPONENTS: usize> StackBlurWorkingPass<T, COMPONENTS>
-    for HorizontalNeonStackBlurPassFloat32<T, J, COMPONENTS>
+impl<T, J, const CN: usize> StackBlurWorkingPass<T, CN>
+    for HorizontalNeonStackBlurPassFloat32<T, J, CN>
 where
     J: Copy
         + 'static

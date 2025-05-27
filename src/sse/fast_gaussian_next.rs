@@ -35,7 +35,7 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
-pub(crate) fn fgn_vertical_pass_sse_u8<T, const CHANNELS_COUNT: usize>(
+pub(crate) fn fgn_vertical_pass_sse_u8<T, const CN: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -48,7 +48,7 @@ pub(crate) fn fgn_vertical_pass_sse_u8<T, const CHANNELS_COUNT: usize>(
     unsafe {
         let bytes: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_slice);
 
-        fgn_vertical_pass_sse_u8_def::<CHANNELS_COUNT>(
+        fgn_vertical_pass_sse_u8_def::<CN>(
             bytes, stride, width, height, radius, start, end, edge_mode,
         );
     }

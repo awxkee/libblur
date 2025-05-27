@@ -35,7 +35,7 @@ use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, EdgeMode};
 use half::f16;
 
-pub(crate) fn fast_gaussian_next_vertical_pass_sse_f16<T, const CHANNELS_COUNT: usize>(
+pub(crate) fn fast_gaussian_next_vertical_pass_sse_f16<T, const CN: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -46,7 +46,7 @@ pub(crate) fn fast_gaussian_next_vertical_pass_sse_f16<T, const CHANNELS_COUNT: 
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        fast_gaussian_next_vertical_pass_sse_f16_impl::<T, CHANNELS_COUNT>(
+        fast_gaussian_next_vertical_pass_sse_f16_impl::<T, CN>(
             undefined_slice,
             stride,
             width,
@@ -60,7 +60,7 @@ pub(crate) fn fast_gaussian_next_vertical_pass_sse_f16<T, const CHANNELS_COUNT: 
 }
 
 #[target_feature(enable = "sse4.1", enable = "f16c")]
-unsafe fn fast_gaussian_next_vertical_pass_sse_f16_impl<T, const CHANNELS_COUNT: usize>(
+unsafe fn fast_gaussian_next_vertical_pass_sse_f16_impl<T, const CN: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -85,7 +85,7 @@ unsafe fn fast_gaussian_next_vertical_pass_sse_f16_impl<T, const CHANNELS_COUNT:
         let mut ders = _mm_setzero_ps();
         let mut summs = _mm_setzero_ps();
 
-        let current_px = (x * CHANNELS_COUNT as u32) as usize;
+        let current_px = (x * CN as u32) as usize;
 
         let start_y = 0 - 3 * radius as i64;
         for y in start_y..height_wide {
@@ -95,7 +95,7 @@ unsafe fn fast_gaussian_next_vertical_pass_sse_f16_impl<T, const CHANNELS_COUNT:
 
                 let pixel = _mm_mul_ps(summs, v_weight);
                 let dst_ptr = bytes.slice.as_ptr().add(bytes_offset) as *mut f16;
-                store_f32_f16::<CHANNELS_COUNT>(dst_ptr, pixel);
+                store_f32_f16::<CN>(dst_ptr, pixel);
 
                 let d_arr_index_1 = ((y + radius_64) & 1023) as usize;
                 let d_arr_index_2 = ((y - radius_64) & 1023) as usize;
@@ -134,11 +134,11 @@ unsafe fn fast_gaussian_next_vertical_pass_sse_f16_impl<T, const CHANNELS_COUNT:
 
             let next_row_y = clamp_edge!(edge_mode, y + ((3 * radius_64) >> 1), 0, height_wide)
                 * (stride as usize);
-            let next_row_x = (x * CHANNELS_COUNT as u32) as usize;
+            let next_row_x = (x * CN as u32) as usize;
 
             let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_x) as *mut f16;
 
-            let pixel_color = load_f32_f16::<CHANNELS_COUNT>(s_ptr);
+            let pixel_color = load_f32_f16::<CN>(s_ptr);
 
             let arr_index = ((y + 2 * radius_64) & 1023) as usize;
             let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr();
@@ -151,7 +151,7 @@ unsafe fn fast_gaussian_next_vertical_pass_sse_f16_impl<T, const CHANNELS_COUNT:
     }
 }
 
-pub(crate) fn fast_gaussian_next_horizontal_pass_sse_f16<T, const CHANNELS_COUNT: usize>(
+pub(crate) fn fast_gaussian_next_horizontal_pass_sse_f16<T, const CN: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -162,7 +162,7 @@ pub(crate) fn fast_gaussian_next_horizontal_pass_sse_f16<T, const CHANNELS_COUNT
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        fast_gaussian_next_horizontal_pass_sse_f16_impl::<T, CHANNELS_COUNT>(
+        fast_gaussian_next_horizontal_pass_sse_f16_impl::<T, CN>(
             undefined_slice,
             stride,
             width,
@@ -176,7 +176,7 @@ pub(crate) fn fast_gaussian_next_horizontal_pass_sse_f16<T, const CHANNELS_COUNT
 }
 
 #[target_feature(enable = "sse4.1", enable = "f16c")]
-unsafe fn fast_gaussian_next_horizontal_pass_sse_f16_impl<T, const CHANNELS_COUNT: usize>(
+unsafe fn fast_gaussian_next_horizontal_pass_sse_f16_impl<T, const CN: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -205,13 +205,13 @@ unsafe fn fast_gaussian_next_horizontal_pass_sse_f16_impl<T, const CHANNELS_COUN
 
         for x in (0 - 3 * radius_64)..(width as i64) {
             if x >= 0 {
-                let current_px = x as usize * CHANNELS_COUNT;
+                let current_px = x as usize * CN;
 
                 let bytes_offset = current_y + current_px;
 
                 let pixel = _mm_mul_ps(summs, v_weight);
                 let dst_ptr = bytes.slice.as_ptr().add(bytes_offset) as *mut f16;
-                store_f32_f16::<CHANNELS_COUNT>(dst_ptr, pixel);
+                store_f32_f16::<CN>(dst_ptr, pixel);
 
                 let d_arr_index_1 = ((x + radius_64) & 1023) as usize;
                 let d_arr_index_2 = ((x - radius_64) & 1023) as usize;
@@ -250,11 +250,11 @@ unsafe fn fast_gaussian_next_horizontal_pass_sse_f16_impl<T, const CHANNELS_COUN
 
             let next_row_y = (y as usize) * (stride as usize);
             let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide);
-            let next_row_px = next_row_x * CHANNELS_COUNT;
+            let next_row_px = next_row_x * CN;
 
             let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut f16;
 
-            let pixel_color = load_f32_f16::<CHANNELS_COUNT>(s_ptr);
+            let pixel_color = load_f32_f16::<CN>(s_ptr);
 
             let arr_index = ((x + 2 * radius_64) & 1023) as usize;
             let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr();

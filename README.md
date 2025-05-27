@@ -292,7 +292,7 @@ libblur::fast_bilateral_filter(&image, &mut dst_image, 25, 7f32, 7f32).unwrap();
 
 This is arbitrary example for blurring speed for all methods in descending order. 
 
-stack_blur -> fast_gaussian_next -> fast_gaussian -> box_blur -> fast_gaussian_superior -> tent_blur -> gaussian_box_blur -> gaussian_blur -> bilateral -> median
+box_blur -> stack_blur -> fast_gaussian_next -> fast_gaussian -> fast_gaussian_superior -> tent_blur -> gaussian_box_blur -> gaussian_blur -> bilateral -> median
 
 This project is licensed under either of
 

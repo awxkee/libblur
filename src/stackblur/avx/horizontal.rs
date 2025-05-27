@@ -37,14 +37,14 @@ use std::arch::x86_64::*;
 use std::marker::PhantomData;
 use std::ops::{AddAssign, Mul, Shr, Sub, SubAssign};
 
-pub(crate) struct HorizontalAvxStackBlurPass<T, J, const COMPONENTS: usize> {
+pub(crate) struct HorizontalAvxStackBlurPass<T, J, const CN: usize> {
     _phantom_t: PhantomData<T>,
     _phantom_j: PhantomData<J>,
 }
 
-impl<T, J, const COMPONENTS: usize> Default for HorizontalAvxStackBlurPass<T, J, COMPONENTS> {
+impl<T, J, const CN: usize> Default for HorizontalAvxStackBlurPass<T, J, CN> {
     fn default() -> Self {
-        HorizontalAvxStackBlurPass::<T, J, COMPONENTS> {
+        HorizontalAvxStackBlurPass::<T, J, CN> {
             _phantom_t: Default::default(),
             _phantom_j: Default::default(),
         }
@@ -55,7 +55,7 @@ impl<T, J, const COMPONENTS: usize> Default for HorizontalAvxStackBlurPass<T, J,
 #[derive(Copy, Clone, Default, Debug)]
 struct StackBlurCache([i32; 8]);
 
-#[inline(always)]
+#[target_feature(enable = "avx2")]
 unsafe fn avx_horiz_pass_impl<const CN: usize>(
     pixels: &UnsafeSlice<u8>,
     stride: u32,
@@ -473,21 +473,7 @@ unsafe fn avx_horiz_pass_impl<const CN: usize>(
     }
 }
 
-#[target_feature(enable = "avx2")]
-unsafe fn avx_horiz_pass_impl_def<const CN: usize>(
-    pixels: &UnsafeSlice<u8>,
-    stride: u32,
-    width: u32,
-    height: u32,
-    radius: u32,
-    thread: usize,
-    total_threads: usize,
-) {
-    avx_horiz_pass_impl::<CN>(pixels, stride, width, height, radius, thread, total_threads);
-}
-
-impl<T, J, const COMPONENTS: usize> StackBlurWorkingPass<T, COMPONENTS>
-    for HorizontalAvxStackBlurPass<T, J, COMPONENTS>
+impl<T, J, const CN: usize> StackBlurWorkingPass<T, CN> for HorizontalAvxStackBlurPass<T, J, CN>
 where
     J: Copy
         + 'static
@@ -518,15 +504,7 @@ where
     ) {
         unsafe {
             let pixels: &UnsafeSlice<u8> = std::mem::transmute(pixels);
-            avx_horiz_pass_impl_def::<COMPONENTS>(
-                pixels,
-                stride,
-                width,
-                height,
-                radius,
-                thread,
-                total_threads,
-            );
+            avx_horiz_pass_impl::<CN>(pixels, stride, width, height, radius, thread, total_threads);
         }
     }
 }

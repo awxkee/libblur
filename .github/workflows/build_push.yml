@@ -131,7 +131,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo install cargo-fuzz
       - run: cargo fuzz run gauss --features "${{ matrix.feature }}" -- -max_total_time=17
-      - run: cargo fuzz run gauss --features "${{ matrix.feature }}" -- -max_total_time=17
       - run: cargo fuzz run gauss_u16 --features "${{ matrix.feature }}" -- -max_total_time=17
       - run: cargo fuzz run gauss_f32 --features "${{ matrix.feature }}" -- -max_total_time=17
       - run: cargo fuzz run gauss_small_kernel --features "${{ matrix.feature }}" -- -max_total_time=17

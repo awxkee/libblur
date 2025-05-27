@@ -337,15 +337,13 @@ impl Filter1DColumnHandlerMultipleRows<u16, f32> for u16 {
 
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     fn get_column_handler_multiple_rows(
-        is_symmetric_kernel: bool,
+        _is_symmetric_kernel: bool,
     ) -> Option<fn(Arena, FilterBrows<u16>, &mut [u16], ImageSize, usize, &[ScanPoint1d<f32>])>
     {
-        if is_symmetric_kernel {
-            #[cfg(all(target_arch = "x86_64", feature = "avx"))]
-            if std::arch::is_x86_feature_detected!("avx2") {
-                use crate::filter1d::avx::filter_column_avx_symm_u16_f32_x2;
-                return Some(filter_column_avx_symm_u16_f32_x2);
-            }
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        if _is_symmetric_kernel && std::arch::is_x86_feature_detected!("avx2") {
+            use crate::filter1d::avx::filter_column_avx_symm_u16_f32_x2;
+            return Some(filter_column_avx_symm_u16_f32_x2);
         }
         None
     }
