@@ -11,6 +11,7 @@ libblur = { path = "../", features = ["image", "fft", "rdm", "neon", "sse", "avx
 accelerate = { path = "accelerate" }
 rayon = "1.10.0"
 fast_transpose = "0.2.5"
+num-complex = "0.4"
 
 [dev-dependencies]
 criterion = "0.6.0"

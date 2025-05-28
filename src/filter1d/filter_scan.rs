@@ -56,7 +56,6 @@ where
 pub(crate) fn is_symmetric_1d<F>(kernel: &[F]) -> bool
 where
     F: Copy + PartialEq + 'static,
-    i32: AsPrimitive<F>,
 {
     let len = kernel.len();
     let fw = kernel.iter().take(len / 2);

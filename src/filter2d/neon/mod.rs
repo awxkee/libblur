@@ -29,11 +29,11 @@
 mod convolve_op_u8_f32;
 mod convolve_op_u8_i16;
 mod convolve_op_u8_i16_fp;
-#[cfg(feature = "nightly_fcma")]
+#[cfg(all(feature = "nightly_fcma", feature = "fft"))]
 mod mul_spectrum;
 
 pub(crate) use convolve_op_u8_f32::convolve_segment_neon_2d_u8_f32;
 pub(crate) use convolve_op_u8_i16::convolve_segment_neon_2d_u8_i16;
 pub(crate) use convolve_op_u8_i16_fp::convolve_segment_neon_2d_u8_i16_fp;
-#[cfg(feature = "nightly_fcma")]
+#[cfg(all(feature = "nightly_fcma", feature = "fft"))]
 pub(crate) use mul_spectrum::neon_mul_spectrum_in_place_f32;

@@ -76,7 +76,7 @@ where
         } else if COMPS == 4 {
             ColorGroup::from_components(self.r * rhs, self.g * rhs, self.b * rhs, self.a * rhs)
         } else {
-            panic!("Not implemented.");
+            unimplemented!("Not implemented.");
         }
     }
 }
@@ -103,7 +103,7 @@ where
                 self.a * rhs.b,
             )
         } else {
-            panic!("Not implemented.");
+            unimplemented!("Not implemented.");
         }
     }
 }
@@ -125,7 +125,7 @@ where
         } else if COMPS == 4 {
             ColorGroup::from_components(self.r - rhs, self.g - rhs, self.b - rhs, self.a - rhs)
         } else {
-            panic!("Not implemented.");
+            unimplemented!("Not implemented.");
         }
     }
 }
@@ -152,7 +152,7 @@ where
                 self.a - rhs.a,
             )
         } else {
-            panic!("Not implemented.");
+            unimplemented!("Not implemented.");
         }
     }
 }
@@ -179,7 +179,7 @@ where
                 self.a + rhs.a,
             )
         } else {
-            panic!("Not implemented.");
+            unimplemented!("Not implemented.");
         }
     }
 }
@@ -201,7 +201,7 @@ where
         } else if COMPS == 4 {
             ColorGroup::from_components(self.r + rhs, self.g + rhs, self.b + rhs, self.a + rhs)
         } else {
-            panic!("Not implemented.");
+            unimplemented!("Not implemented.");
         }
     }
 }
@@ -223,7 +223,7 @@ where
         } else if COMPS == 4 {
             ColorGroup::from_components(self.r >> rhs, self.g >> rhs, self.b >> rhs, self.a >> rhs)
         } else {
-            panic!("Not implemented.");
+            unimplemented!("Not implemented.");
         }
     }
 }
@@ -255,7 +255,7 @@ where
                 mlaf(a.a, self.a, b),
             )
         } else {
-            panic!("Not implemented.");
+            unimplemented!("Not implemented.");
         }
     }
 }

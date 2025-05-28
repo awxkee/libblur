@@ -31,6 +31,15 @@ mod filter_column;
 mod filter_column_approx;
 #[cfg(feature = "rdm")]
 mod filter_column_approx_rdm;
+mod filter_column_complex_f32_f32;
+#[cfg(feature = "nightly_fcma")]
+mod filter_column_complex_f32_f32_fcma;
+mod filter_column_complex_u16_f32;
+#[cfg(feature = "nightly_fcma")]
+mod filter_column_complex_u16_f32_fcma;
+mod filter_column_complex_u8_f32;
+#[cfg(feature = "nightly_fcma")]
+mod filter_column_complex_u8_f32_fcma;
 mod filter_column_f32;
 mod filter_column_symm;
 mod filter_column_symm_approx;
@@ -52,6 +61,9 @@ mod filter_row;
 mod filter_row_approx;
 #[cfg(feature = "rdm")]
 mod filter_row_approx_rdm;
+mod filter_row_complex_f32_f32;
+mod filter_row_complex_u16_f32;
+mod filter_row_complex_u8_f32;
 mod filter_row_f32;
 mod filter_row_symm;
 mod filter_row_symm_approx;
@@ -75,6 +87,15 @@ pub(crate) use filter_column::filter_column_neon_u8_f32;
 pub(crate) use filter_column_approx::filter_column_neon_u8_i32_app;
 #[cfg(feature = "rdm")]
 pub(crate) use filter_column_approx_rdm::filter_column_neon_u8_i32_i16_qrdm_app;
+pub(crate) use filter_column_complex_f32_f32::filter_column_complex_f32_f32;
+#[cfg(feature = "nightly_fcma")]
+pub(crate) use filter_column_complex_f32_f32_fcma::filter_column_complex_f32_f32_fcma;
+pub(crate) use filter_column_complex_u16_f32::filter_column_complex_u16_f32;
+#[cfg(feature = "nightly_fcma")]
+pub(crate) use filter_column_complex_u16_f32_fcma::filter_column_complex_u16_f32_fcma;
+pub(crate) use filter_column_complex_u8_f32::filter_column_complex_u8_f32;
+#[cfg(feature = "nightly_fcma")]
+pub(crate) use filter_column_complex_u8_f32_fcma::filter_column_complex_u8_f32_fcma;
 pub(crate) use filter_column_f32::filter_column_neon_f32_f32;
 pub(crate) use filter_column_symm::filter_symm_column_neon_u8_f32;
 pub(crate) use filter_column_symm_approx::filter_column_symm_neon_u8_i32_app;
@@ -95,6 +116,9 @@ pub(crate) use filter_row::filter_row_neon_u8_f32;
 pub(crate) use filter_row_approx::filter_row_neon_u8_i32_app;
 #[cfg(feature = "rdm")]
 pub(crate) use filter_row_approx_rdm::filter_row_neon_u8_i32_rdm;
+pub(crate) use filter_row_complex_f32_f32::filter_row_complex_f32_f32;
+pub(crate) use filter_row_complex_u16_f32::filter_row_complex_u16_f32;
+pub(crate) use filter_row_complex_u8_f32::filter_row_complex_u8_f32;
 pub(crate) use filter_row_f32::filter_row_neon_f32_f32;
 pub(crate) use filter_row_symm::filter_row_symm_neon_u8_f32;
 pub(crate) use filter_row_symm_approx::filter_row_symm_neon_u8_i32;
