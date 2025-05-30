@@ -182,7 +182,7 @@ unsafe fn filter_sse_column_complex_u16_i32_impl(
         for x in cx..full_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(x..);
 
-            let q_coeff = Complex::new(coeff.re as i32, coeff.im as i32);
+            let q_coeff = Complex::new(coeff.re, coeff.im);
 
             let mut k0 = q_coeff * wrap_complex::<i32>(v_src.get_unchecked(0));
 
