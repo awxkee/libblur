@@ -32,9 +32,9 @@ mod split;
 
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use libblur::{
-    filter_1d_complex, filter_2d_rgba_fft, gaussian_kernel_1d, lens_kernel, sigma_size, BlurImage,
-    BlurImageMut, EdgeMode, FastBlurChannels, KernelShape, Scalar, ThreadingPolicy,
-    TransferFunction,
+    filter_1d_complex, filter_1d_complex_fixed_point, filter_2d_rgba_fft, gaussian_kernel_1d,
+    lens_kernel, sigma_size, BlurImage, BlurImageMut, EdgeMode, FastBlurChannels, KernelShape,
+    Scalar, ThreadingPolicy, TransferFunction,
 };
 use num_complex::Complex;
 use std::any::Any;
@@ -156,9 +156,9 @@ fn main() {
     // let bokeh = generate_complex_bokeh_kernel(35, 30.);
     let start_time = Instant::now();
     // let gaussian_kernel = gaussian_kernel_1d(31, sigma_size(31.)).iter().map(|&x| Complex::new(x, 0.0)).collect::<Vec<Complex<f32>>>();
-    let gaussian_kernel = complex_gaussian_kernel(31., 0.5, 15.);
+    let gaussian_kernel = complex_gaussian_kernel(51., 0.5, 15.);
 
-    filter_1d_complex::<u16, f32, 4>(
+    filter_1d_complex_fixed_point::<u16, i32, f32, 4>(
         &vcvt,
         &mut dst_image,
         &gaussian_kernel,

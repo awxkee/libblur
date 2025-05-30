@@ -44,3 +44,7 @@ harness = false
 [[bench]]
 name = "non_sep_2d"
 harness = false
+
+[[bench]]
+name = "complex"
+harness = false

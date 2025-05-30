@@ -26,52 +26,50 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#![allow(clippy::type_complexity)]
-mod arena;
-mod arena_roi;
-#[cfg(all(target_arch = "x86_64", feature = "avx"))]
-mod avx;
-#[cfg(all(target_arch = "x86_64", feature = "nightly_avx512"))]
-mod avx512;
-mod color_group;
-mod filter;
-mod filter_1d_approx;
-mod filter_1d_column_handler;
-mod filter_1d_column_handler_approx;
-mod filter_1d_row_handler;
-mod filter_1d_row_handler_approx;
-mod filter_column;
-mod filter_column_approx;
-mod filter_column_approx_symmetric;
-mod filter_column_complex;
-mod filter_column_complex_q;
-mod filter_column_symmetric;
-mod filter_complex;
-mod filter_complex_dispatch;
-mod filter_complex_dispatch_q;
-mod filter_complex_q;
-mod filter_element;
-mod filter_row;
-mod filter_row_approx;
-mod filter_row_complex;
-mod filter_row_complex_q;
-mod filter_row_symmetric;
-mod filter_row_symmetric_approx;
-mod filter_scan;
-#[cfg(all(target_arch = "aarch64", feature = "neon"))]
-pub(crate) mod neon;
-mod region;
-mod row_handler_small_approx;
-mod row_symm_approx_binter;
-#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
-pub(crate) mod sse;
-mod to_approx_storage;
-mod to_approx_storage_complex;
+use std::ops::Shr;
 
-pub use arena::{make_arena, Arena, ArenaPads};
-pub use filter::filter_1d_exact;
-pub use filter_1d_approx::filter_1d_approx;
-pub use filter_complex::filter_1d_complex;
-pub use filter_complex_q::filter_1d_complex_fixed_point;
-pub use filter_element::KernelShape;
-pub use to_approx_storage::ToApproxStorage;
+pub trait ToApproxStorageComplex<T>: 'static + Copy + Shr<T>
+where
+    T: 'static + Copy,
+{
+    /// Convert a value to another, using the `to` operator.
+    fn to_c_approx_(self) -> T;
+}
+
+macro_rules! impl_to_approx_storage {
+    ($from:ty, $to:ty) => {
+        impl ToApproxStorageComplex<$to> for $from {
+            #[inline(always)]
+            fn to_c_approx_(self) -> $to {
+                ((self + (1 << (<$to>::Q - 1))) >> <$to>::Q)
+                    .max(<$from>::MIN.into())
+                    .max(<$to>::MIN.into()) as $to
+            }
+        }
+    };
+}
+
+impl_to_approx_storage!(i32, i8);
+impl_to_approx_storage!(i32, u8);
+impl_to_approx_storage!(i32, u16);
+impl_to_approx_storage!(i32, i16);
+
+pub trait ApproxComplexLevel {
+    const Q: i32;
+}
+
+impl ApproxComplexLevel for i8 {
+    const Q: i32 = 15;
+}
+
+impl ApproxComplexLevel for u8 {
+    const Q: i32 = 15;
+}
+
+impl ApproxComplexLevel for u16 {
+    const Q: i32 = 14;
+}
+
+impl ApproxComplexLevel for i16 {
+    const Q: i32 = 14;
+}
