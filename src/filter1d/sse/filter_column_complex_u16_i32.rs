@@ -83,8 +83,6 @@ unsafe fn filter_sse_column_complex_u16_i32_impl(
 
         let length = kernel.len();
 
-        let o_kernel = kernel;
-
         let kernel = kernel
             .iter()
             .map(|x| Complex {
@@ -179,7 +177,7 @@ unsafe fn filter_sse_column_complex_u16_i32_impl(
             cx += 4;
         }
 
-        let coeff = *o_kernel.get_unchecked(0);
+        let coeff = *kernel.get_unchecked(0);
 
         for x in cx..full_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(x..);
@@ -189,10 +187,10 @@ unsafe fn filter_sse_column_complex_u16_i32_impl(
             let mut k0 = q_coeff * wrap_complex::<i32>(v_src.get_unchecked(0));
 
             for i in 1..length {
-                let coeff = *o_kernel.get_unchecked(i);
+                let coeff = *kernel.get_unchecked(i);
                 let q_coeff = Complex::new(coeff.re, coeff.im);
                 k0 = wrap_complex::<i32>(arena_src.get_unchecked(i).get_unchecked(x))
-                    .mul_add(wrap_complex::<i16>(&q_coeff), k0);
+                    .mul_add(wrap_complex::<i32>(&q_coeff), k0);
             }
 
             *dst.get_unchecked_mut(x) = k0.re.to_c_approx_();
