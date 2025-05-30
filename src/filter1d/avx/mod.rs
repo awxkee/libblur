@@ -30,6 +30,8 @@
 #![allow(clippy::manual_clamp)]
 mod filter_column;
 mod filter_column_approx;
+mod filter_column_complex_u16_f32;
+mod filter_column_complex_u8_f32;
 mod filter_column_f32;
 mod filter_column_symm;
 mod filter_column_symm_approx;
@@ -44,6 +46,9 @@ mod filter_column_symm_uq15_u16_x2;
 mod filter_column_symm_x2;
 mod filter_row;
 mod filter_row_approx;
+mod filter_row_complex_f32_f32;
+mod filter_row_complex_u16_f32;
+mod filter_row_complex_u8_f32;
 mod filter_row_f32;
 mod filter_row_f32_f64_symm;
 mod filter_row_f32_symm;
@@ -60,6 +65,8 @@ mod utils;
 
 pub(crate) use filter_column::filter_column_avx_u8_f32;
 pub(crate) use filter_column_approx::filter_column_avx_u8_i32_app;
+pub(crate) use filter_column_complex_u16_f32::filter_avx_column_complex_u16_f32;
+pub(crate) use filter_column_complex_u8_f32::filter_avx_column_complex_u8_f32;
 pub(crate) use filter_column_f32::filter_column_avx_f32_f32;
 pub(crate) use filter_column_symm::filter_column_avx_symm_u8_f32;
 pub(crate) use filter_column_symm_approx::filter_column_avx_symm_u8_i32_app;
@@ -73,6 +80,9 @@ pub(crate) use filter_column_symm_uq15_u16_x2::filter_column_avx_symm_uq15_u16_x
 pub(crate) use filter_column_symm_x2::filter_column_avx_symm_u8_f32_x2;
 pub(crate) use filter_row::filter_row_avx_u8_f32;
 pub(crate) use filter_row_approx::filter_row_avx_u8_i32_app;
+pub(crate) use filter_row_complex_f32_f32::filter_avx_row_complex_f32_f32;
+pub(crate) use filter_row_complex_u16_f32::filter_avx_row_complex_u16_f32;
+pub(crate) use filter_row_complex_u8_f32::filter_avx_row_complex_u8_f32;
 pub(crate) use filter_row_f32::filter_row_avx_f32_f32;
 pub(crate) use filter_row_f32_f64_symm::filter_row_avx_f32_f64_symm;
 pub(crate) use filter_row_f32_symm::filter_row_avx_f32_f32_symm;

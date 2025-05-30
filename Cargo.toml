@@ -27,6 +27,7 @@ rayon = "1.10"
 image = { version = "0.25", optional = true, default-features = false }
 rustfft = { version = "6.3", optional = true }
 fast_transpose = { version = "0.2.5", optional = true }
+num-complex = "0.4"
 
 [features]
 default = ["avx", "sse", "rdm", "neon"]
@@ -36,7 +37,7 @@ fft = ["dep:rustfft", "dep:fast_transpose"]
 rdm = ["neon"]
 # Enables AVX-512. Requires nightly on rust compiler before 1.89.
 nightly_avx512 = []
-# Enables NEON fcma, used in FFT only. Requires nightly.
+# Enables NEON fcma, used in FFT and filter 1d complex. Requires nightly.
 nightly_fcma = []
 # Enables AVX intrinsics
 avx = []

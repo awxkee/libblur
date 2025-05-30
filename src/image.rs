@@ -414,7 +414,13 @@ impl<'a, T: Clone + Copy + Default + Debug> BlurImageMut<'a, T> {
     pub fn resize_arbitrary(&mut self, width: u32, height: u32, cn: usize) {
         self.height = height;
         self.width = width;
-        self.channels = FastBlurChannels::Plane;
+        self.channels = if cn == 4 {
+            FastBlurChannels::Channels4
+        } else if cn == 3 {
+            FastBlurChannels::Channels3
+        } else {
+            FastBlurChannels::Plane
+        };
         self.stride = self.width * cn as u32;
         self.data.resize(
             self.row_stride() as usize * self.height as usize,

@@ -44,7 +44,7 @@ use crate::filter1d::to_approx_storage::{ApproxLevel, ToApproxStorage};
 use crate::safe_math::{SafeAdd, SafeMul};
 use crate::to_storage::ToStorage;
 use crate::{BlurError, BlurImage, BlurImageMut, EdgeMode, Scalar, ThreadingPolicy};
-use num_traits::{AsPrimitive, Float, MulAdd};
+use num_traits::{AsPrimitive, Float, FromPrimitive, MulAdd};
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::ParallelSliceMut;
 use std::fmt::Debug;
@@ -89,7 +89,8 @@ where
         + Filter1DColumnHandlerApprox<T, I>
         + Filter1DColumnMultipleRowsApprox<T, I>
         + Filter1DRowHandlerBInterpolateApr<T, I>
-        + Debug,
+        + Debug
+        + FromPrimitive,
     F: ToStorage<T> + Mul<F> + MulAdd<F, Output = F> + Send + Sync + AsPrimitive<I> + Float,
     I: Copy
         + Mul<Output = I>

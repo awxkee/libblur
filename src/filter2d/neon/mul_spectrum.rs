@@ -66,10 +66,22 @@ unsafe fn mul_spectrum_in_place_f32_impl(
             let vk2 = vld1q_f32(kernel.as_ptr().add(4) as *const f32);
             let vk3 = vld1q_f32(kernel.as_ptr().add(6) as *const f32);
 
-            let p0 = vmulq_f32(vcmlaq_f32(zero, vd0, vk0), v_norm_factor);
-            let p1 = vmulq_f32(vcmlaq_f32(zero, vd1, vk1), v_norm_factor);
-            let p2 = vmulq_f32(vcmlaq_f32(zero, vd2, vk2), v_norm_factor);
-            let p3 = vmulq_f32(vcmlaq_f32(zero, vd3, vk3), v_norm_factor);
+            let p0 = vmulq_f32(
+                vcmlaq_rot90_f32(vcmlaq_f32(zero, vd0, vk0), vd0, vk0),
+                v_norm_factor,
+            );
+            let p1 = vmulq_f32(
+                vcmlaq_rot90_f32(vcmlaq_f32(zero, vd1, vk1), vd1, vk1),
+                v_norm_factor,
+            );
+            let p2 = vmulq_f32(
+                vcmlaq_rot90_f32(vcmlaq_f32(zero, vd2, vk2), vd2, vk2),
+                v_norm_factor,
+            );
+            let p3 = vmulq_f32(
+                vcmlaq_rot90_f32(vcmlaq_f32(zero, vd3, vk3), vd3, vk3),
+                v_norm_factor,
+            );
 
             vst1q_f32(dst.as_mut_ptr() as *mut f32, p0);
             vst1q_f32(dst.get_unchecked_mut(2..).as_mut_ptr() as *mut f32, p1);
@@ -83,7 +95,7 @@ unsafe fn mul_spectrum_in_place_f32_impl(
         for (dst, kernel) in dst_rem.chunks_exact_mut(2).zip(src_rem.chunks_exact(2)) {
             let v0 = vld1q_f32(dst.as_ptr() as *const f32);
             let v1 = vld1q_f32(kernel.as_ptr() as *const f32);
-            let p0 = vcmlaq_f32(zero, v0, v1);
+            let p0 = vcmlaq_rot90_f32(vcmlaq_f32(zero, v0, v1), v0, v1);
             let p1 = vmulq_f32(p0, v_norm_factor);
             vst1q_f32(dst.as_mut_ptr() as *mut f32, p1);
         }
@@ -94,7 +106,7 @@ unsafe fn mul_spectrum_in_place_f32_impl(
         for (dst, kernel) in dst_rem.iter_mut().zip(src_rem.iter()) {
             let v0 = vld1_f32(dst as *const Complex<f32> as *const f32);
             let v1 = vld1_f32(kernel as *const Complex<f32> as *const f32);
-            let p0 = vcmla_f32(vdup_n_f32(0.), v0, v1);
+            let p0 = vcmla_rot90_f32(vcmla_f32(vdup_n_f32(0.), v0, v1), v0, v1);
             let p1 = vmul_f32(p0, vget_low_f32(v_norm_factor));
             vst1_f32(dst as *mut Complex<f32> as *mut f32, p1);
         }

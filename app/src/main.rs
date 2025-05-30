@@ -32,11 +32,15 @@ mod split;
 
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use libblur::{
-    filter_2d_rgba_fft, lens_kernel, BlurImage, BlurImageMut, EdgeMode, FastBlurChannels,
-    KernelShape, Scalar, ThreadingPolicy,
+    filter_1d_complex, filter_2d_rgba_fft, gaussian_kernel_1d, lens_kernel, sigma_size, BlurImage,
+    BlurImageMut, EdgeMode, FastBlurChannels, KernelShape, Scalar, ThreadingPolicy,
+    TransferFunction,
 };
+use num_complex::Complex;
 use std::any::Any;
-use std::io::Read;
+use std::fs;
+use std::fs::File;
+use std::io::{BufReader, Read};
 use std::time::Instant;
 
 #[allow(dead_code)]
@@ -55,8 +59,43 @@ fn f16_to_f32(bytes: Vec<u16>) -> Vec<f32> {
         .collect()
 }
 
+fn complex_gaussian_kernel(radius: f64, scale: f64, distortion: f64) -> Vec<Complex<f32>> {
+    let kernel_radius = radius.ceil() as usize;
+    let mut kernel: Vec<Complex<f64>> = vec![Complex::new(0.0, 0.0); 1 + 2 * (kernel_radius)];
+
+    for (x, dst) in kernel.iter_mut().enumerate() {
+        let ax = (x as f64 - radius) * scale / radius;
+        let ax2 = ax * ax;
+        let exp_a = (-distortion * ax2).exp();
+        let val = Complex::new(
+            exp_a * (distortion * ax2).cos(),
+            exp_a * (distortion * ax2).sin(),
+        );
+        *dst = val;
+    }
+
+    let sum: f64 = kernel.iter().map(|z| z.norm_sqr()).sum::<f64>();
+    if sum != 0.0 {
+        kernel
+            .iter()
+            .map(|z| Complex {
+                re: (z.re / sum) as f32,
+                im: (z.im / sum) as f32,
+            })
+            .collect::<Vec<_>>()
+    } else {
+        kernel
+            .iter()
+            .map(|x| Complex {
+                re: x.re as f32,
+                im: x.im as f32,
+            })
+            .collect()
+    }
+}
+
 fn main() {
-    let mut dyn_image = ImageReader::open("./assets/sonderland.jpg")
+    let mut dyn_image = ImageReader::open("./assets/test_image_2.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -102,9 +141,8 @@ fn main() {
         dyn_image.height(),
         FastBlurChannels::Channels4,
     );
-    let image = cvt
-        .linearize(libblur::TransferFunction::Srgb, true)
-        .unwrap();
+    let vcvt = cvt.linearize(TransferFunction::Srgb, true).unwrap();
+
     let mut dst_image = BlurImageMut::default();
     //
     // libblur::fast_gaussian_next_u16(&mut dst_image, 37, ThreadingPolicy::Single, EdgeMode::Clamp)
@@ -117,16 +155,30 @@ fn main() {
     // let motion = lens_kernel(KernelShape::new(35, 35), 15., 6., 0.5,0.2).unwrap();
     // let bokeh = generate_complex_bokeh_kernel(35, 30.);
     let start_time = Instant::now();
-    filter_2d_rgba_fft::<u16, f32, f32>(
-        &image,
+    // let gaussian_kernel = gaussian_kernel_1d(31, sigma_size(31.)).iter().map(|&x| Complex::new(x, 0.0)).collect::<Vec<Complex<f32>>>();
+    let gaussian_kernel = complex_gaussian_kernel(31., 0.5, 15.);
+
+    filter_1d_complex::<u16, f32, 4>(
+        &vcvt,
         &mut dst_image,
-        &motion,
-        KernelShape::new(151, 151),
+        &gaussian_kernel,
+        &gaussian_kernel,
         EdgeMode::Clamp,
         Scalar::default(),
         ThreadingPolicy::Adaptive,
     )
     .unwrap();
+
+    // filter_2d_rgba_fft::<u16, f32, f32>(
+    //     &image,
+    //     &mut dst_image,
+    //     &motion,
+    //     KernelShape::new(151, 151),
+    //     EdgeMode::Clamp,
+    //     Scalar::default(),
+    //     ThreadingPolicy::Adaptive,
+    // )
+    // .unwrap();
     // for dst in dst_image.data.borrow_mut().chunks_exact_mut(4) {
     //     dst[3] = 255;
     // }
@@ -172,11 +224,10 @@ fn main() {
     // )
     // .unwrap();
 
-    let dst_ref = dst_image.to_immutable_ref();
-    let back_in_gamma = dst_ref.gamma8(libblur::TransferFunction::Srgb, true);
+    let j_dag = dst_image.to_immutable_ref();
+    let gamma = j_dag.gamma8(TransferFunction::Srgb, true).unwrap();
 
-    dst_bytes = back_in_gamma
-        .unwrap()
+    dst_bytes = gamma
         .data
         .as_ref()
         .iter()

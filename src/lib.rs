@@ -135,11 +135,12 @@ pub use fast_gaussian_image::fast_gaussian_blur_image;
 #[cfg(feature = "image")]
 #[cfg_attr(docsrs, doc(cfg(feature = "image")))]
 pub use fast_gaussian_image_next::fast_gaussian_next_blur_image;
-pub use fast_gaussian_next::fast_gaussian_next;
-pub use fast_gaussian_next::fast_gaussian_next_f16;
-pub use fast_gaussian_next::fast_gaussian_next_f32;
-pub use fast_gaussian_next::fast_gaussian_next_u16;
-pub use filter1d::{filter_1d_approx, filter_1d_exact, make_arena, Arena, ArenaPads, KernelShape};
+pub use fast_gaussian_next::{
+    fast_gaussian_next, fast_gaussian_next_f16, fast_gaussian_next_f32, fast_gaussian_next_u16,
+};
+pub use filter1d::{
+    filter_1d_approx, filter_1d_complex, filter_1d_exact, make_arena, Arena, ArenaPads, KernelShape,
+};
 #[cfg(feature = "fft")]
 #[cfg_attr(docsrs, doc(cfg(feature = "fft")))]
 pub use filter2d::{
