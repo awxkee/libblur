@@ -126,6 +126,56 @@ unsafe fn filter_avx_column_complex_u16_i32_impl(
 
         let pack_even = _mm256_setr_epi32(0, 2, 4, 6, -1, -1, -1, -1);
 
+        while cx + 16 < full_width {
+            let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
+
+            let values0 = _mm256_loadu_si256(v_src.as_ptr().cast());
+            let values1 = _mm256_loadu_si256(v_src.get_unchecked(4..).as_ptr().cast());
+            let values2 = _mm256_loadu_si256(v_src.get_unchecked(8..).as_ptr().cast());
+            let values3 = _mm256_loadu_si256(v_src.get_unchecked(12..).as_ptr().cast());
+
+            let mut k0 = mq256_complex_mla(rnd, values0, c_real, c_img, v_idx);
+            let mut k1 = mq256_complex_mla(rnd, values1, c_real, c_img, v_idx);
+            let mut k2 = mq256_complex_mla(rnd, values2, c_real, c_img, v_idx);
+            let mut k3 = mq256_complex_mla(rnd, values3, c_real, c_img, v_idx);
+
+            for i in 1..length {
+                let cwg = kernel.get_unchecked(i);
+                let c_real = _mm256_set1_epi32(cwg.re);
+                let c_img = _mm256_set1_epi32(cwg.im);
+
+                let v0 = arena_src.get_unchecked(i);
+
+                let values0 = _mm256_loadu_si256(v0.get_unchecked(cx..).as_ptr().cast());
+                let values1 = _mm256_loadu_si256(v0.get_unchecked(cx + 4..).as_ptr().cast());
+                let values2 = _mm256_loadu_si256(v0.get_unchecked(cx + 8..).as_ptr().cast());
+                let values3 = _mm256_loadu_si256(v0.get_unchecked(cx + 12..).as_ptr().cast());
+
+                k0 = mq256_complex_mla(k0, values0, c_real, c_img, v_idx);
+                k1 = mq256_complex_mla(k1, values1, c_real, c_img, v_idx);
+                k2 = mq256_complex_mla(k2, values2, c_real, c_img, v_idx);
+                k3 = mq256_complex_mla(k3, values3, c_real, c_img, v_idx);
+            }
+
+            k0 = _mm256_srai_epi32::<14>(k0);
+            k1 = _mm256_srai_epi32::<14>(k1);
+            k2 = _mm256_srai_epi32::<14>(k2);
+            k3 = _mm256_srai_epi32::<14>(k3);
+
+            k0 = _mm256_permutevar8x32_epi32(k0, pack_even);
+            k1 = _mm256_permutevar8x32_epi32(k1, pack_even);
+            k2 = _mm256_permutevar8x32_epi32(k2, pack_even);
+            k3 = _mm256_permutevar8x32_epi32(k3, pack_even);
+
+            let z0 = _mm256_packus_epi32(k0, k1);
+            let z1 = _mm256_packus_epi32(k2, k3);
+
+            let l = _mm256_inserti128_si256::<1>(z0, _mm256_castsi256_si128(z1));
+
+            _mm256_storeu_si256(dst.get_unchecked_mut(cx..).as_mut_ptr().cast(), l);
+            cx += 16;
+        }
+
         while cx + 8 < full_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
