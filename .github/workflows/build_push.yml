@@ -120,6 +120,7 @@ jobs:
       - run: cargo fuzz run gauss_small_kernel --features "${{ matrix.feature }}" -- -max_total_time=17
       - run: cargo fuzz run motion --features ${{ matrix.feature }} -- -max_total_time=17
       - run: cargo fuzz run filter_complex --features "${{ matrix.feature }}" -- -max_total_time=17
+      - run: cargo fuzz run filter_complex_q --features "${{ matrix.feature }}" -- -max_total_time=17
 
   fuzz_filter_arm_complex:
     name: Fuzzing Filter 1D/2D ARM FCMA
@@ -146,6 +147,7 @@ jobs:
       - run: cargo fuzz run gauss_small_kernel --features "${{ matrix.feature }}" -- -max_total_time=17
       - run: cargo fuzz run motion --features "${{ matrix.feature }}" -- -max_total_time=17
       - run: cargo fuzz run filter_complex --features "${{ matrix.feature }}" -- -max_total_time=17
+      - run: cargo fuzz run filter_complex_q --features "${{ matrix.feature }}" -- -max_total_time=17
 
   fuzz_stack_blur:
     name: Fuzzing Stack Blur

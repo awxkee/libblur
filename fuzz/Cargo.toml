@@ -146,3 +146,10 @@ path = "filter_complex/filter_complex.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "filter_complex_q"
+path = "filter_complex_q/filter_complex_q.rs"
+test = false
+doc = false
+bench = false

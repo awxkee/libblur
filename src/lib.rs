@@ -139,7 +139,8 @@ pub use fast_gaussian_next::{
     fast_gaussian_next, fast_gaussian_next_f16, fast_gaussian_next_f32, fast_gaussian_next_u16,
 };
 pub use filter1d::{
-    filter_1d_approx, filter_1d_complex, filter_1d_exact, make_arena, Arena, ArenaPads, KernelShape,
+    filter_1d_approx, filter_1d_complex, filter_1d_complex_fixed_point, filter_1d_exact,
+    make_arena, Arena, ArenaPads, KernelShape,
 };
 #[cfg(feature = "fft")]
 #[cfg_attr(docsrs, doc(cfg(feature = "fft")))]
