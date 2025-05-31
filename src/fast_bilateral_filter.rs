@@ -27,11 +27,13 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::gaussian::gaussian_kernel_1d;
-use crate::{BlurError, BlurImage, BlurImageMut, FastBlurChannels};
+use crate::unsafe_slice::UnsafeSlice;
+use crate::{BlurError, BlurImage, BlurImageMut, FastBlurChannels, ThreadingPolicy};
 use num_traits::real::Real;
 use num_traits::AsPrimitive;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-use rayon::prelude::{ParallelSlice, ParallelSliceMut};
+use rayon::prelude::{IntoParallelIterator, ParallelSlice, ParallelSliceMut};
+use rayon::ThreadPool;
 use std::fmt::{Debug, Display};
 use std::ops::{Add, AddAssign, Div, Index, Mul, MulAssign, Sub};
 
@@ -175,81 +177,69 @@ impl AsReal for u8 {
 }
 
 #[derive(Debug, Clone)]
-struct Array3D<T> {
+struct Array3D<'a, T> {
     x_dim: usize,
     y_dim: usize,
     z_dim: usize,
-    store: Vec<Vector<T>>,
+    store: UnsafeSlice<'a, Vector<T>>,
 }
 
-impl<T> Array3D<T>
+impl<'a, T> Array3D<'a, T>
 where
     T: Default + Clone,
 {
-    pub fn new(width: usize, height: usize, z: usize) -> Array3D<T> {
+    pub fn new(
+        slice: &'a mut [Vector<T>],
+        width: usize,
+        height: usize,
+        z: usize,
+    ) -> Array3D<'a, T> {
         Array3D {
             x_dim: width,
             y_dim: height,
             z_dim: z,
-            store: vec![Vector::<T>::default(); width * height * z],
+            store: UnsafeSlice::new(slice),
         }
     }
 }
 
-impl<T> Index<usize> for Array3D<T> {
+impl<T> Index<usize> for Array3D<'_, T> {
     type Output = Vector<T>;
 
     #[inline]
     fn index(&self, index: usize) -> &Self::Output {
-        unsafe { self.store.get_unchecked(index) }
+        self.store.get(index)
     }
 }
 
-impl<T> Array3D<T>
+impl<T> Array3D<'_, T>
 where
     T: Clone,
 {
     #[inline]
     pub fn find(&self, x: usize, y: usize, z: usize) -> &Vector<T> {
-        unsafe {
-            self.store
-                .get_unchecked((x * self.y_dim + y) * self.z_dim + z)
-        }
-    }
-
-    #[inline]
-    pub fn find_mut(&mut self, x: usize, y: usize, z: usize) -> &mut Vector<T> {
-        unsafe {
-            self.store
-                .get_unchecked_mut((x * self.y_dim + y) * self.z_dim + z)
-        }
+        self.store.get((x * self.y_dim + y) * self.z_dim + z)
     }
 }
 
-impl<T> Array3D<T>
+impl<T> Array3D<'_, T>
 where
     T: Clone + Copy,
 {
     #[inline]
     pub fn get(&self, x: usize, y: usize, z: usize) -> Vector<T> {
-        unsafe {
-            *self
-                .store
-                .get_unchecked((x * self.y_dim + y) * self.z_dim + z)
-        }
+        *self.store.get((x * self.y_dim + y) * self.z_dim + z)
     }
 
     #[inline]
-    pub fn set(&mut self, x: usize, y: usize, z: usize, val: Vector<T>) {
+    pub fn set(&self, x: usize, y: usize, z: usize, val: Vector<T>) {
         unsafe {
-            *self
-                .store
-                .get_unchecked_mut((x * self.y_dim + y) * self.z_dim + z) = val;
+            self.store.write((x * self.y_dim + y) * self.z_dim + z, val);
         }
     }
 }
 
-impl<T> Array3D<T>
+impl<T> Array3D<'_, T>
 where
     T: AsReal + Clone + Copy,
 {
@@ -319,7 +309,9 @@ fn fast_bilateral_filter_impl<
         + MulAssign<T>
         + AddAssign<T>
         + Display
-        + Debug,
+        + Debug
+        + Send
+        + Sync,
 >(
     img: &BlurImage<T>,
     dst: &mut [T],
@@ -361,7 +353,9 @@ fn fast_bilateral_filter_impl<
         (((height - 1) as f32 * spatial_sigma_scale) + 1. + 2. * padding_xy) as usize;
     let small_depth = ((base_delta.as_() * range_sigma_scale) + 1. + 2. * padding_z) as usize;
 
-    let mut data = Array3D::<T>::new(small_width, small_height, small_depth);
+    let mut target = vec![Vector::<T>::default(); small_height * small_depth * small_width];
+
+    let mut data = Array3D::<T>::new(&mut target, small_width, small_height, small_depth);
 
     let stride = img.row_stride() as usize;
     let img = img.data.as_ref();
@@ -378,11 +372,13 @@ fn fast_bilateral_filter_impl<
             let mut d = *data.find(small_x as usize, small_y as usize, small_z as usize);
             d.x += pixel;
             d.y += 1.0f32.as_();
-            *data.find_mut(small_x as usize, small_y as usize, small_z as usize) = d;
+            data.set(small_x as usize, small_y as usize, small_z as usize, d)
         }
     }
 
-    let mut buffer = Array3D::<T>::new(small_width, small_height, small_depth);
+    let mut target2 = vec![Vector::<T>::default(); small_height * small_depth * small_width];
+
+    let mut buffer = Array3D::<T>::new(&mut target2, small_width, small_height, small_depth);
 
     let preferred_sigma = (spatial_sigma * spatial_sigma + range_sigma * range_sigma).sqrt();
 
@@ -391,7 +387,7 @@ fn fast_bilateral_filter_impl<
 
     // Unrolled 3D convolution
 
-    for z in 0..small_depth {
+    (0..small_depth).into_par_iter().for_each(|z| {
         for y in 0..small_height {
             for x in 0..half_kernel.min(small_width) {
                 let mut sum = data
@@ -443,11 +439,11 @@ fn fast_bilateral_filter_impl<
                 buffer.set(x, y, z, sum);
             }
         }
-    }
+    });
 
     std::mem::swap(&mut buffer, &mut data);
 
-    for y in 0..small_height {
+    (0..small_height).into_par_iter().for_each(|y| {
         for x in 0..small_width {
             for z in 0..half_kernel.min(small_depth) {
                 let mut sum = data
@@ -499,11 +495,11 @@ fn fast_bilateral_filter_impl<
                 buffer.set(x, y, z, sum);
             }
         }
-    }
+    });
 
     std::mem::swap(&mut buffer, &mut data);
 
-    for z in 0..small_depth {
+    (0..small_depth).into_par_iter().for_each(|z| {
         for x in 0..small_width {
             for y in 0..half_kernel.min(small_height) {
                 let mut sum = data
@@ -555,7 +551,7 @@ fn fast_bilateral_filter_impl<
                 buffer.set(x, y, z, sum);
             }
         }
-    }
+    });
 
     std::mem::swap(&mut buffer, &mut data);
 
@@ -563,23 +559,23 @@ fn fast_bilateral_filter_impl<
         *dst = *src;
     }
 
-    for x in 0..width as usize {
-        for y in 0..height as usize {
-            let z = (*unsafe { dst.get_unchecked(y * width as usize + x) } - base_min).as_();
-            let d = data.trilinear_interpolation(
-                (x as f32) * spatial_sigma_scale + padding_xy,
-                (y as f32) * spatial_sigma_scale + padding_xy,
-                z * range_sigma_scale + padding_z,
-            );
-            unsafe {
-                *dst.get_unchecked_mut(y * width as usize + x) = if d.y != 0f32.as_() {
+    dst.par_chunks_exact_mut(width as usize)
+        .enumerate()
+        .for_each(|(y, row)| {
+            for (x, t) in row.iter_mut().enumerate() {
+                let z = (*t - base_min).as_();
+                let d = data.trilinear_interpolation(
+                    (x as f32) * spatial_sigma_scale + padding_xy,
+                    (y as f32) * spatial_sigma_scale + padding_xy,
+                    z * range_sigma_scale + padding_z,
+                );
+                *t = if d.y != 0f32.as_() {
                     d.x / d.y
                 } else {
                     0f32.as_()
                 };
             }
-        }
-    }
+        })
 }
 
 pub trait BilinearWorkingItem<T> {
@@ -603,9 +599,9 @@ impl BilinearWorkingItem<u16> for u16 {
     #[inline]
     fn from_bi_linear_f32(value: f32) -> u16 {
         (value * u16::MAX as f32)
+            .round()
             .min(u16::MAX as f32)
-            .max(0.)
-            .round() as u16
+            .max(0.) as u16
     }
     #[inline]
     fn to_bi_linear_f32(&self) -> f32 {
@@ -625,57 +621,60 @@ impl BilinearWorkingItem<f32> for f32 {
 }
 
 fn fast_bilateral_filter_plane_impl<
-    V: Copy + Default + 'static + BilinearWorkingItem<V> + Debug,
+    V: Copy + Default + 'static + BilinearWorkingItem<V> + Debug + Send + Sync,
 >(
     img: &BlurImage<V>,
     dst: &mut BlurImageMut<V>,
     kernel_size: u32,
     spatial_sigma: f32,
     range_sigma: f32,
+    pool: &ThreadPool,
 ) -> Result<(), BlurError> {
-    img.check_layout()?;
-    dst.check_layout(Some(img))?;
-    img.size_matches_mut(dst)?;
-    let width = img.width;
-    let height = img.height;
-    assert_ne!(kernel_size & 1, 0, "kernel size must be odd");
-    assert!(
-        !(spatial_sigma <= 0. || range_sigma <= 0.0),
-        "Spatial sigma and range sigma must be more than 0"
-    );
-    let mut chan0 = vec![0f32; width as usize * height as usize];
-    for (dst, src) in chan0
-        .chunks_exact_mut(width as usize)
-        .zip(img.data.chunks_exact(img.row_stride() as usize))
-    {
-        for (r, &src) in dst.iter_mut().zip(src.iter()) {
-            *r = src.to_bi_linear_f32();
+    pool.install(|| {
+        img.check_layout()?;
+        dst.check_layout(Some(img))?;
+        img.size_matches_mut(dst)?;
+        let width = img.width;
+        let height = img.height;
+        assert_ne!(kernel_size & 1, 0, "kernel size must be odd");
+        assert!(
+            !(spatial_sigma <= 0. || range_sigma <= 0.0),
+            "Spatial sigma and range sigma must be more than 0"
+        );
+        let mut chan0 = vec![0f32; width as usize * height as usize];
+        for (dst, src) in chan0
+            .chunks_exact_mut(width as usize)
+            .zip(img.data.chunks_exact(img.row_stride() as usize))
+        {
+            for (r, &src) in dst.iter_mut().zip(src.iter()) {
+                *r = src.to_bi_linear_f32();
+            }
         }
-    }
-    let in_image = BlurImage::borrow(&chan0, width, height, FastBlurChannels::Plane);
-    let mut working_dst = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
+        let in_image = BlurImage::borrow(&chan0, width, height, FastBlurChannels::Plane);
+        let mut working_dst = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
 
-    fast_bilateral_filter_impl(
-        &in_image,
-        working_dst.data.borrow_mut(),
-        kernel_size,
-        spatial_sigma,
-        range_sigma,
-    );
+        fast_bilateral_filter_impl(
+            &in_image,
+            working_dst.data.borrow_mut(),
+            kernel_size,
+            spatial_sigma,
+            range_sigma,
+        );
 
-    let dst_stride = dst.row_stride() as usize;
+        let dst_stride = dst.row_stride() as usize;
 
-    for (dst, src) in dst.data.borrow_mut().chunks_exact_mut(dst_stride).zip(
-        working_dst
-            .data
-            .borrow()
-            .chunks_exact(working_dst.row_stride() as usize),
-    ) {
-        for (r, &src) in dst.iter_mut().zip(src.iter()) {
-            *r = V::from_bi_linear_f32(src);
+        for (dst, src) in dst.data.borrow_mut().chunks_exact_mut(dst_stride).zip(
+            working_dst
+                .data
+                .borrow()
+                .chunks_exact(working_dst.row_stride() as usize),
+        ) {
+            for (r, &src) in dst.iter_mut().zip(src.iter()) {
+                *r = V::from_bi_linear_f32(src);
+            }
         }
-    }
-    Ok(())
+        Ok(())
+    })
 }
 
 #[cfg(feature = "image")]
@@ -687,6 +686,7 @@ pub(crate) fn fast_bilateral_filter_gray_alpha_impl<
     kernel_size: u32,
     spatial_sigma: f32,
     range_sigma: f32,
+    threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
     img.check_layout_channels(2)?;
     dst.check_layout_channels(2, Some(img))?;
@@ -695,68 +695,78 @@ pub(crate) fn fast_bilateral_filter_gray_alpha_impl<
         !(spatial_sigma <= 0. || range_sigma <= 0.0),
         "Spatial sigma and range sigma must be more than 0"
     );
-    let width = img.width;
-    let height = img.height;
-    let mut in_image0 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
-    let mut in_image1 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
-    for ((dst0, dst1), src) in in_image0
-        .data
-        .borrow_mut()
-        .chunks_exact_mut(width as usize)
-        .zip(in_image1.data.borrow_mut().chunks_exact_mut(width as usize))
-        .zip(img.data.chunks_exact(img.row_stride() as usize))
-    {
-        for ((r, g), src) in dst0
-            .iter_mut()
-            .zip(dst1.iter_mut())
-            .zip(src.chunks_exact(2))
+
+    let thread_count = threading_policy.thread_count(img.width, img.height) as u32;
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(thread_count as usize)
+        .build()
+        .unwrap();
+
+    pool.install(|| {
+        let width = img.width;
+        let height = img.height;
+        let mut in_image0 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
+        let mut in_image1 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
+        for ((dst0, dst1), src) in in_image0
+            .data
+            .borrow_mut()
+            .chunks_exact_mut(width as usize)
+            .zip(in_image1.data.borrow_mut().chunks_exact_mut(width as usize))
+            .zip(img.data.chunks_exact(img.row_stride() as usize))
         {
-            *r = src[0].to_bi_linear_f32();
-            *g = src[1].to_bi_linear_f32();
-        }
-    }
-
-    let mut working_dst0 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
-    let mut working_dst1 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
-
-    let ref0 = in_image0.to_immutable_ref();
-    let ref1 = in_image1.to_immutable_ref();
-
-    rayon::scope(|s| {
-        s.spawn(|_| {
-            fast_bilateral_filter_impl(
-                &ref0,
-                working_dst0.data.borrow_mut(),
-                kernel_size,
-                spatial_sigma,
-                range_sigma,
-            );
-        });
-        s.spawn(|_| {
-            fast_bilateral_filter_impl(
-                &ref1,
-                working_dst1.data.borrow_mut(),
-                kernel_size,
-                spatial_sigma,
-                range_sigma,
-            );
-        });
-    });
-
-    let dst_stride = dst.row_stride() as usize;
-
-    dst.data
-        .borrow_mut()
-        .par_chunks_exact_mut(dst_stride)
-        .zip(working_dst0.data.borrow().par_chunks_exact(width as usize))
-        .zip(working_dst1.data.borrow().par_chunks_exact(width as usize))
-        .for_each(|((dst, src0), src1)| {
-            for ((dst, src0), src1) in dst.chunks_exact_mut(2).zip(src0.iter()).zip(src1.iter()) {
-                dst[0] = V::from_bi_linear_f32(*src0);
-                dst[1] = V::from_bi_linear_f32(*src1);
+            for ((r, g), src) in dst0
+                .iter_mut()
+                .zip(dst1.iter_mut())
+                .zip(src.chunks_exact(2))
+            {
+                *r = src[0].to_bi_linear_f32();
+                *g = src[1].to_bi_linear_f32();
             }
+        }
+
+        let mut working_dst0 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
+        let mut working_dst1 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
+
+        let ref0 = in_image0.to_immutable_ref();
+        let ref1 = in_image1.to_immutable_ref();
+
+        pool.scope(|s| {
+            s.spawn(|_| {
+                fast_bilateral_filter_impl(
+                    &ref0,
+                    working_dst0.data.borrow_mut(),
+                    kernel_size,
+                    spatial_sigma,
+                    range_sigma,
+                );
+            });
+            s.spawn(|_| {
+                fast_bilateral_filter_impl(
+                    &ref1,
+                    working_dst1.data.borrow_mut(),
+                    kernel_size,
+                    spatial_sigma,
+                    range_sigma,
+                );
+            });
         });
-    Ok(())
+
+        let dst_stride = dst.row_stride() as usize;
+
+        dst.data
+            .borrow_mut()
+            .par_chunks_exact_mut(dst_stride)
+            .zip(working_dst0.data.borrow().par_chunks_exact(width as usize))
+            .zip(working_dst1.data.borrow().par_chunks_exact(width as usize))
+            .for_each(|((dst, src0), src1)| {
+                for ((dst, src0), src1) in dst.chunks_exact_mut(2).zip(src0.iter()).zip(src1.iter())
+                {
+                    dst[0] = V::from_bi_linear_f32(*src0);
+                    dst[1] = V::from_bi_linear_f32(*src1);
+                }
+            });
+        Ok(())
+    })
 }
 
 fn fast_bilateral_filter_rgb_impl<
@@ -767,100 +777,103 @@ fn fast_bilateral_filter_rgb_impl<
     kernel_size: u32,
     spatial_sigma: f32,
     range_sigma: f32,
+    pool: &ThreadPool,
 ) -> Result<(), BlurError> {
-    img.check_layout()?;
-    dst.check_layout(None)?;
-    img.size_matches_mut(dst)?;
-    let width = img.width;
-    let height = img.height;
-    assert_ne!(kernel_size & 1, 0, "kernel size must be odd");
-    assert!(
-        !(spatial_sigma <= 0. || range_sigma <= 0.0),
-        "Spatial sigma and range sigma must be more than 0"
-    );
-    let mut in_image0 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
-    let mut in_image1 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
-    let mut in_image2 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
-    for (((dst0, dst1), dst2), src) in in_image0
-        .data
-        .borrow_mut()
-        .chunks_exact_mut(width as usize)
-        .zip(in_image1.data.borrow_mut().chunks_exact_mut(width as usize))
-        .zip(in_image2.data.borrow_mut().chunks_exact_mut(width as usize))
-        .zip(img.data.chunks_exact(img.row_stride() as usize))
-    {
-        for (((r, g), b), src) in dst0
-            .iter_mut()
-            .zip(dst1.iter_mut())
-            .zip(dst2.iter_mut())
-            .zip(src.chunks_exact(3))
+    pool.install(|| {
+        img.check_layout()?;
+        dst.check_layout(None)?;
+        img.size_matches_mut(dst)?;
+        let width = img.width;
+        let height = img.height;
+        assert_ne!(kernel_size & 1, 0, "kernel size must be odd");
+        assert!(
+            !(spatial_sigma <= 0. || range_sigma <= 0.0),
+            "Spatial sigma and range sigma must be more than 0"
+        );
+        let mut in_image0 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
+        let mut in_image1 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
+        let mut in_image2 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
+        for (((dst0, dst1), dst2), src) in in_image0
+            .data
+            .borrow_mut()
+            .chunks_exact_mut(width as usize)
+            .zip(in_image1.data.borrow_mut().chunks_exact_mut(width as usize))
+            .zip(in_image2.data.borrow_mut().chunks_exact_mut(width as usize))
+            .zip(img.data.chunks_exact(img.row_stride() as usize))
         {
-            *r = src[0].to_bi_linear_f32();
-            *g = src[1].to_bi_linear_f32();
-            *b = src[2].to_bi_linear_f32();
-        }
-    }
-
-    let mut working_dst0 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
-    let mut working_dst1 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
-    let mut working_dst2 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
-
-    let ref0 = in_image0.to_immutable_ref();
-    let ref1 = in_image1.to_immutable_ref();
-    let ref2 = in_image2.to_immutable_ref();
-
-    rayon::scope(|s| {
-        s.spawn(|_| {
-            fast_bilateral_filter_impl(
-                &ref0,
-                working_dst0.data.borrow_mut(),
-                kernel_size,
-                spatial_sigma,
-                range_sigma,
-            );
-        });
-        s.spawn(|_| {
-            fast_bilateral_filter_impl(
-                &ref1,
-                working_dst1.data.borrow_mut(),
-                kernel_size,
-                spatial_sigma,
-                range_sigma,
-            );
-        });
-        s.spawn(|_| {
-            fast_bilateral_filter_impl(
-                &ref2,
-                working_dst2.data.borrow_mut(),
-                kernel_size,
-                spatial_sigma,
-                range_sigma,
-            );
-        });
-    });
-
-    let dst_stride = dst.row_stride() as usize;
-
-    dst.data
-        .borrow_mut()
-        .par_chunks_exact_mut(dst_stride)
-        .zip(working_dst0.data.borrow().par_chunks_exact(width as usize))
-        .zip(working_dst1.data.borrow().par_chunks_exact(width as usize))
-        .zip(working_dst2.data.borrow().par_chunks_exact(width as usize))
-        .for_each(|(((dst, src0), src1), src2)| {
-            for (((dst, src0), src1), src2) in dst
-                .chunks_exact_mut(3)
-                .zip(src0.iter())
-                .zip(src1.iter())
-                .zip(src2)
+            for (((r, g), b), src) in dst0
+                .iter_mut()
+                .zip(dst1.iter_mut())
+                .zip(dst2.iter_mut())
+                .zip(src.chunks_exact(3))
             {
-                dst[0] = V::from_bi_linear_f32(*src0);
-                dst[1] = V::from_bi_linear_f32(*src1);
-                dst[2] = V::from_bi_linear_f32(*src2);
+                *r = src[0].to_bi_linear_f32();
+                *g = src[1].to_bi_linear_f32();
+                *b = src[2].to_bi_linear_f32();
             }
+        }
+
+        let mut working_dst0 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
+        let mut working_dst1 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
+        let mut working_dst2 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
+
+        let ref0 = in_image0.to_immutable_ref();
+        let ref1 = in_image1.to_immutable_ref();
+        let ref2 = in_image2.to_immutable_ref();
+
+        pool.scope(|s| {
+            s.spawn(|_| {
+                fast_bilateral_filter_impl(
+                    &ref0,
+                    working_dst0.data.borrow_mut(),
+                    kernel_size,
+                    spatial_sigma,
+                    range_sigma,
+                );
+            });
+            s.spawn(|_| {
+                fast_bilateral_filter_impl(
+                    &ref1,
+                    working_dst1.data.borrow_mut(),
+                    kernel_size,
+                    spatial_sigma,
+                    range_sigma,
+                );
+            });
+            s.spawn(|_| {
+                fast_bilateral_filter_impl(
+                    &ref2,
+                    working_dst2.data.borrow_mut(),
+                    kernel_size,
+                    spatial_sigma,
+                    range_sigma,
+                );
+            });
         });
 
-    Ok(())
+        let dst_stride = dst.row_stride() as usize;
+
+        dst.data
+            .borrow_mut()
+            .par_chunks_exact_mut(dst_stride)
+            .zip(working_dst0.data.borrow().par_chunks_exact(width as usize))
+            .zip(working_dst1.data.borrow().par_chunks_exact(width as usize))
+            .zip(working_dst2.data.borrow().par_chunks_exact(width as usize))
+            .for_each(|(((dst, src0), src1), src2)| {
+                for (((dst, src0), src1), src2) in dst
+                    .chunks_exact_mut(3)
+                    .zip(src0.iter())
+                    .zip(src1.iter())
+                    .zip(src2)
+                {
+                    dst[0] = V::from_bi_linear_f32(*src0);
+                    dst[1] = V::from_bi_linear_f32(*src1);
+                    dst[2] = V::from_bi_linear_f32(*src2);
+                }
+            });
+
+        Ok(())
+    })
 }
 
 fn fast_bilateral_filter_rgba_impl<
@@ -871,118 +884,124 @@ fn fast_bilateral_filter_rgba_impl<
     kernel_size: u32,
     spatial_sigma: f32,
     range_sigma: f32,
+    pool: &ThreadPool,
 ) -> Result<(), BlurError> {
-    img.check_layout()?;
-    dst.check_layout(Some(img))?;
-    img.size_matches_mut(dst)?;
-    let width = img.width;
-    let height = img.height;
-    assert_ne!(kernel_size & 1, 0, "kernel size must be odd");
-    assert!(
-        !(spatial_sigma <= 0. || range_sigma <= 0.0),
-        "Spatial sigma and range sigma must be more than 0"
-    );
-    let mut in_image0 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
-    let mut in_image1 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
-    let mut in_image2 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
-    let mut in_image3 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
-    for ((((dst0, dst1), dst2), dst3), src) in in_image0
-        .data
-        .borrow_mut()
-        .chunks_exact_mut(width as usize)
-        .zip(in_image1.data.borrow_mut().chunks_exact_mut(width as usize))
-        .zip(in_image2.data.borrow_mut().chunks_exact_mut(width as usize))
-        .zip(in_image3.data.borrow_mut().chunks_exact_mut(width as usize))
-        .zip(img.data.chunks_exact(img.row_stride() as usize))
-    {
-        for ((((r, g), b), a), src) in dst0
-            .iter_mut()
-            .zip(dst1.iter_mut())
-            .zip(dst2.iter_mut())
-            .zip(dst3.iter_mut())
-            .zip(src.chunks_exact(4))
+    pool.install(|| {
+        img.check_layout()?;
+        dst.check_layout(Some(img))?;
+        img.size_matches_mut(dst)?;
+        let width = img.width;
+        let height = img.height;
+        assert_ne!(kernel_size & 1, 0, "kernel size must be odd");
+        assert!(
+            !(spatial_sigma <= 0. || range_sigma <= 0.0),
+            "Spatial sigma and range sigma must be more than 0"
+        );
+        let mut in_image0 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
+        let mut in_image1 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
+        let mut in_image2 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
+        let mut in_image3 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
+        for ((((dst0, dst1), dst2), dst3), src) in in_image0
+            .data
+            .borrow_mut()
+            .chunks_exact_mut(width as usize)
+            .zip(in_image1.data.borrow_mut().chunks_exact_mut(width as usize))
+            .zip(in_image2.data.borrow_mut().chunks_exact_mut(width as usize))
+            .zip(in_image3.data.borrow_mut().chunks_exact_mut(width as usize))
+            .zip(img.data.chunks_exact(img.row_stride() as usize))
         {
-            *r = src[0].to_bi_linear_f32();
-            *g = src[1].to_bi_linear_f32();
-            *b = src[2].to_bi_linear_f32();
-            *a = src[3].to_bi_linear_f32();
-        }
-    }
-
-    let mut working_dst0 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
-    let mut working_dst1 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
-    let mut working_dst2 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
-    let mut working_dst3 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
-
-    let ref0 = in_image0.to_immutable_ref();
-    let ref1 = in_image1.to_immutable_ref();
-    let ref2 = in_image2.to_immutable_ref();
-    let ref3 = in_image2.to_immutable_ref();
-
-    rayon::scope(|s| {
-        s.spawn(|_| {
-            fast_bilateral_filter_impl(
-                &ref0,
-                working_dst0.data.borrow_mut(),
-                kernel_size,
-                spatial_sigma,
-                range_sigma,
-            );
-        });
-        s.spawn(|_| {
-            fast_bilateral_filter_impl(
-                &ref1,
-                working_dst1.data.borrow_mut(),
-                kernel_size,
-                spatial_sigma,
-                range_sigma,
-            );
-        });
-        s.spawn(|_| {
-            fast_bilateral_filter_impl(
-                &ref2,
-                working_dst2.data.borrow_mut(),
-                kernel_size,
-                spatial_sigma,
-                range_sigma,
-            );
-        });
-        s.spawn(|_| {
-            fast_bilateral_filter_impl(
-                &ref3,
-                working_dst3.data.borrow_mut(),
-                kernel_size,
-                spatial_sigma,
-                range_sigma,
-            );
-        });
-    });
-
-    let dst_stride = dst.row_stride() as usize;
-
-    dst.data
-        .borrow_mut()
-        .par_chunks_exact_mut(dst_stride)
-        .zip(working_dst0.data.borrow().par_chunks_exact(width as usize))
-        .zip(working_dst1.data.borrow().par_chunks_exact(width as usize))
-        .zip(working_dst2.data.borrow().par_chunks_exact(width as usize))
-        .zip(working_dst3.data.borrow().par_chunks_exact(width as usize))
-        .for_each(|((((dst, src0), src1), src2), src3)| {
-            for ((((dst, src0), src1), src2), src3) in dst
-                .chunks_exact_mut(4)
-                .zip(src0.iter())
-                .zip(src1.iter())
-                .zip(src2.iter())
-                .zip(src3.iter())
+            for ((((r, g), b), a), src) in dst0
+                .iter_mut()
+                .zip(dst1.iter_mut())
+                .zip(dst2.iter_mut())
+                .zip(dst3.iter_mut())
+                .zip(src.chunks_exact(4))
             {
-                dst[0] = V::from_bi_linear_f32(*src0);
-                dst[1] = V::from_bi_linear_f32(*src1);
-                dst[2] = V::from_bi_linear_f32(*src2);
-                dst[3] = V::from_bi_linear_f32(*src3);
+                *r = src[0].to_bi_linear_f32();
+                *g = src[1].to_bi_linear_f32();
+                *b = src[2].to_bi_linear_f32();
+                *a = src[3].to_bi_linear_f32();
             }
+        }
+
+        let mut working_dst0 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
+        let mut working_dst1 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
+        let mut working_dst2 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
+        let mut working_dst3 = BlurImageMut::alloc(width, height, FastBlurChannels::Plane);
+
+        let ref0 = in_image0.to_immutable_ref();
+        let ref1 = in_image1.to_immutable_ref();
+        let ref2 = in_image2.to_immutable_ref();
+        let ref3 = in_image2.to_immutable_ref();
+
+        pool.scope(|s| {
+            s.spawn(|_| {
+                fast_bilateral_filter_impl(
+                    &ref0,
+                    working_dst0.data.borrow_mut(),
+                    kernel_size,
+                    spatial_sigma,
+                    range_sigma,
+                );
+            });
+
+            s.spawn(|_| {
+                fast_bilateral_filter_impl(
+                    &ref1,
+                    working_dst1.data.borrow_mut(),
+                    kernel_size,
+                    spatial_sigma,
+                    range_sigma,
+                );
+            });
+
+            s.spawn(|_| {
+                fast_bilateral_filter_impl(
+                    &ref2,
+                    working_dst2.data.borrow_mut(),
+                    kernel_size,
+                    spatial_sigma,
+                    range_sigma,
+                );
+            });
+
+            s.spawn(|_| {
+                fast_bilateral_filter_impl(
+                    &ref3,
+                    working_dst3.data.borrow_mut(),
+                    kernel_size,
+                    spatial_sigma,
+                    range_sigma,
+                );
+            })
         });
 
-    Ok(())
+        let dst_stride = dst.row_stride() as usize;
+
+        dst.data
+            .borrow_mut()
+            .par_chunks_exact_mut(dst_stride)
+            .zip(working_dst0.data.borrow().par_chunks_exact(width as usize))
+            .zip(working_dst1.data.borrow().par_chunks_exact(width as usize))
+            .zip(working_dst2.data.borrow().par_chunks_exact(width as usize))
+            .zip(working_dst3.data.borrow().par_chunks_exact(width as usize))
+            .for_each(|((((dst, src0), src1), src2), src3)| {
+                for ((((dst, src0), src1), src2), src3) in dst
+                    .chunks_exact_mut(4)
+                    .zip(src0.iter())
+                    .zip(src1.iter())
+                    .zip(src2.iter())
+                    .zip(src3.iter())
+                {
+                    dst[0] = V::from_bi_linear_f32(*src0);
+                    dst[1] = V::from_bi_linear_f32(*src1);
+                    dst[2] = V::from_bi_linear_f32(*src2);
+                    dst[3] = V::from_bi_linear_f32(*src3);
+                }
+            });
+
+        Ok(())
+    })
 }
 
 /// Performs fast bilateral filter on the 8-bit image
@@ -1005,21 +1024,50 @@ pub fn fast_bilateral_filter(
     kernel_size: u32,
     spatial_sigma: f32,
     range_sigma: f32,
+    threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
     src.check_layout()?;
     dst.check_layout(Some(src))?;
     src.size_matches_mut(dst)?;
     let channels = src.channels;
     assert_ne!(kernel_size & 1, 0, "kernel_size must be odd");
+
+    let thread_count = threading_policy.thread_count(src.width, src.height) as u32;
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(thread_count as usize)
+        .build()
+        .unwrap();
+
     match channels {
         FastBlurChannels::Plane => {
-            fast_bilateral_filter_plane_impl(src, dst, kernel_size, spatial_sigma, range_sigma)?;
+            fast_bilateral_filter_plane_impl(
+                src,
+                dst,
+                kernel_size,
+                spatial_sigma,
+                range_sigma,
+                &pool,
+            )?;
         }
         FastBlurChannels::Channels3 => {
-            fast_bilateral_filter_rgb_impl(src, dst, kernel_size, spatial_sigma, range_sigma)?;
+            fast_bilateral_filter_rgb_impl(
+                src,
+                dst,
+                kernel_size,
+                spatial_sigma,
+                range_sigma,
+                &pool,
+            )?;
         }
         FastBlurChannels::Channels4 => {
-            fast_bilateral_filter_rgba_impl(src, dst, kernel_size, spatial_sigma, range_sigma)?;
+            fast_bilateral_filter_rgba_impl(
+                src,
+                dst,
+                kernel_size,
+                spatial_sigma,
+                range_sigma,
+                &pool,
+            )?;
         }
     }
     Ok(())
@@ -1048,21 +1096,50 @@ pub fn fast_bilateral_filter_u16(
     kernel_size: u32,
     spatial_sigma: f32,
     range_sigma: f32,
+    threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
     src.check_layout()?;
     dst.check_layout(Some(src))?;
     src.size_matches_mut(dst)?;
     let channels = src.channels;
     assert_ne!(kernel_size & 1, 0, "kernel_size must be odd");
+
+    let thread_count = threading_policy.thread_count(src.width, src.height) as u32;
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(thread_count as usize)
+        .build()
+        .unwrap();
+
     match channels {
         FastBlurChannels::Plane => {
-            fast_bilateral_filter_plane_impl(src, dst, kernel_size, spatial_sigma, range_sigma)?;
+            fast_bilateral_filter_plane_impl(
+                src,
+                dst,
+                kernel_size,
+                spatial_sigma,
+                range_sigma,
+                &pool,
+            )?;
         }
         FastBlurChannels::Channels3 => {
-            fast_bilateral_filter_rgb_impl(src, dst, kernel_size, spatial_sigma, range_sigma)?;
+            fast_bilateral_filter_rgb_impl(
+                src,
+                dst,
+                kernel_size,
+                spatial_sigma,
+                range_sigma,
+                &pool,
+            )?;
         }
         FastBlurChannels::Channels4 => {
-            fast_bilateral_filter_rgba_impl(src, dst, kernel_size, spatial_sigma, range_sigma)?;
+            fast_bilateral_filter_rgba_impl(
+                src,
+                dst,
+                kernel_size,
+                spatial_sigma,
+                range_sigma,
+                &pool,
+            )?;
         }
     }
     Ok(())
@@ -1091,21 +1168,50 @@ pub fn fast_bilateral_filter_f32(
     kernel_size: u32,
     spatial_sigma: f32,
     range_sigma: f32,
+    threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
     src.check_layout()?;
     dst.check_layout(Some(src))?;
     src.size_matches_mut(dst)?;
     let channels = src.channels;
+
+    let thread_count = threading_policy.thread_count(src.width, src.height) as u32;
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(thread_count as usize)
+        .build()
+        .unwrap();
+
     assert_ne!(kernel_size & 1, 0, "kernel_size must be odd");
     match channels {
         FastBlurChannels::Plane => {
-            fast_bilateral_filter_plane_impl(src, dst, kernel_size, spatial_sigma, range_sigma)?;
+            fast_bilateral_filter_plane_impl(
+                src,
+                dst,
+                kernel_size,
+                spatial_sigma,
+                range_sigma,
+                &pool,
+            )?;
         }
         FastBlurChannels::Channels3 => {
-            fast_bilateral_filter_rgb_impl(src, dst, kernel_size, spatial_sigma, range_sigma)?;
+            fast_bilateral_filter_rgb_impl(
+                src,
+                dst,
+                kernel_size,
+                spatial_sigma,
+                range_sigma,
+                &pool,
+            )?;
         }
         FastBlurChannels::Channels4 => {
-            fast_bilateral_filter_rgba_impl(src, dst, kernel_size, spatial_sigma, range_sigma)?;
+            fast_bilateral_filter_rgba_impl(
+                src,
+                dst,
+                kernel_size,
+                spatial_sigma,
+                range_sigma,
+                &pool,
+            )?;
         }
     }
     Ok(())

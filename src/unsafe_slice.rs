@@ -28,7 +28,7 @@
 use std::cell::UnsafeCell;
 use std::ops::Index;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct UnsafeSlice<'a, T> {
     pub slice: &'a [UnsafeCell<T>],
 }

@@ -32,9 +32,10 @@ mod split;
 
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use libblur::{
-    filter_1d_complex, filter_1d_complex_fixed_point, filter_2d_rgba_fft, gaussian_kernel_1d,
-    lens_kernel, sigma_size, BlurImage, BlurImageMut, EdgeMode, FastBlurChannels, KernelShape,
-    Scalar, ThreadingPolicy, TransferFunction,
+    fast_bilateral_filter, fast_bilateral_filter_u16, filter_1d_complex,
+    filter_1d_complex_fixed_point, filter_2d_rgba_fft, gaussian_kernel_1d, lens_kernel, sigma_size,
+    BlurImage, BlurImageMut, EdgeMode, FastBlurChannels, KernelShape, Scalar, ThreadingPolicy,
+    TransferFunction,
 };
 use num_complex::Complex;
 use std::any::Any;
@@ -111,9 +112,9 @@ fn main() {
 
     println!("{:?}", dyn_image.color());
 
-    let img = dyn_image.to_rgba8();
+    let img = dyn_image.to_rgb8();
     let mut src_bytes = img.as_bytes();
-    let components = 4;
+    let components = 3;
     let stride = dimensions.0 as usize * components;
     let mut bytes: Vec<u8> = src_bytes.to_vec();
     let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
@@ -139,7 +140,7 @@ fn main() {
         &v_vec,
         dyn_image.width(),
         dyn_image.height(),
-        FastBlurChannels::Channels4,
+        FastBlurChannels::Channels3,
     );
     let vcvt = cvt.linearize(TransferFunction::Srgb, true).unwrap();
 
@@ -156,18 +157,17 @@ fn main() {
     // let bokeh = generate_complex_bokeh_kernel(35, 30.);
     let start_time = Instant::now();
     // let gaussian_kernel = gaussian_kernel_1d(31, sigma_size(31.)).iter().map(|&x| Complex::new(x, 0.0)).collect::<Vec<Complex<f32>>>();
-    let gaussian_kernel = complex_gaussian_kernel(51., 0.5, 15.);
+    let gaussian_kernel = complex_gaussian_kernel(51., 0.75, 25.);
 
-    filter_1d_complex_fixed_point::<u16, i32, f32, 4>(
-        &vcvt,
-        &mut dst_image,
-        &gaussian_kernel,
-        &gaussian_kernel,
-        EdgeMode::Clamp,
-        Scalar::default(),
-        ThreadingPolicy::Adaptive,
-    )
-    .unwrap();
+    for i in 0..15 {
+        let start_time = Instant::now();
+        fast_bilateral_filter_u16(&vcvt, &mut dst_image, 15, 1., 5., ThreadingPolicy::Adaptive)
+            .unwrap();
+        println!(
+            "libblur::fast_bilateral_filter_u16 MultiThreading: {:?}",
+            start_time.elapsed()
+        );
+    }
 
     // filter_2d_rgba_fft::<u16, f32, f32>(
     //     &image,

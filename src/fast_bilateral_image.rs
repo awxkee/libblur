@@ -29,7 +29,7 @@
 use crate::fast_bilateral_filter::fast_bilateral_filter_gray_alpha_impl;
 use crate::{
     fast_bilateral_filter, fast_bilateral_filter_f32, fast_bilateral_filter_u16, BlurImage,
-    BlurImageMut, BufferStore, FastBlurChannels,
+    BlurImageMut, BufferStore, FastBlurChannels, ThreadingPolicy,
 };
 use image::{
     DynamicImage, GrayAlphaImage, GrayImage, ImageBuffer, Luma, LumaA, Rgb, Rgb32FImage, RgbImage,
@@ -56,6 +56,7 @@ pub fn fast_bilateral_filter_image(
     kernel_size: u32,
     spatial_sigma: f32,
     range_sigma: f32,
+    threading_policy: ThreadingPolicy,
 ) -> Option<DynamicImage> {
     if kernel_size & 1 == 0 {
         return None;
@@ -74,6 +75,7 @@ pub fn fast_bilateral_filter_image(
                 kernel_size,
                 spatial_sigma,
                 range_sigma,
+                threading_policy,
             )
             .unwrap();
 
@@ -112,6 +114,7 @@ pub fn fast_bilateral_filter_image(
                 kernel_size,
                 spatial_sigma,
                 range_sigma,
+                threading_policy,
             )
             .unwrap();
 
@@ -142,6 +145,7 @@ pub fn fast_bilateral_filter_image(
                 kernel_size,
                 spatial_sigma,
                 range_sigma,
+                threading_policy,
             )
             .unwrap();
 
@@ -172,6 +176,7 @@ pub fn fast_bilateral_filter_image(
                 kernel_size,
                 spatial_sigma,
                 range_sigma,
+                threading_policy,
             )
             .unwrap();
             let new_rgba_image = RgbaImage::from_raw(
@@ -198,6 +203,7 @@ pub fn fast_bilateral_filter_image(
                 kernel_size,
                 spatial_sigma,
                 range_sigma,
+                threading_policy,
             )
             .unwrap();
 
@@ -236,6 +242,7 @@ pub fn fast_bilateral_filter_image(
                 kernel_size,
                 spatial_sigma,
                 range_sigma,
+                threading_policy,
             )
             .unwrap();
 
@@ -266,6 +273,7 @@ pub fn fast_bilateral_filter_image(
                 kernel_size,
                 spatial_sigma,
                 range_sigma,
+                threading_policy,
             )
             .unwrap();
 
@@ -296,6 +304,7 @@ pub fn fast_bilateral_filter_image(
                 kernel_size,
                 spatial_sigma,
                 range_sigma,
+                threading_policy,
             )
             .unwrap();
 
@@ -326,6 +335,7 @@ pub fn fast_bilateral_filter_image(
                 kernel_size,
                 spatial_sigma,
                 range_sigma,
+                threading_policy,
             )
             .unwrap();
 
@@ -356,6 +366,7 @@ pub fn fast_bilateral_filter_image(
                 kernel_size,
                 spatial_sigma,
                 range_sigma,
+                threading_policy,
             )
             .unwrap();
 
