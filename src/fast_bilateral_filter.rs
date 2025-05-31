@@ -932,7 +932,7 @@ fn fast_bilateral_filter_rgba_impl<
         let ref0 = in_image0.to_immutable_ref();
         let ref1 = in_image1.to_immutable_ref();
         let ref2 = in_image2.to_immutable_ref();
-        let ref3 = in_image2.to_immutable_ref();
+        let ref3 = in_image3.to_immutable_ref();
 
         pool.scope(|s| {
             s.spawn(|_| {

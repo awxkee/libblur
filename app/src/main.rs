@@ -112,9 +112,9 @@ fn main() {
 
     println!("{:?}", dyn_image.color());
 
-    let img = dyn_image.to_rgb8();
+    let img = dyn_image.to_rgba8();
     let mut src_bytes = img.as_bytes();
-    let components = 3;
+    let components = 4;
     let stride = dimensions.0 as usize * components;
     let mut bytes: Vec<u8> = src_bytes.to_vec();
     let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
@@ -140,7 +140,7 @@ fn main() {
         &v_vec,
         dyn_image.width(),
         dyn_image.height(),
-        FastBlurChannels::Channels3,
+        FastBlurChannels::Channels4,
     );
     let vcvt = cvt.linearize(TransferFunction::Srgb, true).unwrap();
 
@@ -159,7 +159,7 @@ fn main() {
     // let gaussian_kernel = gaussian_kernel_1d(31, sigma_size(31.)).iter().map(|&x| Complex::new(x, 0.0)).collect::<Vec<Complex<f32>>>();
     let gaussian_kernel = complex_gaussian_kernel(51., 0.75, 25.);
 
-    for i in 0..15 {
+    for i in 0..1 {
         let start_time = Instant::now();
         fast_bilateral_filter_u16(&vcvt, &mut dst_image, 15, 1., 5., ThreadingPolicy::Adaptive)
             .unwrap();
