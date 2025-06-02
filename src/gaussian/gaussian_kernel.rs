@@ -25,6 +25,8 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use num_complex::Complex;
+
 pub fn gaussian_kernel_1d(width: u32, sigma: f32) -> Vec<f32> {
     let mut sum_norm: f32 = 0f32;
     let mut kernel: Vec<f32> = vec![0f32; width as usize];
@@ -69,4 +71,43 @@ pub fn gaussian_kernel_1d_f64(width: u32, sigma: f64) -> Vec<f64> {
     }
 
     kernel
+}
+
+/// Regular gaussian kernel with phase shift.
+pub fn complex_gaussian_kernel(radius: f64, scale: f64, distortion: f64) -> Vec<Complex<f32>> {
+    if radius < 1. {
+        panic!("Radius cannot be less than 1");
+    }
+    let kernel_radius = radius.ceil() as usize;
+    let mut kernel: Vec<Complex<f64>> = vec![Complex::new(0.0, 0.0); 1 + 2 * (kernel_radius)];
+
+    for (x, dst) in kernel.iter_mut().enumerate() {
+        let ax = (x as f64 - radius) * scale / radius;
+        let ax2 = ax * ax;
+        let exp_a = (-distortion * ax2).exp();
+        let val = Complex::new(
+            exp_a * (distortion * ax2).cos(),
+            exp_a * (distortion * ax2).sin(),
+        );
+        *dst = val;
+    }
+
+    let sum: f64 = kernel.iter().map(|z| z.norm_sqr()).sum::<f64>();
+    if sum != 0.0 {
+        kernel
+            .iter()
+            .map(|z| Complex {
+                re: (z.re / sum) as f32,
+                im: (z.im / sum) as f32,
+            })
+            .collect::<Vec<_>>()
+    } else {
+        kernel
+            .iter()
+            .map(|x| Complex {
+                re: x.re as f32,
+                im: x.im as f32,
+            })
+            .collect()
+    }
 }
