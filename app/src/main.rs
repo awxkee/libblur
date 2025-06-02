@@ -32,10 +32,10 @@ mod split;
 
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use libblur::{
-    fast_bilateral_filter, fast_bilateral_filter_u16, filter_1d_complex,
-    filter_1d_complex_fixed_point, filter_2d_rgba_fft, gaussian_kernel_1d, lens_kernel, sigma_size,
-    BlurImage, BlurImageMut, EdgeMode, FastBlurChannels, KernelShape, Scalar, ThreadingPolicy,
-    TransferFunction,
+    bilateral_filter, complex_gaussian_kernel, fast_bilateral_filter, fast_bilateral_filter_u16,
+    filter_1d_complex, filter_1d_complex_fixed_point, filter_2d_rgba_fft, gaussian_kernel_1d,
+    lens_kernel, sigma_size, BilateralBlurParams, BlurImage, BlurImageMut, EdgeMode,
+    FastBlurChannels, KernelShape, Scalar, ThreadingPolicy, TransferFunction,
 };
 use num_complex::Complex;
 use std::any::Any;
@@ -58,41 +58,6 @@ fn f16_to_f32(bytes: Vec<u16>) -> Vec<f32> {
         .iter()
         .map(|&x| half::f16::from_bits(x).to_f32())
         .collect()
-}
-
-fn complex_gaussian_kernel(radius: f64, scale: f64, distortion: f64) -> Vec<Complex<f32>> {
-    let kernel_radius = radius.ceil() as usize;
-    let mut kernel: Vec<Complex<f64>> = vec![Complex::new(0.0, 0.0); 1 + 2 * (kernel_radius)];
-
-    for (x, dst) in kernel.iter_mut().enumerate() {
-        let ax = (x as f64 - radius) * scale / radius;
-        let ax2 = ax * ax;
-        let exp_a = (-distortion * ax2).exp();
-        let val = Complex::new(
-            exp_a * (distortion * ax2).cos(),
-            exp_a * (distortion * ax2).sin(),
-        );
-        *dst = val;
-    }
-
-    let sum: f64 = kernel.iter().map(|z| z.norm_sqr()).sum::<f64>();
-    if sum != 0.0 {
-        kernel
-            .iter()
-            .map(|z| Complex {
-                re: (z.re / sum) as f32,
-                im: (z.im / sum) as f32,
-            })
-            .collect::<Vec<_>>()
-    } else {
-        kernel
-            .iter()
-            .map(|x| Complex {
-                re: x.re as f32,
-                im: x.im as f32,
-            })
-            .collect()
-    }
 }
 
 fn main() {
@@ -142,7 +107,7 @@ fn main() {
         dyn_image.height(),
         FastBlurChannels::Channels4,
     );
-    let vcvt = cvt.linearize(TransferFunction::Srgb, true).unwrap();
+    // let vcvt = cvt.linearize(TransferFunction::Srgb, true).unwrap();
 
     let mut dst_image = BlurImageMut::default();
     //
@@ -159,15 +124,19 @@ fn main() {
     // let gaussian_kernel = gaussian_kernel_1d(31, sigma_size(31.)).iter().map(|&x| Complex::new(x, 0.0)).collect::<Vec<Complex<f32>>>();
     let gaussian_kernel = complex_gaussian_kernel(51., 0.75, 25.);
 
-    for i in 0..1 {
-        let start_time = Instant::now();
-        fast_bilateral_filter_u16(&vcvt, &mut dst_image, 15, 1., 5., ThreadingPolicy::Adaptive)
-            .unwrap();
-        println!(
-            "libblur::fast_bilateral_filter_u16 MultiThreading: {:?}",
-            start_time.elapsed()
-        );
-    }
+    bilateral_filter(
+        &cvt,
+        &mut dst_image,
+        BilateralBlurParams {
+            kernel_size: 9,
+            spatial_sigma: 150.,
+            range_sigma: 1.,
+        },
+        EdgeMode::Clamp,
+        Scalar::new(0., 0., 0., 0.),
+        ThreadingPolicy::Single,
+    )
+    .unwrap();
 
     // filter_2d_rgba_fft::<u16, f32, f32>(
     //     &image,
@@ -224,12 +193,12 @@ fn main() {
     // )
     // .unwrap();
 
-    let j_dag = dst_image.to_immutable_ref();
-    let gamma = j_dag.gamma8(TransferFunction::Srgb, true).unwrap();
+    // let j_dag = dst_image.to_immutable_ref();
+    // let gamma = j_dag.gamma8(TransferFunction::Srgb, true).unwrap();
 
-    dst_bytes = gamma
+    dst_bytes = dst_image
         .data
-        .as_ref()
+        .borrow_mut()
         .iter()
         .map(|&x| x)
         // .map(|&x| (x * 255f32).round() as u8)

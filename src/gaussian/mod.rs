@@ -34,5 +34,5 @@ pub use declaration::{
     gaussian_blur, gaussian_blur_f16, gaussian_blur_f32, gaussian_blur_u16, GaussianBlurParams,
 };
 pub use gaussian_hint::{ConvolutionMode, IeeeBinaryConvolutionMode};
-pub use gaussian_kernel::{gaussian_kernel_1d, gaussian_kernel_1d_f64};
+pub use gaussian_kernel::{complex_gaussian_kernel, gaussian_kernel_1d, gaussian_kernel_1d_f64};
 pub use gaussian_util::{sigma_size, sigma_size_d};

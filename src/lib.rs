@@ -65,6 +65,7 @@
 mod adaptive_blur;
 #[cfg(all(target_arch = "x86_64", feature = "avx"))]
 mod avx;
+mod bilateral;
 mod box_filter;
 mod channels_configuration;
 mod edge_mode;
@@ -115,6 +116,7 @@ mod wasm32;
 #[cfg(feature = "fft")]
 #[cfg_attr(docsrs, doc(cfg(feature = "fft")))]
 pub use adaptive_blur::adaptive_blur;
+pub use bilateral::{bilateral_filter, BilateralBlurParams};
 pub use box_filter::{
     box_blur, box_blur_f32, box_blur_u16, gaussian_box_blur, gaussian_box_blur_f32,
     gaussian_box_blur_u16, tent_blur, tent_blur_f32, tent_blur_u16, BoxBlurParameters,
@@ -151,9 +153,9 @@ pub use filter2d::{
 pub use filter2d::{filter_2d, filter_2d_arbitrary, filter_2d_rgb, filter_2d_rgba};
 pub use gamma_curves::TransferFunction;
 pub use gaussian::{
-    gaussian_blur, gaussian_blur_f16, gaussian_blur_f32, gaussian_blur_u16, gaussian_kernel_1d,
-    gaussian_kernel_1d_f64, sigma_size, sigma_size_d, ConvolutionMode, GaussianBlurParams,
-    IeeeBinaryConvolutionMode,
+    complex_gaussian_kernel, gaussian_blur, gaussian_blur_f16, gaussian_blur_f32,
+    gaussian_blur_u16, gaussian_kernel_1d, gaussian_kernel_1d_f64, sigma_size, sigma_size_d,
+    ConvolutionMode, GaussianBlurParams, IeeeBinaryConvolutionMode,
 };
 #[cfg(feature = "image")]
 #[cfg_attr(docsrs, doc(cfg(feature = "image")))]

@@ -72,6 +72,10 @@ pub struct ArenaPads {
 }
 
 impl ArenaPads {
+    pub fn constant(v: usize) -> ArenaPads {
+        ArenaPads::new(v, v, v, v)
+    }
+
     pub fn new(pad_left: usize, pad_top: usize, pad_right: usize, pad_bottom: usize) -> ArenaPads {
         ArenaPads {
             pad_left,
