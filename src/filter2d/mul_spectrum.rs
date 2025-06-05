@@ -76,7 +76,7 @@ impl SpectrumMultiplier<f32> for f32 {
                 return neon_mul_spectrum_in_place_f32(value1, other, width, height);
             }
         }
-        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
         {
             if std::arch::is_x86_feature_detected!("avx2") {
                 if std::arch::is_x86_feature_detected!("fma") {
