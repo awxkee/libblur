@@ -34,8 +34,8 @@ use image::{EncodableLayout, GenericImageView, ImageReader};
 use libblur::{
     bilateral_filter, complex_gaussian_kernel, fast_bilateral_filter, fast_bilateral_filter_u16,
     filter_1d_complex, filter_1d_complex_fixed_point, filter_2d_rgba_fft, gaussian_kernel_1d,
-    lens_kernel, sigma_size, BilateralBlurParams, BlurImage, BlurImageMut, EdgeMode,
-    FastBlurChannels, KernelShape, Scalar, ThreadingPolicy, TransferFunction,
+    lens_kernel, sigma_size, AnisotropicRadius, BilateralBlurParams, BlurImage, BlurImageMut,
+    EdgeMode, FastBlurChannels, KernelShape, Scalar, ThreadingPolicy, TransferFunction,
 };
 use num_complex::Complex;
 use std::any::Any;
@@ -43,6 +43,7 @@ use std::fs;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::time::Instant;
+use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 
 #[allow(dead_code)]
 fn f32_to_f16(bytes: Vec<f32>) -> Vec<u16> {
@@ -109,10 +110,6 @@ fn main() {
     );
     // let vcvt = cvt.linearize(TransferFunction::Srgb, true).unwrap();
 
-    let mut dst_image = BlurImageMut::default();
-    //
-    // libblur::fast_gaussian_next_u16(&mut dst_image, 37, ThreadingPolicy::Single, EdgeMode::Clamp)
-    //     .unwrap();
     // let kernel = gaussian_kernel_1d_f64(5, sigma_size_d(2.5));
     let start_time = Instant::now();
 
@@ -123,20 +120,6 @@ fn main() {
     let start_time = Instant::now();
     // let gaussian_kernel = gaussian_kernel_1d(31, sigma_size(31.)).iter().map(|&x| Complex::new(x, 0.0)).collect::<Vec<Complex<f32>>>();
     let gaussian_kernel = complex_gaussian_kernel(51., 0.75, 25.);
-
-    bilateral_filter(
-        &cvt,
-        &mut dst_image,
-        BilateralBlurParams {
-            kernel_size: 9,
-            spatial_sigma: 150.,
-            range_sigma: 1.,
-        },
-        EdgeMode::Clamp,
-        Scalar::new(0., 0., 0., 0.),
-        ThreadingPolicy::Single,
-    )
-    .unwrap();
 
     // filter_2d_rgba_fft::<u16, f32, f32>(
     //     &image,
@@ -196,7 +179,7 @@ fn main() {
     // let j_dag = dst_image.to_immutable_ref();
     // let gamma = j_dag.gamma8(TransferFunction::Srgb, true).unwrap();
 
-    dst_bytes = dst_image
+   /* dst_bytes = dst_image
         .data
         .borrow_mut()
         .iter()
@@ -251,5 +234,5 @@ fn main() {
             },
         )
         .unwrap();
-    }
+    }*/
 }
