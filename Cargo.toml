@@ -2,7 +2,7 @@ workspace = { members = ["fuzz", "app/accelerate", "app"] }
 
 [package]
 name = "libblur"
-version = "0.19.2"
+version = "0.19.3"
 edition = "2021"
 description = "Fast image blurring in pure Rust"
 readme = "./README.md"

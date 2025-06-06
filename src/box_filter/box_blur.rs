@@ -1063,7 +1063,7 @@ where
                         }
                     }
 
-                    let mut start_ky = y_kernel_size / 2 + 1;
+                    let mut start_ky = y_kernel_size / 2;
 
                     start_ky %= y_kernel_size;
 
