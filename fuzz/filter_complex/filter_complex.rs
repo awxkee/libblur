@@ -46,6 +46,7 @@ pub struct SrcImage {
     pub y_kernel_size: u8,
     pub channel: u8,
     pub base: u8,
+    pub threading: bool,
 }
 
 fn complex_gaussian_kernel(radius: f64, scale: f64, a: f64, b: f64) -> Vec<Complex<f32>> {
@@ -101,6 +102,11 @@ fuzz_target!(|data: SrcImage| {
         1 => FastBlurChannels::Channels3,
         _ => FastBlurChannels::Channels4,
     };
+    let mp = if data.threading {
+        ThreadingPolicy::Adaptive
+    } else {
+        ThreadingPolicy::Single
+    };
     match data.base % 3 {
         0 => {
             fuzz_8bit(
@@ -110,6 +116,7 @@ fuzz_target!(|data: SrcImage| {
                 data.y_kernel_size as usize,
                 channel,
                 edge_mode,
+                mp,
             );
         }
         1 => {
@@ -120,6 +127,7 @@ fuzz_target!(|data: SrcImage| {
                 data.y_kernel_size as usize,
                 channel,
                 edge_mode,
+                mp,
             );
         }
         _ => {
@@ -130,6 +138,7 @@ fuzz_target!(|data: SrcImage| {
                 data.y_kernel_size as usize,
                 channel,
                 edge_mode,
+                mp,
             );
         }
     }
@@ -142,6 +151,7 @@ fn fuzz_8bit(
     y_kernel_size: usize,
     channels: FastBlurChannels,
     edge_mode: EdgeMode,
+    threading_policy: ThreadingPolicy,
 ) {
     if width == 0 || height == 0 || x_kernel_size == 0 || y_kernel_size == 0 {
         return;
@@ -161,7 +171,7 @@ fn fuzz_8bit(
                 &y_kernel,
                 edge_mode,
                 Scalar::default(),
-                ThreadingPolicy::Single,
+                threading_policy,
             )
             .unwrap();
         }
@@ -173,7 +183,7 @@ fn fuzz_8bit(
                 &y_kernel,
                 edge_mode,
                 Scalar::default(),
-                ThreadingPolicy::Single,
+                threading_policy,
             )
             .unwrap();
         }
@@ -185,7 +195,7 @@ fn fuzz_8bit(
                 &y_kernel,
                 edge_mode,
                 Scalar::default(),
-                ThreadingPolicy::Single,
+                threading_policy,
             )
             .unwrap();
         }
@@ -199,6 +209,7 @@ fn fuzz_16bit(
     y_kernel_size: usize,
     channels: FastBlurChannels,
     edge_mode: EdgeMode,
+    threading_policy: ThreadingPolicy,
 ) {
     if width == 0 || height == 0 || x_kernel_size == 0 || y_kernel_size == 0 {
         return;
@@ -218,7 +229,7 @@ fn fuzz_16bit(
                 &y_kernel,
                 edge_mode,
                 Scalar::default(),
-                ThreadingPolicy::Single,
+                threading_policy,
             )
             .unwrap();
         }
@@ -230,7 +241,7 @@ fn fuzz_16bit(
                 &y_kernel,
                 edge_mode,
                 Scalar::default(),
-                ThreadingPolicy::Single,
+                threading_policy,
             )
             .unwrap();
         }
@@ -242,7 +253,7 @@ fn fuzz_16bit(
                 &y_kernel,
                 edge_mode,
                 Scalar::default(),
-                ThreadingPolicy::Single,
+                threading_policy,
             )
             .unwrap();
         }
@@ -256,6 +267,7 @@ fn fuzz_f32(
     y_kernel_size: usize,
     channels: FastBlurChannels,
     edge_mode: EdgeMode,
+    threading_policy: ThreadingPolicy,
 ) {
     if width == 0 || height == 0 || x_kernel_size == 0 || y_kernel_size == 0 {
         return;
@@ -275,7 +287,7 @@ fn fuzz_f32(
                 &y_kernel,
                 edge_mode,
                 Scalar::default(),
-                ThreadingPolicy::Single,
+                threading_policy,
             )
             .unwrap();
         }
@@ -287,7 +299,7 @@ fn fuzz_f32(
                 &y_kernel,
                 edge_mode,
                 Scalar::default(),
-                ThreadingPolicy::Single,
+                threading_policy,
             )
             .unwrap();
         }
@@ -299,7 +311,7 @@ fn fuzz_f32(
                 &y_kernel,
                 edge_mode,
                 Scalar::default(),
-                ThreadingPolicy::Single,
+                threading_policy,
             )
             .unwrap();
         }

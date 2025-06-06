@@ -35,9 +35,8 @@ use crate::{
     BlurError, BlurImage, BlurImageMut, EdgeMode, FastBlurChannels, ImageSize, MismatchedSize,
     Scalar, ThreadingPolicy,
 };
+use novtb::{ParallelZonedIterator, TbSliceMut};
 use num_traits::{AsPrimitive, MulAdd};
-use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-use rayon::prelude::ParallelSliceMut;
 use std::fmt::Debug;
 use std::ops::Mul;
 use std::sync::Arc;
@@ -190,15 +189,7 @@ where
 
     let thread_count =
         threading_policy.thread_count(image_size.width as u32, image_size.height as u32) as u32;
-    let pool = if thread_count == 1 {
-        None
-    } else {
-        let hold = rayon::ThreadPoolBuilder::new()
-            .num_threads(thread_count as usize)
-            .build()
-            .unwrap();
-        Some(hold)
-    };
+    let pool = novtb::ThreadPool::new(thread_count as usize);
 
     let arena_source_slice = arena_source.as_slice();
     let kernel_slice = analyzed_se.as_slice();
@@ -220,51 +211,22 @@ where
             })
             .collect::<Vec<ScanPoint2d<i16>>>();
 
-        if let Some(pool) = &pool {
-            pool.install(|| {
-                dst.data
-                    .borrow_mut()
-                    .par_chunks_exact_mut(dst_stride)
-                    .enumerate()
-                    .for_each(|(y, row)| {
-                        let row = &mut row[..image_size.width * CN];
-                        filter(arena, arena_source_slice, row, image_size, &fp_slice, y);
-                    });
-            })
-        } else {
-            dst.data
-                .borrow_mut()
-                .chunks_exact_mut(dst_stride)
-                .enumerate()
-                .for_each(|(y, row)| {
-                    let row = &mut row[..image_size.width * CN];
-                    filter(arena, arena_source_slice, row, image_size, &fp_slice, y);
-                });
-        }
+        dst.data
+            .borrow_mut()
+            .tb_par_chunks_exact_mut(dst_stride)
+            .for_each_enumerated(&pool, |y, row| {
+                let row = &mut row[..image_size.width * CN];
+                filter(arena, arena_source_slice, row, image_size, &fp_slice, y);
+            });
     } else {
         let filter = Arc::new(T::get_executor());
-
-        if let Some(pool) = &pool {
-            pool.install(|| {
-                dst.data
-                    .borrow_mut()
-                    .par_chunks_exact_mut(dst_stride)
-                    .enumerate()
-                    .for_each(|(y, row)| {
-                        let row = &mut row[..image_size.width * CN];
-                        filter(arena, arena_source_slice, row, image_size, kernel_slice, y);
-                    });
-            })
-        } else {
-            dst.data
-                .borrow_mut()
-                .chunks_exact_mut(dst_stride)
-                .enumerate()
-                .for_each(|(y, row)| {
-                    let row = &mut row[..image_size.width * CN];
-                    filter(arena, arena_source_slice, row, image_size, kernel_slice, y);
-                });
-        }
+        dst.data
+            .borrow_mut()
+            .tb_par_chunks_exact_mut(dst_stride)
+            .for_each_enumerated(&pool, |y, row| {
+                let row = &mut row[..image_size.width * CN];
+                filter(arena, arena_source_slice, row, image_size, kernel_slice, y);
+            });
     }
     Ok(())
 }

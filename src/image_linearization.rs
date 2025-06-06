@@ -574,12 +574,12 @@ impl BlurImage<'_, u8> {
     ///
     /// * `transfer_function`: See [TransferFunction] for more info.
     /// * `may_have_alpha`: If image could have alpha, image with channels 2 and 4 will consider channels 1 and 3 as alpha.
-    pub fn linearize(
+    pub fn linearize<'f>(
         &self,
         transfer_function: TransferFunction,
         may_have_alpha: bool,
-    ) -> Result<BlurImage<'_, u16>, BlurError> {
-        linearize8::<BlurImage<'_, u16>, ReturnImmutableImage16>(
+    ) -> Result<BlurImage<'f, u16>, BlurError> {
+        linearize8::<BlurImage<'f, u16>, ReturnImmutableImage16>(
             self,
             transfer_function,
             may_have_alpha,
@@ -595,13 +595,13 @@ impl BlurImageMut<'_, u8> {
     ///
     /// * `transfer_function`: See [TransferFunction] for more info.
     /// * `may_have_alpha`: If image could have alpha, image with channels 2 and 4 will consider channels 1 and 3 as alpha.
-    pub fn linearize(
+    pub fn linearize<'f>(
         &self,
         transfer_function: TransferFunction,
         may_have_alpha: bool,
-    ) -> Result<BlurImageMut<'_, u16>, BlurError> {
+    ) -> Result<BlurImageMut<'f, u16>, BlurError> {
         let ref0 = self.to_immutable_ref();
-        linearize8::<BlurImageMut<'_, u16>, ReturnMutableImage16>(
+        linearize8::<BlurImageMut<'f, u16>, ReturnMutableImage16>(
             &ref0,
             transfer_function,
             may_have_alpha,
@@ -617,12 +617,12 @@ impl BlurImage<'_, u16> {
     ///
     /// * `transfer_function`: See [TransferFunction] for more info.
     /// * `may_have_alpha`: If image could have alpha, image with channels 2 and 4 will consider channels 1 and 3 as alpha.
-    pub fn linearize(
+    pub fn linearize<'f>(
         &self,
         transfer_function: TransferFunction,
         may_have_alpha: bool,
-    ) -> Result<BlurImage<'_, u16>, BlurError> {
-        linearize16::<BlurImage<'_, u16>, ReturnImmutableImage16>(
+    ) -> Result<BlurImage<'f, u16>, BlurError> {
+        linearize16::<BlurImage<'f, u16>, ReturnImmutableImage16>(
             self,
             transfer_function,
             may_have_alpha,
@@ -636,12 +636,12 @@ impl BlurImage<'_, u16> {
     ///
     /// * `transfer_function`: See [TransferFunction] for more info.
     /// * `may_have_alpha`: If image could have alpha, image with channels 2 and 4 will consider channels 1 and 3 as alpha.
-    pub fn gamma8(
+    pub fn gamma8<'f>(
         &self,
         transfer_function: TransferFunction,
         may_have_alpha: bool,
-    ) -> Result<BlurImage<'_, u8>, BlurError> {
-        gen_gamma8::<BlurImage<'_, u8>, ReturnImmutableImage8>(
+    ) -> Result<BlurImage<'f, u8>, BlurError> {
+        gen_gamma8::<BlurImage<'f, u8>, ReturnImmutableImage8>(
             self,
             transfer_function,
             may_have_alpha,
@@ -655,12 +655,12 @@ impl BlurImage<'_, u16> {
     ///
     /// * `transfer_function`: See [TransferFunction] for more info.
     /// * `may_have_alpha`: If image could have alpha, image with channels 2 and 4 will consider channels 1 and 3 as alpha.
-    pub fn gamma16(
+    pub fn gamma16<'f>(
         &self,
         transfer_function: TransferFunction,
         may_have_alpha: bool,
-    ) -> Result<BlurImage<'_, u16>, BlurError> {
-        gen_gamma16::<BlurImage<'_, u16>, ReturnImmutableImage16>(
+    ) -> Result<BlurImage<'f, u16>, BlurError> {
+        gen_gamma16::<BlurImage<'f, u16>, ReturnImmutableImage16>(
             self,
             transfer_function,
             may_have_alpha,
@@ -676,13 +676,13 @@ impl BlurImageMut<'_, u16> {
     ///
     /// * `transfer_function`: See [TransferFunction] for more info.
     /// * `may_have_alpha`: If image could have alpha, image with channels 2 and 4 will consider channels 1 and 3 as alpha.
-    pub fn linearize(
+    pub fn linearize<'f>(
         &self,
         transfer_function: TransferFunction,
         may_have_alpha: bool,
-    ) -> Result<BlurImageMut<'_, u16>, BlurError> {
+    ) -> Result<BlurImageMut<'f, u16>, BlurError> {
         let src_ref = self.to_immutable_ref();
-        linearize16::<BlurImageMut<'_, u16>, ReturnMutableImage16>(
+        linearize16::<BlurImageMut<'f, u16>, ReturnMutableImage16>(
             &src_ref,
             transfer_function,
             may_have_alpha,
@@ -696,13 +696,13 @@ impl BlurImageMut<'_, u16> {
     ///
     /// * `transfer_function`: See [TransferFunction] for more info.
     /// * `may_have_alpha`: If image could have alpha, image with channels 2 and 4 will consider channels 1 and 3 as alpha.
-    pub fn gamma8(
+    pub fn gamma8<'f>(
         &self,
         transfer_function: TransferFunction,
         may_have_alpha: bool,
-    ) -> Result<BlurImageMut<'_, u8>, BlurError> {
+    ) -> Result<BlurImageMut<'f, u8>, BlurError> {
         let src_ref = self.to_immutable_ref();
-        gen_gamma8::<BlurImageMut<'_, u8>, ReturnMutableImage8>(
+        gen_gamma8::<BlurImageMut<'f, u8>, ReturnMutableImage8>(
             &src_ref,
             transfer_function,
             may_have_alpha,
@@ -716,13 +716,13 @@ impl BlurImageMut<'_, u16> {
     ///
     /// * `transfer_function`: See [TransferFunction] for more info.
     /// * `may_have_alpha`: If image could have alpha, image with channels 2 and 4 will consider channels 1 and 3 as alpha.
-    pub fn gamma16(
+    pub fn gamma16<'f>(
         &self,
         transfer_function: TransferFunction,
         may_have_alpha: bool,
-    ) -> Result<BlurImageMut<'_, u16>, BlurError> {
+    ) -> Result<BlurImageMut<'f, u16>, BlurError> {
         let src_ref = self.to_immutable_ref();
-        gen_gamma16::<BlurImageMut<'_, u16>, ReturnMutableImage16>(
+        gen_gamma16::<BlurImageMut<'f, u16>, ReturnMutableImage16>(
             &src_ref,
             transfer_function,
             may_have_alpha,
@@ -738,12 +738,12 @@ impl BlurImage<'_, f32> {
     ///
     /// * `transfer_function`: See [TransferFunction] for more info.
     /// * `may_have_alpha`: If image could have alpha, image with channels 2 and 4 will consider channels 1 and 3 as alpha.
-    pub fn linearize(
+    pub fn linearize<'f>(
         &self,
         transfer_function: TransferFunction,
         may_have_alpha: bool,
-    ) -> Result<BlurImage<'_, f32>, BlurError> {
-        linearize_f32::<BlurImage<'_, f32>, ReturnImmutableImageF32>(
+    ) -> Result<BlurImage<'f, f32>, BlurError> {
+        linearize_f32::<BlurImage<'f, f32>, ReturnImmutableImageF32>(
             self,
             transfer_function,
             may_have_alpha,
@@ -757,12 +757,12 @@ impl BlurImage<'_, f32> {
     ///
     /// * `transfer_function`: See [TransferFunction] for more info.
     /// * `may_have_alpha`: If image could have alpha, image with channels 2 and 4 will consider channels 1 and 3 as alpha.
-    pub fn gamma(
+    pub fn gamma<'f>(
         &self,
         transfer_function: TransferFunction,
         may_have_alpha: bool,
-    ) -> Result<BlurImage<'_, f32>, BlurError> {
-        gamma_f32::<BlurImage<'_, f32>, ReturnImmutableImageF32>(
+    ) -> Result<BlurImage<'f, f32>, BlurError> {
+        gamma_f32::<BlurImage<'f, f32>, ReturnImmutableImageF32>(
             self,
             transfer_function,
             may_have_alpha,
@@ -778,13 +778,13 @@ impl BlurImageMut<'_, f32> {
     ///
     /// * `transfer_function`: See [TransferFunction] for more info.
     /// * `may_have_alpha`: If image could have alpha, image with channels 2 and 4 will consider channels 1 and 3 as alpha.
-    pub fn linearize(
+    pub fn linearize<'f>(
         &self,
         transfer_function: TransferFunction,
         may_have_alpha: bool,
-    ) -> Result<BlurImageMut<'_, f32>, BlurError> {
+    ) -> Result<BlurImageMut<'f, f32>, BlurError> {
         let src_ref = self.to_immutable_ref();
-        linearize_f32::<BlurImageMut<'_, f32>, ReturnMutableImageF32>(
+        linearize_f32::<BlurImageMut<'f, f32>, ReturnMutableImageF32>(
             &src_ref,
             transfer_function,
             may_have_alpha,
@@ -798,13 +798,13 @@ impl BlurImageMut<'_, f32> {
     ///
     /// * `transfer_function`: See [TransferFunction] for more info.
     /// * `may_have_alpha`: If image could have alpha, image with channels 2 and 4 will consider channels 1 and 3 as alpha.
-    pub fn gamma(
+    pub fn gamma<'f>(
         &self,
         transfer_function: TransferFunction,
         may_have_alpha: bool,
-    ) -> Result<BlurImageMut<'_, f32>, BlurError> {
+    ) -> Result<BlurImageMut<'f, f32>, BlurError> {
         let src_ref = self.to_immutable_ref();
-        gamma_f32::<BlurImageMut<'_, f32>, ReturnMutableImageF32>(
+        gamma_f32::<BlurImageMut<'f, f32>, ReturnMutableImageF32>(
             &src_ref,
             transfer_function,
             may_have_alpha,

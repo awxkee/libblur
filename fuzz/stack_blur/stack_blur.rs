@@ -41,18 +41,25 @@ pub struct SrcImage {
     pub edge_mode: u8,
     pub x_radius: u8,
     pub y_radius: u8,
+    pub threading: bool,
 }
 
 fuzz_target!(|data: SrcImage| {
     if data.src_width > 250 || data.src_height > 250 {
         return;
     }
+    let mp = if data.threading {
+        ThreadingPolicy::Adaptive
+    } else {
+        ThreadingPolicy::Single
+    };
     fuzz_image(
         data.src_width as usize,
         data.src_height as usize,
         data.x_radius as usize,
         data.y_radius as usize,
         FastBlurChannels::Channels4,
+        mp,
     );
     fuzz_image(
         data.src_width as usize,
@@ -60,6 +67,7 @@ fuzz_target!(|data: SrcImage| {
         data.x_radius as usize,
         data.y_radius as usize,
         FastBlurChannels::Channels3,
+        mp,
     );
     fuzz_image(
         data.src_width as usize,
@@ -67,6 +75,7 @@ fuzz_target!(|data: SrcImage| {
         data.x_radius as usize,
         data.y_radius as usize,
         FastBlurChannels::Plane,
+        mp,
     );
 });
 
@@ -76,6 +85,7 @@ fn fuzz_image(
     x_radius: usize,
     y_radius: usize,
     channels: FastBlurChannels,
+    threading_policy: ThreadingPolicy,
 ) {
     if width == 0 || height == 0 {
         return;
@@ -86,7 +96,7 @@ fn fuzz_image(
     stack_blur(
         &mut dst_image,
         AnisotropicRadius::create(x_radius as u32, y_radius as u32),
-        ThreadingPolicy::Single,
+        threading_policy,
     )
     .unwrap();
 }

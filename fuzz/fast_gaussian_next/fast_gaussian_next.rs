@@ -45,6 +45,7 @@ pub struct SrcImage {
     pub x_radius: u8,
     pub y_radius: u8,
     pub plane: u8,
+    pub threading: bool,
 }
 
 fuzz_target!(|data: SrcImage| {
@@ -70,6 +71,11 @@ fuzz_target!(|data: SrcImage| {
         plane_match,
         edge_mode,
         data.value,
+        if data.threading {
+            ThreadingPolicy::Adaptive
+        } else {
+            ThreadingPolicy::Single
+        },
     );
 });
 
@@ -81,6 +87,7 @@ fn fuzz_image(
     channels: FastBlurChannels,
     edge_mode: EdgeMode,
     value: u8,
+    threading_policy: ThreadingPolicy,
 ) {
     if width == 0 || height == 0 {
         return;
@@ -91,7 +98,7 @@ fn fuzz_image(
     fast_gaussian_next(
         &mut dst_image,
         AnisotropicRadius::create(x_radius as u32, y_radius as u32),
-        ThreadingPolicy::Single,
+        threading_policy,
         edge_mode,
     )
     .unwrap();

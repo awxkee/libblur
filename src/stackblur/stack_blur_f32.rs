@@ -181,7 +181,7 @@ pub fn stack_blur_f32(
     }
     let pool = novtb::ThreadPool::new(thread_count as usize);
     let slice = UnsafeSlice::new(image.data.borrow_mut());
-    pool.execute(|thread_index| {
+    pool.parallel_for(|thread_index| {
         stack_blur_worker_horizontal(
             &slice,
             stride,
@@ -193,7 +193,7 @@ pub fn stack_blur_f32(
             thread_count as usize,
         );
     });
-    pool.execute(|thread_index| {
+    pool.parallel_for(|thread_index| {
         stack_blur_worker_vertical(
             &slice,
             stride,

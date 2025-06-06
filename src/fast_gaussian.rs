@@ -786,7 +786,7 @@ fn fast_gaussian_impl<
     let mut _dispatcher_horizontal: fn(&UnsafeSlice<T>, u32, u32, u32, u32, u32, u32, EdgeMode) =
         T::get_horizontal::<CN>(radius.x_axis);
     let pool = novtb::ThreadPool::new(thread_count as usize);
-    pool.execute(|thread_index| {
+    pool.parallel_for(|thread_index| {
         let segment_size = width as usize / thread_count as usize;
 
         let start_x = thread_index * segment_size;
@@ -805,7 +805,7 @@ fn fast_gaussian_impl<
             edge_mode,
         );
     });
-    pool.execute(|thread_index| {
+    pool.parallel_for(|thread_index| {
         let segment_size = height / thread_count;
 
         let start_y = thread_index as u32 * segment_size;

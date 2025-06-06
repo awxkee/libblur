@@ -27,12 +27,12 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![allow(clippy::manual_clamp)]
+
 use crate::{
     make_arena, Arena, ArenaPads, BlurError, BlurImage, BlurImageMut, EdgeMode, FastBlurChannels,
     Scalar, ThreadingPolicy,
 };
-use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-use rayon::prelude::{ParallelSlice, ParallelSliceMut};
+use novtb::{ParallelZonedIterator, TbSliceMut};
 
 /// Pre-compute exp LUTs  ────────────────────────────────────────────────────
 ///   range LUT  : 256 entries  — exp(-ΔI² / 2σ_r²)
@@ -319,32 +319,15 @@ fn bilateral_filter_impl<const N: usize>(
     }
 
     let thread_count = threading_policy.thread_count(src.width, src.height) as u32;
-    if thread_count == 1 {
-        dst.data
-            .borrow_mut()
-            .chunks_exact_mut(dst_row_stride)
-            .zip(src.data.as_ref().chunks_exact(src.row_stride() as usize))
-            .enumerate()
-            .for_each(|(y, (dst, src_row))| _unit.execute(arena_src, y, dst, src_row));
-    } else {
-        let pool = rayon::ThreadPoolBuilder::new()
-            .num_threads(thread_count as usize)
-            .build()
-            .unwrap();
-
-        pool.install(|| {
-            dst.data
-                .borrow_mut()
-                .par_chunks_exact_mut(dst_row_stride)
-                .zip(
-                    src.data
-                        .as_ref()
-                        .par_chunks_exact(src.row_stride() as usize),
-                )
-                .enumerate()
-                .for_each(|(y, (dst, src_row))| _unit.execute(arena_src, y, dst, src_row));
+    let thread_pool = novtb::ThreadPool::new(thread_count as usize);
+    dst.data
+        .borrow_mut()
+        .tb_par_chunks_exact_mut(dst_row_stride)
+        .for_each_enumerated(&thread_pool, |y, dst| {
+            let src_row = &src.data.as_ref()
+                [y * src.row_stride() as usize..(y + 1) * src.row_stride() as usize];
+            _unit.execute(arena_src, y, dst, src_row)
         });
-    }
 
     Ok(())
 }

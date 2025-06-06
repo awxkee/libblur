@@ -388,15 +388,15 @@ pub fn median_blur(
     let height = src_image.height;
     let src_stride = src_image.row_stride();
     let dst_stride = dst_image.row_stride();
-    
+
     let thread_count = threading_policy.thread_count(width, height) as u32;
-    
+
     let pool = novtb::ThreadPool::new(thread_count as usize);
 
     let unsafe_dst = UnsafeSlice::new(dst_image.data.borrow_mut());
-    
+
     let src = src_image.data.as_ref();
-    pool.execute(|thread_index| {
+    pool.parallel_for(|thread_index| {
         let segment_size = height / thread_count;
         let start_y = thread_index as u32 * segment_size;
         let mut end_y = (thread_index as u32 + 1) * segment_size;

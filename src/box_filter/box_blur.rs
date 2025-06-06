@@ -360,7 +360,7 @@ fn box_blur_horizontal_pass<
     let _dispatcher_horizontal = T::get_horizontal_pass::<CN>();
     let unsafe_dst = UnsafeSlice::new(dst);
     let pool = novtb::ThreadPool::new(thread_count as usize);
-    pool.execute(|thread_index| {
+    pool.parallel_for(|thread_index| {
         let segment_size = height / thread_count;
         let start_y = thread_index as u32 * segment_size;
         let mut end_y = (thread_index as u32 + 1) * segment_size;
@@ -617,7 +617,7 @@ fn box_blur_vertical_pass<
     let unsafe_dst = UnsafeSlice::new(dst);
 
     let pool = novtb::ThreadPool::new(thread_count as usize);
-    pool.execute(|thread_index| {
+    pool.parallel_for(|thread_index| {
         let total_width = width as usize * CN;
         let segment_size = total_width / thread_count as usize;
         let start_x = thread_index * segment_size;

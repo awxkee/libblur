@@ -32,7 +32,7 @@ use crate::{BlurError, BlurImage, BlurImageMut, FastBlurChannels, ThreadingPolic
 use num_traits::real::Real;
 use num_traits::AsPrimitive;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-use rayon::prelude::{IntoParallelIterator, ParallelSlice, ParallelSliceMut};
+use rayon::prelude::{IntoParallelIterator, ParallelSliceMut};
 use rayon::ThreadPool;
 use std::fmt::{Debug, Display};
 use std::ops::{Add, AddAssign, Div, Index, Mul, MulAssign, Sub};
@@ -755,9 +755,9 @@ pub(crate) fn fast_bilateral_filter_gray_alpha_impl<
 
         dst.data
             .borrow_mut()
-            .par_chunks_exact_mut(dst_stride)
-            .zip(working_dst0.data.borrow().par_chunks_exact(width as usize))
-            .zip(working_dst1.data.borrow().par_chunks_exact(width as usize))
+            .chunks_exact_mut(dst_stride)
+            .zip(working_dst0.data.borrow().chunks_exact(width as usize))
+            .zip(working_dst1.data.borrow().chunks_exact(width as usize))
             .for_each(|((dst, src0), src1)| {
                 for ((dst, src0), src1) in dst.chunks_exact_mut(2).zip(src0.iter()).zip(src1.iter())
                 {
@@ -855,10 +855,10 @@ fn fast_bilateral_filter_rgb_impl<
 
         dst.data
             .borrow_mut()
-            .par_chunks_exact_mut(dst_stride)
-            .zip(working_dst0.data.borrow().par_chunks_exact(width as usize))
-            .zip(working_dst1.data.borrow().par_chunks_exact(width as usize))
-            .zip(working_dst2.data.borrow().par_chunks_exact(width as usize))
+            .chunks_exact_mut(dst_stride)
+            .zip(working_dst0.data.borrow().chunks_exact(width as usize))
+            .zip(working_dst1.data.borrow().chunks_exact(width as usize))
+            .zip(working_dst2.data.borrow().chunks_exact(width as usize))
             .for_each(|(((dst, src0), src1), src2)| {
                 for (((dst, src0), src1), src2) in dst
                     .chunks_exact_mut(3)
@@ -980,11 +980,11 @@ fn fast_bilateral_filter_rgba_impl<
 
         dst.data
             .borrow_mut()
-            .par_chunks_exact_mut(dst_stride)
-            .zip(working_dst0.data.borrow().par_chunks_exact(width as usize))
-            .zip(working_dst1.data.borrow().par_chunks_exact(width as usize))
-            .zip(working_dst2.data.borrow().par_chunks_exact(width as usize))
-            .zip(working_dst3.data.borrow().par_chunks_exact(width as usize))
+            .chunks_exact_mut(dst_stride)
+            .zip(working_dst0.data.borrow().chunks_exact(width as usize))
+            .zip(working_dst1.data.borrow().chunks_exact(width as usize))
+            .zip(working_dst2.data.borrow().chunks_exact(width as usize))
+            .zip(working_dst3.data.borrow().chunks_exact(width as usize))
             .for_each(|((((dst, src0), src1), src2), src3)| {
                 for ((((dst, src0), src1), src2), src3) in dst
                     .chunks_exact_mut(4)

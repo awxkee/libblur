@@ -31,7 +31,13 @@ mod merge;
 mod split;
 
 use image::{EncodableLayout, GenericImageView, ImageReader};
-use libblur::{bilateral_filter, complex_gaussian_kernel, fast_bilateral_filter, fast_bilateral_filter_u16, filter_1d_complex, filter_1d_complex_fixed_point, filter_2d_rgba_fft, gaussian_kernel_1d, lens_kernel, sigma_size, AnisotropicRadius, BilateralBlurParams, BlurImage, BlurImageMut, BoxBlurParameters, EdgeMode, FastBlurChannels, KernelShape, Scalar, ThreadingPolicy, TransferFunction};
+use libblur::{
+    bilateral_filter, complex_gaussian_kernel, fast_bilateral_filter, fast_bilateral_filter_u16,
+    filter_1d_complex, filter_1d_complex_fixed_point, filter_2d_rgba_fft, gaussian_blur,
+    gaussian_kernel_1d, lens_kernel, sigma_size, AnisotropicRadius, BilateralBlurParams, BlurImage,
+    BlurImageMut, BoxBlurParameters, CLTParameters, ConvolutionMode, EdgeMode, FastBlurChannels,
+    GaussianBlurParams, KernelShape, Scalar, ThreadingPolicy, TransferFunction,
+};
 use num_complex::Complex;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use std::any::Any;
@@ -114,10 +120,22 @@ fn main() {
     // let bokeh = generate_complex_bokeh_kernel(35, 30.);
     let start_time = Instant::now();
     // let gaussian_kernel = gaussian_kernel_1d(31, sigma_size(31.)).iter().map(|&x| Complex::new(x, 0.0)).collect::<Vec<Complex<f32>>>();
-    let gaussian_kernel = complex_gaussian_kernel(51., 0.75, 25.);
+    let gaussian_kernel = complex_gaussian_kernel(51., 0.75, 5.);
 
-    // filter_2d_rgba_fft::<u16, f32, f32>(
-    //     &image,
+    let mut dst_image = cvt.clone_as_mut();
+
+    // gaussian_blur(
+    //     &cvt,
+    //     &mut dst_image,
+    //     GaussianBlurParams::new_from_kernel(15.),
+    //     EdgeMode::Clamp,
+    //     ThreadingPolicy::Single,
+    //     ConvolutionMode::FixedPoint,
+    // )
+    //     .unwrap();
+
+    // filter_2d_rgba_fft::<u8, f32, f32>(
+    //     &cvt,
     //     &mut dst_image,
     //     &motion,
     //     KernelShape::new(151, 151),
@@ -136,43 +154,43 @@ fn main() {
     );
 
     // }
-    
-    let mut dst_image = BlurImageMut::default();
 
-    libblur::box_blur(
+    libblur::bilateral_filter(
         &cvt,
         &mut dst_image,
-        BoxBlurParameters {
-            x_axis_kernel: 5,
-            y_axis_kernel: 5,
+        BilateralBlurParams {
+            kernel_size: 15,
+            spatial_sigma: 5.,
+            range_sigma: 5.,
         },
-        ThreadingPolicy::Adaptive,
+        EdgeMode::Clamp,
+        Scalar::default(),
+        ThreadingPolicy::Single,
     )
     .unwrap();
 
-    // libblur::fast_gaussian_next_f32(
+    // libblur::stack_blur(
     //     &mut dst_image,
-    //     AnisotropicRadius::create(8, 35),
+    //     AnisotropicRadius::create(35, 35),
     //     ThreadingPolicy::Single,
-    //     EdgeMode::Clamp,
     // )
     // .unwrap();
 
     // libblur::motion_blur(
-    //     &image,
+    //     &cvt,
     //     &mut dst_image,
     //     35.,
-    //     15,
+    //     21,
     //     EdgeMode::Clamp,
     //     Scalar::new(0.0, 0.0, 0.0, 0.0),
-    //     ThreadingPolicy::Single,
+    //     ThreadingPolicy::Adaptive,
     // )
     // .unwrap();
 
     // let j_dag = dst_image.to_immutable_ref();
     // let gamma = j_dag.gamma8(TransferFunction::Srgb, true).unwrap();
 
-     dst_bytes = dst_image
+    dst_bytes = dst_image
         .data
         .borrow_mut()
         .iter()
