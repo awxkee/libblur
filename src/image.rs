@@ -239,6 +239,17 @@ impl<'a, T: Clone + Copy + Default + Debug> BlurImage<'a, T> {
         }
         Ok(())
     }
+
+    /// Deep clone as mutable image
+    pub fn clone_as_mut<'f>(&self) -> BlurImageMut<'f, T> {
+        BlurImageMut {
+            data: BufferStore::Owned(self.data.to_vec()),
+            width: self.width,
+            height: self.height,
+            stride: self.stride,
+            channels: self.channels,
+        }
+    }
 }
 
 impl<'a, T: Clone + Copy + Default + Debug> BlurImageMut<'a, T> {

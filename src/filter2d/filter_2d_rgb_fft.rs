@@ -155,10 +155,7 @@ where
     }
 
     let thread_count = threading_policy.thread_count(src.width, src.height);
-    let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(thread_count)
-        .build()
-        .unwrap();
+    let pool = novtb::ThreadPool::new(thread_count);
 
     let image_size = src.size();
 

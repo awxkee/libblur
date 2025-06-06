@@ -206,43 +206,31 @@ pub fn stack_blur_f16(
         stack_blur_worker_vertical(&slice, stride, width, height, radius.y_axis, channels, 0, 1);
         return Ok(());
     }
-    let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(thread_count as usize)
-        .build()
-        .unwrap();
-    pool.scope(|scope| {
-        let slice = UnsafeSlice::new(image.data.borrow_mut());
-        for i in 0..thread_count {
-            scope.spawn(move |_| {
-                stack_blur_worker_horizontal(
-                    &slice,
-                    stride,
-                    width,
-                    height,
-                    radius.x_axis,
-                    channels,
-                    i as usize,
-                    thread_count as usize,
-                );
-            });
-        }
+    let pool = novtb::ThreadPool::new(thread_count as usize);
+    let slice = UnsafeSlice::new(image.data.borrow_mut());
+    pool.parallel_for(|thread_index| {
+        stack_blur_worker_horizontal(
+            &slice,
+            stride,
+            width,
+            height,
+            radius.x_axis,
+            channels,
+            thread_index,
+            thread_count as usize,
+        );
     });
-    pool.scope(|scope| {
-        let slice = UnsafeSlice::new(image.data.borrow_mut());
-        for i in 0..thread_count {
-            scope.spawn(move |_| {
-                stack_blur_worker_vertical(
-                    &slice,
-                    stride,
-                    width,
-                    height,
-                    radius.y_axis,
-                    channels,
-                    i as usize,
-                    thread_count as usize,
-                );
-            });
-        }
+    pool.parallel_for(|thread_index| {
+        stack_blur_worker_vertical(
+            &slice,
+            stride,
+            width,
+            height,
+            radius.y_axis,
+            channels,
+            thread_index,
+            thread_count as usize,
+        );
     });
     Ok(())
 }

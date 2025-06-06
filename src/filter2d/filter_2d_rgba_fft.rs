@@ -140,10 +140,7 @@ where
     src.size_matches_mut(dst)?;
 
     let thread_count = threading_policy.thread_count(src.width, src.height);
-    let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(thread_count)
-        .build()
-        .unwrap();
+    let pool = novtb::ThreadPool::new(thread_count);
 
     let analyzed_se = scan_se_2d_complex(kernel, kernel_shape);
     if analyzed_se.is_empty() {

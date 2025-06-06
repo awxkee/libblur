@@ -41,6 +41,7 @@ pub struct SrcImage {
     pub channels: u8,
     pub kernel_size: u8,
     pub angle: f32,
+    pub threading: bool,
 }
 
 fuzz_target!(|data: SrcImage| {
@@ -61,6 +62,11 @@ fuzz_target!(|data: SrcImage| {
         1 => FastBlurChannels::Channels3,
         _ => FastBlurChannels::Plane,
     };
+    let mp = if data.threading {
+        ThreadingPolicy::Adaptive
+    } else {
+        ThreadingPolicy::Single
+    };
     fuzz_8bit(
         data.src_width as usize,
         data.src_height as usize,
@@ -68,6 +74,7 @@ fuzz_target!(|data: SrcImage| {
         data.angle,
         channels,
         edge_mode,
+        mp,
     );
 });
 
@@ -78,6 +85,7 @@ fn fuzz_8bit(
     angle: f32,
     channels: FastBlurChannels,
     edge_mode: EdgeMode,
+    threading_policy: ThreadingPolicy,
 ) {
     if width == 0 || height == 0 || radius == 0 {
         return;
@@ -92,7 +100,7 @@ fn fuzz_8bit(
         radius * 2 + 1,
         edge_mode,
         Scalar::new(0.0, 0.0, 0.0, 0.0),
-        ThreadingPolicy::Single,
+        threading_policy,
     )
     .unwrap();
 }

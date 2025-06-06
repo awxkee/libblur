@@ -36,10 +36,8 @@ use crate::{
     Scalar, ThreadingPolicy,
 };
 use fast_transpose::{transpose_arbitrary, transpose_plane_f32_with_alpha, FlipMode, FlopMode};
+use novtb::{ParallelZonedIterator, TbSliceMut};
 use num_traits::AsPrimitive;
-use rayon::iter::ParallelIterator;
-use rayon::prelude::ParallelSliceMut;
-use rayon::ThreadPool;
 use rustfft::num_complex::Complex;
 use rustfft::{FftNum, FftPlanner};
 use std::fmt::Debug;
@@ -220,10 +218,7 @@ where
     }
 
     let thread_count = threading_policy.thread_count(src.width, src.height);
-    let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(thread_count)
-        .build()
-        .unwrap();
+    let pool = novtb::ThreadPool::new(thread_count);
 
     let analyzed_se = scan_se_2d_complex(kernel, kernel_shape);
     if analyzed_se.is_empty() {
@@ -258,7 +253,7 @@ pub(crate) fn filter_2d_fft_impl<T, FftIntermediate>(
     kernel_shape: KernelShape,
     border_mode: EdgeMode,
     border_constant: Scalar,
-    pool: &ThreadPool,
+    pool: &novtb::ThreadPool,
 ) -> Result<(), BlurError>
 where
     T: Copy + Default + Send + Sync + AsPrimitive<FftIntermediate> + Debug,
@@ -270,143 +265,140 @@ where
         + FftTranspose<FftIntermediate>,
     f64: AsPrimitive<T> + AsPrimitive<FftIntermediate>,
 {
-    pool.install(|| {
-        src.check_layout()?;
-        dst.check_layout(Some(src))?;
-        src.size_matches_mut(dst)?;
+    src.check_layout()?;
+    dst.check_layout(Some(src))?;
+    src.size_matches_mut(dst)?;
 
-        if src.channels != FastBlurChannels::Plane {
-            return Err(BlurError::FftChannelsNotSupported);
-        }
+    if src.channels != FastBlurChannels::Plane {
+        return Err(BlurError::FftChannelsNotSupported);
+    }
 
-        let kernel_width = kernel_shape.width;
-        let kernel_height = kernel_shape.height;
-        if kernel_height * kernel_width != kernel.len() {
-            return Err(BlurError::KernelSizeMismatch(MismatchedSize {
-                expected: kernel_height * kernel_width,
-                received: kernel.len(),
-            }));
-        }
+    let kernel_width = kernel_shape.width;
+    let kernel_height = kernel_shape.height;
+    if kernel_height * kernel_width != kernel.len() {
+        return Err(BlurError::KernelSizeMismatch(MismatchedSize {
+            expected: kernel_height * kernel_width,
+            received: kernel.len(),
+        }));
+    }
 
-        let image_size = src.size();
+    let image_size = src.size();
 
-        let best_width = fft_next_good_size(image_size.width + kernel_shape.width);
-        let best_height = fft_next_good_size(image_size.height + kernel_shape.height);
+    let best_width = fft_next_good_size(image_size.width + kernel_shape.width);
+    let best_height = fft_next_good_size(image_size.height + kernel_shape.height);
 
-        let arena_pad_left = (best_width - image_size.width) / 2;
-        let arena_pad_right = best_width - image_size.width - arena_pad_left;
-        let arena_pad_top = (best_height - image_size.height) / 2;
-        let arena_pad_bottom = best_height - image_size.height - arena_pad_top;
+    let arena_pad_left = (best_width - image_size.width) / 2;
+    let arena_pad_right = best_width - image_size.width - arena_pad_left;
+    let arena_pad_top = (best_height - image_size.height) / 2;
+    let arena_pad_bottom = best_height - image_size.height - arena_pad_top;
 
-        let (arena_v_src, _) = make_arena::<T, 1>(
-            src.data.as_ref(),
-            src.row_stride() as usize,
-            image_size,
-            ArenaPads::new(
-                arena_pad_left,
-                arena_pad_top,
-                arena_pad_right,
-                arena_pad_bottom,
-            ),
-            border_mode,
-            border_constant,
-        )?;
+    let (arena_v_src, _) = make_arena::<T, 1>(
+        src.data.as_ref(),
+        src.row_stride() as usize,
+        image_size,
+        ArenaPads::new(
+            arena_pad_left,
+            arena_pad_top,
+            arena_pad_right,
+            arena_pad_bottom,
+        ),
+        border_mode,
+        border_constant,
+    )?;
 
-        let mut arena_source = arena_v_src
-            .iter()
-            .map(|&v| Complex::<FftIntermediate> {
-                re: v.as_(),
-                im: 0f64.as_(),
-            })
-            .collect::<Vec<Complex<FftIntermediate>>>();
+    let mut arena_source = arena_v_src
+        .iter()
+        .map(|&v| Complex::<FftIntermediate> {
+            re: v.as_(),
+            im: 0f64.as_(),
+        })
+        .collect::<Vec<Complex<FftIntermediate>>>();
 
-        let mut kernel_arena =
-            vec![Complex::<FftIntermediate>::default(); best_height * best_width];
+    let mut kernel_arena = vec![Complex::<FftIntermediate>::default(); best_height * best_width];
 
-        let shift_x = kernel_width as i64 / 2;
-        let shift_y = kernel_height as i64 / 2;
+    let shift_x = kernel_width as i64 / 2;
+    let shift_y = kernel_height as i64 / 2;
 
-        kernel
-            .chunks_exact(kernel_shape.width)
-            .enumerate()
-            .for_each(|(y, row)| {
-                for (x, item) in row.iter().enumerate() {
-                    let new_y = (y as i64 - shift_y).rem_euclid(best_height as i64 - 1) as usize;
-                    let new_x = (x as i64 - shift_x).rem_euclid(best_width as i64 - 1) as usize;
-                    kernel_arena[new_y * best_width + new_x] = *item;
-                }
-            });
-
-        let mut fft_planner = FftPlanner::<FftIntermediate>::new();
-        let rows_planner = fft_planner.plan_fft_forward(best_width);
-        let columns_planner = fft_planner.plan_fft_forward(best_height);
-
-        arena_source
-            .par_chunks_exact_mut(best_width)
-            .for_each(|row| {
-                rows_planner.process(row);
-            });
-
-        kernel_arena
-            .par_chunks_exact_mut(best_width)
-            .for_each(|row| {
-                rows_planner.process(row);
-            });
-
-        arena_source =
-            FftIntermediate::transpose(&arena_source, best_width, best_height, FlopMode::Flop);
-        kernel_arena =
-            FftIntermediate::transpose(&kernel_arena, best_width, best_height, FlopMode::Flop);
-
-        arena_source
-            .par_chunks_exact_mut(best_height)
-            .for_each(|column| {
-                columns_planner.process(column);
-            });
-
-        kernel_arena
-            .par_chunks_exact_mut(best_height)
-            .for_each(|column| {
-                columns_planner.process(column);
-            });
-
-        FftIntermediate::mul_spectrum(&mut kernel_arena, &arena_source, best_width, best_height);
-
-        arena_source.resize(0, Complex::<FftIntermediate>::default());
-
-        let rows_inverse_planner = fft_planner.plan_fft_inverse(best_width);
-        let columns_inverse_planner = fft_planner.plan_fft_inverse(best_height);
-
-        kernel_arena
-            .par_chunks_exact_mut(best_height)
-            .for_each(|column| {
-                columns_inverse_planner.process(column);
-            });
-
-        kernel_arena =
-            FftIntermediate::transpose(&kernel_arena, best_height, best_width, FlopMode::Flop);
-
-        kernel_arena
-            .par_chunks_exact_mut(best_width)
-            .for_each(|row| {
-                rows_inverse_planner.process(row);
-            });
-
-        let dst_stride = dst.row_stride() as usize;
-
-        for (dst_chunk, src_chunk) in dst.data.borrow_mut().chunks_exact_mut(dst_stride).zip(
-            kernel_arena
-                .chunks_exact_mut(best_width)
-                .skip(arena_pad_top),
-        ) {
-            for (dst, src) in dst_chunk
-                .iter_mut()
-                .zip(src_chunk.iter().skip(arena_pad_left))
-            {
-                *dst = src.re.to_();
+    kernel
+        .chunks_exact(kernel_shape.width)
+        .enumerate()
+        .for_each(|(y, row)| {
+            for (x, item) in row.iter().enumerate() {
+                let new_y = (y as i64 - shift_y).rem_euclid(best_height as i64 - 1) as usize;
+                let new_x = (x as i64 - shift_x).rem_euclid(best_width as i64 - 1) as usize;
+                kernel_arena[new_y * best_width + new_x] = *item;
             }
-        }
+        });
 
-        Ok(())
-    })
+    let mut fft_planner = FftPlanner::<FftIntermediate>::new();
+    let rows_planner = fft_planner.plan_fft_forward(best_width);
+    let columns_planner = fft_planner.plan_fft_forward(best_height);
+
+    arena_source
+        .tb_par_chunks_exact_mut(best_width)
+        .for_each(pool, |row| {
+            rows_planner.process(row);
+        });
+
+    kernel_arena
+        .tb_par_chunks_exact_mut(best_width)
+        .for_each(pool, |row| {
+            rows_planner.process(row);
+        });
+
+    arena_source =
+        FftIntermediate::transpose(&arena_source, best_width, best_height, FlopMode::Flop);
+    kernel_arena =
+        FftIntermediate::transpose(&kernel_arena, best_width, best_height, FlopMode::Flop);
+
+    arena_source
+        .tb_par_chunks_exact_mut(best_height)
+        .for_each(pool, |column| {
+            columns_planner.process(column);
+        });
+
+    kernel_arena
+        .tb_par_chunks_exact_mut(best_height)
+        .for_each(pool, |column| {
+            columns_planner.process(column);
+        });
+
+    FftIntermediate::mul_spectrum(&mut kernel_arena, &arena_source, best_width, best_height);
+
+    arena_source.resize(0, Complex::<FftIntermediate>::default());
+
+    let rows_inverse_planner = fft_planner.plan_fft_inverse(best_width);
+    let columns_inverse_planner = fft_planner.plan_fft_inverse(best_height);
+
+    kernel_arena
+        .tb_par_chunks_exact_mut(best_height)
+        .for_each(pool, |column| {
+            columns_inverse_planner.process(column);
+        });
+
+    kernel_arena =
+        FftIntermediate::transpose(&kernel_arena, best_height, best_width, FlopMode::Flop);
+
+    kernel_arena
+        .tb_par_chunks_exact_mut(best_width)
+        .for_each(pool, |row| {
+            rows_inverse_planner.process(row);
+        });
+
+    let dst_stride = dst.row_stride() as usize;
+
+    for (dst_chunk, src_chunk) in dst.data.borrow_mut().chunks_exact_mut(dst_stride).zip(
+        kernel_arena
+            .chunks_exact_mut(best_width)
+            .skip(arena_pad_top),
+    ) {
+        for (dst, src) in dst_chunk
+            .iter_mut()
+            .zip(src_chunk.iter().skip(arena_pad_left))
+        {
+            *dst = src.re.to_();
+        }
+    }
+
+    Ok(())
 }

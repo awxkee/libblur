@@ -147,7 +147,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
     });
 
-    c.bench_function("RGB f32 gauss blur edge clamp: rad 51", |b| {
+    c.bench_function("RGB f32 gauss blur edge clamp: rad 25", |b| {
         let mut dst_bytes = BlurImageMut::default();
         let src_bytes = img
             .as_bytes()

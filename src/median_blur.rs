@@ -388,49 +388,32 @@ pub fn median_blur(
     let height = src_image.height;
     let src_stride = src_image.row_stride();
     let dst_stride = dst_image.row_stride();
+
     let thread_count = threading_policy.thread_count(width, height) as u32;
+
+    let pool = novtb::ThreadPool::new(thread_count as usize);
+
     let unsafe_dst = UnsafeSlice::new(dst_image.data.borrow_mut());
-    if thread_count == 1 {
+
+    let src = src_image.data.as_ref();
+    pool.parallel_for(|thread_index| {
+        let segment_size = height / thread_count;
+        let start_y = thread_index as u32 * segment_size;
+        let mut end_y = (thread_index as u32 + 1) * segment_size;
+        if thread_index as u32 == thread_count - 1 {
+            end_y = height;
+        }
         _dispatcher(
-            src_image.data.as_ref(),
+            src,
             src_stride,
             &unsafe_dst,
             dst_stride,
             width,
             height,
             radius,
-            0,
-            height,
+            start_y,
+            end_y,
         );
-    } else {
-        let src = src_image.data.as_ref();
-        let pool = rayon::ThreadPoolBuilder::new()
-            .num_threads(thread_count as usize)
-            .build()
-            .unwrap();
-        pool.scope(|scope| {
-            let segment_size = height / thread_count;
-            for i in 0..thread_count {
-                let start_y = i * segment_size;
-                let mut end_y = (i + 1) * segment_size;
-                if i == thread_count - 1 {
-                    end_y = height;
-                }
-                scope.spawn(move |_| {
-                    _dispatcher(
-                        src,
-                        src_stride,
-                        &unsafe_dst,
-                        dst_stride,
-                        width,
-                        height,
-                        radius,
-                        start_y,
-                        end_y,
-                    );
-                });
-            }
-        });
-    }
+    });
     Ok(())
 }
