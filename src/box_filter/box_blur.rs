@@ -362,31 +362,14 @@ fn box_blur_horizontal_pass<
 {
     let _dispatcher_horizontal = T::get_horizontal_pass::<CN>();
     let unsafe_dst = UnsafeSlice::new(dst);
-    if let Some(pool) = pool {
-        pool.scope(|scope| {
-            let segment_size = height / thread_count;
-            for i in 0..thread_count {
-                let start_y = i * segment_size;
-                let mut end_y = (i + 1) * segment_size;
-                if i == thread_count - 1 {
-                    end_y = height;
-                }
-
-                scope.spawn(move |_| {
-                    _dispatcher_horizontal(
-                        src,
-                        src_stride,
-                        &unsafe_dst,
-                        dst_stride,
-                        width,
-                        radius,
-                        start_y,
-                        end_y,
-                    );
-                });
-            }
-        });
-    } else {
+    let pool = novtb::ThreadPool::new(thread_count as usize);
+    pool.execute(|thread_index| {
+        let segment_size = height / thread_count;
+        let start_y = thread_index as u32 * segment_size;
+        let mut end_y = (thread_index as u32 + 1) * segment_size;
+        if thread_index as u32 == thread_count - 1 {
+            end_y = height;
+        }
         _dispatcher_horizontal(
             src,
             src_stride,
@@ -394,10 +377,10 @@ fn box_blur_horizontal_pass<
             dst_stride,
             width,
             radius,
-            0,
-            height,
+            start_y,
+            end_y,
         );
-    }
+    });
 }
 
 fn box_blur_vertical_pass_impl<T, J>(
@@ -637,34 +620,15 @@ fn box_blur_vertical_pass<
     let _dispatcher_vertical = T::get_box_vertical_pass::<CN>();
     let unsafe_dst = UnsafeSlice::new(dst);
 
-    if let Some(pool) = pool {
-        pool.scope(|scope| {
-            let total_width = width as usize * CN;
-            let segment_size = total_width / thread_count as usize;
-            for i in 0..thread_count as usize {
-                let start_x = i * segment_size;
-                let mut end_x = (i + 1) * segment_size;
-                if i == thread_count as usize - 1 {
-                    end_x = total_width;
-                }
-
-                scope.spawn(move |_| {
-                    _dispatcher_vertical(
-                        src,
-                        src_stride,
-                        &unsafe_dst,
-                        dst_stride,
-                        width,
-                        height,
-                        radius,
-                        start_x as u32,
-                        end_x as u32,
-                    );
-                });
-            }
-        });
-    } else {
+    let pool = novtb::ThreadPool::new(thread_count as usize);
+    pool.execute(|thread_index| {
         let total_width = width as usize * CN;
+        let segment_size = total_width / thread_count as usize;
+        let start_x = thread_index * segment_size;
+        let mut end_x = (thread_index + 1) * segment_size;
+        if thread_index == thread_count as usize - 1 {
+            end_x = total_width;
+        }
         _dispatcher_vertical(
             src,
             src_stride,
@@ -673,10 +637,10 @@ fn box_blur_vertical_pass<
             width,
             height,
             radius,
-            0,
-            total_width as u32,
+            start_x as u32,
+            end_x as u32,
         );
-    }
+    });
 }
 
 trait RingBufferHandler<T> {

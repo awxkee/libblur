@@ -38,12 +38,12 @@ use libblur::{
     EdgeMode, FastBlurChannels, KernelShape, Scalar, ThreadingPolicy, TransferFunction,
 };
 use num_complex::Complex;
+use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use std::any::Any;
 use std::fs;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::time::Instant;
-use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 
 #[allow(dead_code)]
 fn f32_to_f16(bytes: Vec<f32>) -> Vec<u16> {
@@ -179,7 +179,7 @@ fn main() {
     // let j_dag = dst_image.to_immutable_ref();
     // let gamma = j_dag.gamma8(TransferFunction::Srgb, true).unwrap();
 
-   /* dst_bytes = dst_image
+    /* dst_bytes = dst_image
         .data
         .borrow_mut()
         .iter()

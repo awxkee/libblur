@@ -31,10 +31,10 @@ use std::{num::NonZeroUsize, thread::available_parallelism};
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Default, Hash)]
 /// Set threading policy.
-/// 
+///
 /// # Warning about outside Rayon scheduling
-/// 
-/// Implementation currently relies on Rayon, and due to how Rayon works 
+///
+/// Implementation currently relies on Rayon, and due to how Rayon works
 /// accurate attention is required if API is expected to be used in MultiThreaded more
 /// scheduled by outside Rayon parallelism. It may cause excessive memory and CPU usage.
 /// If it is impossible to guarantee finite and predictable amount of memory used consider

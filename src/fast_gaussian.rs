@@ -28,6 +28,7 @@
 use half::f16;
 use num_traits::cast::FromPrimitive;
 use num_traits::{AsPrimitive, Float};
+use std::sync::Arc;
 
 use crate::channels_configuration::FastBlurChannels;
 #[cfg(all(target_arch = "aarch64", feature = "neon"))]
@@ -769,10 +770,10 @@ fn fast_gaussian_impl<
 {
     let unsafe_image = UnsafeSlice::new(bytes);
     let thread_count = threading_policy.thread_count(width, height) as u32;
-    let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(thread_count as usize)
-        .build()
-        .unwrap();
+    // let pool = rayon::ThreadPoolBuilder::new()
+    //     .num_threads(thread_count as usize)
+    //     .build()
+    //     .unwrap();
     let mut _dispatcher_vertical: fn(
         bytes: &UnsafeSlice<T>,
         stride: u32,
@@ -785,75 +786,45 @@ fn fast_gaussian_impl<
     ) = T::get_vertical::<CN>(radius.y_axis);
     let mut _dispatcher_horizontal: fn(&UnsafeSlice<T>, u32, u32, u32, u32, u32, u32, EdgeMode) =
         T::get_horizontal::<CN>(radius.x_axis);
-    if thread_count == 1 {
+    let pool = novtb::ThreadPool::new(thread_count as usize);
+    pool.execute(|thread_index| {
+        let segment_size = width as usize / thread_count as usize;
+
+        let start_x = thread_index * segment_size;
+        let mut end_x = (thread_index + 1) * segment_size;
+        if thread_index == thread_count as usize - 1 {
+            end_x = width as usize;
+        }
         _dispatcher_vertical(
             &unsafe_image,
             stride,
             width,
             height,
             radius.y_axis,
-            0,
-            width,
+            start_x as u32,
+            end_x as u32,
             edge_mode,
         );
+    });
+    pool.execute(|thread_index| {
+        let segment_size = height / thread_count;
+
+        let start_y = thread_index as u32 * segment_size;
+        let mut end_y = (thread_index as u32 + 1) * segment_size;
+        if thread_index as u32 == thread_count - 1 {
+            end_y = height;
+        }
         _dispatcher_horizontal(
             &unsafe_image,
             stride,
             width,
             height,
             radius.x_axis,
-            0,
-            height,
+            start_y,
+            end_y,
             edge_mode,
         );
-    } else {
-        pool.scope(|scope| {
-            let segment_size = width / thread_count;
-
-            for i in 0..thread_count {
-                let start_x = i * segment_size;
-                let mut end_x = (i + 1) * segment_size;
-                if i == thread_count - 1 {
-                    end_x = width;
-                }
-                scope.spawn(move |_| {
-                    _dispatcher_vertical(
-                        &unsafe_image,
-                        stride,
-                        width,
-                        height,
-                        radius.y_axis,
-                        start_x,
-                        end_x,
-                        edge_mode,
-                    );
-                });
-            }
-        });
-        pool.scope(|scope| {
-            let segment_size = height / thread_count;
-
-            for i in 0..thread_count {
-                let start_y = i * segment_size;
-                let mut end_y = (i + 1) * segment_size;
-                if i == thread_count - 1 {
-                    end_y = height;
-                }
-                scope.spawn(move |_| {
-                    _dispatcher_horizontal(
-                        &unsafe_image,
-                        stride,
-                        width,
-                        height,
-                        radius.x_axis,
-                        start_y,
-                        end_y,
-                        edge_mode,
-                    );
-                });
-            }
-        });
-    }
+    });
 }
 
 /// Performs gaussian approximation on the image.
