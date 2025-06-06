@@ -28,7 +28,6 @@
 use half::f16;
 use num_traits::cast::FromPrimitive;
 use num_traits::{AsPrimitive, Float};
-use std::sync::Arc;
 
 use crate::channels_configuration::FastBlurChannels;
 #[cfg(all(target_arch = "aarch64", feature = "neon"))]

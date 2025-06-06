@@ -31,11 +31,9 @@ use crate::unsafe_slice::UnsafeSlice;
 use crate::util::check_slice_size;
 use crate::{BlurError, BlurImage, BlurImageMut, ThreadingPolicy};
 use half::f16;
+use novtb::{ParallelZonedIterator, TbSliceMut};
 use num_traits::cast::FromPrimitive;
 use num_traits::AsPrimitive;
-use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-use rayon::prelude::ParallelSliceMut;
-use rayon::ThreadPool;
 use std::fmt::Debug;
 
 /// Both kernels are expected to be odd.
@@ -113,19 +111,19 @@ fn box_blur_horizontal_pass_impl<T, J, const CN: usize>(
     end_y: u32,
 ) where
     T: std::ops::AddAssign
-        + std::ops::SubAssign
-        + Copy
-        + FromPrimitive
-        + Default
-        + Send
-        + Sync
-        + AsPrimitive<J>,
+    + std::ops::SubAssign
+    + Copy
+    + FromPrimitive
+    + Default
+    + Send
+    + Sync
+    + AsPrimitive<J>,
     J: FromPrimitive
-        + Copy
-        + std::ops::Mul<Output = J>
-        + std::ops::AddAssign
-        + std::ops::SubAssign
-        + AsPrimitive<f32>,
+    + Copy
+    + std::ops::Mul<Output = J>
+    + std::ops::AddAssign
+    + std::ops::SubAssign
+    + AsPrimitive<f32>,
     f32: ToStorage<T>,
 {
     let kernel_size = radius * 2 + 1;
@@ -335,17 +333,17 @@ impl BoxBlurHorizontalPass<u8> for u8 {
 #[allow(clippy::type_complexity)]
 fn box_blur_horizontal_pass<
     T: FromPrimitive
-        + Default
-        + Send
-        + Sync
-        + std::ops::AddAssign
-        + std::ops::SubAssign
-        + Copy
-        + AsPrimitive<u32>
-        + AsPrimitive<u64>
-        + AsPrimitive<f32>
-        + AsPrimitive<f64>
-        + BoxBlurHorizontalPass<T>,
+    + Default
+    + Send
+    + Sync
+    + std::ops::AddAssign
+    + std::ops::SubAssign
+    + Copy
+    + AsPrimitive<u32>
+    + AsPrimitive<u64>
+    + AsPrimitive<f32>
+    + AsPrimitive<f64>
+    + BoxBlurHorizontalPass<T>,
     const CN: usize,
 >(
     src: &[T],
@@ -355,7 +353,6 @@ fn box_blur_horizontal_pass<
     width: u32,
     height: u32,
     radius: u32,
-    pool: &Option<ThreadPool>,
     thread_count: u32,
 ) where
     f32: ToStorage<T>,
@@ -395,20 +392,20 @@ fn box_blur_vertical_pass_impl<T, J>(
     end_x: u32,
 ) where
     T: std::ops::AddAssign
-        + std::ops::SubAssign
-        + Copy
-        + FromPrimitive
-        + Default
-        + Send
-        + Sync
-        + AsPrimitive<J>,
+    + std::ops::SubAssign
+    + Copy
+    + FromPrimitive
+    + Default
+    + Send
+    + Sync
+    + AsPrimitive<J>,
     J: FromPrimitive
-        + Copy
-        + std::ops::Mul<Output = J>
-        + std::ops::AddAssign
-        + std::ops::SubAssign
-        + AsPrimitive<f32>
-        + Default,
+    + Copy
+    + std::ops::Mul<Output = J>
+    + std::ops::AddAssign
+    + std::ops::SubAssign
+    + AsPrimitive<f32>
+    + Default,
     f32: ToStorage<T>,
 {
     let kernel_size = radius * 2 + 1;
@@ -591,18 +588,18 @@ impl BoxBlurVerticalPass<u8> for u8 {
 #[allow(clippy::type_complexity)]
 fn box_blur_vertical_pass<
     T: FromPrimitive
-        + Default
-        + Sync
-        + Send
-        + Copy
-        + std::ops::AddAssign
-        + std::ops::SubAssign
-        + Copy
-        + AsPrimitive<u32>
-        + AsPrimitive<u64>
-        + AsPrimitive<f32>
-        + AsPrimitive<f64>
-        + BoxBlurVerticalPass<T>,
+    + Default
+    + Sync
+    + Send
+    + Copy
+    + std::ops::AddAssign
+    + std::ops::SubAssign
+    + Copy
+    + AsPrimitive<u32>
+    + AsPrimitive<u64>
+    + AsPrimitive<f32>
+    + AsPrimitive<f64>
+    + BoxBlurVerticalPass<T>,
     const CN: usize,
 >(
     src: &[T],
@@ -612,7 +609,6 @@ fn box_blur_vertical_pass<
     width: u32,
     height: u32,
     radius: u32,
-    pool: &Option<ThreadPool>,
     thread_count: u32,
 ) where
     f32: ToStorage<T>,
@@ -652,7 +648,6 @@ trait RingBufferHandler<T> {
         width: u32,
         height: u32,
         parameters: BoxBlurParameters,
-        pool: &Option<ThreadPool>,
         thread_count: u32,
     ) -> Result<(), BlurError>;
     const BOX_RING_IN_SINGLE_THREAD: bool;
@@ -667,7 +662,6 @@ impl RingBufferHandler<u8> for u8 {
         width: u32,
         height: u32,
         parameters: BoxBlurParameters,
-        pool: &Option<ThreadPool>,
         thread_count: u32,
     ) -> Result<(), BlurError>
     where
@@ -681,7 +675,6 @@ impl RingBufferHandler<u8> for u8 {
             width,
             height,
             parameters,
-            pool,
             thread_count,
         )
     }
@@ -697,7 +690,6 @@ impl RingBufferHandler<u16> for u16 {
         width: u32,
         height: u32,
         parameters: BoxBlurParameters,
-        pool: &Option<ThreadPool>,
         thread_count: u32,
     ) -> Result<(), BlurError>
     where
@@ -711,7 +703,6 @@ impl RingBufferHandler<u16> for u16 {
             width,
             height,
             parameters,
-            pool,
             thread_count,
         )
     }
@@ -730,7 +721,6 @@ impl RingBufferHandler<f32> for f32 {
         width: u32,
         height: u32,
         parameters: BoxBlurParameters,
-        pool: &Option<ThreadPool>,
         thread_count: u32,
     ) -> Result<(), BlurError>
     where
@@ -744,7 +734,6 @@ impl RingBufferHandler<f32> for f32 {
             width,
             height,
             parameters,
-            pool,
             thread_count,
         )
     }
@@ -760,7 +749,6 @@ impl RingBufferHandler<f16> for f16 {
         width: u32,
         height: u32,
         parameters: BoxBlurParameters,
-        pool: &Option<ThreadPool>,
         thread_count: u32,
     ) -> Result<(), BlurError>
     where
@@ -774,7 +762,6 @@ impl RingBufferHandler<f16> for f16 {
             width,
             height,
             parameters,
-            pool,
             thread_count,
         )
     }
@@ -860,14 +847,14 @@ impl VRowSum<f16, f32> for () {
 fn ring_vertical_row_summ<
     T: Sync + Send + Copy + AsPrimitive<J>,
     J: FromPrimitive
-        + Default
-        + Sync
-        + Send
-        + Copy
-        + std::ops::AddAssign
-        + std::ops::SubAssign
-        + Copy
-        + AsPrimitive<f32>,
+    + Default
+    + Sync
+    + Send
+    + Copy
+    + std::ops::AddAssign
+    + std::ops::SubAssign
+    + Copy
+    + AsPrimitive<f32>,
 >(
     src: &[&[T]; 2],
     dst: &mut [T],
@@ -898,30 +885,30 @@ fn ring_vertical_row_summ<
 
 fn ring_box_filter<
     T: FromPrimitive
-        + Default
-        + Sync
-        + Send
-        + Debug
-        + Copy
-        + std::ops::AddAssign
-        + std::ops::SubAssign
-        + Copy
-        + AsPrimitive<u32>
-        + AsPrimitive<u64>
-        + AsPrimitive<f32>
-        + AsPrimitive<f64>
-        + BoxBlurHorizontalPass<T>
-        + BoxBlurVerticalPass<T>
-        + AsPrimitive<J>,
+    + Default
+    + Sync
+    + Send
+    + Debug
+    + Copy
+    + std::ops::AddAssign
+    + std::ops::SubAssign
+    + Copy
+    + AsPrimitive<u32>
+    + AsPrimitive<u64>
+    + AsPrimitive<f32>
+    + AsPrimitive<f64>
+    + BoxBlurHorizontalPass<T>
+    + BoxBlurVerticalPass<T>
+    + AsPrimitive<J>,
     J: FromPrimitive
-        + Default
-        + Sync
-        + Send
-        + Copy
-        + std::ops::AddAssign
-        + std::ops::SubAssign
-        + Copy
-        + AsPrimitive<f32>,
+    + Default
+    + Sync
+    + Send
+    + Copy
+    + std::ops::AddAssign
+    + std::ops::SubAssign
+    + Copy
+    + AsPrimitive<f32>,
     const CN: usize,
 >(
     src: &[T],
@@ -931,7 +918,6 @@ fn ring_box_filter<
     width: u32,
     height: u32,
     parameters: BoxBlurParameters,
-    pool: &Option<ThreadPool>,
     thread_count: u32,
 ) -> Result<(), BlurError>
 where
@@ -946,106 +932,69 @@ where
     let horizontal_handler = T::get_horizontal_pass::<CN>();
     let ring_vsum = <() as VRowSum<T, J>>::ring_vertical_row_summ();
 
-    if let Some(pool) = &pool {
+    if thread_count > 1 {
         let tile_size = height as usize / thread_count as usize;
+        let pool = novtb::ThreadPool::new(thread_count as usize);
+        dst.tb_par_chunks_exact_mut(dst_stride as usize * tile_size)
+            .for_each_enumerated(&pool, |cy, dst_rows| {
+                let source_y = cy * tile_size;
 
-        pool.install(|| {
-            dst.par_chunks_mut(dst_stride as usize * tile_size)
-                .enumerate()
-                .for_each(|(cy, dst_rows)| {
-                    let source_y = cy * tile_size;
+                let mut working_row = vec![J::default(); working_stride];
+                let mut buffer = vec![T::default(); working_stride * y_kernel_size];
 
-                    let mut working_row = vec![J::default(); working_stride];
-                    let mut buffer = vec![T::default(); working_stride * y_kernel_size];
+                let half_kernel = y_kernel_size / 2;
 
-                    let half_kernel = y_kernel_size / 2;
+                if source_y == 0 {
+                    let dst0 = UnsafeSlice::new(&mut buffer[..working_stride]);
+                    let src0 =
+                        &src[source_y * src_stride as usize..(source_y + 1) * src_stride as usize];
 
-                    if source_y == 0 {
-                        let dst0 = UnsafeSlice::new(&mut buffer[..working_stride]);
-                        let src0 = &src
-                            [source_y * src_stride as usize..(source_y + 1) * src_stride as usize];
+                    horizontal_handler(
+                        &src0[..width as usize * CN],
+                        src_stride,
+                        &dst0,
+                        working_stride as u32,
+                        width,
+                        x_radius,
+                        0,
+                        1,
+                    );
 
-                        horizontal_handler(
-                            &src0[..width as usize * CN],
-                            src_stride,
-                            &dst0,
-                            working_stride as u32,
-                            width,
-                            x_radius,
-                            0,
-                            1,
-                        );
-
-                        let (src_row, rest) = buffer.split_at_mut(working_stride);
-                        for dst in rest.chunks_exact_mut(working_stride).take(half_kernel) {
-                            for (dst, src) in dst.iter_mut().zip(src_row.iter()) {
-                                *dst = *src;
-                            }
+                    let (src_row, rest) = buffer.split_at_mut(working_stride);
+                    for dst in rest.chunks_exact_mut(working_stride).take(half_kernel) {
+                        for (dst, src) in dst.iter_mut().zip(src_row.iter()) {
+                            *dst = *src;
                         }
-                    } else if source_y as i64 - half_kernel as i64 - 1 >= 0 {
-                        let s_y = (source_y as i64 - half_kernel as i64 - 1)
+                    }
+                } else if source_y as i64 - half_kernel as i64 - 1 >= 0 {
+                    let s_y = (source_y as i64 - half_kernel as i64 - 1).clamp(0, height as i64 - 1)
+                        as usize;
+
+                    let dst0 = UnsafeSlice::new(
+                        &mut buffer[working_stride..(half_kernel + 1) * working_stride],
+                    );
+                    let src0 = &src
+                        [s_y * src_stride as usize..(s_y + half_kernel + 1) * src_stride as usize];
+
+                    horizontal_handler(
+                        src0,
+                        src_stride,
+                        &dst0,
+                        working_stride as u32,
+                        width,
+                        x_radius,
+                        0,
+                        half_kernel as u32,
+                    );
+                } else {
+                    for src_y in 0..=half_kernel {
+                        let s_y = (src_y as i64 + source_y as i64 - half_kernel as i64 - 1)
                             .clamp(0, height as i64 - 1) as usize;
 
                         let dst0 = UnsafeSlice::new(
-                            &mut buffer[working_stride..(half_kernel + 1) * working_stride],
+                            &mut buffer[src_y * working_stride..(src_y + 1) * working_stride],
                         );
-                        let src0 = &src[s_y * src_stride as usize
-                            ..(s_y + half_kernel + 1) * src_stride as usize];
-
-                        horizontal_handler(
-                            src0,
-                            src_stride,
-                            &dst0,
-                            working_stride as u32,
-                            width,
-                            x_radius,
-                            0,
-                            half_kernel as u32,
-                        );
-                    } else {
-                        for src_y in 0..=half_kernel {
-                            let s_y = (src_y as i64 + source_y as i64 - half_kernel as i64 - 1)
-                                .clamp(0, height as i64 - 1)
-                                as usize;
-
-                            let dst0 = UnsafeSlice::new(
-                                &mut buffer[src_y * working_stride..(src_y + 1) * working_stride],
-                            );
-                            let src0 =
-                                &src[s_y * src_stride as usize..(s_y + 1) * src_stride as usize];
-
-                            horizontal_handler(
-                                &src0[..width as usize * CN],
-                                src_stride,
-                                &dst0,
-                                working_stride as u32,
-                                width,
-                                x_radius,
-                                0,
-                                1,
-                            );
-                        }
-                    }
-
-                    let mut start_ky = y_kernel_size / 2 + 1;
-
-                    start_ky %= y_kernel_size;
-
-                    let mut has_warmed_up = false;
-
-                    let rows_count = dst_rows.len() / dst_stride as usize;
-
-                    for (y, dy) in (source_y..source_y + rows_count + half_kernel)
-                        .zip(0..rows_count + half_kernel)
-                    {
-                        let new_y = y.min(height as usize - 1);
-
-                        let src0 =
-                            &src[new_y * src_stride as usize..(new_y + 1) * src_stride as usize];
-
-                        let dst0 = UnsafeSlice::new(
-                            &mut buffer[start_ky * working_stride..(start_ky + 1) * working_stride],
-                        );
+                        let src0 = &src[s_y * src_stride as usize..(s_y + 1) * src_stride as usize];
 
                         horizontal_handler(
                             &src0[..width as usize * CN],
@@ -1057,45 +1006,74 @@ where
                             0,
                             1,
                         );
+                    }
+                }
 
-                        if dy >= half_kernel {
-                            if !has_warmed_up {
-                                for row in
-                                    buffer.chunks_exact(working_stride).take(y_kernel_size - 1)
-                                {
-                                    for (dst, src) in working_row.iter_mut().zip(row.iter()) {
-                                        *dst += src.as_();
-                                    }
+                let mut start_ky = y_kernel_size / 2 + 1;
+
+                start_ky %= y_kernel_size;
+
+                let mut has_warmed_up = false;
+
+                let rows_count = dst_rows.len() / dst_stride as usize;
+
+                for (y, dy) in
+                    (source_y..source_y + rows_count + half_kernel).zip(0..rows_count + half_kernel)
+                {
+                    let new_y = y.min(height as usize - 1);
+
+                    let src0 = &src[new_y * src_stride as usize..(new_y + 1) * src_stride as usize];
+
+                    let dst0 = UnsafeSlice::new(
+                        &mut buffer[start_ky * working_stride..(start_ky + 1) * working_stride],
+                    );
+
+                    horizontal_handler(
+                        &src0[..width as usize * CN],
+                        src_stride,
+                        &dst0,
+                        working_stride as u32,
+                        width,
+                        x_radius,
+                        0,
+                        1,
+                    );
+
+                    if dy >= half_kernel {
+                        if !has_warmed_up {
+                            for row in buffer.chunks_exact(working_stride).take(y_kernel_size - 1) {
+                                for (dst, src) in working_row.iter_mut().zip(row.iter()) {
+                                    *dst += src.as_();
                                 }
-                                has_warmed_up = true;
                             }
-
-                            let ky0 = (start_ky + 1) % y_kernel_size;
-                            let ky1 = (start_ky + y_kernel_size) % y_kernel_size;
-
-                            let brow0 = &buffer[ky0 * working_stride..(ky0 + 1) * working_stride];
-                            let brow1 = &buffer[ky1 * working_stride..(ky1 + 1) * working_stride];
-
-                            let capture = [brow0, brow1];
-
-                            let dy = dy - half_kernel;
-
-                            let dst0 = &mut dst_rows
-                                [dy * dst_stride as usize..(dy + 1) * dst_stride as usize];
-
-                            ring_vsum(
-                                &capture,
-                                &mut dst0[..width as usize * CN],
-                                &mut working_row,
-                                y_radius,
-                            );
+                            has_warmed_up = true;
                         }
 
-                        start_ky += 1;
-                        start_ky %= y_kernel_size;
+                        let ky0 = (start_ky + 1) % y_kernel_size;
+                        let ky1 = (start_ky + y_kernel_size) % y_kernel_size;
+
+                        let brow0 = &buffer[ky0 * working_stride..(ky0 + 1) * working_stride];
+                        let brow1 = &buffer[ky1 * working_stride..(ky1 + 1) * working_stride];
+
+                        let capture = [brow0, brow1];
+
+                        let dy = dy - half_kernel;
+
+                        let dst0 =
+                            &mut dst_rows[dy * dst_stride as usize..(dy + 1) * dst_stride as usize];
+
+                        ring_vsum(
+                            &capture,
+                            &mut dst0[..width as usize * CN],
+                            &mut working_row,
+                            y_radius,
+                        );
                     }
-                });
-        });
+
+                    start_ky += 1;
+                    start_ky %= y_kernel_size;
+                }
+            });
     } else {
         let mut working_row = vec![J::default(); working_stride];
         let mut buffer = vec![T::default(); working_stride * y_kernel_size];
@@ -1188,20 +1166,20 @@ where
 
 fn box_blur_impl<
     T: FromPrimitive
-        + Default
-        + Sync
-        + Send
-        + Copy
-        + std::ops::AddAssign
-        + std::ops::SubAssign
-        + Copy
-        + AsPrimitive<u32>
-        + AsPrimitive<u64>
-        + AsPrimitive<f32>
-        + AsPrimitive<f64>
-        + BoxBlurHorizontalPass<T>
-        + BoxBlurVerticalPass<T>
-        + RingBufferHandler<T>,
+    + Default
+    + Sync
+    + Send
+    + Copy
+    + std::ops::AddAssign
+    + std::ops::SubAssign
+    + Copy
+    + AsPrimitive<u32>
+    + AsPrimitive<u64>
+    + AsPrimitive<f32>
+    + AsPrimitive<f64>
+    + BoxBlurHorizontalPass<T>
+    + BoxBlurVerticalPass<T>
+    + RingBufferHandler<T>,
     const CN: usize,
 >(
     src: &[T],
@@ -1211,7 +1189,6 @@ fn box_blur_impl<
     width: u32,
     height: u32,
     parameters: BoxBlurParameters,
-    pool: &Option<ThreadPool>,
     thread_count: u32,
 ) -> Result<(), BlurError>
 where
@@ -1241,7 +1218,6 @@ where
             width,
             height,
             parameters,
-            pool,
             thread_count,
         );
     }
@@ -1254,7 +1230,6 @@ where
         width,
         height,
         parameters.x_radius(),
-        pool,
         thread_count,
     );
 
@@ -1266,7 +1241,6 @@ where
         width,
         height,
         parameters.y_radius(),
-        pool,
         thread_count,
     );
 
@@ -1308,16 +1282,6 @@ pub fn box_blur(
         FastBlurChannels::Channels3 => box_blur_impl::<u8, 3>,
         FastBlurChannels::Channels4 => box_blur_impl::<u8, 4>,
     };
-    let pool = if thread_count == 1 {
-        None
-    } else {
-        Some(
-            rayon::ThreadPoolBuilder::new()
-                .num_threads(thread_count as usize)
-                .build()
-                .unwrap(),
-        )
-    };
     let dst_stride = dst_image.row_stride();
     let dst = dst_image.data.borrow_mut();
     _dispatcher(
@@ -1328,7 +1292,6 @@ pub fn box_blur(
         width,
         height,
         parameters,
-        &pool,
         thread_count,
     )?;
     Ok(())
@@ -1363,16 +1326,6 @@ pub fn box_blur_u16(
     let width = image.width;
     let height = image.height;
     let thread_count = threading_policy.thread_count(width, height) as u32;
-    let pool = if thread_count == 1 {
-        None
-    } else {
-        Some(
-            rayon::ThreadPoolBuilder::new()
-                .num_threads(thread_count as usize)
-                .build()
-                .unwrap(),
-        )
-    };
     let dispatcher = match image.channels {
         FastBlurChannels::Plane => box_blur_impl::<u16, 1>,
         FastBlurChannels::Channels3 => box_blur_impl::<u16, 3>,
@@ -1388,7 +1341,6 @@ pub fn box_blur_u16(
         width,
         height,
         parameters,
-        &pool,
         thread_count,
     )?;
     Ok(())
@@ -1424,16 +1376,6 @@ pub fn box_blur_f32(
     let width = image.width;
     let height = image.height;
     let thread_count = threading_policy.thread_count(width, height) as u32;
-    let pool = if thread_count == 1 {
-        None
-    } else {
-        Some(
-            rayon::ThreadPoolBuilder::new()
-                .num_threads(thread_count as usize)
-                .build()
-                .unwrap(),
-        )
-    };
     let dispatcher = match image.channels {
         FastBlurChannels::Plane => box_blur_impl::<f32, 1>,
         FastBlurChannels::Channels3 => box_blur_impl::<f32, 3>,
@@ -1449,7 +1391,6 @@ pub fn box_blur_f32(
         width,
         height,
         parameters,
-        &pool,
         thread_count,
     )
 }
@@ -1499,20 +1440,20 @@ fn create_box_gauss(sigma: f32, n: usize) -> Vec<u32> {
 
 fn tent_blur_impl<
     T: FromPrimitive
-        + Default
-        + Sync
-        + Send
-        + Copy
-        + std::ops::AddAssign
-        + std::ops::SubAssign
-        + Copy
-        + AsPrimitive<u32>
-        + AsPrimitive<u64>
-        + AsPrimitive<f32>
-        + AsPrimitive<f64>
-        + BoxBlurHorizontalPass<T>
-        + BoxBlurVerticalPass<T>
-        + RingBufferHandler<T>,
+    + Default
+    + Sync
+    + Send
+    + Copy
+    + std::ops::AddAssign
+    + std::ops::SubAssign
+    + Copy
+    + AsPrimitive<u32>
+    + AsPrimitive<u64>
+    + AsPrimitive<f32>
+    + AsPrimitive<f64>
+    + BoxBlurHorizontalPass<T>
+    + BoxBlurVerticalPass<T>
+    + RingBufferHandler<T>,
     const CN: usize,
 >(
     src: &[T],
@@ -1529,16 +1470,6 @@ where
 {
     parameters.validate()?;
     let thread_count = threading_policy.thread_count(width, height) as u32;
-    let pool = if thread_count == 1 {
-        None
-    } else {
-        Some(
-            rayon::ThreadPoolBuilder::new()
-                .num_threads(thread_count as usize)
-                .build()
-                .unwrap(),
-        )
-    };
     let mut transient: Vec<T> =
         vec![T::from_u32(0).unwrap_or_default(); width as usize * height as usize * CN];
     let boxes_horizontal = create_box_gauss(parameters.x_sigma, 2);
@@ -1554,7 +1485,6 @@ where
             x_axis_kernel: boxes_horizontal[0] * 2 + 1,
             y_axis_kernel: boxes_vertical[0] * 2 + 1,
         },
-        &pool,
         thread_count,
     )?;
     box_blur_impl::<T, CN>(
@@ -1568,7 +1498,6 @@ where
             x_axis_kernel: boxes_horizontal[1] * 2 + 1,
             y_axis_kernel: boxes_vertical[1] * 2 + 1,
         },
-        &pool,
         thread_count,
     )
 }
@@ -1723,20 +1652,20 @@ pub fn tent_blur_f32(
 
 fn gaussian_box_blur_impl<
     T: FromPrimitive
-        + Default
-        + Sync
-        + Send
-        + Copy
-        + std::ops::AddAssign
-        + std::ops::SubAssign
-        + Copy
-        + AsPrimitive<u32>
-        + AsPrimitive<u64>
-        + AsPrimitive<f32>
-        + AsPrimitive<f64>
-        + BoxBlurHorizontalPass<T>
-        + BoxBlurVerticalPass<T>
-        + RingBufferHandler<T>,
+    + Default
+    + Sync
+    + Send
+    + Copy
+    + std::ops::AddAssign
+    + std::ops::SubAssign
+    + Copy
+    + AsPrimitive<u32>
+    + AsPrimitive<u64>
+    + AsPrimitive<f32>
+    + AsPrimitive<f64>
+    + BoxBlurHorizontalPass<T>
+    + BoxBlurVerticalPass<T>
+    + RingBufferHandler<T>,
     const CN: usize,
 >(
     src: &[T],
@@ -1753,16 +1682,6 @@ where
 {
     parameters.validate()?;
     let thread_count = threading_policy.thread_count(width, height) as u32;
-    let pool = if thread_count == 1 {
-        None
-    } else {
-        Some(
-            rayon::ThreadPoolBuilder::new()
-                .num_threads(thread_count as usize)
-                .build()
-                .unwrap(),
-        )
-    };
     let mut transient: Vec<T> = vec![T::default(); dst_stride as usize * height as usize];
     let boxes_horizontal = create_box_gauss(parameters.x_sigma, 3);
     let boxes_vertical = create_box_gauss(parameters.y_sigma, 3);
@@ -1777,7 +1696,6 @@ where
             x_axis_kernel: boxes_horizontal[0] * 2 + 1,
             y_axis_kernel: boxes_vertical[0] * 2 + 1,
         },
-        &pool,
         thread_count,
     )?;
     box_blur_impl::<T, CN>(
@@ -1791,7 +1709,6 @@ where
             x_axis_kernel: boxes_horizontal[1] * 2 + 1,
             y_axis_kernel: boxes_vertical[1] * 2 + 1,
         },
-        &pool,
         thread_count,
     )?;
     box_blur_impl::<T, CN>(
@@ -1805,7 +1722,6 @@ where
             x_axis_kernel: boxes_horizontal[2] * 2 + 1,
             y_axis_kernel: boxes_vertical[2] * 2 + 1,
         },
-        &pool,
         thread_count,
     )
 }

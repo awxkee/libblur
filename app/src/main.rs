@@ -31,12 +31,7 @@ mod merge;
 mod split;
 
 use image::{EncodableLayout, GenericImageView, ImageReader};
-use libblur::{
-    bilateral_filter, complex_gaussian_kernel, fast_bilateral_filter, fast_bilateral_filter_u16,
-    filter_1d_complex, filter_1d_complex_fixed_point, filter_2d_rgba_fft, gaussian_kernel_1d,
-    lens_kernel, sigma_size, AnisotropicRadius, BilateralBlurParams, BlurImage, BlurImageMut,
-    EdgeMode, FastBlurChannels, KernelShape, Scalar, ThreadingPolicy, TransferFunction,
-};
+use libblur::{bilateral_filter, complex_gaussian_kernel, fast_bilateral_filter, fast_bilateral_filter_u16, filter_1d_complex, filter_1d_complex_fixed_point, filter_2d_rgba_fft, gaussian_kernel_1d, lens_kernel, sigma_size, AnisotropicRadius, BilateralBlurParams, BlurImage, BlurImageMut, BoxBlurParameters, EdgeMode, FastBlurChannels, KernelShape, Scalar, ThreadingPolicy, TransferFunction};
 use num_complex::Complex;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use std::any::Any;
@@ -141,21 +136,19 @@ fn main() {
     );
 
     // }
+    
+    let mut dst_image = BlurImageMut::default();
 
-    // libblur::gaussian_blur(
-    //     &image,
-    //     &mut dst_image,
-    //     GaussianBlurParams {
-    //         x_kernel: 7,
-    //         x_sigma: 0.,
-    //         y_kernel: 9,
-    //         y_sigma: 0.,
-    //     },
-    //     EdgeMode::Clamp,
-    //     ThreadingPolicy::Single,
-    //     ConvolutionMode::FixedPoint,
-    // )
-    // .unwrap();
+    libblur::box_blur(
+        &cvt,
+        &mut dst_image,
+        BoxBlurParameters {
+            x_axis_kernel: 5,
+            y_axis_kernel: 5,
+        },
+        ThreadingPolicy::Adaptive,
+    )
+    .unwrap();
 
     // libblur::fast_gaussian_next_f32(
     //     &mut dst_image,
@@ -179,7 +172,7 @@ fn main() {
     // let j_dag = dst_image.to_immutable_ref();
     // let gamma = j_dag.gamma8(TransferFunction::Srgb, true).unwrap();
 
-    /* dst_bytes = dst_image
+     dst_bytes = dst_image
         .data
         .borrow_mut()
         .iter()
@@ -234,5 +227,5 @@ fn main() {
             },
         )
         .unwrap();
-    }*/
+    }
 }
