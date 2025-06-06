@@ -111,19 +111,19 @@ fn box_blur_horizontal_pass_impl<T, J, const CN: usize>(
     end_y: u32,
 ) where
     T: std::ops::AddAssign
-    + std::ops::SubAssign
-    + Copy
-    + FromPrimitive
-    + Default
-    + Send
-    + Sync
-    + AsPrimitive<J>,
+        + std::ops::SubAssign
+        + Copy
+        + FromPrimitive
+        + Default
+        + Send
+        + Sync
+        + AsPrimitive<J>,
     J: FromPrimitive
-    + Copy
-    + std::ops::Mul<Output = J>
-    + std::ops::AddAssign
-    + std::ops::SubAssign
-    + AsPrimitive<f32>,
+        + Copy
+        + std::ops::Mul<Output = J>
+        + std::ops::AddAssign
+        + std::ops::SubAssign
+        + AsPrimitive<f32>,
     f32: ToStorage<T>,
 {
     let kernel_size = radius * 2 + 1;
@@ -333,17 +333,17 @@ impl BoxBlurHorizontalPass<u8> for u8 {
 #[allow(clippy::type_complexity)]
 fn box_blur_horizontal_pass<
     T: FromPrimitive
-    + Default
-    + Send
-    + Sync
-    + std::ops::AddAssign
-    + std::ops::SubAssign
-    + Copy
-    + AsPrimitive<u32>
-    + AsPrimitive<u64>
-    + AsPrimitive<f32>
-    + AsPrimitive<f64>
-    + BoxBlurHorizontalPass<T>,
+        + Default
+        + Send
+        + Sync
+        + std::ops::AddAssign
+        + std::ops::SubAssign
+        + Copy
+        + AsPrimitive<u32>
+        + AsPrimitive<u64>
+        + AsPrimitive<f32>
+        + AsPrimitive<f64>
+        + BoxBlurHorizontalPass<T>,
     const CN: usize,
 >(
     src: &[T],
@@ -392,20 +392,20 @@ fn box_blur_vertical_pass_impl<T, J>(
     end_x: u32,
 ) where
     T: std::ops::AddAssign
-    + std::ops::SubAssign
-    + Copy
-    + FromPrimitive
-    + Default
-    + Send
-    + Sync
-    + AsPrimitive<J>,
+        + std::ops::SubAssign
+        + Copy
+        + FromPrimitive
+        + Default
+        + Send
+        + Sync
+        + AsPrimitive<J>,
     J: FromPrimitive
-    + Copy
-    + std::ops::Mul<Output = J>
-    + std::ops::AddAssign
-    + std::ops::SubAssign
-    + AsPrimitive<f32>
-    + Default,
+        + Copy
+        + std::ops::Mul<Output = J>
+        + std::ops::AddAssign
+        + std::ops::SubAssign
+        + AsPrimitive<f32>
+        + Default,
     f32: ToStorage<T>,
 {
     let kernel_size = radius * 2 + 1;
@@ -588,18 +588,18 @@ impl BoxBlurVerticalPass<u8> for u8 {
 #[allow(clippy::type_complexity)]
 fn box_blur_vertical_pass<
     T: FromPrimitive
-    + Default
-    + Sync
-    + Send
-    + Copy
-    + std::ops::AddAssign
-    + std::ops::SubAssign
-    + Copy
-    + AsPrimitive<u32>
-    + AsPrimitive<u64>
-    + AsPrimitive<f32>
-    + AsPrimitive<f64>
-    + BoxBlurVerticalPass<T>,
+        + Default
+        + Sync
+        + Send
+        + Copy
+        + std::ops::AddAssign
+        + std::ops::SubAssign
+        + Copy
+        + AsPrimitive<u32>
+        + AsPrimitive<u64>
+        + AsPrimitive<f32>
+        + AsPrimitive<f64>
+        + BoxBlurVerticalPass<T>,
     const CN: usize,
 >(
     src: &[T],
@@ -847,14 +847,14 @@ impl VRowSum<f16, f32> for () {
 fn ring_vertical_row_summ<
     T: Sync + Send + Copy + AsPrimitive<J>,
     J: FromPrimitive
-    + Default
-    + Sync
-    + Send
-    + Copy
-    + std::ops::AddAssign
-    + std::ops::SubAssign
-    + Copy
-    + AsPrimitive<f32>,
+        + Default
+        + Sync
+        + Send
+        + Copy
+        + std::ops::AddAssign
+        + std::ops::SubAssign
+        + Copy
+        + AsPrimitive<f32>,
 >(
     src: &[&[T]; 2],
     dst: &mut [T],
@@ -885,30 +885,30 @@ fn ring_vertical_row_summ<
 
 fn ring_box_filter<
     T: FromPrimitive
-    + Default
-    + Sync
-    + Send
-    + Debug
-    + Copy
-    + std::ops::AddAssign
-    + std::ops::SubAssign
-    + Copy
-    + AsPrimitive<u32>
-    + AsPrimitive<u64>
-    + AsPrimitive<f32>
-    + AsPrimitive<f64>
-    + BoxBlurHorizontalPass<T>
-    + BoxBlurVerticalPass<T>
-    + AsPrimitive<J>,
+        + Default
+        + Sync
+        + Send
+        + Debug
+        + Copy
+        + std::ops::AddAssign
+        + std::ops::SubAssign
+        + Copy
+        + AsPrimitive<u32>
+        + AsPrimitive<u64>
+        + AsPrimitive<f32>
+        + AsPrimitive<f64>
+        + BoxBlurHorizontalPass<T>
+        + BoxBlurVerticalPass<T>
+        + AsPrimitive<J>,
     J: FromPrimitive
-    + Default
-    + Sync
-    + Send
-    + Copy
-    + std::ops::AddAssign
-    + std::ops::SubAssign
-    + Copy
-    + AsPrimitive<f32>,
+        + Default
+        + Sync
+        + Send
+        + Copy
+        + std::ops::AddAssign
+        + std::ops::SubAssign
+        + Copy
+        + AsPrimitive<f32>,
     const CN: usize,
 >(
     src: &[T],
@@ -935,7 +935,7 @@ where
     if thread_count > 1 {
         let tile_size = height as usize / thread_count as usize;
         let pool = novtb::ThreadPool::new(thread_count as usize);
-        dst.tb_par_chunks_exact_mut(dst_stride as usize * tile_size)
+        dst.tb_par_chunks_mut(dst_stride as usize * tile_size)
             .for_each_enumerated(&pool, |cy, dst_rows| {
                 let source_y = cy * tile_size;
 
@@ -1009,7 +1009,7 @@ where
                     }
                 }
 
-                let mut start_ky = y_kernel_size / 2 + 1;
+                let mut start_ky = y_kernel_size / 2;
 
                 start_ky %= y_kernel_size;
 
@@ -1166,20 +1166,20 @@ where
 
 fn box_blur_impl<
     T: FromPrimitive
-    + Default
-    + Sync
-    + Send
-    + Copy
-    + std::ops::AddAssign
-    + std::ops::SubAssign
-    + Copy
-    + AsPrimitive<u32>
-    + AsPrimitive<u64>
-    + AsPrimitive<f32>
-    + AsPrimitive<f64>
-    + BoxBlurHorizontalPass<T>
-    + BoxBlurVerticalPass<T>
-    + RingBufferHandler<T>,
+        + Default
+        + Sync
+        + Send
+        + Copy
+        + std::ops::AddAssign
+        + std::ops::SubAssign
+        + Copy
+        + AsPrimitive<u32>
+        + AsPrimitive<u64>
+        + AsPrimitive<f32>
+        + AsPrimitive<f64>
+        + BoxBlurHorizontalPass<T>
+        + BoxBlurVerticalPass<T>
+        + RingBufferHandler<T>,
     const CN: usize,
 >(
     src: &[T],
@@ -1440,20 +1440,20 @@ fn create_box_gauss(sigma: f32, n: usize) -> Vec<u32> {
 
 fn tent_blur_impl<
     T: FromPrimitive
-    + Default
-    + Sync
-    + Send
-    + Copy
-    + std::ops::AddAssign
-    + std::ops::SubAssign
-    + Copy
-    + AsPrimitive<u32>
-    + AsPrimitive<u64>
-    + AsPrimitive<f32>
-    + AsPrimitive<f64>
-    + BoxBlurHorizontalPass<T>
-    + BoxBlurVerticalPass<T>
-    + RingBufferHandler<T>,
+        + Default
+        + Sync
+        + Send
+        + Copy
+        + std::ops::AddAssign
+        + std::ops::SubAssign
+        + Copy
+        + AsPrimitive<u32>
+        + AsPrimitive<u64>
+        + AsPrimitive<f32>
+        + AsPrimitive<f64>
+        + BoxBlurHorizontalPass<T>
+        + BoxBlurVerticalPass<T>
+        + RingBufferHandler<T>,
     const CN: usize,
 >(
     src: &[T],
@@ -1652,20 +1652,20 @@ pub fn tent_blur_f32(
 
 fn gaussian_box_blur_impl<
     T: FromPrimitive
-    + Default
-    + Sync
-    + Send
-    + Copy
-    + std::ops::AddAssign
-    + std::ops::SubAssign
-    + Copy
-    + AsPrimitive<u32>
-    + AsPrimitive<u64>
-    + AsPrimitive<f32>
-    + AsPrimitive<f64>
-    + BoxBlurHorizontalPass<T>
-    + BoxBlurVerticalPass<T>
-    + RingBufferHandler<T>,
+        + Default
+        + Sync
+        + Send
+        + Copy
+        + std::ops::AddAssign
+        + std::ops::SubAssign
+        + Copy
+        + AsPrimitive<u32>
+        + AsPrimitive<u64>
+        + AsPrimitive<f32>
+        + AsPrimitive<f64>
+        + BoxBlurHorizontalPass<T>
+        + BoxBlurVerticalPass<T>
+        + RingBufferHandler<T>,
     const CN: usize,
 >(
     src: &[T],
