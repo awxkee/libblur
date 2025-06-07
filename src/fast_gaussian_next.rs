@@ -861,7 +861,6 @@ fn fast_gaussian_next_impl<
     let unsafe_image = UnsafeSlice::new(bytes);
     let pool = novtb::ThreadPool::new(thread_count as usize);
     pool.parallel_for(|thread_index| {
-        println!("{thread_index}, {thread_count}");
         let segment_size = width / thread_count;
         let start_x = thread_index as u32 * segment_size;
         let mut end_x = (thread_index as u32 + 1) * segment_size;

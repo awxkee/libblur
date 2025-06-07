@@ -59,7 +59,12 @@
     ),
     feature(x86_amx_intrinsics)
 )]
-
+#![deny(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    clippy::print_literal,
+    clippy::print_in_format_impl
+)]
 #[cfg(feature = "fft")]
 #[cfg_attr(docsrs, doc(cfg(feature = "fft")))]
 mod adaptive_blur;
