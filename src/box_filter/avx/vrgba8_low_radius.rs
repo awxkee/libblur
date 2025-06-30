@@ -73,7 +73,7 @@ impl ExecutionUnit {
         let mut cx = start_x;
 
         let v_edge_count = _mm256_set1_epi8(edge_count as i8);
-        let v_weight = _mm256_set1_ps(1f32 / (radius * 2) as f32);
+        let v_weight = _mm256_set1_ps(1f32 / (radius * 2 + 1) as f32);
 
         assert!(end_x >= start_x);
 
@@ -110,7 +110,7 @@ impl ExecutionUnit {
             store_2 = _mm256_maddubs_epi16(lo1, v_edge_count);
             store_3 = _mm256_maddubs_epi16(hi1, v_edge_count);
 
-            for y in 1..half_kernel as usize {
+            for y in 1..=half_kernel as usize {
                 let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
                 let s_ptr = src.as_ptr().add(y_src_shift + px);
 
@@ -164,7 +164,7 @@ impl ExecutionUnit {
             store_0 = _mm256_maddubs_epi16(lo0, v_edge_count);
             store_1 = _mm256_maddubs_epi16(hi0, v_edge_count);
 
-            for y in 1..half_kernel as usize {
+            for y in 1..=half_kernel as usize {
                 let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
                 let s_ptr = src.as_ptr().add(y_src_shift + px);
 
@@ -206,7 +206,7 @@ impl ExecutionUnit {
 
             store_0 = _mm256_maddubs_epi16(lo0, v_edge_count);
 
-            for y in 1..half_kernel as usize {
+            for y in 1..=half_kernel as usize {
                 let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
                 let s_ptr = src.as_ptr().add(y_src_shift + px);
 
@@ -240,7 +240,7 @@ impl ExecutionUnit {
 
             let mut store_0 = _mm_maddubs_epi16(lo0, v_edge_count);
 
-            for y in 1..half_kernel as usize {
+            for y in 1..=half_kernel as usize {
                 let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
                 let s_ptr = src.as_ptr().add(y_src_shift + px);
 
@@ -269,7 +269,7 @@ impl ExecutionUnit {
 
             let mut store_0 = _mm_maddubs_epi16(lo0, v_edge_count);
 
-            for y in 1..half_kernel as usize {
+            for y in 1..=half_kernel as usize {
                 let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
                 let s_ptr = src.get_unchecked(y_src_shift + px);
 
@@ -293,7 +293,8 @@ impl ExecutionUnit {
             let mut cx = start_x as usize;
 
             // preload edge pixels
-            let next = (y + half_kernel as usize).min(height as usize - 1) * src_stride as usize;
+            let next =
+                (y + half_kernel as usize + 1).min(height as usize - 1) * src_stride as usize;
             let previous = (y as i64 - half_kernel as i64).max(0) as usize * src_stride as usize;
             let y_dst_shift = dst_stride as usize * y;
 
@@ -309,58 +310,8 @@ impl ExecutionUnit {
                 let mut store_3 =
                     _mm256_loadu_si256(buffer.get_unchecked(buf_cx + 48..).as_ptr() as *const _);
 
-                unsafe {
-                    // subtract previous
-                    {
-                        let s_ptr = src.as_ptr().add(previous + px);
-                        let edge0 = _mm256_loadu_si256(s_ptr as *const _);
-                        let edge1 = _mm256_loadu_si256(s_ptr.add(32) as *const _);
-                        let lo0 = _mm256_unpacklo_epi8(edge0, _mm256_setzero_si256());
-                        let hi0 = _mm256_unpackhi_epi8(edge0, _mm256_setzero_si256());
-
-                        let lo1 = _mm256_unpacklo_epi8(edge1, _mm256_setzero_si256());
-                        let hi1 = _mm256_unpackhi_epi8(edge1, _mm256_setzero_si256());
-
-                        store_0 = _mm256_subs_epu16(store_0, lo0);
-                        store_1 = _mm256_subs_epu16(store_1, hi0);
-
-                        store_2 = _mm256_subs_epu16(store_2, lo1);
-                        store_3 = _mm256_subs_epu16(store_3, hi1);
-                    }
-
-                    // add next
-                    {
-                        let s_ptr = src.as_ptr().add(next + px);
-                        let edge0 = _mm256_loadu_si256(s_ptr as *const _);
-                        let edge1 = _mm256_loadu_si256(s_ptr.add(32) as *const _);
-                        let lo0 = _mm256_unpacklo_epi8(edge0, _mm256_setzero_si256());
-                        let hi0 = _mm256_unpackhi_epi8(edge0, _mm256_setzero_si256());
-
-                        let lo1 = _mm256_unpacklo_epi8(edge1, _mm256_setzero_si256());
-                        let hi1 = _mm256_unpackhi_epi8(edge1, _mm256_setzero_si256());
-
-                        store_0 = _mm256_adds_epu16(store_0, lo0);
-                        store_1 = _mm256_adds_epu16(store_1, hi0);
-
-                        store_2 = _mm256_adds_epu16(store_2, lo1);
-                        store_3 = _mm256_adds_epu16(store_3, hi1);
-                    }
-
+                {
                     let px = cx;
-
-                    _mm256_storeu_si256(buffer.get_unchecked(buf_cx..).as_ptr() as *mut _, store_0);
-                    _mm256_storeu_si256(
-                        buffer.get_unchecked(buf_cx + 16..).as_ptr() as *mut _,
-                        store_1,
-                    );
-                    _mm256_storeu_si256(
-                        buffer.get_unchecked(buf_cx + 32..).as_ptr() as *mut _,
-                        store_2,
-                    );
-                    _mm256_storeu_si256(
-                        buffer.get_unchecked(buf_cx + 48..).as_ptr() as *mut _,
-                        store_3,
-                    );
 
                     let jw0 = _mm256_unpacklo_epi16(store_0, _mm256_setzero_si256());
                     let jw1 = _mm256_unpackhi_epi16(store_0, _mm256_setzero_si256());
@@ -412,6 +363,58 @@ impl ExecutionUnit {
                     _mm256_storeu_si256(ptr.add(32) as *mut _, full_set1);
                 }
 
+                unsafe {
+                    // subtract previous
+                    {
+                        let s_ptr = src.as_ptr().add(previous + px);
+                        let edge0 = _mm256_loadu_si256(s_ptr as *const _);
+                        let edge1 = _mm256_loadu_si256(s_ptr.add(32) as *const _);
+                        let lo0 = _mm256_unpacklo_epi8(edge0, _mm256_setzero_si256());
+                        let hi0 = _mm256_unpackhi_epi8(edge0, _mm256_setzero_si256());
+
+                        let lo1 = _mm256_unpacklo_epi8(edge1, _mm256_setzero_si256());
+                        let hi1 = _mm256_unpackhi_epi8(edge1, _mm256_setzero_si256());
+
+                        store_0 = _mm256_subs_epu16(store_0, lo0);
+                        store_1 = _mm256_subs_epu16(store_1, hi0);
+
+                        store_2 = _mm256_subs_epu16(store_2, lo1);
+                        store_3 = _mm256_subs_epu16(store_3, hi1);
+                    }
+
+                    // add next
+                    {
+                        let s_ptr = src.as_ptr().add(next + px);
+                        let edge0 = _mm256_loadu_si256(s_ptr as *const _);
+                        let edge1 = _mm256_loadu_si256(s_ptr.add(32) as *const _);
+                        let lo0 = _mm256_unpacklo_epi8(edge0, _mm256_setzero_si256());
+                        let hi0 = _mm256_unpackhi_epi8(edge0, _mm256_setzero_si256());
+
+                        let lo1 = _mm256_unpacklo_epi8(edge1, _mm256_setzero_si256());
+                        let hi1 = _mm256_unpackhi_epi8(edge1, _mm256_setzero_si256());
+
+                        store_0 = _mm256_adds_epu16(store_0, lo0);
+                        store_1 = _mm256_adds_epu16(store_1, hi0);
+
+                        store_2 = _mm256_adds_epu16(store_2, lo1);
+                        store_3 = _mm256_adds_epu16(store_3, hi1);
+                    }
+
+                    _mm256_storeu_si256(buffer.get_unchecked(buf_cx..).as_ptr() as *mut _, store_0);
+                    _mm256_storeu_si256(
+                        buffer.get_unchecked(buf_cx + 16..).as_ptr() as *mut _,
+                        store_1,
+                    );
+                    _mm256_storeu_si256(
+                        buffer.get_unchecked(buf_cx + 32..).as_ptr() as *mut _,
+                        store_2,
+                    );
+                    _mm256_storeu_si256(
+                        buffer.get_unchecked(buf_cx + 48..).as_ptr() as *mut _,
+                        store_3,
+                    );
+                }
+
                 cx += 64;
                 buf_cx += 64;
             }
@@ -423,6 +426,39 @@ impl ExecutionUnit {
                     _mm256_loadu_si256(buffer.get_unchecked(buf_cx..).as_ptr() as *const _);
                 let mut store_1 =
                     _mm256_loadu_si256(buffer.get_unchecked(buf_cx + 16..).as_ptr() as *const _);
+
+                {
+                    let px = cx;
+
+                    let jw0 = _mm256_unpacklo_epi16(store_0, _mm256_setzero_si256());
+                    let jw1 = _mm256_unpackhi_epi16(store_0, _mm256_setzero_si256());
+                    let jw2 = _mm256_unpacklo_epi16(store_1, _mm256_setzero_si256());
+                    let jw3 = _mm256_unpackhi_epi16(store_1, _mm256_setzero_si256());
+
+                    let store0_ps = _mm256_cvtepi32_ps(jw0);
+                    let store1_ps = _mm256_cvtepi32_ps(jw1);
+                    let store2_ps = _mm256_cvtepi32_ps(jw2);
+                    let store3_ps = _mm256_cvtepi32_ps(jw3);
+
+                    let r0 = _mm256_mul_ps(store0_ps, v_weight);
+                    let r1 = _mm256_mul_ps(store1_ps, v_weight);
+                    let r2 = _mm256_mul_ps(store2_ps, v_weight);
+                    let r3 = _mm256_mul_ps(store3_ps, v_weight);
+
+                    let scale_store_0 = _mm256_cvtps_epi32(r0);
+                    let scale_store_1 = _mm256_cvtps_epi32(r1);
+                    let scale_store_2 = _mm256_cvtps_epi32(r2);
+                    let scale_store_3 = _mm256_cvtps_epi32(r3);
+
+                    let offset = y_dst_shift + px;
+                    let ptr = unsafe_dst.slice.get_unchecked(offset).get();
+
+                    let set0 = _mm256_packus_epi32(scale_store_0, scale_store_1);
+                    let set1 = _mm256_packus_epi32(scale_store_2, scale_store_3);
+
+                    let full_set0 = _mm256_packus_epi16(set0, set1);
+                    _mm256_storeu_si256(ptr as *mut _, full_set0);
+                }
 
                 // subtract previous
                 {
@@ -446,42 +482,11 @@ impl ExecutionUnit {
                     store_1 = _mm256_adds_epu16(store_1, hi0);
                 }
 
-                let px = cx;
-
                 _mm256_storeu_si256(buffer.get_unchecked(buf_cx..).as_ptr() as *mut _, store_0);
                 _mm256_storeu_si256(
                     buffer.get_unchecked(buf_cx + 16..).as_ptr() as *mut _,
                     store_1,
                 );
-
-                let jw0 = _mm256_unpacklo_epi16(store_0, _mm256_setzero_si256());
-                let jw1 = _mm256_unpackhi_epi16(store_0, _mm256_setzero_si256());
-                let jw2 = _mm256_unpacklo_epi16(store_1, _mm256_setzero_si256());
-                let jw3 = _mm256_unpackhi_epi16(store_1, _mm256_setzero_si256());
-
-                let store0_ps = _mm256_cvtepi32_ps(jw0);
-                let store1_ps = _mm256_cvtepi32_ps(jw1);
-                let store2_ps = _mm256_cvtepi32_ps(jw2);
-                let store3_ps = _mm256_cvtepi32_ps(jw3);
-
-                let r0 = _mm256_mul_ps(store0_ps, v_weight);
-                let r1 = _mm256_mul_ps(store1_ps, v_weight);
-                let r2 = _mm256_mul_ps(store2_ps, v_weight);
-                let r3 = _mm256_mul_ps(store3_ps, v_weight);
-
-                let scale_store_0 = _mm256_cvtps_epi32(r0);
-                let scale_store_1 = _mm256_cvtps_epi32(r1);
-                let scale_store_2 = _mm256_cvtps_epi32(r2);
-                let scale_store_3 = _mm256_cvtps_epi32(r3);
-
-                let offset = y_dst_shift + px;
-                let ptr = unsafe_dst.slice.get_unchecked(offset).get();
-
-                let set0 = _mm256_packus_epi32(scale_store_0, scale_store_1);
-                let set1 = _mm256_packus_epi32(scale_store_2, scale_store_3);
-
-                let full_set0 = _mm256_packus_epi16(set0, set1);
-                _mm256_storeu_si256(ptr as *mut _, full_set0);
 
                 cx += 32;
                 buf_cx += 32;
@@ -494,6 +499,33 @@ impl ExecutionUnit {
                     _mm256_loadu_si256(buffer.get_unchecked(buf_cx..).as_ptr() as *const _);
 
                 const MASK: i32 = shuffle(3, 1, 2, 0);
+
+                {
+                    let px = cx;
+
+                    let jw0 = _mm256_unpacklo_epi16(store_0, _mm256_setzero_si256());
+                    let jw1 = _mm256_unpackhi_epi16(store_0, _mm256_setzero_si256());
+
+                    let store0_ps = _mm256_cvtepi32_ps(jw0);
+                    let store1_ps = _mm256_cvtepi32_ps(jw1);
+
+                    let r0 = _mm256_mul_ps(store0_ps, v_weight);
+                    let r1 = _mm256_mul_ps(store1_ps, v_weight);
+
+                    let scale_store_0 = _mm256_cvtps_epi32(r0);
+                    let scale_store_1 = _mm256_cvtps_epi32(r1);
+
+                    let offset = y_dst_shift + px;
+                    let ptr = unsafe_dst.slice.get_unchecked(offset).get();
+
+                    let set0 = _mm256_packus_epi32(scale_store_0, scale_store_1);
+
+                    let full_set0 = _mm256_packus_epi16(set0, set0);
+                    _mm_storeu_si128(
+                        ptr as *mut _,
+                        _mm256_castsi256_si128(_mm256_permute4x64_epi64::<MASK>(full_set0)),
+                    );
+                }
 
                 // subtract previous
                 {
@@ -519,44 +551,45 @@ impl ExecutionUnit {
                     store_0 = _mm256_adds_epu16(store_0, lo0);
                 }
 
-                let px = cx;
-
                 _mm256_storeu_si256(buffer.get_unchecked(buf_cx..).as_ptr() as *mut _, store_0);
-
-                let jw0 = _mm256_unpacklo_epi16(store_0, _mm256_setzero_si256());
-                let jw1 = _mm256_unpackhi_epi16(store_0, _mm256_setzero_si256());
-
-                let store0_ps = _mm256_cvtepi32_ps(jw0);
-                let store1_ps = _mm256_cvtepi32_ps(jw1);
-
-                let r0 = _mm256_mul_ps(store0_ps, v_weight);
-                let r1 = _mm256_mul_ps(store1_ps, v_weight);
-
-                let scale_store_0 = _mm256_cvtps_epi32(r0);
-                let scale_store_1 = _mm256_cvtps_epi32(r1);
-
-                let offset = y_dst_shift + px;
-                let ptr = unsafe_dst.slice.get_unchecked(offset).get();
-
-                let set0 = _mm256_packus_epi32(scale_store_0, scale_store_1);
-
-                let full_set0 = _mm256_packus_epi16(set0, set0);
-                _mm_storeu_si128(
-                    ptr as *mut _,
-                    _mm256_castsi256_si128(_mm256_permute4x64_epi64::<MASK>(full_set0)),
-                );
 
                 cx += 16;
                 buf_cx += 16;
             }
 
-            let v_weight = _mm_set1_ps(1f32 / (radius * 2) as f32);
+            let v_weight = _mm_set1_ps(1f32 / (radius * 2 + 1) as f32);
 
             while cx + 8 < end_x as usize {
                 let px = cx;
 
                 let mut store_0 =
                     _mm_loadu_si128(buffer.get_unchecked(buf_cx..).as_ptr() as *const _);
+
+                {
+                    let px = cx;
+
+                    let jw = store_0;
+
+                    let store_0 = _mm_unpacklo_epi16(jw, _mm_setzero_si128());
+                    let store_1 = _mm_unpackhi_epi16(jw, _mm_setzero_si128());
+
+                    let store0_ps = _mm_cvtepi32_ps(store_0);
+                    let store1_ps = _mm_cvtepi32_ps(store_1);
+
+                    let r0 = _mm_mul_ps(store0_ps, v_weight);
+                    let r1 = _mm_mul_ps(store1_ps, v_weight);
+
+                    let scale_store_0 = _mm_cvtps_epi32(r0);
+                    let scale_store_1 = _mm_cvtps_epi32(r1);
+
+                    let offset = y_dst_shift + px;
+                    let ptr = unsafe_dst.slice.get_unchecked(offset).get();
+
+                    let set0 = _mm_packus_epi32(scale_store_0, scale_store_1);
+
+                    let full_set = _mm_packus_epi16(set0, _mm_setzero_si128());
+                    _mm_storeu_si64(ptr as *mut _, full_set);
+                }
 
                 // subtract previous
                 {
@@ -576,31 +609,7 @@ impl ExecutionUnit {
                     store_0 = _mm_adds_epu16(store_0, lo0);
                 }
 
-                let px = cx;
-
-                let jw = store_0;
-
                 _mm_storeu_si128(buffer.get_unchecked(buf_cx..).as_ptr() as *mut _, store_0);
-
-                let store_0 = _mm_unpacklo_epi16(jw, _mm_setzero_si128());
-                let store_1 = _mm_unpackhi_epi16(jw, _mm_setzero_si128());
-
-                let store0_ps = _mm_cvtepi32_ps(store_0);
-                let store1_ps = _mm_cvtepi32_ps(store_1);
-
-                let r0 = _mm_mul_ps(store0_ps, v_weight);
-                let r1 = _mm_mul_ps(store1_ps, v_weight);
-
-                let scale_store_0 = _mm_cvtps_epi32(r0);
-                let scale_store_1 = _mm_cvtps_epi32(r1);
-
-                let offset = y_dst_shift + px;
-                let ptr = unsafe_dst.slice.get_unchecked(offset).get();
-
-                let set0 = _mm_packus_epi32(scale_store_0, scale_store_1);
-
-                let full_set = _mm_packus_epi16(set0, _mm_setzero_si128());
-                _mm_storeu_si64(ptr as *mut _, full_set);
 
                 cx += 8;
                 buf_cx += 8;
@@ -612,6 +621,14 @@ impl ExecutionUnit {
                 let px = x * TAIL_CN;
 
                 let mut store = _mm_loadu_si16(buffer.get_unchecked(buf_cx..).as_ptr() as *const _);
+
+                {
+                    let px = x;
+                    let store = _mm_unpacklo_epi16(store, _mm_setzero_si128());
+                    let r0 = _mm_mul_ps(_mm_cvtepi32_ps(store), v_weight);
+                    let ptr = unsafe_dst.slice.as_ptr().add(y_dst_shift + px) as *mut u8;
+                    store_u8_s16::<TAIL_CN>(ptr, _mm_cvtps_epi32(r0));
+                }
 
                 // subtract previous
                 unsafe {
@@ -627,14 +644,8 @@ impl ExecutionUnit {
                     store = _mm_adds_epu16(store, edge_colors);
                 }
 
-                let px = x;
-
                 _mm_storeu_si16(buffer.get_unchecked(buf_cx..).as_ptr() as *mut _, store);
 
-                let store = _mm_unpacklo_epi16(store, _mm_setzero_si128());
-                let r0 = _mm_mul_ps(_mm_cvtepi32_ps(store), v_weight);
-                let ptr = unsafe_dst.slice.as_ptr().add(y_dst_shift + px) as *mut u8;
-                store_u8_s16::<TAIL_CN>(ptr, _mm_cvtps_epi32(r0));
                 buf_cx += 1;
             }
         }

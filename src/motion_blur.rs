@@ -195,7 +195,7 @@ mod tests {
             let diff = (cn as i32 - 126).abs();
             assert!(
                 diff <= 3,
-                "Diff expected to be less than 3 but it was {diff} at {i}"
+                "Diff expected to be less than 3, but it was {diff} at {i}"
             );
         }
     }
@@ -226,7 +226,7 @@ mod tests {
             let diff = (cn as i32 - 126).abs();
             assert!(
                 diff <= 3,
-                "Diff expected to be less than 3 but it was {diff} at {i}"
+                "Diff expected to be less than 3, but it was {diff} at {i}"
             );
         }
     }
@@ -253,7 +253,7 @@ mod tests {
             let diff = (cn as i32 - 126).abs();
             assert!(
                 diff <= 3,
-                "Diff expected to be less than 3 but it was {diff} at {i}"
+                "Diff expected to be less than 3, but it was {diff} at {i}"
             );
         }
     }

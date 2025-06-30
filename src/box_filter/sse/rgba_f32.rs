@@ -73,7 +73,7 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
         let edge_count = (kernel_size / 2) + 1;
         let v_edge_count = _mm_set1_ps(edge_count as f32);
 
-        let v_weight = _mm_set1_ps(1f32 / (radius * 2) as f32);
+        let v_weight = _mm_set1_ps(1f32 / (radius * 2 + 1) as f32);
 
         let half_kernel = kernel_size / 2;
 
@@ -107,7 +107,7 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
             }
 
             unsafe {
-                for x in 1usize..half_kernel as usize {
+                for x in 1usize..=half_kernel as usize {
                     let px = x.min(width as usize - 1) * CN;
 
                     let s_ptr_0 = src.as_ptr().add(y_src_shift + px);
@@ -128,7 +128,23 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
             }
 
             for x in 0..width {
-                // preload edge pixels
+                let px = x as usize * CN;
+
+                unsafe {
+                    let r0 = _mm_mul_ps(store_0, v_weight);
+                    let r1 = _mm_mul_ps(store_1, v_weight);
+                    let r2 = _mm_mul_ps(store_2, v_weight);
+                    let r3 = _mm_mul_ps(store_3, v_weight);
+
+                    let bytes_offset_0 = y_dst_shift + px;
+                    let bytes_offset_1 = y_dst_shift + dst_stride as usize + px;
+                    let bytes_offset_2 = y_dst_shift + dst_stride as usize * 2 + px;
+                    let bytes_offset_3 = y_dst_shift + dst_stride as usize * 3 + px;
+                    store_f32::<CN>(unsafe_dst.slice.as_ptr().add(bytes_offset_0) as *mut _, r0);
+                    store_f32::<CN>(unsafe_dst.slice.as_ptr().add(bytes_offset_1) as *mut _, r1);
+                    store_f32::<CN>(unsafe_dst.slice.as_ptr().add(bytes_offset_2) as *mut _, r2);
+                    store_f32::<CN>(unsafe_dst.slice.as_ptr().add(bytes_offset_3) as *mut _, r3);
+                }
 
                 // subtract previous
                 unsafe {
@@ -159,7 +175,7 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
 
                 // add next
                 unsafe {
-                    let next_x = (x + half_kernel).min(width - 1) as usize;
+                    let next_x = (x + half_kernel + 1).min(width - 1) as usize;
 
                     let next = next_x * CN;
 
@@ -182,24 +198,6 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
                     store_2 = _mm_add_ps(store_2, edge_colors_2);
                     store_3 = _mm_add_ps(store_3, edge_colors_3);
                 }
-
-                let px = x as usize * CN;
-
-                unsafe {
-                    let r0 = _mm_mul_ps(store_0, v_weight);
-                    let r1 = _mm_mul_ps(store_1, v_weight);
-                    let r2 = _mm_mul_ps(store_2, v_weight);
-                    let r3 = _mm_mul_ps(store_3, v_weight);
-
-                    let bytes_offset_0 = y_dst_shift + px;
-                    let bytes_offset_1 = y_dst_shift + dst_stride as usize + px;
-                    let bytes_offset_2 = y_dst_shift + dst_stride as usize * 2 + px;
-                    let bytes_offset_3 = y_dst_shift + dst_stride as usize * 3 + px;
-                    store_f32::<CN>(unsafe_dst.slice.as_ptr().add(bytes_offset_0) as *mut _, r0);
-                    store_f32::<CN>(unsafe_dst.slice.as_ptr().add(bytes_offset_1) as *mut _, r1);
-                    store_f32::<CN>(unsafe_dst.slice.as_ptr().add(bytes_offset_2) as *mut _, r2);
-                    store_f32::<CN>(unsafe_dst.slice.as_ptr().add(bytes_offset_3) as *mut _, r3);
-                }
             }
 
             yy += 4;
@@ -218,7 +216,7 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
             }
 
             unsafe {
-                for x in 1usize..half_kernel as usize {
+                for x in 1usize..=half_kernel as usize {
                     let px = x.min(width as usize - 1) * CN;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let edge_colors = load_f32::<CN>(s_ptr);
@@ -227,7 +225,14 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
             }
 
             for x in 0..width {
-                // preload edge pixels
+                let px = x as usize * CN;
+
+                unsafe {
+                    let r0 = _mm_mul_ps(store, v_weight);
+                    let bytes_offset = y_dst_shift + px;
+                    let ptr = unsafe_dst.slice.as_ptr().add(bytes_offset) as *mut f32;
+                    store_f32::<CN>(ptr, r0);
+                }
 
                 // subtract previous
                 unsafe {
@@ -240,22 +245,13 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
 
                 // add next
                 unsafe {
-                    let next_x = (x + half_kernel).min(width - 1) as usize;
+                    let next_x = (x + half_kernel + 1).min(width - 1) as usize;
 
                     let next = next_x * CN;
 
                     let s_ptr = src.as_ptr().add(y_src_shift + next);
                     let edge_colors = load_f32::<CN>(s_ptr);
                     store = _mm_add_ps(store, edge_colors);
-                }
-
-                let px = x as usize * CN;
-
-                unsafe {
-                    let r0 = _mm_mul_ps(store, v_weight);
-                    let bytes_offset = y_dst_shift + px;
-                    let ptr = unsafe_dst.slice.as_ptr().add(bytes_offset) as *mut f32;
-                    store_f32::<CN>(ptr, r0);
                 }
             }
         }

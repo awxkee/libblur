@@ -35,7 +35,7 @@ pub(crate) fn neon_ring_vertical_row_summ16(
 ) {
     let next_row = src[1];
     let previous_row = src[0];
-    let weight = 1. / (radius as f32 * 2.);
+    let weight = 1. / (radius as f32 * 2. + 1.);
     let v_weight = unsafe { vdupq_n_f32(weight) };
 
     let chunks = previous_row.chunks_exact(16).len();
@@ -52,30 +52,10 @@ pub(crate) fn neon_ring_vertical_row_summ16(
             let mut weight2 = vld1q_u32(buffer.get_unchecked(8..).as_ptr());
             let mut weight3 = vld1q_u32(buffer.get_unchecked(12..).as_ptr());
 
-            let next0 = vld1q_u16(src_next.as_ptr());
-            let next1 = vld1q_u16(src_next.get_unchecked(8..).as_ptr());
-            let previous0 = vld1q_u16(src_previous.as_ptr());
-            let previous1 = vld1q_u16(src_previous.get_unchecked(8..).as_ptr());
-
-            weight0 = vaddw_u16(weight0, vget_low_u16(next0));
-            weight1 = vaddw_high_u16(weight1, next0);
-            weight2 = vaddw_u16(weight2, vget_low_u16(next1));
-            weight3 = vaddw_high_u16(weight3, next1);
-
-            weight0 = vsubw_u16(weight0, vget_low_u16(previous0));
-            weight1 = vsubw_high_u16(weight1, previous0);
-            weight2 = vsubw_u16(weight2, vget_low_u16(previous1));
-            weight3 = vsubw_high_u16(weight3, previous1);
-
             let w0 = vcvtq_f32_u32(weight0);
             let w1 = vcvtq_f32_u32(weight1);
             let w2 = vcvtq_f32_u32(weight2);
             let w3 = vcvtq_f32_u32(weight3);
-
-            vst1q_u32(buffer.as_mut_ptr(), weight0);
-            vst1q_u32(buffer.get_unchecked_mut(4..).as_mut_ptr(), weight1);
-            vst1q_u32(buffer.get_unchecked_mut(8..).as_mut_ptr(), weight2);
-            vst1q_u32(buffer.get_unchecked_mut(12..).as_mut_ptr(), weight3);
 
             let z0 = vmulq_f32(w0, v_weight);
             let z1 = vmulq_f32(w1, v_weight);
@@ -92,6 +72,26 @@ pub(crate) fn neon_ring_vertical_row_summ16(
 
             vst1q_u16(dst.as_mut_ptr(), r0);
             vst1q_u16(dst.get_unchecked_mut(8..).as_mut_ptr(), r1);
+
+            let next0 = vld1q_u16(src_next.as_ptr());
+            let next1 = vld1q_u16(src_next.get_unchecked(8..).as_ptr());
+            let previous0 = vld1q_u16(src_previous.as_ptr());
+            let previous1 = vld1q_u16(src_previous.get_unchecked(8..).as_ptr());
+
+            weight0 = vaddw_u16(weight0, vget_low_u16(next0));
+            weight1 = vaddw_high_u16(weight1, next0);
+            weight2 = vaddw_u16(weight2, vget_low_u16(next1));
+            weight3 = vaddw_high_u16(weight3, next1);
+
+            weight0 = vsubw_u16(weight0, vget_low_u16(previous0));
+            weight1 = vsubw_high_u16(weight1, previous0);
+            weight2 = vsubw_u16(weight2, vget_low_u16(previous1));
+            weight3 = vsubw_high_u16(weight3, previous1);
+
+            vst1q_u32(buffer.as_mut_ptr(), weight0);
+            vst1q_u32(buffer.get_unchecked_mut(4..).as_mut_ptr(), weight1);
+            vst1q_u32(buffer.get_unchecked_mut(8..).as_mut_ptr(), weight2);
+            vst1q_u32(buffer.get_unchecked_mut(12..).as_mut_ptr(), weight3);
         }
     }
 
@@ -104,11 +104,11 @@ pub(crate) fn neon_ring_vertical_row_summ16(
     {
         let mut weight0 = *buffer;
 
+        *dst = ((weight0 as f32 * weight).round() as u32).min(65535) as u16;
+
         weight0 += *src_next as u32;
         weight0 -= *src_previous as u32;
 
         *buffer = weight0;
-
-        *dst = ((weight0 as f32 * weight).round() as u32).min(65535) as u16;
     }
 }

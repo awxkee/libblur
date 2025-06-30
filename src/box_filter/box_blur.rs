@@ -130,17 +130,24 @@ fn box_blur_horizontal_pass_impl<T, J, const CN: usize>(
     let edge_count = J::from_u32((kernel_size / 2) + 1).unwrap();
     let half_kernel = kernel_size / 2;
 
-    let weight = 1f32 / (radius * 2) as f32;
+    let weight = 1f32 / (radius * 2 + 1) as f32;
 
     for y in start_y..end_y {
-        let mut weight0;
         let mut weight1 = J::from_u32(0u32).unwrap();
         let mut weight2 = J::from_u32(0u32).unwrap();
         let mut weight3 = J::from_u32(0u32).unwrap();
         let y_src_shift = (y * src_stride) as usize;
         let y_dst_shift = (y * dst_stride) as usize;
+
+        let dst_row = unsafe {
+            std::slice::from_raw_parts_mut(
+                unsafe_dst.slice.get_unchecked(y_dst_shift).get(),
+                width as usize * CN,
+            )
+        };
+
         // replicate edge
-        weight0 = (unsafe { *src.get_unchecked(y_src_shift) }.as_()) * edge_count;
+        let mut weight0 = (unsafe { *src.get_unchecked(y_src_shift) }.as_()) * edge_count;
         if CN > 1 {
             weight1 = (unsafe { *src.get_unchecked(y_src_shift + 1) }.as_()) * edge_count;
         }
@@ -151,7 +158,7 @@ fn box_blur_horizontal_pass_impl<T, J, const CN: usize>(
             weight3 = (unsafe { *src.get_unchecked(y_src_shift + 3) }.as_()) * edge_count;
         }
 
-        for x in 1..half_kernel as usize {
+        for x in 1..=half_kernel as usize {
             let px = x.min(width as usize - 1) * CN;
             weight0 += unsafe { *src.get_unchecked(y_src_shift + px) }.as_();
             if CN > 1 {
@@ -165,45 +172,145 @@ fn box_blur_horizontal_pass_impl<T, J, const CN: usize>(
             }
         }
 
-        for x in 0..width as usize {
-            let next = (x + half_kernel as usize).min(width as usize - 1) * CN;
+        let current_row = &src[y_src_shift..(y_src_shift + width as usize * CN)];
+
+        for x in 0..(half_kernel as usize).min(width as usize) {
+            let next = (x + half_kernel as usize + 1).min(width as usize - 1) * CN;
             let previous = (x as i64 - half_kernel as i64).max(0) as usize * CN;
             let px = x * CN;
             // Prune previous and add next and compute mean
 
-            weight0 += unsafe { *src.get_unchecked(y_src_shift + next) }.as_();
-            if CN > 1 {
-                weight1 += unsafe { *src.get_unchecked(y_src_shift + next + 1) }.as_();
-            }
-            if CN > 2 {
-                weight2 += unsafe { *src.get_unchecked(y_src_shift + next + 2) }.as_();
+            unsafe {
+                let write_offset = px;
+                *dst_row.get_unchecked_mut(write_offset) = (weight0.as_() * weight).to_();
+                if CN > 1 {
+                    *dst_row.get_unchecked_mut(write_offset + 1) = (weight1.as_() * weight).to_();
+                }
+                if CN > 2 {
+                    *dst_row.get_unchecked_mut(write_offset + 2) = (weight2.as_() * weight).to_();
+                }
+                if CN == 4 {
+                    *dst_row.get_unchecked_mut(write_offset + 3) = (weight3.as_() * weight).to_();
+                }
             }
 
-            weight0 -= unsafe { *src.get_unchecked(y_src_shift + previous) }.as_();
+            weight0 += unsafe { *current_row.get_unchecked(next) }.as_();
             if CN > 1 {
-                weight1 -= unsafe { *src.get_unchecked(y_src_shift + previous + 1) }.as_();
+                weight1 += unsafe { *current_row.get_unchecked(next + 1) }.as_();
             }
             if CN > 2 {
-                weight2 -= unsafe { *src.get_unchecked(y_src_shift + previous + 2) }.as_();
+                weight2 += unsafe { *current_row.get_unchecked(next + 2) }.as_();
+            }
+
+            weight0 -= unsafe { *current_row.get_unchecked(previous) }.as_();
+            if CN > 1 {
+                weight1 -= unsafe { *current_row.get_unchecked(previous + 1) }.as_();
+            }
+            if CN > 2 {
+                weight2 -= unsafe { *current_row.get_unchecked(previous + 2) }.as_();
             }
 
             if CN == 4 {
-                weight3 += unsafe { *src.get_unchecked(y_src_shift + next + 3) }.as_();
-                weight3 -= unsafe { *src.get_unchecked(y_src_shift + previous + 3) }.as_();
+                weight3 += unsafe { *current_row.get_unchecked(next + 3) }.as_();
+                weight3 -= unsafe { *current_row.get_unchecked(previous + 3) }.as_();
             }
+        }
 
-            let write_offset = y_dst_shift + px;
-            unsafe {
-                unsafe_dst.write(write_offset, (weight0.as_() * weight).to_());
+        let max_x_before_clamping = (width - 1).saturating_sub(half_kernel + 1);
+        let row_length = current_row.len();
+
+        let mut last_processed_item = half_kernel;
+
+        if ((half_kernel as usize * 2 + 1) * CN < row_length)
+            && ((max_x_before_clamping as usize * CN) < row_length)
+        {
+            let data_section = current_row;
+            let advanced_kernel_part = &data_section[(half_kernel as usize * 2 + 1) * CN..];
+            let section_length = max_x_before_clamping as usize - half_kernel as usize;
+            let dst = &mut dst_row
+                [half_kernel as usize * CN..(half_kernel as usize * CN + section_length * CN)];
+
+            for ((dst, src_previous), src_next) in dst
+                .chunks_exact_mut(CN)
+                .zip(data_section.chunks_exact(CN))
+                .zip(advanced_kernel_part.chunks_exact(CN))
+            {
+                dst[0] = (weight0.as_() * weight).to_();
                 if CN > 1 {
-                    unsafe_dst.write(write_offset + 1, (weight1.as_() * weight).to_());
+                    dst[1] = (weight1.as_() * weight).to_();
                 }
                 if CN > 2 {
-                    unsafe_dst.write(write_offset + 2, (weight2.as_() * weight).to_());
+                    dst[2] = (weight2.as_() * weight).to_();
                 }
                 if CN == 4 {
-                    unsafe_dst.write(write_offset + 3, (weight3.as_() * weight).to_());
+                    dst[3] = (weight3.as_() * weight).to_();
                 }
+
+                weight0 += src_next[0].as_();
+                if CN > 1 {
+                    weight1 += src_next[1].as_();
+                }
+                if CN > 2 {
+                    weight2 += src_next[2].as_();
+                }
+                if CN == 4 {
+                    weight3 += src_next[3].as_();
+                }
+
+                weight0 -= src_previous[0].as_();
+                if CN > 1 {
+                    weight1 -= src_previous[1].as_();
+                }
+                if CN > 2 {
+                    weight2 -= src_previous[2].as_();
+                }
+                if CN == 4 {
+                    weight3 -= src_previous[3].as_();
+                }
+            }
+
+            last_processed_item = max_x_before_clamping;
+        }
+
+        for x in last_processed_item as usize..width as usize {
+            let next = (x + half_kernel as usize + 1).min(width as usize - 1) * CN;
+            let previous = (x as i64 - half_kernel as i64).max(0) as usize * CN;
+            let px = x * CN;
+            // Prune previous and add next and compute mean
+
+            unsafe {
+                let write_offset = px;
+                *dst_row.get_unchecked_mut(write_offset) = (weight0.as_() * weight).to_();
+                if CN > 1 {
+                    *dst_row.get_unchecked_mut(write_offset + 1) = (weight1.as_() * weight).to_();
+                }
+                if CN > 2 {
+                    *dst_row.get_unchecked_mut(write_offset + 2) = (weight2.as_() * weight).to_();
+                }
+                if CN == 4 {
+                    *dst_row.get_unchecked_mut(write_offset + 3) = (weight3.as_() * weight).to_();
+                }
+            }
+
+            weight0 += unsafe { *current_row.get_unchecked(next) }.as_();
+            if CN > 1 {
+                weight1 += unsafe { *current_row.get_unchecked(next + 1) }.as_();
+            }
+            if CN > 2 {
+                weight2 += unsafe { *current_row.get_unchecked(next + 2) }.as_();
+            }
+
+            weight0 -= unsafe { *current_row.get_unchecked(previous) }.as_();
+            if CN > 1 {
+                weight1 -= unsafe { *current_row.get_unchecked(previous + 1) }.as_();
+            }
+            if CN > 2 {
+                weight2 -= unsafe { *current_row.get_unchecked(previous + 2) }.as_();
+            }
+
+            if CN == 4 {
+                weight3 += unsafe { *current_row.get_unchecked(next + 3) }.as_();
+                weight3 -= unsafe { *current_row.get_unchecked(previous + 3) }.as_();
             }
         }
     }
@@ -211,7 +318,7 @@ fn box_blur_horizontal_pass_impl<T, J, const CN: usize>(
 
 trait BoxBlurHorizontalPass<T> {
     #[allow(clippy::type_complexity)]
-    fn get_horizontal_pass<const CHANNEL_CONFIGURATION: usize>() -> fn(
+    fn get_horizontal_pass<const CN: usize>() -> fn(
         src: &[T],
         src_stride: u32,
         unsafe_dst: &UnsafeSlice<T>,
@@ -255,9 +362,9 @@ impl BoxBlurHorizontalPass<f32> for f32 {
 
 impl BoxBlurHorizontalPass<f16> for f16 {
     #[allow(clippy::type_complexity)]
-    fn get_horizontal_pass<const CHANNEL_CONFIGURATION: usize>(
+    fn get_horizontal_pass<const CN: usize>(
     ) -> fn(&[f16], u32, &UnsafeSlice<f16>, u32, u32, u32, u32, u32) {
-        box_blur_horizontal_pass_impl::<f16, f32, CHANNEL_CONFIGURATION>
+        box_blur_horizontal_pass_impl::<f16, f32, CN>
     }
 }
 
@@ -413,7 +520,7 @@ fn box_blur_vertical_pass_impl<T, J>(
     let edge_count = J::from_u32((kernel_size / 2) + 1).unwrap();
     let half_kernel = kernel_size / 2;
 
-    let weight = 1f32 / (radius * 2) as f32;
+    let weight = 1f32 / (radius * 2 + 1) as f32;
 
     let buf_size = end_x - start_x;
 
@@ -424,7 +531,7 @@ fn box_blur_vertical_pass_impl<T, J>(
 
     for (x, (v, bf)) in src_lane.iter().zip(buffer.iter_mut()).enumerate() {
         let mut w = v.as_() * edge_count;
-        for y in 1..half_kernel as usize {
+        for y in 1..=half_kernel as usize {
             let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
             unsafe {
                 w += src.get_unchecked(y_src_shift + x + start_x as usize).as_();
@@ -434,7 +541,7 @@ fn box_blur_vertical_pass_impl<T, J>(
     }
 
     for y in 0..height {
-        let next = (y + half_kernel).min(height - 1) as usize * src_stride as usize;
+        let next = (y + half_kernel + 1).min(height - 1) as usize * src_stride as usize;
         let previous = (y as i64 - half_kernel as i64).max(0) as usize * src_stride as usize;
         let y_dst_shift = dst_stride as usize * y as usize;
 
@@ -463,12 +570,12 @@ fn box_blur_vertical_pass_impl<T, J>(
         {
             let mut weight0 = *buffer;
 
+            *dst = (weight0.as_() * weight).to_();
+
             weight0 += src_next.as_();
             weight0 -= src_previous.as_();
 
             *buffer = weight0;
-
-            *dst = (weight0.as_() * weight).to_();
         }
     }
 }
@@ -778,6 +885,11 @@ impl VRowSum<u8, u32> for () {
     fn ring_vertical_row_summ() -> fn(&[&[u8]; 2], &mut [u8], &mut [u32], u32) {
         #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
+            #[cfg(feature = "rdm")]
+            if std::arch::is_aarch64_feature_detected!("rdm") {
+                use crate::box_filter::neon::neon_ring_vertical_row_summ_rdm;
+                return neon_ring_vertical_row_summ_rdm;
+            }
             use crate::box_filter::neon::neon_ring_vertical_row_summ;
             neon_ring_vertical_row_summ
         }
@@ -865,7 +977,7 @@ fn ring_vertical_row_summ<
 {
     let next_row = src[1];
     let previous_row = src[0];
-    let weight = 1. / (radius as f32 * 2.);
+    let weight = 1. / (radius as f32 * 2. + 1.);
     for (((src_next, src_previous), buffer), dst) in next_row
         .iter()
         .zip(previous_row.iter())
@@ -874,12 +986,12 @@ fn ring_vertical_row_summ<
     {
         let mut weight0 = *buffer;
 
+        *dst = (weight0.as_() * weight).to_();
+
         weight0 += src_next.as_();
         weight0 -= src_previous.as_();
 
         *buffer = weight0;
-
-        *dst = (weight0.as_() * weight).to_();
     }
 }
 
@@ -940,7 +1052,8 @@ where
                 let source_y = cy * tile_size;
 
                 let mut working_row = vec![J::default(); working_stride];
-                let mut buffer = vec![T::default(); working_stride * y_kernel_size];
+                let ring_size = y_kernel_size + 1;
+                let mut buffer = vec![T::default(); working_stride * ring_size];
 
                 let half_kernel = y_kernel_size / 2;
 
@@ -966,26 +1079,6 @@ where
                             *dst = *src;
                         }
                     }
-                } else if source_y as i64 - half_kernel as i64 - 1 >= 0 {
-                    let s_y = (source_y as i64 - half_kernel as i64 - 1).clamp(0, height as i64 - 1)
-                        as usize;
-
-                    let dst0 = UnsafeSlice::new(
-                        &mut buffer[working_stride..(half_kernel + 1) * working_stride],
-                    );
-                    let src0 = &src
-                        [s_y * src_stride as usize..(s_y + half_kernel + 1) * src_stride as usize];
-
-                    horizontal_handler(
-                        src0,
-                        src_stride,
-                        &dst0,
-                        working_stride as u32,
-                        width,
-                        x_radius,
-                        0,
-                        half_kernel as u32,
-                    );
                 } else {
                     for src_y in 0..=half_kernel {
                         let s_y = (src_y as i64 + source_y as i64 - half_kernel as i64 - 1)
@@ -1011,14 +1104,14 @@ where
 
                 let mut start_ky = y_kernel_size / 2;
 
-                start_ky %= y_kernel_size;
+                start_ky %= ring_size;
 
                 let mut has_warmed_up = false;
 
                 let rows_count = dst_rows.len() / dst_stride as usize;
 
-                for (y, dy) in
-                    (source_y..source_y + rows_count + half_kernel).zip(0..rows_count + half_kernel)
+                for (y, dy) in (source_y..source_y + rows_count + half_kernel + 1)
+                    .zip(0..rows_count + half_kernel + 1)
                 {
                     let new_y = y.min(height as usize - 1);
 
@@ -1039,9 +1132,9 @@ where
                         1,
                     );
 
-                    if dy >= half_kernel {
+                    if dy > half_kernel {
                         if !has_warmed_up {
-                            for row in buffer.chunks_exact(working_stride).take(y_kernel_size - 1) {
+                            for row in buffer.chunks_exact(working_stride).take(ring_size - 1) {
                                 for (dst, src) in working_row.iter_mut().zip(row.iter()) {
                                     *dst += src.as_();
                                 }
@@ -1049,15 +1142,15 @@ where
                             has_warmed_up = true;
                         }
 
-                        let ky0 = (start_ky + 1) % y_kernel_size;
-                        let ky1 = (start_ky + y_kernel_size) % y_kernel_size;
+                        let ky0 = (start_ky + 1) % ring_size;
+                        let ky1 = (start_ky) % ring_size;
 
                         let brow0 = &buffer[ky0 * working_stride..(ky0 + 1) * working_stride];
                         let brow1 = &buffer[ky1 * working_stride..(ky1 + 1) * working_stride];
 
                         let capture = [brow0, brow1];
 
-                        let dy = dy - half_kernel;
+                        let dy = dy - half_kernel - 1;
 
                         let dst0 =
                             &mut dst_rows[dy * dst_stride as usize..(dy + 1) * dst_stride as usize];
@@ -1071,12 +1164,13 @@ where
                     }
 
                     start_ky += 1;
-                    start_ky %= y_kernel_size;
+                    start_ky %= ring_size;
                 }
             });
     } else {
         let mut working_row = vec![J::default(); working_stride];
-        let mut buffer = vec![T::default(); working_stride * y_kernel_size];
+        let ring_size = y_kernel_size + 1;
+        let mut buffer = vec![T::default(); working_stride * ring_size];
 
         let dst0 = UnsafeSlice::new(&mut buffer[..working_stride]);
 
@@ -1102,11 +1196,11 @@ where
 
         let mut start_ky = y_kernel_size / 2 + 1;
 
-        start_ky %= y_kernel_size;
+        start_ky %= ring_size;
 
         let mut has_warmed_up = false;
 
-        for y in 1..height as usize + half_kernel {
+        for y in 1..height as usize + half_kernel + 1 {
             let new_y = y.min(height as usize - 1);
 
             let src0 = &src[new_y * src_stride as usize..(new_y + 1) * src_stride as usize];
@@ -1126,9 +1220,9 @@ where
                 1,
             );
 
-            if y >= half_kernel {
+            if y > half_kernel {
                 if !has_warmed_up {
-                    for row in buffer.chunks_exact(working_stride).take(y_kernel_size - 1) {
+                    for row in buffer.chunks_exact(working_stride).take(ring_size - 1) {
                         for (dst, src) in working_row.iter_mut().zip(row.iter()) {
                             *dst += src.as_();
                         }
@@ -1136,15 +1230,15 @@ where
                     has_warmed_up = true;
                 }
 
-                let ky0 = (start_ky + 1) % y_kernel_size;
-                let ky1 = (start_ky + y_kernel_size) % y_kernel_size;
+                let ky0 = (start_ky + 1) % ring_size;
+                let ky1 = (start_ky) % ring_size;
 
                 let brow0 = &buffer[ky0 * working_stride..(ky0 + 1) * working_stride];
                 let brow1 = &buffer[ky1 * working_stride..(ky1 + 1) * working_stride];
 
                 let capture = [brow0, brow1];
 
-                let dy = y - half_kernel;
+                let dy = y - half_kernel - 1;
 
                 let dst0 = &mut dst[dy * dst_stride as usize..(dy + 1) * dst_stride as usize];
 
@@ -1157,7 +1251,7 @@ where
             }
 
             start_ky += 1;
-            start_ky %= y_kernel_size;
+            start_ky %= ring_size;
         }
     }
 

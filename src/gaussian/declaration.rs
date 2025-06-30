@@ -126,7 +126,7 @@ impl GaussianBlurParams {
         }
     }
 
-    /// Sigma must be > 0 and not equal to `0.8`.
+    /// Sigma must be > 0.
     pub fn new_asymmetric_from_sigma(x_sigma: f64, y_sigma: f64) -> GaussianBlurParams {
         GaussianBlurParams {
             x_kernel: kernel_size_d(x_sigma),

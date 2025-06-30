@@ -50,7 +50,7 @@ unsafe fn sse_ring_vertical_row_summ_impl16(
 ) {
     let next_row = src[1];
     let previous_row = src[0];
-    let weight = 1. / (radius as f32 * 2.);
+    let weight = 1. / (radius as f32 * 2. + 1.);
     let v_weight = _mm_set1_ps(weight);
 
     let chunks = previous_row.chunks_exact(16).len();
@@ -67,39 +67,10 @@ unsafe fn sse_ring_vertical_row_summ_impl16(
             let mut weight2 = _mm_loadu_si128(buffer.get_unchecked(8..).as_ptr() as *const _);
             let mut weight3 = _mm_loadu_si128(buffer.get_unchecked(12..).as_ptr() as *const _);
 
-            let next0 = _mm_loadu_si128(src_next.as_ptr() as *const _);
-            let next1 = _mm_loadu_si128(src_next.get_unchecked(8..).as_ptr() as *const _);
-            let previous0 = _mm_loadu_si128(src_previous.as_ptr() as *const _);
-            let previous1 = _mm_loadu_si128(src_previous.get_unchecked(8..).as_ptr() as *const _);
-
-            weight0 = _mm_add_epi32(weight0, _mm_unpacklo_epi16(next0, _mm_setzero_si128()));
-            weight1 = _mm_add_epi32(weight1, _mm_unpackhi_epi16(next0, _mm_setzero_si128()));
-            weight2 = _mm_add_epi32(weight2, _mm_unpacklo_epi16(next1, _mm_setzero_si128()));
-            weight3 = _mm_add_epi32(weight3, _mm_unpackhi_epi16(next1, _mm_setzero_si128()));
-
-            weight0 = _mm_sub_epi32(weight0, _mm_unpacklo_epi16(previous0, _mm_setzero_si128()));
-            weight1 = _mm_sub_epi32(weight1, _mm_unpackhi_epi16(previous0, _mm_setzero_si128()));
-            weight2 = _mm_sub_epi32(weight2, _mm_unpacklo_epi16(previous1, _mm_setzero_si128()));
-            weight3 = _mm_sub_epi32(weight3, _mm_unpackhi_epi16(previous1, _mm_setzero_si128()));
-
             let w0 = _mm_cvtepi32_ps(weight0);
             let w1 = _mm_cvtepi32_ps(weight1);
             let w2 = _mm_cvtepi32_ps(weight2);
             let w3 = _mm_cvtepi32_ps(weight3);
-
-            _mm_storeu_si128(buffer.as_mut_ptr() as *mut _, weight0);
-            _mm_storeu_si128(
-                buffer.get_unchecked_mut(4..).as_mut_ptr() as *mut _,
-                weight1,
-            );
-            _mm_storeu_si128(
-                buffer.get_unchecked_mut(8..).as_mut_ptr() as *mut _,
-                weight2,
-            );
-            _mm_storeu_si128(
-                buffer.get_unchecked_mut(12..).as_mut_ptr() as *mut _,
-                weight3,
-            );
 
             let z0 = _mm_mul_ps(w0, v_weight);
             let z1 = _mm_mul_ps(w1, v_weight);
@@ -116,6 +87,35 @@ unsafe fn sse_ring_vertical_row_summ_impl16(
 
             _mm_storeu_si128(dst.as_mut_ptr() as *mut _, r0);
             _mm_storeu_si128(dst.get_unchecked_mut(8..).as_mut_ptr() as *mut _, r1);
+
+            let next0 = _mm_loadu_si128(src_next.as_ptr() as *const _);
+            let next1 = _mm_loadu_si128(src_next.get_unchecked(8..).as_ptr() as *const _);
+            let previous0 = _mm_loadu_si128(src_previous.as_ptr() as *const _);
+            let previous1 = _mm_loadu_si128(src_previous.get_unchecked(8..).as_ptr() as *const _);
+
+            weight0 = _mm_add_epi32(weight0, _mm_unpacklo_epi16(next0, _mm_setzero_si128()));
+            weight1 = _mm_add_epi32(weight1, _mm_unpackhi_epi16(next0, _mm_setzero_si128()));
+            weight2 = _mm_add_epi32(weight2, _mm_unpacklo_epi16(next1, _mm_setzero_si128()));
+            weight3 = _mm_add_epi32(weight3, _mm_unpackhi_epi16(next1, _mm_setzero_si128()));
+
+            weight0 = _mm_sub_epi32(weight0, _mm_unpacklo_epi16(previous0, _mm_setzero_si128()));
+            weight1 = _mm_sub_epi32(weight1, _mm_unpackhi_epi16(previous0, _mm_setzero_si128()));
+            weight2 = _mm_sub_epi32(weight2, _mm_unpacklo_epi16(previous1, _mm_setzero_si128()));
+            weight3 = _mm_sub_epi32(weight3, _mm_unpackhi_epi16(previous1, _mm_setzero_si128()));
+
+            _mm_storeu_si128(buffer.as_mut_ptr() as *mut _, weight0);
+            _mm_storeu_si128(
+                buffer.get_unchecked_mut(4..).as_mut_ptr() as *mut _,
+                weight1,
+            );
+            _mm_storeu_si128(
+                buffer.get_unchecked_mut(8..).as_mut_ptr() as *mut _,
+                weight2,
+            );
+            _mm_storeu_si128(
+                buffer.get_unchecked_mut(12..).as_mut_ptr() as *mut _,
+                weight3,
+            );
         }
     }
 
@@ -128,11 +128,11 @@ unsafe fn sse_ring_vertical_row_summ_impl16(
     {
         let mut weight0 = *buffer;
 
+        *dst = ((weight0 as f32 * weight).round() as u32).min(u16::MAX as u32) as u16;
+
         weight0 += *src_next as u32;
         weight0 -= *src_previous as u32;
 
         *buffer = weight0;
-
-        *dst = ((weight0 as f32 * weight).round() as u32).min(u16::MAX as u32) as u16;
     }
 }

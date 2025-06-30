@@ -35,7 +35,7 @@ pub(crate) fn neon_ring_vertical_row_summ_f32(
 ) {
     let next_row = src[1];
     let previous_row = src[0];
-    let weight = 1. / (radius as f32 * 2.);
+    let weight = 1. / (radius as f32 * 2. + 1.);
     let v_weight = unsafe { vdupq_n_f32(weight) };
 
     let chunks = previous_row.chunks_exact(16).len();
@@ -51,6 +51,16 @@ pub(crate) fn neon_ring_vertical_row_summ_f32(
             let mut weight1 = vld1q_f32(buffer.get_unchecked(4..).as_ptr());
             let mut weight2 = vld1q_f32(buffer.get_unchecked(8..).as_ptr());
             let mut weight3 = vld1q_f32(buffer.get_unchecked(12..).as_ptr());
+
+            let z0 = vmulq_f32(weight0, v_weight);
+            let z1 = vmulq_f32(weight1, v_weight);
+            let z2 = vmulq_f32(weight2, v_weight);
+            let z3 = vmulq_f32(weight3, v_weight);
+
+            vst1q_f32(dst.as_mut_ptr(), z0);
+            vst1q_f32(dst.get_unchecked_mut(4..).as_mut_ptr(), z1);
+            vst1q_f32(dst.get_unchecked_mut(8..).as_mut_ptr(), z2);
+            vst1q_f32(dst.get_unchecked_mut(12..).as_mut_ptr(), z3);
 
             let next0 = vld1q_f32(src_next.as_ptr());
             let next1 = vld1q_f32(src_next.get_unchecked(4..).as_ptr());
@@ -75,16 +85,6 @@ pub(crate) fn neon_ring_vertical_row_summ_f32(
             vst1q_f32(buffer.get_unchecked_mut(4..).as_mut_ptr(), weight1);
             vst1q_f32(buffer.get_unchecked_mut(8..).as_mut_ptr(), weight2);
             vst1q_f32(buffer.get_unchecked_mut(12..).as_mut_ptr(), weight3);
-
-            let z0 = vmulq_f32(weight0, v_weight);
-            let z1 = vmulq_f32(weight1, v_weight);
-            let z2 = vmulq_f32(weight2, v_weight);
-            let z3 = vmulq_f32(weight3, v_weight);
-
-            vst1q_f32(dst.as_mut_ptr(), z0);
-            vst1q_f32(dst.get_unchecked_mut(4..).as_mut_ptr(), z1);
-            vst1q_f32(dst.get_unchecked_mut(8..).as_mut_ptr(), z2);
-            vst1q_f32(dst.get_unchecked_mut(12..).as_mut_ptr(), z3);
         }
     }
 
@@ -97,11 +97,11 @@ pub(crate) fn neon_ring_vertical_row_summ_f32(
     {
         let mut weight0 = *buffer;
 
+        *dst = weight0 * weight;
+
         weight0 += *src_next;
         weight0 -= *src_previous;
 
         *buffer = weight0;
-
-        *dst = weight0 * weight;
     }
 }

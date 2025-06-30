@@ -73,7 +73,7 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
         let edge_count = (kernel_size / 2) + 1;
         let v_edge_count = _mm_set1_epi32(edge_count as i32);
 
-        let v_weight = _mm_set1_ps(1f32 / (radius * 2) as f32);
+        let v_weight = _mm_set1_ps(1f32 / (radius * 2 + 1) as f32);
 
         let half_kernel = kernel_size / 2;
 
@@ -107,7 +107,7 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
             }
 
             unsafe {
-                for x in 1usize..half_kernel as usize {
+                for x in 1usize..=half_kernel as usize {
                     let px = x.min(width as usize - 1) * CN;
 
                     let s_ptr_0 = src.as_ptr().add(y_src_shift + px);
@@ -128,61 +128,6 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
             }
 
             for x in 0..width {
-                // preload edge pixels
-
-                // subtract previous
-                unsafe {
-                    let previous_x = (x as i64 - half_kernel as i64).max(0) as usize;
-                    let previous = previous_x * CN;
-
-                    let s_ptr_0 = src.as_ptr().add(y_src_shift + previous);
-                    let s_ptr_1 = src
-                        .as_ptr()
-                        .add(y_src_shift + src_stride as usize + previous);
-                    let s_ptr_2 = src
-                        .as_ptr()
-                        .add(y_src_shift + src_stride as usize * 2 + previous);
-                    let s_ptr_3 = src
-                        .as_ptr()
-                        .add(y_src_shift + src_stride as usize * 3 + previous);
-
-                    let edge_colors_0 = load_u16_s32_fast::<CN>(s_ptr_0);
-                    let edge_colors_1 = load_u16_s32_fast::<CN>(s_ptr_1);
-                    let edge_colors_2 = load_u16_s32_fast::<CN>(s_ptr_2);
-                    let edge_colors_3 = load_u16_s32_fast::<CN>(s_ptr_3);
-
-                    store_0 = _mm_sub_epi32(store_0, edge_colors_0);
-                    store_1 = _mm_sub_epi32(store_1, edge_colors_1);
-                    store_2 = _mm_sub_epi32(store_2, edge_colors_2);
-                    store_3 = _mm_sub_epi32(store_3, edge_colors_3);
-                }
-
-                // add next
-                unsafe {
-                    let next_x = (x + half_kernel).min(width - 1) as usize;
-
-                    let next = next_x * CN;
-
-                    let s_ptr_0 = src.as_ptr().add(y_src_shift + next);
-                    let s_ptr_1 = src.as_ptr().add(y_src_shift + src_stride as usize + next);
-                    let s_ptr_2 = src
-                        .as_ptr()
-                        .add(y_src_shift + src_stride as usize * 2 + next);
-                    let s_ptr_3 = src
-                        .as_ptr()
-                        .add(y_src_shift + src_stride as usize * 3 + next);
-
-                    let edge_colors_0 = load_u16_s32_fast::<CN>(s_ptr_0);
-                    let edge_colors_1 = load_u16_s32_fast::<CN>(s_ptr_1);
-                    let edge_colors_2 = load_u16_s32_fast::<CN>(s_ptr_2);
-                    let edge_colors_3 = load_u16_s32_fast::<CN>(s_ptr_3);
-
-                    store_0 = _mm_add_epi32(store_0, edge_colors_0);
-                    store_1 = _mm_add_epi32(store_1, edge_colors_1);
-                    store_2 = _mm_add_epi32(store_2, edge_colors_2);
-                    store_3 = _mm_add_epi32(store_3, edge_colors_3);
-                }
-
                 let px = x as usize * CN;
 
                 unsafe {
@@ -222,6 +167,59 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
                         scale_store3,
                     );
                 }
+
+                // subtract previous
+                unsafe {
+                    let previous_x = (x as i64 - half_kernel as i64).max(0) as usize;
+                    let previous = previous_x * CN;
+
+                    let s_ptr_0 = src.as_ptr().add(y_src_shift + previous);
+                    let s_ptr_1 = src
+                        .as_ptr()
+                        .add(y_src_shift + src_stride as usize + previous);
+                    let s_ptr_2 = src
+                        .as_ptr()
+                        .add(y_src_shift + src_stride as usize * 2 + previous);
+                    let s_ptr_3 = src
+                        .as_ptr()
+                        .add(y_src_shift + src_stride as usize * 3 + previous);
+
+                    let edge_colors_0 = load_u16_s32_fast::<CN>(s_ptr_0);
+                    let edge_colors_1 = load_u16_s32_fast::<CN>(s_ptr_1);
+                    let edge_colors_2 = load_u16_s32_fast::<CN>(s_ptr_2);
+                    let edge_colors_3 = load_u16_s32_fast::<CN>(s_ptr_3);
+
+                    store_0 = _mm_sub_epi32(store_0, edge_colors_0);
+                    store_1 = _mm_sub_epi32(store_1, edge_colors_1);
+                    store_2 = _mm_sub_epi32(store_2, edge_colors_2);
+                    store_3 = _mm_sub_epi32(store_3, edge_colors_3);
+                }
+
+                // add next
+                unsafe {
+                    let next_x = (x + half_kernel + 1).min(width - 1) as usize;
+
+                    let next = next_x * CN;
+
+                    let s_ptr_0 = src.as_ptr().add(y_src_shift + next);
+                    let s_ptr_1 = src.as_ptr().add(y_src_shift + src_stride as usize + next);
+                    let s_ptr_2 = src
+                        .as_ptr()
+                        .add(y_src_shift + src_stride as usize * 2 + next);
+                    let s_ptr_3 = src
+                        .as_ptr()
+                        .add(y_src_shift + src_stride as usize * 3 + next);
+
+                    let edge_colors_0 = load_u16_s32_fast::<CN>(s_ptr_0);
+                    let edge_colors_1 = load_u16_s32_fast::<CN>(s_ptr_1);
+                    let edge_colors_2 = load_u16_s32_fast::<CN>(s_ptr_2);
+                    let edge_colors_3 = load_u16_s32_fast::<CN>(s_ptr_3);
+
+                    store_0 = _mm_add_epi32(store_0, edge_colors_0);
+                    store_1 = _mm_add_epi32(store_1, edge_colors_1);
+                    store_2 = _mm_add_epi32(store_2, edge_colors_2);
+                    store_3 = _mm_add_epi32(store_3, edge_colors_3);
+                }
             }
 
             yy += 4;
@@ -240,7 +238,7 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
             }
 
             unsafe {
-                for x in 1usize..half_kernel as usize {
+                for x in 1usize..=half_kernel as usize {
                     let px = x.min(width as usize - 1) * CN;
                     let s_ptr = src.as_ptr().add(y_src_shift + px);
                     let edge_colors = load_u16_s32_fast::<CN>(s_ptr);
@@ -249,7 +247,14 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
             }
 
             for x in 0..width {
-                // preload edge pixels
+                let px = x as usize * CN;
+
+                unsafe {
+                    let r0 = _mm_mul_ps(_mm_cvtepi32_ps(store), v_weight);
+                    let bytes_offset = y_dst_shift + px;
+                    let ptr = unsafe_dst.slice.as_ptr().add(bytes_offset) as *mut u16;
+                    store_u16_u32::<CN>(ptr, _mm_cvtps_epi32(r0));
+                }
 
                 // subtract previous
                 unsafe {
@@ -262,22 +267,13 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
 
                 // add next
                 unsafe {
-                    let next_x = (x + half_kernel).min(width - 1) as usize;
+                    let next_x = (x + half_kernel + 1).min(width - 1) as usize;
 
                     let next = next_x * CN;
 
                     let s_ptr = src.as_ptr().add(y_src_shift + next);
                     let edge_colors = load_u16_s32_fast::<CN>(s_ptr);
                     store = _mm_add_epi32(store, edge_colors);
-                }
-
-                let px = x as usize * CN;
-
-                unsafe {
-                    let r0 = _mm_mul_ps(_mm_cvtepi32_ps(store), v_weight);
-                    let bytes_offset = y_dst_shift + px;
-                    let ptr = unsafe_dst.slice.as_ptr().add(bytes_offset) as *mut u16;
-                    store_u16_u32::<CN>(ptr, _mm_cvtps_epi32(r0));
                 }
             }
         }
@@ -318,7 +314,7 @@ unsafe fn box_blur_vertical_pass_sse_impl16(
     let edge_count = (kernel_size / 2) + 1;
     let v_edge_count = _mm_set1_epi32(edge_count as i32);
 
-    let v_weight = _mm_set1_ps(1f32 / (radius * 2) as f32);
+    let v_weight = _mm_set1_ps(1f32 / (radius * 2 + 1) as f32);
 
     let half_kernel = kernel_size / 2;
 
@@ -350,8 +346,8 @@ unsafe fn box_blur_vertical_pass_sse_impl16(
         }
 
         unsafe {
-            for y in 1..std::cmp::min(half_kernel, height) {
-                let y_src_shift = y as usize * src_stride as usize;
+            for y in 1..=half_kernel {
+                let y_src_shift = y.min(height - 1) as usize * src_stride as usize;
                 let s_ptr = src.as_ptr().add(y_src_shift + px);
 
                 let edge0 = _mm_loadu_si128(s_ptr as *const _);
@@ -373,10 +369,38 @@ unsafe fn box_blur_vertical_pass_sse_impl16(
         unsafe {
             for y in 0..height {
                 // preload edge pixels
-                let next = (y + half_kernel).min(height - 1) as usize * src_stride as usize;
+                let next = (y + half_kernel + 1).min(height - 1) as usize * src_stride as usize;
                 let previous =
                     (y as i64 - half_kernel as i64).max(0) as usize * src_stride as usize;
                 let y_dst_shift = dst_stride as usize * y as usize;
+
+                {
+                    let px = cx as usize;
+
+                    let store0_ps = _mm_cvtepi32_ps(store_0);
+                    let store1_ps = _mm_cvtepi32_ps(store_1);
+                    let store2_ps = _mm_cvtepi32_ps(store_2);
+                    let store3_ps = _mm_cvtepi32_ps(store_3);
+
+                    let r0 = _mm_mul_ps(store0_ps, v_weight);
+                    let r1 = _mm_mul_ps(store1_ps, v_weight);
+                    let r2 = _mm_mul_ps(store2_ps, v_weight);
+                    let r3 = _mm_mul_ps(store3_ps, v_weight);
+
+                    let scale_store_0 = _mm_cvtps_epi32(r0);
+                    let scale_store_1 = _mm_cvtps_epi32(r1);
+                    let scale_store_2 = _mm_cvtps_epi32(r2);
+                    let scale_store_3 = _mm_cvtps_epi32(r3);
+
+                    let offset = y_dst_shift + px;
+                    let ptr = unsafe_dst.slice.get_unchecked(offset).get();
+
+                    let set0 = _mm_packus_epi32(scale_store_0, scale_store_1);
+                    let set1 = _mm_packus_epi32(scale_store_2, scale_store_3);
+
+                    _mm_storeu_si128(ptr as *mut _, set0);
+                    _mm_storeu_si128(ptr.add(8) as *mut _, set1);
+                }
 
                 // subtract previous
                 {
@@ -413,32 +437,6 @@ unsafe fn box_blur_vertical_pass_sse_impl16(
                     store_2 = _mm_add_epi32(store_2, i16_l1);
                     store_3 = _mm_add_epi32(store_3, i16_h1);
                 }
-
-                let px = cx as usize;
-
-                let store0_ps = _mm_cvtepi32_ps(store_0);
-                let store1_ps = _mm_cvtepi32_ps(store_1);
-                let store2_ps = _mm_cvtepi32_ps(store_2);
-                let store3_ps = _mm_cvtepi32_ps(store_3);
-
-                let r0 = _mm_mul_ps(store0_ps, v_weight);
-                let r1 = _mm_mul_ps(store1_ps, v_weight);
-                let r2 = _mm_mul_ps(store2_ps, v_weight);
-                let r3 = _mm_mul_ps(store3_ps, v_weight);
-
-                let scale_store_0 = _mm_cvtps_epi32(r0);
-                let scale_store_1 = _mm_cvtps_epi32(r1);
-                let scale_store_2 = _mm_cvtps_epi32(r2);
-                let scale_store_3 = _mm_cvtps_epi32(r3);
-
-                let offset = y_dst_shift + px;
-                let ptr = unsafe_dst.slice.get_unchecked(offset).get();
-
-                let set0 = _mm_packus_epi32(scale_store_0, scale_store_1);
-                let set1 = _mm_packus_epi32(scale_store_2, scale_store_3);
-
-                _mm_storeu_si128(ptr as *mut _, set0);
-                _mm_storeu_si128(ptr.add(8) as *mut _, set1);
             }
         }
 
@@ -463,8 +461,8 @@ unsafe fn box_blur_vertical_pass_sse_impl16(
         }
 
         unsafe {
-            for y in 1..std::cmp::min(half_kernel, height) {
-                let y_src_shift = y as usize * src_stride as usize;
+            for y in 1..=half_kernel {
+                let y_src_shift = y.min(height - 1) as usize * src_stride as usize;
                 let s_ptr = src.as_ptr().add(y_src_shift + px);
 
                 let edge = _mm_loadu_si128(s_ptr as *const _);
@@ -481,10 +479,30 @@ unsafe fn box_blur_vertical_pass_sse_impl16(
             for y in 0..height {
                 // preload edge pixels
                 let next =
-                    std::cmp::min(y + half_kernel, height - 1) as usize * src_stride as usize;
+                    std::cmp::min(y + half_kernel + 1, height - 1) as usize * src_stride as usize;
                 let previous =
                     std::cmp::max(y as i64 - half_kernel as i64, 0) as usize * src_stride as usize;
                 let y_dst_shift = dst_stride as usize * y as usize;
+
+                {
+                    let px = cx as usize;
+
+                    let store0_ps = _mm_cvtepi32_ps(store_0);
+                    let store1_ps = _mm_cvtepi32_ps(store_1);
+
+                    let scale_store_0_ps = _mm_mul_ps(store0_ps, v_weight);
+                    let scale_store_1_ps = _mm_mul_ps(store1_ps, v_weight);
+
+                    let scale_store_0 = _mm_cvtps_epi32(scale_store_0_ps);
+                    let scale_store_1 = _mm_cvtps_epi32(scale_store_1_ps);
+
+                    let offset = y_dst_shift + px;
+                    let ptr = unsafe_dst.slice.get_unchecked(offset).get();
+
+                    let set0 = _mm_packus_epi32(scale_store_0, scale_store_1);
+
+                    _mm_storeu_si128(ptr as *mut _, set0);
+                }
 
                 // subtract previous
                 {
@@ -509,24 +527,6 @@ unsafe fn box_blur_vertical_pass_sse_impl16(
                     store_0 = _mm_add_epi32(store_0, i16_l0);
                     store_1 = _mm_add_epi32(store_1, i16_h0);
                 }
-
-                let px = cx as usize;
-
-                let store0_ps = _mm_cvtepi32_ps(store_0);
-                let store1_ps = _mm_cvtepi32_ps(store_1);
-
-                let scale_store_0_ps = _mm_mul_ps(store0_ps, v_weight);
-                let scale_store_1_ps = _mm_mul_ps(store1_ps, v_weight);
-
-                let scale_store_0 = _mm_cvtps_epi32(scale_store_0_ps);
-                let scale_store_1 = _mm_cvtps_epi32(scale_store_1_ps);
-
-                let offset = y_dst_shift + px;
-                let ptr = unsafe_dst.slice.get_unchecked(offset).get();
-
-                let set0 = _mm_packus_epi32(scale_store_0, scale_store_1);
-
-                _mm_storeu_si128(ptr as *mut _, set0);
             }
         }
 
@@ -545,8 +545,8 @@ unsafe fn box_blur_vertical_pass_sse_impl16(
             store = _mm_mullo_epi32(edge_colors, v_edge_count);
         }
 
-        for y in 1..std::cmp::min(half_kernel, height) {
-            let y_src_shift = y as usize * src_stride as usize;
+        for y in 1..=half_kernel {
+            let y_src_shift = y.min(height - 1) as usize * src_stride as usize;
             let s_ptr = src.as_ptr().add(y_src_shift + px);
             let edge_colors = load_u16_s32_fast::<TAIL_CN>(s_ptr);
             store = _mm_add_epi32(store, edge_colors);
@@ -554,10 +554,18 @@ unsafe fn box_blur_vertical_pass_sse_impl16(
 
         for y in 0..height {
             // preload edge pixels
-            let next = std::cmp::min(y + half_kernel, height - 1) as usize * src_stride as usize;
+            let next =
+                std::cmp::min(y + half_kernel + 1, height - 1) as usize * src_stride as usize;
             let previous =
                 std::cmp::max(y as i64 - half_kernel as i64, 0) as usize * src_stride as usize;
             let y_dst_shift = dst_stride as usize * y as usize;
+
+            let px = x as usize;
+
+            let scale_store = _mm_mul_ps_epi32(store, v_weight);
+
+            let ptr = unsafe_dst.slice.as_ptr().add(y_dst_shift + px) as *mut u16;
+            store_u16_u32::<TAIL_CN>(ptr, scale_store);
 
             // subtract previous
             {
@@ -572,13 +580,6 @@ unsafe fn box_blur_vertical_pass_sse_impl16(
                 let edge_colors = load_u16_s32_fast::<TAIL_CN>(s_ptr);
                 store = _mm_add_epi32(store, edge_colors);
             }
-
-            let px = x as usize;
-
-            let scale_store = _mm_mul_ps_epi32(store, v_weight);
-
-            let ptr = unsafe_dst.slice.as_ptr().add(y_dst_shift + px) as *mut u16;
-            store_u16_u32::<TAIL_CN>(ptr, scale_store);
         }
     }
 }
