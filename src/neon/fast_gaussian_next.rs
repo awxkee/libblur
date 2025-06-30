@@ -321,7 +321,7 @@ pub(crate) fn fgn_vertical_pass_neon_u8<T, const CN: usize>(
     }
 }
 
-pub(crate) fn fgn_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
+pub(crate) fn fgn_horizontal_pass_neon_u8<T, const CN: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -371,7 +371,7 @@ pub(crate) fn fgn_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
 
             for x in (0 - 3 * radius_64)..(width as i64) {
                 if x >= 0 {
-                    let current_px = x as usize * CHANNELS_COUNT;
+                    let current_px = x as usize * CN;
 
                     let c0 = vcvtq_f32_s32(summs0);
                     let c1 = vcvtq_f32_s32(summs1);
@@ -393,7 +393,7 @@ pub(crate) fn fgn_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
                     let dst_ptr2 = (bytes.slice.as_ptr() as *mut u8).add(current_y2 + current_px);
                     let dst_ptr3 = (bytes.slice.as_ptr() as *mut u8).add(current_y3 + current_px);
 
-                    store_u8_s32_x4::<CHANNELS_COUNT>(
+                    store_u8_s32_x4::<CN>(
                         (dst_ptr0, dst_ptr1, dst_ptr2, dst_ptr3),
                         int32x4x4_t(prepared_px0, prepared_px1, prepared_px2, prepared_px3),
                     );
@@ -488,17 +488,17 @@ pub(crate) fn fgn_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
                 }
 
                 let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide);
-                let next_row_px = next_row_x * CHANNELS_COUNT;
+                let next_row_px = next_row_x * CN;
 
                 let s_ptr0 = bytes.slice.as_ptr().add(current_y0 + next_row_px) as *mut u8;
                 let s_ptr1 = bytes.slice.as_ptr().add(current_y1 + next_row_px) as *mut u8;
                 let s_ptr2 = bytes.slice.as_ptr().add(current_y2 + next_row_px) as *mut u8;
                 let s_ptr3 = bytes.slice.as_ptr().add(current_y3 + next_row_px) as *mut u8;
 
-                let pixel_color0 = load_u8_s32_fast::<CHANNELS_COUNT>(s_ptr0);
-                let pixel_color1 = load_u8_s32_fast::<CHANNELS_COUNT>(s_ptr1);
-                let pixel_color2 = load_u8_s32_fast::<CHANNELS_COUNT>(s_ptr2);
-                let pixel_color3 = load_u8_s32_fast::<CHANNELS_COUNT>(s_ptr3);
+                let pixel_color0 = load_u8_s32_fast::<CN>(s_ptr0);
+                let pixel_color1 = load_u8_s32_fast::<CN>(s_ptr1);
+                let pixel_color2 = load_u8_s32_fast::<CN>(s_ptr2);
+                let pixel_color3 = load_u8_s32_fast::<CN>(s_ptr3);
 
                 let arr_index = ((x + 2 * radius_64) & 1023) as usize;
                 let buf_ptr0 = buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr() as *mut _;
@@ -539,7 +539,7 @@ pub(crate) fn fgn_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
 
             for x in (0 - 3 * radius_64)..(width as i64) {
                 if x >= 0 {
-                    let current_px = x as usize * CHANNELS_COUNT;
+                    let current_px = x as usize * CN;
 
                     let prepared_px_s32 = vcvtaq_s32_f32(vmulq_f32(vcvtq_f32_s32(summs), v_weight));
                     let prepared_u16 = vqmovun_s32(prepared_px_s32);
@@ -548,7 +548,7 @@ pub(crate) fn fgn_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
                     let bytes_offset = current_y + current_px;
 
                     let dst_ptr = (bytes.slice.as_ptr() as *mut u8).add(bytes_offset);
-                    store_u8x8_m4::<CHANNELS_COUNT>(dst_ptr, prepared_u8);
+                    store_u8x8_m4::<CN>(dst_ptr, prepared_u8);
 
                     let d_arr_index_1 = ((x + radius_64) & 1023) as usize;
                     let d_arr_index_2 = ((x - radius_64) & 1023) as usize;
@@ -584,11 +584,11 @@ pub(crate) fn fgn_horizontal_pass_neon_u8<T, const CHANNELS_COUNT: usize>(
 
                 let next_row_y = (y as usize) * (stride as usize);
                 let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide);
-                let next_row_px = next_row_x * CHANNELS_COUNT;
+                let next_row_px = next_row_x * CN;
 
                 let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut u8;
 
-                let pixel_color = load_u8_s32_fast::<CHANNELS_COUNT>(s_ptr);
+                let pixel_color = load_u8_s32_fast::<CN>(s_ptr);
 
                 let arr_index = ((x + 2 * radius_64) & 1023) as usize;
                 let buf_ptr = buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr() as *mut _;

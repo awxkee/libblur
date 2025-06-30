@@ -28,14 +28,14 @@
 use num_complex::Complex;
 
 pub fn gaussian_kernel_1d(width: u32, sigma: f32) -> Vec<f32> {
-    let mut sum_norm: f32 = 0f32;
-    let mut kernel: Vec<f32> = vec![0f32; width as usize];
-    let scale = 1f32 / (f32::sqrt(2f32 * std::f32::consts::PI) * sigma);
+    let mut sum_norm: f32 = 0.;
+    let mut kernel: Vec<f32> = vec![0.; width as usize];
+    let scale = 1f32 / (f32::sqrt(2. * std::f32::consts::PI) * sigma);
     let mean = (width / 2) as f32;
 
     for (x, item) in kernel.iter_mut().enumerate() {
         let dx = (x as f32 - mean) / sigma;
-        let new_weight = f32::exp(-0.5f32 * dx * dx) * scale;
+        let new_weight = f32::exp(-0.5 * dx * dx) * scale;
         *item = new_weight;
         sum_norm += new_weight;
     }

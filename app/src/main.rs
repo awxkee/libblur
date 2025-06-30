@@ -30,12 +30,13 @@
 mod merge;
 mod split;
 
+use image::imageops::FilterType;
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use libblur::{
     bilateral_filter, complex_gaussian_kernel, fast_bilateral_filter, fast_bilateral_filter_u16,
-    filter_1d_complex, filter_1d_complex_fixed_point, filter_2d_rgba_fft, gaussian_blur,
-    gaussian_kernel_1d, lens_kernel, sigma_size, AnisotropicRadius, BilateralBlurParams, BlurImage,
-    BlurImageMut, BoxBlurParameters, CLTParameters, ConvolutionMode, EdgeMode, FastBlurChannels,
+    filter_1d_complex, filter_1d_complex_fixed_point, gaussian_blur, gaussian_kernel_1d,
+    lens_kernel, sigma_size, AnisotropicRadius, BilateralBlurParams, BlurImage, BlurImageMut,
+    BoxBlurParameters, CLTParameters, ConvolutionMode, EdgeMode, FastBlurChannels,
     GaussianBlurParams, KernelShape, Scalar, ThreadingPolicy, TransferFunction,
 };
 use num_complex::Complex;
@@ -91,10 +92,10 @@ fn main() {
     let mut v_vec = src_bytes
         .to_vec()
         .iter()
-        .map(|&x| x)
+        // .map(|&x| x)
         // .map(|&x| (x as f32 / 255.))
-        // .map(|&x| u16::from_ne_bytes([x, x]))
-        .collect::<Vec<u8>>();
+        .map(|&x| u16::from_ne_bytes([x, x]))
+        .collect::<Vec<u16>>();
 
     // let mut dst_image = BlurImageMut::borrow(
     //     &mut v_vec,
@@ -103,6 +104,7 @@ fn main() {
     //     FastBlurChannels::Channels4,
     // );
 
+    // let z0 = v_vec.iter().map(|&x| (x as f32 * (1. / 255.))).collect::<Vec<_>>();
     let cvt = BlurImage::borrow(
         &v_vec,
         dyn_image.width(),
@@ -122,7 +124,7 @@ fn main() {
     // let gaussian_kernel = gaussian_kernel_1d(31, sigma_size(31.)).iter().map(|&x| Complex::new(x, 0.0)).collect::<Vec<Complex<f32>>>();
     let gaussian_kernel = complex_gaussian_kernel(51., 0.75, 5.);
 
-    let mut dst_image = cvt.clone_as_mut();
+    let mut dst_image = BlurImageMut::default(); //cvt.clone_as_mut();
 
     // gaussian_blur(
     //     &cvt,
@@ -155,16 +157,13 @@ fn main() {
 
     // }
 
-    libblur::bilateral_filter(
+    libblur::box_blur_u16(
         &cvt,
         &mut dst_image,
-        BilateralBlurParams {
-            kernel_size: 15,
-            spatial_sigma: 5.,
-            range_sigma: 5.,
+        BoxBlurParameters {
+            x_axis_kernel: 7,
+            y_axis_kernel: 7,
         },
-        EdgeMode::Clamp,
-        Scalar::default(),
         ThreadingPolicy::Single,
     )
     .unwrap();
@@ -187,16 +186,17 @@ fn main() {
     // )
     // .unwrap();
 
-    // let j_dag = dst_image.to_immutable_ref();
+    let j_dag = dst_image.to_immutable_ref();
+
     // let gamma = j_dag.gamma8(TransferFunction::Srgb, true).unwrap();
 
     dst_bytes = dst_image
         .data
         .borrow_mut()
         .iter()
-        .map(|&x| x)
+        // .map(|&x| x)
         // .map(|&x| (x * 255f32).round() as u8)
-        // .map(|&x| (x >> 8) as u8)
+        .map(|&x| (x >> 8) as u8)
         .collect::<Vec<u8>>();
 
     // dst_bytes = dst_image.data.borrow().to_vec();

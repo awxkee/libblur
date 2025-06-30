@@ -1050,9 +1050,7 @@ pub fn fast_gaussian_next_f16(
         half::f16,
         channels,
         edge_mode,
-        unsafe {
-            std::mem::transmute::<&mut [half::f16], &mut [half::f16]>(in_place.data.borrow_mut())
-        },
+        unsafe { std::mem::transmute::<&mut [f16], &mut [f16]>(in_place.data.borrow_mut()) },
         stride,
         width,
         height,
@@ -1088,7 +1086,7 @@ mod tests {
             let diff = (cn as i32 - 126).abs();
             assert!(
                 diff <= 3,
-                "Diff expected to be less than 3 but it was {diff} at {i}"
+                "Diff expected to be less than 3, but it was {diff} at {i}"
             );
         }
     }
@@ -1115,7 +1113,7 @@ mod tests {
             let diff = (cn as i32 - 17234i32).abs();
             assert!(
                 diff <= 14,
-                "Diff expected to be less than 14 but it was {diff}"
+                "Diff expected to be less than 14, but it was {diff}"
             );
         }
     }
@@ -1142,7 +1140,7 @@ mod tests {
             let diff = (cn - 0.432).abs();
             assert!(
                 diff <= 1e-4,
-                "Diff expected to be less than 1e-4 but it was {diff}"
+                "Diff expected to be less than 1e-4, but it was {diff}"
             );
         }
     }

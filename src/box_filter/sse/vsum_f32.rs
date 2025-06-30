@@ -50,7 +50,7 @@ unsafe fn sse_ring_vertical_row_summ_impl_f32(
 ) {
     let next_row = src[1];
     let previous_row = src[0];
-    let weight = 1. / (radius as f32 * 2.);
+    let weight = 1. / (radius as f32 * 2. + 1.);
     let v_weight = _mm_set1_ps(weight);
 
     let chunks = previous_row.chunks_exact(16).len();
@@ -66,6 +66,16 @@ unsafe fn sse_ring_vertical_row_summ_impl_f32(
             let mut weight1 = _mm_loadu_ps(buffer.get_unchecked(4..).as_ptr() as *const _);
             let mut weight2 = _mm_loadu_ps(buffer.get_unchecked(8..).as_ptr() as *const _);
             let mut weight3 = _mm_loadu_ps(buffer.get_unchecked(12..).as_ptr() as *const _);
+
+            let z0 = _mm_mul_ps(weight0, v_weight);
+            let z1 = _mm_mul_ps(weight1, v_weight);
+            let z2 = _mm_mul_ps(weight2, v_weight);
+            let z3 = _mm_mul_ps(weight3, v_weight);
+
+            _mm_storeu_ps(dst.as_mut_ptr() as *mut _, z0);
+            _mm_storeu_ps(dst.get_unchecked_mut(4..).as_mut_ptr() as *mut _, z1);
+            _mm_storeu_ps(dst.get_unchecked_mut(8..).as_mut_ptr() as *mut _, z2);
+            _mm_storeu_ps(dst.get_unchecked_mut(12..).as_mut_ptr() as *mut _, z3);
 
             let next0 = _mm_loadu_ps(src_next.as_ptr() as *const _);
             let next1 = _mm_loadu_ps(src_next.get_unchecked(4..).as_ptr() as *const _);
@@ -100,16 +110,6 @@ unsafe fn sse_ring_vertical_row_summ_impl_f32(
                 buffer.get_unchecked_mut(12..).as_mut_ptr() as *mut _,
                 weight3,
             );
-
-            let z0 = _mm_mul_ps(weight0, v_weight);
-            let z1 = _mm_mul_ps(weight1, v_weight);
-            let z2 = _mm_mul_ps(weight2, v_weight);
-            let z3 = _mm_mul_ps(weight3, v_weight);
-
-            _mm_storeu_ps(dst.as_mut_ptr() as *mut _, z0);
-            _mm_storeu_ps(dst.get_unchecked_mut(4..).as_mut_ptr() as *mut _, z1);
-            _mm_storeu_ps(dst.get_unchecked_mut(8..).as_mut_ptr() as *mut _, z2);
-            _mm_storeu_ps(dst.get_unchecked_mut(12..).as_mut_ptr() as *mut _, z3);
         }
     }
 
@@ -122,11 +122,11 @@ unsafe fn sse_ring_vertical_row_summ_impl_f32(
     {
         let mut weight0 = *buffer;
 
+        *dst = weight0 * weight;
+
         weight0 += *src_next;
         weight0 -= *src_previous;
 
         *buffer = weight0;
-
-        *dst = weight0 * weight;
     }
 }

@@ -29,20 +29,19 @@
 
 /// Computes sigma from kernel size
 pub fn sigma_size(kernel_size: f32) -> f32 {
-    let safe_kernel_size = if kernel_size <= 1. { 2. } else { kernel_size };
+    let safe_kernel_size = if kernel_size <= 1. { 0.8 } else { kernel_size };
     0.3f32 * ((safe_kernel_size - 1.) * 0.5f32 - 1f32) + 0.8f32
 }
 
 /// Computes sigma from kernel size for `f64`
 pub fn sigma_size_d(kernel_size: f64) -> f64 {
-    let safe_kernel_size = if kernel_size <= 1. { 2. } else { kernel_size };
+    let safe_kernel_size = if kernel_size <= 1. { 0.8 } else { kernel_size };
     0.3 * ((safe_kernel_size - 1.) * 0.5 - 1.) + 0.8
 }
 
 /// Computes kernel size from sigma
 pub fn kernel_size(sigma: f32) -> u32 {
-    assert_ne!(sigma, 0.8f32);
-    let possible_size = (((((sigma - 0.8f32) / 0.3f32) + 1f32) * 2f32) + 1f32).max(3f32) as u32;
+    let possible_size = (((((sigma - 0.8) / 0.3) + 1.) * 2.) + 1.).max(3.) as u32;
     if possible_size % 2 == 0 {
         return possible_size + 1;
     }
@@ -51,7 +50,6 @@ pub fn kernel_size(sigma: f32) -> u32 {
 
 /// Computes kernel size from sigma
 pub fn kernel_size_d(sigma: f64) -> u32 {
-    assert_ne!(sigma, 0.8);
     let possible_size = (((((sigma - 0.8) / 0.3) + 1.) * 2.) + 1.).max(3.) as u32;
     if possible_size % 2 == 0 {
         return possible_size + 1;

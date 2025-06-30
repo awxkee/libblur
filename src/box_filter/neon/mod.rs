@@ -44,4 +44,6 @@ pub(crate) use rgba_f32::{
 };
 pub(crate) use vsum16::neon_ring_vertical_row_summ16;
 pub(crate) use vsum8::neon_ring_vertical_row_summ;
+#[cfg(feature = "rdm")]
+pub(crate) use vsum8::neon_ring_vertical_row_summ_rdm;
 pub(crate) use vsum_f32::neon_ring_vertical_row_summ_f32;
