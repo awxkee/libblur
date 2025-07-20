@@ -33,7 +33,6 @@ mod arena_roi;
 mod avx;
 #[cfg(all(target_arch = "x86_64", feature = "nightly_avx512"))]
 mod avx512;
-mod color_group;
 mod filter;
 mod filter_1d_approx;
 mod filter_1d_column_handler;

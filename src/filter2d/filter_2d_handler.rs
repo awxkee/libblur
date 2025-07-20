@@ -186,3 +186,7 @@ default_2d_column_handler!(u32, f32, true);
 default_2d_column_handler!(u32, f64, true);
 default_2d_column_handler!(u64, f32, true);
 default_2d_column_handler!(u64, f64, true);
+default_2d_column_handler!(f32, f32, false);
+default_2d_column_handler!(f32, f64, false);
+default_2d_column_handler!(f64, f32, false);
+default_2d_column_handler!(f64, f64, false);
