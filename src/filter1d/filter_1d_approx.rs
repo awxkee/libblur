@@ -41,11 +41,12 @@ use crate::filter1d::row_handler_small_approx::{
     Filter1DRowHandlerBInterpolateApr, RowsHolder, RowsHolderMut,
 };
 use crate::filter1d::to_approx_storage::{ApproxLevel, ToApproxStorage};
+use crate::primitives::PrimitiveCast;
 use crate::safe_math::{SafeAdd, SafeMul};
 use crate::to_storage::ToStorage;
 use crate::{BlurError, BlurImage, BlurImageMut, EdgeMode, Scalar, ThreadingPolicy};
 use novtb::{ParallelZonedIterator, TbSliceMut};
-use num_traits::{AsPrimitive, Float, FromPrimitive, MulAdd};
+use num_traits::{Float, MulAdd};
 use std::fmt::Debug;
 use std::ops::{Add, Mul, Shl, Shr};
 
@@ -80,7 +81,7 @@ pub fn filter_1d_approx<T, F, I, const N: usize>(
 ) -> Result<(), BlurError>
 where
     T: Copy
-        + AsPrimitive<F>
+        + PrimitiveCast<F>
         + Default
         + Send
         + Sync
@@ -88,9 +89,8 @@ where
         + Filter1DColumnHandlerApprox<T, I>
         + Filter1DColumnMultipleRowsApprox<T, I>
         + Filter1DRowHandlerBInterpolateApr<T, I>
-        + Debug
-        + FromPrimitive,
-    F: ToStorage<T> + Mul<F> + MulAdd<F, Output = F> + Send + Sync + AsPrimitive<I> + Float,
+        + Debug,
+    F: ToStorage<T> + Mul<F> + MulAdd<F, Output = F> + Send + Sync + PrimitiveCast<I> + Float,
     I: Copy
         + Mul<Output = I>
         + Add<Output = I>
@@ -98,15 +98,15 @@ where
         + Default
         + 'static
         + ToApproxStorage<T>
-        + AsPrimitive<F>
+        + PrimitiveCast<F>
         + PartialEq
         + Sync
         + Send
         + ApproxLevel
         + Shl<Output = I>,
-    i32: AsPrimitive<F> + AsPrimitive<I>,
-    i64: AsPrimitive<I> + AsPrimitive<F>,
-    f64: AsPrimitive<T>,
+    i32: PrimitiveCast<F> + PrimitiveCast<I>,
+    i64: PrimitiveCast<I> + PrimitiveCast<F>,
+    f64: PrimitiveCast<T>,
 {
     const SMALL_KERNEL_CUTOFF: usize = 61;
     if column_kernel.len() <= SMALL_KERNEL_CUTOFF {
@@ -143,17 +143,17 @@ where
 
     _ = (destination.stride as usize).safe_mul(3)?;
 
-    let one_i: I = 1.as_();
-    let base_level: I = one_i << I::approx_level().as_();
-    let initial_scale: F = base_level.as_();
+    let one_i: I = 1.cast_();
+    let base_level: I = one_i << I::approx_level().cast_();
+    let initial_scale: F = base_level.cast_();
 
     let scaled_row_kernel = row_kernel
         .iter()
-        .map(|&x| (x * initial_scale).as_())
+        .map(|&x| (x * initial_scale).cast_())
         .collect::<Vec<I>>();
     let scaled_column_kernel = column_kernel
         .iter()
-        .map(|&x| (x * initial_scale).as_())
+        .map(|&x| (x * initial_scale).cast_())
         .collect::<Vec<I>>();
 
     let scanned_row_kernel = scan_se_1d::<I>(&scaled_row_kernel);
@@ -203,7 +203,11 @@ where
         image_size,
         column_kernel_shape,
         border_mode,
-        border_constant,
+        (0..N)
+            .map(|x| border_constant[x].cast_())
+            .collect::<Vec<T>>()
+            .try_into()
+            .unwrap(),
     )?;
 
     let top_pad = column_arena_k.top_pad.as_slice();
@@ -373,7 +377,7 @@ fn filter_1d_approx_sliding_buffer<T, F, I, const N: usize>(
 ) -> Result<(), BlurError>
 where
     T: Copy
-        + AsPrimitive<F>
+        + PrimitiveCast<F>
         + Default
         + Send
         + Sync
@@ -382,7 +386,7 @@ where
         + Filter1DColumnMultipleRowsApprox<T, I>
         + Filter1DRowHandlerBInterpolateApr<T, I>
         + Debug,
-    F: ToStorage<T> + Mul<F> + MulAdd<F, Output = F> + Send + Sync + AsPrimitive<I> + Float,
+    F: ToStorage<T> + Mul<F> + MulAdd<F, Output = F> + Send + Sync + PrimitiveCast<I> + Float,
     I: Copy
         + Mul<Output = I>
         + Add<Output = I>
@@ -390,15 +394,15 @@ where
         + Default
         + 'static
         + ToApproxStorage<T>
-        + AsPrimitive<F>
+        + PrimitiveCast<F>
         + PartialEq
         + Sync
         + Send
         + ApproxLevel
         + Shl<Output = I>,
-    i32: AsPrimitive<F> + AsPrimitive<I>,
-    i64: AsPrimitive<I> + AsPrimitive<F>,
-    f64: AsPrimitive<T>,
+    i32: PrimitiveCast<F> + PrimitiveCast<I>,
+    i64: PrimitiveCast<I> + PrimitiveCast<F>,
+    f64: PrimitiveCast<T>,
 {
     image.check_layout_channels(N)?;
     destination.check_layout_channels(N, Some(image))?;
@@ -419,17 +423,17 @@ where
 
     const B_INTER_CUTOFF: usize = 29;
 
-    let one_i: I = 1.as_();
-    let base_level: I = one_i << I::approx_level().as_();
-    let initial_scale: F = base_level.as_();
+    let one_i: I = 1.cast_();
+    let base_level: I = one_i << I::approx_level().cast_();
+    let initial_scale: F = base_level.cast_();
 
     let scaled_row_kernel = row_kernel
         .iter()
-        .map(|&x| (x * initial_scale).as_())
+        .map(|&x| (x * initial_scale).cast_())
         .collect::<Vec<I>>();
     let scaled_column_kernel = column_kernel
         .iter()
-        .map(|&x| (x * initial_scale).as_())
+        .map(|&x| (x * initial_scale).cast_())
         .collect::<Vec<I>>();
 
     let scanned_row_kernel = scan_se_1d::<I>(&scaled_row_kernel);

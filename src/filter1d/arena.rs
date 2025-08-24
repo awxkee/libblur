@@ -30,9 +30,10 @@ use crate::edge_mode::{reflect_index, reflect_index_101};
 use crate::filter1d::arena_roi::copy_roi;
 use crate::filter1d::filter_element::KernelShape;
 use crate::img_size::ImageSize;
+use crate::primitives::PrimitiveCast;
 use crate::util::check_slice_size;
 use crate::{BlurError, BlurImage, EdgeMode, Scalar};
-use num_traits::{AsPrimitive, FromPrimitive};
+use num_traits::AsPrimitive;
 use std::fmt::Debug;
 
 #[derive(Copy, Clone)]
@@ -341,7 +342,7 @@ pub fn make_arena_row<T, const CN: usize>(
 ) -> Result<(Vec<T>, usize), BlurError>
 where
     T: Default + Copy + Send + Sync + 'static + Debug,
-    f64: AsPrimitive<T>,
+    f64: PrimitiveCast<T>,
 {
     image.check_layout()?;
     let pad_w = kernel_size.width / 2;
@@ -364,7 +365,7 @@ pub(crate) fn write_arena_row<T, const CN: usize>(
 ) -> Result<(), BlurError>
 where
     T: Default + Copy + Send + Sync + 'static + Debug,
-    f64: AsPrimitive<T>,
+    f64: PrimitiveCast<T>,
 {
     image.check_layout()?;
     let pad_w = kernel_size.width / 2;
@@ -423,7 +424,7 @@ where
             }
             EdgeMode::Constant => {
                 for (i, dst) in dst.iter_mut().enumerate() {
-                    *dst = scalar[i].as_();
+                    *dst = scalar[i].cast_();
                 }
             }
         }
@@ -467,7 +468,7 @@ where
             }
             EdgeMode::Constant => {
                 for (i, dst) in dst.iter_mut().enumerate() {
-                    *dst = scalar[i].as_();
+                    *dst = scalar[i].cast_();
                 }
             }
         }
@@ -498,21 +499,27 @@ where
 }
 
 /// Pads a column image with chosen border strategy
-pub fn make_arena_columns<T, const CN: usize>(
+pub(crate) fn make_arena_columns<T, const CN: usize>(
     image: &[T],
     image_size: ImageSize,
     kernel_size: KernelShape,
     border_mode: EdgeMode,
-    scalar: Scalar,
+    scalar_projection: [T; CN],
 ) -> Result<ArenaColumns<T>, BlurError>
 where
-    T: Default + Copy + Send + Sync + 'static + FromPrimitive,
+    T: Default + Copy + Send + Sync + 'static,
 {
     #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]
     {
         if std::arch::is_x86_feature_detected!("avx2") {
             return unsafe {
-                mac_avx2::<T, CN>(image, image_size, kernel_size, border_mode, scalar)
+                mac_avx2::<T, CN>(
+                    image,
+                    image_size,
+                    kernel_size,
+                    border_mode,
+                    scalar_projection,
+                )
             };
         }
     }
@@ -520,11 +527,23 @@ where
     {
         if std::arch::is_x86_feature_detected!("sse4.1") {
             return unsafe {
-                mac_sse_4_1::<T, CN>(image, image_size, kernel_size, border_mode, scalar)
+                mac_sse_4_1::<T, CN>(
+                    image,
+                    image_size,
+                    kernel_size,
+                    border_mode,
+                    scalar_projection,
+                )
             };
         }
     }
-    make_arena_columns_exec::<T, CN>(image, image_size, kernel_size, border_mode, scalar)
+    make_arena_columns_exec::<T, CN>(
+        image,
+        image_size,
+        kernel_size,
+        border_mode,
+        scalar_projection,
+    )
 }
 
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]
@@ -534,12 +553,18 @@ unsafe fn mac_avx2<T, const CN: usize>(
     image_size: ImageSize,
     kernel_size: KernelShape,
     border_mode: EdgeMode,
-    scalar: Scalar,
+    scalar_projection: [T; CN],
 ) -> Result<ArenaColumns<T>, BlurError>
 where
-    T: Default + Copy + Send + Sync + 'static + FromPrimitive,
+    T: Default + Copy + Send + Sync + 'static,
 {
-    make_arena_columns_exec::<T, CN>(image, image_size, kernel_size, border_mode, scalar)
+    make_arena_columns_exec::<T, CN>(
+        image,
+        image_size,
+        kernel_size,
+        border_mode,
+        scalar_projection,
+    )
 }
 
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
@@ -549,12 +574,18 @@ unsafe fn mac_sse_4_1<T, const CN: usize>(
     image_size: ImageSize,
     kernel_size: KernelShape,
     border_mode: EdgeMode,
-    scalar: Scalar,
+    scalar_projection: [T; CN],
 ) -> Result<ArenaColumns<T>, BlurError>
 where
-    T: Default + Copy + Send + Sync + 'static + FromPrimitive,
+    T: Default + Copy + Send + Sync + 'static,
 {
-    make_arena_columns_exec::<T, CN>(image, image_size, kernel_size, border_mode, scalar)
+    make_arena_columns_exec::<T, CN>(
+        image,
+        image_size,
+        kernel_size,
+        border_mode,
+        scalar_projection,
+    )
 }
 
 /// Pads a column image with chosen border strategy
@@ -564,10 +595,10 @@ fn make_arena_columns_exec<T, const CN: usize>(
     image_size: ImageSize,
     kernel_size: KernelShape,
     border_mode: EdgeMode,
-    scalar: Scalar,
+    scalar_projection: [T; CN],
 ) -> Result<ArenaColumns<T>, BlurError>
 where
-    T: Default + Copy + Send + Sync + 'static + FromPrimitive,
+    T: Default + Copy + Send + Sync + 'static,
 {
     check_slice_size(
         image,
@@ -623,7 +654,7 @@ where
                 }
                 EdgeMode::Constant => {
                     for (i, dst) in dst.iter_mut().enumerate() {
-                        *dst = T::from_f64(scalar[i]).unwrap_or_default();
+                        *dst = scalar_projection[i];
                     }
                 }
             }
@@ -676,7 +707,7 @@ where
                 }
                 EdgeMode::Constant => {
                     for (i, dst) in dst.iter_mut().enumerate() {
-                        *dst = T::from_f64(scalar[i]).unwrap_or_default();
+                        *dst = scalar_projection[i];
                     }
                 }
             }

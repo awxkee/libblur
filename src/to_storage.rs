@@ -25,7 +25,8 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-use half::f16;
+#[cfg(feature = "nightly_f16")]
+use core::f16;
 
 /// Helper trait to convert and round if we are storing in integral type
 pub trait ToStorage<T>: 'static + Copy
@@ -79,6 +80,12 @@ impl_to_direct_storage!(f32, f32);
 impl_to_direct_storage!(f64, f64);
 impl_to_direct_storage!(f64, f32);
 impl_to_direct_storage!(f32, f64);
+#[cfg(feature = "nightly_f16")]
+impl_to_direct_storage!(f16, f16);
+#[cfg(feature = "nightly_f16")]
+impl_to_direct_storage!(f16, f32);
+#[cfg(feature = "nightly_f16")]
+impl_to_direct_storage!(f16, f64);
 
 macro_rules! impl_to_saturated_signed_storage {
     ($from:ty, $to:ty) => {
@@ -115,14 +122,16 @@ impl_to_saturated_signed_storage!(i64, i16);
 impl_to_saturated_signed_storage!(i16, i8);
 impl_to_saturated_signed_storage!(u16, i8);
 
+#[cfg(feature = "nightly_f16")]
 impl ToStorage<f16> for f32 {
     fn to_(self) -> f16 {
-        f16::from_f32(self)
+        self as f16
     }
 }
 
+#[cfg(feature = "nightly_f16")]
 impl ToStorage<f16> for f64 {
     fn to_(self) -> f16 {
-        f16::from_f64(self)
+        self as f16
     }
 }

@@ -46,7 +46,8 @@ use crate::filter1d::sse::{
     filter_column_symm_sse_u8_f32, filter_column_symm_sse_u8_i16,
 };
 use crate::ImageSize;
-use half::f16;
+#[cfg(feature = "nightly_f16")]
+use core::f16;
 
 #[allow(dead_code, unused)]
 #[derive(Clone, Debug)]
@@ -439,7 +440,9 @@ default_1d_column_handler!(u32, f32);
 default_1d_column_handler!(u32, f64);
 default_1d_column_handler!(i32, f32);
 default_1d_column_handler!(i32, f64);
+#[cfg(feature = "nightly_f16")]
 default_1d_column_handler!(f16, f32);
+#[cfg(feature = "nightly_f16")]
 default_1d_column_handler!(f16, f64);
 default_1d_column_handler!(f64, f64);
 
@@ -457,7 +460,9 @@ default_1d_column_multiple_rows!(u32, f32);
 default_1d_column_multiple_rows!(u32, f64);
 default_1d_column_multiple_rows!(i32, f32);
 default_1d_column_multiple_rows!(i32, f64);
+#[cfg(feature = "nightly_f16")]
 default_1d_column_multiple_rows!(f16, f32);
+#[cfg(feature = "nightly_f16")]
 default_1d_column_multiple_rows!(f16, f64);
 default_1d_column_multiple_rows!(f32, f64);
 default_1d_column_multiple_rows!(f64, f64);

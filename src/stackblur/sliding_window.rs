@@ -26,13 +26,13 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::primitives::PrimitiveCast;
 use crate::unsafe_slice::UnsafeSlice;
-use num_traits::{AsPrimitive, FromPrimitive};
 use std::ops::{AddAssign, Mul, Shr, Sub, SubAssign};
 
 #[repr(C)]
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Copy)]
-pub(crate) struct SlidingWindow<const COMPS: usize, J: Copy> {
+pub(crate) struct SlidingWindow<const CN: usize, J: Copy> {
     pub r: J,
     pub g: J,
     pub b: J,
@@ -61,59 +61,74 @@ where
     #[inline]
     pub fn cast<T>(&self) -> SlidingWindow<COMPS, T>
     where
-        J: AsPrimitive<T>,
+        J: PrimitiveCast<T>,
         T: Default + Copy + 'static,
     {
         if COMPS == 1 {
-            SlidingWindow::from_components(self.r.as_(), T::default(), T::default(), T::default())
+            SlidingWindow::from_components(self.r.cast_(), T::default(), T::default(), T::default())
         } else if COMPS == 2 {
-            SlidingWindow::from_components(self.r.as_(), self.g.as_(), T::default(), T::default())
+            SlidingWindow::from_components(
+                self.r.cast_(),
+                self.g.cast_(),
+                T::default(),
+                T::default(),
+            )
         } else if COMPS == 3 {
-            SlidingWindow::from_components(self.r.as_(), self.g.as_(), self.b.as_(), T::default())
+            SlidingWindow::from_components(
+                self.r.cast_(),
+                self.g.cast_(),
+                self.b.cast_(),
+                T::default(),
+            )
         } else if COMPS == 4 {
-            SlidingWindow::from_components(self.r.as_(), self.g.as_(), self.b.as_(), self.a.as_())
+            SlidingWindow::from_components(
+                self.r.cast_(),
+                self.g.cast_(),
+                self.b.cast_(),
+                self.a.cast_(),
+            )
         } else {
             unimplemented!();
         }
     }
 }
 
-impl<const COMPS: usize, J> SlidingWindow<COMPS, J>
+impl<const CN: usize, J> SlidingWindow<CN, J>
 where
-    J: Copy + FromPrimitive + Default + 'static,
+    J: Copy + Default + 'static,
 {
     #[inline]
-    pub fn from_store<T>(store: &UnsafeSlice<T>, offset: usize) -> SlidingWindow<COMPS, J>
+    pub fn from_store<T>(store: &UnsafeSlice<T>, offset: usize) -> SlidingWindow<CN, J>
     where
-        T: AsPrimitive<J>,
+        T: PrimitiveCast<J>,
     {
-        if COMPS == 1 {
+        if CN == 1 {
             SlidingWindow {
-                r: (*store.get(offset)).as_(),
+                r: (*store.get(offset)).cast_(),
                 g: J::default(),
                 b: J::default(),
                 a: J::default(),
             }
-        } else if COMPS == 2 {
+        } else if CN == 2 {
             SlidingWindow {
-                r: (*store.get(offset)).as_(),
-                g: (*store.get(offset + 1)).as_(),
+                r: (*store.get(offset)).cast_(),
+                g: (*store.get(offset + 1)).cast_(),
                 b: J::default(),
                 a: J::default(),
             }
-        } else if COMPS == 3 {
+        } else if CN == 3 {
             SlidingWindow {
-                r: (*store.get(offset)).as_(),
-                g: (*store.get(offset + 1)).as_(),
-                b: (*store.get(offset + 2)).as_(),
+                r: (*store.get(offset)).cast_(),
+                g: (*store.get(offset + 1)).cast_(),
+                b: (*store.get(offset + 2)).cast_(),
                 a: J::default(),
             }
-        } else if COMPS == 4 {
+        } else if CN == 4 {
             SlidingWindow {
-                r: (*store.get(offset)).as_(),
-                g: (*store.get(offset + 1)).as_(),
-                b: (*store.get(offset + 2)).as_(),
-                a: (*store.get(offset + 3)).as_(),
+                r: (*store.get(offset)).cast_(),
+                g: (*store.get(offset + 1)).cast_(),
+                b: (*store.get(offset + 2)).cast_(),
+                a: (*store.get(offset + 3)).cast_(),
             }
         } else {
             unimplemented!();
@@ -123,19 +138,19 @@ where
     #[inline]
     pub fn to_store<T>(self, store: &UnsafeSlice<T>, offset: usize)
     where
-        J: AsPrimitive<T>,
+        J: PrimitiveCast<T>,
         T: Copy + 'static,
     {
         unsafe {
-            store.write(offset, self.r.as_());
-            if COMPS > 1 {
-                store.write(offset + 1, self.g.as_());
+            store.write(offset, self.r.cast_());
+            if CN > 1 {
+                store.write(offset + 1, self.g.cast_());
             }
-            if COMPS > 2 {
-                store.write(offset + 2, self.b.as_());
+            if CN > 2 {
+                store.write(offset + 2, self.b.cast_());
             }
-            if COMPS == 4 {
-                store.write(offset + 3, self.a.as_());
+            if CN == 4 {
+                store.write(offset + 3, self.a.cast_());
             }
         }
     }
@@ -287,9 +302,9 @@ where
     }
 }
 
-impl<const COMPS: usize, J> Default for SlidingWindow<COMPS, J>
+impl<const CN: usize, J> Default for SlidingWindow<CN, J>
 where
-    J: Copy + FromPrimitive + Default,
+    J: Copy + Default,
 {
     #[inline]
     fn default() -> Self {

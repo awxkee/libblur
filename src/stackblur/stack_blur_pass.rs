@@ -26,13 +26,13 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::primitives::PrimitiveCast;
 use crate::unsafe_slice::UnsafeSlice;
-use num_traits::{AsPrimitive, FromPrimitive};
 
 pub(crate) trait StackBlurWorkingPass<T, const CN: usize>
 where
-    T: Copy + FromPrimitive + 'static,
-    f32: AsPrimitive<T>,
+    T: Copy + Default + 'static,
+    f32: PrimitiveCast<T>,
 {
     ///
     ///

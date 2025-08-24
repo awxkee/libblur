@@ -26,6 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::primitives::PrimitiveCast;
 use crate::stackblur::stack_blur_pass::StackBlurWorkingPass;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::wasm32::{
@@ -63,10 +64,10 @@ where
         + SubAssign
         + AsPrimitive<T>
         + Default,
-    T: Copy + AsPrimitive<J> + FromPrimitive,
+    T: Copy + AsPrimitive<J> + Default,
     i32: AsPrimitive<J>,
     u32: AsPrimitive<J>,
-    f32: AsPrimitive<T>,
+    f32: PrimitiveCast<T>,
     usize: AsPrimitive<J>,
 {
     #[target_feature(enable = "simd128")]
@@ -200,10 +201,10 @@ where
         + SubAssign
         + AsPrimitive<T>
         + Default,
-    T: Copy + AsPrimitive<J> + FromPrimitive,
+    T: Copy + AsPrimitive<J> + Default,
     i32: AsPrimitive<J>,
     u32: AsPrimitive<J>,
-    f32: AsPrimitive<T>,
+    f32: PrimitiveCast<T>,
     usize: AsPrimitive<J>,
 {
     fn pass(

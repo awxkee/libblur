@@ -27,9 +27,10 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::neon::{load_u8_s32_fast, store_u8_s32, store_u8_s32_x4};
+use crate::primitives::PrimitiveCast;
 use crate::stackblur::stack_blur_pass::StackBlurWorkingPass;
 use crate::unsafe_slice::UnsafeSlice;
-use num_traits::{AsPrimitive, FromPrimitive};
+use num_traits::AsPrimitive;
 use std::arch::aarch64::*;
 use std::marker::PhantomData;
 use std::ops::{AddAssign, Mul, Shr, Sub, SubAssign};
@@ -48,12 +49,11 @@ impl<T, J, const COMPONENTS: usize> Default for HorizontalNeonStackBlurPassQ0_31
     }
 }
 
-impl<T, J, const COMPONENTS: usize> StackBlurWorkingPass<T, COMPONENTS>
-    for HorizontalNeonStackBlurPassQ0_31<T, J, COMPONENTS>
+impl<T, J, const CN: usize> StackBlurWorkingPass<T, CN>
+    for HorizontalNeonStackBlurPassQ0_31<T, J, CN>
 where
     J: Copy
         + 'static
-        + FromPrimitive
         + AddAssign<J>
         + Mul<Output = J>
         + Shr<Output = J>
@@ -62,10 +62,10 @@ where
         + SubAssign
         + AsPrimitive<T>
         + Default,
-    T: Copy + AsPrimitive<J> + FromPrimitive,
+    T: Copy + AsPrimitive<J> + Default,
     i32: AsPrimitive<J>,
     u32: AsPrimitive<J>,
-    f32: AsPrimitive<T>,
+    f32: PrimitiveCast<T>,
     usize: AsPrimitive<J>,
 {
     fn pass(
@@ -86,7 +86,6 @@ impl<T, J, const CN: usize> HorizontalNeonStackBlurPassQ0_31<T, J, CN>
 where
     J: Copy
         + 'static
-        + FromPrimitive
         + AddAssign<J>
         + Mul<Output = J>
         + Shr<Output = J>
@@ -95,10 +94,10 @@ where
         + SubAssign
         + AsPrimitive<T>
         + Default,
-    T: Copy + AsPrimitive<J> + FromPrimitive,
+    T: Copy + AsPrimitive<J> + Default,
     i32: AsPrimitive<J>,
     u32: AsPrimitive<J>,
-    f32: AsPrimitive<T>,
+    f32: PrimitiveCast<T>,
     usize: AsPrimitive<J>,
 {
     #[target_feature(enable = "rdm")]

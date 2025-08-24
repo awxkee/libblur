@@ -34,7 +34,7 @@ use crate::stackblur::sse::{HorizontalSseStackBlurPassFloat16, VerticalSseStackB
 use crate::stackblur::{HorizontalStackBlurPass, StackBlurWorkingPass, VerticalStackBlurPass};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{AnisotropicRadius, BlurError, BlurImageMut, FastBlurChannels, ThreadingPolicy};
-use half::f16;
+use core::f16;
 
 fn stack_blur_worker_horizontal(
     slice: &UnsafeSlice<f16>,
@@ -188,6 +188,8 @@ fn stack_blur_worker_vertical(
 ///
 /// # Complexity
 /// O(1) complexity.
+#[cfg(feature = "nightly_f16")]
+#[cfg_attr(docsrs, doc(cfg(feature = "nightly_f16")))]
 pub fn stack_blur_f16(
     image: &mut BlurImageMut<f16>,
     radius: AnisotropicRadius,

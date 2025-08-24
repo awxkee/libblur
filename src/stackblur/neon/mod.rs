@@ -27,22 +27,26 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 mod horizontal;
+#[cfg(feature = "nightly_f16")]
 mod horizontal_f16;
 mod horizontal_f32;
 #[cfg(feature = "rdm")]
 mod horizontal_q0_31;
 mod vertical;
+#[cfg(feature = "nightly_f16")]
 mod vertical_f16;
 mod vertical_f32;
 #[cfg(feature = "rdm")]
 mod vertical_q0_31;
 
 pub(crate) use horizontal::HorizontalNeonStackBlurPass;
+#[cfg(feature = "nightly_f16")]
 pub(crate) use horizontal_f16::HorizontalNeonStackBlurPassFloat16;
 pub(crate) use horizontal_f32::HorizontalNeonStackBlurPassFloat32;
 #[cfg(feature = "rdm")]
 pub(crate) use horizontal_q0_31::HorizontalNeonStackBlurPassQ0_31;
 pub(crate) use vertical::VerticalNeonStackBlurPass;
+#[cfg(feature = "nightly_f16")]
 pub(crate) use vertical_f16::VerticalNeonStackBlurPassFloat16;
 pub(crate) use vertical_f32::VerticalNeonStackBlurPassFloat32;
 #[cfg(feature = "rdm")]

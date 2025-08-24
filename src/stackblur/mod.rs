@@ -36,6 +36,7 @@ mod sliding_window;
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 pub(crate) mod sse;
 pub mod stack_blur;
+#[cfg(feature = "nightly_f16")]
 pub mod stack_blur_f16;
 pub mod stack_blur_f32;
 mod stack_blur_pass;

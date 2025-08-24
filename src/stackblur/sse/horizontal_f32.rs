@@ -27,6 +27,7 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter1d::sse::utils::_mm_opt_fmlaf_ps;
+use crate::primitives::PrimitiveCast;
 use crate::sse::{load_f32, store_f32};
 use crate::stackblur::stack_blur_pass::StackBlurWorkingPass;
 use crate::unsafe_slice::UnsafeSlice;
@@ -172,10 +173,10 @@ where
         + SubAssign
         + AsPrimitive<T>
         + Default,
-    T: Copy + AsPrimitive<J> + FromPrimitive,
+    T: Copy + AsPrimitive<J> + Default,
     i32: AsPrimitive<J>,
     u32: AsPrimitive<J>,
-    f32: AsPrimitive<T>,
+    f32: PrimitiveCast<T>,
     usize: AsPrimitive<J>,
 {
     fn pass(

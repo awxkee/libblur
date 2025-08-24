@@ -25,14 +25,24 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#[cfg(all(target_arch = "aarch64", feature = "neon", feature = "nightly_f16"))]
+use crate::neon::{fgn_horizontal_pass_neon_f16, fgn_vertical_pass_neon_f16};
 #[cfg(all(target_arch = "aarch64", feature = "neon"))]
 use crate::neon::{
-    fgn_horizontal_pass_neon_f16, fgn_horizontal_pass_neon_f32, fgn_horizontal_pass_neon_u8,
-    fgn_vertical_pass_neon_f16, fgn_vertical_pass_neon_f32, fgn_vertical_pass_neon_u8,
+    fgn_horizontal_pass_neon_f32, fgn_horizontal_pass_neon_u8, fgn_vertical_pass_neon_f32,
+    fgn_vertical_pass_neon_u8,
+};
+use crate::primitives::PrimitiveCast;
+#[cfg(all(
+    any(target_arch = "x86_64", target_arch = "x86"),
+    feature = "sse",
+    feature = "nightly_f16"
+))]
+use crate::sse::{
+    fast_gaussian_next_horizontal_pass_sse_f16, fast_gaussian_next_vertical_pass_sse_f16,
 };
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 use crate::sse::{
-    fast_gaussian_next_horizontal_pass_sse_f16, fast_gaussian_next_vertical_pass_sse_f16,
     fgn_horizontal_pass_sse_f32, fgn_horizontal_pass_sse_u8, fgn_vertical_pass_sse_f32,
     fgn_vertical_pass_sse_u8,
 };
@@ -44,8 +54,9 @@ use crate::wasm32::{
 };
 use crate::{clamp_edge, BlurImageMut, EdgeMode, FastBlurChannels, ThreadingPolicy};
 use crate::{AnisotropicRadius, BlurError};
-use half::f16;
-use num_traits::{AsPrimitive, Float, FromPrimitive};
+#[cfg(feature = "nightly_f16")]
+use core::f16;
+use num_traits::Float;
 
 const BASE_RADIUS_I64_CUTOFF: u32 = 150;
 const BASE_RADIUS_I64_CUTOFF_U16: u32 = 32;
@@ -89,7 +100,7 @@ macro_rules! impl_margin_call {
 
 macro_rules! write_out_blurred {
     ($sum:expr, $weight:expr, $bytes:expr, $bytes_offset:expr) => {{
-        let sum_f: M = $sum.as_();
+        let sum_f: M = $sum.cast_();
         let new_v: T = (sum_f * $weight).to_();
         unsafe {
             $bytes.write($bytes_offset, new_v);
@@ -99,7 +110,7 @@ macro_rules! write_out_blurred {
 
 macro_rules! update_differences_inside {
     ($dif:expr, $buffer:expr, $d_idx:expr, $d_idx_1:expr, $d_idx_2:expr) => {{
-        let threes = J::from_i32(3i32).unwrap();
+        let threes: J = 3i32.cast_();
         $dif += threes
             * (unsafe { *$buffer.get_unchecked($d_idx) }
                 - unsafe { *$buffer.get_unchecked($d_idx_1) })
@@ -109,7 +120,7 @@ macro_rules! update_differences_inside {
 
 macro_rules! update_differences_one_rad {
     ($dif:expr, $buffer:expr, $d_idx:expr, $d_idx_1:expr) => {{
-        let threes = J::from_i32(3i32).unwrap();
+        let threes: J = 3i32.cast_();
         $dif += threes
             * (unsafe { *$buffer.get_unchecked($d_idx) }
                 - unsafe { *$buffer.get_unchecked($d_idx_1) });
@@ -118,14 +129,14 @@ macro_rules! update_differences_one_rad {
 
 macro_rules! update_differences_two_rad {
     ($dif:expr, $buffer:expr, $d_idx:expr) => {{
-        let threes = J::from_i32(3i32).unwrap();
+        let threes: J = 3i32.cast_();
         $dif -= threes * unsafe { *$buffer.get_unchecked($d_idx) };
     }};
 }
 
 macro_rules! update_sum_in {
     ($bytes:expr, $bytes_offset:expr, $dif:expr, $der:expr, $sum:expr, $buffer:expr, $arr_index:expr) => {{
-        let v: J = $bytes[$bytes_offset].as_();
+        let v: J = $bytes[$bytes_offset].cast_();
         $dif += v;
         $der += $dif;
         $sum += $der;
@@ -140,15 +151,13 @@ macro_rules! update_sum_in {
 /// `J` - accumulator type
 /// `M` - multiplication type, when weight will be applied this type will be used also
 fn fgn_vertical_pass<
-    T: FromPrimitive
-        + Default
+    T: Default
         + std::ops::AddAssign
         + 'static
         + std::ops::SubAssign
         + Copy
-        + FromPrimitive
         + Default
-        + AsPrimitive<J>,
+        + PrimitiveCast<J>,
     J,
     M,
     const CN: usize,
@@ -163,38 +172,37 @@ fn fgn_vertical_pass<
     edge_mode: EdgeMode,
 ) where
     J: Copy
-        + FromPrimitive
         + Default
         + std::ops::Mul<Output = J>
         + std::ops::Sub<Output = J>
         + std::ops::Add<Output = J>
         + std::ops::AddAssign
         + std::ops::SubAssign
-        + AsPrimitive<M>,
-    M: Copy + FromPrimitive + std::ops::Mul<Output = M> + AsPrimitive<T> + Float + ToStorage<T>,
-    i32: AsPrimitive<J>,
+        + PrimitiveCast<M>,
+    M: Copy + std::ops::Mul<Output = M> + PrimitiveCast<T> + Float + ToStorage<T>,
+    i32: PrimitiveCast<J>,
+    f64: PrimitiveCast<M>,
 {
-    let mut buffer_r = Box::new([0i32.as_(); 1024]);
-    let mut buffer_g = Box::new([0i32.as_(); 1024]);
-    let mut buffer_b = Box::new([0i32.as_(); 1024]);
-    let mut buffer_a = Box::new([0i32.as_(); 1024]);
+    let mut buffer_r = Box::new([0i32.cast_(); 1024]);
+    let mut buffer_g = Box::new([0i32.cast_(); 1024]);
+    let mut buffer_b = Box::new([0i32.cast_(); 1024]);
+    let mut buffer_a = Box::new([0i32.cast_(); 1024]);
     let radius_64 = radius as i64;
     let height_wide = height as i64;
-    let weight =
-        M::from_f64(1.0f64 / ((radius as f64) * (radius as f64) * (radius as f64))).unwrap();
+    let weight: M = (1.0f64 / ((radius as f64) * (radius as f64) * (radius as f64))).cast_();
     for x in start..std::cmp::min(width, end) {
-        let mut dif_r: J = 0i32.as_();
-        let mut der_r: J = 0i32.as_();
-        let mut sum_r: J = 0i32.as_();
-        let mut dif_g: J = 0i32.as_();
-        let mut der_g: J = 0i32.as_();
-        let mut sum_g: J = 0i32.as_();
-        let mut dif_b: J = 0i32.as_();
-        let mut der_b: J = 0i32.as_();
-        let mut sum_b: J = 0i32.as_();
-        let mut dif_a: J = 0i32.as_();
-        let mut der_a: J = 0i32.as_();
-        let mut sum_a: J = 0i32.as_();
+        let mut dif_r: J = 0i32.cast_();
+        let mut der_r: J = 0i32.cast_();
+        let mut sum_r: J = 0i32.cast_();
+        let mut dif_g: J = 0i32.cast_();
+        let mut der_g: J = 0i32.cast_();
+        let mut sum_g: J = 0i32.cast_();
+        let mut dif_b: J = 0i32.cast_();
+        let mut der_b: J = 0i32.cast_();
+        let mut sum_b: J = 0i32.cast_();
+        let mut dif_a: J = 0i32.cast_();
+        let mut der_a: J = 0i32.cast_();
+        let mut sum_a: J = 0i32.cast_();
 
         let current_px = (x * CN as u32) as usize;
 
@@ -281,17 +289,15 @@ fn fgn_vertical_pass<
 /// `J` - accumulator type
 /// `M` - multiplication type, when weight will be applied this type will be used also
 fn fgn_horizontal_pass<
-    T: FromPrimitive
-        + Default
+    T: Default
         + Send
         + Sync
         + std::ops::AddAssign
         + 'static
         + std::ops::SubAssign
         + Copy
-        + FromPrimitive
         + Default
-        + AsPrimitive<J>,
+        + PrimitiveCast<J>,
     J,
     M,
     const CN: usize,
@@ -306,39 +312,38 @@ fn fgn_horizontal_pass<
     edge_mode: EdgeMode,
 ) where
     J: Copy
-        + FromPrimitive
         + Default
         + std::ops::Mul<Output = J>
         + std::ops::Sub<Output = J>
         + std::ops::Add<Output = J>
         + std::ops::AddAssign
         + std::ops::SubAssign
-        + AsPrimitive<M>,
-    M: Copy + FromPrimitive + std::ops::Mul<Output = M> + AsPrimitive<T> + Float + ToStorage<T>,
-    f32: AsPrimitive<T>,
-    i32: AsPrimitive<J>,
+        + PrimitiveCast<M>,
+    M: Copy + std::ops::Mul<Output = M> + PrimitiveCast<T> + Float + ToStorage<T>,
+    f32: PrimitiveCast<T>,
+    i32: PrimitiveCast<J>,
+    f64: PrimitiveCast<M>,
 {
-    let mut buffer_r = Box::new([0i32.as_(); 1024]);
-    let mut buffer_g = Box::new([0i32.as_(); 1024]);
-    let mut buffer_b = Box::new([0i32.as_(); 1024]);
-    let mut buffer_a = Box::new([0i32.as_(); 1024]);
+    let mut buffer_r = Box::new([0i32.cast_(); 1024]);
+    let mut buffer_g = Box::new([0i32.cast_(); 1024]);
+    let mut buffer_b = Box::new([0i32.cast_(); 1024]);
+    let mut buffer_a = Box::new([0i32.cast_(); 1024]);
     let radius_64 = radius as i64;
     let width_wide = width as i64;
-    let weight =
-        M::from_f64(1.0f64 / ((radius as f64) * (radius as f64) * (radius as f64))).unwrap();
+    let weight: M = (1.0f64 / ((radius as f64) * (radius as f64) * (radius as f64))).cast_();
     for y in start..std::cmp::min(height, end) {
-        let mut dif_r: J = 0i32.as_();
-        let mut der_r: J = 0i32.as_();
-        let mut sum_r: J = 0i32.as_();
-        let mut dif_g: J = 0i32.as_();
-        let mut der_g: J = 0i32.as_();
-        let mut sum_g: J = 0i32.as_();
-        let mut dif_b: J = 0i32.as_();
-        let mut der_b: J = 0i32.as_();
-        let mut sum_b: J = 0i32.as_();
-        let mut dif_a: J = 0i32.as_();
-        let mut der_a: J = 0i32.as_();
-        let mut sum_a: J = 0i32.as_();
+        let mut dif_r: J = 0i32.cast_();
+        let mut der_r: J = 0i32.cast_();
+        let mut sum_r: J = 0i32.cast_();
+        let mut dif_g: J = 0i32.cast_();
+        let mut der_g: J = 0i32.cast_();
+        let mut sum_g: J = 0i32.cast_();
+        let mut dif_b: J = 0i32.cast_();
+        let mut der_b: J = 0i32.cast_();
+        let mut sum_b: J = 0i32.cast_();
+        let mut dif_a: J = 0i32.cast_();
+        let mut der_a: J = 0i32.cast_();
+        let mut sum_a: J = 0i32.cast_();
 
         let current_y = ((y as i64) * (stride as i64)) as usize;
 
@@ -743,6 +748,7 @@ impl FastGaussianNextPassProvider<f32> for f32 {
     }
 }
 
+#[cfg(feature = "nightly_f16")]
 impl FastGaussianNextPassProvider<f16> for f16 {
     fn get_horizontal<const CN: usize>(
         radius: u32,
@@ -810,17 +816,16 @@ impl FastGaussianNextPassProvider<f16> for f16 {
 }
 
 fn fast_gaussian_next_impl<
-    T: FromPrimitive
-        + Default
+    T: Default
         + Send
         + Sync
         + std::ops::AddAssign
         + std::ops::SubAssign
         + Copy
-        + AsPrimitive<f32>
-        + AsPrimitive<f64>
-        + AsPrimitive<i64>
-        + AsPrimitive<i32>
+        + PrimitiveCast<f32>
+        + PrimitiveCast<f64>
+        + PrimitiveCast<i64>
+        + PrimitiveCast<i32>
         + FastGaussianNextPassProvider<T>,
     const CN: usize,
 >(
@@ -832,9 +837,9 @@ fn fast_gaussian_next_impl<
     threading_policy: ThreadingPolicy,
     edge_mode: EdgeMode,
 ) where
-    i64: AsPrimitive<T>,
-    f32: AsPrimitive<T> + ToStorage<T>,
-    f64: AsPrimitive<T> + ToStorage<T>,
+    i64: PrimitiveCast<T>,
+    f32: PrimitiveCast<T> + ToStorage<T>,
+    f64: PrimitiveCast<T> + ToStorage<T>,
 {
     let mut _dispatcher_vertical: fn(
         bytes: &UnsafeSlice<T>,
@@ -1034,6 +1039,8 @@ pub fn fast_gaussian_next_f32(
 ///
 /// # Panics
 /// Panic is stride/width/height/channel configuration do not match provided
+#[cfg(feature = "nightly_f16")]
+#[cfg_attr(docsrs, doc(cfg(feature = "nightly_f16")))]
 pub fn fast_gaussian_next_f16(
     in_place: &mut BlurImageMut<f16>,
     radius: AnisotropicRadius,
@@ -1047,7 +1054,7 @@ pub fn fast_gaussian_next_f16(
     let height = in_place.height;
     let radius = AnisotropicRadius::create(radius.x_axis.max(1), radius.y_axis.max(1));
     impl_margin_call!(
-        half::f16,
+        f16,
         channels,
         edge_mode,
         unsafe { std::mem::transmute::<&mut [f16], &mut [f16]>(in_place.data.borrow_mut()) },
