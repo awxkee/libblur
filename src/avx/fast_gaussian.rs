@@ -26,10 +26,11 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::avx::fast_gaussian_next::AvxSseI32x8;
+use crate::edge_mode::clamp_edge;
 use crate::sse::store_u8_u32;
 use crate::sse::utils::load_u8_s32_fast;
 use crate::unsafe_slice::UnsafeSlice;
-use crate::{clamp_edge, EdgeMode};
+use crate::EdgeMode;
 use std::arch::x86_64::*;
 
 pub(crate) fn fg_horizontal_pass_sse_u8<T, const CN: usize>(

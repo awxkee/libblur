@@ -26,13 +26,13 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::edge_mode::{reflect_index, reflect_index_101};
+use crate::edge_mode::{clamp_edge, reflect_index, reflect_index_101};
 use crate::filter1d::arena_roi::copy_roi;
 use crate::filter1d::filter_element::KernelShape;
 use crate::img_size::ImageSize;
 use crate::primitives::PrimitiveCast;
 use crate::util::check_slice_size;
-use crate::{BlurError, BlurImage, EdgeMode, Scalar};
+use crate::{BlurError, BlurImage, EdgeMode, EdgeMode2D, Scalar};
 use num_traits::AsPrimitive;
 use std::fmt::Debug;
 
@@ -65,7 +65,7 @@ impl Arena {
 }
 
 #[derive(Copy, Clone)]
-pub struct ArenaPads {
+pub(crate) struct ArenaPads {
     pub pad_left: usize,
     pub pad_top: usize,
     pub pad_right: usize,
@@ -73,11 +73,16 @@ pub struct ArenaPads {
 }
 
 impl ArenaPads {
-    pub fn constant(v: usize) -> ArenaPads {
+    pub(crate) fn constant(v: usize) -> ArenaPads {
         ArenaPads::new(v, v, v, v)
     }
 
-    pub fn new(pad_left: usize, pad_top: usize, pad_right: usize, pad_bottom: usize) -> ArenaPads {
+    pub(crate) fn new(
+        pad_left: usize,
+        pad_top: usize,
+        pad_right: usize,
+        pad_bottom: usize,
+    ) -> ArenaPads {
         ArenaPads {
             pad_left,
             pad_top,
@@ -86,7 +91,7 @@ impl ArenaPads {
         }
     }
 
-    pub fn from_kernel_shape(kernel_shape: KernelShape) -> ArenaPads {
+    pub(crate) fn from_kernel_shape(kernel_shape: KernelShape) -> ArenaPads {
         let pad_w = kernel_shape.width / 2;
         let pad_h = kernel_shape.height / 2;
         ArenaPads::new(pad_w, pad_h, pad_w, pad_h)
@@ -94,12 +99,12 @@ impl ArenaPads {
 }
 
 /// Pads an image with chosen border strategy
-pub fn make_arena<T, const CN: usize>(
+pub(crate) fn make_arena<T, const CN: usize>(
     image: &[T],
     image_stride: usize,
     image_size: ImageSize,
     pads: ArenaPads,
-    border_mode: EdgeMode,
+    edge_modes: EdgeMode2D,
     scalar: Scalar,
 ) -> Result<(Vec<T>, Arena), BlurError>
 where
@@ -110,7 +115,7 @@ where
     {
         if std::arch::is_x86_feature_detected!("avx2") {
             return unsafe {
-                make_arena_avx2::<T, CN>(image, image_stride, image_size, pads, border_mode, scalar)
+                make_arena_avx2::<T, CN>(image, image_stride, image_size, pads, edge_modes, scalar)
             };
         }
     }
@@ -123,13 +128,13 @@ where
                     image_stride,
                     image_size,
                     pads,
-                    border_mode,
+                    edge_modes,
                     scalar,
                 )
             };
         }
     }
-    make_arena_exec::<T, CN>(image, image_stride, image_size, pads, border_mode, scalar)
+    make_arena_exec::<T, CN>(image, image_stride, image_size, pads, edge_modes, scalar)
 }
 
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]
@@ -139,14 +144,14 @@ unsafe fn make_arena_avx2<T, const CN: usize>(
     image_stride: usize,
     image_size: ImageSize,
     pads: ArenaPads,
-    border_mode: EdgeMode,
+    edge_modes: EdgeMode2D,
     scalar: Scalar,
 ) -> Result<(Vec<T>, Arena), BlurError>
 where
     T: Default + Copy + Send + Sync + 'static,
     f64: AsPrimitive<T>,
 {
-    make_arena_exec::<T, CN>(image, image_stride, image_size, pads, border_mode, scalar)
+    make_arena_exec::<T, CN>(image, image_stride, image_size, pads, edge_modes, scalar)
 }
 
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
@@ -156,14 +161,14 @@ unsafe fn make_arena_sse4_1<T, const CN: usize>(
     image_stride: usize,
     image_size: ImageSize,
     pads: ArenaPads,
-    border_mode: EdgeMode,
+    edge_modes: EdgeMode2D,
     scalar: Scalar,
 ) -> Result<(Vec<T>, Arena), BlurError>
 where
     T: Default + Copy + Send + Sync + 'static,
     f64: AsPrimitive<T>,
 {
-    make_arena_exec::<T, CN>(image, image_stride, image_size, pads, border_mode, scalar)
+    make_arena_exec::<T, CN>(image, image_stride, image_size, pads, edge_modes, scalar)
 }
 
 /// Pads an image with chosen border strategy
@@ -173,7 +178,7 @@ fn make_arena_exec<T, const CN: usize>(
     image_stride: usize,
     image_size: ImageSize,
     pads: ArenaPads,
-    border_mode: EdgeMode,
+    edge_modes: EdgeMode2D,
     scalar: Scalar,
 ) -> Result<(Vec<T>, Arena), BlurError>
 where
@@ -212,115 +217,127 @@ where
     let pad_w = pads.pad_left;
     let pad_h = pads.pad_top;
 
-    match border_mode {
-        EdgeMode::Clamp => {
-            for ranges in filling_ranges.iter() {
-                for (i, dst) in ranges.0.clone().zip(
-                    padded_image
-                        .chunks_exact_mut(new_stride)
-                        .skip(ranges.0.start),
-                ) {
-                    for (j, dst) in ranges
-                        .1
-                        .clone()
-                        .zip(dst.chunks_exact_mut(CN).skip(ranges.1.start))
-                    {
-                        let y = i.saturating_sub(pad_h).min(height - 1);
-                        let x = j.saturating_sub(pad_w).min(width - 1);
+    if edge_modes.horizontal != EdgeMode::Constant && edge_modes.vertical != EdgeMode::Constant {
+        for ranges in filling_ranges.iter() {
+            for (i, dst) in ranges.0.clone().zip(
+                padded_image
+                    .chunks_exact_mut(new_stride)
+                    .skip(ranges.0.start),
+            ) {
+                for (j, dst) in ranges
+                    .1
+                    .clone()
+                    .zip(dst.chunks_exact_mut(CN).skip(ranges.1.start))
+                {
+                    let y = clamp_edge!(
+                        edge_modes.vertical,
+                        i as i64 - pad_h as i64,
+                        0,
+                        height as i64
+                    );
+                    let x = clamp_edge!(
+                        edge_modes.horizontal,
+                        j as i64 - pad_w as i64,
+                        0,
+                        width as i64
+                    );
 
-                        let v_src = y * old_stride + x * CN;
-                        let src_iter = &image[v_src..(v_src + CN)];
-                        for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
-                            *dst = *src;
-                        }
+                    let v_src = y * old_stride + x * CN;
+                    let src_iter = &image[v_src..(v_src + CN)];
+                    for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
+                        *dst = *src;
                     }
                 }
             }
         }
-        EdgeMode::Wrap => {
-            for ranges in filling_ranges.iter() {
-                for (i, dst) in ranges.0.clone().zip(
-                    padded_image
-                        .chunks_exact_mut(new_stride)
-                        .skip(ranges.0.start),
-                ) {
-                    for (j, dst) in ranges
-                        .1
-                        .clone()
-                        .zip(dst.chunks_exact_mut(CN).skip(ranges.1.start))
-                    {
-                        let y = (i as i64 - pad_h as i64).rem_euclid(height as i64) as usize;
-                        let x = (j as i64 - pad_w as i64).rem_euclid(width as i64) as usize;
-                        let v_src = y * old_stride + x * CN;
-                        let src_iter = &image[v_src..(v_src + CN)];
-                        for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
-                            *dst = *src;
-                        }
-                    }
-                }
-            }
-        }
-        EdgeMode::Reflect => {
-            for ranges in filling_ranges.iter() {
-                for (i, dst) in ranges.0.clone().zip(
-                    padded_image
-                        .chunks_exact_mut(new_stride)
-                        .skip(ranges.0.start),
-                ) {
-                    for (j, dst) in ranges
-                        .1
-                        .clone()
-                        .zip(dst.chunks_exact_mut(CN).skip(ranges.1.start))
-                    {
-                        let y = reflect_index(i as isize - pad_h as isize, height as isize);
-                        let x = reflect_index(j as isize - pad_w as isize, width as isize);
-                        let v_src = y * old_stride + x * CN;
-                        let src_iter = &image[v_src..(v_src + CN)];
-                        for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
-                            *dst = *src;
-                        }
-                    }
-                }
-            }
-        }
-        EdgeMode::Reflect101 => {
-            for ranges in filling_ranges.iter() {
-                for (i, dst) in ranges.0.clone().zip(
-                    padded_image
-                        .chunks_exact_mut(new_stride)
-                        .skip(ranges.0.start),
-                ) {
-                    for (j, dst) in ranges
-                        .1
-                        .clone()
-                        .zip(dst.chunks_exact_mut(CN).skip(ranges.1.start))
-                    {
-                        let y = reflect_index_101(i as isize - pad_h as isize, height as isize);
-                        let x = reflect_index_101(j as isize - pad_w as isize, width as isize);
-                        let v_src = y * old_stride + x * CN;
-                        let src_iter = &image[v_src..(v_src + CN)];
-                        for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
-                            *dst = *src;
-                        }
-                    }
-                }
-            }
-        }
-        EdgeMode::Constant => {
-            for ranges in filling_ranges.iter() {
-                for (_, dst) in ranges.0.clone().zip(
-                    padded_image
-                        .chunks_exact_mut(new_stride)
-                        .skip(ranges.0.start),
-                ) {
-                    for (_, dst) in ranges
-                        .1
-                        .clone()
-                        .zip(dst.chunks_exact_mut(CN).skip(ranges.1.start))
-                    {
+    } else if edge_modes.vertical != EdgeMode::Constant
+        && edge_modes.horizontal == EdgeMode::Constant
+    {
+        // edge_modes.horizontal == EdgeMode::Constant
+        for ranges in filling_ranges.iter() {
+            for (i, dst) in ranges.0.clone().zip(
+                padded_image
+                    .chunks_exact_mut(new_stride)
+                    .skip(ranges.0.start),
+            ) {
+                for (j, dst) in ranges
+                    .1
+                    .clone()
+                    .zip(dst.chunks_exact_mut(CN).skip(ranges.1.start))
+                {
+                    let y = clamp_edge!(
+                        edge_modes.vertical,
+                        i as i64 - pad_h as i64,
+                        0,
+                        height as i64
+                    );
+                    let x = j as i64 - pad_w as i64;
+                    if x < 0 || x >= width as i64 {
                         for (y, dst) in dst.iter_mut().enumerate() {
                             *dst = scalar[y].as_();
                         }
+                    } else {
+                        let v_src = y * old_stride + (x as usize) * CN;
+                        let src_iter = &image[v_src..(v_src + CN)];
+                        for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
+                            *dst = *src;
+                        }
+                    }
+                }
+            }
+        }
+    } else if edge_modes.vertical == EdgeMode::Constant
+        && edge_modes.horizontal != EdgeMode::Constant
+    {
+        // edge_modes.vertical == EdgeMode::Constant
+        for ranges in filling_ranges.iter() {
+            for (i, dst) in ranges.0.clone().zip(
+                padded_image
+                    .chunks_exact_mut(new_stride)
+                    .skip(ranges.0.start),
+            ) {
+                for (j, dst) in ranges
+                    .1
+                    .clone()
+                    .zip(dst.chunks_exact_mut(CN).skip(ranges.1.start))
+                {
+                    let y = i as i64 - pad_h as i64;
+                    let x = clamp_edge!(
+                        edge_modes.horizontal,
+                        j as i64 - pad_w as i64,
+                        0,
+                        width as i64
+                    );
+
+                    if y < 0 || y >= height as i64 {
+                        for (y, dst) in dst.iter_mut().enumerate() {
+                            *dst = scalar[y].as_();
+                        }
+                    } else {
+                        let v_src = (y as usize) * old_stride + x * CN;
+                        let src_iter = &image[v_src..(v_src + CN)];
+                        for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {
+                            *dst = *src;
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        // both are constant
+        for ranges in filling_ranges.iter() {
+            for (_, dst) in ranges.0.clone().zip(
+                padded_image
+                    .chunks_exact_mut(new_stride)
+                    .skip(ranges.0.start),
+            ) {
+                for (_, dst) in ranges
+                    .1
+                    .clone()
+                    .zip(dst.chunks_exact_mut(CN).skip(ranges.1.start))
+                {
+                    for (y, dst) in dst.iter_mut().enumerate() {
+                        *dst = scalar[y].as_();
                     }
                 }
             }

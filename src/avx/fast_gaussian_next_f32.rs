@@ -26,9 +26,10 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::avx::utils::{_mm256_opt_fmlaf_ps, _mm256_opt_fnmlaf_ps, _mm256_opt_fnmlsf_ps};
+use crate::edge_mode::clamp_edge;
 use crate::sse::{_mm_opt_fmlaf_ps, _mm_opt_fnmlaf_ps, _mm_opt_fnmlsf_ps, load_f32, store_f32};
 use crate::unsafe_slice::UnsafeSlice;
-use crate::{clamp_edge, EdgeMode};
+use crate::EdgeMode;
 use std::arch::x86_64::*;
 
 pub(crate) fn fgn_vertical_pass_avx_f32<T, const CN: usize>(

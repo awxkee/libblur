@@ -30,6 +30,7 @@ use core::f16;
 use num_traits::Float;
 
 use crate::channels_configuration::FastBlurChannels;
+use crate::edge_mode::clamp_edge;
 #[cfg(all(target_arch = "aarch64", feature = "neon", feature = "nightly_f16"))]
 use crate::neon::{fg_horizontal_pass_neon_f16, fg_vertical_pass_neon_f16};
 #[cfg(all(target_arch = "aarch64", feature = "neon"))]
@@ -54,7 +55,7 @@ use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 use crate::wasm32::{fg_horizontal_pass_wasm_u8, fg_vertical_pass_wasm_u8};
-use crate::{clamp_edge, AnisotropicRadius, BlurError, BlurImageMut, EdgeMode};
+use crate::{AnisotropicRadius, BlurError, BlurImageMut, EdgeMode, EdgeMode2D};
 
 const BASE_RADIUS_I64_CUTOFF: u32 = 180;
 
@@ -773,17 +774,13 @@ fn fast_gaussian_impl<
     height: u32,
     radius: AnisotropicRadius,
     threading_policy: ThreadingPolicy,
-    edge_mode: EdgeMode,
+    edge_modes: EdgeMode2D,
 ) where
     f32: PrimitiveCast<T> + ToStorage<T>,
     f64: PrimitiveCast<T> + ToStorage<T>,
 {
     let unsafe_image = UnsafeSlice::new(bytes);
     let thread_count = threading_policy.thread_count(width, height) as u32;
-    // let pool = rayon::ThreadPoolBuilder::new()
-    //     .num_threads(thread_count as usize)
-    //     .build()
-    //     .unwrap();
     let mut _dispatcher_vertical: fn(
         bytes: &UnsafeSlice<T>,
         stride: u32,
@@ -813,7 +810,7 @@ fn fast_gaussian_impl<
             radius.y_axis,
             start_x as u32,
             end_x as u32,
-            edge_mode,
+            edge_modes.vertical,
         );
     });
     pool.parallel_for(|thread_index| {
@@ -832,7 +829,7 @@ fn fast_gaussian_impl<
             radius.x_axis,
             start_y,
             end_y,
-            edge_mode,
+            edge_modes.horizontal,
         );
     });
 }
@@ -859,7 +856,7 @@ pub fn fast_gaussian(
     image: &mut BlurImageMut<u8>,
     radius: AnisotropicRadius,
     threading_policy: ThreadingPolicy,
-    edge_mode: EdgeMode,
+    edge_modes: EdgeMode2D,
 ) -> Result<(), BlurError> {
     image.check_layout(None)?;
     let radius = radius.clamp(1, 319);
@@ -870,7 +867,7 @@ pub fn fast_gaussian(
     impl_margin_call!(
         u8,
         image.channels,
-        edge_mode,
+        edge_modes,
         data,
         stride,
         width,
@@ -899,7 +896,7 @@ pub fn fast_gaussian_u16(
     image: &mut BlurImageMut<u16>,
     radius: AnisotropicRadius,
     threading_policy: ThreadingPolicy,
-    edge_mode: EdgeMode,
+    edge_modes: EdgeMode2D,
 ) -> Result<(), BlurError> {
     image.check_layout(None)?;
     let stride = image.row_stride();
@@ -911,7 +908,7 @@ pub fn fast_gaussian_u16(
     impl_margin_call!(
         u16,
         channels,
-        edge_mode,
+        edge_modes,
         data,
         stride,
         width,
@@ -941,7 +938,7 @@ pub fn fast_gaussian_f32(
     image: &mut BlurImageMut<f32>,
     radius: AnisotropicRadius,
     threading_policy: ThreadingPolicy,
-    edge_mode: EdgeMode,
+    edge_modes: EdgeMode2D,
 ) -> Result<(), BlurError> {
     image.check_layout(None)?;
     let stride = image.row_stride();
@@ -953,7 +950,7 @@ pub fn fast_gaussian_f32(
     impl_margin_call!(
         f32,
         channels,
-        edge_mode,
+        edge_modes,
         data,
         stride,
         width,
@@ -985,7 +982,7 @@ pub fn fast_gaussian_f16(
     image: &mut BlurImageMut<f16>,
     radius: AnisotropicRadius,
     threading_policy: ThreadingPolicy,
-    edge_mode: EdgeMode,
+    edge_modes: EdgeMode2D,
 ) -> Result<(), BlurError> {
     image.check_layout(None)?;
     let stride = image.row_stride();
@@ -997,7 +994,7 @@ pub fn fast_gaussian_f16(
     impl_margin_call!(
         f16,
         channels,
-        edge_mode,
+        edge_modes,
         data,
         stride,
         width,
@@ -1027,7 +1024,7 @@ mod tests {
             &mut dst_image,
             AnisotropicRadius::new(5),
             ThreadingPolicy::Single,
-            EdgeMode::Clamp,
+            EdgeMode2D::new(EdgeMode::Clamp),
         )
         .unwrap();
         for (i, &cn) in dst.iter().enumerate() {
@@ -1054,7 +1051,7 @@ mod tests {
             &mut dst_image,
             AnisotropicRadius::new(5),
             ThreadingPolicy::Single,
-            EdgeMode::Clamp,
+            EdgeMode2D::new(EdgeMode::Clamp),
         )
         .unwrap();
         for &cn in dst.iter() {
@@ -1081,7 +1078,7 @@ mod tests {
             &mut dst_image,
             AnisotropicRadius::new(25),
             ThreadingPolicy::Single,
-            EdgeMode::Clamp,
+            EdgeMode2D::new(EdgeMode::Clamp),
         )
         .unwrap();
         for &cn in dst.iter() {

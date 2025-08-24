@@ -28,9 +28,9 @@
  */
 #![allow(clippy::manual_clamp)]
 
+use crate::filter1d::{make_arena, Arena, ArenaPads};
 use crate::{
-    make_arena, Arena, ArenaPads, BlurError, BlurImage, BlurImageMut, EdgeMode, FastBlurChannels,
-    Scalar, ThreadingPolicy,
+    BlurError, BlurImage, BlurImageMut, EdgeMode2D, FastBlurChannels, Scalar, ThreadingPolicy,
 };
 use novtb::{ParallelZonedIterator, TbSliceMut};
 
@@ -261,7 +261,7 @@ fn bilateral_filter_impl<const N: usize>(
     src: &BlurImage<u8>,
     dst: &mut BlurImageMut<u8>,
     params: BilateralBlurParams,
-    edge_mode: EdgeMode,
+    edge_modes: EdgeMode2D,
     constant_border: Scalar,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
@@ -275,7 +275,7 @@ fn bilateral_filter_impl<const N: usize>(
         src.row_stride() as usize,
         src.size(),
         ArenaPads::constant(params.kernel_size / 2),
-        edge_mode,
+        edge_modes,
         constant_border,
     )?;
 
@@ -374,7 +374,7 @@ pub fn bilateral_filter(
     src: &BlurImage<u8>,
     dst: &mut BlurImageMut<u8>,
     params: BilateralBlurParams,
-    edge_mode: EdgeMode,
+    edge_modes: EdgeMode2D,
     constant_border: Scalar,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
@@ -392,7 +392,7 @@ pub fn bilateral_filter(
             src,
             dst,
             copied_params,
-            edge_mode,
+            edge_modes,
             constant_border,
             threading_policy,
         ),
@@ -400,7 +400,7 @@ pub fn bilateral_filter(
             src,
             dst,
             copied_params,
-            edge_mode,
+            edge_modes,
             constant_border,
             threading_policy,
         ),
@@ -408,7 +408,7 @@ pub fn bilateral_filter(
             src,
             dst,
             copied_params,
-            edge_mode,
+            edge_modes,
             constant_border,
             threading_policy,
         ),

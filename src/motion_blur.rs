@@ -27,7 +27,7 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::{
-    filter_2d, BlurError, BlurImage, BlurImageMut, EdgeMode, KernelShape, Scalar, ThreadingPolicy,
+    filter_2d, BlurError, BlurImage, BlurImageMut, EdgeMode2D, KernelShape, Scalar, ThreadingPolicy,
 };
 
 #[derive(Copy, Clone)]
@@ -131,7 +131,7 @@ pub fn generate_motion_kernel(size: usize, angle_deg: f32) -> Vec<f32> {
 /// * `destination`: Destination image.
 /// * `angle`: Degree of acceleration, in degrees.
 /// * `kernel_size`: Convolve kernel size, must be odd!
-/// * `border_mode`: See [EdgeMode] for more info.
+/// * `edge_modes`: Border handling mode see [EdgeMode] and [EdgeMode2D] for more info.
 /// * `border_constant`: If [EdgeMode::Constant] border will be replaced with this provided [Scalar] value.
 /// * `threading_policy`: see [ThreadingPolicy] for more info.
 ///
@@ -142,7 +142,7 @@ pub fn motion_blur(
     destination: &mut BlurImageMut<u8>,
     angle: f32,
     kernel_size: usize,
-    border_mode: EdgeMode,
+    edge_modes: EdgeMode2D,
     border_constant: Scalar,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
@@ -158,7 +158,7 @@ pub fn motion_blur(
         destination,
         &kernel,
         KernelShape::new(kernel_size, kernel_size),
-        border_mode,
+        edge_modes,
         border_constant,
         threading_policy,
     )
@@ -167,7 +167,7 @@ pub fn motion_blur(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::FastBlurChannels;
+    use crate::{EdgeMode, FastBlurChannels};
 
     #[test]
     fn test_motion_k25_a25_rgb() {
@@ -186,7 +186,7 @@ mod tests {
             &mut dst,
             90.,
             25,
-            EdgeMode::Clamp,
+            EdgeMode2D::new(EdgeMode::Clamp),
             Scalar::default(),
             ThreadingPolicy::Single,
         )
@@ -217,7 +217,7 @@ mod tests {
             &mut dst,
             90.,
             25,
-            EdgeMode::Clamp,
+            EdgeMode2D::new(EdgeMode::Clamp),
             Scalar::default(),
             ThreadingPolicy::Single,
         )
@@ -244,7 +244,7 @@ mod tests {
             &mut dst,
             90.,
             25,
-            EdgeMode::Clamp,
+            EdgeMode2D::new(EdgeMode::Clamp),
             Scalar::default(),
             ThreadingPolicy::Single,
         )

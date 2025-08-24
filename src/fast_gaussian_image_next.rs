@@ -28,7 +28,7 @@
  */
 use crate::{
     fast_gaussian_next, fast_gaussian_next_f32, fast_gaussian_next_u16, AnisotropicRadius,
-    BlurImageMut, EdgeMode, FastBlurChannels, ThreadingPolicy,
+    BlurImageMut, EdgeMode2D, FastBlurChannels, ThreadingPolicy,
 };
 use image::{
     DynamicImage, GrayAlphaImage, GrayImage, ImageBuffer, Luma, LumaA, Rgb, Rgb32FImage, RgbImage,
@@ -50,7 +50,7 @@ use image::{
 pub fn fast_gaussian_next_blur_image(
     image: DynamicImage,
     radius: AnisotropicRadius,
-    edge_mode: EdgeMode,
+    edge_modes: EdgeMode2D,
     threading_policy: ThreadingPolicy,
 ) -> Option<DynamicImage> {
     match image {
@@ -62,7 +62,7 @@ pub fn fast_gaussian_next_blur_image(
                 gray.height(),
                 FastBlurChannels::Plane,
             );
-            fast_gaussian_next(&mut blur_image, radius, threading_policy, edge_mode).unwrap();
+            fast_gaussian_next(&mut blur_image, radius, threading_policy, edge_modes).unwrap();
             let new_gray_image = GrayImage::from_raw(gray.width(), gray.height(), new_image)?;
             Some(DynamicImage::ImageLuma8(new_gray_image))
         }
@@ -89,7 +89,7 @@ pub fn fast_gaussian_next_blur_image(
                 FastBlurChannels::Plane,
             );
 
-            fast_gaussian_next(&mut intensity_image, radius, threading_policy, edge_mode).unwrap();
+            fast_gaussian_next(&mut intensity_image, radius, threading_policy, edge_modes).unwrap();
 
             let mut alpha_image = BlurImageMut::borrow(
                 &mut alpha_plane,
@@ -98,7 +98,7 @@ pub fn fast_gaussian_next_blur_image(
                 FastBlurChannels::Plane,
             );
 
-            fast_gaussian_next(&mut alpha_image, radius, threading_policy, edge_mode).unwrap();
+            fast_gaussian_next(&mut alpha_image, radius, threading_policy, edge_modes).unwrap();
 
             let mut new_raw_buffer =
                 vec![
@@ -132,7 +132,7 @@ pub fn fast_gaussian_next_blur_image(
                 FastBlurChannels::Channels3,
             );
 
-            fast_gaussian_next(&mut b_rgb_image, radius, threading_policy, edge_mode).unwrap();
+            fast_gaussian_next(&mut b_rgb_image, radius, threading_policy, edge_modes).unwrap();
             let new_rgb_image =
                 RgbImage::from_raw(rgb_image.width(), rgb_image.height(), new_image)?;
             Some(DynamicImage::ImageRgb8(new_rgb_image))
@@ -147,7 +147,7 @@ pub fn fast_gaussian_next_blur_image(
                 FastBlurChannels::Channels4,
             );
 
-            fast_gaussian_next(&mut b_rgba_image, radius, threading_policy, edge_mode).unwrap();
+            fast_gaussian_next(&mut b_rgba_image, radius, threading_policy, edge_modes).unwrap();
             let new_rgba_image =
                 RgbaImage::from_raw(rgba_image.width(), rgba_image.height(), new_image)?;
             Some(DynamicImage::ImageRgba8(new_rgba_image))
@@ -162,7 +162,7 @@ pub fn fast_gaussian_next_blur_image(
                 FastBlurChannels::Plane,
             );
 
-            fast_gaussian_next_u16(&mut intensity_image, radius, threading_policy, edge_mode)
+            fast_gaussian_next_u16(&mut intensity_image, radius, threading_policy, edge_modes)
                 .unwrap();
 
             let new_rgb_image = ImageBuffer::<Luma<u16>, Vec<u16>>::from_raw(
@@ -195,7 +195,7 @@ pub fn fast_gaussian_next_blur_image(
                 FastBlurChannels::Plane,
             );
 
-            fast_gaussian_next_u16(&mut intensity_image, radius, threading_policy, edge_mode)
+            fast_gaussian_next_u16(&mut intensity_image, radius, threading_policy, edge_modes)
                 .unwrap();
 
             let mut alpha_image = BlurImageMut::borrow(
@@ -205,7 +205,7 @@ pub fn fast_gaussian_next_blur_image(
                 FastBlurChannels::Plane,
             );
 
-            fast_gaussian_next_u16(&mut alpha_image, radius, threading_policy, edge_mode).unwrap();
+            fast_gaussian_next_u16(&mut alpha_image, radius, threading_policy, edge_modes).unwrap();
 
             let mut new_raw_buffer =
                 vec![0u16; gray_alpha_16.width() as usize * gray_alpha_16.height() as usize * 2];
@@ -236,7 +236,7 @@ pub fn fast_gaussian_next_blur_image(
                 FastBlurChannels::Channels3,
             );
 
-            fast_gaussian_next_u16(&mut rgb_image, radius, threading_policy, edge_mode).unwrap();
+            fast_gaussian_next_u16(&mut rgb_image, radius, threading_policy, edge_modes).unwrap();
 
             let new_rgb_image = ImageBuffer::<Rgb<u16>, Vec<u16>>::from_raw(
                 rgb_16_image.width(),
@@ -255,7 +255,7 @@ pub fn fast_gaussian_next_blur_image(
                 FastBlurChannels::Channels4,
             );
 
-            fast_gaussian_next_u16(&mut rgba_image, radius, threading_policy, edge_mode).unwrap();
+            fast_gaussian_next_u16(&mut rgba_image, radius, threading_policy, edge_modes).unwrap();
 
             let new_rgba_image = ImageBuffer::<Rgba<u16>, Vec<u16>>::from_raw(
                 rgba_16_image.width(),
@@ -274,7 +274,7 @@ pub fn fast_gaussian_next_blur_image(
                 FastBlurChannels::Channels3,
             );
 
-            fast_gaussian_next_f32(&mut rgb_image, radius, threading_policy, edge_mode).unwrap();
+            fast_gaussian_next_f32(&mut rgb_image, radius, threading_policy, edge_modes).unwrap();
             let new_rgb_image =
                 Rgb32FImage::from_raw(rgb_image_f32.width(), rgb_image_f32.height(), new_image)?;
             Some(DynamicImage::ImageRgb32F(new_rgb_image))
@@ -289,7 +289,7 @@ pub fn fast_gaussian_next_blur_image(
                 FastBlurChannels::Channels4,
             );
 
-            fast_gaussian_next_f32(&mut rgb_image, radius, threading_policy, edge_mode).unwrap();
+            fast_gaussian_next_f32(&mut rgb_image, radius, threading_policy, edge_modes).unwrap();
 
             let new_rgb_image =
                 Rgba32FImage::from_raw(rgba_image_f32.width(), rgba_image_f32.height(), new_image)?;

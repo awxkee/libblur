@@ -28,6 +28,34 @@
 use std::ops::Index;
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Default)]
+/// Declares a 2D edge handling mode.
+///
+/// `EdgeMode2D` allows specifying how out-of-bounds pixel access
+/// is handled independently in the horizontal and vertical directions.
+pub struct EdgeMode2D {
+    /// Edge handling mode in the horizontal direction.
+    pub horizontal: EdgeMode,
+    /// Edge handling mode in the vertical direction.
+    pub vertical: EdgeMode,
+}
+
+impl EdgeMode2D {
+    pub const fn new(mode: EdgeMode) -> Self {
+        Self {
+            horizontal: mode,
+            vertical: mode,
+        }
+    }
+
+    pub const fn anisotropy(horizontal: EdgeMode, vertical: EdgeMode) -> Self {
+        Self {
+            horizontal,
+            vertical,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Default)]
 /// Declares an edge handling mode
 pub enum EdgeMode {
     /// If kernel goes out of bounds it will be clipped to an edge and edge pixel replicated across filter
@@ -56,6 +84,12 @@ impl From<usize> for EdgeMode {
                 unreachable!("Unknown edge mode for value: {value}");
             }
         }
+    }
+}
+
+impl EdgeMode {
+    pub const fn as_2d(self) -> EdgeMode2D {
+        EdgeMode2D::new(self)
     }
 }
 
@@ -89,7 +123,7 @@ macro_rules! clamp_edge {
             }
             EdgeMode::Reflect => {
                 if $value < $min || $value >= $max {
-                    use crate::reflect_index;
+                    use crate::edge_mode::reflect_index;
                     let cx = reflect_index($value as isize, $max as isize);
                     cx as usize
                 } else {
@@ -98,7 +132,7 @@ macro_rules! clamp_edge {
             }
             EdgeMode::Reflect101 => {
                 if $value < $min || $value >= $max {
-                    use crate::reflect_index_101;
+                    use crate::edge_mode::reflect_index_101;
                     reflect_index_101($value as isize, $max as isize)
                 } else {
                     $value as usize
@@ -138,7 +172,7 @@ macro_rules! border_interpolate {
             }
             EdgeMode::Reflect => {
                 if $value < $min || $value >= $max {
-                    use crate::reflect_index;
+                    use crate::edge_mode::reflect_index;
                     let cx = reflect_index($value as isize, $max as isize);
                     *$slice.get_unchecked(cx as usize * $scale + $cn)
                 } else {
@@ -147,7 +181,7 @@ macro_rules! border_interpolate {
             }
             EdgeMode::Reflect101 => {
                 if $value < $min || $value >= $max {
-                    use crate::reflect_index_101;
+                    use crate::edge_mode::reflect_index_101;
                     let cx = reflect_index_101($value as isize, $max as isize);
                     *$slice.get_unchecked(cx as usize * $scale + $cn)
                 } else {

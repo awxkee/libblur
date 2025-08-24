@@ -28,7 +28,8 @@
  */
 #![allow(clippy::manual_clamp)]
 use crate::bilateral::bp8::{BilateralStore, BilateralUnit};
-use crate::{Arena, BilateralBlurParams};
+use crate::filter1d::Arena;
+use crate::BilateralBlurParams;
 use std::arch::aarch64::*;
 
 pub(crate) struct BilateralExecutionUnitNeon<'a, const N: usize> {

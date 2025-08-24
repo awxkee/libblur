@@ -67,7 +67,7 @@ pub(crate) mod sse;
 mod to_approx_storage;
 mod to_approx_storage_complex;
 
-pub use arena::{make_arena, Arena, ArenaPads};
+pub(crate) use arena::{make_arena, Arena, ArenaPads};
 pub use filter::filter_1d_exact;
 pub use filter_1d_approx::filter_1d_approx;
 pub use filter_complex::filter_1d_complex;

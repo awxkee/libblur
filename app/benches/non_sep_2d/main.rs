@@ -35,7 +35,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 &mut dst_image,
                 &motion,
                 KernelShape::new(35, 35),
-                EdgeMode::Clamp,
+                EdgeMode::Clamp.as_2d(),
                 Scalar::default(),
                 ThreadingPolicy::Adaptive,
             )

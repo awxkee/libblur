@@ -28,7 +28,7 @@
  */
 use crate::{
     gaussian_blur, gaussian_blur_f32, gaussian_blur_u16, BlurImage, BlurImageMut, ConvolutionMode,
-    EdgeMode, FastBlurChannels, GaussianBlurParams, IeeeBinaryConvolutionMode, ThreadingPolicy,
+    EdgeMode2D, FastBlurChannels, GaussianBlurParams, IeeeBinaryConvolutionMode, ThreadingPolicy,
 };
 use image::{
     DynamicImage, GrayAlphaImage, GrayImage, ImageBuffer, Luma, LumaA, Rgb, Rgb32FImage, RgbImage,
@@ -51,7 +51,7 @@ use image::{
 pub fn gaussian_blur_image(
     image: DynamicImage,
     params: GaussianBlurParams,
-    edge_mode: EdgeMode,
+    edge_modes: EdgeMode2D,
     precise_level: ConvolutionMode,
     threading_policy: ThreadingPolicy,
 ) -> Option<DynamicImage> {
@@ -66,7 +66,7 @@ pub fn gaussian_blur_image(
                 &gray_image,
                 &mut new_image,
                 params,
-                edge_mode,
+                edge_modes,
                 threading_policy,
                 precise_level,
             )
@@ -120,7 +120,7 @@ pub fn gaussian_blur_image(
                 &int,
                 &mut new_intensity_plane,
                 params,
-                edge_mode,
+                edge_modes,
                 threading_policy,
                 precise_level,
             )
@@ -130,7 +130,7 @@ pub fn gaussian_blur_image(
                 &alp,
                 &mut new_alpha_plane,
                 params,
-                edge_mode,
+                edge_modes,
                 threading_policy,
                 precise_level,
             )
@@ -170,7 +170,7 @@ pub fn gaussian_blur_image(
                 &gray_image,
                 &mut new_image,
                 params,
-                edge_mode,
+                edge_modes,
                 threading_policy,
                 precise_level,
             )
@@ -189,7 +189,7 @@ pub fn gaussian_blur_image(
                 &gray_image,
                 &mut new_image,
                 params,
-                edge_mode,
+                edge_modes,
                 threading_policy,
                 precise_level,
             )
@@ -208,7 +208,7 @@ pub fn gaussian_blur_image(
                 &gray_image,
                 &mut new_image,
                 params,
-                edge_mode,
+                edge_modes,
                 threading_policy,
                 precise_level,
             )
@@ -263,7 +263,7 @@ pub fn gaussian_blur_image(
                 &int,
                 &mut new_intensity_plane,
                 params,
-                edge_mode,
+                edge_modes,
                 threading_policy,
                 precise_level,
             )
@@ -273,7 +273,7 @@ pub fn gaussian_blur_image(
                 &alp,
                 &mut new_alpha_plane,
                 params,
-                edge_mode,
+                edge_modes,
                 threading_policy,
                 precise_level,
             )
@@ -313,7 +313,7 @@ pub fn gaussian_blur_image(
                 &gray_image,
                 &mut new_image,
                 params,
-                edge_mode,
+                edge_modes,
                 threading_policy,
                 precise_level,
             )
@@ -335,7 +335,7 @@ pub fn gaussian_blur_image(
                 &gray_image,
                 &mut new_image,
                 params,
-                edge_mode,
+                edge_modes,
                 threading_policy,
                 precise_level,
             )
@@ -357,7 +357,7 @@ pub fn gaussian_blur_image(
                 &gray_image,
                 &mut new_image,
                 params,
-                edge_mode,
+                edge_modes,
                 threading_policy,
                 IeeeBinaryConvolutionMode::Normal,
             )
@@ -375,7 +375,7 @@ pub fn gaussian_blur_image(
                 &gray_image,
                 &mut new_image,
                 params,
-                edge_mode,
+                edge_modes,
                 threading_policy,
                 IeeeBinaryConvolutionMode::Normal,
             )

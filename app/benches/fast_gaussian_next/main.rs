@@ -1,7 +1,9 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use image::{EncodableLayout, GenericImageView, ImageReader};
 
-use libblur::{AnisotropicRadius, BlurImageMut, EdgeMode, FastBlurChannels, ThreadingPolicy};
+use libblur::{
+    AnisotropicRadius, BlurImageMut, EdgeMode, EdgeMode2D, FastBlurChannels, ThreadingPolicy,
+};
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     let img = ImageReader::open("../assets/test_image_4.png")
@@ -23,7 +25,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 &mut dst_image,
                 AnisotropicRadius::new(77),
                 ThreadingPolicy::Adaptive,
-                EdgeMode::Clamp,
+                EdgeMode2D::new(EdgeMode::Clamp),
             )
             .unwrap();
         })
@@ -42,7 +44,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 &mut dst_image,
                 AnisotropicRadius::new(77),
                 ThreadingPolicy::Single,
-                EdgeMode::Clamp,
+                EdgeMode2D::new(EdgeMode::Clamp),
             )
             .unwrap();
         })
@@ -63,7 +65,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 &mut dst_image,
                 AnisotropicRadius::new(77),
                 ThreadingPolicy::Single,
-                EdgeMode::Clamp,
+                EdgeMode2D::new(EdgeMode::Clamp),
             )
             .unwrap();
         })
@@ -84,7 +86,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 &mut dst_image,
                 AnisotropicRadius::new(77),
                 ThreadingPolicy::Single,
-                EdgeMode::Clamp,
+                EdgeMode2D::new(EdgeMode::Clamp),
             )
             .unwrap();
         })
@@ -111,7 +113,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 &mut dst_image,
                 AnisotropicRadius::new(77),
                 ThreadingPolicy::Adaptive,
-                EdgeMode::Clamp,
+                EdgeMode2D::new(EdgeMode::Clamp),
             )
             .unwrap();
         })
@@ -130,7 +132,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 &mut dst_image,
                 AnisotropicRadius::new(77),
                 ThreadingPolicy::Single,
-                EdgeMode::Clamp,
+                EdgeMode2D::new(EdgeMode::Clamp),
             )
             .unwrap();
         })

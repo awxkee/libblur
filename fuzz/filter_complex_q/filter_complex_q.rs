@@ -32,7 +32,7 @@
 use arbitrary::Arbitrary;
 use libblur::{
     filter_1d_complex, filter_1d_complex_fixed_point, BlurImage, BlurImageMut, EdgeMode,
-    FastBlurChannels, Scalar, ThreadingPolicy,
+    EdgeMode2D, FastBlurChannels, Scalar, ThreadingPolicy,
 };
 use libfuzzer_sys::fuzz_target;
 use num_complex::Complex;
@@ -42,7 +42,8 @@ pub struct SrcImage {
     pub src_width: u16,
     pub src_height: u16,
     pub value: u8,
-    pub edge_mode: u8,
+    pub edge_mode_horizontal: u8,
+    pub edge_mode_vertical: u8,
     pub x_kernel_size: u8,
     pub y_kernel_size: u8,
     pub channel: u8,
@@ -92,7 +93,13 @@ fuzz_target!(|data: SrcImage| {
     if data.y_kernel_size > 45 || data.y_kernel_size == 0 {
         return;
     }
-    let edge_mode = match data.edge_mode % 4 {
+    let edge_mode_horizontal = match data.edge_mode_horizontal % 4 {
+        0 => EdgeMode::Clamp,
+        1 => EdgeMode::Wrap,
+        2 => EdgeMode::Reflect,
+        _ => EdgeMode::Reflect101,
+    };
+    let edge_mode_vertical = match data.edge_mode_vertical % 4 {
         0 => EdgeMode::Clamp,
         1 => EdgeMode::Wrap,
         2 => EdgeMode::Reflect,
@@ -116,7 +123,7 @@ fuzz_target!(|data: SrcImage| {
                 data.x_kernel_size as usize,
                 data.y_kernel_size as usize,
                 channel,
-                edge_mode,
+                EdgeMode2D::anisotropy(edge_mode_horizontal, edge_mode_vertical),
                 mp,
             );
         }
@@ -127,7 +134,7 @@ fuzz_target!(|data: SrcImage| {
                 data.x_kernel_size as usize,
                 data.y_kernel_size as usize,
                 channel,
-                edge_mode,
+                EdgeMode2D::anisotropy(edge_mode_horizontal, edge_mode_vertical),
                 mp,
             );
         }
@@ -140,7 +147,7 @@ fn fuzz_8bit(
     x_kernel_size: usize,
     y_kernel_size: usize,
     channels: FastBlurChannels,
-    edge_mode: EdgeMode,
+    edge_mode: EdgeMode2D,
     threading_policy: ThreadingPolicy,
 ) {
     if width == 0 || height == 0 || x_kernel_size == 0 || y_kernel_size == 0 {
@@ -198,7 +205,7 @@ fn fuzz_16bit(
     x_kernel_size: usize,
     y_kernel_size: usize,
     channels: FastBlurChannels,
-    edge_mode: EdgeMode,
+    edge_mode: EdgeMode2D,
     threading_policy: ThreadingPolicy,
 ) {
     if width == 0 || height == 0 || x_kernel_size == 0 || y_kernel_size == 0 {

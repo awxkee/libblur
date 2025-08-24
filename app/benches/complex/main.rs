@@ -2,7 +2,7 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use image::ImageReader;
 use libblur::{
     filter_1d_complex, filter_1d_complex_fixed_point, BlurImage, BlurImageMut, EdgeMode,
-    FastBlurChannels, Scalar, ThreadingPolicy,
+    EdgeMode2D, FastBlurChannels, Scalar, ThreadingPolicy,
 };
 use num_complex::Complex;
 
@@ -66,7 +66,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 &mut dst_bytes,
                 &gaussian_kernel,
                 &gaussian_kernel,
-                EdgeMode::Clamp,
+                EdgeMode2D::new(EdgeMode::Clamp),
                 Scalar::default(),
                 ThreadingPolicy::Single,
             )
@@ -84,7 +84,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 &mut dst_bytes,
                 &gaussian_kernel,
                 &gaussian_kernel,
-                EdgeMode::Clamp,
+                EdgeMode2D::new(EdgeMode::Clamp),
                 Scalar::default(),
                 ThreadingPolicy::Single,
             )
@@ -114,7 +114,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 &mut dst_bytes,
                 &gaussian_kernel,
                 &gaussian_kernel,
-                EdgeMode::Clamp,
+                EdgeMode2D::new(EdgeMode::Clamp),
                 Scalar::default(),
                 ThreadingPolicy::Single,
             )
@@ -132,7 +132,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 &mut dst_bytes,
                 &gaussian_kernel,
                 &gaussian_kernel,
-                EdgeMode::Clamp,
+                EdgeMode2D::new(EdgeMode::Clamp),
                 Scalar::default(),
                 ThreadingPolicy::Single,
             )

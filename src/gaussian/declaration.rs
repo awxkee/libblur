@@ -26,13 +26,12 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::channels_configuration::FastBlurChannels;
-use crate::edge_mode::EdgeMode;
 use crate::gaussian::gaussian_hint::IeeeBinaryConvolutionMode;
 use crate::gaussian::gaussian_kernel::gaussian_kernel_1d;
 use crate::gaussian::gaussian_util::{kernel_size as get_kernel_size, kernel_size_d};
 use crate::{
     filter_1d_approx, filter_1d_exact, gaussian_kernel_1d_f64, sigma_size, sigma_size_d, BlurError,
-    BlurImage, BlurImageMut, ConvolutionMode, Scalar, ThreadingPolicy,
+    BlurImage, BlurImageMut, ConvolutionMode, EdgeMode2D, Scalar, ThreadingPolicy,
 };
 #[cfg(feature = "nightly_f16")]
 use core::f16;
@@ -234,7 +233,7 @@ pub fn gaussian_blur(
     src: &BlurImage<u8>,
     dst: &mut BlurImageMut<u8>,
     params: GaussianBlurParams,
-    edge_mode: EdgeMode,
+    edge_modes: EdgeMode2D,
     threading_policy: ThreadingPolicy,
     hint: ConvolutionMode,
 ) -> Result<(), BlurError> {
@@ -255,7 +254,7 @@ pub fn gaussian_blur(
                 dst,
                 &x_kernel,
                 &y_kernel,
-                edge_mode,
+                edge_modes,
                 Scalar::default(),
                 threading_policy,
             )?;
@@ -271,7 +270,7 @@ pub fn gaussian_blur(
                 dst,
                 &x_kernel,
                 &y_kernel,
-                edge_mode,
+                edge_modes,
                 Scalar::default(),
                 threading_policy,
             )?;
@@ -306,7 +305,7 @@ pub fn gaussian_blur_u16(
     src: &BlurImage<u16>,
     dst: &mut BlurImageMut<u16>,
     params: GaussianBlurParams,
-    edge_mode: EdgeMode,
+    edge_modes: EdgeMode2D,
     threading_policy: ThreadingPolicy,
     hint: ConvolutionMode,
 ) -> Result<(), BlurError> {
@@ -327,7 +326,7 @@ pub fn gaussian_blur_u16(
                 dst,
                 &x_kernel,
                 &y_kernel,
-                edge_mode,
+                edge_modes,
                 Scalar::default(),
                 threading_policy,
             )
@@ -344,7 +343,7 @@ pub fn gaussian_blur_u16(
                 dst,
                 &x_kernel,
                 &y_kernel,
-                edge_mode,
+                edge_modes,
                 Scalar::default(),
                 threading_policy,
             )
@@ -364,7 +363,7 @@ pub fn gaussian_blur_u16(
 /// * `src` - Source image.
 /// * `dst` - Destination image.
 /// * `params` - See [GaussianBlurParams] for more info.
-/// * `edge_mode` - Rule to handle edge mode, sse [EdgeMode] for more info.
+/// * `edge_modes` - Rule to handle edge mode, sse [EdgeMode] and [EdgeMode2D] for more info.
 /// * `threading_policy` - Threading policy according to [ThreadingPolicy].
 /// * `convolution_mode` - See [IeeeBinaryConvolutionMode] for more info.
 ///
@@ -375,7 +374,7 @@ pub fn gaussian_blur_f32(
     src: &BlurImage<f32>,
     dst: &mut BlurImageMut<f32>,
     params: GaussianBlurParams,
-    edge_mode: EdgeMode,
+    edge_modes: EdgeMode2D,
     threading_policy: ThreadingPolicy,
     convolution_mode: IeeeBinaryConvolutionMode,
 ) -> Result<(), BlurError> {
@@ -396,7 +395,7 @@ pub fn gaussian_blur_f32(
                 dst,
                 &x_kernel,
                 &y_kernel,
-                edge_mode,
+                edge_modes,
                 Scalar::default(),
                 threading_policy,
             )
@@ -413,7 +412,7 @@ pub fn gaussian_blur_f32(
                 dst,
                 &x_kernel,
                 &y_kernel,
-                edge_mode,
+                edge_modes,
                 Scalar::default(),
                 threading_policy,
             )
@@ -433,7 +432,7 @@ pub fn gaussian_blur_f32(
 /// * `src` - Source image.
 /// * `dst` - Destination image.
 /// * `params` - See [GaussianBlurParams] for more info.
-/// * `edge_mode` - Rule to handle edge mode, sse [EdgeMode] for more info.
+/// * `edge_modes` - Rule to handle edge mode, sse [EdgeMode] and [EdgeMode2D] for more info.
 /// * `threading_policy` - Threading policy according to [ThreadingPolicy].
 ///
 /// # Panics
@@ -445,7 +444,7 @@ pub fn gaussian_blur_f16(
     src: &BlurImage<f16>,
     dst: &mut BlurImageMut<f16>,
     params: GaussianBlurParams,
-    edge_mode: EdgeMode,
+    edge_modes: EdgeMode2D,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
     src.check_layout()?;
@@ -463,7 +462,7 @@ pub fn gaussian_blur_f16(
         dst,
         &x_kernel,
         &y_kernel,
-        edge_mode,
+        edge_modes,
         Scalar::default(),
         threading_policy,
     )
@@ -472,6 +471,7 @@ pub fn gaussian_blur_f16(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::EdgeMode;
     use crate::{gaussian_kernel_1d_f64, sigma_size_d};
 
     macro_rules! compare_u8_stat {
@@ -517,7 +517,7 @@ mod tests {
             &src_image,
             &mut dst,
             GaussianBlurParams::new_from_kernel(5.),
-            EdgeMode::Clamp,
+            EdgeMode2D::new(EdgeMode::Clamp),
             ThreadingPolicy::Single,
             ConvolutionMode::FixedPoint,
         )
@@ -546,7 +546,7 @@ mod tests {
             &src_image,
             &mut dst,
             GaussianBlurParams::new_from_kernel(3.),
-            EdgeMode::Clamp,
+            EdgeMode2D::new(EdgeMode::Clamp),
             ThreadingPolicy::Single,
             ConvolutionMode::FixedPoint,
         )
@@ -576,7 +576,7 @@ mod tests {
             &src_image,
             &mut dst,
             GaussianBlurParams::new_from_kernel(7.),
-            EdgeMode::Clamp,
+            EdgeMode2D::new(EdgeMode::Clamp),
             ThreadingPolicy::Single,
             ConvolutionMode::FixedPoint,
         )
@@ -605,7 +605,7 @@ mod tests {
             &src_image,
             &mut dst,
             GaussianBlurParams::new_from_kernel(5.),
-            EdgeMode::Clamp,
+            EdgeMode2D::new(EdgeMode::Clamp),
             ThreadingPolicy::Single,
             ConvolutionMode::Exact,
         )
@@ -634,7 +634,7 @@ mod tests {
             &src_image,
             &mut dst,
             GaussianBlurParams::new_from_kernel(31.),
-            EdgeMode::Clamp,
+            EdgeMode2D::new(EdgeMode::Clamp),
             ThreadingPolicy::Single,
             ConvolutionMode::FixedPoint,
         )
@@ -663,7 +663,7 @@ mod tests {
             &src_image,
             &mut dst,
             GaussianBlurParams::new_from_kernel(31.),
-            EdgeMode::Clamp,
+            EdgeMode2D::new(EdgeMode::Clamp),
             ThreadingPolicy::Single,
             ConvolutionMode::Exact,
         )
@@ -714,7 +714,7 @@ mod tests {
             &src_image,
             &mut dst,
             GaussianBlurParams::new_from_kernel(31.),
-            EdgeMode::Clamp,
+            EdgeMode2D::new(EdgeMode::Clamp),
             ThreadingPolicy::Single,
             ConvolutionMode::FixedPoint,
         )
@@ -743,7 +743,7 @@ mod tests {
             &src_image,
             &mut dst,
             GaussianBlurParams::new_from_kernel(31.),
-            EdgeMode::Clamp,
+            EdgeMode2D::new(EdgeMode::Clamp),
             ThreadingPolicy::Single,
             ConvolutionMode::Exact,
         )
@@ -794,7 +794,7 @@ mod tests {
             &src_image,
             &mut dst,
             GaussianBlurParams::new_from_kernel(31.),
-            EdgeMode::Clamp,
+            EdgeMode2D::new(EdgeMode::Clamp),
             ThreadingPolicy::Single,
             IeeeBinaryConvolutionMode::Normal,
         )
@@ -805,7 +805,7 @@ mod tests {
             &src_image,
             &mut dst,
             GaussianBlurParams::new_from_kernel(31.),
-            EdgeMode::Clamp,
+            EdgeMode2D::new(EdgeMode::Clamp),
             ThreadingPolicy::Single,
             IeeeBinaryConvolutionMode::Zealous,
         )
@@ -838,7 +838,7 @@ mod tests {
             &mut dst,
             &kernel,
             &kernel,
-            EdgeMode::Clamp,
+            EdgeMode2D::new(EdgeMode::Clamp),
             Scalar::default(),
             ThreadingPolicy::Adaptive,
         )

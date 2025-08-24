@@ -35,7 +35,7 @@ use crate::filter1d::filter_scan::is_symmetric_1d;
 use crate::filter1d::to_approx_storage_complex::{ApproxComplexLevel, ToApproxStorageComplex};
 use crate::primitives::PrimitiveCast;
 use crate::safe_math::{SafeAdd, SafeMul};
-use crate::{BlurError, BlurImage, BlurImageMut, EdgeMode, Scalar, ThreadingPolicy};
+use crate::{BlurError, BlurImage, BlurImageMut, EdgeMode2D, Scalar, ThreadingPolicy};
 use novtb::{ParallelZonedIterator, TbSliceMut};
 use num_complex::Complex;
 use num_traits::{MulAdd, Num};
@@ -56,9 +56,9 @@ use std::ops::Mul;
 /// * `destination`: Destination image.
 /// * `row_kernel`: Row kernel, *size must be odd*!
 /// * `column_kernel`: Column kernel, *size must be odd*!
-/// * `border_mode`: See [EdgeMode] for more info
-/// * `border_constant`: If [EdgeMode::Constant] border will be replaced with this provided [Scalar] value
-/// * `threading_policy`: See [ThreadingPolicy] for more info
+/// * `edge_modes`: See [EdgeMode] and [EdgeMode2D] for more info.
+/// * `border_constant`: If [EdgeMode::Constant] border will be replaced with this provided [Scalar] value.
+/// * `threading_policy`: See [ThreadingPolicy] for more info.
 ///
 /// returns: Result<(), String>
 ///
@@ -71,7 +71,7 @@ pub fn filter_1d_complex_fixed_point<T, I, F, const N: usize>(
     destination: &mut BlurImageMut<T>,
     row_kernel: &[Complex<F>],
     column_kernel: &[Complex<F>],
-    border_mode: EdgeMode,
+    edge_modes: EdgeMode2D,
     border_constant: Scalar,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError>
@@ -103,7 +103,7 @@ where
             destination,
             row_kernel,
             column_kernel,
-            border_mode,
+            edge_modes,
             border_constant,
             threading_policy,
         );
@@ -186,7 +186,7 @@ where
                 image,
                 y,
                 KernelShape::new(row_kernel.len(), 0),
-                border_mode,
+                edge_modes.horizontal,
                 border_constant,
             )
             .unwrap();
@@ -206,7 +206,7 @@ where
         transient_image.as_slice(),
         image_size,
         column_kernel_shape,
-        border_mode,
+        edge_modes.vertical,
         (0..N)
             .map(|x| Complex {
                 re: border_constant[x].cast_(),
@@ -265,7 +265,7 @@ fn filter_1d_complex_sliding_buffer_q<T, I, F, const N: usize>(
     destination: &mut BlurImageMut<T>,
     row_kernel: &[Complex<F>],
     column_kernel: &[Complex<F>],
-    border_mode: EdgeMode,
+    edge_modes: EdgeMode2D,
     border_constant: Scalar,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError>
@@ -381,7 +381,7 @@ where
                         image,
                         0,
                         KernelShape::new(row_kernel.len(), 0),
-                        border_mode,
+                        edge_modes.horizontal,
                         border_constant,
                     )
                     .unwrap();
@@ -402,7 +402,7 @@ where
                 } else {
                     for src_y in 0..=half_kernel {
                         let s_y = clamp_edge!(
-                            border_mode,
+                            edge_modes.vertical,
                             src_y as i64 + source_y as i64 - half_kernel as i64 - 1,
                             0i64,
                             image_size.height as i64
@@ -416,7 +416,7 @@ where
                             image,
                             s_y,
                             KernelShape::new(row_kernel.len(), 0),
-                            border_mode,
+                            edge_modes.horizontal,
                             border_constant,
                         )
                         .unwrap();
@@ -438,7 +438,12 @@ where
                     let new_y = if y < image_size.height {
                         y
                     } else {
-                        clamp_edge!(border_mode, y as i64, 0i64, image_size.height as i64)
+                        clamp_edge!(
+                            edge_modes.vertical,
+                            y as i64,
+                            0i64,
+                            image_size.height as i64
+                        )
                     };
 
                     write_arena_row::<T, N>(
@@ -446,7 +451,7 @@ where
                         image,
                         new_y,
                         KernelShape::new(row_kernel.len(), 0),
-                        border_mode,
+                        edge_modes.horizontal,
                         border_constant,
                     )
                     .unwrap();
@@ -495,7 +500,7 @@ where
             image,
             0,
             KernelShape::new(row_kernel.len(), 0),
-            border_mode,
+            edge_modes.horizontal,
             border_constant,
         )?;
         row_handler(
@@ -525,7 +530,12 @@ where
             let new_y = if y < image_size.height {
                 y
             } else {
-                clamp_edge!(border_mode, y as i64, 0i64, image_size.height as i64)
+                clamp_edge!(
+                    edge_modes.vertical,
+                    y as i64,
+                    0i64,
+                    image_size.height as i64
+                )
             };
 
             write_arena_row::<T, N>(
@@ -533,7 +543,7 @@ where
                 image,
                 new_y,
                 KernelShape::new(row_kernel.len(), 0),
-                border_mode,
+                edge_modes.horizontal,
                 border_constant,
             )?;
             row_handler(

@@ -31,8 +31,8 @@
 
 use arbitrary::Arbitrary;
 use libblur::{
-    fast_gaussian_next_f32, AnisotropicRadius, BlurImageMut, EdgeMode, FastBlurChannels,
-    ThreadingPolicy,
+    fast_gaussian_next_f32, AnisotropicRadius, BlurImageMut, EdgeMode, EdgeMode2D,
+    FastBlurChannels, ThreadingPolicy,
 };
 use libfuzzer_sys::fuzz_target;
 
@@ -92,7 +92,7 @@ fn fuzz_image(
         &mut dst_image,
         AnisotropicRadius::create(x_radius as u32, y_radius as u32),
         ThreadingPolicy::Single,
-        edge_mode,
+        EdgeMode2D::new(edge_mode),
     )
     .unwrap();
 }

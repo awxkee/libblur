@@ -30,8 +30,8 @@
 
 use crate::{
     filter_2d, filter_2d_fft, gaussian_blur, stack_blur, AnisotropicRadius, BlurError, BlurImage,
-    BlurImageMut, ConvolutionMode, EdgeMode, FastBlurChannels, GaussianBlurParams, KernelShape,
-    Scalar, ThreadingPolicy, TransferFunction,
+    BlurImageMut, ConvolutionMode, EdgeMode, EdgeMode2D, FastBlurChannels, GaussianBlurParams,
+    KernelShape, Scalar, ThreadingPolicy, TransferFunction,
 };
 use num_traits::AsPrimitive;
 use std::fmt::Debug;
@@ -132,7 +132,7 @@ impl Blur<u8> for u8 {
             &src,
             &mut dst,
             GaussianBlurParams::new_from_kernel(rad as f64),
-            EdgeMode::Clamp,
+            EdgeMode2D::new(EdgeMode::Clamp),
             ThreadingPolicy::Adaptive,
             ConvolutionMode::FixedPoint,
         )
@@ -232,7 +232,7 @@ trait Edges<T> {
         width: usize,
         height: usize,
         radius: usize,
-        border_mode: EdgeMode,
+        edge_modes: EdgeMode2D,
         border_constant: Scalar,
     ) -> Vec<T>;
 }
@@ -243,7 +243,7 @@ impl Edges<u8> for u8 {
         width: usize,
         height: usize,
         radius: usize,
-        border_mode: EdgeMode,
+        edge_modes: EdgeMode2D,
         border_constant: Scalar,
     ) -> Vec<u8> {
         let mut dst = vec![0u8; width * height];
@@ -270,7 +270,7 @@ impl Edges<u8> for u8 {
                 &mut dst_image,
                 &edge_filter,
                 KernelShape::new(radius, radius),
-                border_mode,
+                edge_modes,
                 border_constant,
                 ThreadingPolicy::Adaptive,
             )
@@ -289,7 +289,7 @@ impl Edges<u8> for u8 {
                 &mut dst_image,
                 &edge_filter,
                 KernelShape::new(radius, radius),
-                border_mode,
+                edge_modes,
                 border_constant,
                 ThreadingPolicy::Adaptive,
             )
@@ -398,7 +398,7 @@ fn adaptive_blur_impl<
     dst_image: &mut BlurImageMut<T>,
     radius: u32,
     transfer_function: TransferFunction,
-    border_mode: EdgeMode,
+    edge_modes: EdgeMode2D,
     border_constant: Scalar,
 ) {
     let image = src_image.data.as_ref();
@@ -412,7 +412,7 @@ fn adaptive_blur_impl<
         width,
         height,
         radius as usize,
-        border_mode,
+        edge_modes,
         border_constant,
     );
     T::auto_level(&mut edges, width, height);
@@ -452,7 +452,7 @@ pub fn adaptive_blur(
     dst_image: &mut BlurImageMut<u8>,
     radius: u32,
     transfer_function: TransferFunction,
-    border_mode: EdgeMode,
+    edge_modes: EdgeMode2D,
     border_constant: Scalar,
 ) -> Result<(), BlurError> {
     src_image.check_layout()?;
@@ -469,7 +469,7 @@ pub fn adaptive_blur(
         dst_image,
         radius,
         transfer_function,
-        border_mode,
+        edge_modes,
         border_constant,
     );
     Ok(())
