@@ -26,6 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::primitives::PrimitiveCast;
 use crate::sse::{load_u8_s32_fast, store_u8_s32};
 use crate::stackblur::stack_blur_pass::StackBlurWorkingPass;
 use crate::unsafe_slice::UnsafeSlice;
@@ -35,7 +36,7 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 use std::marker::PhantomData;
-use std::ops::{AddAssign, Mul, Shr, Sub, SubAssign};
+use std::ops::{AddAssign, Mul, Sub, SubAssign};
 
 pub(crate) struct VerticalSseStackBlurPass<T, J, const CN: usize> {
     _phantom_t: PhantomData<T>,
@@ -58,16 +59,15 @@ where
         + FromPrimitive
         + AddAssign<J>
         + Mul<Output = J>
-        + Shr<Output = J>
         + Sub<Output = J>
         + AsPrimitive<f32>
         + SubAssign
         + AsPrimitive<T>
         + Default,
-    T: Copy + AsPrimitive<J> + FromPrimitive,
+    T: Copy + AsPrimitive<J> + Default,
     i32: AsPrimitive<J>,
     u32: AsPrimitive<J>,
-    f32: AsPrimitive<T>,
+    f32: PrimitiveCast<T>,
     usize: AsPrimitive<J>,
 {
     #[target_feature(enable = "sse4.1")]
@@ -443,16 +443,15 @@ where
         + FromPrimitive
         + AddAssign<J>
         + Mul<Output = J>
-        + Shr<Output = J>
         + Sub<Output = J>
         + AsPrimitive<f32>
         + SubAssign
         + AsPrimitive<T>
         + Default,
-    T: Copy + AsPrimitive<J> + FromPrimitive,
+    T: Copy + AsPrimitive<J> + Default,
     i32: AsPrimitive<J>,
     u32: AsPrimitive<J>,
-    f32: AsPrimitive<T>,
+    f32: PrimitiveCast<T>,
     usize: AsPrimitive<J>,
 {
     fn pass(

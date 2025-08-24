@@ -25,11 +25,14 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#[cfg(feature = "nightly_f16")]
 mod f16_utils;
 mod fast_gaussian;
+#[cfg(feature = "nightly_f16")]
 mod fast_gaussian_f16;
 mod fast_gaussian_f32;
 mod fast_gaussian_next;
+#[cfg(feature = "nightly_f16")]
 mod fast_gaussian_next_f16;
 mod fast_gaussian_next_f32;
 #[cfg(feature = "rdm")]
@@ -43,9 +46,11 @@ mod fast_gaussian_u16;
 mod utils;
 
 pub(crate) use fast_gaussian::{fg_horizontal_pass_neon_u8, fg_vertical_pass_neon_u8};
+#[cfg(feature = "nightly_f16")]
 pub(crate) use fast_gaussian_f16::{fg_horizontal_pass_neon_f16, fg_vertical_pass_neon_f16};
 pub(crate) use fast_gaussian_f32::{fg_horizontal_pass_neon_f32, fg_vertical_pass_neon_f32};
 pub(crate) use fast_gaussian_next::{fgn_horizontal_pass_neon_u8, fgn_vertical_pass_neon_u8};
+#[cfg(feature = "nightly_f16")]
 pub(crate) use fast_gaussian_next_f16::{fgn_horizontal_pass_neon_f16, fgn_vertical_pass_neon_f16};
 pub(crate) use fast_gaussian_next_f32::{fgn_horizontal_pass_neon_f32, fgn_vertical_pass_neon_f32};
 #[cfg(feature = "rdm")]

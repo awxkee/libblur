@@ -33,7 +33,8 @@ use crate::filter1d::region::FilterRegion;
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 use crate::filter1d::sse::filter_row_sse_f32_f32;
 use crate::ImageSize;
-use half::f16;
+#[cfg(feature = "nightly_f16")]
+use core::f16;
 
 pub trait Filter1DRowHandler<T, F> {
     fn get_row_handler<const N: usize>(
@@ -343,6 +344,8 @@ default_1d_row_handler!(u32, f32);
 default_1d_row_handler!(u32, f64);
 default_1d_row_handler!(i32, f32);
 default_1d_row_handler!(i32, f64);
+#[cfg(feature = "nightly_f16")]
 default_1d_row_handler!(f16, f32);
+#[cfg(feature = "nightly_f16")]
 default_1d_row_handler!(f16, f64);
 default_1d_row_handler!(f64, f64);

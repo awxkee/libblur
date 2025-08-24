@@ -33,11 +33,12 @@ use crate::filter1d::filter_complex_dispatch_q::ComplexDispatchQ;
 use crate::filter1d::filter_element::KernelShape;
 use crate::filter1d::filter_scan::is_symmetric_1d;
 use crate::filter1d::to_approx_storage_complex::{ApproxComplexLevel, ToApproxStorageComplex};
+use crate::primitives::PrimitiveCast;
 use crate::safe_math::{SafeAdd, SafeMul};
 use crate::{BlurError, BlurImage, BlurImageMut, EdgeMode, Scalar, ThreadingPolicy};
 use novtb::{ParallelZonedIterator, TbSliceMut};
 use num_complex::Complex;
-use num_traits::{AsPrimitive, FromPrimitive, MulAdd, Num};
+use num_traits::{MulAdd, Num};
 use std::fmt::Debug;
 use std::ops::Mul;
 
@@ -76,25 +77,24 @@ pub fn filter_1d_complex_fixed_point<T, I, F, const N: usize>(
 ) -> Result<(), BlurError>
 where
     T: Copy
-        + AsPrimitive<F>
+        + PrimitiveCast<F>
         + Default
         + Send
         + Sync
         + ComplexDispatchQ<T, I>
         + Debug
         + ApproxComplexLevel,
-    I: Copy + 'static + Default + Send + Sync + FromPrimitive + Num,
+    I: Copy + 'static + Default + Send + Sync + Num + Debug,
     F: Mul<F>
         + MulAdd<F, Output = F>
         + Send
         + Sync
         + PartialEq
         + Default
-        + FromPrimitive
         + Num
-        + AsPrimitive<f64>,
-    i32: AsPrimitive<F> + ToApproxStorageComplex<T>,
-    f64: AsPrimitive<T>,
+        + PrimitiveCast<f64>,
+    i32: PrimitiveCast<F> + ToApproxStorageComplex<T>,
+    f64: PrimitiveCast<T> + PrimitiveCast<I>,
 {
     const SMALL_KERNEL_CUTOFF: usize = 61;
     if column_kernel.len() <= SMALL_KERNEL_CUTOFF {
@@ -139,8 +139,8 @@ where
     let row_kernel = row_kernel
         .iter()
         .map(|x| {
-            let re: f64 = x.re.as_();
-            let im: f64 = x.im.as_();
+            let re: f64 = x.re.cast_();
+            let im: f64 = x.im.cast_();
             Complex::new(
                 (re * (1 << T::Q) as f64)
                     .min(i16::MAX as f64)
@@ -155,8 +155,8 @@ where
     let column_kernel = column_kernel
         .iter()
         .map(|x| {
-            let re: f64 = x.re.as_();
-            let im: f64 = x.im.as_();
+            let re: f64 = x.re.cast_();
+            let im: f64 = x.im.cast_();
             Complex::new(
                 (re * (1 << T::Q) as f64)
                     .min(i16::MAX as f64)
@@ -207,7 +207,14 @@ where
         image_size,
         column_kernel_shape,
         border_mode,
-        border_constant,
+        (0..N)
+            .map(|x| Complex {
+                re: border_constant[x].cast_(),
+                im: 0f64.cast_(),
+            })
+            .collect::<Vec<Complex<I>>>()
+            .try_into()
+            .unwrap(),
     )?;
 
     let top_pad = column_arena_k.top_pad.as_slice();
@@ -264,7 +271,7 @@ fn filter_1d_complex_sliding_buffer_q<T, I, F, const N: usize>(
 ) -> Result<(), BlurError>
 where
     T: Copy
-        + AsPrimitive<F>
+        + PrimitiveCast<F>
         + Default
         + Send
         + Sync
@@ -272,9 +279,9 @@ where
         + Debug
         + ApproxComplexLevel,
     I: Copy + 'static + Default + Send + Sync,
-    F: Mul<F> + MulAdd<F, Output = F> + Send + Sync + PartialEq + Default + AsPrimitive<f64>,
-    i32: AsPrimitive<F> + ToApproxStorageComplex<T>,
-    f64: AsPrimitive<T>,
+    F: Mul<F> + MulAdd<F, Output = F> + Send + Sync + PartialEq + Default + PrimitiveCast<f64>,
+    i32: PrimitiveCast<F> + ToApproxStorageComplex<T>,
+    f64: PrimitiveCast<T>,
 {
     image.check_layout_channels(N)?;
     destination.check_layout_channels(N, Some(image))?;
@@ -299,8 +306,8 @@ where
     let row_kernel = row_kernel
         .iter()
         .map(|x| {
-            let re: f64 = x.re.as_();
-            let im: f64 = x.im.as_();
+            let re: f64 = x.re.cast_();
+            let im: f64 = x.im.cast_();
             Complex::new(
                 (re * (1 << T::Q) as f64)
                     .min(i16::MAX as f64)
@@ -315,8 +322,8 @@ where
     let column_kernel = column_kernel
         .iter()
         .map(|x| {
-            let re: f64 = x.re.as_();
-            let im: f64 = x.im.as_();
+            let re: f64 = x.re.cast_();
+            let im: f64 = x.im.cast_();
             Complex::new(
                 (re * (1 << T::Q) as f64)
                     .min(i16::MAX as f64)

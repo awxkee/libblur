@@ -35,11 +35,12 @@ use crate::filter1d::filter_1d_row_handler::Filter1DRowHandler;
 use crate::filter1d::filter_element::KernelShape;
 use crate::filter1d::filter_scan::{is_symmetric_1d, scan_se_1d};
 use crate::filter1d::region::FilterRegion;
+use crate::primitives::PrimitiveCast;
 use crate::safe_math::{SafeAdd, SafeMul};
 use crate::to_storage::ToStorage;
 use crate::{BlurError, BlurImage, BlurImageMut, EdgeMode, ImageSize, Scalar, ThreadingPolicy};
 use novtb::{ParallelZonedIterator, TbSliceMut};
-use num_traits::{AsPrimitive, FromPrimitive, MulAdd};
+use num_traits::MulAdd;
 use std::fmt::Debug;
 use std::ops::Mul;
 
@@ -75,18 +76,17 @@ pub fn filter_1d_exact<T, F, const N: usize>(
 ) -> Result<(), BlurError>
 where
     T: Copy
-        + AsPrimitive<F>
+        + PrimitiveCast<F>
         + Default
         + Send
         + Sync
         + Filter1DRowHandler<T, F>
         + Filter1DColumnHandler<T, F>
         + Debug
-        + Filter1DColumnHandlerMultipleRows<T, F>
-        + FromPrimitive,
+        + Filter1DColumnHandlerMultipleRows<T, F>,
     F: ToStorage<T> + Mul<F> + MulAdd<F, Output = F> + Send + Sync + PartialEq + Default,
-    i32: AsPrimitive<F>,
-    f64: AsPrimitive<T>,
+    i32: PrimitiveCast<F>,
+    f64: PrimitiveCast<T>,
 {
     const SMALL_KERNEL_CUTOFF: usize = 61;
     if column_kernel.len() <= SMALL_KERNEL_CUTOFF {
@@ -170,7 +170,11 @@ where
         image_size,
         column_kernel_shape,
         border_mode,
-        border_constant,
+        (0..N)
+            .map(|x| border_constant[x].cast_())
+            .collect::<Vec<T>>()
+            .try_into()
+            .unwrap(),
     )?;
 
     let top_pad = column_arena_k.top_pad.as_slice();
@@ -341,7 +345,7 @@ fn filter_1d_exact_sliding_buffer<T, F, const N: usize>(
 ) -> Result<(), BlurError>
 where
     T: Copy
-        + AsPrimitive<F>
+        + PrimitiveCast<F>
         + Default
         + Send
         + Sync
@@ -350,8 +354,8 @@ where
         + Debug
         + Filter1DColumnHandlerMultipleRows<T, F>,
     F: ToStorage<T> + Mul<F> + MulAdd<F, Output = F> + Send + Sync + PartialEq + Default,
-    i32: AsPrimitive<F>,
-    f64: AsPrimitive<T>,
+    i32: PrimitiveCast<F>,
+    f64: PrimitiveCast<T>,
 {
     image.check_layout_channels(N)?;
     destination.check_layout_channels(N, Some(image))?;

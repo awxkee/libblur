@@ -27,9 +27,9 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::neon::{load_u8_s32_fast, store_u8_s32, store_u8_s32_x4};
+use crate::primitives::PrimitiveCast;
 use crate::stackblur::stack_blur_pass::StackBlurWorkingPass;
 use crate::unsafe_slice::UnsafeSlice;
-use num_traits::{AsPrimitive, FromPrimitive};
 use std::arch::aarch64::*;
 use std::marker::PhantomData;
 use std::ops::{AddAssign, Mul, Shr, Sub, SubAssign};
@@ -52,20 +52,19 @@ impl<T, J, const CN: usize> StackBlurWorkingPass<T, CN> for HorizontalNeonStackB
 where
     J: Copy
         + 'static
-        + FromPrimitive
         + AddAssign<J>
         + Mul<Output = J>
         + Shr<Output = J>
         + Sub<Output = J>
-        + AsPrimitive<f32>
+        + PrimitiveCast<f32>
         + SubAssign
-        + AsPrimitive<T>
+        + PrimitiveCast<T>
         + Default,
-    T: Copy + AsPrimitive<J> + FromPrimitive,
-    i32: AsPrimitive<J>,
-    u32: AsPrimitive<J>,
-    f32: AsPrimitive<T>,
-    usize: AsPrimitive<J>,
+    T: Copy + PrimitiveCast<J> + Default,
+    i32: PrimitiveCast<J>,
+    u32: PrimitiveCast<J>,
+    f32: PrimitiveCast<T>,
+    usize: PrimitiveCast<J>,
 {
     fn pass(
         &self,

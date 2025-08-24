@@ -26,7 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use num_traits::AsPrimitive;
+use crate::primitives::PrimitiveCast;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
@@ -43,7 +43,7 @@ impl<F> ScanPoint1d<F> {
 pub(crate) fn scan_se_1d<F>(kernel: &[F]) -> Vec<ScanPoint1d<F>>
 where
     F: Copy + PartialEq + 'static + Default,
-    i32: AsPrimitive<F>,
+    i32: PrimitiveCast<F>,
 {
     let mut left_front = vec![ScanPoint1d::new(F::default()); kernel.len()];
 

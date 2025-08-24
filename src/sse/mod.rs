@@ -27,13 +27,13 @@
 #![deny(unreachable_pub)]
 #[cfg(feature = "sse")]
 mod fast_gaussian;
-#[cfg(feature = "sse")]
+#[cfg(all(feature = "sse", feature = "nightly_f16"))]
 mod fast_gaussian_f16;
 #[cfg(feature = "sse")]
 mod fast_gaussian_f32;
 #[cfg(feature = "sse")]
 mod fast_gaussian_next;
-#[cfg(feature = "sse")]
+#[cfg(all(feature = "sse", feature = "nightly_f16"))]
 mod fast_gaussian_next_f16;
 #[cfg(feature = "sse")]
 mod fast_gaussian_next_f32;
@@ -47,13 +47,13 @@ mod v_load_store;
 
 #[cfg(feature = "sse")]
 pub(crate) use fast_gaussian::{fg_horizontal_pass_sse_u8, fg_vertical_pass_sse_u8};
-#[cfg(feature = "sse")]
+#[cfg(all(feature = "sse", feature = "nightly_f16"))]
 pub(crate) use fast_gaussian_f16::{fg_horizontal_pass_sse_f16, fg_vertical_pass_sse_f16};
 #[cfg(feature = "sse")]
 pub(crate) use fast_gaussian_f32::{fg_horizontal_pass_sse_f32, fg_vertical_pass_sse_f32};
 #[cfg(feature = "sse")]
 pub(crate) use fast_gaussian_next::{fgn_horizontal_pass_sse_u8, fgn_vertical_pass_sse_u8};
-#[cfg(feature = "sse")]
+#[cfg(all(feature = "sse", feature = "nightly_f16"))]
 pub(crate) use fast_gaussian_next_f16::{
     fast_gaussian_next_horizontal_pass_sse_f16, fast_gaussian_next_vertical_pass_sse_f16,
 };

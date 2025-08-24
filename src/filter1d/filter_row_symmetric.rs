@@ -32,8 +32,9 @@ use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
+use crate::primitives::PrimitiveCast;
 use crate::to_storage::ToStorage;
-use num_traits::{AsPrimitive, MulAdd};
+use num_traits::MulAdd;
 use std::ops::{Add, Mul};
 
 pub(crate) fn filter_row_symmetrical<T, F, const N: usize>(
@@ -44,9 +45,9 @@ pub(crate) fn filter_row_symmetrical<T, F, const N: usize>(
     _: FilterRegion,
     scanned_kernel: &[ScanPoint1d<F>],
 ) where
-    T: Copy + AsPrimitive<F> + Default,
+    T: Copy + PrimitiveCast<F> + Default,
     F: ToStorage<T> + Mul<Output = F> + MulAdd<F, Output = F> + Default + Add<F, Output = F>,
-    i32: AsPrimitive<F>,
+    i32: PrimitiveCast<F>,
 {
     unsafe {
         let width = image_size.width;
@@ -60,10 +61,10 @@ pub(crate) fn filter_row_symmetrical<T, F, const N: usize>(
         while cx + 4 < max_width {
             let coeff = *scanned_kernel.get_unchecked(half_len);
             let shifted_src = arena_src.get_unchecked(cx..);
-            let mut k0 = shifted_src.get_unchecked(half_len * N).as_() * coeff.weight;
-            let mut k1 = shifted_src.get_unchecked(half_len * N + 1).as_() * coeff.weight;
-            let mut k2 = shifted_src.get_unchecked(half_len * N + 2).as_() * coeff.weight;
-            let mut k3 = shifted_src.get_unchecked(half_len * N + 3).as_() * coeff.weight;
+            let mut k0 = shifted_src.get_unchecked(half_len * N).cast_() * coeff.weight;
+            let mut k1 = shifted_src.get_unchecked(half_len * N + 1).cast_() * coeff.weight;
+            let mut k2 = shifted_src.get_unchecked(half_len * N + 2).cast_() * coeff.weight;
+            let mut k3 = shifted_src.get_unchecked(half_len * N + 3).cast_() * coeff.weight;
 
             for i in 0..half_len {
                 let coeff = *scanned_kernel.get_unchecked(i);
@@ -71,28 +72,28 @@ pub(crate) fn filter_row_symmetrical<T, F, const N: usize>(
 
                 k0 = mlaf(
                     k0,
-                    shifted_src.get_unchecked(i * N).as_()
-                        + shifted_src.get_unchecked(rollback * N).as_(),
+                    shifted_src.get_unchecked(i * N).cast_()
+                        + shifted_src.get_unchecked(rollback * N).cast_(),
                     coeff.weight,
                 );
 
                 k1 = mlaf(
                     k1,
-                    shifted_src.get_unchecked(i * N + 1).as_()
-                        + shifted_src.get_unchecked(rollback * N + 1).as_(),
+                    shifted_src.get_unchecked(i * N + 1).cast_()
+                        + shifted_src.get_unchecked(rollback * N + 1).cast_(),
                     coeff.weight,
                 );
 
                 k2 = mlaf(
                     k2,
-                    shifted_src.get_unchecked(i * N + 2).as_()
-                        + shifted_src.get_unchecked(rollback * N + 2).as_(),
+                    shifted_src.get_unchecked(i * N + 2).cast_()
+                        + shifted_src.get_unchecked(rollback * N + 2).cast_(),
                     coeff.weight,
                 );
                 k3 = mlaf(
                     k3,
-                    shifted_src.get_unchecked(i * N + 3).as_()
-                        + shifted_src.get_unchecked(rollback * N + 3).as_(),
+                    shifted_src.get_unchecked(i * N + 3).cast_()
+                        + shifted_src.get_unchecked(rollback * N + 3).cast_(),
                     coeff.weight,
                 );
             }
@@ -107,7 +108,7 @@ pub(crate) fn filter_row_symmetrical<T, F, const N: usize>(
         for x in cx..max_width {
             let coeff = *scanned_kernel.get_unchecked(half_len);
             let shifted_src = arena_src.get_unchecked(x..);
-            let mut k0 = shifted_src.get_unchecked(half_len * N).as_() * coeff.weight;
+            let mut k0 = shifted_src.get_unchecked(half_len * N).cast_() * coeff.weight;
 
             for i in 0..half_len {
                 let coeff = *scanned_kernel.get_unchecked(i);
@@ -115,8 +116,8 @@ pub(crate) fn filter_row_symmetrical<T, F, const N: usize>(
 
                 k0 = mlaf(
                     k0,
-                    shifted_src.get_unchecked(i * N).as_()
-                        + shifted_src.get_unchecked(rollback * N).as_(),
+                    shifted_src.get_unchecked(i * N).cast_()
+                        + shifted_src.get_unchecked(rollback * N).cast_(),
                     coeff.weight,
                 );
             }

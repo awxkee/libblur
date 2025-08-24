@@ -32,12 +32,13 @@ use crate::filter1d::filter::create_brows;
 use crate::filter1d::filter_complex_dispatch::ComplexDispatch;
 use crate::filter1d::filter_element::KernelShape;
 use crate::filter1d::filter_scan::is_symmetric_1d;
+use crate::primitives::PrimitiveCast;
 use crate::safe_math::{SafeAdd, SafeMul};
 use crate::to_storage::ToStorage;
 use crate::{BlurError, BlurImage, BlurImageMut, EdgeMode, Scalar, ThreadingPolicy};
 use novtb::{ParallelZonedIterator, TbSliceMut};
 use num_complex::Complex;
-use num_traits::{AsPrimitive, FromPrimitive, MulAdd, Num};
+use num_traits::{MulAdd, Num};
 use std::fmt::Debug;
 use std::ops::Mul;
 
@@ -72,7 +73,7 @@ pub fn filter_1d_complex<T, F, const N: usize>(
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError>
 where
-    T: Copy + AsPrimitive<F> + Default + Send + Sync + ComplexDispatch<T, F> + Debug,
+    T: Copy + PrimitiveCast<F> + Default + Send + Sync + ComplexDispatch<T, F> + Debug,
     F: ToStorage<T>
         + Mul<F>
         + MulAdd<F, Output = F>
@@ -80,10 +81,10 @@ where
         + Sync
         + PartialEq
         + Default
-        + FromPrimitive
-        + Num,
-    i32: AsPrimitive<F>,
-    f64: AsPrimitive<T>,
+        + Num
+        + Debug,
+    i32: PrimitiveCast<F>,
+    f64: PrimitiveCast<T> + PrimitiveCast<F>,
 {
     const SMALL_KERNEL_CUTOFF: usize = 61;
     if column_kernel.len() <= SMALL_KERNEL_CUTOFF {
@@ -164,7 +165,14 @@ where
         image_size,
         column_kernel_shape,
         border_mode,
-        border_constant,
+        (0..N)
+            .map(|x| Complex {
+                re: border_constant[x].cast_(),
+                im: 0f64.cast_(),
+            })
+            .collect::<Vec<Complex<F>>>()
+            .try_into()
+            .unwrap(),
     )?;
 
     let top_pad = column_arena_k.top_pad.as_slice();
@@ -220,10 +228,10 @@ fn filter_1d_complex_sliding_buffer<T, F, const N: usize>(
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError>
 where
-    T: Copy + AsPrimitive<F> + Default + Send + Sync + ComplexDispatch<T, F> + Debug,
+    T: Copy + PrimitiveCast<F> + Default + Send + Sync + ComplexDispatch<T, F> + Debug,
     F: ToStorage<T> + Mul<F> + MulAdd<F, Output = F> + Send + Sync + PartialEq + Default,
-    i32: AsPrimitive<F>,
-    f64: AsPrimitive<T>,
+    i32: PrimitiveCast<F>,
+    f64: PrimitiveCast<T>,
 {
     image.check_layout_channels(N)?;
     destination.check_layout_channels(N, Some(image))?;

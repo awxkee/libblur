@@ -33,7 +33,7 @@ use std::arch::x86_64::*;
 use crate::sse::{load_f32_f16, store_f32_f16};
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{clamp_edge, EdgeMode};
-use half::f16;
+use core::f16;
 
 pub(crate) fn fg_horizontal_pass_sse_f16<T, const CN: usize>(
     undefined_slice: &UnsafeSlice<T>,

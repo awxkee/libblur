@@ -25,7 +25,8 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #![allow(dead_code)]
-use half::f16;
+#[cfg(feature = "nightly_f16")]
+use core::f16;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -336,6 +337,7 @@ pub(crate) unsafe fn _mm_broadcast_fourth(item: __m128) -> __m128 {
     _mm_shuffle_ps::<FLAG>(item, item)
 }
 
+#[cfg(feature = "nightly_f16")]
 #[inline(always)]
 pub(crate) unsafe fn load_f32_f16<const CN: usize>(ptr: *const f16) -> __m128 {
     if CN == 4 {
@@ -373,6 +375,7 @@ pub(crate) unsafe fn load_f32_f16<const CN: usize>(ptr: *const f16) -> __m128 {
     _mm_cvtph_ps(in_regi)
 }
 
+#[cfg(feature = "nightly_f16")]
 #[inline(always)]
 pub(crate) unsafe fn store_f32_f16<const CN: usize>(dst_ptr: *mut f16, in_regi: __m128) {
     let out_regi = _mm_cvtps_ph::<_MM_FROUND_TO_NEAREST_INT>(in_regi);

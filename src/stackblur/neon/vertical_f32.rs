@@ -27,9 +27,9 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::neon::{load_f32_fast, p_vfmaq_f32, store_f32};
+use crate::primitives::PrimitiveCast;
 use crate::stackblur::stack_blur_pass::StackBlurWorkingPass;
 use crate::unsafe_slice::UnsafeSlice;
-use num_traits::{AsPrimitive, FromPrimitive};
 use std::arch::aarch64::*;
 use std::marker::PhantomData;
 use std::ops::{AddAssign, Mul, Sub, SubAssign};
@@ -52,19 +52,18 @@ impl<T, J, const COMPONENTS: usize> VerticalNeonStackBlurPassFloat32<T, J, COMPO
 where
     J: Copy
         + 'static
-        + FromPrimitive
         + AddAssign<J>
         + Mul<Output = J>
         + Sub<Output = J>
-        + AsPrimitive<f32>
+        + PrimitiveCast<f32>
         + SubAssign
-        + AsPrimitive<T>
+        + PrimitiveCast<T>
         + Default,
-    T: Copy + AsPrimitive<J> + FromPrimitive,
-    i32: AsPrimitive<J>,
-    u32: AsPrimitive<J>,
-    f32: AsPrimitive<T>,
-    usize: AsPrimitive<J>,
+    T: Copy + PrimitiveCast<J> + Default,
+    i32: PrimitiveCast<J>,
+    u32: PrimitiveCast<J>,
+    f32: PrimitiveCast<T>,
+    usize: PrimitiveCast<J>,
 {
     #[inline]
     unsafe fn pass_impl(
@@ -186,19 +185,18 @@ impl<T, J, const COMPONENTS: usize> StackBlurWorkingPass<T, COMPONENTS>
 where
     J: Copy
         + 'static
-        + FromPrimitive
         + AddAssign<J>
         + Mul<Output = J>
         + Sub<Output = J>
-        + AsPrimitive<f32>
+        + PrimitiveCast<f32>
         + SubAssign
-        + AsPrimitive<T>
+        + PrimitiveCast<T>
         + Default,
-    T: Copy + AsPrimitive<J> + FromPrimitive,
-    i32: AsPrimitive<J>,
-    u32: AsPrimitive<J>,
-    f32: AsPrimitive<T>,
-    usize: AsPrimitive<J>,
+    T: Copy + PrimitiveCast<J> + Default,
+    i32: PrimitiveCast<J>,
+    u32: PrimitiveCast<J>,
+    f32: PrimitiveCast<T>,
+    usize: PrimitiveCast<J>,
 {
     fn pass(
         &self,

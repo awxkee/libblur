@@ -26,11 +26,13 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::channels_configuration::FastBlurChannels;
+use crate::primitives::PrimitiveCast;
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::util::check_slice_size;
 use crate::{BlurError, BlurImage, BlurImageMut, ThreadingPolicy};
-use half::f16;
+#[cfg(feature = "nightly_f16")]
+use core::f16;
 use novtb::{ParallelZonedIterator, TbSliceMut};
 use num_traits::cast::FromPrimitive;
 use num_traits::AsPrimitive;
@@ -110,32 +112,25 @@ fn box_blur_horizontal_pass_impl<T, J, const CN: usize>(
     start_y: u32,
     end_y: u32,
 ) where
-    T: std::ops::AddAssign
-        + std::ops::SubAssign
-        + Copy
-        + FromPrimitive
-        + Default
-        + Send
-        + Sync
-        + AsPrimitive<J>,
-    J: FromPrimitive
-        + Copy
+    T: std::ops::AddAssign + std::ops::SubAssign + Copy + Default + Send + Sync + PrimitiveCast<J>,
+    J: Copy
         + std::ops::Mul<Output = J>
         + std::ops::AddAssign
         + std::ops::SubAssign
-        + AsPrimitive<f32>,
+        + PrimitiveCast<f32>,
     f32: ToStorage<T>,
+    u32: PrimitiveCast<J>,
 {
     let kernel_size = radius * 2 + 1;
-    let edge_count = J::from_u32((kernel_size / 2) + 1).unwrap();
+    let edge_count: J = ((kernel_size / 2) + 1).cast_();
     let half_kernel = kernel_size / 2;
 
     let weight = 1f32 / (radius * 2 + 1) as f32;
 
     for y in start_y..end_y {
-        let mut weight1 = J::from_u32(0u32).unwrap();
-        let mut weight2 = J::from_u32(0u32).unwrap();
-        let mut weight3 = J::from_u32(0u32).unwrap();
+        let mut weight1: J = 0u32.cast_();
+        let mut weight2: J = 0u32.cast_();
+        let mut weight3: J = 0u32.cast_();
         let y_src_shift = (y * src_stride) as usize;
         let y_dst_shift = (y * dst_stride) as usize;
 
@@ -147,28 +142,28 @@ fn box_blur_horizontal_pass_impl<T, J, const CN: usize>(
         };
 
         // replicate edge
-        let mut weight0 = (unsafe { *src.get_unchecked(y_src_shift) }.as_()) * edge_count;
+        let mut weight0 = (unsafe { *src.get_unchecked(y_src_shift) }.cast_()) * edge_count;
         if CN > 1 {
-            weight1 = (unsafe { *src.get_unchecked(y_src_shift + 1) }.as_()) * edge_count;
+            weight1 = (unsafe { *src.get_unchecked(y_src_shift + 1) }.cast_()) * edge_count;
         }
         if CN > 2 {
-            weight2 = (unsafe { *src.get_unchecked(y_src_shift + 2) }.as_()) * edge_count;
+            weight2 = (unsafe { *src.get_unchecked(y_src_shift + 2) }.cast_()) * edge_count;
         }
         if CN == 4 {
-            weight3 = (unsafe { *src.get_unchecked(y_src_shift + 3) }.as_()) * edge_count;
+            weight3 = (unsafe { *src.get_unchecked(y_src_shift + 3) }.cast_()) * edge_count;
         }
 
         for x in 1..=half_kernel as usize {
             let px = x.min(width as usize - 1) * CN;
-            weight0 += unsafe { *src.get_unchecked(y_src_shift + px) }.as_();
+            weight0 += unsafe { *src.get_unchecked(y_src_shift + px) }.cast_();
             if CN > 1 {
-                weight1 += unsafe { *src.get_unchecked(y_src_shift + px + 1) }.as_();
+                weight1 += unsafe { *src.get_unchecked(y_src_shift + px + 1) }.cast_();
             }
             if CN > 2 {
-                weight2 += unsafe { *src.get_unchecked(y_src_shift + px + 2) }.as_();
+                weight2 += unsafe { *src.get_unchecked(y_src_shift + px + 2) }.cast_();
             }
             if CN == 4 {
-                weight3 += unsafe { *src.get_unchecked(y_src_shift + px + 3) }.as_();
+                weight3 += unsafe { *src.get_unchecked(y_src_shift + px + 3) }.cast_();
             }
         }
 
@@ -182,37 +177,37 @@ fn box_blur_horizontal_pass_impl<T, J, const CN: usize>(
 
             unsafe {
                 let write_offset = px;
-                *dst_row.get_unchecked_mut(write_offset) = (weight0.as_() * weight).to_();
+                *dst_row.get_unchecked_mut(write_offset) = (weight0.cast_() * weight).to_();
                 if CN > 1 {
-                    *dst_row.get_unchecked_mut(write_offset + 1) = (weight1.as_() * weight).to_();
+                    *dst_row.get_unchecked_mut(write_offset + 1) = (weight1.cast_() * weight).to_();
                 }
                 if CN > 2 {
-                    *dst_row.get_unchecked_mut(write_offset + 2) = (weight2.as_() * weight).to_();
+                    *dst_row.get_unchecked_mut(write_offset + 2) = (weight2.cast_() * weight).to_();
                 }
                 if CN == 4 {
-                    *dst_row.get_unchecked_mut(write_offset + 3) = (weight3.as_() * weight).to_();
+                    *dst_row.get_unchecked_mut(write_offset + 3) = (weight3.cast_() * weight).to_();
                 }
             }
 
-            weight0 += unsafe { *current_row.get_unchecked(next) }.as_();
+            weight0 += unsafe { *current_row.get_unchecked(next) }.cast_();
             if CN > 1 {
-                weight1 += unsafe { *current_row.get_unchecked(next + 1) }.as_();
+                weight1 += unsafe { *current_row.get_unchecked(next + 1) }.cast_();
             }
             if CN > 2 {
-                weight2 += unsafe { *current_row.get_unchecked(next + 2) }.as_();
+                weight2 += unsafe { *current_row.get_unchecked(next + 2) }.cast_();
             }
 
-            weight0 -= unsafe { *current_row.get_unchecked(previous) }.as_();
+            weight0 -= unsafe { *current_row.get_unchecked(previous) }.cast_();
             if CN > 1 {
-                weight1 -= unsafe { *current_row.get_unchecked(previous + 1) }.as_();
+                weight1 -= unsafe { *current_row.get_unchecked(previous + 1) }.cast_();
             }
             if CN > 2 {
-                weight2 -= unsafe { *current_row.get_unchecked(previous + 2) }.as_();
+                weight2 -= unsafe { *current_row.get_unchecked(previous + 2) }.cast_();
             }
 
             if CN == 4 {
-                weight3 += unsafe { *current_row.get_unchecked(next + 3) }.as_();
-                weight3 -= unsafe { *current_row.get_unchecked(previous + 3) }.as_();
+                weight3 += unsafe { *current_row.get_unchecked(next + 3) }.cast_();
+                weight3 -= unsafe { *current_row.get_unchecked(previous + 3) }.cast_();
             }
         }
 
@@ -235,37 +230,37 @@ fn box_blur_horizontal_pass_impl<T, J, const CN: usize>(
                 .zip(data_section.chunks_exact(CN))
                 .zip(advanced_kernel_part.chunks_exact(CN))
             {
-                dst[0] = (weight0.as_() * weight).to_();
+                dst[0] = (weight0.cast_() * weight).to_();
                 if CN > 1 {
-                    dst[1] = (weight1.as_() * weight).to_();
+                    dst[1] = (weight1.cast_() * weight).to_();
                 }
                 if CN > 2 {
-                    dst[2] = (weight2.as_() * weight).to_();
+                    dst[2] = (weight2.cast_() * weight).to_();
                 }
                 if CN == 4 {
-                    dst[3] = (weight3.as_() * weight).to_();
+                    dst[3] = (weight3.cast_() * weight).to_();
                 }
 
-                weight0 += src_next[0].as_();
+                weight0 += src_next[0].cast_();
                 if CN > 1 {
-                    weight1 += src_next[1].as_();
+                    weight1 += src_next[1].cast_();
                 }
                 if CN > 2 {
-                    weight2 += src_next[2].as_();
+                    weight2 += src_next[2].cast_();
                 }
                 if CN == 4 {
-                    weight3 += src_next[3].as_();
+                    weight3 += src_next[3].cast_();
                 }
 
-                weight0 -= src_previous[0].as_();
+                weight0 -= src_previous[0].cast_();
                 if CN > 1 {
-                    weight1 -= src_previous[1].as_();
+                    weight1 -= src_previous[1].cast_();
                 }
                 if CN > 2 {
-                    weight2 -= src_previous[2].as_();
+                    weight2 -= src_previous[2].cast_();
                 }
                 if CN == 4 {
-                    weight3 -= src_previous[3].as_();
+                    weight3 -= src_previous[3].cast_();
                 }
             }
 
@@ -280,37 +275,37 @@ fn box_blur_horizontal_pass_impl<T, J, const CN: usize>(
 
             unsafe {
                 let write_offset = px;
-                *dst_row.get_unchecked_mut(write_offset) = (weight0.as_() * weight).to_();
+                *dst_row.get_unchecked_mut(write_offset) = (weight0.cast_() * weight).to_();
                 if CN > 1 {
-                    *dst_row.get_unchecked_mut(write_offset + 1) = (weight1.as_() * weight).to_();
+                    *dst_row.get_unchecked_mut(write_offset + 1) = (weight1.cast_() * weight).to_();
                 }
                 if CN > 2 {
-                    *dst_row.get_unchecked_mut(write_offset + 2) = (weight2.as_() * weight).to_();
+                    *dst_row.get_unchecked_mut(write_offset + 2) = (weight2.cast_() * weight).to_();
                 }
                 if CN == 4 {
-                    *dst_row.get_unchecked_mut(write_offset + 3) = (weight3.as_() * weight).to_();
+                    *dst_row.get_unchecked_mut(write_offset + 3) = (weight3.cast_() * weight).to_();
                 }
             }
 
-            weight0 += unsafe { *current_row.get_unchecked(next) }.as_();
+            weight0 += unsafe { *current_row.get_unchecked(next) }.cast_();
             if CN > 1 {
-                weight1 += unsafe { *current_row.get_unchecked(next + 1) }.as_();
+                weight1 += unsafe { *current_row.get_unchecked(next + 1) }.cast_();
             }
             if CN > 2 {
-                weight2 += unsafe { *current_row.get_unchecked(next + 2) }.as_();
+                weight2 += unsafe { *current_row.get_unchecked(next + 2) }.cast_();
             }
 
-            weight0 -= unsafe { *current_row.get_unchecked(previous) }.as_();
+            weight0 -= unsafe { *current_row.get_unchecked(previous) }.cast_();
             if CN > 1 {
-                weight1 -= unsafe { *current_row.get_unchecked(previous + 1) }.as_();
+                weight1 -= unsafe { *current_row.get_unchecked(previous + 1) }.cast_();
             }
             if CN > 2 {
-                weight2 -= unsafe { *current_row.get_unchecked(previous + 2) }.as_();
+                weight2 -= unsafe { *current_row.get_unchecked(previous + 2) }.cast_();
             }
 
             if CN == 4 {
-                weight3 += unsafe { *current_row.get_unchecked(next + 3) }.as_();
-                weight3 -= unsafe { *current_row.get_unchecked(previous + 3) }.as_();
+                weight3 += unsafe { *current_row.get_unchecked(next + 3) }.cast_();
+                weight3 -= unsafe { *current_row.get_unchecked(previous + 3) }.cast_();
             }
         }
     }
@@ -360,6 +355,7 @@ impl BoxBlurHorizontalPass<f32> for f32 {
     }
 }
 
+#[cfg(feature = "nightly_f16")]
 impl BoxBlurHorizontalPass<f16> for f16 {
     #[allow(clippy::type_complexity)]
     fn get_horizontal_pass<const CN: usize>(
@@ -498,26 +494,19 @@ fn box_blur_vertical_pass_impl<T, J>(
     start_x: u32,
     end_x: u32,
 ) where
-    T: std::ops::AddAssign
-        + std::ops::SubAssign
-        + Copy
-        + FromPrimitive
-        + Default
-        + Send
-        + Sync
-        + AsPrimitive<J>,
-    J: FromPrimitive
-        + Copy
+    T: std::ops::AddAssign + std::ops::SubAssign + Copy + Default + Send + Sync + PrimitiveCast<J>,
+    J: Copy
         + std::ops::Mul<Output = J>
         + std::ops::AddAssign
         + std::ops::SubAssign
-        + AsPrimitive<f32>
+        + PrimitiveCast<f32>
         + Default,
     f32: ToStorage<T>,
+    u32: PrimitiveCast<J>,
 {
     let kernel_size = radius * 2 + 1;
 
-    let edge_count = J::from_u32((kernel_size / 2) + 1).unwrap();
+    let edge_count: J = ((kernel_size / 2) + 1).cast_();
     let half_kernel = kernel_size / 2;
 
     let weight = 1f32 / (radius * 2 + 1) as f32;
@@ -530,11 +519,13 @@ fn box_blur_vertical_pass_impl<T, J>(
     let src_lane = &src[start_x as usize..end_x as usize];
 
     for (x, (v, bf)) in src_lane.iter().zip(buffer.iter_mut()).enumerate() {
-        let mut w = v.as_() * edge_count;
+        let mut w = v.cast_() * edge_count;
         for y in 1..=half_kernel as usize {
             let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
             unsafe {
-                w += src.get_unchecked(y_src_shift + x + start_x as usize).as_();
+                w += src
+                    .get_unchecked(y_src_shift + x + start_x as usize)
+                    .cast_();
             }
         }
         *bf = w;
@@ -570,10 +561,10 @@ fn box_blur_vertical_pass_impl<T, J>(
         {
             let mut weight0 = *buffer;
 
-            *dst = (weight0.as_() * weight).to_();
+            *dst = (weight0.cast_() * weight).to_();
 
-            weight0 += src_next.as_();
-            weight0 -= src_previous.as_();
+            weight0 += src_next.cast_();
+            weight0 -= src_previous.cast_();
 
             *buffer = weight0;
         }
@@ -595,6 +586,7 @@ trait BoxBlurVerticalPass<T> {
     );
 }
 
+#[cfg(feature = "nightly_f16")]
 impl BoxBlurVerticalPass<f16> for f16 {
     #[allow(clippy::type_complexity)]
     fn get_box_vertical_pass<const CHANNELS_CONFIGURATION: usize>(
@@ -847,6 +839,7 @@ impl RingBufferHandler<f32> for f32 {
     const BOX_RING_IN_SINGLE_THREAD: bool = true;
 }
 
+#[cfg(feature = "nightly_f16")]
 impl RingBufferHandler<f16> for f16 {
     fn box_filter_ring_buffer<const CN: usize>(
         src: &[f16],
@@ -950,23 +943,24 @@ impl VRowSum<f32, f32> for () {
     }
 }
 
+#[cfg(feature = "nightly_f16")]
 impl VRowSum<f16, f32> for () {
     fn ring_vertical_row_summ() -> fn(&[&[f16]; 2], &mut [f16], &mut [f32], u32) {
         ring_vertical_row_summ
     }
 }
 
+#[allow(unused)]
 fn ring_vertical_row_summ<
-    T: Sync + Send + Copy + AsPrimitive<J>,
-    J: FromPrimitive
-        + Default
+    T: Sync + Send + Copy + PrimitiveCast<J>,
+    J: Default
         + Sync
         + Send
         + Copy
         + std::ops::AddAssign
         + std::ops::SubAssign
         + Copy
-        + AsPrimitive<f32>,
+        + PrimitiveCast<f32>,
 >(
     src: &[&[T]; 2],
     dst: &mut [T],
@@ -986,18 +980,17 @@ fn ring_vertical_row_summ<
     {
         let mut weight0 = *buffer;
 
-        *dst = (weight0.as_() * weight).to_();
+        *dst = (weight0.cast_() * weight).to_();
 
-        weight0 += src_next.as_();
-        weight0 -= src_previous.as_();
+        weight0 += src_next.cast_();
+        weight0 -= src_previous.cast_();
 
         *buffer = weight0;
     }
 }
 
 fn ring_box_filter<
-    T: FromPrimitive
-        + Default
+    T: Default
         + Sync
         + Send
         + Debug
@@ -1005,22 +998,21 @@ fn ring_box_filter<
         + std::ops::AddAssign
         + std::ops::SubAssign
         + Copy
-        + AsPrimitive<u32>
-        + AsPrimitive<u64>
-        + AsPrimitive<f32>
-        + AsPrimitive<f64>
+        + PrimitiveCast<u32>
+        + PrimitiveCast<u64>
+        + PrimitiveCast<f32>
+        + PrimitiveCast<f64>
         + BoxBlurHorizontalPass<T>
         + BoxBlurVerticalPass<T>
-        + AsPrimitive<J>,
-    J: FromPrimitive
-        + Default
+        + PrimitiveCast<J>,
+    J: Default
         + Sync
         + Send
         + Copy
         + std::ops::AddAssign
         + std::ops::SubAssign
         + Copy
-        + AsPrimitive<f32>,
+        + PrimitiveCast<f32>,
     const CN: usize,
 >(
     src: &[T],
@@ -1136,7 +1128,7 @@ where
                         if !has_warmed_up {
                             for row in buffer.chunks_exact(working_stride).take(ring_size - 1) {
                                 for (dst, src) in working_row.iter_mut().zip(row.iter()) {
-                                    *dst += src.as_();
+                                    *dst += src.cast_();
                                 }
                             }
                             has_warmed_up = true;
@@ -1224,7 +1216,7 @@ where
                 if !has_warmed_up {
                     for row in buffer.chunks_exact(working_stride).take(ring_size - 1) {
                         for (dst, src) in working_row.iter_mut().zip(row.iter()) {
-                            *dst += src.as_();
+                            *dst += src.cast_();
                         }
                     }
                     has_warmed_up = true;

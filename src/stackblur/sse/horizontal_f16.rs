@@ -26,10 +26,11 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::primitives::PrimitiveCast;
 use crate::sse::{load_f32_f16, store_f32_f16};
 use crate::stackblur::stack_blur_pass::StackBlurWorkingPass;
 use crate::unsafe_slice::UnsafeSlice;
-use half::f16;
+use core::f16;
 use num_traits::{AsPrimitive, FromPrimitive};
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
@@ -62,14 +63,14 @@ where
         + AddAssign<J>
         + Mul<Output = J>
         + Sub<Output = J>
-        + AsPrimitive<f32>
+        + PrimitiveCast<f32>
         + SubAssign
-        + AsPrimitive<T>
+        + PrimitiveCast<T>
         + Default,
-    T: Copy + AsPrimitive<J> + FromPrimitive,
+    T: Copy + PrimitiveCast<J> + Default,
     i32: AsPrimitive<J>,
     u32: AsPrimitive<J>,
-    f32: AsPrimitive<T>,
+    f32: PrimitiveCast<T>,
     usize: AsPrimitive<J>,
 {
     #[target_feature(enable = "sse4.1,f16c")]
@@ -196,14 +197,14 @@ where
         + AddAssign<J>
         + Mul<Output = J>
         + Sub<Output = J>
-        + AsPrimitive<f32>
+        + PrimitiveCast<f32>
         + SubAssign
-        + AsPrimitive<T>
+        + PrimitiveCast<T>
         + Default,
-    T: Copy + AsPrimitive<J> + FromPrimitive,
+    T: Copy + PrimitiveCast<J> + Default,
     i32: AsPrimitive<J>,
     u32: AsPrimitive<J>,
-    f32: AsPrimitive<T>,
+    f32: PrimitiveCast<T>,
     usize: AsPrimitive<J>,
 {
     fn pass(

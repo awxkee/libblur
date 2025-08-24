@@ -26,10 +26,10 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::primitives::PrimitiveCast;
 use crate::stackblur::sliding_window::SlidingWindow;
 use crate::stackblur::stack_blur_pass::StackBlurWorkingPass;
 use crate::unsafe_slice::UnsafeSlice;
-use num_traits::{AsPrimitive, FromPrimitive};
 use std::marker::PhantomData;
 use std::ops::{AddAssign, Mul, Sub, SubAssign};
 
@@ -53,21 +53,20 @@ impl<T, J, F, const CN: usize> VerticalStackBlurPass<T, J, F, CN>
 where
     J: Copy
         + 'static
-        + FromPrimitive
         + AddAssign<J>
         + Mul<Output = J>
         + Sub<Output = J>
-        + AsPrimitive<f32>
-        + AsPrimitive<F>
+        + PrimitiveCast<f32>
+        + PrimitiveCast<F>
         + SubAssign
-        + AsPrimitive<T>
+        + PrimitiveCast<T>
         + Default,
-    T: Copy + AsPrimitive<J> + FromPrimitive,
-    i32: AsPrimitive<J>,
-    u32: AsPrimitive<J>,
-    f32: AsPrimitive<T> + AsPrimitive<J> + AsPrimitive<F>,
-    F: AsPrimitive<T> + 'static + Mul<Output = F>,
-    usize: AsPrimitive<J>,
+    T: Copy + PrimitiveCast<J> + Default,
+    i32: PrimitiveCast<J>,
+    u32: PrimitiveCast<J>,
+    f32: PrimitiveCast<T> + PrimitiveCast<J> + PrimitiveCast<F>,
+    F: PrimitiveCast<T> + 'static + Mul<Output = F>,
+    usize: PrimitiveCast<J>,
 {
     #[inline]
     unsafe fn pass_impl(
@@ -99,7 +98,7 @@ where
         let min_x = thread * width as usize / total_threads;
         let max_x = (thread + 1) * width as usize / total_threads;
 
-        let mul_value = (1. / ((radius as f32 + 1.) * (radius as f32 + 1.))).as_();
+        let mul_value = (1. / ((radius as f32 + 1.) * (radius as f32 + 1.))).cast_();
 
         for x in min_x..max_x {
             sum = SlidingWindow::default();
@@ -113,7 +112,7 @@ where
             for i in 0..=radius {
                 unsafe { *stacks.get_unchecked_mut(i as usize) = src }
 
-                let ji = (i + 1).as_();
+                let ji = (i + 1).cast_();
                 sum += src * ji;
                 sum_out += src;
             }
@@ -127,7 +126,7 @@ where
 
                 unsafe { *stacks.get_unchecked_mut((i + radius) as usize) = src };
 
-                let rji = (radius + 1 - i).as_();
+                let rji = (radius + 1 - i).cast_();
                 sum += src * rji;
                 sum_in += src;
             }
@@ -186,21 +185,20 @@ impl<T, J, F, const CN: usize> StackBlurWorkingPass<T, CN> for VerticalStackBlur
 where
     J: Copy
         + 'static
-        + FromPrimitive
         + AddAssign<J>
         + Mul<Output = J>
         + Sub<Output = J>
-        + AsPrimitive<f32>
-        + AsPrimitive<F>
+        + PrimitiveCast<f32>
+        + PrimitiveCast<F>
         + SubAssign
-        + AsPrimitive<T>
+        + PrimitiveCast<T>
         + Default,
-    T: Copy + AsPrimitive<J> + FromPrimitive,
-    i32: AsPrimitive<J>,
-    u32: AsPrimitive<J>,
-    f32: AsPrimitive<T> + AsPrimitive<J> + AsPrimitive<F>,
-    F: AsPrimitive<T> + 'static + Mul<Output = F>,
-    usize: AsPrimitive<J>,
+    T: Copy + PrimitiveCast<J> + Default,
+    i32: PrimitiveCast<J>,
+    u32: PrimitiveCast<J>,
+    f32: PrimitiveCast<T> + PrimitiveCast<J> + PrimitiveCast<F>,
+    F: PrimitiveCast<T> + 'static + Mul<Output = F>,
+    usize: PrimitiveCast<J>,
 {
     fn pass(
         &self,

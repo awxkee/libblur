@@ -59,6 +59,7 @@
     ),
     feature(x86_amx_intrinsics)
 )]
+#![cfg_attr(feature = "nightly_f16", feature(f16))]
 #![deny(
     clippy::print_stdout,
     clippy::print_stderr,
@@ -103,6 +104,7 @@ mod mlaf;
 mod motion_blur;
 #[cfg(all(target_arch = "aarch64", feature = "neon"))]
 mod neon;
+mod primitives;
 mod safe_math;
 mod sobel;
 #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
@@ -135,16 +137,18 @@ pub use fast_bilateral_filter::{
 #[cfg(feature = "image")]
 #[cfg_attr(docsrs, doc(cfg(feature = "image")))]
 pub use fast_bilateral_image::fast_bilateral_filter_image;
-pub use fast_gaussian::{fast_gaussian, fast_gaussian_f16, fast_gaussian_f32, fast_gaussian_u16};
+#[cfg(feature = "nightly_f16")]
+pub use fast_gaussian::fast_gaussian_f16;
+pub use fast_gaussian::{fast_gaussian, fast_gaussian_f32, fast_gaussian_u16};
 #[cfg(feature = "image")]
 #[cfg_attr(docsrs, doc(cfg(feature = "image")))]
 pub use fast_gaussian_image::fast_gaussian_blur_image;
 #[cfg(feature = "image")]
 #[cfg_attr(docsrs, doc(cfg(feature = "image")))]
 pub use fast_gaussian_image_next::fast_gaussian_next_blur_image;
-pub use fast_gaussian_next::{
-    fast_gaussian_next, fast_gaussian_next_f16, fast_gaussian_next_f32, fast_gaussian_next_u16,
-};
+#[cfg(feature = "nightly_f16")]
+pub use fast_gaussian_next::fast_gaussian_next_f16;
+pub use fast_gaussian_next::{fast_gaussian_next, fast_gaussian_next_f32, fast_gaussian_next_u16};
 pub use filter1d::{
     filter_1d_approx, filter_1d_complex, filter_1d_complex_fixed_point, filter_1d_exact,
     make_arena, Arena, ArenaPads, KernelShape,
@@ -157,10 +161,12 @@ pub use filter2d::{
 };
 pub use filter2d::{filter_2d, filter_2d_arbitrary, filter_2d_rgb, filter_2d_rgba};
 pub use gamma_curves::TransferFunction;
+#[cfg(feature = "nightly_f16")]
+pub use gaussian::gaussian_blur_f16;
 pub use gaussian::{
-    complex_gaussian_kernel, gaussian_blur, gaussian_blur_f16, gaussian_blur_f32,
-    gaussian_blur_u16, gaussian_kernel_1d, gaussian_kernel_1d_f64, sigma_size, sigma_size_d,
-    ConvolutionMode, GaussianBlurParams, IeeeBinaryConvolutionMode,
+    complex_gaussian_kernel, gaussian_blur, gaussian_blur_f32, gaussian_blur_u16,
+    gaussian_kernel_1d, gaussian_kernel_1d_f64, sigma_size, sigma_size_d, ConvolutionMode,
+    GaussianBlurParams, IeeeBinaryConvolutionMode,
 };
 #[cfg(feature = "image")]
 #[cfg_attr(docsrs, doc(cfg(feature = "image")))]
@@ -176,6 +182,7 @@ pub use sobel::sobel;
 #[cfg_attr(docsrs, doc(cfg(feature = "image")))]
 pub use stack_blur_image::stack_blur_image;
 pub use stackblur::stack_blur::stack_blur;
+#[cfg(feature = "nightly_f16")]
 pub use stackblur::stack_blur_f16::stack_blur_f16;
 pub use stackblur::stack_blur_f32::stack_blur_f32;
 pub use stackblur::stack_blur_u16;
