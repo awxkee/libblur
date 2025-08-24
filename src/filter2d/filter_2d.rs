@@ -32,7 +32,7 @@ use crate::filter2d::scan_point_2d::ScanPoint2d;
 use crate::filter2d::scan_se_2d::scan_se_2d;
 use crate::to_storage::ToStorage;
 use crate::{
-    BlurError, BlurImage, BlurImageMut, EdgeMode, FastBlurChannels, ImageSize, MismatchedSize,
+    BlurError, BlurImage, BlurImageMut, EdgeMode2D, FastBlurChannels, ImageSize, MismatchedSize,
     Scalar, ThreadingPolicy,
 };
 use novtb::{ParallelZonedIterator, TbSliceMut};
@@ -53,7 +53,7 @@ use std::sync::Arc;
 /// * `image_size`: Image size.
 /// * `kernel`: Kernel.
 /// * `kernel_shape`: Kernel size, see [KernelShape] for more info.
-/// * `border_mode`: Border handling mode see [EdgeMode] for more info.
+/// * `edge_modes`: Border handling mode see [EdgeMode] and [EdgeMode2D] for more info.
 /// * `border_constant`: If [EdgeMode::Constant] border will be replaced with this provided [Scalar] value.
 /// * `threading_policy`: See [ThreadingPolicy] for more info.
 ///
@@ -68,7 +68,7 @@ pub fn filter_2d<T, F>(
     dst: &mut BlurImageMut<T>,
     kernel: &[F],
     kernel_shape: KernelShape,
-    border_mode: EdgeMode,
+    edge_modes: EdgeMode2D,
     border_constant: Scalar,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError>
@@ -88,7 +88,7 @@ where
             dst,
             kernel,
             kernel_shape,
-            border_mode,
+            edge_modes,
             border_constant,
             threading_policy,
         ),
@@ -97,7 +97,7 @@ where
             dst,
             kernel,
             kernel_shape,
-            border_mode,
+            edge_modes,
             border_constant,
             threading_policy,
         ),
@@ -106,7 +106,7 @@ where
             dst,
             kernel,
             kernel_shape,
-            border_mode,
+            edge_modes,
             border_constant,
             threading_policy,
         ),
@@ -123,7 +123,7 @@ where
 /// * `image_size`: Image size.
 /// * `kernel`: Kernel.
 /// * `kernel_shape`: Kernel size, see [KernelShape] for more info.
-/// * `border_mode`: Border handling mode see [EdgeMode] for more info.
+/// * `edge_modes`: Border handling mode see [EdgeMode] and [EdgeMode2D] for more info.
 /// * `border_constant`: If [EdgeMode::Constant] border will be replaced with this provided [Scalar] value.
 /// * `threading_policy`: See [ThreadingPolicy] for more info.
 ///
@@ -138,7 +138,7 @@ pub fn filter_2d_arbitrary<T, F, const CN: usize>(
     dst: &mut BlurImageMut<T>,
     kernel: &[F],
     kernel_shape: KernelShape,
-    border_mode: EdgeMode,
+    edge_modes: EdgeMode2D,
     border_constant: Scalar,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError>
@@ -183,7 +183,7 @@ where
         src.row_stride() as usize,
         image_size,
         ArenaPads::from_kernel_shape(kernel_shape),
-        border_mode,
+        edge_modes,
         border_constant,
     )?;
 

@@ -29,7 +29,7 @@
 use crate::filter1d::KernelShape;
 use crate::filter2d::filter_2d_handler::Filter2dHandler;
 use crate::to_storage::ToStorage;
-use crate::{filter_2d, BlurError, BlurImage, BlurImageMut, EdgeMode, Scalar, ThreadingPolicy};
+use crate::{filter_2d, BlurError, BlurImage, BlurImageMut, EdgeMode2D, Scalar, ThreadingPolicy};
 use num_traits::{AsPrimitive, MulAdd};
 use std::fmt::Debug;
 use std::ops::Mul;
@@ -45,7 +45,7 @@ use std::ops::Mul;
 /// * `image_size`: Image size.
 /// * `kernel`: Kernel.
 /// * `kernel_shape`: Kernel size, see [KernelShape] for more info.
-/// * `border_mode`: Border handling mode see [EdgeMode] for more info.
+/// * `edge_modes`: Border handling mode see [EdgeMode] and [EdgeMode2D] for more info.
 /// * `border_constant`: If [EdgeMode::Constant] border will be replaced with this provided [Scalar] value.
 /// * `threading_policy`: See [ThreadingPolicy] for more info
 ///
@@ -60,7 +60,7 @@ pub fn filter_2d_rgba<T, F>(
     dst: &mut BlurImageMut<T>,
     kernel: &[F],
     kernel_shape: KernelShape,
-    border_mode: EdgeMode,
+    edge_modes: EdgeMode2D,
     border_constant: Scalar,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError>
@@ -75,7 +75,7 @@ where
         dst,
         kernel,
         kernel_shape,
-        border_mode,
+        edge_modes,
         border_constant,
         threading_policy,
     )

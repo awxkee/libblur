@@ -27,10 +27,11 @@
 
 use std::arch::aarch64::*;
 
+use crate::edge_mode::clamp_edge;
 use crate::neon::fast_gaussian_next_f32::NeonF32x4;
 use crate::neon::{load_f32_fast, store_f32};
 use crate::unsafe_slice::UnsafeSlice;
-use crate::{clamp_edge, EdgeMode};
+use crate::EdgeMode;
 
 pub(crate) fn fg_vertical_pass_neon_f32<T, const CN: usize>(
     undef_bytes: &UnsafeSlice<T>,

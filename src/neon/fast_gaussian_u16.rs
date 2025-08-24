@@ -25,10 +25,11 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use crate::edge_mode::clamp_edge;
 use crate::neon::fast_gaussian::NeonI32x4;
 use crate::neon::{load_u16_s32_fast, store_u16_s32_x5, store_u16x4, vmulq_s32_f32};
 use crate::unsafe_slice::UnsafeSlice;
-use crate::{clamp_edge, EdgeMode};
+use crate::EdgeMode;
 use std::arch::aarch64::*;
 
 pub(crate) fn fg_horizontal_pass_neon_u16<const CN: usize>(

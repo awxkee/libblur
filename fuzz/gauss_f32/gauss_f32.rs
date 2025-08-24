@@ -31,7 +31,7 @@
 
 use arbitrary::Arbitrary;
 use libblur::{
-    BlurImage, BlurImageMut, EdgeMode, FastBlurChannels, GaussianBlurParams,
+    BlurImage, BlurImageMut, EdgeMode, EdgeMode2D, FastBlurChannels, GaussianBlurParams,
     IeeeBinaryConvolutionMode, ThreadingPolicy,
 };
 use libfuzzer_sys::fuzz_target;
@@ -98,7 +98,7 @@ fn fuzz_f32(
         &src_image,
         &mut dst_image,
         GaussianBlurParams::new_asymmetric_from_kernels(x_kernel_size as f64, y_kernel_size as f64),
-        edge_mode,
+        EdgeMode2D::new(edge_mode),
         ThreadingPolicy::Single,
         if double_precision {
             IeeeBinaryConvolutionMode::Zealous

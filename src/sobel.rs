@@ -27,7 +27,7 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::{
-    filter_1d_exact, BlurError, BlurImage, BlurImageMut, EdgeMode, FastBlurChannels, Scalar,
+    filter_1d_exact, BlurError, BlurImage, BlurImageMut, EdgeMode2D, FastBlurChannels, Scalar,
     ThreadingPolicy,
 };
 
@@ -35,18 +35,18 @@ use crate::{
 ///
 /// # Arguments
 ///
-/// * `image`: Source image
-/// * `destination`: Destination image
-/// * `border_mode`: See [EdgeMode] for more info
-/// * `border_constant`: If [EdgeMode::Constant] border will be replaced with this provided [Scalar] value
-/// * `threading_policy`: see [ThreadingPolicy] for more info
+/// * `image`: Source image.
+/// * `destination`: Destination image.
+/// * `edge_modes`: See [EdgeMode] and [EdgeMode2D] for more info.
+/// * `border_constant`: If [EdgeMode::Constant] border will be replaced with this provided [Scalar] value.
+/// * `threading_policy`: see [ThreadingPolicy] for more info.
 ///
 /// returns: ()
 ///
 pub fn sobel(
     image: &BlurImage<u8>,
     destination: &mut BlurImageMut<u8>,
-    border_mode: EdgeMode,
+    edge_modes: EdgeMode2D,
     border_constant: Scalar,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
@@ -65,7 +65,7 @@ pub fn sobel(
         destination,
         &sobel_horizontal,
         &sobel_vertical,
-        border_mode,
+        edge_modes,
         border_constant,
         threading_policy,
     )

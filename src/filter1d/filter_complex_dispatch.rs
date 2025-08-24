@@ -28,7 +28,8 @@
  */
 use crate::filter1d::filter_column_complex::filter_column_complex;
 use crate::filter1d::filter_row_complex::filter_row_complex;
-use crate::{Arena, ImageSize};
+use crate::filter1d::Arena;
+use crate::ImageSize;
 use num_complex::Complex;
 
 pub trait ComplexDispatch<T, F> {

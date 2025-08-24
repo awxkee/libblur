@@ -26,9 +26,10 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 use crate::avx::utils::_mm256_mul_by_3_epi32;
+use crate::edge_mode::clamp_edge;
 use crate::sse::{_mm_mul_by_3_epi32, load_u8_s32_fast, store_u8_u32};
 use crate::unsafe_slice::UnsafeSlice;
-use crate::{clamp_edge, EdgeMode};
+use crate::EdgeMode;
 use std::arch::x86_64::*;
 
 pub(crate) fn fgn_vertical_pass_avx_u8<T, const CN: usize>(

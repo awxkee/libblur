@@ -29,9 +29,10 @@ use std::arch::aarch64::*;
 
 use core::f16;
 
+use crate::edge_mode::clamp_edge;
 use crate::neon::{load_f32_f16, store_f32_f16};
 use crate::unsafe_slice::UnsafeSlice;
-use crate::{clamp_edge, EdgeMode};
+use crate::EdgeMode;
 
 pub(crate) fn fgn_vertical_pass_neon_f16<T, const CN: usize>(
     undef_bytes: &UnsafeSlice<T>,

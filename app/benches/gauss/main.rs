@@ -2,7 +2,7 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use image::{GenericImageView, ImageReader};
 use libblur::{
     filter_1d_exact, gaussian_kernel_1d, sigma_size, BlurImage, BlurImageMut, ConvolutionMode,
-    EdgeMode, FastBlurChannels, GaussianBlurParams, IeeeBinaryConvolutionMode, Scalar,
+    EdgeMode, EdgeMode2D, FastBlurChannels, GaussianBlurParams, IeeeBinaryConvolutionMode, Scalar,
     ThreadingPolicy,
 };
 use opencv::core::{
@@ -60,7 +60,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 &src_image,
                 &mut dst_bytes,
                 GaussianBlurParams::new_from_kernel(3.),
-                EdgeMode::Clamp,
+                EdgeMode2D::new(EdgeMode::Clamp.as_2d()),
                 ThreadingPolicy::Adaptive,
                 ConvolutionMode::FixedPoint,
             )
@@ -107,7 +107,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 &src_image,
                 &mut dst_bytes,
                 GaussianBlurParams::new_from_kernel(13.),
-                EdgeMode::Clamp,
+                EdgeMode2D::new(EdgeMode::Clamp.as_2d()),
                 ThreadingPolicy::Adaptive,
                 ConvolutionMode::Exact,
             )
@@ -123,7 +123,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 &src_image,
                 &mut dst_bytes,
                 GaussianBlurParams::new_from_kernel(13.),
-                EdgeMode::Clamp,
+                EdgeMode2D::new(EdgeMode::Clamp.as_2d()),
                 ThreadingPolicy::Adaptive,
                 ConvolutionMode::FixedPoint,
             )
@@ -166,7 +166,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 &src_image,
                 &mut dst_bytes,
                 GaussianBlurParams::new_from_kernel((25 * 2 + 1) as f64),
-                EdgeMode::Clamp,
+                EdgeMode::Clamp.as_2d(),
                 ThreadingPolicy::Adaptive,
                 IeeeBinaryConvolutionMode::Normal,
             )
@@ -208,7 +208,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 &src_image,
                 &mut dst_bytes,
                 GaussianBlurParams::new_from_kernel((51 * 2 + 1) as f64),
-                EdgeMode::Clamp,
+                EdgeMode::Clamp.as_2d(),
                 ThreadingPolicy::Adaptive,
                 ConvolutionMode::Exact,
             )
@@ -235,7 +235,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 &src_image,
                 &mut dst_bytes,
                 GaussianBlurParams::new_from_kernel((51 * 2 + 1) as f64),
-                EdgeMode::Clamp,
+                EdgeMode::Clamp.as_2d(),
                 ThreadingPolicy::Adaptive,
                 ConvolutionMode::FixedPoint,
             )
@@ -301,7 +301,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 &src_image,
                 &mut dst_bytes,
                 GaussianBlurParams::new((77 * 2 + 1) as u32, (77. * 2. + 1.) / 6.),
-                EdgeMode::Clamp,
+                EdgeMode::Clamp.as_2d(),
                 ThreadingPolicy::Adaptive,
                 ConvolutionMode::Exact,
             )
@@ -317,7 +317,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 &src_image,
                 &mut dst_bytes,
                 GaussianBlurParams::new((77 * 2 + 1) as u32, (77. * 2. + 1.) / 6.),
-                EdgeMode::Clamp,
+                EdgeMode::Clamp.as_2d(),
                 ThreadingPolicy::Adaptive,
                 ConvolutionMode::FixedPoint,
             )
@@ -360,7 +360,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                     &src_image,
                     &mut dst_bytes,
                     GaussianBlurParams::new((77 * 2 + 1) as u32, (77. * 2. + 1.) / 6.),
-                    EdgeMode::Clamp,
+                    EdgeMode::Clamp.as_2d(),
                     ThreadingPolicy::Adaptive,
                     ConvolutionMode::Exact,
                 )
@@ -376,7 +376,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                     &src_image,
                     &mut dst_bytes,
                     GaussianBlurParams::new_from_kernel(21.),
-                    EdgeMode::Clamp,
+                    EdgeMode::Clamp.as_2d(),
                     ThreadingPolicy::Adaptive,
                     ConvolutionMode::Exact,
                 )
@@ -394,7 +394,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                     &mut dst_bytes,
                     &kernel,
                     &kernel,
-                    EdgeMode::Clamp,
+                    EdgeMode::Clamp.as_2d(),
                     Scalar::default(),
                     ThreadingPolicy::Adaptive,
                 )
@@ -412,7 +412,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                     &mut dst_bytes,
                     &kernel,
                     &kernel,
-                    EdgeMode::Clamp,
+                    EdgeMode::Clamp.as_2d(),
                     Scalar::default(),
                     ThreadingPolicy::Adaptive,
                 )
@@ -428,7 +428,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                     &src_image,
                     &mut dst_bytes,
                     GaussianBlurParams::new((77 * 2 + 1) as u32, (77. * 2. + 1.) / 6.),
-                    EdgeMode::Clamp,
+                    EdgeMode::Clamp.as_2d(),
                     ThreadingPolicy::Adaptive,
                     ConvolutionMode::FixedPoint,
                 )
@@ -491,7 +491,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                     &src_image,
                     &mut dst_bytes,
                     GaussianBlurParams::new_from_kernel(151.),
-                    EdgeMode::Clamp,
+                    EdgeMode::Clamp.as_2d(),
                     ThreadingPolicy::Adaptive,
                     ConvolutionMode::Exact,
                 )
@@ -507,7 +507,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                     &src_image,
                     &mut dst_bytes,
                     GaussianBlurParams::new((77 * 2 + 1) as u32, (77. * 2. + 1.) / 6.),
-                    EdgeMode::Clamp,
+                    EdgeMode::Clamp.as_2d(),
                     ThreadingPolicy::Adaptive,
                     ConvolutionMode::FixedPoint,
                 )

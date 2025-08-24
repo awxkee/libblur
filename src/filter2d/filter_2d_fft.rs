@@ -32,7 +32,7 @@ use crate::filter2d::mul_spectrum::SpectrumMultiplier;
 use crate::filter2d::scan_se_2d::scan_se_2d_complex;
 use crate::to_storage::ToStorage;
 use crate::{
-    BlurError, BlurImage, BlurImageMut, EdgeMode, FastBlurChannels, KernelShape, MismatchedSize,
+    BlurError, BlurImage, BlurImageMut, EdgeMode2D, FastBlurChannels, KernelShape, MismatchedSize,
     Scalar, ThreadingPolicy,
 };
 use fast_transpose::{transpose_arbitrary, transpose_plane_f32_with_alpha, FlipMode, FlopMode};
@@ -129,7 +129,7 @@ impl FftTranspose<f64> for f64 {
 /// * `destination`: Destination image.
 /// * `kernel`: Kernel.
 /// * `kernel_shape`: Kernel size, see [KernelShape] for more info.
-/// * `border_mode`: See [EdgeMode] for more info.
+/// * `edge_modes`: See [EdgeMode] and [EdgeMode2D] for more info.
 /// * `border_constant`: If [EdgeMode::Constant] border will be replaced with this provided [Scalar] value.
 /// * `FftIntermediate`: Intermediate internal type for fft, only `f32` and `f64` is supported.
 ///
@@ -140,7 +140,7 @@ pub fn filter_2d_fft<T, F, FftIntermediate>(
     dst: &mut BlurImageMut<T>,
     kernel: &[F],
     kernel_shape: KernelShape,
-    border_mode: EdgeMode,
+    edge_modes: EdgeMode2D,
     border_constant: Scalar,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError>
@@ -168,7 +168,7 @@ where
         dst,
         &complex_kernel,
         kernel_shape,
-        border_mode,
+        edge_modes,
         border_constant,
         threading_policy,
     )
@@ -184,7 +184,7 @@ where
 /// * `destination`: Destination image.
 /// * `kernel`: Kernel.
 /// * `kernel_shape`: Kernel size, see [KernelShape] for more info.
-/// * `border_mode`: See [EdgeMode] for more info.
+/// * `edge_modes`: See [EdgeMode] and [EdgeMode2D] for more info.
 /// * `border_constant`: If [EdgeMode::Constant] border will be replaced with this provided [Scalar] value.
 /// * `FftIntermediate`: Intermediate internal type for fft, only `f32` and `f64` is supported.
 ///
@@ -195,7 +195,7 @@ pub fn filter_2d_fft_complex<T, FftIntermediate>(
     dst: &mut BlurImageMut<T>,
     kernel: &[Complex<FftIntermediate>],
     kernel_shape: KernelShape,
-    border_mode: EdgeMode,
+    edge_modes: EdgeMode2D,
     border_constant: Scalar,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError>
@@ -240,7 +240,7 @@ where
         dst,
         kernel,
         kernel_shape,
-        border_mode,
+        edge_modes,
         border_constant,
         &pool,
     )
@@ -251,7 +251,7 @@ pub(crate) fn filter_2d_fft_impl<T, FftIntermediate>(
     dst: &mut BlurImageMut<T>,
     kernel: &[Complex<FftIntermediate>],
     kernel_shape: KernelShape,
-    border_mode: EdgeMode,
+    edge_modes: EdgeMode2D,
     border_constant: Scalar,
     pool: &novtb::ThreadPool,
 ) -> Result<(), BlurError>
@@ -302,7 +302,7 @@ where
             arena_pad_right,
             arena_pad_bottom,
         ),
-        border_mode,
+        edge_modes,
         border_constant,
     )?;
 

@@ -130,7 +130,7 @@ pub use box_filter::{
     CLTParameters,
 };
 pub use channels_configuration::FastBlurChannels;
-pub use edge_mode::*;
+pub use edge_mode::{BorderHandle, EdgeMode, EdgeMode2D, Scalar};
 pub use fast_bilateral_filter::{
     fast_bilateral_filter, fast_bilateral_filter_f32, fast_bilateral_filter_u16,
 };
@@ -151,7 +151,7 @@ pub use fast_gaussian_next::fast_gaussian_next_f16;
 pub use fast_gaussian_next::{fast_gaussian_next, fast_gaussian_next_f32, fast_gaussian_next_u16};
 pub use filter1d::{
     filter_1d_approx, filter_1d_complex, filter_1d_complex_fixed_point, filter_1d_exact,
-    make_arena, Arena, ArenaPads, KernelShape,
+    KernelShape,
 };
 #[cfg(feature = "fft")]
 #[cfg_attr(docsrs, doc(cfg(feature = "fft")))]
@@ -283,7 +283,7 @@ mod tests {
             &mut dst,
             &kernel,
             KernelShape::new(9, 9),
-            EdgeMode::Clamp,
+            EdgeMode::Clamp.as_2d(),
             Scalar::default(),
             ThreadingPolicy::Single,
         )

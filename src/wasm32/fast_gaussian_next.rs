@@ -25,12 +25,13 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use crate::edge_mode::clamp_edge;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::wasm32::utils::{
     i32x4_mul_by_3, load_u8_s32_fast, u16x8_pack_trunc_u8x16, u32x4_pack_trunc_u16x8,
     w_store_u8x8_m4,
 };
-use crate::{clamp_edge, EdgeMode};
+use crate::EdgeMode;
 use std::arch::wasm32::*;
 
 pub fn fast_gaussian_next_vertical_pass_wasm_u8<T, const CN: usize>(
@@ -179,7 +180,7 @@ pub fn fast_gaussian_next_horizontal_pass_wasm_u8<T, const CHANNELS_COUNT: usize
 
 #[inline]
 #[target_feature(enable = "simd128")]
-unsafe fn fast_gaussian_next_horizontal_pass_impl<T, const CHANNELS_COUNT: usize>(
+unsafe fn fast_gaussian_next_horizontal_pass_impl<T, const CN: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -206,7 +207,7 @@ unsafe fn fast_gaussian_next_horizontal_pass_impl<T, const CHANNELS_COUNT: usize
 
         for x in (0 - 3 * radius_64)..(width as i64) {
             if x >= 0 {
-                let current_px = x as usize * CHANNELS_COUNT;
+                let current_px = x as usize * CN;
 
                 let prepared_px_s32 = i32x4_trunc_sat_f32x4(f32x4_nearest(f32x4_mul(
                     f32x4_convert_i32x4(summs),
@@ -218,7 +219,7 @@ unsafe fn fast_gaussian_next_horizontal_pass_impl<T, const CHANNELS_COUNT: usize
                 let bytes_offset = current_y + current_px;
 
                 let dst_ptr = (bytes.slice.as_ptr() as *mut u8).add(bytes_offset);
-                w_store_u8x8_m4::<CHANNELS_COUNT>(dst_ptr, prepared_u8);
+                w_store_u8x8_m4::<CN>(dst_ptr, prepared_u8);
 
                 let d_arr_index_1 = ((x + radius_64) & 1023) as usize;
                 let d_arr_index_2 = ((x - radius_64) & 1023) as usize;
@@ -257,11 +258,11 @@ unsafe fn fast_gaussian_next_horizontal_pass_impl<T, const CHANNELS_COUNT: usize
 
             let next_row_y = (y as usize) * (stride as usize);
             let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide);
-            let next_row_px = next_row_x * CHANNELS_COUNT;
+            let next_row_px = next_row_x * CN;
 
             let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut u8;
 
-            let pixel_color = load_u8_s32_fast::<CHANNELS_COUNT>(s_ptr);
+            let pixel_color = load_u8_s32_fast::<CN>(s_ptr);
 
             let arr_index = ((x + 2 * radius_64) & 1023) as usize;
             let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr();

@@ -27,9 +27,10 @@
 
 use std::arch::aarch64::*;
 
+use crate::edge_mode::clamp_edge;
 use crate::neon::utils::{load_f32_fast, store_f32};
 use crate::unsafe_slice::UnsafeSlice;
-use crate::{clamp_edge, EdgeMode};
+use crate::EdgeMode;
 
 #[repr(C, align(16))]
 #[derive(Copy, Clone, Default)]

@@ -30,14 +30,17 @@
 #![no_main]
 
 use arbitrary::Arbitrary;
-use libblur::{BlurImage, BlurImageMut, EdgeMode, FastBlurChannels, Scalar, ThreadingPolicy};
+use libblur::{
+    BlurImage, BlurImageMut, EdgeMode, EdgeMode2D, FastBlurChannels, Scalar, ThreadingPolicy,
+};
 use libfuzzer_sys::fuzz_target;
 
 #[derive(Clone, Debug, Arbitrary)]
 pub struct SrcImage {
     pub src_width: u16,
     pub src_height: u16,
-    pub edge_mode: u8,
+    pub edge_mode_horizontal: u8,
+    pub edge_mode_vertical: u8,
     pub channels: u8,
     pub kernel_size: u8,
     pub angle: f32,
@@ -51,7 +54,13 @@ fuzz_target!(|data: SrcImage| {
     if data.kernel_size % 2 == 0 || data.kernel_size > 35 || data.kernel_size == 0 {
         return;
     }
-    let edge_mode = match data.edge_mode % 4 {
+    let edge_mode_horizontal = match data.edge_mode_horizontal % 4 {
+        0 => EdgeMode::Clamp,
+        1 => EdgeMode::Wrap,
+        2 => EdgeMode::Reflect,
+        _ => EdgeMode::Reflect101,
+    };
+    let edge_mode_vertical = match data.edge_mode_vertical % 4 {
         0 => EdgeMode::Clamp,
         1 => EdgeMode::Wrap,
         2 => EdgeMode::Reflect,
@@ -73,7 +82,7 @@ fuzz_target!(|data: SrcImage| {
         data.kernel_size as usize,
         data.angle,
         channels,
-        edge_mode,
+        EdgeMode2D::anisotropy(edge_mode_horizontal, edge_mode_vertical),
         mp,
     );
 });
@@ -84,7 +93,7 @@ fn fuzz_8bit(
     radius: usize,
     angle: f32,
     channels: FastBlurChannels,
-    edge_mode: EdgeMode,
+    edge_mode: EdgeMode2D,
     threading_policy: ThreadingPolicy,
 ) {
     if width == 0 || height == 0 || radius == 0 {

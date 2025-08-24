@@ -27,9 +27,10 @@
 
 use crate::avx::fast_gaussian_next_f32::AvxSseF32x8;
 use crate::avx::utils::_mm256_opt_fnmlaf_ps;
+use crate::edge_mode::clamp_edge;
 use crate::sse::{_mm_opt_fnmlaf_ps, load_f32, store_f32};
 use crate::unsafe_slice::UnsafeSlice;
-use crate::{clamp_edge, EdgeMode};
+use crate::EdgeMode;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
