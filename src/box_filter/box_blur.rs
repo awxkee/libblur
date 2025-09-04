@@ -573,7 +573,7 @@ fn box_blur_vertical_pass_impl<T, J>(
 
 trait BoxBlurVerticalPass<T> {
     #[allow(clippy::type_complexity)]
-    fn get_box_vertical_pass<const CHANNELS_CONFIGURATION: usize>() -> fn(
+    fn get_box_vertical_pass<const CN: usize>() -> fn(
         src: &[T],
         src_stride: u32,
         unsafe_dst: &UnsafeSlice<T>,
@@ -589,7 +589,7 @@ trait BoxBlurVerticalPass<T> {
 #[cfg(feature = "nightly_f16")]
 impl BoxBlurVerticalPass<f16> for f16 {
     #[allow(clippy::type_complexity)]
-    fn get_box_vertical_pass<const CHANNELS_CONFIGURATION: usize>(
+    fn get_box_vertical_pass<const CN: usize>(
     ) -> fn(&[f16], u32, &UnsafeSlice<f16>, u32, u32, u32, u32, u32, u32) {
         box_blur_vertical_pass_impl::<f16, f32>
     }
