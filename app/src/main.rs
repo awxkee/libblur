@@ -36,7 +36,7 @@ use libblur::{
     bilateral_filter, complex_gaussian_kernel, fast_bilateral_filter, fast_bilateral_filter_u16,
     filter_1d_complex, filter_1d_complex_fixed_point, gaussian_blur, gaussian_kernel_1d,
     lens_kernel, sigma_size, AnisotropicRadius, BilateralBlurParams, BlurImage, BlurImageMut,
-    BoxBlurParameters, CLTParameters, ConvolutionMode, EdgeMode, FastBlurChannels,
+    BoxBlurParameters, CLTParameters, ConvolutionMode, EdgeMode, EdgeMode2D, FastBlurChannels,
     GaussianBlurParams, KernelShape, Scalar, ThreadingPolicy, TransferFunction,
 };
 use num_complex::Complex;
@@ -80,9 +80,9 @@ fn main() {
 
     println!("{:?}", dyn_image.color());
 
-    let img = dyn_image.to_rgba8();
+    let img = dyn_image.to_rgb8();
     let mut src_bytes = img.as_bytes();
-    let components = 4;
+    let components = 3;
     let stride = dimensions.0 as usize * components;
     let mut bytes: Vec<u8> = src_bytes.to_vec();
     let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
@@ -92,10 +92,10 @@ fn main() {
     let mut v_vec = src_bytes
         .to_vec()
         .iter()
-        // .map(|&x| x)
+        .map(|&x| x)
         // .map(|&x| (x as f32 / 255.))
-        .map(|&x| u16::from_ne_bytes([x, x]))
-        .collect::<Vec<u16>>();
+        // .map(|&x| u16::from_ne_bytes([x, x]))
+        .collect::<Vec<u8>>();
 
     // let mut dst_image = BlurImageMut::borrow(
     //     &mut v_vec,
@@ -109,7 +109,7 @@ fn main() {
         &v_vec,
         dyn_image.width(),
         dyn_image.height(),
-        FastBlurChannels::Channels4,
+        FastBlurChannels::Channels3,
     );
     // let vcvt = cvt.linearize(TransferFunction::Srgb, true).unwrap();
 
@@ -157,13 +157,11 @@ fn main() {
 
     // }
 
-    libblur::box_blur_u16(
+    libblur::sobel(
         &cvt,
         &mut dst_image,
-        BoxBlurParameters {
-            x_axis_kernel: 7,
-            y_axis_kernel: 7,
-        },
+        EdgeMode2D::default(),
+        Scalar::default(),
         ThreadingPolicy::Single,
     )
     .unwrap();
@@ -186,7 +184,7 @@ fn main() {
     // )
     // .unwrap();
 
-    let j_dag = dst_image.to_immutable_ref();
+    // let j_dag = dst_image.to_immutable_ref();
 
     // let gamma = j_dag.gamma8(TransferFunction::Srgb, true).unwrap();
 
@@ -194,9 +192,9 @@ fn main() {
         .data
         .borrow_mut()
         .iter()
-        // .map(|&x| x)
+        .map(|&x| x)
         // .map(|&x| (x * 255f32).round() as u8)
-        .map(|&x| (x >> 8) as u8)
+        // .map(|&x| (x >> 8) as u8)
         .collect::<Vec<u8>>();
 
     // dst_bytes = dst_image.data.borrow().to_vec();
@@ -225,7 +223,7 @@ fn main() {
 
     if components == 3 {
         image::save_buffer(
-            "blurred_stack_next.jpg",
+            "blurred_stack_next1.jpg",
             bytes.as_bytes(),
             dimensions.0,
             dimensions.1,
@@ -234,7 +232,7 @@ fn main() {
         .unwrap();
     } else {
         image::save_buffer(
-            "blurred_stack_next_f.png",
+            "blurred_stack_next_f1.png",
             bytes.as_bytes(),
             dimensions.0,
             dimensions.1,
