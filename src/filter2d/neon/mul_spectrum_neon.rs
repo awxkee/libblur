@@ -36,68 +36,42 @@ pub(crate) fn neon_mul_spectrum_in_place_f32(
     height: usize,
 ) {
     unsafe {
-        mul_spectrum_in_place_f32_impl(value1, other, width, height);
-    }
-}
-
-#[target_feature(enable = "fcma")]
-unsafe fn mul_spectrum_in_place_f32_impl(
-    value1: &mut [Complex<f32>],
-    other: &[Complex<f32>],
-    width: usize,
-    height: usize,
-) {
-    unsafe {
         let normalization_factor = (1f64 / (width * height) as f64) as f32;
         let v_norm_factor = vdupq_n_f32(normalization_factor);
         let complex_size = height * width;
         let value1 = &mut value1[..complex_size];
         let other = &other[..complex_size];
-        let zero = vdupq_n_f32(0.);
 
         for (dst, kernel) in value1.chunks_exact_mut(8).zip(other.chunks_exact(8)) {
-            let vd0 = vld1q_f32(dst.as_ptr() as *const f32);
-            let vd1 = vld1q_f32(dst.as_ptr().add(2) as *const f32);
-            let vd2 = vld1q_f32(dst.as_ptr().add(4) as *const f32);
-            let vd3 = vld1q_f32(dst.as_ptr().add(6) as *const f32);
+            let vd0 = vld1q_f32(dst.as_ptr().cast());
+            let vd1 = vld1q_f32(dst.as_ptr().add(2).cast());
+            let vd2 = vld1q_f32(dst.as_ptr().add(4).cast());
+            let vd3 = vld1q_f32(dst.as_ptr().add(6).cast());
 
-            let vk0 = vld1q_f32(kernel.as_ptr() as *const f32);
-            let vk1 = vld1q_f32(kernel.as_ptr().add(2) as *const f32);
-            let vk2 = vld1q_f32(kernel.as_ptr().add(4) as *const f32);
-            let vk3 = vld1q_f32(kernel.as_ptr().add(6) as *const f32);
+            let vk0 = vld1q_f32(kernel.as_ptr().cast());
+            let vk1 = vld1q_f32(kernel.as_ptr().add(2).cast());
+            let vk2 = vld1q_f32(kernel.as_ptr().add(4).cast());
+            let vk3 = vld1q_f32(kernel.as_ptr().add(6).cast());
 
-            let p0 = vmulq_f32(
-                vcmlaq_rot90_f32(vcmlaq_f32(zero, vd0, vk0), vd0, vk0),
-                v_norm_factor,
-            );
-            let p1 = vmulq_f32(
-                vcmlaq_rot90_f32(vcmlaq_f32(zero, vd1, vk1), vd1, vk1),
-                v_norm_factor,
-            );
-            let p2 = vmulq_f32(
-                vcmlaq_rot90_f32(vcmlaq_f32(zero, vd2, vk2), vd2, vk2),
-                v_norm_factor,
-            );
-            let p3 = vmulq_f32(
-                vcmlaq_rot90_f32(vcmlaq_f32(zero, vd3, vk3), vd3, vk3),
-                v_norm_factor,
-            );
+            let p0 = vmulq_f32(mul_complex_f32(vd0, vk0), v_norm_factor);
+            let p1 = vmulq_f32(mul_complex_f32(vd1, vk1), v_norm_factor);
+            let p2 = vmulq_f32(mul_complex_f32(vd2, vk2), v_norm_factor);
+            let p3 = vmulq_f32(mul_complex_f32(vd3, vk3), v_norm_factor);
 
-            vst1q_f32(dst.as_mut_ptr() as *mut f32, p0);
-            vst1q_f32(dst.get_unchecked_mut(2..).as_mut_ptr() as *mut f32, p1);
-            vst1q_f32(dst.get_unchecked_mut(4..).as_mut_ptr() as *mut f32, p2);
-            vst1q_f32(dst.get_unchecked_mut(6..).as_mut_ptr() as *mut f32, p3);
+            vst1q_f32(dst.as_mut_ptr().cast(), p0);
+            vst1q_f32(dst.get_unchecked_mut(2..).as_mut_ptr().cast(), p1);
+            vst1q_f32(dst.get_unchecked_mut(4..).as_mut_ptr().cast(), p2);
+            vst1q_f32(dst.get_unchecked_mut(6..).as_mut_ptr().cast(), p3);
         }
 
         let dst_rem = value1.chunks_exact_mut(8).into_remainder();
         let src_rem = other.chunks_exact(8).remainder();
 
         for (dst, kernel) in dst_rem.chunks_exact_mut(2).zip(src_rem.chunks_exact(2)) {
-            let v0 = vld1q_f32(dst.as_ptr() as *const f32);
-            let v1 = vld1q_f32(kernel.as_ptr() as *const f32);
-            let p0 = vcmlaq_rot90_f32(vcmlaq_f32(zero, v0, v1), v0, v1);
-            let p1 = vmulq_f32(p0, v_norm_factor);
-            vst1q_f32(dst.as_mut_ptr() as *mut f32, p1);
+            let v0 = vld1q_f32(dst.as_ptr().cast());
+            let v1 = vld1q_f32(kernel.as_ptr().cast());
+            let p1 = vmulq_f32(mul_complex_f32(v0, v1), v_norm_factor);
+            vst1q_f32(dst.as_mut_ptr().cast(), p1);
         }
 
         let dst_rem = dst_rem.chunks_exact_mut(2).into_remainder();
@@ -106,9 +80,30 @@ unsafe fn mul_spectrum_in_place_f32_impl(
         for (dst, kernel) in dst_rem.iter_mut().zip(src_rem.iter()) {
             let v0 = vld1_f32(dst as *const Complex<f32> as *const f32);
             let v1 = vld1_f32(kernel as *const Complex<f32> as *const f32);
-            let p0 = vcmla_rot90_f32(vcmla_f32(vdup_n_f32(0.), v0, v1), v0, v1);
-            let p1 = vmul_f32(p0, vget_low_f32(v_norm_factor));
+            let p1 = vmul_f32(mulh_complex_f32(v0, v1), vget_low_f32(v_norm_factor));
             vst1_f32(dst as *mut Complex<f32> as *mut f32, p1);
         }
+    }
+}
+
+#[inline(always)]
+unsafe fn mul_complex_f32(lhs: float32x4_t, rhs: float32x4_t) -> float32x4_t {
+    unsafe {
+        let temp1 = vtrn1q_f32(rhs, rhs);
+        let temp2 = vtrn2q_f32(rhs, vnegq_f32(rhs));
+        let temp3 = vmulq_f32(temp2, lhs);
+        let temp4 = vrev64q_f32(temp3);
+        vfmaq_f32(temp4, temp1, lhs)
+    }
+}
+
+#[inline(always)]
+unsafe fn mulh_complex_f32(lhs: float32x2_t, rhs: float32x2_t) -> float32x2_t {
+    unsafe {
+        let temp1 = vtrn1_f32(rhs, rhs);
+        let temp2 = vtrn2_f32(rhs, vneg_f32(rhs));
+        let temp3 = vmul_f32(temp2, lhs);
+        let temp4 = vrev64_f32(temp3);
+        vfma_f32(temp4, temp1, lhs)
     }
 }

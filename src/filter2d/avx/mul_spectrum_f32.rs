@@ -65,13 +65,13 @@ unsafe fn avx_interleave(a: __m256, b: __m256) -> (__m256, __m256) {
 }
 
 #[inline]
-#[target_feature(enable = "avx2")]
-unsafe fn sse_unpacklo_ps(a: __m128i) -> (__m128, __m128) {
-    let v2 = _mm_unpacklo_epi32(a, _mm_setzero_si128()); // a0 a2 b0 b2
-
-    let a = _mm_unpacklo_epi32(v2, _mm_setzero_si128()); // a0 a1 a2 a3
-    let b = _mm_unpackhi_epi32(v2, _mm_setzero_si128()); // b0 b1 ab b3
-    (_mm_castsi128_ps(a), _mm_castsi128_ps(b))
+#[target_feature(enable = "avx2", enable = "fma")]
+unsafe fn complex_mul_fma(a: __m128, b: __m128) -> __m128 {
+    let temp1 = _mm_shuffle_ps::<0xA0>(b, b);
+    let temp2 = _mm_shuffle_ps::<0xF5>(b, b);
+    let mul2 = _mm_mul_ps(a, temp2);
+    let mul2 = _mm_shuffle_ps::<0xB1>(mul2, mul2);
+    _mm_fmaddsub_ps(a, temp1, mul2)
 }
 
 #[target_feature(enable = "avx2", enable = "fma")]
@@ -89,15 +89,15 @@ unsafe fn mul_spectrum_in_place_f32_impl(
         let other = &other[..complex_size];
 
         for (dst, kernel) in value1.chunks_exact_mut(16).zip(other.chunks_exact(16)) {
-            let vd0 = _mm256_loadu_ps(dst.as_ptr() as *const f32);
-            let vd1 = _mm256_loadu_ps(dst.get_unchecked(4..).as_ptr() as *const f32);
-            let vd2 = _mm256_loadu_ps(dst.get_unchecked(8..).as_ptr() as *const f32);
-            let vd3 = _mm256_loadu_ps(dst.get_unchecked(12..).as_ptr() as *const f32);
+            let vd0 = _mm256_loadu_ps(dst.as_ptr().cast());
+            let vd1 = _mm256_loadu_ps(dst.get_unchecked(4..).as_ptr().cast());
+            let vd2 = _mm256_loadu_ps(dst.get_unchecked(8..).as_ptr().cast());
+            let vd3 = _mm256_loadu_ps(dst.get_unchecked(12..).as_ptr().cast());
 
-            let vk0 = _mm256_loadu_ps(kernel.as_ptr() as *const f32);
-            let vk1 = _mm256_loadu_ps(kernel.get_unchecked(4..).as_ptr() as *const f32);
-            let vk2 = _mm256_loadu_ps(kernel.get_unchecked(8..).as_ptr() as *const f32);
-            let vk3 = _mm256_loadu_ps(kernel.get_unchecked(12..).as_ptr() as *const f32);
+            let vk0 = _mm256_loadu_ps(kernel.as_ptr().cast());
+            let vk1 = _mm256_loadu_ps(kernel.get_unchecked(4..).as_ptr().cast());
+            let vk2 = _mm256_loadu_ps(kernel.get_unchecked(8..).as_ptr().cast());
+            let vk3 = _mm256_loadu_ps(kernel.get_unchecked(12..).as_ptr().cast());
 
             let (ar0, ai0) = avx_deinterleave(vd0, vd1);
             let (ar1, ai1) = avx_deinterleave(vd2, vd3);
@@ -123,18 +123,18 @@ unsafe fn mul_spectrum_in_place_f32_impl(
             let (d0, d1) = avx_interleave(prod_r0, prod_i0);
             let (d2, d3) = avx_interleave(prod_r1, prod_i1);
 
-            _mm256_storeu_ps(dst.as_mut_ptr() as *mut f32, d0);
-            _mm256_storeu_ps(dst.get_unchecked_mut(4..).as_mut_ptr() as *mut f32, d1);
-            _mm256_storeu_ps(dst.get_unchecked_mut(8..).as_mut_ptr() as *mut f32, d2);
-            _mm256_storeu_ps(dst.get_unchecked_mut(12..).as_mut_ptr() as *mut f32, d3);
+            _mm256_storeu_ps(dst.as_mut_ptr().cast(), d0);
+            _mm256_storeu_ps(dst.get_unchecked_mut(4..).as_mut_ptr().cast(), d1);
+            _mm256_storeu_ps(dst.get_unchecked_mut(8..).as_mut_ptr().cast(), d2);
+            _mm256_storeu_ps(dst.get_unchecked_mut(12..).as_mut_ptr().cast(), d3);
         }
 
         let dst_rem = value1.chunks_exact_mut(16).into_remainder();
         let src_rem = other.chunks_exact(16).remainder();
 
         for (dst, kernel) in dst_rem.chunks_exact_mut(4).zip(src_rem.chunks_exact(4)) {
-            let a0 = _mm256_loadu_ps(dst.as_ptr() as *const f32);
-            let b0 = _mm256_loadu_ps(kernel.as_ptr() as *const f32);
+            let a0 = _mm256_loadu_ps(dst.as_ptr().cast());
+            let b0 = _mm256_loadu_ps(kernel.as_ptr().cast());
 
             let (ar0, ai0) = avx_deinterleave(a0, _mm256_setzero_ps());
             let (br0, bi0) = avx_deinterleave(b0, _mm256_setzero_ps());
@@ -149,7 +149,7 @@ unsafe fn mul_spectrum_in_place_f32_impl(
 
             let (d0, _) = avx_interleave(prod_r0, prod_i0);
 
-            _mm256_storeu_ps(dst.as_mut_ptr() as *mut f32, d0);
+            _mm256_storeu_ps(dst.as_mut_ptr().cast(), d0);
         }
 
         let dst_rem = dst_rem.chunks_exact_mut(4).into_remainder();
@@ -159,18 +159,7 @@ unsafe fn mul_spectrum_in_place_f32_impl(
             let v0 = _mm_loadu_si64(dst as *const Complex<f32> as *const _);
             let v1 = _mm_loadu_si64(kernel as *const Complex<f32> as *const _);
 
-            let (ar0, ai0) = sse_unpacklo_ps(v0);
-            let (br0, bi0) = sse_unpacklo_ps(v1);
-
-            let mut prod_r0 = _mm_mul_ps(ar0, br0);
-            let mut prod_i0 = _mm_mul_ps(ar0, bi0);
-            prod_r0 = _mm_fnmadd_ps(ai0, bi0, prod_r0);
-            prod_i0 = _mm_fmadd_ps(ai0, br0, prod_i0);
-
-            prod_r0 = _mm_mul_ps(prod_r0, _mm256_castps256_ps128(v_norm_factor));
-            prod_i0 = _mm_mul_ps(prod_i0, _mm256_castps256_ps128(v_norm_factor));
-
-            let lo = _mm_unpacklo_ps(prod_r0, prod_i0);
+            let lo = complex_mul_fma(_mm_castsi128_ps(v0), _mm_castsi128_ps(v1));
 
             _mm_storeu_si64(dst as *mut Complex<f32> as *mut _, _mm_castps_si128(lo));
         }

@@ -28,8 +28,8 @@
  */
 mod convolve_op_u8_i16_fp;
 #[cfg(feature = "fft")]
-mod mul_spectrum;
+mod mul_spectrum_f32;
 
 pub(crate) use convolve_op_u8_i16_fp::convolve_segment_sse_2d_u8_i16_fp;
 #[cfg(feature = "fft")]
-pub(crate) use mul_spectrum::avx_fma_mul_spectrum_in_place_f32;
+pub(crate) use mul_spectrum_f32::avx_fma_mul_spectrum_in_place_f32;

@@ -72,8 +72,8 @@ impl SpectrumMultiplier<f32> for f32 {
         #[cfg(all(target_arch = "aarch64", feature = "nightly_fcma"))]
         {
             if std::arch::is_aarch64_feature_detected!("fcma") {
-                use crate::filter2d::neon::neon_mul_spectrum_in_place_f32;
-                return neon_mul_spectrum_in_place_f32(value1, other, width, height);
+                use crate::filter2d::neon::fcma_mul_spectrum_in_place_f32;
+                return fcma_mul_spectrum_in_place_f32(value1, other, width, height);
             }
         }
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]
@@ -96,7 +96,15 @@ impl SpectrumMultiplier<f32> for f32 {
                 }
             }
         }
-        mul_spectrum_in_place_impl(value1, other, width, height);
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
+        {
+            use crate::filter2d::neon::neon_mul_spectrum_in_place_f32;
+            neon_mul_spectrum_in_place_f32(value1, other, width, height);
+        }
+        #[cfg(not(all(target_arch = "aarch64", feature = "neon")))]
+        {
+            mul_spectrum_in_place_impl(value1, other, width, height);
+        }
     }
 }
 
@@ -111,6 +119,7 @@ impl SpectrumMultiplier<f64> for f64 {
     }
 }
 
+#[allow(dead_code)]
 #[inline(always)]
 fn mul_spectrum_in_place_impl<V: FftNum + Mul<V>>(
     value1: &mut [Complex<V>],
