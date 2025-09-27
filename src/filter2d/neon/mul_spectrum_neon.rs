@@ -44,14 +44,14 @@ pub(crate) fn neon_mul_spectrum_in_place_f32(
 
         for (dst, kernel) in value1.chunks_exact_mut(8).zip(other.chunks_exact(8)) {
             let vd0 = vld1q_f32(dst.as_ptr().cast());
-            let vd1 = vld1q_f32(dst.as_ptr().add(2).cast());
-            let vd2 = vld1q_f32(dst.as_ptr().add(4).cast());
-            let vd3 = vld1q_f32(dst.as_ptr().add(6).cast());
+            let vd1 = vld1q_f32(dst.get_unchecked(2..).as_ptr().cast());
+            let vd2 = vld1q_f32(dst.get_unchecked(4..).as_ptr().cast());
+            let vd3 = vld1q_f32(dst.get_unchecked(6..).as_ptr().cast());
 
             let vk0 = vld1q_f32(kernel.as_ptr().cast());
-            let vk1 = vld1q_f32(kernel.as_ptr().add(2).cast());
-            let vk2 = vld1q_f32(kernel.as_ptr().add(4).cast());
-            let vk3 = vld1q_f32(kernel.as_ptr().add(6).cast());
+            let vk1 = vld1q_f32(kernel.get_unchecked(2..).as_ptr().cast());
+            let vk2 = vld1q_f32(kernel.get_unchecked(4..).as_ptr().cast());
+            let vk3 = vld1q_f32(kernel.get_unchecked(6..).as_ptr().cast());
 
             let p0 = vmulq_f32(mul_complex_f32(vd0, vk0), v_norm_factor);
             let p1 = vmulq_f32(mul_complex_f32(vd1, vk1), v_norm_factor);
