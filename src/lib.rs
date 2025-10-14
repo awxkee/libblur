@@ -278,7 +278,7 @@ mod tests {
 
         let kernel = gaussian_kernel_9x9(3.);
 
-        filter_2d_rgb_fft::<u8, f32, f32>(
+        filter_2d_rgb_fft::<u8>(
             &src_image,
             &mut dst,
             &kernel,

@@ -28,6 +28,7 @@ rustfft = { version = "6.3", optional = true }
 fast_transpose = { version = "0.2", optional = true }
 num-complex = "0.4"
 novtb = "^0.1.6"
+zaft = {path = "../zaft", features = ["fcma"], default-features = false}
 
 [features]
 default = ["avx", "sse", "rdm", "neon"]

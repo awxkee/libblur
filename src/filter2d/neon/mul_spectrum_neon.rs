@@ -34,9 +34,10 @@ pub(crate) fn neon_mul_spectrum_in_place_f32(
     other: &[Complex<f32>],
     width: usize,
     height: usize,
+    scale: f32,
 ) {
     unsafe {
-        let normalization_factor = (1f64 / (width * height) as f64) as f32;
+        let normalization_factor = scale;
         let v_norm_factor = vdupq_n_f32(normalization_factor);
         let complex_size = height * width;
         let value1 = &mut value1[..complex_size];

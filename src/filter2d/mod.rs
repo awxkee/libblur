@@ -35,6 +35,7 @@ mod fft_utils;
 mod filter_2d;
 #[cfg(feature = "fft")]
 mod filter_2d_fft;
+mod filter_2d_fft_real;
 mod filter_2d_handler;
 mod filter_2d_rgb;
 #[cfg(feature = "fft")]

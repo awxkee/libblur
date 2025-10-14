@@ -363,7 +363,15 @@ where
             columns_planner.process(column);
         });
 
-    FftIntermediate::mul_spectrum(&mut kernel_arena, &arena_source, best_width, best_height);
+    let norm_factor = 1f64 / (best_width * best_height) as f64;
+
+    FftIntermediate::mul_spectrum(
+        &mut kernel_arena,
+        &arena_source,
+        best_width,
+        best_height,
+        norm_factor.as_(),
+    );
 
     arena_source.resize(0, Complex::<FftIntermediate>::default());
 

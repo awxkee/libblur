@@ -59,3 +59,41 @@ pub fn fft_next_good_size(mut n: usize) -> usize {
         n += 1;
     }
 }
+
+pub(crate) fn fft_next_good_size_real(mut n: usize) -> usize {
+    if n <= 2 {
+        return 2;
+    }
+
+    loop {
+        let mut m = n;
+
+        // Divide by 2 until it's no longer divisible
+        while m % 2 == 0 {
+            m /= 2;
+        }
+
+        // Divide by 3 until it's no longer divisible
+        while m % 3 == 0 {
+            m /= 3;
+        }
+
+        // Divide by 5 until it's no longer divisible
+        while m % 5 == 0 {
+            m /= 5;
+        }
+
+        // Divide by 5 until it's no longer divisible
+        while m % 7 == 0 {
+            m /= 7;
+        }
+
+        // If m is reduced to 1, n is a good FFT size
+        if m <= 1 && n % 2 == 0 {
+            return n;
+        }
+
+        // Otherwise, increment n and try again
+        n += 1;
+    }
+}

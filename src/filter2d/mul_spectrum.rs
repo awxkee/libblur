@@ -36,6 +36,7 @@ pub(crate) fn mul_spectrum_in_place<V: FftNum + Mul<V> + SpectrumMultiplier<V>>(
     other: &[Complex<V>],
     width: usize,
     height: usize,
+    scale: V,
 ) where
     f64: AsPrimitive<V>,
 {
@@ -55,11 +56,17 @@ pub(crate) fn mul_spectrum_in_place<V: FftNum + Mul<V> + SpectrumMultiplier<V>>(
             }
         }
     }
-    V::mul_spectrum(value1, other, width, height);
+    V::mul_spectrum(value1, other, width, height, scale);
 }
 
 pub trait SpectrumMultiplier<V> {
-    fn mul_spectrum(value1: &mut [Complex<V>], other: &[Complex<V>], width: usize, height: usize);
+    fn mul_spectrum(
+        value1: &mut [Complex<V>],
+        other: &[Complex<V>],
+        width: usize,
+        height: usize,
+        scale: V,
+    );
 }
 
 impl SpectrumMultiplier<f32> for f32 {
@@ -68,6 +75,7 @@ impl SpectrumMultiplier<f32> for f32 {
         other: &[Complex<f32>],
         width: usize,
         height: usize,
+        scale: f32,
     ) {
         #[cfg(all(target_arch = "aarch64", feature = "nightly_fcma"))]
         {
@@ -99,7 +107,7 @@ impl SpectrumMultiplier<f32> for f32 {
         #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             use crate::filter2d::neon::neon_mul_spectrum_in_place_f32;
-            neon_mul_spectrum_in_place_f32(value1, other, width, height);
+            neon_mul_spectrum_in_place_f32(value1, other, width, height, scale);
         }
         #[cfg(not(all(target_arch = "aarch64", feature = "neon")))]
         {
@@ -114,8 +122,9 @@ impl SpectrumMultiplier<f64> for f64 {
         other: &[Complex<f64>],
         width: usize,
         height: usize,
+        scale: f64,
     ) {
-        mul_spectrum_in_place(value1, other, width, height);
+        mul_spectrum_in_place(value1, other, width, height, scale);
     }
 }
 
