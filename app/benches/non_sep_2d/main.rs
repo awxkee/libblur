@@ -30,7 +30,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         );
         let motion = generate_motion_kernel(35, 24.);
         b.iter(|| {
-            filter_2d_rgb_fft::<u8, f32, f32>(
+            filter_2d_rgb_fft::<u8, f32>(
                 &src_image,
                 &mut dst_image,
                 &motion,

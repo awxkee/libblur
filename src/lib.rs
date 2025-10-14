@@ -157,7 +157,7 @@ pub use filter1d::{
 #[cfg_attr(docsrs, doc(cfg(feature = "fft")))]
 pub use filter2d::{
     fft_next_good_size, filter_2d_fft, filter_2d_fft_complex, filter_2d_rgb_fft,
-    filter_2d_rgb_fft_complex, filter_2d_rgba_fft, filter_2d_rgba_fft_complex,
+    filter_2d_rgb_fft_complex, filter_2d_rgba_fft, filter_2d_rgba_fft_complex, FftNumber,
 };
 pub use filter2d::{filter_2d, filter_2d_arbitrary, filter_2d_rgb, filter_2d_rgba};
 pub use gamma_curves::TransferFunction;
@@ -278,7 +278,7 @@ mod tests {
 
         let kernel = gaussian_kernel_9x9(3.);
 
-        filter_2d_rgb_fft::<u8, f32, f32>(
+        filter_2d_rgb_fft::<u8, f32>(
             &src_image,
             &mut dst,
             &kernel,
