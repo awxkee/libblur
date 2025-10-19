@@ -65,7 +65,7 @@ fn f16_to_f32(bytes: Vec<u16>) -> Vec<f32> {
 }
 
 fn main() {
-    let mut dyn_image = ImageReader::open("./assets/beach_horizon.jpg")
+    let mut dyn_image = ImageReader::open("./assets/sonderland.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -118,7 +118,8 @@ fn main() {
     let start_time = Instant::now();
 
     // for i in 0..10 {
-    let motion = lens_kernel(KernelShape::new(123, 123), 10., 3., 0.3, 0.5).unwrap();
+    let ks = KernelShape::new(27, 27);
+    let motion = lens_kernel(ks, 10., 3., 0.3, 0.5).unwrap();
     // let motion = lens_kernel(KernelShape::new(35, 35), 15., 6., 0.5,0.2).unwrap();
     // let bokeh = generate_complex_bokeh_kernel(35, 30.);
     let start_time = Instant::now();
@@ -193,7 +194,7 @@ fn main() {
         &cvt,
         &mut dst_image,
         &motion,
-        KernelShape::new(123, 123),
+        ks,
         EdgeMode2D::new(EdgeMode::Clamp),
         Scalar::default(),
         ThreadingPolicy::Adaptive,

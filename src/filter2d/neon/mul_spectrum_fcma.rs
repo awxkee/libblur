@@ -34,6 +34,7 @@ pub(crate) fn fcma_mul_spectrum_in_place_f32(
     other: &[Complex<f32>],
     width: usize,
     height: usize,
+    scale: f32,
 ) {
     unsafe {
         mul_spectrum_in_place_f32_impl(value1, other, width, height);
@@ -46,10 +47,10 @@ unsafe fn mul_spectrum_in_place_f32_impl(
     other: &[Complex<f32>],
     width: usize,
     height: usize,
+    scale: f32,
 ) {
     unsafe {
-        let normalization_factor = (1f64 / (width * height) as f64) as f32;
-        let v_norm_factor = vdupq_n_f32(normalization_factor);
+        let v_norm_factor = vdupq_n_f32(scale);
         let complex_size = height * width;
         let value1 = &mut value1[..complex_size];
         let other = &other[..complex_size];
