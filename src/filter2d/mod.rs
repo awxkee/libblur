@@ -59,6 +59,8 @@ pub use fft_utils::fft_next_good_size;
 pub use filter_2d::{filter_2d, filter_2d_arbitrary};
 #[cfg(feature = "fft")]
 pub use filter_2d_fft::{filter_2d_fft, filter_2d_fft_complex};
+#[cfg(feature = "fft")]
+pub use filter_2d_fft_real::FftNumber;
 pub use filter_2d_rgb::filter_2d_rgb;
 #[cfg(feature = "fft")]
 pub use filter_2d_rgb_fft::{filter_2d_rgb_fft, filter_2d_rgb_fft_complex};

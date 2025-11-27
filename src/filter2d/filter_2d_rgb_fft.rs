@@ -26,21 +26,18 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::filter2d::filter_2d_fft::{filter_2d_fft_impl, FftTranspose};
-use crate::filter2d::filter_2d_fft_real::{filter_2d_fft_real_impl, FftRealFactory};
+use crate::filter2d::filter_2d_fft::filter_2d_fft_impl;
+use crate::filter2d::filter_2d_fft_real::{filter_2d_fft_real_impl, FftNumber};
 use crate::filter2d::gather_channel::{gather_channel, squash_channel};
-use crate::filter2d::mul_spectrum::SpectrumMultiplier;
 use crate::filter2d::scan_se_2d::{scan_se_2d, scan_se_2d_complex};
 use crate::to_storage::ToStorage;
 use crate::{
     BlurError, BlurImage, BlurImageMut, EdgeMode2D, FastBlurChannels, KernelShape, Scalar,
     ThreadingPolicy,
 };
+use num_complex::Complex;
 use num_traits::AsPrimitive;
-use rustfft::num_complex::Complex;
-use rustfft::FftNum;
 use std::fmt::Debug;
-use std::ops::Mul;
 
 /// Performs 2D non-separable convolution on RGB image using FFT.
 ///
@@ -69,18 +66,7 @@ pub fn filter_2d_rgb_fft<T, F>(
 ) -> Result<(), BlurError>
 where
     T: AsPrimitive<F> + Copy + Default + Send + Sync + Default + Debug,
-    F: Copy
-        + Default
-        + Send
-        + Sync
-        + Default
-        + Mul<F>
-        + ToStorage<T>
-        + SpectrumMultiplier<F>
-        + FftTranspose<F>
-        + Debug
-        + FftRealFactory<F>
-        + PartialEq,
+    F: FftNumber + ToStorage<T>,
     f64: AsPrimitive<T> + AsPrimitive<F>,
     i32: AsPrimitive<F>,
 {
@@ -190,12 +176,7 @@ pub fn filter_2d_rgb_fft_complex<T, FftIntermediate>(
 ) -> Result<(), BlurError>
 where
     T: Copy + Default + Send + Sync + AsPrimitive<FftIntermediate> + Debug,
-    FftIntermediate: FftNum
-        + Default
-        + Mul<FftIntermediate>
-        + ToStorage<T>
-        + SpectrumMultiplier<FftIntermediate>
-        + FftTranspose<FftIntermediate>,
+    FftIntermediate: FftNumber + ToStorage<T>,
     f64: AsPrimitive<T> + AsPrimitive<FftIntermediate>,
 {
     if src.channels != FastBlurChannels::Channels3 {

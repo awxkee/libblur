@@ -1,4 +1,4 @@
-workspace = { members = ["fuzz", "app/accelerate", "app"] }
+workspace = { members = ["app/accelerate", "app"], exclude = ["fuzz"] }
 
 [package]
 name = "libblur"
@@ -28,26 +28,26 @@ rustfft = { version = "6.3", optional = true }
 fast_transpose = { version = "0.2", optional = true }
 num-complex = "0.4"
 novtb = "^0.1.6"
-zaft = {path = "../zaft", features = ["fcma", "avx"], default-features = false}
+zaft = { version = "0.2.1", default-features = false, optional = true }
 
 [features]
 default = ["avx", "sse", "rdm", "neon"]
 image = ["dep:image"]
-fft = ["dep:rustfft", "dep:fast_transpose"]
+fft = ["dep:zaft", "dep:fast_transpose"]
 # Enables NEON RDM intrinsics
 rdm = ["neon"]
 # Enables AVX-512. Requires nightly on rust compiler before 1.89.
 nightly_avx512 = []
 # Enables NEON fcma, used in FFT and filter 1d complex. Requires nightly.
-nightly_fcma = []
+nightly_fcma = ["zaft/fcma"]
 # Enables core::f16 support. Requires nightly.
 nightly_f16 = []
 # Enables AVX intrinsics
-avx = []
+avx = ["zaft/avx"]
 # Enables SSE4.1 intrinsics
 sse = []
 # Enables NEON intrinsics
-neon = []
+neon = ["zaft/neon"]
 
 [package.metadata.docs.rs]
 # To build locally:

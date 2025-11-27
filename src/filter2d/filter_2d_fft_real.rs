@@ -39,42 +39,61 @@ use crate::{
 use fast_transpose::FlopMode;
 use novtb::{ParallelZonedIterator, TbSliceMut};
 use num_complex::Complex;
-use num_traits::AsPrimitive;
+use num_traits::{AsPrimitive, Num};
 use std::fmt::Debug;
 use std::ops::Mul;
+use std::sync::Arc;
 use zaft::{C2RFftExecutor, FftDirection, FftExecutor, R2CFftExecutor, Zaft};
 
-pub trait FftRealFactory<T> {
+pub trait FftFactory<T> {
     fn make_r2c_executor(
         size: usize,
-    ) -> Result<Box<dyn R2CFftExecutor<T> + Send + Sync>, BlurError>;
+    ) -> Result<Arc<dyn R2CFftExecutor<T> + Send + Sync>, BlurError>;
     fn make_c2r_executor(
         size: usize,
-    ) -> Result<Box<dyn C2RFftExecutor<T> + Send + Sync>, BlurError>;
+    ) -> Result<Arc<dyn C2RFftExecutor<T> + Send + Sync>, BlurError>;
     fn make_c2c_executor(
         size: usize,
         direction: FftDirection,
-    ) -> Result<Box<dyn FftExecutor<T> + Send + Sync>, BlurError>;
+    ) -> Result<Arc<dyn FftExecutor<T> + Send + Sync>, BlurError>;
+    fn make_fft(
+        size: usize,
+        direction: FftDirection,
+    ) -> Result<Arc<dyn FftExecutor<T> + Send + Sync>, BlurError>;
 }
 
-impl FftRealFactory<f32> for f32 {
+impl FftFactory<f32> for f32 {
     fn make_c2r_executor(
         size: usize,
-    ) -> Result<Box<dyn C2RFftExecutor<f32> + Send + Sync>, BlurError> {
+    ) -> Result<Arc<dyn C2RFftExecutor<f32> + Send + Sync>, BlurError> {
         Zaft::make_c2r_fft_f32(size).map_err(|_| BlurError::FftChannelsNotSupported)
     }
 
     fn make_r2c_executor(
         size: usize,
-    ) -> Result<Box<dyn R2CFftExecutor<f32> + Send + Sync>, BlurError> {
+    ) -> Result<Arc<dyn R2CFftExecutor<f32> + Send + Sync>, BlurError> {
         Zaft::make_r2c_fft_f32(size).map_err(|_| BlurError::FftChannelsNotSupported)
     }
 
     fn make_c2c_executor(
         size: usize,
         fft_direction: FftDirection,
-    ) -> Result<Box<dyn FftExecutor<f32> + Send + Sync>, BlurError> {
+    ) -> Result<Arc<dyn FftExecutor<f32> + Send + Sync>, BlurError> {
         match fft_direction {
+            FftDirection::Forward => {
+                Zaft::make_forward_fft_f32(size).map_err(|_| BlurError::FftChannelsNotSupported)
+            }
+            FftDirection::Inverse => {
+                Zaft::make_inverse_fft_f32(size).map_err(|_| BlurError::FftChannelsNotSupported)
+            }
+        }
+    }
+
+    fn make_fft(
+        size: usize,
+        direction: FftDirection,
+    ) -> Result<Arc<dyn FftExecutor<f32> + Send + Sync>, BlurError> {
+        match direction {
             FftDirection::Forward => {
                 Zaft::make_forward_fft_f32(size).map_err(|_| BlurError::FftChannelsNotSupported)
             }
@@ -85,23 +104,37 @@ impl FftRealFactory<f32> for f32 {
     }
 }
 
-impl FftRealFactory<f64> for f64 {
+impl FftFactory<f64> for f64 {
     fn make_c2r_executor(
         size: usize,
-    ) -> Result<Box<dyn C2RFftExecutor<f64> + Send + Sync>, BlurError> {
+    ) -> Result<Arc<dyn C2RFftExecutor<f64> + Send + Sync>, BlurError> {
         Zaft::make_c2r_fft_f64(size).map_err(|_| BlurError::FftChannelsNotSupported)
     }
 
     fn make_r2c_executor(
         size: usize,
-    ) -> Result<Box<dyn R2CFftExecutor<f64> + Send + Sync>, BlurError> {
+    ) -> Result<Arc<dyn R2CFftExecutor<f64> + Send + Sync>, BlurError> {
         Zaft::make_r2c_fft_f64(size).map_err(|_| BlurError::FftChannelsNotSupported)
     }
 
     fn make_c2c_executor(
         size: usize,
         direction: FftDirection,
-    ) -> Result<Box<dyn FftExecutor<f64> + Send + Sync>, BlurError> {
+    ) -> Result<Arc<dyn FftExecutor<f64> + Send + Sync>, BlurError> {
+        match direction {
+            FftDirection::Forward => {
+                Zaft::make_forward_fft_f64(size).map_err(|_| BlurError::FftChannelsNotSupported)
+            }
+            FftDirection::Inverse => {
+                Zaft::make_inverse_fft_f64(size).map_err(|_| BlurError::FftChannelsNotSupported)
+            }
+        }
+    }
+
+    fn make_fft(
+        size: usize,
+        direction: FftDirection,
+    ) -> Result<Arc<dyn FftExecutor<f64> + Send + Sync>, BlurError> {
         match direction {
             FftDirection::Forward => {
                 Zaft::make_forward_fft_f64(size).map_err(|_| BlurError::FftChannelsNotSupported)
@@ -112,6 +145,28 @@ impl FftRealFactory<f64> for f64 {
         }
     }
 }
+
+pub trait FftNumber:
+    Copy
+    + Default
+    + Send
+    + Sync
+    + Default
+    + Mul<Self>
+    + SpectrumMultiplier<Self>
+    + FftTranspose<Self>
+    + Debug
+    + Num
+    + FftFactory<Self>
+    + PartialEq
+    + PartialOrd
+    + 'static
+{
+}
+
+impl FftNumber for f32 {}
+
+impl FftNumber for f64 {}
 
 pub(crate) fn filter_2d_fft_real_impl<T, F>(
     src: &BlurImage<T>,
@@ -124,17 +179,7 @@ pub(crate) fn filter_2d_fft_real_impl<T, F>(
 ) -> Result<(), BlurError>
 where
     T: AsPrimitive<F> + Copy + Default + Send + Sync + Default + Debug,
-    F: Copy
-        + Default
-        + Send
-        + Sync
-        + Default
-        + Mul<F>
-        + ToStorage<T>
-        + SpectrumMultiplier<F>
-        + FftTranspose<F>
-        + Debug
-        + FftRealFactory<F>,
+    F: FftNumber + ToStorage<T>,
     f64: AsPrimitive<T> + AsPrimitive<F>,
 {
     src.check_layout()?;

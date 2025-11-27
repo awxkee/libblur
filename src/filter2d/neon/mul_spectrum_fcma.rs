@@ -26,7 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use rustfft::num_complex::Complex;
+use num_complex::Complex;
 use std::arch::aarch64::*;
 
 pub(crate) fn fcma_mul_spectrum_in_place_f32(
@@ -37,7 +37,7 @@ pub(crate) fn fcma_mul_spectrum_in_place_f32(
     scale: f32,
 ) {
     unsafe {
-        mul_spectrum_in_place_f32_impl(value1, other, width, height);
+        mul_spectrum_in_place_f32_impl(value1, other, width, height, scale);
     }
 }
 

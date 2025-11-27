@@ -28,9 +28,9 @@
  */
 use crate::filter1d::KernelShape;
 use crate::filter2d::scan_point_2d::ScanPoint2d;
-use num_traits::AsPrimitive;
 #[cfg(feature = "fft")]
-use rustfft::num_complex::Complex;
+use num_complex::Complex;
+use num_traits::AsPrimitive;
 
 pub(crate) fn scan_se_2d<F>(
     structuring_element: &[F],

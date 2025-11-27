@@ -118,9 +118,9 @@ fn main() {
     let start_time = Instant::now();
 
     // for i in 0..10 {
-    let ks = KernelShape::new(27, 27);
+    let ks = KernelShape::new(77, 77);
     let motion = lens_kernel(ks, 10., 3., 0.3, 0.5).unwrap();
-    // let motion = lens_kernel(KernelShape::new(35, 35), 15., 6., 0.5,0.2).unwrap();
+    // let motion = lens_kernel(KernelShape::new(35, 35), 15., 6., 0.5, 0.2).unwrap();
     // let bokeh = generate_complex_bokeh_kernel(35, 30.);
     let start_time = Instant::now();
     // let gaussian_kernel = gaussian_kernel_1d(31, sigma_size(31.)).iter().map(|&x| Complex::new(x, 0.0)).collect::<Vec<Complex<f32>>>();
@@ -188,7 +188,8 @@ fn main() {
 
     // let j_dag = dst_image.to_immutable_ref();
 
-    // let gamma = j_dag.gamma8(TransferFunction::Srgb, true).unwrap();
+    // let gamma = cvt.linearize(TransferFunction::Srgb, false).unwrap();
+    // let mut vzd = BlurImageMut::default();
 
     filter_2d_rgb_fft::<u8, f32>(
         &cvt,
@@ -200,6 +201,8 @@ fn main() {
         ThreadingPolicy::Adaptive,
     )
     .unwrap();
+
+    // dst_image = vzd.gamma8(TransferFunction::Srgb, false).unwrap();
 
     dst_bytes = dst_image
         .data

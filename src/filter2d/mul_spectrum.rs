@@ -26,12 +26,11 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::FftNumber;
+use num_complex::Complex;
 use num_traits::AsPrimitive;
-use rustfft::num_complex::Complex;
-use rustfft::FftNum;
-use std::ops::Mul;
 
-pub(crate) fn mul_spectrum_in_place<V: FftNum + Mul<V> + SpectrumMultiplier<V>>(
+pub(crate) fn mul_spectrum_in_place<V: FftNumber>(
     value1: &mut [Complex<V>],
     other: &[Complex<V>],
     width: usize,
@@ -81,7 +80,7 @@ impl SpectrumMultiplier<f32> for f32 {
         {
             if std::arch::is_aarch64_feature_detected!("fcma") {
                 use crate::filter2d::neon::fcma_mul_spectrum_in_place_f32;
-                return fcma_mul_spectrum_in_place_f32(value1, other, width, height);
+                return fcma_mul_spectrum_in_place_f32(value1, other, width, height, scale);
             }
         }
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]
@@ -130,7 +129,7 @@ impl SpectrumMultiplier<f64> for f64 {
 
 #[allow(dead_code)]
 #[inline(always)]
-fn mul_spectrum_in_place_impl<V: FftNum + Mul<V>>(
+fn mul_spectrum_in_place_impl<V: FftNumber>(
     value1: &mut [Complex<V>],
     other: &[Complex<V>],
     width: usize,
@@ -151,7 +150,7 @@ fn mul_spectrum_in_place_impl<V: FftNum + Mul<V>>(
 
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 #[target_feature(enable = "sse4.1")]
-unsafe fn mul_spectrum_in_place_sse_4_1<V: FftNum + Mul<V>>(
+unsafe fn mul_spectrum_in_place_sse_4_1<V: FftNumber>(
     value1: &mut [Complex<V>],
     other: &[Complex<V>],
     width: usize,
@@ -165,7 +164,7 @@ unsafe fn mul_spectrum_in_place_sse_4_1<V: FftNum + Mul<V>>(
 
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]
 #[target_feature(enable = "avx2")]
-unsafe fn mul_spectrum_in_place_avx2<V: FftNum + Mul<V>>(
+unsafe fn mul_spectrum_in_place_avx2<V: FftNumber>(
     value1: &mut [Complex<V>],
     other: &[Complex<V>],
     width: usize,
