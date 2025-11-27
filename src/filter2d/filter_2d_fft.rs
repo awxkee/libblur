@@ -28,20 +28,19 @@
  */
 use crate::filter1d::{make_arena, ArenaPads};
 use crate::filter2d::fft_utils::fft_next_good_size;
-use crate::filter2d::mul_spectrum::SpectrumMultiplier;
 use crate::filter2d::scan_se_2d::scan_se_2d_complex;
 use crate::to_storage::ToStorage;
 use crate::{
-    BlurError, BlurImage, BlurImageMut, EdgeMode2D, FastBlurChannels, KernelShape, MismatchedSize,
-    Scalar, ThreadingPolicy,
+    BlurError, BlurImage, BlurImageMut, EdgeMode2D, FastBlurChannels, FftNumber, KernelShape,
+    MismatchedSize, Scalar, ThreadingPolicy,
 };
 use fast_transpose::{transpose_arbitrary, transpose_plane_f32_with_alpha, FlipMode, FlopMode};
 use novtb::{ParallelZonedIterator, TbSliceMut};
+use num_complex::Complex;
 use num_traits::AsPrimitive;
-use rustfft::num_complex::Complex;
-use rustfft::{FftNum, FftPlanner};
 use std::fmt::Debug;
 use std::ops::Mul;
+use zaft::FftDirection;
 
 pub trait FftTranspose<T: Copy + Default> {
     fn transpose(
@@ -147,12 +146,7 @@ pub fn filter_2d_fft<T, F, FftIntermediate>(
 where
     T: Copy + AsPrimitive<F> + Default + Send + Sync + AsPrimitive<FftIntermediate> + Debug,
     F: ToStorage<T> + Mul<F> + Send + Sync + PartialEq + AsPrimitive<FftIntermediate>,
-    FftIntermediate: FftNum
-        + Default
-        + Mul<FftIntermediate>
-        + ToStorage<T>
-        + SpectrumMultiplier<FftIntermediate>
-        + FftTranspose<FftIntermediate>,
+    FftIntermediate: FftNumber + ToStorage<T>,
     i32: AsPrimitive<F>,
     f64: AsPrimitive<T> + AsPrimitive<FftIntermediate>,
 {
@@ -201,12 +195,7 @@ pub fn filter_2d_fft_complex<T, FftIntermediate>(
 ) -> Result<(), BlurError>
 where
     T: Copy + Default + Send + Sync + AsPrimitive<FftIntermediate> + Debug,
-    FftIntermediate: FftNum
-        + Default
-        + Mul<FftIntermediate>
-        + ToStorage<T>
-        + SpectrumMultiplier<FftIntermediate>
-        + FftTranspose<FftIntermediate>,
+    FftIntermediate: FftNumber + ToStorage<T>,
     f64: AsPrimitive<T> + AsPrimitive<FftIntermediate>,
 {
     src.check_layout()?;
@@ -257,12 +246,7 @@ pub(crate) fn filter_2d_fft_impl<T, FftIntermediate>(
 ) -> Result<(), BlurError>
 where
     T: Copy + Default + Send + Sync + AsPrimitive<FftIntermediate> + Debug,
-    FftIntermediate: FftNum
-        + Default
-        + Mul<FftIntermediate>
-        + ToStorage<T>
-        + SpectrumMultiplier<FftIntermediate>
-        + FftTranspose<FftIntermediate>,
+    FftIntermediate: FftNumber + ToStorage<T>,
     f64: AsPrimitive<T> + AsPrimitive<FftIntermediate>,
 {
     src.check_layout()?;
@@ -330,20 +314,19 @@ where
             }
         });
 
-    let mut fft_planner = FftPlanner::<FftIntermediate>::new();
-    let rows_planner = fft_planner.plan_fft_forward(best_width);
-    let columns_planner = fft_planner.plan_fft_forward(best_height);
+    let rows_planner = FftIntermediate::make_fft(best_width, FftDirection::Forward)?;
+    let columns_planner = FftIntermediate::make_fft(best_height, FftDirection::Forward)?;
 
     arena_source
         .tb_par_chunks_exact_mut(best_width)
         .for_each(pool, |row| {
-            rows_planner.process(row);
+            _ = rows_planner.execute(row);
         });
 
     kernel_arena
         .tb_par_chunks_exact_mut(best_width)
         .for_each(pool, |row| {
-            rows_planner.process(row);
+            _ = rows_planner.execute(row);
         });
 
     arena_source =
@@ -354,26 +337,34 @@ where
     arena_source
         .tb_par_chunks_exact_mut(best_height)
         .for_each(pool, |column| {
-            columns_planner.process(column);
+            _ = columns_planner.execute(column);
         });
 
     kernel_arena
         .tb_par_chunks_exact_mut(best_height)
         .for_each(pool, |column| {
-            columns_planner.process(column);
+            _ = columns_planner.execute(column);
         });
 
-    FftIntermediate::mul_spectrum(&mut kernel_arena, &arena_source, best_width, best_height);
+    let norm_factor = 1f64 / (best_width * best_height) as f64;
+
+    FftIntermediate::mul_spectrum(
+        &mut kernel_arena,
+        &arena_source,
+        best_width,
+        best_height,
+        norm_factor.as_(),
+    );
 
     arena_source.resize(0, Complex::<FftIntermediate>::default());
 
-    let rows_inverse_planner = fft_planner.plan_fft_inverse(best_width);
-    let columns_inverse_planner = fft_planner.plan_fft_inverse(best_height);
+    let rows_inverse_planner = FftIntermediate::make_fft(best_width, FftDirection::Inverse)?;
+    let columns_inverse_planner = FftIntermediate::make_fft(best_height, FftDirection::Inverse)?;
 
     kernel_arena
         .tb_par_chunks_exact_mut(best_height)
         .for_each(pool, |column| {
-            columns_inverse_planner.process(column);
+            _ = columns_inverse_planner.execute(column);
         });
 
     kernel_arena =
@@ -382,7 +373,7 @@ where
     kernel_arena
         .tb_par_chunks_exact_mut(best_width)
         .for_each(pool, |row| {
-            rows_inverse_planner.process(row);
+            _ = rows_inverse_planner.execute(row);
         });
 
     let dst_stride = dst.row_stride() as usize;
