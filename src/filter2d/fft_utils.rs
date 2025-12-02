@@ -83,7 +83,7 @@ pub(crate) fn fft_next_good_size_real(mut n: usize) -> usize {
             m /= 5;
         }
 
-        // Divide by 5 until it's no longer divisible
+        // Divide by 7 until it's no longer divisible
         while m % 7 == 0 {
             m /= 7;
         }

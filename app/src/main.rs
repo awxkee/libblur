@@ -65,7 +65,7 @@ fn f16_to_f32(bytes: Vec<u16>) -> Vec<f32> {
 }
 
 fn main() {
-    let mut dyn_image = ImageReader::open("./assets/sonderland.jpg")
+    let mut dyn_image = ImageReader::open("./assets/test_image_4.png")
         .unwrap()
         .decode()
         .unwrap();

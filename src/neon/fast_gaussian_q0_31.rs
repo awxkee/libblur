@@ -32,7 +32,7 @@ use crate::unsafe_slice::UnsafeSlice;
 use crate::EdgeMode;
 use std::arch::aarch64::*;
 
-pub(crate) fn fg_horizontal_pass_neon_u8_rdm<T, const CHANNELS_COUNT: usize>(
+pub(crate) fn fg_horizontal_pass_neon_u8_rdm<T, const CN: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -43,7 +43,7 @@ pub(crate) fn fg_horizontal_pass_neon_u8_rdm<T, const CHANNELS_COUNT: usize>(
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        fg_horizontal_pass_neon_rdm::<T, CHANNELS_COUNT>(
+        fg_horizontal_pass_neon_rdm::<T, CN>(
             undefined_slice,
             stride,
             width,
