@@ -94,7 +94,6 @@ where
     }
 
     let thread_count = threading_policy.thread_count(src.width, src.height);
-    let pool = novtb::ThreadPool::new(thread_count);
 
     let image_size = src.size();
 
@@ -118,7 +117,7 @@ where
         kernel_shape,
         edge_modes,
         Scalar::dup(border_constant[0]),
-        &pool,
+        thread_count,
     )?;
     squash_channel::<T, 3>(dst, &working_channel.to_immutable_ref(), 0);
 
@@ -130,7 +129,7 @@ where
         kernel_shape,
         edge_modes,
         Scalar::dup(border_constant[1]),
-        &pool,
+        thread_count,
     )?;
     squash_channel::<T, 3>(dst, &working_channel.to_immutable_ref(), 1);
 
@@ -142,7 +141,7 @@ where
         kernel_shape,
         edge_modes,
         Scalar::dup(border_constant[2]),
-        &pool,
+        thread_count,
     )?;
     squash_channel::<T, 3>(dst, &working_channel.to_immutable_ref(), 2);
 

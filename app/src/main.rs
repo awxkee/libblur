@@ -34,11 +34,11 @@ use image::imageops::FilterType;
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use libblur::{
     bilateral_filter, complex_gaussian_kernel, fast_bilateral_filter, fast_bilateral_filter_u16,
-    filter_1d_complex, filter_1d_complex_fixed_point, filter_2d_rgb_fft, filter_2d_rgba_fft,
-    gaussian_blur, gaussian_kernel_1d, lens_kernel, sigma_size, AnisotropicRadius,
-    BilateralBlurParams, BlurImage, BlurImageMut, BoxBlurParameters, CLTParameters,
-    ConvolutionMode, EdgeMode, EdgeMode2D, FastBlurChannels, GaussianBlurParams, ImageSize,
-    KernelShape, Scalar, ThreadingPolicy, TransferFunction,
+    filter_1d_complex, filter_1d_complex_fixed_point, filter_2d_rgb_fft, filter_2d_rgb_fft_complex,
+    filter_2d_rgba_fft, gaussian_blur, gaussian_kernel_1d, lens_kernel, sigma_size,
+    AnisotropicRadius, BilateralBlurParams, BlurImage, BlurImageMut, BoxBlurParameters,
+    CLTParameters, ConvolutionMode, EdgeMode, EdgeMode2D, FastBlurChannels, GaussianBlurParams,
+    ImageSize, KernelShape, Scalar, ThreadingPolicy, TransferFunction,
 };
 use num_complex::Complex;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
@@ -65,7 +65,7 @@ fn f16_to_f32(bytes: Vec<u16>) -> Vec<f32> {
 }
 
 fn main() {
-    let mut dyn_image = ImageReader::open("./assets/test_image_4.png")
+    let mut dyn_image = ImageReader::open("./assets/sonderland.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -118,7 +118,7 @@ fn main() {
     let start_time = Instant::now();
 
     // for i in 0..10 {
-    let ks = KernelShape::new(77, 77);
+    let ks = KernelShape::new(17, 17);
     let motion = lens_kernel(ks, 10., 3., 0.3, 0.5).unwrap();
     // let motion = lens_kernel(KernelShape::new(35, 35), 15., 6., 0.5, 0.2).unwrap();
     // let bokeh = generate_complex_bokeh_kernel(35, 30.);

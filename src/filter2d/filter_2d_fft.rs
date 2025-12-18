@@ -26,6 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::fast_divide::{DividerIsize, RemEuclidFast};
 use crate::filter1d::{make_arena, ArenaPads};
 use crate::filter2d::fft_utils::fft_next_good_size;
 use crate::filter2d::scan_se_2d::scan_se_2d_complex;
@@ -34,89 +35,11 @@ use crate::{
     BlurError, BlurImage, BlurImageMut, EdgeMode2D, FastBlurChannels, FftNumber, KernelShape,
     MismatchedSize, Scalar, ThreadingPolicy,
 };
-use fast_transpose::{transpose_arbitrary, transpose_plane_f32_with_alpha, FlipMode, FlopMode};
-use novtb::{ParallelZonedIterator, TbSliceMut};
 use num_complex::Complex;
 use num_traits::AsPrimitive;
 use std::fmt::Debug;
 use std::ops::Mul;
 use zaft::FftDirection;
-
-pub trait FftTranspose<T: Copy + Default> {
-    fn transpose(
-        matrix: &[Complex<T>],
-        width: usize,
-        height: usize,
-        flop_mode: FlopMode,
-    ) -> Vec<Complex<T>>;
-}
-
-impl FftTranspose<f32> for f32 {
-    fn transpose(
-        matrix: &[Complex<f32>],
-        width: usize,
-        height: usize,
-        flop_mode: FlopMode,
-    ) -> Vec<Complex<f32>> {
-        if matrix.is_empty() {
-            return Vec::new();
-        }
-
-        let mut transposed = vec![Complex::<f32>::default(); width * height];
-
-        let cast_source =
-            unsafe { std::slice::from_raw_parts(matrix.as_ptr() as *const f32, matrix.len() * 2) };
-        let cast_target = unsafe {
-            std::slice::from_raw_parts_mut(
-                transposed.as_mut_ptr() as *mut f32,
-                transposed.len() * 2,
-            )
-        };
-
-        transpose_plane_f32_with_alpha(
-            cast_source,
-            width * 2,
-            cast_target,
-            height * 2,
-            width,
-            height,
-            FlipMode::NoFlip,
-            flop_mode,
-        )
-        .unwrap();
-
-        transposed
-    }
-}
-
-impl FftTranspose<f64> for f64 {
-    fn transpose(
-        matrix: &[Complex<f64>],
-        width: usize,
-        height: usize,
-        flop_mode: FlopMode,
-    ) -> Vec<Complex<f64>> {
-        if matrix.is_empty() {
-            return Vec::new();
-        }
-
-        let mut transposed = vec![Complex::<f64>::default(); width * height];
-
-        transpose_arbitrary(
-            matrix,
-            width,
-            &mut transposed,
-            height,
-            width,
-            height,
-            FlipMode::NoFlip,
-            flop_mode,
-        )
-        .unwrap();
-
-        transposed
-    }
-}
 
 /// Performs 2D non-separable convolution on single plane image using FFT.
 ///
@@ -300,51 +223,53 @@ where
 
     let mut kernel_arena = vec![Complex::<FftIntermediate>::default(); best_height * best_width];
 
-    let shift_x = kernel_width as i64 / 2;
-    let shift_y = kernel_height as i64 / 2;
+    let shift_x = kernel_width as isize / 2;
+    let shift_y = kernel_height as isize / 2;
 
-    kernel
-        .chunks_exact(kernel_shape.width)
-        .enumerate()
-        .for_each(|(y, row)| {
-            for (x, item) in row.iter().enumerate() {
-                let new_y = (y as i64 - shift_y).rem_euclid(best_height as i64 - 1) as usize;
-                let new_x = (x as i64 - shift_x).rem_euclid(best_width as i64 - 1) as usize;
-                kernel_arena[new_y * best_width + new_x] = *item;
-            }
-        });
+    if best_height - 1 <= 1 || best_width - 1 <= 1 {
+        // fast divide do not support <= 1
+        kernel
+            .chunks_exact(kernel_shape.width)
+            .enumerate()
+            .for_each(|(y, row)| {
+                for (x, item) in row.iter().enumerate() {
+                    let new_y =
+                        (y as isize - shift_y).rem_euclid(best_height as isize - 1) as usize;
+                    let new_x = (x as isize - shift_x).rem_euclid(best_width as isize - 1) as usize;
+                    kernel_arena[new_y * best_width + new_x] = *item;
+                }
+            });
+    } else {
+        let divider_height = DividerIsize::new(best_height as isize - 1);
+        let divider_width = DividerIsize::new(best_width as isize - 1);
+        kernel
+            .chunks_exact(kernel_shape.width)
+            .enumerate()
+            .for_each(|(y, row)| {
+                for (x, item) in row.iter().enumerate() {
+                    let new_y = (y as isize - shift_y).rem_euclid_fast(&divider_height) as usize;
+                    let new_x = (x as isize - shift_x).rem_euclid_fast(&divider_width) as usize;
+                    kernel_arena[new_y * best_width + new_x] = *item;
+                }
+            });
+    }
 
-    let rows_planner = FftIntermediate::make_fft(best_width, FftDirection::Forward)?;
-    let columns_planner = FftIntermediate::make_fft(best_height, FftDirection::Forward)?;
+    let fft_forward = FftIntermediate::make_fft(
+        best_width,
+        best_height,
+        FftDirection::Forward,
+        pool.thread_count(),
+    )?;
 
-    arena_source
-        .tb_par_chunks_exact_mut(best_width)
-        .for_each(pool, |row| {
-            _ = rows_planner.execute(row);
-        });
+    let mut scratch =
+        vec![Complex::<FftIntermediate>::default(); fft_forward.required_scratch_size()];
 
-    kernel_arena
-        .tb_par_chunks_exact_mut(best_width)
-        .for_each(pool, |row| {
-            _ = rows_planner.execute(row);
-        });
-
-    arena_source =
-        FftIntermediate::transpose(&arena_source, best_width, best_height, FlopMode::Flop);
-    kernel_arena =
-        FftIntermediate::transpose(&kernel_arena, best_width, best_height, FlopMode::Flop);
-
-    arena_source
-        .tb_par_chunks_exact_mut(best_height)
-        .for_each(pool, |column| {
-            _ = columns_planner.execute(column);
-        });
-
-    kernel_arena
-        .tb_par_chunks_exact_mut(best_height)
-        .for_each(pool, |column| {
-            _ = columns_planner.execute(column);
-        });
+    fft_forward
+        .execute_with_scratch(&mut arena_source, &mut scratch)
+        .map_err(|_| BlurError::FftChannelsNotSupported)?;
+    fft_forward
+        .execute_with_scratch(&mut kernel_arena, &mut scratch)
+        .map_err(|_| BlurError::FftChannelsNotSupported)?;
 
     let norm_factor = 1f64 / (best_width * best_height) as f64;
 
@@ -358,23 +283,16 @@ where
 
     arena_source.resize(0, Complex::<FftIntermediate>::default());
 
-    let rows_inverse_planner = FftIntermediate::make_fft(best_width, FftDirection::Inverse)?;
-    let columns_inverse_planner = FftIntermediate::make_fft(best_height, FftDirection::Inverse)?;
+    let fft_inverse = FftIntermediate::make_fft(
+        best_width,
+        best_height,
+        FftDirection::Inverse,
+        pool.thread_count(),
+    )?;
 
-    kernel_arena
-        .tb_par_chunks_exact_mut(best_height)
-        .for_each(pool, |column| {
-            _ = columns_inverse_planner.execute(column);
-        });
-
-    kernel_arena =
-        FftIntermediate::transpose(&kernel_arena, best_height, best_width, FlopMode::Flop);
-
-    kernel_arena
-        .tb_par_chunks_exact_mut(best_width)
-        .for_each(pool, |row| {
-            _ = rows_inverse_planner.execute(row);
-        });
+    fft_inverse
+        .execute_with_scratch(&mut kernel_arena, &mut scratch)
+        .map_err(|_| BlurError::FftChannelsNotSupported)?;
 
     let dst_stride = dst.row_stride() as usize;
 

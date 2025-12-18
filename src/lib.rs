@@ -79,6 +79,7 @@ mod fast_bilateral_filter;
 #[cfg(feature = "image")]
 #[cfg_attr(docsrs, doc(cfg(feature = "image")))]
 mod fast_bilateral_image;
+mod fast_divide;
 mod fast_gaussian;
 #[cfg(feature = "image")]
 #[cfg_attr(docsrs, doc(cfg(feature = "image")))]

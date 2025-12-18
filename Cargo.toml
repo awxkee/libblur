@@ -2,7 +2,7 @@ workspace = { members = ["app/accelerate", "app"], exclude = ["fuzz"] }
 
 [package]
 name = "libblur"
-version = "0.21.0"
+version = "0.22.0"
 edition = "2021"
 description = "Fast image blurring in pure Rust"
 readme = "./README.md"
@@ -25,15 +25,14 @@ path = "src/lib.rs"
 num-traits = "0.2"
 rayon = "1.10"
 image = { version = "0.25", optional = true, default-features = false }
-fast_transpose = { version = "0.2", optional = true }
 num-complex = "0.4"
-novtb = "^0.1.6"
-zaft = { version = "0.2.1", default-features = false, optional = true }
+novtb = "^0.1.7"
+zaft = { version = "0.2.6", default-features = false, optional = true }
 
 [features]
 default = ["avx", "sse", "rdm", "neon"]
 image = ["dep:image"]
-fft = ["dep:zaft", "dep:fast_transpose"]
+fft = ["dep:zaft"]
 # Enables NEON RDM intrinsics
 rdm = ["neon"]
 # Enables AVX-512. Requires nightly on rust compiler before 1.89.
