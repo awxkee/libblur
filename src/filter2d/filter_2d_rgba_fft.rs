@@ -79,7 +79,6 @@ where
     src.size_matches_mut(dst)?;
 
     let thread_count = threading_policy.thread_count(src.width, src.height);
-    let pool = novtb::ThreadPool::new(thread_count);
 
     let analyzed_se = scan_se_2d(kernel, kernel_shape);
     if analyzed_se.is_empty() {
@@ -118,7 +117,7 @@ where
         kernel_shape,
         edge_modes,
         Scalar::dup(border_constant[0]),
-        &pool,
+        thread_count,
     )?;
     squash_channel::<T, 4>(dst, &working_channel.to_immutable_ref(), 0);
 
@@ -130,7 +129,7 @@ where
         kernel_shape,
         edge_modes,
         Scalar::dup(border_constant[1]),
-        &pool,
+        thread_count,
     )?;
     squash_channel::<T, 4>(dst, &working_channel.to_immutable_ref(), 1);
 
@@ -142,7 +141,7 @@ where
         kernel_shape,
         edge_modes,
         Scalar::dup(border_constant[2]),
-        &pool,
+        thread_count,
     )?;
     squash_channel::<T, 4>(dst, &working_channel.to_immutable_ref(), 2);
 
@@ -154,7 +153,7 @@ where
         kernel_shape,
         edge_modes,
         Scalar::dup(border_constant[3]),
-        &pool,
+        thread_count,
     )?;
     squash_channel::<T, 4>(dst, &working_channel.to_immutable_ref(), 3);
 

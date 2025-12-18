@@ -27,122 +27,101 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+use crate::fast_divide::{DividerIsize, RemEuclidFast};
 use crate::filter1d::{make_arena, ArenaPads};
 use crate::filter2d::fft_utils::fft_next_good_size_real;
-use crate::filter2d::filter_2d_fft::FftTranspose;
 use crate::filter2d::mul_spectrum::SpectrumMultiplier;
 use crate::to_storage::ToStorage;
 use crate::{
     BlurError, BlurImage, BlurImageMut, EdgeMode2D, FastBlurChannels, KernelShape, MismatchedSize,
     Scalar,
 };
-use fast_transpose::FlopMode;
-use novtb::{ParallelZonedIterator, TbSliceMut};
 use num_complex::Complex;
 use num_traits::{AsPrimitive, Num};
 use std::fmt::Debug;
 use std::ops::Mul;
 use std::sync::Arc;
-use zaft::{C2RFftExecutor, FftDirection, FftExecutor, R2CFftExecutor, Zaft};
+use zaft::{
+    FftDirection, TwoDimensionalExecutorC2R, TwoDimensionalExecutorR2C, TwoDimensionalFftExecutor,
+    Zaft,
+};
 
 pub trait FftFactory<T> {
     fn make_r2c_executor(
-        size: usize,
-    ) -> Result<Arc<dyn R2CFftExecutor<T> + Send + Sync>, BlurError>;
+        width: usize,
+        height: usize,
+        thread_count: usize,
+    ) -> Result<Arc<dyn TwoDimensionalExecutorR2C<T> + Send + Sync>, BlurError>;
     fn make_c2r_executor(
-        size: usize,
-    ) -> Result<Arc<dyn C2RFftExecutor<T> + Send + Sync>, BlurError>;
-    fn make_c2c_executor(
-        size: usize,
-        direction: FftDirection,
-    ) -> Result<Arc<dyn FftExecutor<T> + Send + Sync>, BlurError>;
+        width: usize,
+        height: usize,
+        thread_count: usize,
+    ) -> Result<Arc<dyn TwoDimensionalExecutorC2R<T> + Send + Sync>, BlurError>;
     fn make_fft(
-        size: usize,
+        width: usize,
+        height: usize,
         direction: FftDirection,
-    ) -> Result<Arc<dyn FftExecutor<T> + Send + Sync>, BlurError>;
+        thread_count: usize,
+    ) -> Result<Arc<dyn TwoDimensionalFftExecutor<T> + Send + Sync>, BlurError>;
 }
 
 impl FftFactory<f32> for f32 {
     fn make_c2r_executor(
-        size: usize,
-    ) -> Result<Arc<dyn C2RFftExecutor<f32> + Send + Sync>, BlurError> {
-        Zaft::make_c2r_fft_f32(size).map_err(|_| BlurError::FftChannelsNotSupported)
+        width: usize,
+        height: usize,
+        thread_count: usize,
+    ) -> Result<Arc<dyn TwoDimensionalExecutorC2R<f32> + Send + Sync>, BlurError> {
+        Zaft::make_2d_c2r_fft_f32(width, height, thread_count)
+            .map_err(|_| BlurError::FftChannelsNotSupported)
     }
 
     fn make_r2c_executor(
-        size: usize,
-    ) -> Result<Arc<dyn R2CFftExecutor<f32> + Send + Sync>, BlurError> {
-        Zaft::make_r2c_fft_f32(size).map_err(|_| BlurError::FftChannelsNotSupported)
-    }
-
-    fn make_c2c_executor(
-        size: usize,
-        fft_direction: FftDirection,
-    ) -> Result<Arc<dyn FftExecutor<f32> + Send + Sync>, BlurError> {
-        match fft_direction {
-            FftDirection::Forward => {
-                Zaft::make_forward_fft_f32(size).map_err(|_| BlurError::FftChannelsNotSupported)
-            }
-            FftDirection::Inverse => {
-                Zaft::make_inverse_fft_f32(size).map_err(|_| BlurError::FftChannelsNotSupported)
-            }
-        }
+        width: usize,
+        height: usize,
+        thread_count: usize,
+    ) -> Result<Arc<dyn TwoDimensionalExecutorR2C<f32> + Send + Sync>, BlurError> {
+        Zaft::make_2d_r2c_fft_f32(width, height, thread_count)
+            .map_err(|_| BlurError::FftChannelsNotSupported)
     }
 
     fn make_fft(
-        size: usize,
+        width: usize,
+        height: usize,
         direction: FftDirection,
-    ) -> Result<Arc<dyn FftExecutor<f32> + Send + Sync>, BlurError> {
-        match direction {
-            FftDirection::Forward => {
-                Zaft::make_forward_fft_f32(size).map_err(|_| BlurError::FftChannelsNotSupported)
-            }
-            FftDirection::Inverse => {
-                Zaft::make_inverse_fft_f32(size).map_err(|_| BlurError::FftChannelsNotSupported)
-            }
-        }
+        thread_count: usize,
+    ) -> Result<Arc<dyn TwoDimensionalFftExecutor<f32> + Send + Sync>, BlurError> {
+        Zaft::make_2d_c2c_fft_f32(width, height, direction, thread_count)
+            .map_err(|_| BlurError::FftChannelsNotSupported)
     }
 }
 
 impl FftFactory<f64> for f64 {
     fn make_c2r_executor(
-        size: usize,
-    ) -> Result<Arc<dyn C2RFftExecutor<f64> + Send + Sync>, BlurError> {
-        Zaft::make_c2r_fft_f64(size).map_err(|_| BlurError::FftChannelsNotSupported)
+        width: usize,
+        height: usize,
+        thread_count: usize,
+    ) -> Result<Arc<dyn TwoDimensionalExecutorC2R<f64> + Send + Sync>, BlurError> {
+        Zaft::make_2d_c2r_fft_f64(width, height, thread_count)
+            .map_err(|_| BlurError::FftChannelsNotSupported)
     }
 
     fn make_r2c_executor(
-        size: usize,
-    ) -> Result<Arc<dyn R2CFftExecutor<f64> + Send + Sync>, BlurError> {
-        Zaft::make_r2c_fft_f64(size).map_err(|_| BlurError::FftChannelsNotSupported)
-    }
-
-    fn make_c2c_executor(
-        size: usize,
-        direction: FftDirection,
-    ) -> Result<Arc<dyn FftExecutor<f64> + Send + Sync>, BlurError> {
-        match direction {
-            FftDirection::Forward => {
-                Zaft::make_forward_fft_f64(size).map_err(|_| BlurError::FftChannelsNotSupported)
-            }
-            FftDirection::Inverse => {
-                Zaft::make_inverse_fft_f64(size).map_err(|_| BlurError::FftChannelsNotSupported)
-            }
-        }
+        width: usize,
+        height: usize,
+        thread_count: usize,
+    ) -> Result<Arc<dyn TwoDimensionalExecutorR2C<f64> + Send + Sync>, BlurError> {
+        Zaft::make_2d_r2c_fft_f64(width, height, thread_count)
+            .map_err(|_| BlurError::FftChannelsNotSupported)
     }
 
     fn make_fft(
-        size: usize,
+        width: usize,
+        height: usize,
         direction: FftDirection,
-    ) -> Result<Arc<dyn FftExecutor<f64> + Send + Sync>, BlurError> {
-        match direction {
-            FftDirection::Forward => {
-                Zaft::make_forward_fft_f64(size).map_err(|_| BlurError::FftChannelsNotSupported)
-            }
-            FftDirection::Inverse => {
-                Zaft::make_inverse_fft_f64(size).map_err(|_| BlurError::FftChannelsNotSupported)
-            }
-        }
+        thread_count: usize,
+    ) -> Result<Arc<dyn TwoDimensionalFftExecutor<f64> + Send + Sync>, BlurError> {
+        Zaft::make_2d_c2c_fft_f64(width, height, direction, thread_count)
+            .map_err(|_| BlurError::FftChannelsNotSupported)
     }
 }
 
@@ -154,7 +133,6 @@ pub trait FftNumber:
     + Default
     + Mul<Self>
     + SpectrumMultiplier<Self>
-    + FftTranspose<Self>
     + Debug
     + Num
     + FftFactory<Self>
@@ -175,7 +153,7 @@ pub(crate) fn filter_2d_fft_real_impl<T, F>(
     kernel_shape: KernelShape,
     edge_modes: EdgeMode2D,
     border_constant: Scalar,
-    pool: &novtb::ThreadPool,
+    thread_count: usize,
 ) -> Result<(), BlurError>
 where
     T: AsPrimitive<F> + Copy + Default + Send + Sync + Default + Debug,
@@ -225,72 +203,56 @@ where
 
     let mut kernel_arena = vec![F::default(); best_height * best_width];
 
-    let shift_x = kernel_width as i64 / 2;
-    let shift_y = kernel_height as i64 / 2;
+    let shift_x = kernel_width as isize / 2;
+    let shift_y = kernel_height as isize / 2;
 
-    kernel
-        .chunks_exact(kernel_shape.width)
-        .enumerate()
-        .for_each(|(y, row)| {
-            for (x, item) in row.iter().enumerate() {
-                let new_y = (y as i64 - shift_y).rem_euclid(best_height as i64 - 1) as usize;
-                let new_x = (x as i64 - shift_x).rem_euclid(best_width as i64 - 1) as usize;
-                kernel_arena[new_y * best_width + new_x] = *item;
-            }
-        });
+    if best_height - 1 <= 1 || best_width - 1 <= 1 {
+        // fast divide do not support <= 1
+        kernel
+            .chunks_exact(kernel_shape.width)
+            .enumerate()
+            .for_each(|(y, row)| {
+                for (x, item) in row.iter().enumerate() {
+                    let new_y =
+                        (y as isize - shift_y).rem_euclid(best_height as isize - 1) as usize;
+                    let new_x = (x as isize - shift_x).rem_euclid(best_width as isize - 1) as usize;
+                    kernel_arena[new_y * best_width + new_x] = *item;
+                }
+            });
+    } else {
+        let divider_height = DividerIsize::new(best_height as isize - 1);
+        let divider_width = DividerIsize::new(best_width as isize - 1);
+        kernel
+            .chunks_exact(kernel_shape.width)
+            .enumerate()
+            .for_each(|(y, row)| {
+                for (x, item) in row.iter().enumerate() {
+                    let new_y = (y as isize - shift_y).rem_euclid_fast(&divider_height) as usize;
+                    let new_x = (x as isize - shift_x).rem_euclid_fast(&divider_width) as usize;
+                    kernel_arena[new_y * best_width + new_x] = *item;
+                }
+            });
+    }
 
     let complex_plane_width = (best_width / 2) + 1;
     let complex_plane_size = ((best_width / 2) + 1) * best_height;
     let complex_plane_height = best_height;
 
-    let rows_planner = F::make_r2c_executor(best_width)?;
-    let columns_planner = F::make_c2c_executor(best_height, FftDirection::Forward)?;
+    let fft_2d_r2c = F::make_r2c_executor(best_width, best_height, thread_count)?;
+
+    let mut scratch = vec![Complex::<F>::default(); fft_2d_r2c.required_scratch_size()];
 
     let mut arena_dst = vec![Complex::<F>::default(); complex_plane_size];
     let mut kernel_dst = vec![Complex::<F>::default(); complex_plane_size];
 
-    let mut arena_source = arena_v_src.iter().map(|&v| v.as_()).collect::<Vec<F>>();
+    let arena_source = arena_v_src.iter().map(|&v| v.as_()).collect::<Vec<F>>();
 
-    arena_dst
-        .tb_par_chunks_exact_mut(complex_plane_width)
-        .for_each_enumerated(pool, |idx, row| {
-            let arena_src = &arena_source[best_width * idx..(best_width) * (idx + 1)];
-            rows_planner.execute(arena_src, row).unwrap();
-        });
-
-    arena_source.resize(0, F::default());
-
-    kernel_dst
-        .tb_par_chunks_exact_mut(complex_plane_width)
-        .for_each_enumerated(pool, |idx, row| {
-            let src = &kernel_arena[best_width * idx..(best_width) * (idx + 1)];
-            rows_planner.execute(src, row).unwrap();
-        });
-
-    arena_dst = F::transpose(
-        &arena_dst,
-        complex_plane_width,
-        complex_plane_height,
-        FlopMode::Flop,
-    );
-    kernel_dst = F::transpose(
-        &kernel_dst,
-        complex_plane_width,
-        complex_plane_height,
-        FlopMode::Flop,
-    );
-
-    arena_dst
-        .tb_par_chunks_exact_mut(complex_plane_height)
-        .for_each(pool, |column| {
-            _ = columns_planner.execute(column);
-        });
-
-    kernel_dst
-        .tb_par_chunks_exact_mut(complex_plane_height)
-        .for_each(pool, |column| {
-            _ = columns_planner.execute(column);
-        });
+    fft_2d_r2c
+        .execute_with_scratch(&arena_source, &mut arena_dst, &mut scratch)
+        .map_err(|_| BlurError::FftChannelsNotSupported)?;
+    fft_2d_r2c
+        .execute_with_scratch(&kernel_arena, &mut kernel_dst, &mut scratch)
+        .map_err(|_| BlurError::FftChannelsNotSupported)?;
 
     let norm_factor = 1f64 / (best_width * best_height) as f64;
 
@@ -304,37 +266,20 @@ where
 
     arena_dst.resize(0, Complex::<F>::default());
 
-    let rows_inverse_planner = F::make_c2r_executor(best_width)?;
-    let columns_inverse_planner =
-        F::make_c2c_executor(complex_plane_height, FftDirection::Inverse)?;
+    let fft_2d_c2r = F::make_c2r_executor(best_width, best_height, thread_count)?;
 
-    kernel_dst
-        .tb_par_chunks_exact_mut(best_height)
-        .for_each(pool, |column| {
-            _ = columns_inverse_planner.execute(column);
-        });
-
-    kernel_dst = F::transpose(
-        &kernel_dst,
-        complex_plane_height,
-        complex_plane_width,
-        FlopMode::Flop,
-    );
-
-    kernel_arena
-        .tb_par_chunks_exact_mut(best_width)
-        .for_each_enumerated(pool, |idx, row| {
-            let src = &kernel_dst[complex_plane_width * idx..(complex_plane_width) * (idx + 1)];
-            rows_inverse_planner.execute(src, row).unwrap();
-        });
+    fft_2d_c2r
+        .execute_with_scratch(&mut kernel_dst, &mut kernel_arena, &mut scratch)
+        .map_err(|_| BlurError::FftChannelsNotSupported)?;
 
     let dst_stride = dst.row_stride() as usize;
 
-    for (dst_chunk, src_chunk) in dst.data.borrow_mut().chunks_exact_mut(dst_stride).zip(
-        kernel_arena
-            .chunks_exact_mut(best_width)
-            .skip(arena_pad_top),
-    ) {
+    for (dst_chunk, src_chunk) in dst
+        .data
+        .borrow_mut()
+        .chunks_exact_mut(dst_stride)
+        .zip(kernel_arena.chunks_exact(best_width).skip(arena_pad_top))
+    {
         for (dst, src) in dst_chunk
             .iter_mut()
             .zip(src_chunk.iter().skip(arena_pad_left))
