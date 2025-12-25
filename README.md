@@ -28,9 +28,8 @@ cargo add libblur
 ```rust
 let blurred = gaussian_blur_image(
     img,
-    61,
-    0.,
-    EdgeMode::Clamp,
+    GaussianBlurParams::new_from_kernel(61.),
+    EdgeMode2D::new(EdgeMode::Clamp),
     ConvolutionMode::FixedPoint,
     ThreadingPolicy::Adaptive,
 )
