@@ -2,7 +2,7 @@ workspace = { members = ["app/accelerate", "app"], exclude = ["fuzz"] }
 
 [package]
 name = "libblur"
-version = "0.22.0"
+version = "0.23.0"
 edition = "2021"
 description = "Fast image blurring in pure Rust"
 readme = "./README.md"
@@ -27,7 +27,7 @@ rayon = "1.10"
 image = { version = "0.25", optional = true, default-features = false }
 num-complex = "0.4"
 novtb = "^0.1.7"
-zaft = { version = "0.2.6", default-features = false, optional = true }
+zaft = { version = "0.3", default-features = false, optional = true }
 
 [features]
 default = ["avx", "sse", "rdm", "neon"]

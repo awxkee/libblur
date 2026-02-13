@@ -239,8 +239,10 @@ where
     let complex_plane_height = best_height;
 
     let fft_2d_r2c = F::make_r2c_executor(best_width, best_height, thread_count)?;
+    let fft_2d_c2r = F::make_c2r_executor(best_width, best_height, thread_count)?;
 
-    let mut scratch = vec![Complex::<F>::default(); fft_2d_r2c.required_scratch_size()];
+    let mut scratch =
+        vec![Complex::<F>::default(); fft_2d_r2c.scratch_length().max(fft_2d_c2r.scratch_length())];
 
     let mut arena_dst = vec![Complex::<F>::default(); complex_plane_size];
     let mut kernel_dst = vec![Complex::<F>::default(); complex_plane_size];
@@ -249,10 +251,10 @@ where
 
     fft_2d_r2c
         .execute_with_scratch(&arena_source, &mut arena_dst, &mut scratch)
-        .map_err(|_| BlurError::FftChannelsNotSupported)?;
+        .map_err(|x| BlurError::FftError(x.to_string()))?;
     fft_2d_r2c
         .execute_with_scratch(&kernel_arena, &mut kernel_dst, &mut scratch)
-        .map_err(|_| BlurError::FftChannelsNotSupported)?;
+        .map_err(|x| BlurError::FftError(x.to_string()))?;
 
     let norm_factor = 1f64 / (best_width * best_height) as f64;
 
@@ -266,11 +268,9 @@ where
 
     arena_dst.resize(0, Complex::<F>::default());
 
-    let fft_2d_c2r = F::make_c2r_executor(best_width, best_height, thread_count)?;
-
     fft_2d_c2r
         .execute_with_scratch(&mut kernel_dst, &mut kernel_arena, &mut scratch)
-        .map_err(|_| BlurError::FftChannelsNotSupported)?;
+        .map_err(|x| BlurError::FftError(x.to_string()))?;
 
     let dst_stride = dst.row_stride() as usize;
 

@@ -261,8 +261,7 @@ where
         pool.thread_count(),
     )?;
 
-    let mut scratch =
-        vec![Complex::<FftIntermediate>::default(); fft_forward.required_scratch_size()];
+    let mut scratch = vec![Complex::<FftIntermediate>::default(); fft_forward.scratch_length()];
 
     fft_forward
         .execute_with_scratch(&mut arena_source, &mut scratch)
