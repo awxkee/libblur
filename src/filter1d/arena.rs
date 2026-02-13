@@ -452,7 +452,7 @@ where
     {
         match border_mode {
             EdgeMode::Clamp => {
-                let old_x = x.max(0).min(image_size.width - 1);
+                let old_x = x.min(image_size.width - 1);
                 let old_px = old_x * CN;
                 let src_iter = &source_row[old_px..(old_px + CN)];
                 for (dst, src) in dst.iter_mut().zip(src_iter.iter()) {

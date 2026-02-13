@@ -48,8 +48,9 @@ pub(crate) unsafe fn vmull_expand_i16(input: uint8x8_t, weight: int16x8_t) -> in
     vqrdmulhq_s16(v, weight)
 }
 
-#[inline(always)]
 #[cfg(feature = "rdm")]
+#[inline]
+#[target_feature(enable = "rdm")]
 pub(crate) unsafe fn vmlaq_hi_u8_s16(
     store: (int16x8_t, int16x8_t),
     input: uint8x16_t,
@@ -64,7 +65,8 @@ pub(crate) unsafe fn vmlaq_hi_u8_s16(
     )
 }
 
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "rdm")]
 #[cfg(feature = "rdm")]
 pub(crate) unsafe fn vmla_symm_hi_u8_s16(
     store: int16x8_t,
@@ -77,7 +79,8 @@ pub(crate) unsafe fn vmla_symm_hi_u8_s16(
     vqrdmlahq_s16(store, lo_16, weight)
 }
 
-#[inline(always)]
+#[inline]
+#[target_feature(enable = "rdm")]
 #[cfg(feature = "rdm")]
 pub(crate) unsafe fn vmlaq_symm_hi_u8_s16(
     store: (int16x8_t, int16x8_t),

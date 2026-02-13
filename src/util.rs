@@ -35,7 +35,7 @@ pub struct MismatchedSize {
     pub received: usize,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub enum BlurError {
     ZeroBaseSize,
     MinimumSliceSizeMismatch(MismatchedSize),
@@ -48,6 +48,7 @@ pub enum BlurError {
     ExceedingPointerSize,
     NegativeOrZeroSigma,
     InvalidArguments,
+    FftError(String),
 }
 
 impl Error for BlurError {}
@@ -83,6 +84,7 @@ impl std::fmt::Display for BlurError {
                 f.write_str("Negative or zero sigma is not supported")
             }
             BlurError::InvalidArguments => f.write_str("Invalid arguments"),
+            BlurError::FftError(msg) => f.write_str(msg),
         }
     }
 }

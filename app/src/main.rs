@@ -118,7 +118,7 @@ fn main() {
     let start_time = Instant::now();
 
     // for i in 0..10 {
-    let ks = KernelShape::new(17, 17);
+    let ks = KernelShape::new(75, 75);
     let motion = lens_kernel(ks, 10., 3., 0.3, 0.5).unwrap();
     // let motion = lens_kernel(KernelShape::new(35, 35), 15., 6., 0.5, 0.2).unwrap();
     // let bokeh = generate_complex_bokeh_kernel(35, 30.);
