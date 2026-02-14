@@ -192,6 +192,8 @@ where
 
     let mut _dest_slice = destination.data.borrow_mut();
 
+    let mut _processed_y = 0usize;
+
     #[cfg(all(target_arch = "aarch64", feature = "neon"))]
     if let Some(column_multiple_rows) = _column_multiple_rows {
         _dest_slice
@@ -249,6 +251,7 @@ where
                     scanned_column_kernel_slice,
                 );
             });
+        _processed_y = _dest_slice.chunks_exact_mut(dst_stride * 3).len() * 3;
         _dest_slice = _dest_slice
             .chunks_exact_mut(dst_stride * 3)
             .into_remainder();
@@ -257,7 +260,7 @@ where
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
     if let Some(column_multiple_rows) = _column_multiple_rows {
         _dest_slice
-            .tb_par_chunks_exact_mut(dst_stride * 3)
+            .tb_par_chunks_exact_mut(dst_stride * 2)
             .for_each_enumerated(&pool, |y, row| {
                 let y = y * 2;
                 use crate::filter1d::filter_1d_column_handler::FilterBrows;
@@ -299,6 +302,7 @@ where
                     scanned_column_kernel_slice,
                 );
             });
+        _processed_y = _dest_slice.chunks_exact_mut(dst_stride * 2).len() * 2;
         _dest_slice = _dest_slice
             .chunks_exact_mut(dst_stride * 2)
             .into_remainder();
@@ -315,7 +319,7 @@ where
                 pad_h,
                 transient_image_slice,
                 src_stride,
-                y,
+                _processed_y + y,
             );
 
             let brows_slice = brows.as_slice();

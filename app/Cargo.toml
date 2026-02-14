@@ -6,14 +6,14 @@ edition = "2021"
 [dependencies]
 half = "2.4.1"
 image = "0.25.5"
-libblur = { path = "../", features = ["nightly_f16", "sse", "avx", "fft", "neon", "rdm", "nightly_avx512", "nightly_fcma"], default-features = false }
+libblur = { path = "../", features = ["nightly_f16", "sse", "avx", "fft", "neon", "rdm", "nightly_avx512", "nightly_fcma", "image"], default-features = false }
 accelerate = { path = "accelerate" }
 rayon = "1.10.0"
 fast_transpose = "0.2.5"
 num-complex = "0.4"
 
 [dev-dependencies]
-criterion = "0.7.0"
+criterion = "0.8.2"
 opencv = { version = "0.95.1", default-features = false, features = ["imgcodecs", "imgproc", "clang-runtime"] }
 
 [[bench]]
