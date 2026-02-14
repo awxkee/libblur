@@ -31,15 +31,8 @@ mod merge;
 mod split;
 
 use image::imageops::FilterType;
-use image::{EncodableLayout, GenericImageView, ImageReader};
-use libblur::{
-    bilateral_filter, complex_gaussian_kernel, fast_bilateral_filter, fast_bilateral_filter_u16,
-    filter_1d_complex, filter_1d_complex_fixed_point, filter_2d_rgb_fft, filter_2d_rgb_fft_complex,
-    filter_2d_rgba_fft, gaussian_blur, gaussian_kernel_1d, lens_kernel, sigma_size,
-    AnisotropicRadius, BilateralBlurParams, BlurImage, BlurImageMut, BoxBlurParameters,
-    CLTParameters, ConvolutionMode, EdgeMode, EdgeMode2D, FastBlurChannels, GaussianBlurParams,
-    ImageSize, KernelShape, Scalar, ThreadingPolicy, TransferFunction,
-};
+use image::{DynamicImage, EncodableLayout, GenericImageView, ImageReader};
+use libblur::{bilateral_filter, complex_gaussian_kernel, fast_bilateral_filter, fast_bilateral_filter_u16, filter_1d_complex, filter_1d_complex_fixed_point, filter_2d_rgb_fft, filter_2d_rgb_fft_complex, filter_2d_rgba_fft, gaussian_blur, gaussian_blur_image, gaussian_kernel_1d, lens_kernel, sigma_size, AnisotropicRadius, BilateralBlurParams, BlurImage, BlurImageMut, BoxBlurParameters, CLTParameters, ConvolutionMode, EdgeMode, EdgeMode2D, FastBlurChannels, GaussianBlurParams, ImageSize, KernelShape, Scalar, ThreadingPolicy, TransferFunction};
 use num_complex::Complex;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use std::any::Any;
@@ -65,7 +58,7 @@ fn f16_to_f32(bytes: Vec<u16>) -> Vec<f32> {
 }
 
 fn main() {
-    let mut dyn_image = ImageReader::open("./assets/sonderland.jpg")
+    let mut dyn_image = ImageReader::open("./assets/test_image_1_small.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -73,6 +66,15 @@ fn main() {
     let dimensions = dyn_image.dimensions();
     println!("dimensions {:?}", dyn_image.dimensions());
     println!("type {:?}", dyn_image.color());
+
+    // let first_gauss = gaussian_blur_image(
+    //     DynamicImage::from(dyn_image.clone()),
+    //     GaussianBlurParams::new_asymmetric_from_sigma(15., 15.),
+    //     EdgeMode2D::new(EdgeMode::Clamp),
+    //     ConvolutionMode::FixedPoint,
+    //     ThreadingPolicy::Adaptive,
+    // ).unwrap();
+    // first_gauss.save("blurred_image.jpg").unwrap();
 
     // let vldg = dyn_image.to_rgb8();
     // let new_rgb = image::imageops::blur(&vldg, 66.);
@@ -128,15 +130,15 @@ fn main() {
 
     let mut dst_image = BlurImageMut::default(); //cvt.clone_as_mut();
 
-    // gaussian_blur(
-    //     &cvt,
-    //     &mut dst_image,
-    //     GaussianBlurParams::new_from_kernel(15.),
-    //     EdgeMode::Clamp,
-    //     ThreadingPolicy::Single,
-    //     ConvolutionMode::FixedPoint,
-    // )
-    //     .unwrap();
+    gaussian_blur(
+        &cvt,
+        &mut dst_image,
+        GaussianBlurParams::new_asymmetric_from_sigma(25., 25.),
+        EdgeMode::Clamp.as_2d(),
+        ThreadingPolicy::Single,
+        ConvolutionMode::FixedPoint,
+    )
+        .unwrap();
 
     // filter_2d_rgba_fft::<u8, f32, f32>(
     //     &cvt,
@@ -190,17 +192,17 @@ fn main() {
 
     // let gamma = cvt.linearize(TransferFunction::Srgb, false).unwrap();
     // let mut vzd = BlurImageMut::default();
-
-    filter_2d_rgb_fft::<u8, f32>(
-        &cvt,
-        &mut dst_image,
-        &motion,
-        ks,
-        EdgeMode2D::new(EdgeMode::Clamp),
-        Scalar::default(),
-        ThreadingPolicy::Adaptive,
-    )
-    .unwrap();
+    //
+    // filter_2d_rgb_fft::<u8, f32>(
+    //     &cvt,
+    //     &mut dst_image,
+    //     &motion,
+    //     ks,
+    //     EdgeMode2D::new(EdgeMode::Clamp),
+    //     Scalar::default(),
+    //     ThreadingPolicy::Adaptive,
+    // )
+    // .unwrap();
 
     // dst_image = vzd.gamma8(TransferFunction::Srgb, false).unwrap();
 
