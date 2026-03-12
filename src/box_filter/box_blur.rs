@@ -102,6 +102,7 @@ impl BoxBlurParameters {
     }
 }
 
+#[allow(clippy::needless_range_loop)]
 fn box_blur_horizontal_pass_impl<T, J, const CN: usize>(
     src: &[T],
     src_stride: u32,
@@ -128,9 +129,6 @@ fn box_blur_horizontal_pass_impl<T, J, const CN: usize>(
     let weight = 1f32 / (radius * 2 + 1) as f32;
 
     for y in start_y..end_y {
-        let mut weight1: J = 0u32.cast_();
-        let mut weight2: J = 0u32.cast_();
-        let mut weight3: J = 0u32.cast_();
         let y_src_shift = (y * src_stride) as usize;
         let y_dst_shift = (y * dst_stride) as usize;
 
@@ -142,28 +140,14 @@ fn box_blur_horizontal_pass_impl<T, J, const CN: usize>(
         };
 
         // replicate edge
-        let mut weight0 = (unsafe { *src.get_unchecked(y_src_shift) }.cast_()) * edge_count;
-        if CN > 1 {
-            weight1 = (unsafe { *src.get_unchecked(y_src_shift + 1) }.cast_()) * edge_count;
-        }
-        if CN > 2 {
-            weight2 = (unsafe { *src.get_unchecked(y_src_shift + 2) }.cast_()) * edge_count;
-        }
-        if CN == 4 {
-            weight3 = (unsafe { *src.get_unchecked(y_src_shift + 3) }.cast_()) * edge_count;
-        }
+        let mut weights: [J; CN] = std::array::from_fn(|x| {
+            (unsafe { *src.get_unchecked(y_src_shift + x) }.cast_()) * edge_count
+        });
 
         for x in 1..=half_kernel as usize {
             let px = x.min(width as usize - 1) * CN;
-            weight0 += unsafe { *src.get_unchecked(y_src_shift + px) }.cast_();
-            if CN > 1 {
-                weight1 += unsafe { *src.get_unchecked(y_src_shift + px + 1) }.cast_();
-            }
-            if CN > 2 {
-                weight2 += unsafe { *src.get_unchecked(y_src_shift + px + 2) }.cast_();
-            }
-            if CN == 4 {
-                weight3 += unsafe { *src.get_unchecked(y_src_shift + px + 3) }.cast_();
+            for i in 0..CN {
+                weights[i] += unsafe { *src.get_unchecked(y_src_shift + px + i) }.cast_();
             }
         }
 
@@ -177,37 +161,17 @@ fn box_blur_horizontal_pass_impl<T, J, const CN: usize>(
 
             unsafe {
                 let write_offset = px;
-                *dst_row.get_unchecked_mut(write_offset) = (weight0.cast_() * weight).to_();
-                if CN > 1 {
-                    *dst_row.get_unchecked_mut(write_offset + 1) = (weight1.cast_() * weight).to_();
-                }
-                if CN > 2 {
-                    *dst_row.get_unchecked_mut(write_offset + 2) = (weight2.cast_() * weight).to_();
-                }
-                if CN == 4 {
-                    *dst_row.get_unchecked_mut(write_offset + 3) = (weight3.cast_() * weight).to_();
+                for i in 0..CN {
+                    *dst_row.get_unchecked_mut(write_offset + i) =
+                        (weights[i].cast_() * weight).to_();
                 }
             }
 
-            weight0 += unsafe { *current_row.get_unchecked(next) }.cast_();
-            if CN > 1 {
-                weight1 += unsafe { *current_row.get_unchecked(next + 1) }.cast_();
+            for i in 0..CN {
+                weights[i] += unsafe { *current_row.get_unchecked(next + i) }.cast_();
             }
-            if CN > 2 {
-                weight2 += unsafe { *current_row.get_unchecked(next + 2) }.cast_();
-            }
-
-            weight0 -= unsafe { *current_row.get_unchecked(previous) }.cast_();
-            if CN > 1 {
-                weight1 -= unsafe { *current_row.get_unchecked(previous + 1) }.cast_();
-            }
-            if CN > 2 {
-                weight2 -= unsafe { *current_row.get_unchecked(previous + 2) }.cast_();
-            }
-
-            if CN == 4 {
-                weight3 += unsafe { *current_row.get_unchecked(next + 3) }.cast_();
-                weight3 -= unsafe { *current_row.get_unchecked(previous + 3) }.cast_();
+            for i in 0..CN {
+                weights[i] -= unsafe { *current_row.get_unchecked(previous + i) }.cast_();
             }
         }
 
@@ -230,37 +194,16 @@ fn box_blur_horizontal_pass_impl<T, J, const CN: usize>(
                 .zip(data_section.chunks_exact(CN))
                 .zip(advanced_kernel_part.chunks_exact(CN))
             {
-                dst[0] = (weight0.cast_() * weight).to_();
-                if CN > 1 {
-                    dst[1] = (weight1.cast_() * weight).to_();
-                }
-                if CN > 2 {
-                    dst[2] = (weight2.cast_() * weight).to_();
-                }
-                if CN == 4 {
-                    dst[3] = (weight3.cast_() * weight).to_();
+                for i in 0..CN {
+                    dst[i] = (weights[i].cast_() * weight).to_();
                 }
 
-                weight0 += src_next[0].cast_();
-                if CN > 1 {
-                    weight1 += src_next[1].cast_();
-                }
-                if CN > 2 {
-                    weight2 += src_next[2].cast_();
-                }
-                if CN == 4 {
-                    weight3 += src_next[3].cast_();
+                for i in 0..CN {
+                    weights[i] += src_next[i].cast_();
                 }
 
-                weight0 -= src_previous[0].cast_();
-                if CN > 1 {
-                    weight1 -= src_previous[1].cast_();
-                }
-                if CN > 2 {
-                    weight2 -= src_previous[2].cast_();
-                }
-                if CN == 4 {
-                    weight3 -= src_previous[3].cast_();
+                for i in 0..CN {
+                    weights[i] -= src_previous[i].cast_();
                 }
             }
 
@@ -275,37 +218,18 @@ fn box_blur_horizontal_pass_impl<T, J, const CN: usize>(
 
             unsafe {
                 let write_offset = px;
-                *dst_row.get_unchecked_mut(write_offset) = (weight0.cast_() * weight).to_();
-                if CN > 1 {
-                    *dst_row.get_unchecked_mut(write_offset + 1) = (weight1.cast_() * weight).to_();
-                }
-                if CN > 2 {
-                    *dst_row.get_unchecked_mut(write_offset + 2) = (weight2.cast_() * weight).to_();
-                }
-                if CN == 4 {
-                    *dst_row.get_unchecked_mut(write_offset + 3) = (weight3.cast_() * weight).to_();
+                for i in 0..CN {
+                    *dst_row.get_unchecked_mut(write_offset + i) =
+                        (weights[i].cast_() * weight).to_();
                 }
             }
 
-            weight0 += unsafe { *current_row.get_unchecked(next) }.cast_();
-            if CN > 1 {
-                weight1 += unsafe { *current_row.get_unchecked(next + 1) }.cast_();
-            }
-            if CN > 2 {
-                weight2 += unsafe { *current_row.get_unchecked(next + 2) }.cast_();
+            for i in 0..CN {
+                weights[i] += unsafe { *current_row.get_unchecked(next + i) }.cast_();
             }
 
-            weight0 -= unsafe { *current_row.get_unchecked(previous) }.cast_();
-            if CN > 1 {
-                weight1 -= unsafe { *current_row.get_unchecked(previous + 1) }.cast_();
-            }
-            if CN > 2 {
-                weight2 -= unsafe { *current_row.get_unchecked(previous + 2) }.cast_();
-            }
-
-            if CN == 4 {
-                weight3 += unsafe { *current_row.get_unchecked(next + 3) }.cast_();
-                weight3 -= unsafe { *current_row.get_unchecked(previous + 3) }.cast_();
+            for i in 0..CN {
+                weights[i] -= unsafe { *current_row.get_unchecked(previous + i) }.cast_();
             }
         }
     }
@@ -573,7 +497,7 @@ fn box_blur_vertical_pass_impl<T, J>(
 
 trait BoxBlurVerticalPass<T> {
     #[allow(clippy::type_complexity)]
-    fn get_box_vertical_pass<const CN: usize>() -> fn(
+    fn get_box_vertical_pass() -> fn(
         src: &[T],
         src_stride: u32,
         unsafe_dst: &UnsafeSlice<T>,
@@ -589,16 +513,14 @@ trait BoxBlurVerticalPass<T> {
 #[cfg(feature = "nightly_f16")]
 impl BoxBlurVerticalPass<f16> for f16 {
     #[allow(clippy::type_complexity)]
-    fn get_box_vertical_pass<const CN: usize>(
-    ) -> fn(&[f16], u32, &UnsafeSlice<f16>, u32, u32, u32, u32, u32, u32) {
+    fn get_box_vertical_pass() -> fn(&[f16], u32, &UnsafeSlice<f16>, u32, u32, u32, u32, u32, u32) {
         box_blur_vertical_pass_impl::<f16, f32>
     }
 }
 
 impl BoxBlurVerticalPass<f32> for f32 {
     #[allow(clippy::type_complexity)]
-    fn get_box_vertical_pass<const CN: usize>(
-    ) -> fn(&[f32], u32, &UnsafeSlice<f32>, u32, u32, u32, u32, u32, u32) {
+    fn get_box_vertical_pass() -> fn(&[f32], u32, &UnsafeSlice<f32>, u32, u32, u32, u32, u32, u32) {
         #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             use crate::box_filter::neon::box_blur_vertical_pass_neon_rgba_f32;
@@ -613,8 +535,7 @@ impl BoxBlurVerticalPass<f32> for f32 {
 
 impl BoxBlurVerticalPass<u16> for u16 {
     #[allow(clippy::type_complexity)]
-    fn get_box_vertical_pass<const CN: usize>(
-    ) -> fn(&[u16], u32, &UnsafeSlice<u16>, u32, u32, u32, u32, u32, u32) {
+    fn get_box_vertical_pass() -> fn(&[u16], u32, &UnsafeSlice<u16>, u32, u32, u32, u32, u32, u32) {
         #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             use crate::box_filter::neon::box_blur_vertical_pass_neon_rgba16;
@@ -636,8 +557,7 @@ impl BoxBlurVerticalPass<u16> for u16 {
 
 impl BoxBlurVerticalPass<u8> for u8 {
     #[allow(clippy::type_complexity)]
-    fn get_box_vertical_pass<const CN: usize>(
-    ) -> fn(&[u8], u32, &UnsafeSlice<u8>, u32, u32, u32, u32, u32, u32) {
+    fn get_box_vertical_pass() -> fn(&[u8], u32, &UnsafeSlice<u8>, u32, u32, u32, u32, u32, u32) {
         let mut _dispatcher_vertical: fn(
             src: &[u8],
             src_stride: u32,
@@ -712,7 +632,7 @@ fn box_blur_vertical_pass<
 ) where
     f32: ToStorage<T>,
 {
-    let _dispatcher_vertical = T::get_box_vertical_pass::<CN>();
+    let _dispatcher_vertical = T::get_box_vertical_pass();
     let unsafe_dst = UnsafeSlice::new(dst);
 
     let pool = novtb::ThreadPool::new(thread_count as usize);

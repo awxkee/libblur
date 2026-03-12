@@ -492,7 +492,7 @@ unsafe fn fg_vertical_pass_neon_rdm<T, const CN: usize>(
                 diffs1 = vaddq_s32(diffs1, pixel_color1);
                 diffs2 = vaddq_s32(diffs2, pixel_color2);
                 diffs3 = vaddq_s32(diffs3, pixel_color3);
-                diffs4 = vaddq_s32(diffs4, pixel_color3);
+                diffs4 = vaddq_s32(diffs4, pixel_color4);
 
                 vst1q_s32(
                     buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr(),
