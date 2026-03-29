@@ -26,29 +26,19 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::primitives::PrimitiveCast;
 use crate::sse::{load_u8_s32_fast, store_u8_s32};
 use crate::stackblur::stack_blur_pass::StackBlurWorkingPass;
 use crate::unsafe_slice::UnsafeSlice;
-use num_traits::{AsPrimitive, FromPrimitive};
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
-use std::marker::PhantomData;
-use std::ops::{AddAssign, Mul, Shr, Sub, SubAssign};
 
-pub(crate) struct HorizontalAvxStackBlurPass<T, J, const CN: usize> {
-    _phantom_t: PhantomData<T>,
-    _phantom_j: PhantomData<J>,
-}
+pub(crate) struct HorizontalAvxStackBlurPass<const CN: usize> {}
 
-impl<T, J, const CN: usize> Default for HorizontalAvxStackBlurPass<T, J, CN> {
+impl<const CN: usize> Default for HorizontalAvxStackBlurPass<CN> {
     fn default() -> Self {
-        HorizontalAvxStackBlurPass::<T, J, CN> {
-            _phantom_t: Default::default(),
-            _phantom_j: Default::default(),
-        }
+        HorizontalAvxStackBlurPass::<CN> {}
     }
 }
 
@@ -83,7 +73,7 @@ unsafe fn avx_horiz_pass_impl<const CN: usize>(
 
     let mut yy = min_y;
 
-    while yy + 4 < max_y {
+    while yy + 4 <= max_y {
         let mut sums0 = _mm256_setzero_si256();
         let mut sums1 = _mm256_setzero_si256();
 
@@ -259,7 +249,7 @@ unsafe fn avx_horiz_pass_impl<const CN: usize>(
         yy += 4;
     }
 
-    while yy + 2 < max_y {
+    while yy + 2 <= max_y {
         let mut sums0 = _mm256_setzero_si256();
 
         let mut sum_in0 = _mm256_setzero_si256();
@@ -474,28 +464,10 @@ unsafe fn avx_horiz_pass_impl<const CN: usize>(
     }
 }
 
-impl<T, J, const CN: usize> StackBlurWorkingPass<T, CN> for HorizontalAvxStackBlurPass<T, J, CN>
-where
-    J: Copy
-        + 'static
-        + FromPrimitive
-        + AddAssign<J>
-        + Mul<Output = J>
-        + Shr<Output = J>
-        + Sub<Output = J>
-        + AsPrimitive<f32>
-        + SubAssign
-        + AsPrimitive<T>
-        + Default,
-    T: Copy + AsPrimitive<J> + Default,
-    i32: AsPrimitive<J>,
-    u32: AsPrimitive<J>,
-    f32: PrimitiveCast<T>,
-    usize: AsPrimitive<J>,
-{
+impl<const CN: usize> StackBlurWorkingPass<u8, CN> for HorizontalAvxStackBlurPass<CN> {
     fn pass(
         &self,
-        pixels: &UnsafeSlice<T>,
+        pixels: &UnsafeSlice<u8>,
         stride: u32,
         width: u32,
         height: u32,
@@ -504,7 +476,6 @@ where
         total_threads: usize,
     ) {
         unsafe {
-            let pixels: &UnsafeSlice<u8> = std::mem::transmute(pixels);
             avx_horiz_pass_impl::<CN>(pixels, stride, width, height, radius, thread, total_threads);
         }
     }

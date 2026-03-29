@@ -63,13 +63,22 @@ fn stack_blur_worker_horizontal(
         }
         #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         fn select_blur_pass<const N: usize>() -> impl StackBlurWorkingPass<f32, N> {
-            HorizontalNeonStackBlurPassFloat32::<f32, f32, N>::default()
+            HorizontalNeonStackBlurPassFloat32::<N>::default()
         }
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         fn select_blur_pass<const N: usize>() -> Box<dyn StackBlurWorkingPass<f32, N>> {
+            #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+            {
+                if std::arch::is_x86_feature_detected!("avx2")
+                    && std::arch::is_x86_feature_detected!("fma")
+                {
+                    use avx::HorizontalAvxStackBlurPassFloat32;
+                    return Box::new(HorizontalAvxStackBlurPassFloat32::<N>::default());
+                }
+            }
             #[cfg(feature = "sse")]
             if std::arch::is_x86_feature_detected!("sse4.1") {
-                Box::new(HorizontalSseStackBlurPassFloat32::<f32, f32, N>::default())
+                Box::new(HorizontalSseStackBlurPassFloat32::<N>::default())
             } else {
                 Box::new(HorizontalStackBlurPass::<f32, f32, f32, N>::default())
             }
@@ -121,13 +130,22 @@ fn stack_blur_worker_vertical(
         }
         #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         fn select_blur_pass<const N: usize>() -> impl StackBlurWorkingPass<f32, N> {
-            VerticalNeonStackBlurPassFloat32::<f32, f32, N>::default()
+            VerticalNeonStackBlurPassFloat32::<N>::default()
         }
         #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
         fn select_blur_pass<const N: usize>() -> Box<dyn StackBlurWorkingPass<f32, N>> {
+            #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+            {
+                if std::arch::is_x86_feature_detected!("avx2")
+                    && std::arch::is_x86_feature_detected!("fma")
+                {
+                    use avx::VerticalAvxStackBlurPassFloat32;
+                    return Box::new(VerticalAvxStackBlurPassFloat32::<N>::default());
+                }
+            }
             #[cfg(feature = "sse")]
             if std::arch::is_x86_feature_detected!("sse4.1") {
-                Box::new(VerticalSseStackBlurPassFloat32::<f32, f32, N>::default())
+                Box::new(VerticalSseStackBlurPassFloat32::<N>::default())
             } else {
                 Box::new(VerticalStackBlurPass::<f32, f32, f32, N>::default())
             }

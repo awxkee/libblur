@@ -60,12 +60,12 @@ fn stack_blur_worker_horizontal(
             {
                 if std::arch::is_x86_feature_detected!("avx2") {
                     use crate::stackblur::avx::HorizontalAvxStackBlurPass;
-                    return Box::new(HorizontalAvxStackBlurPass::<u8, i32, N>::default());
+                    return Box::new(HorizontalAvxStackBlurPass::<N>::default());
                 }
             }
             #[cfg(feature = "sse")]
             if std::arch::is_x86_feature_detected!("sse4.1") {
-                Box::new(HorizontalSseStackBlurPass::<u8, i32, N>::default())
+                Box::new(HorizontalSseStackBlurPass::<N>::default())
             } else {
                 Box::new(HorizontalStackBlurPass::<u8, i32, f32, N>::default())
             }
@@ -78,9 +78,9 @@ fn stack_blur_worker_horizontal(
             #[cfg(feature = "rdm")]
             if std::arch::is_aarch64_feature_detected!("rdm") {
                 use crate::stackblur::neon::HorizontalNeonStackBlurPassQ0_31;
-                return Box::new(HorizontalNeonStackBlurPassQ0_31::<u8, i32, N>::default());
+                return Box::new(HorizontalNeonStackBlurPassQ0_31::<N>::default());
             }
-            Box::new(HorizontalNeonStackBlurPass::<u8, i32, N>::default())
+            Box::new(HorizontalNeonStackBlurPass::<N>::default())
         }
 
         #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
@@ -139,11 +139,11 @@ fn stack_blur_worker_vertical(
             #[cfg(all(target_arch = "x86_64", feature = "avx"))]
             if std::arch::is_x86_feature_detected!("avx2") {
                 use crate::stackblur::avx::VerticalAvxStackBlurPass;
-                return Box::new(VerticalAvxStackBlurPass::<u8, i32, N>::default());
+                return Box::new(VerticalAvxStackBlurPass::<N>::default());
             }
             #[cfg(feature = "sse")]
             if std::arch::is_x86_feature_detected!("sse4.1") {
-                Box::new(VerticalSseStackBlurPass::<u8, i32, N>::default())
+                Box::new(VerticalSseStackBlurPass::<N>::default())
             } else {
                 Box::new(VerticalStackBlurPass::<u8, i32, f32, N>::default())
             }
@@ -156,9 +156,9 @@ fn stack_blur_worker_vertical(
             #[cfg(feature = "rdm")]
             if std::arch::is_aarch64_feature_detected!("rdm") {
                 use crate::stackblur::neon::VerticalNeonStackBlurPassQ0_31;
-                return Box::new(VerticalNeonStackBlurPassQ0_31::<u8, i32, N>::default());
+                return Box::new(VerticalNeonStackBlurPassQ0_31::<N>::default());
             }
-            Box::new(VerticalNeonStackBlurPass::<u8, i32, N>::default())
+            Box::new(VerticalNeonStackBlurPass::<N>::default())
         }
 
         #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]

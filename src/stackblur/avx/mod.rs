@@ -27,7 +27,11 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 mod horizontal;
+mod horizontal_f32;
 mod vertical;
+mod vertical_f32;
 
 pub(crate) use horizontal::HorizontalAvxStackBlurPass;
+pub(crate) use horizontal_f32::HorizontalAvxStackBlurPassFloat32;
 pub(crate) use vertical::VerticalAvxStackBlurPass;
+pub(crate) use vertical_f32::VerticalAvxStackBlurPassFloat32;

@@ -150,8 +150,8 @@ pub(crate) unsafe fn _mm_mul_epi8_by_epi16_x2(input: __m128i, weight: __m128i) -
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_opt_fmlaf_ps(a: __m128, b: __m128, c: __m128) -> __m128 {
-    _mm_add_ps(_mm_mul_ps(b, c), a)
+pub(crate) fn _mm_opt_fmlaf_ps(a: __m128, b: __m128, c: __m128) -> __m128 {
+    unsafe { _mm_add_ps(_mm_mul_ps(b, c), a) }
 }
 
 #[inline(always)]
