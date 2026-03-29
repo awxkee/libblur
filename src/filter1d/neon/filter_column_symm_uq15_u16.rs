@@ -27,7 +27,6 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter1d::arena::Arena;
-use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::neon::utils::{
     vfmlaq_symm_u16_u16, vmullq_u16_by_u16, vqmovnq_u32_u16, xvld1q_u16_x2, xvld1q_u16_x3,
     xvld1q_u16_x4, xvst1q_u16_x2, xvst1q_u16_x3, xvst1q_u16_x4,
@@ -44,7 +43,7 @@ pub(crate) fn filter_column_symm_neon_uq15_u16(
     dst: &mut [u16],
     image_size: ImageSize,
     _: FilterRegion,
-    scanned_kernel: &[ScanPoint1d<u32>],
+    scanned_kernel: &[u32],
 ) {
     unsafe {
         let image_width = image_size.width * arena.components;
@@ -56,7 +55,7 @@ pub(crate) fn filter_column_symm_neon_uq15_u16(
 
         let ref0 = arena_src.get_unchecked(half_len);
 
-        let coeff = vdupq_n_u16(scanned_kernel.get_unchecked(half_len).weight as u16);
+        let coeff = vdupq_n_u16(*scanned_kernel.get_unchecked(half_len) as u16);
 
         while cx + 32 < image_width {
             let v_src = ref0.get_unchecked(cx..);
@@ -69,7 +68,7 @@ pub(crate) fn filter_column_symm_neon_uq15_u16(
 
             for i in 0..half_len {
                 let rollback = length - i - 1;
-                let coeff = vdupq_n_u32(scanned_kernel.get_unchecked(i).weight);
+                let coeff = vdupq_n_u32(*scanned_kernel.get_unchecked(i));
                 let v_source0 =
                     xvld1q_u16_x4(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 let v_source1 = xvld1q_u16_x4(
@@ -106,7 +105,7 @@ pub(crate) fn filter_column_symm_neon_uq15_u16(
             let mut k2 = vmullq_u16_by_u16(source.2, coeff);
 
             for i in 0..half_len {
-                let coeff = vdupq_n_u32(scanned_kernel.get_unchecked(i).weight);
+                let coeff = vdupq_n_u32(*scanned_kernel.get_unchecked(i));
                 let rollback = length - i - 1;
                 let v_source0 =
                     xvld1q_u16_x3(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
@@ -141,7 +140,7 @@ pub(crate) fn filter_column_symm_neon_uq15_u16(
             let mut k1 = vmullq_u16_by_u16(source.1, coeff);
 
             for i in 0..half_len {
-                let coeff = vdupq_n_u32(scanned_kernel.get_unchecked(i).weight);
+                let coeff = vdupq_n_u32(*scanned_kernel.get_unchecked(i));
                 let rollback = length - i - 1;
                 let v_source0 =
                     xvld1q_u16_x2(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
@@ -170,7 +169,7 @@ pub(crate) fn filter_column_symm_neon_uq15_u16(
             let mut k0 = vmullq_u16_by_u16(source, coeff);
 
             for i in 0..half_len {
-                let coeff = vdupq_n_u32(scanned_kernel.get_unchecked(i).weight);
+                let coeff = vdupq_n_u32(*scanned_kernel.get_unchecked(i));
                 let rollback = length - i - 1;
                 let v_source0 = vld1q_u16(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 let v_source1 = vld1q_u16(
@@ -194,7 +193,7 @@ pub(crate) fn filter_column_symm_neon_uq15_u16(
             let mut k0 = vmull_u16(source, vget_low_u16(coeff));
 
             for i in 0..half_len {
-                let coeff = vdupq_n_u32(scanned_kernel.get_unchecked(i).weight);
+                let coeff = vdupq_n_u32(*scanned_kernel.get_unchecked(i));
                 let rollback = length - i - 1;
                 let v_source0 = vld1_u16(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 let v_source1 = vld1_u16(
@@ -216,14 +215,14 @@ pub(crate) fn filter_column_symm_neon_uq15_u16(
         for x in cx..image_width {
             let v_src = ref0.get_unchecked(x..);
 
-            let mut k0 = ((*v_src.get_unchecked(0)) as u32).mul(coeff.weight);
+            let mut k0 = ((*v_src.get_unchecked(0)) as u32).mul(coeff);
 
             for i in 0..half_len {
                 let coeff = *scanned_kernel.get_unchecked(i);
                 let rollback = length - i - 1;
                 k0 = ((*arena_src.get_unchecked(i).get_unchecked(x)) as u32)
                     .add((*arena_src.get_unchecked(rollback).get_unchecked(x)) as u32)
-                    .mul(coeff.weight)
+                    .mul(coeff)
                     .add(k0);
             }
 

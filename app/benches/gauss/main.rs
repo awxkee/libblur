@@ -52,7 +52,9 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         FastBlurChannels::Channels4,
     );
 
-    c.bench_function("RGBA gauss blur kernel clip: 3", |b| {
+    opencv::core::set_num_threads(1).unwrap();
+
+    c.bench_function("RGBA gauss blur kernel clip Single Thread: 3", |b| {
         let mut dst_bytes =
             BlurImageMut::alloc(img.width(), img.height(), FastBlurChannels::Channels4);
         b.iter(|| {
@@ -61,7 +63,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 &mut dst_bytes,
                 GaussianBlurParams::new_from_kernel(3.),
                 EdgeMode::Clamp.as_2d(),
-                ThreadingPolicy::Adaptive,
+                ThreadingPolicy::Single,
                 ConvolutionMode::FixedPoint,
             )
             .unwrap();
@@ -82,6 +84,40 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         AlgorithmHint::ALGO_HINT_DEFAULT,
     )
     .unwrap();
+
+    c.bench_function("OpenCV RGBA Gaussian Single Thread: 3", |b| {
+        b.iter(|| {
+            let mut dst = Mat::default();
+            opencv::imgproc::gaussian_blur(
+                &src,
+                &mut dst,
+                Size::new(3, 3),
+                3.,
+                3.,
+                BORDER_DEFAULT,
+                AlgorithmHint::ALGO_HINT_ACCURATE,
+            )
+            .unwrap();
+        })
+    });
+
+    opencv::core::set_num_threads(-1).unwrap();
+
+    c.bench_function("RGBA gauss blur kernel clip: 3", |b| {
+        let mut dst_bytes =
+            BlurImageMut::alloc(img.width(), img.height(), FastBlurChannels::Channels4);
+        b.iter(|| {
+            libblur::gaussian_blur(
+                &src_image,
+                &mut dst_bytes,
+                GaussianBlurParams::new_from_kernel(3.),
+                EdgeMode::Clamp.as_2d(),
+                ThreadingPolicy::Adaptive,
+                ConvolutionMode::FixedPoint,
+            )
+            .unwrap();
+        })
+    });
 
     c.bench_function("OpenCV RGBA Gaussian: 3", |b| {
         b.iter(|| {

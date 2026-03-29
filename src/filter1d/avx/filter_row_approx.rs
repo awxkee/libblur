@@ -62,7 +62,7 @@ pub(crate) fn filter_row_avx_u8_i32_app<const N: usize>(
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn filter_row_neon_u8_i32_impl<const N: usize>(
+fn filter_row_neon_u8_i32_impl<const N: usize>(
     _: Arena,
     arena_src: &[u8],
     dst: &mut [u8],
@@ -70,131 +70,133 @@ unsafe fn filter_row_neon_u8_i32_impl<const N: usize>(
     _: FilterRegion,
     scanned_kernel: &[ScanPoint1d<i32>],
 ) {
-    let src = arena_src;
+    unsafe {
+        let src = arena_src;
 
-    let v_prepared = scanned_kernel
-        .iter()
-        .map(|&x| {
-            let z = x.weight.to_ne_bytes();
-            i32::from_ne_bytes([z[0], z[1], z[0], z[1]])
-        })
-        .collect::<Vec<_>>();
+        let v_prepared = scanned_kernel
+            .iter()
+            .map(|&x| {
+                let z = x.weight.to_ne_bytes();
+                i32::from_ne_bytes([z[0], z[1], z[0], z[1]])
+            })
+            .collect::<Vec<_>>();
 
-    let length = scanned_kernel.len();
+        let length = scanned_kernel.len();
 
-    let local_src = src;
+        let local_src = src;
 
-    let max_width = image_size.width * N;
+        let max_width = image_size.width * N;
 
-    let mut cx = 0usize;
+        let mut cx = 0usize;
 
-    let coeff = _mm256_set1_epi32(*v_prepared.get_unchecked(0));
+        let coeff = _mm256_set1_epi32(*v_prepared.get_unchecked(0));
 
-    while cx + 64 < max_width {
-        let shifted_src = local_src.get_unchecked(cx..);
+        while cx + 64 <= max_width {
+            let shifted_src = local_src.get_unchecked(cx..);
 
-        let source = _mm256_load_pack_x2(shifted_src.as_ptr());
-        let mut k0 = _mm256_mul_epi8_by_epi16_x4(source.0, coeff);
-        let mut k1 = _mm256_mul_epi8_by_epi16_x4(source.1, coeff);
+            let source = _mm256_load_pack_x2(shifted_src.as_ptr());
+            let mut k0 = _mm256_mul_epi8_by_epi16_x4(source.0, coeff);
+            let mut k1 = _mm256_mul_epi8_by_epi16_x4(source.1, coeff);
 
-        for i in 1..length {
-            let coeff = _mm256_set1_epi32(*v_prepared.get_unchecked(i));
-            let v_source = _mm256_load_pack_x2(shifted_src.get_unchecked((i * N)..).as_ptr());
-            k0 = _mm256_mul_add_epi8_by_epi16_x4(k0, v_source.0, coeff);
-            k1 = _mm256_mul_add_epi8_by_epi16_x4(k1, v_source.1, coeff);
+            for i in 1..length {
+                let coeff = _mm256_set1_epi32(*v_prepared.get_unchecked(i));
+                let v_source = _mm256_load_pack_x2(shifted_src.get_unchecked((i * N)..).as_ptr());
+                k0 = _mm256_mul_add_epi8_by_epi16_x4(k0, v_source.0, coeff);
+                k1 = _mm256_mul_add_epi8_by_epi16_x4(k1, v_source.1, coeff);
+            }
+
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
+            _mm256_store_pack_x2(
+                dst_ptr0,
+                (_mm256_pack_epi32_x4_epi8(k0), _mm256_pack_epi32_x4_epi8(k1)),
+            );
+            cx += 64;
         }
 
-        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
-        _mm256_store_pack_x2(
-            dst_ptr0,
-            (_mm256_pack_epi32_x4_epi8(k0), _mm256_pack_epi32_x4_epi8(k1)),
-        );
-        cx += 64;
-    }
+        while cx + 32 <= max_width {
+            let shifted_src = local_src.get_unchecked(cx..);
 
-    while cx + 32 < max_width {
-        let shifted_src = local_src.get_unchecked(cx..);
+            let source = _mm256_loadu_si256(shifted_src.as_ptr() as *const _);
+            let mut k0 = _mm256_mul_epi8_by_epi16_x4(source, coeff);
 
-        let source = _mm256_loadu_si256(shifted_src.as_ptr() as *const _);
-        let mut k0 = _mm256_mul_epi8_by_epi16_x4(source, coeff);
+            for i in 1..length {
+                let coeff = _mm256_set1_epi32(*v_prepared.get_unchecked(i));
+                let v_source =
+                    _mm256_loadu_si256(shifted_src.get_unchecked((i * N)..).as_ptr() as *const _);
+                k0 = _mm256_mul_add_epi8_by_epi16_x4(k0, v_source, coeff);
+            }
 
-        for i in 1..length {
-            let coeff = _mm256_set1_epi32(*v_prepared.get_unchecked(i));
-            let v_source =
-                _mm256_loadu_si256(shifted_src.get_unchecked((i * N)..).as_ptr() as *const _);
-            k0 = _mm256_mul_add_epi8_by_epi16_x4(k0, v_source, coeff);
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
+            _mm256_storeu_si256(dst_ptr0 as *mut _, _mm256_pack_epi32_x4_epi8(k0));
+            cx += 32;
         }
 
-        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
-        _mm256_storeu_si256(dst_ptr0 as *mut _, _mm256_pack_epi32_x4_epi8(k0));
-        cx += 32;
-    }
+        while cx + 16 <= max_width {
+            let shifted_src = local_src.get_unchecked(cx..);
 
-    while cx + 16 < max_width {
-        let shifted_src = local_src.get_unchecked(cx..);
+            let source = _mm_loadu_si128(shifted_src.as_ptr() as *const _);
+            let mut k0 = _mm_mul_epi8_by_epi16_x4(source, _mm256_castsi256_si128(coeff));
 
-        let source = _mm_loadu_si128(shifted_src.as_ptr() as *const _);
-        let mut k0 = _mm_mul_epi8_by_epi16_x4(source, _mm256_castsi256_si128(coeff));
+            for i in 1..length {
+                let coeff = _mm_set1_epi32(*v_prepared.get_unchecked(i));
+                let v_source =
+                    _mm_loadu_si128(shifted_src.get_unchecked((i * N)..).as_ptr() as *const _);
+                k0 = _mm_mul_add_epi8_by_epi16_x4(k0, v_source, coeff);
+            }
 
-        for i in 1..length {
-            let coeff = _mm_set1_epi32(*v_prepared.get_unchecked(i));
-            let v_source =
-                _mm_loadu_si128(shifted_src.get_unchecked((i * N)..).as_ptr() as *const _);
-            k0 = _mm_mul_add_epi8_by_epi16_x4(k0, v_source, coeff);
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
+            _mm_storeu_si128(dst_ptr0 as *mut _, _mm_pack_epi32_x2_epi8(k0));
+            cx += 16;
         }
 
-        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
-        _mm_storeu_si128(dst_ptr0 as *mut _, _mm_pack_epi32_x2_epi8(k0));
-        cx += 16;
-    }
+        while cx + 8 <= max_width {
+            let shifted_src = local_src.get_unchecked(cx..);
 
-    while cx + 8 < max_width {
-        let shifted_src = local_src.get_unchecked(cx..);
+            let source = _mm_loadu_si64(shifted_src.as_ptr() as *const _);
+            let mut k0 = _mm_mul_epi8_by_epi16_x2(source, _mm256_castsi256_si128(coeff));
 
-        let source = _mm_loadu_si64(shifted_src.as_ptr() as *const _);
-        let mut k0 = _mm_mul_epi8_by_epi16_x2(source, _mm256_castsi256_si128(coeff));
+            for i in 1..length {
+                let coeff = _mm_set1_epi32(*v_prepared.get_unchecked(i));
+                let v_source =
+                    _mm_loadu_si64(shifted_src.get_unchecked((i * N)..).as_ptr() as *const _);
+                k0 = _mm_mul_add_epi8_by_epi16_x2(k0, v_source, coeff);
+            }
 
-        for i in 1..length {
-            let coeff = _mm_set1_epi32(*v_prepared.get_unchecked(i));
-            let v_source =
-                _mm_loadu_si64(shifted_src.get_unchecked((i * N)..).as_ptr() as *const _);
-            k0 = _mm_mul_add_epi8_by_epi16_x2(k0, v_source, coeff);
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
+            _mm_storeu_si64(dst_ptr0 as *mut _, _mm_pack_epi32_epi8(k0));
+            cx += 8;
         }
 
-        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
-        _mm_storeu_si64(dst_ptr0 as *mut _, _mm_pack_epi32_epi8(k0));
-        cx += 8;
-    }
+        while cx + 4 <= max_width {
+            let shifted_src = local_src.get_unchecked(cx..);
 
-    while cx + 4 < max_width {
-        let shifted_src = local_src.get_unchecked(cx..);
+            let source = _mm_loadu_si32(shifted_src.as_ptr() as *const _);
+            let mut k0 = _mm_mul_epi8_by_epi16_x2(source, _mm256_castsi256_si128(coeff));
 
-        let source = _mm_loadu_si32(shifted_src.as_ptr() as *const _);
-        let mut k0 = _mm_mul_epi8_by_epi16_x2(source, _mm256_castsi256_si128(coeff));
+            for i in 1..length {
+                let coeff = _mm_set1_epi32(*v_prepared.get_unchecked(i));
+                let v_source =
+                    _mm_loadu_si32(shifted_src.get_unchecked((i * N)..).as_ptr() as *const _);
+                k0 = _mm_mul_add_epi8_by_epi16_x2(k0, v_source, coeff);
+            }
 
-        for i in 1..length {
-            let coeff = _mm_set1_epi32(*v_prepared.get_unchecked(i));
-            let v_source =
-                _mm_loadu_si32(shifted_src.get_unchecked((i * N)..).as_ptr() as *const _);
-            k0 = _mm_mul_add_epi8_by_epi16_x2(k0, v_source, coeff);
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
+            _mm_storeu_si32(dst_ptr0 as *mut _, _mm_pack_epi32_epi8(k0));
+            cx += 4;
         }
 
-        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
-        _mm_storeu_si32(dst_ptr0 as *mut _, _mm_pack_epi32_epi8(k0));
-        cx += 4;
-    }
+        for x in cx..max_width {
+            let coeff = *scanned_kernel.get_unchecked(0);
+            let shifted_src = local_src.get_unchecked(x..);
+            let mut k0 = *shifted_src.get_unchecked(0) as i32 * coeff.weight;
 
-    for x in cx..max_width {
-        let coeff = *scanned_kernel.get_unchecked(0);
-        let shifted_src = local_src.get_unchecked(x..);
-        let mut k0 = *shifted_src.get_unchecked(0) as i32 * coeff.weight;
+            for i in 1..length {
+                let coeff = *scanned_kernel.get_unchecked(i);
 
-        for i in 1..length {
-            let coeff = *scanned_kernel.get_unchecked(i);
+                k0 += (*shifted_src.get_unchecked(i * N) as i32) * coeff.weight;
+            }
 
-            k0 += (*shifted_src.get_unchecked(i * N) as i32) * coeff.weight;
+            *dst.get_unchecked_mut(x) = k0.to_approx_();
         }
-
-        *dst.get_unchecked_mut(x) = k0.to_approx_();
     }
 }

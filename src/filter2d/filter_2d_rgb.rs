@@ -29,7 +29,7 @@
 use crate::filter1d::KernelShape;
 use crate::filter2d::filter_2d_handler::Filter2dHandler;
 use crate::to_storage::ToStorage;
-use crate::{filter_2d, BlurError, BlurImage, BlurImageMut, EdgeMode2D, Scalar, ThreadingPolicy};
+use crate::{BlurError, BlurImage, BlurImageMut, EdgeMode2D, Scalar, ThreadingPolicy, filter_2d};
 use num_traits::{AsPrimitive, MulAdd};
 use std::fmt::Debug;
 use std::ops::Mul;

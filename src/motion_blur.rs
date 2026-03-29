@@ -27,7 +27,7 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::{
-    filter_2d, BlurError, BlurImage, BlurImageMut, EdgeMode2D, KernelShape, Scalar, ThreadingPolicy,
+    BlurError, BlurImage, BlurImageMut, EdgeMode2D, KernelShape, Scalar, ThreadingPolicy, filter_2d,
 };
 
 #[derive(Copy, Clone)]

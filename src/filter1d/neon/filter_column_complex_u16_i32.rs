@@ -32,28 +32,32 @@ use num_complex::Complex;
 use std::arch::aarch64::*;
 
 #[inline(always)]
-pub(crate) unsafe fn vq_complex_mla_q(
+pub(crate) fn vq_complex_mla_q(
     acc_r: (int32x4_t, int32x4_t),
     r0: int32x4_t,
     i0: int32x4_t,
     r1: int32x4_t,
     i1: int32x4_t,
 ) -> (int32x4_t, int32x4_t) {
-    let re = vmlsq_s32(vmlaq_s32(acc_r.0, r0, r1), i0, i1);
-    let im = vmlaq_s32(vmlaq_s32(acc_r.1, r0, i1), i0, r1);
-    (re, im)
+    unsafe {
+        let re = vmlsq_s32(vmlaq_s32(acc_r.0, r0, r1), i0, i1);
+        let im = vmlaq_s32(vmlaq_s32(acc_r.1, r0, i1), i0, r1);
+        (re, im)
+    }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn vq_complex_mul_q(
+pub(crate) fn vq_complex_mul_q(
     r0: int32x4_t,
     i0: int32x4_t,
     r1: int32x4_t,
     i1: int32x4_t,
 ) -> (int32x4_t, int32x4_t) {
-    let re = vmlsq_s32(vmulq_s32(r0, r1), i0, i1);
-    let im = vmlaq_s32(vmulq_s32(r0, i1), i0, r1);
-    (re, im)
+    unsafe {
+        let re = vmlsq_s32(vmulq_s32(r0, r1), i0, i1);
+        let im = vmlaq_s32(vmulq_s32(r0, i1), i0, r1);
+        (re, im)
+    }
 }
 
 pub(crate) fn filter_column_complex_u16_i32(
@@ -73,7 +77,7 @@ pub(crate) fn filter_column_complex_u16_i32(
         let c_re = vdupq_n_s32(kernel.get_unchecked(0).re as i32);
         let c_im = vdupq_n_s32(kernel.get_unchecked(0).im as i32);
 
-        while cx + 16 < full_width {
+        while cx + 16 <= full_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let values0 = vld2q_s32(v_src.as_ptr().cast());
@@ -137,7 +141,7 @@ pub(crate) fn filter_column_complex_u16_i32(
             cx += 16;
         }
 
-        while cx + 8 < full_width {
+        while cx + 8 <= full_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let values0 = vld2q_s32(v_src.as_ptr().cast());
@@ -177,7 +181,7 @@ pub(crate) fn filter_column_complex_u16_i32(
             cx += 8;
         }
 
-        while cx + 4 < full_width {
+        while cx + 4 <= full_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let values = vld2q_s32(v_src.as_ptr().cast());

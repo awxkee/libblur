@@ -30,6 +30,7 @@ use crate::primitives::PrimitiveCast;
 use crate::stackblur::sliding_window::SlidingWindow;
 use crate::stackblur::stack_blur_pass::StackBlurWorkingPass;
 use crate::unsafe_slice::UnsafeSlice;
+use crate::util::ScratchBuffer;
 use std::marker::PhantomData;
 use std::ops::{AddAssign, Mul, Sub, SubAssign};
 
@@ -70,8 +71,7 @@ where
     usize: PrimitiveCast<J>,
     f32: PrimitiveCast<F>,
 {
-    #[inline]
-    unsafe fn pass_impl(
+    fn pass_impl(
         &self,
         pixels: &UnsafeSlice<T>,
         stride: u32,
@@ -85,7 +85,8 @@ where
         let mut xp;
         let mut sp;
         let mut stack_start;
-        let mut stacks0 = vec![SlidingWindow::<CN, J>::new(); div];
+        let mut stack_buffer = ScratchBuffer::<SlidingWindow<CN, J>, 1024>::new(div);
+        let stacks0 = stack_buffer.as_mut_slice();
 
         let rad_p_1 = radius as f32 + 1.;
         let scale_filter_value = (1. / (rad_p_1 * rad_p_1)).cast_();
@@ -205,8 +206,6 @@ where
         thread: usize,
         total_threads: usize,
     ) {
-        unsafe {
-            self.pass_impl(pixels, stride, width, height, radius, thread, total_threads);
-        }
+        self.pass_impl(pixels, stride, width, height, radius, thread, total_threads);
     }
 }

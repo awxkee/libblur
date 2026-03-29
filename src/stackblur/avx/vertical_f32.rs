@@ -28,6 +28,7 @@
  */
 use crate::stackblur::StackBlurWorkingPass;
 use crate::unsafe_slice::UnsafeSlice;
+use crate::util::ScratchBuffer;
 use std::arch::x86_64::*;
 
 #[repr(C, align(32))]
@@ -56,7 +57,8 @@ unsafe fn stack_blur_pass_vert_avx<const CN: usize>(
         let mut yp;
         let mut sp;
         let mut stack_start;
-        let mut stacks = vec![Avx2F32x8::default(); div * 2];
+        let mut scratch_buffer = ScratchBuffer::<Avx2F32x8, 512>::new(div * 2);
+        let stacks = scratch_buffer.as_mut_slice();
 
         let hm = height - 1;
         let div = (radius * 2) + 1;

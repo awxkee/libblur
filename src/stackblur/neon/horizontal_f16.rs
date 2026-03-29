@@ -27,50 +27,27 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::neon::{load_f32_f16, p_vfmaq_f32, store_f32_f16};
-use crate::primitives::PrimitiveCast;
 use crate::stackblur::stack_blur_pass::StackBlurWorkingPass;
 use crate::unsafe_slice::UnsafeSlice;
+use crate::util::ScratchBuffer;
 #[cfg(feature = "nightly_f16")]
 use core::f16;
 use std::arch::aarch64::*;
-use std::marker::PhantomData;
-use std::ops::{AddAssign, Mul, Sub, SubAssign};
 
-pub(crate) struct HorizontalNeonStackBlurPassFloat16<T, J, const CN: usize> {
-    _phantom_t: PhantomData<T>,
-    _phantom_j: PhantomData<J>,
-}
+pub(crate) struct HorizontalNeonStackBlurPassFloat16<const CN: usize> {}
 
-impl<T, J, const CN: usize> Default for HorizontalNeonStackBlurPassFloat16<T, J, CN> {
+impl<const CN: usize> Default for HorizontalNeonStackBlurPassFloat16<CN> {
     fn default() -> Self {
-        HorizontalNeonStackBlurPassFloat16::<T, J, CN> {
-            _phantom_t: Default::default(),
-            _phantom_j: Default::default(),
-        }
+        HorizontalNeonStackBlurPassFloat16::<CN> {}
     }
 }
 
-impl<T, J, const CN: usize> HorizontalNeonStackBlurPassFloat16<T, J, CN>
-where
-    J: Copy
-        + 'static
-        + AddAssign<J>
-        + Mul<Output = J>
-        + Sub<Output = J>
-        + PrimitiveCast<f32>
-        + SubAssign
-        + PrimitiveCast<T>
-        + Default,
-    T: Copy + PrimitiveCast<J> + Default,
-    i32: PrimitiveCast<J>,
-    u32: PrimitiveCast<J>,
-    f32: PrimitiveCast<T>,
-    usize: PrimitiveCast<J>,
-{
+impl<const CN: usize> HorizontalNeonStackBlurPassFloat16<CN> {
     #[inline]
-    unsafe fn pass_impl(
+    #[target_feature(enable = "neon")]
+    fn pass_impl(
         &self,
-        pixels: &UnsafeSlice<T>,
+        pixels: &UnsafeSlice<f16>,
         stride: u32,
         width: u32,
         height: u32,
@@ -79,12 +56,12 @@ where
         total_threads: usize,
     ) {
         unsafe {
-            let pixels: &UnsafeSlice<f16> = std::mem::transmute(pixels);
             let div = ((radius * 2) + 1) as usize;
             let mut xp;
             let mut sp;
             let mut stack_start;
-            let mut stacks = vec![0f32; 4 * div];
+            let mut scratch_buffer = ScratchBuffer::<f32, 2048>::new(4 * div);
+            let stacks = scratch_buffer.as_mut_slice();
 
             let wm = width - 1;
             let div = (radius * 2) + 1;
@@ -183,27 +160,12 @@ where
     }
 }
 
-impl<T, J, const COMPONENTS: usize> StackBlurWorkingPass<T, COMPONENTS>
-    for HorizontalNeonStackBlurPassFloat16<T, J, COMPONENTS>
-where
-    J: Copy
-        + 'static
-        + AddAssign<J>
-        + Mul<Output = J>
-        + Sub<Output = J>
-        + PrimitiveCast<f32>
-        + SubAssign
-        + PrimitiveCast<T>
-        + Default,
-    T: Copy + PrimitiveCast<J> + Default,
-    i32: PrimitiveCast<J>,
-    u32: PrimitiveCast<J>,
-    f32: PrimitiveCast<T>,
-    usize: PrimitiveCast<J>,
+impl<const COMPONENTS: usize> StackBlurWorkingPass<f16, COMPONENTS>
+    for HorizontalNeonStackBlurPassFloat16<COMPONENTS>
 {
     fn pass(
         &self,
-        pixels: &UnsafeSlice<T>,
+        pixels: &UnsafeSlice<f16>,
         stride: u32,
         width: u32,
         height: u32,

@@ -63,7 +63,7 @@ struct ExecutionUnit<const N: usize> {}
 
 impl<const N: usize> ExecutionUnit<N> {
     #[target_feature(enable = "sse4.1")]
-    unsafe fn pass(
+    fn pass(
         &self,
         _: Arena,
         arena_src: &[f32],
@@ -72,97 +72,99 @@ impl<const N: usize> ExecutionUnit<N> {
         _: FilterRegion,
         scanned_kernel: &[ScanPoint1d<f64>],
     ) {
-        let src = arena_src;
+        unsafe {
+            let src = arena_src;
 
-        let local_src = src;
+            let local_src = src;
 
-        let length = scanned_kernel.len();
+            let length = scanned_kernel.len();
 
-        let max_width = image_size.width * N;
+            let max_width = image_size.width * N;
 
-        let coeff = _mm_set1_pd(scanned_kernel.get_unchecked(0).weight);
+            let coeff = _mm_set1_pd(scanned_kernel.get_unchecked(0).weight);
 
-        let mut cx = 0usize;
+            let mut cx = 0usize;
 
-        while cx + 8 < max_width {
-            let shifted_src = local_src.get_unchecked(cx..);
+            while cx + 8 <= max_width {
+                let shifted_src = local_src.get_unchecked(cx..);
 
-            let source = _mm_load_pack_ps_x2(shifted_src.as_ptr());
-            let mut k0 = _mm_mul_pd(_mm_cvtps_pd(source.0), coeff);
-            let mut k1 = _mm_mul_pd(_mm_cvtps_pd(_mm_movehl_ps(source.0, source.0)), coeff);
-            let mut k2 = _mm_mul_pd(_mm_cvtps_pd(source.1), coeff);
-            let mut k3 = _mm_mul_pd(_mm_cvtps_pd(_mm_movehl_ps(source.1, source.1)), coeff);
+                let source = _mm_load_pack_ps_x2(shifted_src.as_ptr());
+                let mut k0 = _mm_mul_pd(_mm_cvtps_pd(source.0), coeff);
+                let mut k1 = _mm_mul_pd(_mm_cvtps_pd(_mm_movehl_ps(source.0, source.0)), coeff);
+                let mut k2 = _mm_mul_pd(_mm_cvtps_pd(source.1), coeff);
+                let mut k3 = _mm_mul_pd(_mm_cvtps_pd(_mm_movehl_ps(source.1, source.1)), coeff);
 
-            for i in 1..length {
-                let coeff = _mm_set1_pd(scanned_kernel.get_unchecked(i).weight);
-                let v_source = _mm_load_pack_ps_x2(shifted_src.get_unchecked(i * N..).as_ptr());
-                k0 = _mm_fmla_pd(k0, _mm_cvtps_pd(v_source.0), coeff);
-                k1 = _mm_fmla_pd(
-                    k1,
-                    _mm_cvtps_pd(_mm_movehl_ps(v_source.0, v_source.0)),
-                    coeff,
-                );
-                k2 = _mm_fmla_pd(k2, _mm_cvtps_pd(v_source.1), coeff);
-                k3 = _mm_fmla_pd(
-                    k3,
-                    _mm_cvtps_pd(_mm_movehl_ps(v_source.1, v_source.1)),
-                    coeff,
-                );
+                for i in 1..length {
+                    let coeff = _mm_set1_pd(scanned_kernel.get_unchecked(i).weight);
+                    let v_source = _mm_load_pack_ps_x2(shifted_src.get_unchecked(i * N..).as_ptr());
+                    k0 = _mm_fmla_pd(k0, _mm_cvtps_pd(v_source.0), coeff);
+                    k1 = _mm_fmla_pd(
+                        k1,
+                        _mm_cvtps_pd(_mm_movehl_ps(v_source.0, v_source.0)),
+                        coeff,
+                    );
+                    k2 = _mm_fmla_pd(k2, _mm_cvtps_pd(v_source.1), coeff);
+                    k3 = _mm_fmla_pd(
+                        k3,
+                        _mm_cvtps_pd(_mm_movehl_ps(v_source.1, v_source.1)),
+                        coeff,
+                    );
+                }
+
+                let z0 = _mm_cvtpd_ps(k0);
+                let z1 = _mm_cvtpd_ps(k1);
+                let z2 = _mm_cvtpd_ps(k2);
+                let z3 = _mm_cvtpd_ps(k3);
+
+                let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
+                _mm_store_pack_ps_x2(dst_ptr0, (_mm_movelh_ps(z0, z1), _mm_movelh_ps(z2, z3)));
+                cx += 8;
             }
 
-            let z0 = _mm_cvtpd_ps(k0);
-            let z1 = _mm_cvtpd_ps(k1);
-            let z2 = _mm_cvtpd_ps(k2);
-            let z3 = _mm_cvtpd_ps(k3);
+            while cx + 4 <= max_width {
+                let shifted_src = local_src.get_unchecked(cx..);
 
-            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
-            _mm_store_pack_ps_x2(dst_ptr0, (_mm_movelh_ps(z0, z1), _mm_movelh_ps(z2, z3)));
-            cx += 8;
-        }
+                let source_0 = _mm_loadu_ps(shifted_src.as_ptr());
+                let mut k0 = _mm_mul_pd(_mm_cvtps_pd(source_0), coeff);
+                let mut k1 = _mm_mul_pd(_mm_cvtps_pd(_mm_movehl_ps(source_0, source_0)), coeff);
 
-        while cx + 4 < max_width {
-            let shifted_src = local_src.get_unchecked(cx..);
+                for i in 1..length {
+                    let coeff = _mm_set1_pd(scanned_kernel.get_unchecked(i).weight);
+                    let v_source_0 = _mm_loadu_ps(shifted_src.get_unchecked(i * N..).as_ptr());
+                    k0 = _mm_fmla_pd(k0, _mm_cvtps_pd(v_source_0), coeff);
+                    k1 = _mm_fmla_pd(
+                        k1,
+                        _mm_cvtps_pd(_mm_movehl_ps(v_source_0, v_source_0)),
+                        coeff,
+                    );
+                }
 
-            let source_0 = _mm_loadu_ps(shifted_src.as_ptr());
-            let mut k0 = _mm_mul_pd(_mm_cvtps_pd(source_0), coeff);
-            let mut k1 = _mm_mul_pd(_mm_cvtps_pd(_mm_movehl_ps(source_0, source_0)), coeff);
+                let z0 = _mm_cvtpd_ps(k0);
+                let z1 = _mm_cvtpd_ps(k1);
 
-            for i in 1..length {
-                let coeff = _mm_set1_pd(scanned_kernel.get_unchecked(i).weight);
-                let v_source_0 = _mm_loadu_ps(shifted_src.get_unchecked(i * N..).as_ptr());
-                k0 = _mm_fmla_pd(k0, _mm_cvtps_pd(v_source_0), coeff);
-                k1 = _mm_fmla_pd(
-                    k1,
-                    _mm_cvtps_pd(_mm_movehl_ps(v_source_0, v_source_0)),
-                    coeff,
-                );
+                let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
+                _mm_storeu_ps(dst_ptr0, _mm_movelh_ps(z0, z1));
+                cx += 4;
             }
 
-            let z0 = _mm_cvtpd_ps(k0);
-            let z1 = _mm_cvtpd_ps(k1);
+            while cx < max_width {
+                let shifted_src = local_src.get_unchecked(cx..);
 
-            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
-            _mm_storeu_ps(dst_ptr0, _mm_movelh_ps(z0, z1));
-            cx += 4;
-        }
+                let source_0 = _mm_load_ss(shifted_src.as_ptr());
+                let mut k0 = _mm_mul_pd(_mm_cvtps_pd(source_0), coeff);
 
-        while cx < max_width {
-            let shifted_src = local_src.get_unchecked(cx..);
+                for i in 1..length {
+                    let coeff = *scanned_kernel.get_unchecked(i);
+                    let v_source_0 = _mm_load_ss(shifted_src.get_unchecked(i * N..).as_ptr());
+                    k0 = _mm_fmla_pd(k0, _mm_cvtps_pd(v_source_0), _mm_set1_pd(coeff.weight));
+                }
 
-            let source_0 = _mm_load_ss(shifted_src.as_ptr());
-            let mut k0 = _mm_mul_pd(_mm_cvtps_pd(source_0), coeff);
+                let z0 = _mm_cvtpd_ps(k0);
 
-            for i in 1..length {
-                let coeff = *scanned_kernel.get_unchecked(i);
-                let v_source_0 = _mm_load_ss(shifted_src.get_unchecked(i * N..).as_ptr());
-                k0 = _mm_fmla_pd(k0, _mm_cvtps_pd(v_source_0), _mm_set1_pd(coeff.weight));
+                let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
+                _mm_store_ss(dst_ptr0, z0);
+                cx += 1;
             }
-
-            let z0 = _mm_cvtpd_ps(k0);
-
-            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
-            _mm_store_ss(dst_ptr0, z0);
-            cx += 1;
         }
     }
 }

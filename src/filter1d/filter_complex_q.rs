@@ -27,7 +27,7 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::edge_mode::clamp_edge;
-use crate::filter1d::arena::{make_arena_columns, make_arena_row, write_arena_row, Arena};
+use crate::filter1d::arena::{Arena, make_arena_columns, make_arena_row, write_arena_row};
 use crate::filter1d::filter::create_brows;
 use crate::filter1d::filter_complex_dispatch_q::ComplexDispatchQ;
 use crate::filter1d::filter_element::KernelShape;

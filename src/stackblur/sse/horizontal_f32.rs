@@ -45,7 +45,7 @@ impl<const CN: usize> Default for HorizontalSseStackBlurPassFloat32<CN> {
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn horiz_f32_pass_stack_impl<const CN: usize>(
+fn horiz_f32_pass_stack_impl<const CN: usize>(
     pixels: &UnsafeSlice<f32>,
     stride: u32,
     width: u32,
@@ -54,99 +54,101 @@ unsafe fn horiz_f32_pass_stack_impl<const CN: usize>(
     thread: usize,
     total_threads: usize,
 ) {
-    let div = ((radius * 2) + 1) as usize;
-    let v_mul_value = _mm_set1_ps(1. / ((radius as f32 + 1.) * (radius as f32 + 1.)));
-    let mut xp;
-    let mut sp;
-    let mut stack_start;
-    let mut stacks = vec![SseF32x4::default(); div];
+    unsafe {
+        let div = ((radius * 2) + 1) as usize;
+        let v_mul_value = _mm_set1_ps(1. / ((radius as f32 + 1.) * (radius as f32 + 1.)));
+        let mut xp;
+        let mut sp;
+        let mut stack_start;
+        let mut stacks = vec![SseF32x4::default(); div];
 
-    let wm = width - 1;
-    let div = (radius * 2) + 1;
+        let wm = width - 1;
+        let div = (radius * 2) + 1;
 
-    let mut src_ptr;
-    let mut dst_ptr;
+        let mut src_ptr;
+        let mut dst_ptr;
 
-    let min_y = thread * height as usize / total_threads;
-    let max_y = (thread + 1) * height as usize / total_threads;
+        let min_y = thread * height as usize / total_threads;
+        let max_y = (thread + 1) * height as usize / total_threads;
 
-    for y in min_y..max_y {
-        let mut sums = _mm_setzero_ps();
-        let mut sum_in = _mm_setzero_ps();
-        let mut sum_out = _mm_setzero_ps();
+        for y in min_y..max_y {
+            let mut sums = _mm_setzero_ps();
+            let mut sum_in = _mm_setzero_ps();
+            let mut sum_out = _mm_setzero_ps();
 
-        src_ptr = stride as usize * y;
-
-        let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f32;
-        let src_pixel = load_f32::<CN>(src_ld);
-
-        for i in 0..=radius {
-            let stack_value = stacks.as_mut_ptr().add(i as usize);
-            _mm_store_ps(stack_value.cast(), src_pixel);
-            sums = _mm_opt_fmlaf_ps(sums, src_pixel, _mm_set1_ps((i + 1) as f32));
-            sum_out = _mm_add_ps(sum_out, src_pixel);
-        }
-
-        for i in 1..=radius {
-            if i <= wm {
-                src_ptr += CN;
-            }
-            let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize);
-            let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f32;
-            let src_pixel = load_f32::<CN>(src_ld);
-            _mm_store_ps(stack_ptr.cast(), src_pixel);
-            sums = _mm_opt_fmlaf_ps(sums, src_pixel, _mm_set1_ps((radius + 1 - i) as f32));
-
-            sum_in = _mm_add_ps(sum_in, src_pixel);
-        }
-
-        sp = radius;
-        xp = radius;
-        if xp > wm {
-            xp = wm;
-        }
-
-        src_ptr = CN * xp as usize + y * stride as usize;
-        dst_ptr = y * stride as usize;
-        for _ in 0..width {
-            let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut f32;
-            let blurred = _mm_mul_ps(sums, v_mul_value);
-            store_f32::<CN>(store_ld, blurred);
-            dst_ptr += CN;
-
-            sums = _mm_sub_ps(sums, sum_out);
-
-            stack_start = sp + div - radius;
-            if stack_start >= div {
-                stack_start -= div;
-            }
-            let stack = stacks.as_mut_ptr().add(stack_start as usize);
-
-            let stack_val = _mm_load_ps(stack.cast());
-
-            sum_out = _mm_sub_ps(sum_out, stack_val);
-
-            if xp < wm {
-                src_ptr += CN;
-                xp += 1;
-            }
+            src_ptr = stride as usize * y;
 
             let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f32;
             let src_pixel = load_f32::<CN>(src_ld);
-            _mm_store_ps(stack.cast(), src_pixel);
 
-            sum_in = _mm_add_ps(sum_in, src_pixel);
-            sums = _mm_add_ps(sums, sum_in);
-
-            sp += 1;
-            if sp >= div {
-                sp = 0;
+            for i in 0..=radius {
+                let stack_value = stacks.as_mut_ptr().add(i as usize);
+                _mm_store_ps(stack_value.cast(), src_pixel);
+                sums = _mm_opt_fmlaf_ps(sums, src_pixel, _mm_set1_ps((i + 1) as f32));
+                sum_out = _mm_add_ps(sum_out, src_pixel);
             }
-            let stack = stacks.as_mut_ptr().add(sp as usize);
-            let stack_val = _mm_load_ps(stack.cast());
 
-            sum_out = _mm_add_ps(sum_out, stack_val);
-            sum_in = _mm_sub_ps(sum_in, stack_val);
+            for i in 1..=radius {
+                if i <= wm {
+                    src_ptr += CN;
+                }
+                let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize);
+                let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f32;
+                let src_pixel = load_f32::<CN>(src_ld);
+                _mm_store_ps(stack_ptr.cast(), src_pixel);
+                sums = _mm_opt_fmlaf_ps(sums, src_pixel, _mm_set1_ps((radius + 1 - i) as f32));
+
+                sum_in = _mm_add_ps(sum_in, src_pixel);
+            }
+
+            sp = radius;
+            xp = radius;
+            if xp > wm {
+                xp = wm;
+            }
+
+            src_ptr = CN * xp as usize + y * stride as usize;
+            dst_ptr = y * stride as usize;
+            for _ in 0..width {
+                let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut f32;
+                let blurred = _mm_mul_ps(sums, v_mul_value);
+                store_f32::<CN>(store_ld, blurred);
+                dst_ptr += CN;
+
+                sums = _mm_sub_ps(sums, sum_out);
+
+                stack_start = sp + div - radius;
+                if stack_start >= div {
+                    stack_start -= div;
+                }
+                let stack = stacks.as_mut_ptr().add(stack_start as usize);
+
+                let stack_val = _mm_load_ps(stack.cast());
+
+                sum_out = _mm_sub_ps(sum_out, stack_val);
+
+                if xp < wm {
+                    src_ptr += CN;
+                    xp += 1;
+                }
+
+                let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f32;
+                let src_pixel = load_f32::<CN>(src_ld);
+                _mm_store_ps(stack.cast(), src_pixel);
+
+                sum_in = _mm_add_ps(sum_in, src_pixel);
+                sums = _mm_add_ps(sums, sum_in);
+
+                sp += 1;
+                if sp >= div {
+                    sp = 0;
+                }
+                let stack = stacks.as_mut_ptr().add(sp as usize);
+                let stack_val = _mm_load_ps(stack.cast());
+
+                sum_out = _mm_add_ps(sum_out, stack_val);
+                sum_in = _mm_sub_ps(sum_in, stack_val);
+            }
         }
     }
 }

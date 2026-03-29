@@ -53,47 +53,49 @@ pub(crate) unsafe fn load_u8_s32_fast_x2<const CN: usize>(
     ptr0: *const u8,
     ptr1: *const u8,
 ) -> __m256i {
-    let sh1 = _mm256_setr_epi8(
-        0, -1, -1, -1, 1, -1, -1, -1, 2, -1, -1, -1, 3, -1, -1, -1, 0, -1, -1, -1, 1, -1, -1, -1,
-        2, -1, -1, -1, 3, -1, -1, -1,
-    );
-    if CN == 4 {
-        let v0 = _mm_loadu_si32(ptr0 as *const _);
-        let v1 = _mm_loadu_si32(ptr1 as *const _);
+    unsafe {
+        let sh1 = _mm256_setr_epi8(
+            0, -1, -1, -1, 1, -1, -1, -1, 2, -1, -1, -1, 3, -1, -1, -1, 0, -1, -1, -1, 1, -1, -1,
+            -1, 2, -1, -1, -1, 3, -1, -1, -1,
+        );
+        if CN == 4 {
+            let v0 = _mm_loadu_si32(ptr0 as *const _);
+            let v1 = _mm_loadu_si32(ptr1 as *const _);
 
-        _mm256_shuffle_epi8(
-            _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(v0), v1),
-            sh1,
-        )
-    } else if CN == 3 {
-        let mut v0 = _mm_loadu_si16(ptr0);
-        v0 = _mm_insert_epi8::<2>(v0, ptr0.add(2).read_unaligned() as i32);
-        let mut v1 = _mm_loadu_si16(ptr1);
-        v1 = _mm_insert_epi8::<2>(v1, ptr1.add(2).read_unaligned() as i32);
-        _mm256_shuffle_epi8(
-            _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(v0), v1),
-            sh1,
-        )
-    } else if CN == 2 {
-        let v0 = _mm_loadu_si16(ptr0);
-        let v1 = _mm_loadu_si16(ptr1);
-        _mm256_shuffle_epi8(
-            _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(v0), v1),
-            sh1,
-        )
-    } else {
-        _mm256_shuffle_epi8(
-            _mm256_inserti128_si256::<1>(
-                _mm256_castsi128_si256(_mm_cvtsi32_si128(ptr0.read_unaligned() as i32)),
-                _mm_cvtsi32_si128(ptr1.read_unaligned() as i32),
-            ),
-            sh1,
-        )
+            _mm256_shuffle_epi8(
+                _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(v0), v1),
+                sh1,
+            )
+        } else if CN == 3 {
+            let mut v0 = _mm_loadu_si16(ptr0);
+            v0 = _mm_insert_epi8::<2>(v0, ptr0.add(2).read_unaligned() as i32);
+            let mut v1 = _mm_loadu_si16(ptr1);
+            v1 = _mm_insert_epi8::<2>(v1, ptr1.add(2).read_unaligned() as i32);
+            _mm256_shuffle_epi8(
+                _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(v0), v1),
+                sh1,
+            )
+        } else if CN == 2 {
+            let v0 = _mm_loadu_si16(ptr0);
+            let v1 = _mm_loadu_si16(ptr1);
+            _mm256_shuffle_epi8(
+                _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(v0), v1),
+                sh1,
+            )
+        } else {
+            _mm256_shuffle_epi8(
+                _mm256_inserti128_si256::<1>(
+                    _mm256_castsi128_si256(_mm_cvtsi32_si128(ptr0.read_unaligned() as i32)),
+                    _mm_cvtsi32_si128(ptr1.read_unaligned() as i32),
+                ),
+                sh1,
+            )
+        }
     }
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn box_blur_horizontal_pass_impl<const CN: usize>(
+fn box_blur_horizontal_pass_impl<const CN: usize>(
     src: &[u8],
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<u8>,
@@ -113,7 +115,7 @@ unsafe fn box_blur_horizontal_pass_impl<const CN: usize>(
 
     let mut yy = start_y;
 
-    while yy + 6 < end_y {
+    while yy + 6 <= end_y {
         let y = yy;
         let y_src_shift = y as usize * src_stride as usize;
         let y_dst_shift = y as usize * dst_stride as usize;

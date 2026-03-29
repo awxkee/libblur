@@ -139,8 +139,6 @@ pub(crate) fn neon_ring_vertical_row_summ_rdm_impl(
     let weight = (((1i64 << 31) - 1) as f64 / (radius as f64 * 2. + 1.)) as i32;
     let v_weight = unsafe { vdupq_n_s32(weight) };
 
-    let chunks = previous_row.chunks_exact(16).len();
-
     for (((src_next, src_previous), buffer), dst) in next_row
         .chunks_exact(16)
         .zip(previous_row.chunks_exact(16))
@@ -197,12 +195,16 @@ pub(crate) fn neon_ring_vertical_row_summ_rdm_impl(
         }
     }
 
-    for (((src_next, src_previous), buffer), dst) in next_row
+    let next_rem = next_row.chunks_exact(16).remainder();
+    let previous_rem = previous_row.chunks_exact(16).remainder();
+    let working_rem = working_row.chunks_exact_mut(16).into_remainder();
+    let dst_rem = dst.chunks_exact_mut(16).into_remainder();
+
+    for (((src_next, src_previous), buffer), dst) in next_rem
         .iter()
-        .zip(previous_row.iter())
-        .zip(working_row.iter_mut())
-        .zip(dst.iter_mut())
-        .skip(chunks * 16)
+        .zip(previous_rem.iter())
+        .zip(working_rem.iter_mut())
+        .zip(dst_rem.iter_mut())
     {
         let mut weight0 = *buffer;
 

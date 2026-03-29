@@ -27,7 +27,6 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter1d::arena::Arena;
-use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::region::FilterRegion;
 use crate::filter1d::to_approx_storage::ToApproxStorage;
 use crate::img_size::ImageSize;
@@ -40,7 +39,7 @@ pub(crate) fn filter_column_approx<T, I>(
     dst: &mut [T],
     image_size: ImageSize,
     _: FilterRegion,
-    scanned_kernel: &[ScanPoint1d<I>],
+    scanned_kernel: &[I],
 ) where
     T: Copy + AsPrimitive<I> + Default,
     I: Copy
@@ -63,28 +62,28 @@ pub(crate) fn filter_column_approx<T, I>(
         while cx + 4 < dst_stride {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
-            let mut k0 = v_src.get_unchecked(0).as_().mul(coeff.weight);
-            let mut k1 = v_src.get_unchecked(1).as_().mul(coeff.weight);
-            let mut k2 = v_src.get_unchecked(2).as_().mul(coeff.weight);
-            let mut k3 = v_src.get_unchecked(3).as_().mul(coeff.weight);
+            let mut k0 = v_src.get_unchecked(0).as_().mul(coeff);
+            let mut k1 = v_src.get_unchecked(1).as_().mul(coeff);
+            let mut k2 = v_src.get_unchecked(2).as_().mul(coeff);
+            let mut k3 = v_src.get_unchecked(3).as_().mul(coeff);
 
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
                 k0 = (*arena_src.get_unchecked(i).get_unchecked(cx))
                     .as_()
-                    .mul(coeff.weight)
+                    .mul(coeff)
                     .add(k0);
                 k1 = (*arena_src.get_unchecked(i).get_unchecked(cx + 1))
                     .as_()
-                    .mul(coeff.weight)
+                    .mul(coeff)
                     .add(k1);
                 k2 = (*arena_src.get_unchecked(i).get_unchecked(cx + 2))
                     .as_()
-                    .mul(coeff.weight)
+                    .mul(coeff)
                     .add(k2);
                 k3 = (*arena_src.get_unchecked(i).get_unchecked(cx + 3))
                     .as_()
-                    .mul(coeff.weight)
+                    .mul(coeff)
                     .add(k3);
             }
 
@@ -98,13 +97,13 @@ pub(crate) fn filter_column_approx<T, I>(
         for x in cx..dst_stride {
             let v_src = arena_src.get_unchecked(0).get_unchecked(x..);
 
-            let mut k0 = v_src.get_unchecked(0).as_().mul(coeff.weight);
+            let mut k0 = v_src.get_unchecked(0).as_().mul(coeff);
 
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
                 k0 = (*arena_src.get_unchecked(i).get_unchecked(x))
                     .as_()
-                    .mul(coeff.weight)
+                    .mul(coeff)
                     .add(k0);
             }
 

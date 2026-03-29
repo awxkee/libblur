@@ -28,7 +28,6 @@
  */
 use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_1d_column_handler::FilterBrows;
-use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::neon::utils::{
     vfmlaq_symm_u16_u16, vmullq_u16_by_u16, vqmovnq_u32_u16, xvld1q_u16_x2, xvst1q_u16_x2,
 };
@@ -44,7 +43,7 @@ pub(crate) fn filter_symm_column_neon_uq15_u16_x3(
     dst: &mut [u16],
     image_size: ImageSize,
     dst_stride: usize,
-    scanned_kernel: &[ScanPoint1d<u32>],
+    scanned_kernel: &[u32],
 ) {
     unsafe {
         let image_width = image_size.width * arena.components;
@@ -65,7 +64,7 @@ pub(crate) fn filter_symm_column_neon_uq15_u16_x3(
 
         let mut cx = 0usize;
 
-        let coeff = vdupq_n_u16(scanned_kernel.get_unchecked(half_len).weight as u16);
+        let coeff = vdupq_n_u16(*scanned_kernel.get_unchecked(half_len) as u16);
 
         while cx + 16 < image_width {
             let v_src0 = ref0.get_unchecked(cx..);
@@ -86,7 +85,7 @@ pub(crate) fn filter_symm_column_neon_uq15_u16_x3(
             let mut k1_2 = vmullq_u16_by_u16(source2.1, coeff);
 
             for i in 0..half_len {
-                let coeff = vdupq_n_u32(scanned_kernel.get_unchecked(i).weight);
+                let coeff = vdupq_n_u32(*scanned_kernel.get_unchecked(i));
                 let rollback = length - i - 1;
 
                 let v_source0_0 =
@@ -147,7 +146,7 @@ pub(crate) fn filter_symm_column_neon_uq15_u16_x3(
             let mut k2 = vmullq_u16_by_u16(source2, coeff);
 
             for i in 0..half_len {
-                let coeff = vdupq_n_u32(scanned_kernel.get_unchecked(i).weight);
+                let coeff = vdupq_n_u32(*scanned_kernel.get_unchecked(i));
                 let rollback = length - i - 1;
                 let v_source0_0 = vld1q_u16(brows0.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 let v_source1_0 =
@@ -191,7 +190,7 @@ pub(crate) fn filter_symm_column_neon_uq15_u16_x3(
             let mut k2 = vmull_u16(source2, vget_low_u16(coeff));
 
             for i in 0..half_len {
-                let coeff = vdupq_n_u32(scanned_kernel.get_unchecked(i).weight);
+                let coeff = vdupq_n_u32(*scanned_kernel.get_unchecked(i));
                 let rollback = length - i - 1;
                 let v_source0_0 = vld1_u16(brows0.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 let v_source1_0 =
@@ -221,7 +220,7 @@ pub(crate) fn filter_symm_column_neon_uq15_u16_x3(
             cx += 4;
         }
 
-        let coeff = scanned_kernel.get_unchecked(half_len).weight;
+        let coeff = scanned_kernel.get_unchecked(half_len);
 
         for x in cx..dst_stride {
             let mut k0 = (*ref0.get_unchecked(x) as u32).mul(coeff);
@@ -235,21 +234,21 @@ pub(crate) fn filter_symm_column_neon_uq15_u16_x3(
                     k0,
                     ((*brows0.get_unchecked(i).get_unchecked(x)) as u32)
                         .add(*brows0.get_unchecked(rollback).get_unchecked(x) as u32),
-                    coeff.weight,
+                    coeff,
                 );
 
                 k1 = mlaf(
                     k1,
                     ((*brows1.get_unchecked(i).get_unchecked(x)) as u32)
                         .add(*brows1.get_unchecked(rollback).get_unchecked(x) as u32),
-                    coeff.weight,
+                    coeff,
                 );
 
                 k2 = mlaf(
                     k2,
                     ((*brows2.get_unchecked(i).get_unchecked(x)) as u32)
                         .add(*brows2.get_unchecked(rollback).get_unchecked(x) as u32),
-                    coeff.weight,
+                    coeff,
                 );
             }
 

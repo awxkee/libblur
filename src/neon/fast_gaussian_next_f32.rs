@@ -27,17 +27,17 @@
 
 use std::arch::aarch64::*;
 
+use crate::EdgeMode;
 use crate::edge_mode::clamp_edge;
 use crate::neon::utils::{load_f32_fast, store_f32};
 use crate::unsafe_slice::UnsafeSlice;
-use crate::EdgeMode;
 
 #[repr(C, align(16))]
 #[derive(Copy, Clone, Default)]
 pub(crate) struct NeonF32x4(pub(crate) [f32; 4]);
 
-pub(crate) fn fgn_vertical_pass_neon_f32<T, const CHANNELS_COUNT: usize>(
-    undef_bytes: &UnsafeSlice<T>,
+pub(crate) fn fgn_vertical_pass_neon_f32<const CN: usize>(
+    bytes: &UnsafeSlice<f32>,
     stride: u32,
     width: u32,
     height: u32,
@@ -47,9 +47,7 @@ pub(crate) fn fgn_vertical_pass_neon_f32<T, const CHANNELS_COUNT: usize>(
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        let bytes: &UnsafeSlice<'_, f32> = std::mem::transmute(undef_bytes);
-
-        let mut full_buffer = Box::new([NeonF32x4::default(); 1024 * 4]);
+        let mut full_buffer = [NeonF32x4::default(); 1024 * 4];
 
         let (bf0, rem) = full_buffer.split_at_mut(1024);
         let (bf1, rem) = rem.split_at_mut(1024);
@@ -63,7 +61,7 @@ pub(crate) fn fgn_vertical_pass_neon_f32<T, const CHANNELS_COUNT: usize>(
 
         let mut xx = start as usize;
 
-        while xx + 4 < width.min(end) as usize {
+        while xx + 4 <= width.min(end) as usize {
             let mut diffs0 = vdupq_n_f32(0f32);
             let mut diffs1 = vdupq_n_f32(0f32);
             let mut diffs2 = vdupq_n_f32(0f32);
@@ -79,10 +77,10 @@ pub(crate) fn fgn_vertical_pass_neon_f32<T, const CHANNELS_COUNT: usize>(
             let mut summs2 = vdupq_n_f32(0f32);
             let mut summs3 = vdupq_n_f32(0f32);
 
-            let current_px0 = xx * CHANNELS_COUNT;
-            let current_px1 = (xx + 1) * CHANNELS_COUNT;
-            let current_px2 = (xx + 2) * CHANNELS_COUNT;
-            let current_px3 = (xx + 3) * CHANNELS_COUNT;
+            let current_px0 = xx * CN;
+            let current_px1 = (xx + 1) * CN;
+            let current_px2 = (xx + 2) * CN;
+            let current_px3 = (xx + 3) * CN;
 
             let start_y = 0 - 3 * radius as i64;
             for y in start_y..height_wide {
@@ -99,10 +97,10 @@ pub(crate) fn fgn_vertical_pass_neon_f32<T, const CHANNELS_COUNT: usize>(
                     let dst_ptr2 = bytes.slice.as_ptr().add(current_y + current_px2) as *mut f32;
                     let dst_ptr3 = bytes.slice.as_ptr().add(current_y + current_px3) as *mut f32;
 
-                    store_f32::<CHANNELS_COUNT>(dst_ptr0, prepared_px0);
-                    store_f32::<CHANNELS_COUNT>(dst_ptr1, prepared_px1);
-                    store_f32::<CHANNELS_COUNT>(dst_ptr2, prepared_px2);
-                    store_f32::<CHANNELS_COUNT>(dst_ptr3, prepared_px3);
+                    store_f32::<CN>(dst_ptr0, prepared_px0);
+                    store_f32::<CN>(dst_ptr1, prepared_px1);
+                    store_f32::<CN>(dst_ptr2, prepared_px2);
+                    store_f32::<CN>(dst_ptr3, prepared_px3);
 
                     let d_a_1 = ((y + radius_64) & 1023) as usize;
                     let d_a_2 = ((y - radius_64) & 1023) as usize;
@@ -175,10 +173,10 @@ pub(crate) fn fgn_vertical_pass_neon_f32<T, const CHANNELS_COUNT: usize>(
                 let s_ptr2 = bytes.slice.as_ptr().add(next_row_y + current_px2) as *mut f32;
                 let s_ptr3 = bytes.slice.as_ptr().add(next_row_y + current_px3) as *mut f32;
 
-                let pixel_color0 = load_f32_fast::<CHANNELS_COUNT>(s_ptr0);
-                let pixel_color1 = load_f32_fast::<CHANNELS_COUNT>(s_ptr1);
-                let pixel_color2 = load_f32_fast::<CHANNELS_COUNT>(s_ptr2);
-                let pixel_color3 = load_f32_fast::<CHANNELS_COUNT>(s_ptr3);
+                let pixel_color0 = load_f32_fast::<CN>(s_ptr0);
+                let pixel_color1 = load_f32_fast::<CN>(s_ptr1);
+                let pixel_color2 = load_f32_fast::<CN>(s_ptr2);
+                let pixel_color3 = load_f32_fast::<CN>(s_ptr3);
 
                 let a_i = ((y + 2 * radius_64) & 1023) as usize;
 
@@ -215,11 +213,11 @@ pub(crate) fn fgn_vertical_pass_neon_f32<T, const CHANNELS_COUNT: usize>(
             for y in start_y..height_wide {
                 if y >= 0 {
                     let current_y = (y * (stride as i64)) as usize;
-                    let current_px = x * CHANNELS_COUNT;
+                    let current_px = x * CN;
 
                     let prepared_px = vmulq_f32(summs, f_weight);
                     let dst_ptr = bytes.slice.as_ptr().add(current_y + current_px) as *mut f32;
-                    store_f32::<CHANNELS_COUNT>(dst_ptr, prepared_px);
+                    store_f32::<CN>(dst_ptr, prepared_px);
 
                     let d_arr_index_1 = ((y + radius_64) & 1023) as usize;
                     let d_arr_index_2 = ((y - radius_64) & 1023) as usize;
@@ -256,11 +254,11 @@ pub(crate) fn fgn_vertical_pass_neon_f32<T, const CHANNELS_COUNT: usize>(
 
                 let next_row_y = clamp_edge!(edge_mode, y + ((3 * radius_64) >> 1), 0, height_wide)
                     * (stride as usize);
-                let next_row_x = x * CHANNELS_COUNT;
+                let next_row_x = x * CN;
 
                 let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_x) as *mut f32;
 
-                let pixel_color = load_f32_fast::<CHANNELS_COUNT>(s_ptr);
+                let pixel_color = load_f32_fast::<CN>(s_ptr);
 
                 let arr_index = ((y + 2 * radius_64) & 1023) as usize;
                 let buf_ptr = bf0.as_mut_ptr().add(arr_index) as *mut f32;
@@ -274,8 +272,8 @@ pub(crate) fn fgn_vertical_pass_neon_f32<T, const CHANNELS_COUNT: usize>(
     }
 }
 
-pub(crate) fn fgn_horizontal_pass_neon_f32<T, const CHANNELS_COUNT: usize>(
-    undef_bytes: &UnsafeSlice<T>,
+pub(crate) fn fgn_horizontal_pass_neon_f32<const CN: usize>(
+    bytes: &UnsafeSlice<f32>,
     stride: u32,
     width: u32,
     height: u32,
@@ -285,13 +283,11 @@ pub(crate) fn fgn_horizontal_pass_neon_f32<T, const CHANNELS_COUNT: usize>(
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        let mut full_buffer = Box::new([NeonF32x4::default(); 1024 * 4]);
+        let mut full_buffer = [NeonF32x4::default(); 1024 * 4];
 
         let (bf0, rem) = full_buffer.split_at_mut(1024);
         let (bf1, rem) = rem.split_at_mut(1024);
         let (bf2, bf3) = rem.split_at_mut(1024);
-
-        let bytes: &UnsafeSlice<'_, f32> = std::mem::transmute(undef_bytes);
 
         let width_wide = width as i64;
 
@@ -326,7 +322,7 @@ pub(crate) fn fgn_horizontal_pass_neon_f32<T, const CHANNELS_COUNT: usize>(
 
             for x in start_x..(width as i64) {
                 if x >= 0 {
-                    let current_px = x as usize * CHANNELS_COUNT;
+                    let current_px = x as usize * CN;
 
                     let prepared_px0 = vmulq_f32(summs0, f_weight);
                     let prepared_px1 = vmulq_f32(summs1, f_weight);
@@ -338,10 +334,10 @@ pub(crate) fn fgn_horizontal_pass_neon_f32<T, const CHANNELS_COUNT: usize>(
                     let dst_ptr2 = bytes.slice.as_ptr().add(current_y2 + current_px) as *mut f32;
                     let dst_ptr3 = bytes.slice.as_ptr().add(current_y3 + current_px) as *mut f32;
 
-                    store_f32::<CHANNELS_COUNT>(dst_ptr0, prepared_px0);
-                    store_f32::<CHANNELS_COUNT>(dst_ptr1, prepared_px1);
-                    store_f32::<CHANNELS_COUNT>(dst_ptr2, prepared_px2);
-                    store_f32::<CHANNELS_COUNT>(dst_ptr3, prepared_px3);
+                    store_f32::<CN>(dst_ptr0, prepared_px0);
+                    store_f32::<CN>(dst_ptr1, prepared_px1);
+                    store_f32::<CN>(dst_ptr2, prepared_px2);
+                    store_f32::<CN>(dst_ptr3, prepared_px3);
 
                     let d_a_1 = ((x + radius_64) & 1023) as usize;
                     let d_a_2 = ((x - radius_64) & 1023) as usize;
@@ -407,17 +403,17 @@ pub(crate) fn fgn_horizontal_pass_neon_f32<T, const CHANNELS_COUNT: usize>(
                 }
 
                 let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide);
-                let next_row_px = next_row_x * CHANNELS_COUNT;
+                let next_row_px = next_row_x * CN;
 
                 let s_ptr0 = bytes.slice.as_ptr().add(current_y0 + next_row_px) as *mut f32;
                 let s_ptr1 = bytes.slice.as_ptr().add(current_y1 + next_row_px) as *mut f32;
                 let s_ptr2 = bytes.slice.as_ptr().add(current_y2 + next_row_px) as *mut f32;
                 let s_ptr3 = bytes.slice.as_ptr().add(current_y3 + next_row_px) as *mut f32;
 
-                let pixel_color0 = load_f32_fast::<CHANNELS_COUNT>(s_ptr0);
-                let pixel_color1 = load_f32_fast::<CHANNELS_COUNT>(s_ptr1);
-                let pixel_color2 = load_f32_fast::<CHANNELS_COUNT>(s_ptr2);
-                let pixel_color3 = load_f32_fast::<CHANNELS_COUNT>(s_ptr3);
+                let pixel_color0 = load_f32_fast::<CN>(s_ptr0);
+                let pixel_color1 = load_f32_fast::<CN>(s_ptr1);
+                let pixel_color2 = load_f32_fast::<CN>(s_ptr2);
+                let pixel_color3 = load_f32_fast::<CN>(s_ptr3);
 
                 let a_i = ((x + 2 * radius_64) & 1023) as usize;
 
@@ -455,12 +451,12 @@ pub(crate) fn fgn_horizontal_pass_neon_f32<T, const CHANNELS_COUNT: usize>(
             for x in start_x..(width as i64) {
                 if x >= 0 {
                     let current_y = ((y as i64) * (stride as i64)) as usize;
-                    let current_px = x as usize * CHANNELS_COUNT;
+                    let current_px = x as usize * CN;
 
                     let prepared_px = vmulq_f32(summs, f_weight);
 
                     let dst_ptr = bytes.slice.as_ptr().add(current_y + current_px) as *mut f32;
-                    store_f32::<CHANNELS_COUNT>(dst_ptr, prepared_px);
+                    store_f32::<CN>(dst_ptr, prepared_px);
 
                     let d_arr_index_1 = ((x + radius_64) & 1023) as usize;
                     let d_arr_index_2 = ((x - radius_64) & 1023) as usize;
@@ -497,10 +493,10 @@ pub(crate) fn fgn_horizontal_pass_neon_f32<T, const CHANNELS_COUNT: usize>(
 
                 let next_row_y = y * (stride as usize);
                 let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide);
-                let next_row_px = next_row_x * CHANNELS_COUNT;
+                let next_row_px = next_row_x * CN;
 
                 let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut f32;
-                let pixel_color = load_f32_fast::<CHANNELS_COUNT>(s_ptr);
+                let pixel_color = load_f32_fast::<CN>(s_ptr);
 
                 let arr_index = ((x + 2 * radius_64) & 1023) as usize;
                 let buf_ptr = bf0.as_mut_ptr().add(arr_index) as *mut f32;

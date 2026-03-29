@@ -36,7 +36,6 @@ use crate::filter1d::avx::utils::{
     _mm256_mul_add_symm_epi8_by_epi16_x4, _mm256_mul_epi8_by_epi16_x4, _mm256_pack_epi32_x4_epi8,
 };
 use crate::filter1d::filter_1d_column_handler::FilterBrows;
-use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::to_approx_storage::ToApproxStorage;
 use crate::img_size::ImageSize;
 use std::arch::x86_64::*;
@@ -48,42 +47,27 @@ pub(crate) fn filter_column_avx_symm_u8_i32_app_x2(
     dst: &mut [u8],
     image_size: ImageSize,
     dst_stride: usize,
-    scanned_kernel: &[ScanPoint1d<i32>],
+    kernel: &[i32],
 ) {
     unsafe {
-        filter_column_avx_symm_u8_i32_impl_x2(
-            arena,
-            brows,
-            dst,
-            image_size,
-            dst_stride,
-            scanned_kernel,
-        );
+        filter_column_avx_symm_u8_i32_impl_x2(arena, brows, dst, image_size, dst_stride, kernel);
     }
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn filter_column_avx_symm_u8_i32_impl_x2(
+fn filter_column_avx_symm_u8_i32_impl_x2(
     arena: Arena,
     brows: FilterBrows<u8>,
     dst: &mut [u8],
     image_size: ImageSize,
     dst_stride: usize,
-    scanned_kernel: &[ScanPoint1d<i32>],
+    kernel: &[i32],
 ) {
     unsafe {
         let image_width = image_size.width * arena.components;
 
-        let length = scanned_kernel.len();
+        let length = kernel.len();
         let half_len = length / 2;
-
-        let v_prepared = scanned_kernel
-            .iter()
-            .map(|&x| {
-                let z = x.weight.to_ne_bytes();
-                i32::from_ne_bytes([z[0], z[1], z[0], z[1]])
-            })
-            .collect::<Vec<_>>();
 
         let brows0 = brows.brows[0];
         let brows1 = brows.brows[1];
@@ -95,7 +79,7 @@ unsafe fn filter_column_avx_symm_u8_i32_impl_x2(
         let ref0 = brows0.get_unchecked(half_len);
         let ref1 = brows1.get_unchecked(half_len);
 
-        let coeff = _mm256_set1_epi32(*v_prepared.get_unchecked(half_len));
+        let coeff = _mm256_set1_epi32(*kernel.get_unchecked(half_len));
 
         while cx + 64 <= image_width {
             let v_src0 = ref0.get_unchecked(cx..);
@@ -112,7 +96,7 @@ unsafe fn filter_column_avx_symm_u8_i32_impl_x2(
 
             for i in 0..half_len {
                 let rollback = length - i - 1;
-                let coeff = _mm256_set1_epi32(*v_prepared.get_unchecked(i));
+                let coeff = _mm256_set1_epi32(*kernel.get_unchecked(i));
                 let v_source0_0 =
                     _mm256_load_pack_x2(brows0.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 let v_source1_0 = _mm256_load_pack_x2(
@@ -165,7 +149,7 @@ unsafe fn filter_column_avx_symm_u8_i32_impl_x2(
 
             for i in 0..half_len {
                 let rollback = length - i - 1;
-                let coeff = _mm256_set1_epi32(*v_prepared.get_unchecked(i));
+                let coeff = _mm256_set1_epi32(*kernel.get_unchecked(i));
 
                 let v_source0_0 = _mm256_loadu_si256(
                     brows0.get_unchecked(i).get_unchecked(cx..).as_ptr() as *const __m256i,
@@ -205,7 +189,7 @@ unsafe fn filter_column_avx_symm_u8_i32_impl_x2(
 
             for i in 0..half_len {
                 let rollback = length - i - 1;
-                let coeff = _mm_set1_epi32(*v_prepared.get_unchecked(i));
+                let coeff = _mm_set1_epi32(*kernel.get_unchecked(i));
                 let v_source0_0 = _mm_loadu_si128(
                     brows0.get_unchecked(i).get_unchecked(cx..).as_ptr() as *const __m128i,
                 );
@@ -243,7 +227,7 @@ unsafe fn filter_column_avx_symm_u8_i32_impl_x2(
 
             for i in 0..half_len {
                 let rollback = length - i - 1;
-                let coeff = _mm_set1_epi32(*v_prepared.get_unchecked(i));
+                let coeff = _mm_set1_epi32(*kernel.get_unchecked(i));
                 let v_source0_0 = _mm_loadu_si64(
                     brows0.get_unchecked(i).get_unchecked(cx..).as_ptr() as *const _,
                 );
@@ -281,7 +265,7 @@ unsafe fn filter_column_avx_symm_u8_i32_impl_x2(
 
             for i in 0..half_len {
                 let rollback = length - i - 1;
-                let coeff = _mm_set1_epi32(*v_prepared.get_unchecked(i));
+                let coeff = _mm_set1_epi32(*kernel.get_unchecked(i));
                 let v_source0_0 = _mm_loadu_si32(
                     brows0.get_unchecked(i).get_unchecked(cx..).as_ptr() as *const _,
                 );
@@ -308,25 +292,29 @@ unsafe fn filter_column_avx_symm_u8_i32_impl_x2(
         }
 
         for x in cx..image_width {
-            let coeff = *scanned_kernel.get_unchecked(half_len);
+            let coeff = *kernel.get_unchecked(half_len);
+            let cb = coeff.to_ne_bytes();
+            let wb = i16::from_ne_bytes([cb[0], cb[1]]);
 
             let v_src0 = ref0.get_unchecked(x..);
             let v_src1 = ref1.get_unchecked(x..);
 
-            let mut k0 = ((*v_src0.get_unchecked(0)) as i32).mul(coeff.weight);
-            let mut k1 = ((*v_src1.get_unchecked(0)) as i32).mul(coeff.weight);
+            let mut k0 = ((*v_src0.get_unchecked(0)) as i32).mul(wb as i32);
+            let mut k1 = ((*v_src1.get_unchecked(0)) as i32).mul(wb as i32);
 
             for i in 0..half_len {
-                let coeff = *scanned_kernel.get_unchecked(i);
+                let coeff = *kernel.get_unchecked(i);
                 let rollback = length - i - 1;
+                let cb = coeff.to_ne_bytes();
+                let wb = i16::from_ne_bytes([cb[0], cb[1]]);
                 k0 = ((*brows0.get_unchecked(i).get_unchecked(x)) as i32)
                     .add((*brows0.get_unchecked(rollback).get_unchecked(x)) as i32)
-                    .mul(coeff.weight)
+                    .mul(wb as i32)
                     .add(k0);
 
                 k1 = ((*brows1.get_unchecked(i).get_unchecked(x)) as i32)
                     .add((*brows1.get_unchecked(rollback).get_unchecked(x)) as i32)
-                    .mul(coeff.weight)
+                    .mul(wb as i32)
                     .add(k1);
             }
 

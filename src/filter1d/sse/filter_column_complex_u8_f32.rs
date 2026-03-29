@@ -37,28 +37,27 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 #[inline(always)]
-pub(crate) unsafe fn mq_complex_mla(
-    acc_r: __m128,
-    r0i0: __m128,
-    r: __m128,
-    r_swop: __m128,
-) -> __m128 {
-    let c0 = _mm_mul_ps(r0i0, r);
-    let c1 = _mm_mul_ps(
-        _mm_shuffle_ps::<{ _shuffle(2, 3, 0, 1) }>(r0i0, r0i0),
-        r_swop,
-    );
-    _mm_add_ps(acc_r, _mm_addsub_ps(c0, c1))
+pub(crate) fn mq_complex_mla(acc_r: __m128, r0i0: __m128, r: __m128, r_swop: __m128) -> __m128 {
+    unsafe {
+        let c0 = _mm_mul_ps(r0i0, r);
+        let c1 = _mm_mul_ps(
+            _mm_shuffle_ps::<{ _shuffle(2, 3, 0, 1) }>(r0i0, r0i0),
+            r_swop,
+        );
+        _mm_add_ps(acc_r, _mm_addsub_ps(c0, c1))
+    }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn mq_complex_mul(r0i0: __m128, r: __m128, r_swop: __m128) -> __m128 {
-    let c0 = _mm_mul_ps(r0i0, r);
-    let c1 = _mm_mul_ps(
-        _mm_shuffle_ps::<{ _shuffle(2, 3, 0, 1) }>(r0i0, r0i0),
-        r_swop,
-    );
-    _mm_addsub_ps(c0, c1)
+pub(crate) fn mq_complex_mul(r0i0: __m128, r: __m128, r_swop: __m128) -> __m128 {
+    unsafe {
+        let c0 = _mm_mul_ps(r0i0, r);
+        let c1 = _mm_mul_ps(
+            _mm_shuffle_ps::<{ _shuffle(2, 3, 0, 1) }>(r0i0, r0i0),
+            r_swop,
+        );
+        _mm_addsub_ps(c0, c1)
+    }
 }
 
 pub(crate) fn filter_sse_column_complex_u8_f32(
@@ -74,7 +73,7 @@ pub(crate) fn filter_sse_column_complex_u8_f32(
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn filter_sse_column_complex_u8_f32_impl(
+fn filter_sse_column_complex_u8_f32_impl(
     arena: Arena,
     arena_src: &[&[Complex<f32>]],
     dst: &mut [u8],

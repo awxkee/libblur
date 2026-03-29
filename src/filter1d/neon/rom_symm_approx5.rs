@@ -27,7 +27,6 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::edge_mode::clamp_edge;
-use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::neon::utils::xvld4u8;
 use crate::filter1d::row_handler_small_approx::{RowsHolder, RowsHolderMut};
 use crate::{BorderHandle, ImageSize};
@@ -38,34 +37,18 @@ pub(crate) fn filter_row_symm_neon_binter_u8_uq0_7_x5<const N: usize>(
     m_src: &RowsHolder<u8>,
     m_dst: &mut RowsHolderMut<u8>,
     image_size: ImageSize,
-    scanned_kernel: &[ScanPoint1d<i32>],
+    kernel: &[u8],
 ) {
     assert!(N <= 4);
-    let mut shifted = scanned_kernel
-        .iter()
-        .map(|&x| ((x.weight) >> 8) as u8)
-        .collect::<Vec<_>>();
-    let mut sum: u32 = shifted.iter().map(|&x| x as u32).sum();
-    if sum > 128 {
-        let half = shifted.len() / 2;
-        while sum > 128 {
-            shifted[half] = shifted[half].saturating_sub(1);
-            sum -= 1;
-        }
-    } else if sum < 128 {
-        let half = shifted.len() / 2;
-        while sum < 128 {
-            shifted[half] = shifted[half].saturating_add(1);
-            sum += 1;
-        }
-    }
-    executor_unit_5_q0_u8::<N>(edge_mode, m_src, m_dst, image_size, &shifted);
+    executor_unit_5_q0_u8::<N>(edge_mode, m_src, m_dst, image_size, kernel);
 }
 
 #[inline(always)]
-pub(crate) unsafe fn xvst_u8x4_q0_7(a: *mut u8, v: uint16x8_t) {
-    let shifted = vqrshrn_n_u16::<7>(v);
-    vst1_lane_u32::<0>(a as *mut _, vreinterpret_u32_u8(shifted));
+pub(crate) fn xvst_u8x4_q0_7(a: *mut u8, v: uint16x8_t) {
+    unsafe {
+        let shifted = vqrshrn_n_u16::<7>(v);
+        vst1_lane_u32::<0>(a as *mut _, vreinterpret_u32_u8(shifted));
+    }
 }
 
 fn executor_unit_5_q0_u8<const N: usize>(

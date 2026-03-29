@@ -68,7 +68,7 @@ pub(crate) fn filter_column_avx_symm_f32_f64(
 }
 
 #[target_feature(enable = "avx2", enable = "fma")]
-unsafe fn filter_column_avx_symm_f32_f64_impl_fma(
+fn filter_column_avx_symm_f32_f64_impl_fma(
     arena: Arena,
     arena_src: &[&[f32]],
     dst: &mut [f32],
@@ -88,7 +88,7 @@ unsafe fn filter_column_avx_symm_f32_f64_impl_fma(
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn filter_column_avx_symm_f32_f64_impl_def(
+fn filter_column_avx_symm_f32_f64_impl_def(
     arena: Arena,
     arena_src: &[&[f32]],
     dst: &mut [f32],
@@ -112,7 +112,7 @@ struct ExecutionUnit<const FMA: bool> {}
 
 impl<const FMA: bool> ExecutionUnit<FMA> {
     #[inline(always)]
-    unsafe fn pass(
+    fn pass(
         &self,
         arena: Arena,
         arena_src: &[&[f32]],
@@ -133,7 +133,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
 
             let mut cx = 0usize;
 
-            while cx + 16 < dst_stride {
+            while cx + 16 <= dst_stride {
                 let v_src = ref0.get_unchecked(cx..);
 
                 let source = _mm256_load_pack_ps_x2(v_src.as_ptr());
@@ -209,7 +209,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
                 cx += 16;
             }
 
-            while cx + 8 < dst_stride {
+            while cx + 8 <= dst_stride {
                 let v_src = ref0.get_unchecked(cx..);
 
                 let source = _mm256_loadu_ps(v_src.as_ptr());
@@ -258,15 +258,15 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
                 cx += 8;
             }
 
-            while cx + 4 < dst_stride {
+            while cx + 4 <= dst_stride {
                 let v_src = ref0.get_unchecked(cx..);
 
                 let source_0 = _mm_loadu_ps(v_src.as_ptr());
-                let mut k0 = _mm_mul_pd(_mm_cvtps_pd(source_0), _mm256_castpd256_pd128(coeff));
+                let mut k0 = _mm256_mul_pd(_mm256_cvtps_pd(source_0), coeff);
 
                 for i in 0..half_len {
                     let rollback = length - i - 1;
-                    let coeff = _mm_set_pd1(scanned_kernel.get_unchecked(i).weight);
+                    let coeff = _mm256_set1_pd(scanned_kernel.get_unchecked(i).weight);
                     let v_source_0 =
                         _mm_loadu_ps(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
                     let v_source_1 = _mm_loadu_ps(
@@ -275,15 +275,15 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
                             .get_unchecked(cx..)
                             .as_ptr(),
                     );
-                    k0 = _mm_opt_fmla_pd::<FMA>(
+                    k0 = _mm256_opt_fmla_pd::<FMA>(
                         k0,
-                        _mm_add_pd(_mm_cvtps_pd(v_source_0), _mm_cvtps_pd(v_source_1)),
+                        _mm256_add_pd(_mm256_cvtps_pd(v_source_0), _mm256_cvtps_pd(v_source_1)),
                         coeff,
                     );
                 }
 
                 let dst_ptr = dst.get_unchecked_mut(cx..).as_mut_ptr();
-                _mm_storeu_ps(dst_ptr, _mm_cvtpd_ps(k0));
+                _mm_storeu_ps(dst_ptr, _mm256_cvtpd_ps(k0));
                 cx += 4;
             }
 

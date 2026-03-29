@@ -39,6 +39,7 @@ mod v_load;
 mod v_store;
 
 pub(crate) use filter_column_symm_approx::filter_column_avx512_symm_u8_i32_app;
+pub(crate) use filter_column_symm_approx_uq0_7::filter_column_avx512_symm_u8_uq0_7;
 pub(crate) use filter_row_symm_uq15_u16::filter_row_avx512_symm_uq15_u16;
 pub(crate) use row_symm_approx_binter::filter_row_avx512_symm_u8_i32_app_binter;
 pub(crate) use row_symm_approx_binter3_uq0_7::filter_row_avx512_symm_u8_uq0_7_k3;

@@ -38,9 +38,11 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_addsub_epi32(a: __m128i, b: __m128i) -> __m128i {
-    let c = _mm_sign_epi32(b, _mm_setr_epi32(-1, 1, -1, 1));
-    _mm_add_epi32(a, c)
+pub(crate) fn _mm_addsub_epi32(a: __m128i, b: __m128i) -> __m128i {
+    unsafe {
+        let c = _mm_sign_epi32(b, _mm_setr_epi32(-1, 1, -1, 1));
+        _mm_add_epi32(a, c)
+    }
 }
 
 #[inline(always)]
@@ -50,13 +52,15 @@ pub(crate) unsafe fn mq_complex_mla(
     r: __m128i,
     r_swop: __m128i,
 ) -> (__m128i, __m128i) {
-    let xc00 = _mm_madd_epi16(r0i0, r);
-    let xc10 = _mm_madd_epi16(r0i0, r_swop);
+    unsafe {
+        let xc00 = _mm_madd_epi16(r0i0, r);
+        let xc10 = _mm_madd_epi16(r0i0, r_swop);
 
-    let x_r = _mm_unpacklo_epi32(xc00, xc10);
-    let x_c = _mm_unpackhi_epi32(xc00, xc10);
+        let x_r = _mm_unpacklo_epi32(xc00, xc10);
+        let x_c = _mm_unpackhi_epi32(xc00, xc10);
 
-    (_mm_add_epi32(acc.0, x_r), _mm_add_epi32(acc.1, x_c))
+        (_mm_add_epi32(acc.0, x_r), _mm_add_epi32(acc.1, x_c))
+    }
 }
 
 pub(crate) fn filter_sse_column_complex_u8_i32(

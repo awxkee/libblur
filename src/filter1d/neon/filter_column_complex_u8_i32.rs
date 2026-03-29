@@ -32,75 +32,83 @@ use num_complex::Complex;
 use std::arch::aarch64::*;
 
 #[inline(always)]
-pub(crate) unsafe fn vq_complex_mla_q(
+pub(crate) fn vq_complex_mla_q(
     acc_r: ((int32x4_t, int32x4_t), (int32x4_t, int32x4_t)),
     r0: int16x8_t,
     i0: int16x8_t,
     r1: int16x8_t,
     i1: int16x8_t,
 ) -> ((int32x4_t, int32x4_t), (int32x4_t, int32x4_t)) {
-    let acc0 = acc_r.0;
-    let acc1 = acc_r.1;
-    let re0 = vmlsl_s16(
-        vmlal_s16(acc0.0, vget_low_s16(r0), vget_low_s16(r1)),
-        vget_low_s16(i0),
-        vget_low_s16(i1),
-    );
-    let im0 = vmlal_s16(
-        vmlal_s16(acc0.1, vget_low_s16(r0), vget_low_s16(i1)),
-        vget_low_s16(i0),
-        vget_low_s16(r1),
-    );
-    let re1 = vmlsl_high_s16(vmlal_high_s16(acc1.0, r0, r1), i0, i1);
-    let im1 = vmlal_high_s16(vmlal_high_s16(acc1.1, r0, i1), i0, r1);
-    ((re0, im0), (re1, im1))
+    unsafe {
+        let acc0 = acc_r.0;
+        let acc1 = acc_r.1;
+        let re0 = vmlsl_s16(
+            vmlal_s16(acc0.0, vget_low_s16(r0), vget_low_s16(r1)),
+            vget_low_s16(i0),
+            vget_low_s16(i1),
+        );
+        let im0 = vmlal_s16(
+            vmlal_s16(acc0.1, vget_low_s16(r0), vget_low_s16(i1)),
+            vget_low_s16(i0),
+            vget_low_s16(r1),
+        );
+        let re1 = vmlsl_high_s16(vmlal_high_s16(acc1.0, r0, r1), i0, i1);
+        let im1 = vmlal_high_s16(vmlal_high_s16(acc1.1, r0, i1), i0, r1);
+        ((re0, im0), (re1, im1))
+    }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn v_complex_mla_q(
+pub(crate) fn v_complex_mla_q(
     acc: (int32x4_t, int32x4_t),
     r0: int16x4_t,
     i0: int16x4_t,
     r1: int16x4_t,
     i1: int16x4_t,
 ) -> (int32x4_t, int32x4_t) {
-    let re0 = vmlsl_s16(vmlal_s16(acc.0, r0, r1), i0, i1);
-    let im0 = vmlal_s16(vmlal_s16(acc.1, r0, i1), i0, r1);
-    (re0, im0)
+    unsafe {
+        let re0 = vmlsl_s16(vmlal_s16(acc.0, r0, r1), i0, i1);
+        let im0 = vmlal_s16(vmlal_s16(acc.1, r0, i1), i0, r1);
+        (re0, im0)
+    }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn vq_complex_mul_q(
+pub(crate) fn vq_complex_mul_q(
     r0: int16x8_t,
     i0: int16x8_t,
     r1: int16x8_t,
     i1: int16x8_t,
 ) -> ((int32x4_t, int32x4_t), (int32x4_t, int32x4_t)) {
-    let re0 = vmlsl_s16(
-        vmull_s16(vget_low_s16(r0), vget_low_s16(r1)),
-        vget_low_s16(i0),
-        vget_low_s16(i1),
-    );
-    let im0 = vmlal_s16(
-        vmull_s16(vget_low_s16(r0), vget_low_s16(i1)),
-        vget_low_s16(i0),
-        vget_low_s16(r1),
-    );
-    let re1 = vmlsl_high_s16(vmull_high_s16(r0, r1), i0, i1);
-    let im1 = vmlal_high_s16(vmull_high_s16(r0, i1), i0, r1);
-    ((re0, im0), (re1, im1))
+    unsafe {
+        let re0 = vmlsl_s16(
+            vmull_s16(vget_low_s16(r0), vget_low_s16(r1)),
+            vget_low_s16(i0),
+            vget_low_s16(i1),
+        );
+        let im0 = vmlal_s16(
+            vmull_s16(vget_low_s16(r0), vget_low_s16(i1)),
+            vget_low_s16(i0),
+            vget_low_s16(r1),
+        );
+        let re1 = vmlsl_high_s16(vmull_high_s16(r0, r1), i0, i1);
+        let im1 = vmlal_high_s16(vmull_high_s16(r0, i1), i0, r1);
+        ((re0, im0), (re1, im1))
+    }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn v_complex_mul_q(
+pub(crate) fn v_complex_mul_q(
     r0: int16x4_t,
     i0: int16x4_t,
     r1: int16x4_t,
     i1: int16x4_t,
 ) -> (int32x4_t, int32x4_t) {
-    let re0 = vmlsl_s16(vmull_s16(r0, r1), i0, i1);
-    let im0 = vmlal_s16(vmull_s16(r0, i1), i0, r1);
-    (re0, im0)
+    unsafe {
+        let re0 = vmlsl_s16(vmull_s16(r0, r1), i0, i1);
+        let im0 = vmlal_s16(vmull_s16(r0, i1), i0, r1);
+        (re0, im0)
+    }
 }
 
 pub(crate) fn filter_column_complex_u8_i32(

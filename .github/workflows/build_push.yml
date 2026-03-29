@@ -23,7 +23,7 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions-rust-lang/setup-rust-toolchain@v1
       - run: rustup target add aarch64-unknown-linux-gnu x86_64-unknown-linux-gnu i686-unknown-linux-gnu powerpc-unknown-linux-gnu armv7-unknown-linux-gnueabi
       - run: RUSTFLAGS="-C target-feature=+neon" cargo build --target aarch64-unknown-linux-gnu --features image
@@ -43,7 +43,7 @@ jobs:
         os: [ ubuntu-latest, macos-latest ]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
       - run: rustup component add clippy
       - run: cargo clippy --all-features -- -D warnings
@@ -52,7 +52,7 @@ jobs:
     name: Clippy WASM
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
       - run: rustup target add wasm32-unknown-unknown
       - run: rustup component add clippy
@@ -65,7 +65,7 @@ jobs:
       matrix:
         feature: [ neon, rdm, "" ]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo test --features "${{ matrix.feature }}" --features fft --no-default-features
 
@@ -76,7 +76,7 @@ jobs:
         feature: [ sse, avx, "" ]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo test --features "${{ matrix.feature }}" --features fft --no-default-features
 
@@ -87,7 +87,7 @@ jobs:
       matrix:
         feature: [ neon, rdm, "" ]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo install cargo-fuzz
       - run: cargo fuzz run box --features "${{ matrix.feature }}" -- -max_total_time=14
@@ -101,7 +101,7 @@ jobs:
         feature: [ avx, sse ]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo install cargo-fuzz
       - run: cargo fuzz run box --features "${{ matrix.feature }}" -- -max_total_time=14
@@ -115,7 +115,7 @@ jobs:
       matrix:
         feature: [ neon, rdm ]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo install cargo-fuzz
       - run: cargo fuzz run gauss --features ${{ matrix.feature }} -- -max_total_time=17
@@ -130,7 +130,7 @@ jobs:
     name: Fuzzing Filter 1D/2D ARM FCMA
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo install cargo-fuzz
       - run: cargo fuzz run filter_complex --features neon,nightly_fcma -- -max_total_time=17
@@ -143,7 +143,7 @@ jobs:
         feature: [ "", sse, avx ]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo install cargo-fuzz
       - run: cargo fuzz run gauss --features "${{ matrix.feature }}" -- -max_total_time=17
@@ -161,7 +161,7 @@ jobs:
       matrix:
         feature: [ neon, rdm ]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo install cargo-fuzz
       - run: cargo fuzz run stack_blur --features ${{ matrix.feature }} -- -max_total_time=17
@@ -175,7 +175,7 @@ jobs:
         feature: [ sse, avx, "" ]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo install cargo-fuzz
       - run: cargo fuzz run stack_blur --features "${{ matrix.feature }}" -- -max_total_time=17
@@ -189,7 +189,7 @@ jobs:
       matrix:
         feature: [ neon, rdm ]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo install cargo-fuzz
       - run: cargo fuzz run fast_gaussian --features ${{ matrix.feature }} -- -max_total_time=14
@@ -206,7 +206,7 @@ jobs:
         feature: [ sse, avx, "" ]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo install cargo-fuzz
       - run: cargo fuzz run fast_gaussian --features "${{ matrix.feature }}" -- -max_total_time=14

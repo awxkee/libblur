@@ -29,13 +29,13 @@ use std::arch::aarch64::*;
 
 use core::f16;
 
+use crate::EdgeMode;
 use crate::edge_mode::clamp_edge;
 use crate::neon::{load_f32_f16, store_f32_f16};
 use crate::unsafe_slice::UnsafeSlice;
-use crate::EdgeMode;
 
-pub(crate) fn fgn_vertical_pass_neon_f16<T, const CN: usize>(
-    undef_bytes: &UnsafeSlice<T>,
+pub(crate) fn fgn_vertical_pass_neon_f16<const CN: usize>(
+    bytes: &UnsafeSlice<f16>,
     stride: u32,
     width: u32,
     height: u32,
@@ -45,7 +45,6 @@ pub(crate) fn fgn_vertical_pass_neon_f16<T, const CN: usize>(
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        let bytes: &UnsafeSlice<'_, f16> = std::mem::transmute(undef_bytes);
         let mut buffer: [[f32; 4]; 1024] = [[0f32; 4]; 1024];
 
         let height_wide = height as i64;
@@ -124,8 +123,8 @@ pub(crate) fn fgn_vertical_pass_neon_f16<T, const CN: usize>(
     }
 }
 
-pub(crate) fn fgn_horizontal_pass_neon_f16<T, const CN: usize>(
-    undef_bytes: &UnsafeSlice<T>,
+pub(crate) fn fgn_horizontal_pass_neon_f16<const CN: usize>(
+    bytes: &UnsafeSlice<f16>,
     stride: u32,
     width: u32,
     height: u32,
@@ -136,7 +135,6 @@ pub(crate) fn fgn_horizontal_pass_neon_f16<T, const CN: usize>(
 ) {
     unsafe {
         let mut buffer: [[f32; 4]; 1024] = [[0f32; 4]; 1024];
-        let bytes: &UnsafeSlice<'_, f16> = std::mem::transmute(undef_bytes);
 
         let width_wide = width as i64;
 

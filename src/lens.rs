@@ -46,10 +46,10 @@ pub fn lens_kernel(
     if shape.width == 0 || shape.height == 0 {
         return Err(BlurError::ZeroBaseSize);
     }
-    if shape.width % 2 == 0 {
+    if shape.width.is_multiple_of(2) {
         return Err(BlurError::OddKernel(shape.width));
     }
-    if shape.height % 2 == 0 {
+    if shape.height.is_multiple_of(2) {
         return Err(BlurError::OddKernel(shape.height));
     }
     assert!(k.abs() <= 1., "Roundness contract is not satisfied");

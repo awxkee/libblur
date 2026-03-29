@@ -33,53 +33,61 @@ use num_complex::Complex;
 use std::arch::aarch64::*;
 
 #[inline(always)]
-pub(crate) unsafe fn v_complex_mul(
+pub(crate) fn v_complex_mul(
     r0: float32x2_t,
     i0: float32x2_t,
     r1: float32x2_t,
     i1: float32x2_t,
 ) -> (float32x2_t, float32x2_t) {
-    let re = vfms_f32(vmul_f32(r0, r1), i0, i1);
-    let im = vfma_f32(vmul_f32(r0, i1), i0, r1);
-    (re, im)
+    unsafe {
+        let re = vfms_f32(vmul_f32(r0, r1), i0, i1);
+        let im = vfma_f32(vmul_f32(r0, i1), i0, r1);
+        (re, im)
+    }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn v_complex_mla(
+pub(crate) fn v_complex_mla(
     acc_r: (float32x2_t, float32x2_t),
     r0: float32x2_t,
     i0: float32x2_t,
     r1: float32x2_t,
     i1: float32x2_t,
 ) -> (float32x2_t, float32x2_t) {
-    let re = vfms_f32(vfma_f32(acc_r.0, r0, r1), i0, i1);
-    let im = vfma_f32(vfma_f32(acc_r.1, r0, i1), i0, r1);
-    (re, im)
+    unsafe {
+        let re = vfms_f32(vfma_f32(acc_r.0, r0, r1), i0, i1);
+        let im = vfma_f32(vfma_f32(acc_r.1, r0, i1), i0, r1);
+        (re, im)
+    }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn vq_complex_mla(
+pub(crate) fn vq_complex_mla(
     acc_r: (float32x4_t, float32x4_t),
     r0: float32x4_t,
     i0: float32x4_t,
     r1: float32x4_t,
     i1: float32x4_t,
 ) -> (float32x4_t, float32x4_t) {
-    let re = vfmsq_f32(vfmaq_f32(acc_r.0, r0, r1), i0, i1);
-    let im = vfmaq_f32(vfmaq_f32(acc_r.1, r0, i1), i0, r1);
-    (re, im)
+    unsafe {
+        let re = vfmsq_f32(vfmaq_f32(acc_r.0, r0, r1), i0, i1);
+        let im = vfmaq_f32(vfmaq_f32(acc_r.1, r0, i1), i0, r1);
+        (re, im)
+    }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn vq_complex_mul(
+pub(crate) fn vq_complex_mul(
     r0: float32x4_t,
     i0: float32x4_t,
     r1: float32x4_t,
     i1: float32x4_t,
 ) -> (float32x4_t, float32x4_t) {
-    let re = vfmsq_f32(vmulq_f32(r0, r1), i0, i1);
-    let im = vfmaq_f32(vmulq_f32(r0, i1), i0, r1);
-    (re, im)
+    unsafe {
+        let re = vfmsq_f32(vmulq_f32(r0, r1), i0, i1);
+        let im = vfmaq_f32(vmulq_f32(r0, i1), i0, r1);
+        (re, im)
+    }
 }
 
 pub(crate) fn filter_column_complex_u8_f32(

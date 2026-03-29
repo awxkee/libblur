@@ -44,15 +44,17 @@ pub(crate) fn filter_column_complex_u8_f32_fcma(
     }
 }
 
-#[inline]
-pub(crate) unsafe fn vqpermf(v0: float32x4_t, v1: float32x4_t, q: uint8x16_t) -> float32x4_t {
-    let a0 = vreinterpretq_f32_u8(vqtbl1q_u8(vreinterpretq_u8_f32(v0), q));
-    let a1 = vreinterpretq_f32_u8(vqtbl1q_u8(vreinterpretq_u8_f32(v1), q));
-    vcombine_f32(vget_low_f32(a0), vget_low_f32(a1))
+#[inline(always)]
+pub(crate) fn vqpermf(v0: float32x4_t, v1: float32x4_t, q: uint8x16_t) -> float32x4_t {
+    unsafe {
+        let a0 = vreinterpretq_f32_u8(vqtbl1q_u8(vreinterpretq_u8_f32(v0), q));
+        let a1 = vreinterpretq_f32_u8(vqtbl1q_u8(vreinterpretq_u8_f32(v1), q));
+        vcombine_f32(vget_low_f32(a0), vget_low_f32(a1))
+    }
 }
 
 #[target_feature(enable = "fcma")]
-unsafe fn filter_column_complex_u8_f32_impl_fc(
+fn filter_column_complex_u8_f32_impl_fc(
     arena: Arena,
     arena_src: &[&[Complex<f32>]],
     dst: &mut [u8],
@@ -79,7 +81,7 @@ unsafe fn filter_column_complex_u8_f32_impl_fc(
             .as_ptr(),
         );
 
-        while cx + 8 < full_width {
+        while cx + 8 <= full_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let values0 = vld1q_f32(v_src.as_ptr().cast());
@@ -148,7 +150,7 @@ unsafe fn filter_column_complex_u8_f32_impl_fc(
             cx += 8;
         }
 
-        while cx + 4 < full_width {
+        while cx + 4 <= full_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let values0 = vld1q_f32(v_src.as_ptr().cast());

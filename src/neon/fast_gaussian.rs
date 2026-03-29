@@ -25,18 +25,18 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use crate::EdgeMode;
 use crate::edge_mode::clamp_edge;
 use crate::neon::{load_u8_s32_fast, store_u8_s32_x4, store_u8x8_m4, vmulq_s32_f32};
 use crate::unsafe_slice::UnsafeSlice;
-use crate::EdgeMode;
 use std::arch::aarch64::*;
 
 #[repr(C, align(16))]
 #[derive(Copy, Clone, Default)]
 pub(crate) struct NeonI32x4(pub(crate) [i32; 4]);
 
-pub(crate) fn fg_horizontal_pass_neon_u8<T, const CN: usize>(
-    undefined_slice: &UnsafeSlice<T>,
+pub(crate) fn fg_horizontal_pass_neon_u8<const CN: usize>(
+    bytes: &UnsafeSlice<u8>,
     stride: u32,
     width: u32,
     height: u32,
@@ -46,9 +46,7 @@ pub(crate) fn fg_horizontal_pass_neon_u8<T, const CN: usize>(
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        let bytes: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_slice);
-
-        let mut full_buffer = Box::new([NeonI32x4::default(); 1024 * 4]);
+        let mut full_buffer = [NeonI32x4::default(); 1024 * 4];
 
         let (buffer0, rem) = full_buffer.split_at_mut(1024);
         let (buffer1, rem) = rem.split_at_mut(1024);
@@ -62,7 +60,7 @@ pub(crate) fn fg_horizontal_pass_neon_u8<T, const CN: usize>(
 
         let mut yy = start;
 
-        while yy + 4 < height.min(end) {
+        while yy + 4 <= height.min(end) {
             let mut diffs0 = vdupq_n_s32(0);
             let mut diffs1 = vdupq_n_s32(0);
             let mut diffs2 = vdupq_n_s32(0);
@@ -263,8 +261,8 @@ pub(crate) fn fg_horizontal_pass_neon_u8<T, const CN: usize>(
     }
 }
 
-pub(crate) fn fg_vertical_pass_neon_u8<T, const CN: usize>(
-    undefined_slice: &UnsafeSlice<T>,
+pub(crate) fn fg_vertical_pass_neon_u8<const CN: usize>(
+    bytes: &UnsafeSlice<u8>,
     stride: u32,
     width: u32,
     height: u32,
@@ -274,9 +272,7 @@ pub(crate) fn fg_vertical_pass_neon_u8<T, const CN: usize>(
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        let bytes: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_slice);
-
-        let mut full_buffer = Box::new([NeonI32x4::default(); 1024 * 4]);
+        let mut full_buffer = [NeonI32x4::default(); 1024 * 4];
 
         let (buffer0, rem) = full_buffer.split_at_mut(1024);
         let (buffer1, rem) = rem.split_at_mut(1024);
@@ -291,7 +287,7 @@ pub(crate) fn fg_vertical_pass_neon_u8<T, const CN: usize>(
 
         let mut xx = start;
 
-        while xx + 4 < width.min(end) {
+        while xx + 4 <= width.min(end) {
             let mut diffs0 = vdupq_n_s32(0);
             let mut diffs1 = vdupq_n_s32(0);
             let mut diffs2 = vdupq_n_s32(0);

@@ -26,15 +26,15 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::ImageSize;
+use crate::filter1d::Arena;
 use crate::filter1d::sse::utils::{
     _mm_mul_add_epi8_by_ps_x4, _mm_mul_epi8_by_ps_x4, _mm_pack_ps_x4_epi8,
 };
-use crate::filter1d::Arena;
 use crate::filter2d::scan_point_2d::ScanPoint2d;
 use crate::mlaf::mlaf;
 use crate::sse::{_mm_load_pack_x2, _mm_load_pack_x4, _mm_store_pack_x2, _mm_store_pack_x4};
 use crate::to_storage::ToStorage;
-use crate::ImageSize;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
@@ -55,7 +55,7 @@ pub(crate) fn convolve_segment_sse_2d_u8_f32(
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn convolve_segment_2d_u8_f32_impl(
+fn convolve_segment_2d_u8_f32_impl(
     arena: Arena,
     arena_source: &[u8],
     dst: &mut [u8],
@@ -63,142 +63,144 @@ unsafe fn convolve_segment_2d_u8_f32_impl(
     prepared_kernel: &[ScanPoint2d<f32>],
     y: usize,
 ) {
-    let width = image_size.width;
+    unsafe {
+        let width = image_size.width;
 
-    let dx = arena.pad_w as i64;
-    let dy = arena.pad_h as i64;
+        let dx = arena.pad_w as i64;
+        let dy = arena.pad_h as i64;
 
-    let arena_stride = arena.width * arena.components;
+        let arena_stride = arena.width * arena.components;
 
-    let offsets = prepared_kernel
-        .iter()
-        .map(|&x| {
-            arena_source.get_unchecked(
-                ((x.y + dy + y as i64) as usize * arena_stride
-                    + (x.x + dx) as usize * arena.components)..,
-            )
-        })
-        .collect::<Vec<_>>();
+        let offsets = prepared_kernel
+            .iter()
+            .map(|&x| {
+                arena_source.get_unchecked(
+                    ((x.y + dy + y as i64) as usize * arena_stride
+                        + (x.x + dx) as usize * arena.components)..,
+                )
+            })
+            .collect::<Vec<_>>();
 
-    let length = prepared_kernel.len();
+        let length = prepared_kernel.len();
 
-    let total_width = width * arena.components;
+        let total_width = width * arena.components;
 
-    let mut cx = 0usize;
+        let mut cx = 0usize;
 
-    let off0 = offsets.get_unchecked(0);
+        let off0 = offsets.get_unchecked(0);
 
-    let k_weight = _mm_set1_ps(prepared_kernel.get_unchecked(0).weight);
+        let k_weight = _mm_set1_ps(prepared_kernel.get_unchecked(0).weight);
 
-    while cx + 64 < total_width {
-        let items0 = _mm_load_pack_x4(off0.get_unchecked(cx..).as_ptr());
-        let mut k0 = _mm_mul_epi8_by_ps_x4(items0.0, k_weight);
-        let mut k1 = _mm_mul_epi8_by_ps_x4(items0.1, k_weight);
-        let mut k2 = _mm_mul_epi8_by_ps_x4(items0.2, k_weight);
-        let mut k3 = _mm_mul_epi8_by_ps_x4(items0.3, k_weight);
-        for i in 1..length {
-            let weight = _mm_set1_ps(prepared_kernel.get_unchecked(i).weight);
-            let s_ptr = offsets.get_unchecked(i);
-            let items0 = _mm_load_pack_x4(s_ptr.get_unchecked(cx..).as_ptr());
-            k0 = _mm_mul_add_epi8_by_ps_x4(k0, items0.0, weight);
-            k1 = _mm_mul_add_epi8_by_ps_x4(k1, items0.1, weight);
-            k2 = _mm_mul_add_epi8_by_ps_x4(k2, items0.2, weight);
-            k3 = _mm_mul_add_epi8_by_ps_x4(k3, items0.3, weight);
-        }
-        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
-        _mm_store_pack_x4(
-            dst_ptr0,
-            (
-                _mm_pack_ps_x4_epi8(k0),
-                _mm_pack_ps_x4_epi8(k1),
-                _mm_pack_ps_x4_epi8(k2),
-                _mm_pack_ps_x4_epi8(k3),
-            ),
-        );
-        cx += 64;
-    }
-
-    while cx + 32 < total_width {
-        let items0 = _mm_load_pack_x2(off0.get_unchecked(cx..).as_ptr());
-        let mut k0 = _mm_mul_epi8_by_ps_x4(items0.0, k_weight);
-        let mut k1 = _mm_mul_epi8_by_ps_x4(items0.1, k_weight);
-        for i in 1..length {
-            let weight = _mm_set1_ps(prepared_kernel.get_unchecked(i).weight);
-            let s_ptr = offsets.get_unchecked(i);
-            let items0 = _mm_load_pack_x2(s_ptr.get_unchecked(cx..).as_ptr());
-            k0 = _mm_mul_add_epi8_by_ps_x4(k0, items0.0, weight);
-            k1 = _mm_mul_add_epi8_by_ps_x4(k1, items0.1, weight);
-        }
-        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
-        _mm_store_pack_x2(dst_ptr0, (_mm_pack_ps_x4_epi8(k0), _mm_pack_ps_x4_epi8(k1)));
-        cx += 32;
-    }
-
-    while cx + 16 < total_width {
-        let items0 = _mm_loadu_si128(off0.get_unchecked(cx..).as_ptr() as *const __m128i);
-        let mut k0 = _mm_mul_epi8_by_ps_x4(items0, k_weight);
-        for i in 1..length {
-            let weight = _mm_set1_ps(prepared_kernel.get_unchecked(i).weight);
-            let items0 = _mm_loadu_si128(
-                offsets.get_unchecked(i).get_unchecked(cx..).as_ptr() as *const __m128i
+        while cx + 64 <= total_width {
+            let items0 = _mm_load_pack_x4(off0.get_unchecked(cx..).as_ptr());
+            let mut k0 = _mm_mul_epi8_by_ps_x4(items0.0, k_weight);
+            let mut k1 = _mm_mul_epi8_by_ps_x4(items0.1, k_weight);
+            let mut k2 = _mm_mul_epi8_by_ps_x4(items0.2, k_weight);
+            let mut k3 = _mm_mul_epi8_by_ps_x4(items0.3, k_weight);
+            for i in 1..length {
+                let weight = _mm_set1_ps(prepared_kernel.get_unchecked(i).weight);
+                let s_ptr = offsets.get_unchecked(i);
+                let items0 = _mm_load_pack_x4(s_ptr.get_unchecked(cx..).as_ptr());
+                k0 = _mm_mul_add_epi8_by_ps_x4(k0, items0.0, weight);
+                k1 = _mm_mul_add_epi8_by_ps_x4(k1, items0.1, weight);
+                k2 = _mm_mul_add_epi8_by_ps_x4(k2, items0.2, weight);
+                k3 = _mm_mul_add_epi8_by_ps_x4(k3, items0.3, weight);
+            }
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
+            _mm_store_pack_x4(
+                dst_ptr0,
+                (
+                    _mm_pack_ps_x4_epi8(k0),
+                    _mm_pack_ps_x4_epi8(k1),
+                    _mm_pack_ps_x4_epi8(k2),
+                    _mm_pack_ps_x4_epi8(k3),
+                ),
             );
-            k0 = _mm_mul_add_epi8_by_ps_x4(k0, items0, weight);
-        }
-        let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
-        _mm_storeu_si128(dst_ptr0 as *mut __m128i, _mm_pack_ps_x4_epi8(k0));
-        cx += 16;
-    }
-
-    let k_weight = prepared_kernel.get_unchecked(0).weight;
-
-    while cx + 4 < total_width {
-        let mut k0 = ((*off0.get_unchecked(cx)) as f32).mul(k_weight);
-        let mut k1 = ((*off0.get_unchecked(cx + 1)) as f32).mul(k_weight);
-        let mut k2 = ((*off0.get_unchecked(cx + 2)) as f32).mul(k_weight);
-        let mut k3 = ((*off0.get_unchecked(cx + 3)) as f32).mul(k_weight);
-
-        for i in 1..length {
-            let weight = prepared_kernel.get_unchecked(i).weight;
-            k0 = mlaf(
-                k0,
-                (*offsets.get_unchecked(i).get_unchecked(cx)) as f32,
-                weight,
-            );
-            k1 = mlaf(
-                k1,
-                (*offsets.get_unchecked(i).get_unchecked(cx + 1)) as f32,
-                weight,
-            );
-            k2 = mlaf(
-                k2,
-                (*offsets.get_unchecked(i).get_unchecked(cx + 2)) as f32,
-                weight,
-            );
-            k3 = mlaf(
-                k3,
-                (*offsets.get_unchecked(i).get_unchecked(cx + 3)) as f32,
-                weight,
-            );
+            cx += 64;
         }
 
-        *dst.get_unchecked_mut(cx) = k0.to_();
-        *dst.get_unchecked_mut(cx + 1) = k1.to_();
-        *dst.get_unchecked_mut(cx + 2) = k2.to_();
-        *dst.get_unchecked_mut(cx + 3) = k3.to_();
-        cx += 4;
-    }
-
-    for x in cx..total_width {
-        let mut k0 = ((*(*off0).get_unchecked(x)) as f32).mul(k_weight);
-
-        for i in 1..length {
-            let k_weight = prepared_kernel.get_unchecked(i).weight;
-            k0 = mlaf(
-                k0,
-                (*offsets.get_unchecked(i).get_unchecked(x)) as f32,
-                k_weight,
-            );
+        while cx + 32 <= total_width {
+            let items0 = _mm_load_pack_x2(off0.get_unchecked(cx..).as_ptr());
+            let mut k0 = _mm_mul_epi8_by_ps_x4(items0.0, k_weight);
+            let mut k1 = _mm_mul_epi8_by_ps_x4(items0.1, k_weight);
+            for i in 1..length {
+                let weight = _mm_set1_ps(prepared_kernel.get_unchecked(i).weight);
+                let s_ptr = offsets.get_unchecked(i);
+                let items0 = _mm_load_pack_x2(s_ptr.get_unchecked(cx..).as_ptr());
+                k0 = _mm_mul_add_epi8_by_ps_x4(k0, items0.0, weight);
+                k1 = _mm_mul_add_epi8_by_ps_x4(k1, items0.1, weight);
+            }
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
+            _mm_store_pack_x2(dst_ptr0, (_mm_pack_ps_x4_epi8(k0), _mm_pack_ps_x4_epi8(k1)));
+            cx += 32;
         }
-        *dst.get_unchecked_mut(x) = k0.to_();
+
+        while cx + 16 <= total_width {
+            let items0 = _mm_loadu_si128(off0.get_unchecked(cx..).as_ptr() as *const __m128i);
+            let mut k0 = _mm_mul_epi8_by_ps_x4(items0, k_weight);
+            for i in 1..length {
+                let weight = _mm_set1_ps(prepared_kernel.get_unchecked(i).weight);
+                let items0 = _mm_loadu_si128(
+                    offsets.get_unchecked(i).get_unchecked(cx..).as_ptr() as *const __m128i
+                );
+                k0 = _mm_mul_add_epi8_by_ps_x4(k0, items0, weight);
+            }
+            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
+            _mm_storeu_si128(dst_ptr0 as *mut __m128i, _mm_pack_ps_x4_epi8(k0));
+            cx += 16;
+        }
+
+        let k_weight = prepared_kernel.get_unchecked(0).weight;
+
+        while cx + 4 <= total_width {
+            let mut k0 = ((*off0.get_unchecked(cx)) as f32).mul(k_weight);
+            let mut k1 = ((*off0.get_unchecked(cx + 1)) as f32).mul(k_weight);
+            let mut k2 = ((*off0.get_unchecked(cx + 2)) as f32).mul(k_weight);
+            let mut k3 = ((*off0.get_unchecked(cx + 3)) as f32).mul(k_weight);
+
+            for i in 1..length {
+                let weight = prepared_kernel.get_unchecked(i).weight;
+                k0 = mlaf(
+                    k0,
+                    (*offsets.get_unchecked(i).get_unchecked(cx)) as f32,
+                    weight,
+                );
+                k1 = mlaf(
+                    k1,
+                    (*offsets.get_unchecked(i).get_unchecked(cx + 1)) as f32,
+                    weight,
+                );
+                k2 = mlaf(
+                    k2,
+                    (*offsets.get_unchecked(i).get_unchecked(cx + 2)) as f32,
+                    weight,
+                );
+                k3 = mlaf(
+                    k3,
+                    (*offsets.get_unchecked(i).get_unchecked(cx + 3)) as f32,
+                    weight,
+                );
+            }
+
+            *dst.get_unchecked_mut(cx) = k0.to_();
+            *dst.get_unchecked_mut(cx + 1) = k1.to_();
+            *dst.get_unchecked_mut(cx + 2) = k2.to_();
+            *dst.get_unchecked_mut(cx + 3) = k3.to_();
+            cx += 4;
+        }
+
+        for x in cx..total_width {
+            let mut k0 = ((*(*off0).get_unchecked(x)) as f32).mul(k_weight);
+
+            for i in 1..length {
+                let k_weight = prepared_kernel.get_unchecked(i).weight;
+                k0 = mlaf(
+                    k0,
+                    (*offsets.get_unchecked(i).get_unchecked(x)) as f32,
+                    k_weight,
+                );
+            }
+            *dst.get_unchecked_mut(x) = k0.to_();
+        }
     }
 }

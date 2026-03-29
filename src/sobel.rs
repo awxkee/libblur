@@ -27,8 +27,8 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::{
-    filter_1d_exact, BlurError, BlurImage, BlurImageMut, EdgeMode2D, FastBlurChannels, Scalar,
-    ThreadingPolicy,
+    BlurError, BlurImage, BlurImageMut, EdgeMode2D, FastBlurChannels, Scalar, ThreadingPolicy,
+    filter_1d_exact,
 };
 
 /// Performs sobel operator on the image

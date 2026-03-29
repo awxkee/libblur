@@ -26,14 +26,13 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::BorderHandle;
 use crate::edge_mode::border_interpolate;
-use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::neon::utils::{
     xvld1q_u8_x2, xvld1q_u8_x3, xvld4u8, xvst1q_u8_x2, xvst1q_u8_x3,
 };
 use crate::filter1d::row_handler_small_approx::{RowsHolder, RowsHolderMut};
 use crate::img_size::ImageSize;
-use crate::BorderHandle;
 use std::arch::aarch64::*;
 
 pub(crate) fn filter_row_symm_neon_binter_u8_u0_7<const N: usize>(
@@ -41,33 +40,17 @@ pub(crate) fn filter_row_symm_neon_binter_u8_u0_7<const N: usize>(
     m_src: &RowsHolder<u8>,
     m_dst: &mut RowsHolderMut<u8>,
     image_size: ImageSize,
-    scanned_kernel: &[ScanPoint1d<i32>],
+    kernel: &[u8],
 ) {
-    let mut shifted = scanned_kernel
-        .iter()
-        .map(|&x| ((x.weight) >> 8) as u8)
-        .collect::<Vec<_>>();
-    let mut sum: u32 = shifted.iter().map(|&x| x as u32).sum();
-    if sum > 128 {
-        let half = shifted.len() / 2;
-        while sum > 128 {
-            shifted[half] = shifted[half].saturating_sub(1);
-            sum -= 1;
-        }
-    } else if sum < 128 {
-        let half = shifted.len() / 2;
-        while sum < 128 {
-            shifted[half] = shifted[half].saturating_add(1);
-            sum += 1;
-        }
-    }
-    executor_unit::<N>(edge_mode, m_src, m_dst, image_size, &shifted);
+    executor_unit::<N>(edge_mode, m_src, m_dst, image_size, kernel);
 }
 
 #[inline(always)]
-pub(crate) unsafe fn xvst_u8x4_q7(a: *mut u8, v: uint16x8_t) {
-    let shifted = vqrshrn_n_u16::<7>(v);
-    vst1_lane_u32::<0>(a as *mut _, vreinterpret_u32_u8(shifted));
+pub(crate) fn xvst_u8x4_q7(a: *mut u8, v: uint16x8_t) {
+    unsafe {
+        let shifted = vqrshrn_n_u16::<7>(v);
+        vst1_lane_u32::<0>(a as *mut _, vreinterpret_u32_u8(shifted));
+    }
 }
 
 fn executor_unit<const N: usize>(

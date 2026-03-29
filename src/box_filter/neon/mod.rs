@@ -35,15 +35,15 @@ mod vsum16;
 mod vsum8;
 mod vsum_f32;
 
-pub(crate) use rgba16::{box_blur_horizontal_pass_neon_rgba16, box_blur_vertical_pass_neon_rgba16};
-pub(crate) use rgba8::{box_blur_horizontal_pass_neon, box_blur_vertical_pass_neon};
-#[cfg(feature = "rdm")]
-pub(crate) use rgba8_q0_31::{box_blur_horizontal_pass_neon_rdm, box_blur_vertical_pass_neon_rdm};
 pub(crate) use rgba_f32::{
     box_blur_horizontal_pass_neon_rgba_f32, box_blur_vertical_pass_neon_rgba_f32,
 };
-pub(crate) use vsum16::neon_ring_vertical_row_summ16;
+pub(crate) use rgba8::{box_blur_horizontal_pass_neon, box_blur_vertical_pass_neon};
+#[cfg(feature = "rdm")]
+pub(crate) use rgba8_q0_31::{box_blur_horizontal_pass_neon_rdm, box_blur_vertical_pass_neon_rdm};
+pub(crate) use rgba16::{box_blur_horizontal_pass_neon_rgba16, box_blur_vertical_pass_neon_rgba16};
+pub(crate) use vsum_f32::neon_ring_vertical_row_summ_f32;
 pub(crate) use vsum8::neon_ring_vertical_row_summ;
 #[cfg(feature = "rdm")]
 pub(crate) use vsum8::neon_ring_vertical_row_summ_rdm;
-pub(crate) use vsum_f32::neon_ring_vertical_row_summ_f32;
+pub(crate) use vsum16::neon_ring_vertical_row_summ16;

@@ -68,7 +68,7 @@ struct ExecutionUnit<const N: usize> {}
 
 impl<const N: usize> ExecutionUnit<N> {
     #[target_feature(enable = "sse4.1")]
-    unsafe fn pass(
+    fn pass(
         &self,
         _: Arena,
         arena_src: &[u8],
@@ -77,132 +77,135 @@ impl<const N: usize> ExecutionUnit<N> {
         _: FilterRegion,
         scanned_kernel: &[ScanPoint1d<f32>],
     ) {
-        let src = arena_src;
+        unsafe {
+            let src = arena_src;
 
-        let local_src = src;
+            let local_src = src;
 
-        let length = scanned_kernel.len();
+            let length = scanned_kernel.len();
 
-        let max_width = image_size.width * N;
+            let max_width = image_size.width * N;
 
-        let mut cx = 0usize;
+            let mut cx = 0usize;
 
-        let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(0).weight);
+            let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(0).weight);
 
-        while cx + 64 < max_width {
-            let shifted_src = local_src.get_unchecked(cx..);
+            while cx + 64 < max_width {
+                let shifted_src = local_src.get_unchecked(cx..);
 
-            let source = _mm_load_pack_x4(shifted_src.as_ptr());
-            let mut k0 = _mm_mul_epi8_by_ps_x4(source.0, coeff);
-            let mut k1 = _mm_mul_epi8_by_ps_x4(source.1, coeff);
-            let mut k2 = _mm_mul_epi8_by_ps_x4(source.2, coeff);
-            let mut k3 = _mm_mul_epi8_by_ps_x4(source.3, coeff);
+                let source = _mm_load_pack_x4(shifted_src.as_ptr());
+                let mut k0 = _mm_mul_epi8_by_ps_x4(source.0, coeff);
+                let mut k1 = _mm_mul_epi8_by_ps_x4(source.1, coeff);
+                let mut k2 = _mm_mul_epi8_by_ps_x4(source.2, coeff);
+                let mut k3 = _mm_mul_epi8_by_ps_x4(source.3, coeff);
 
-            for i in 1..length {
-                let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(i).weight);
-                let v_source = _mm_load_pack_x4(shifted_src.get_unchecked(i * N..).as_ptr());
-                k0 = _mm_mul_add_epi8_by_ps_x4(k0, v_source.0, coeff);
-                k1 = _mm_mul_add_epi8_by_ps_x4(k1, v_source.1, coeff);
-                k2 = _mm_mul_add_epi8_by_ps_x4(k2, v_source.2, coeff);
-                k3 = _mm_mul_add_epi8_by_ps_x4(k3, v_source.3, coeff);
-            }
+                for i in 1..length {
+                    let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(i).weight);
+                    let v_source = _mm_load_pack_x4(shifted_src.get_unchecked(i * N..).as_ptr());
+                    k0 = _mm_mul_add_epi8_by_ps_x4(k0, v_source.0, coeff);
+                    k1 = _mm_mul_add_epi8_by_ps_x4(k1, v_source.1, coeff);
+                    k2 = _mm_mul_add_epi8_by_ps_x4(k2, v_source.2, coeff);
+                    k3 = _mm_mul_add_epi8_by_ps_x4(k3, v_source.3, coeff);
+                }
 
-            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
-            _mm_store_pack_x4(
-                dst_ptr0,
-                (
-                    _mm_pack_ps_x4_epi8(k0),
-                    _mm_pack_ps_x4_epi8(k1),
-                    _mm_pack_ps_x4_epi8(k2),
-                    _mm_pack_ps_x4_epi8(k3),
-                ),
-            );
-            cx += 64;
-        }
-
-        while cx + 32 < max_width {
-            let shifted_src = local_src.get_unchecked(cx..);
-
-            let source = _mm_load_pack_x2(shifted_src.as_ptr());
-            let mut k0 = _mm_mul_epi8_by_ps_x4(source.0, coeff);
-            let mut k1 = _mm_mul_epi8_by_ps_x4(source.1, coeff);
-
-            for i in 1..length {
-                let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(i).weight);
-                let v_source = _mm_load_pack_x2(shifted_src.get_unchecked(i * N..).as_ptr());
-                k0 = _mm_mul_add_epi8_by_ps_x4(k0, v_source.0, coeff);
-                k1 = _mm_mul_add_epi8_by_ps_x4(k1, v_source.1, coeff);
-            }
-
-            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
-            _mm_store_pack_x2(dst_ptr0, (_mm_pack_ps_x4_epi8(k0), _mm_pack_ps_x4_epi8(k1)));
-            cx += 32;
-        }
-
-        while cx + 16 < max_width {
-            let shifted_src = local_src.get_unchecked(cx..);
-
-            let source_0 = _mm_loadu_si128(shifted_src.as_ptr() as *const __m128i);
-            let mut k0 = _mm_mul_epi8_by_ps_x4(source_0, coeff);
-
-            for i in 1..length {
-                let coeff = *scanned_kernel.get_unchecked(i);
-                let v_source_0 =
-                    _mm_loadu_si128(shifted_src.get_unchecked(i * N..).as_ptr() as *const __m128i);
-                k0 = _mm_mul_add_epi8_by_ps_x4(k0, v_source_0, _mm_set1_ps(coeff.weight));
-            }
-
-            let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
-            _mm_storeu_si128(dst_ptr0 as *mut __m128i, _mm_pack_ps_x4_epi8(k0));
-            cx += 16;
-        }
-
-        let coeff = *scanned_kernel.get_unchecked(0);
-
-        while cx + 4 < max_width {
-            let shifted_src = local_src.get_unchecked(cx..);
-
-            let mut k0 = ((*shifted_src.get_unchecked(0)) as f32).mul(coeff.weight);
-            let mut k1 = ((*shifted_src.get_unchecked(1)) as f32).mul(coeff.weight);
-            let mut k2 = ((*shifted_src.get_unchecked(2)) as f32).mul(coeff.weight);
-            let mut k3 = ((*shifted_src.get_unchecked(3)) as f32).mul(coeff.weight);
-
-            for i in 1..length {
-                let coeff = *scanned_kernel.get_unchecked(i);
-                k0 = mlaf(k0, (*shifted_src.get_unchecked(i * N)) as f32, coeff.weight);
-                k1 = mlaf(
-                    k1,
-                    (*shifted_src.get_unchecked(i * N + 1)) as f32,
-                    coeff.weight,
+                let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
+                _mm_store_pack_x4(
+                    dst_ptr0,
+                    (
+                        _mm_pack_ps_x4_epi8(k0),
+                        _mm_pack_ps_x4_epi8(k1),
+                        _mm_pack_ps_x4_epi8(k2),
+                        _mm_pack_ps_x4_epi8(k3),
+                    ),
                 );
-                k2 = mlaf(
-                    k2,
-                    (*shifted_src.get_unchecked(i * N + 2)) as f32,
-                    coeff.weight,
-                );
-                k3 = mlaf(
-                    k3,
-                    (*shifted_src.get_unchecked(i * N + 3)) as f32,
-                    coeff.weight,
-                );
+                cx += 64;
             }
 
-            *dst.get_unchecked_mut(cx) = k0.to_();
-            *dst.get_unchecked_mut(cx + 1) = k1.to_();
-            *dst.get_unchecked_mut(cx + 2) = k2.to_();
-            *dst.get_unchecked_mut(cx + 3) = k3.to_();
-            cx += 4;
-        }
+            while cx + 32 < max_width {
+                let shifted_src = local_src.get_unchecked(cx..);
 
-        for x in cx..max_width {
-            let shifted_src = local_src.get_unchecked(x..);
-            let mut k0 = ((*shifted_src.get_unchecked(0)) as f32).mul(coeff.weight);
+                let source = _mm_load_pack_x2(shifted_src.as_ptr());
+                let mut k0 = _mm_mul_epi8_by_ps_x4(source.0, coeff);
+                let mut k1 = _mm_mul_epi8_by_ps_x4(source.1, coeff);
 
-            for i in 1..length {
-                let coeff = *scanned_kernel.get_unchecked(i);
-                k0 = mlaf(k0, (*shifted_src.get_unchecked(i * N)) as f32, coeff.weight);
+                for i in 1..length {
+                    let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(i).weight);
+                    let v_source = _mm_load_pack_x2(shifted_src.get_unchecked(i * N..).as_ptr());
+                    k0 = _mm_mul_add_epi8_by_ps_x4(k0, v_source.0, coeff);
+                    k1 = _mm_mul_add_epi8_by_ps_x4(k1, v_source.1, coeff);
+                }
+
+                let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
+                _mm_store_pack_x2(dst_ptr0, (_mm_pack_ps_x4_epi8(k0), _mm_pack_ps_x4_epi8(k1)));
+                cx += 32;
             }
-            *dst.get_unchecked_mut(x) = k0.to_();
+
+            while cx + 16 < max_width {
+                let shifted_src = local_src.get_unchecked(cx..);
+
+                let source_0 = _mm_loadu_si128(shifted_src.as_ptr() as *const __m128i);
+                let mut k0 = _mm_mul_epi8_by_ps_x4(source_0, coeff);
+
+                for i in 1..length {
+                    let coeff = *scanned_kernel.get_unchecked(i);
+                    let v_source_0 = _mm_loadu_si128(
+                        shifted_src.get_unchecked(i * N..).as_ptr() as *const __m128i
+                    );
+                    k0 = _mm_mul_add_epi8_by_ps_x4(k0, v_source_0, _mm_set1_ps(coeff.weight));
+                }
+
+                let dst_ptr0 = dst.get_unchecked_mut(cx..).as_mut_ptr();
+                _mm_storeu_si128(dst_ptr0 as *mut __m128i, _mm_pack_ps_x4_epi8(k0));
+                cx += 16;
+            }
+
+            let coeff = *scanned_kernel.get_unchecked(0);
+
+            while cx + 4 < max_width {
+                let shifted_src = local_src.get_unchecked(cx..);
+
+                let mut k0 = ((*shifted_src.get_unchecked(0)) as f32).mul(coeff.weight);
+                let mut k1 = ((*shifted_src.get_unchecked(1)) as f32).mul(coeff.weight);
+                let mut k2 = ((*shifted_src.get_unchecked(2)) as f32).mul(coeff.weight);
+                let mut k3 = ((*shifted_src.get_unchecked(3)) as f32).mul(coeff.weight);
+
+                for i in 1..length {
+                    let coeff = *scanned_kernel.get_unchecked(i);
+                    k0 = mlaf(k0, (*shifted_src.get_unchecked(i * N)) as f32, coeff.weight);
+                    k1 = mlaf(
+                        k1,
+                        (*shifted_src.get_unchecked(i * N + 1)) as f32,
+                        coeff.weight,
+                    );
+                    k2 = mlaf(
+                        k2,
+                        (*shifted_src.get_unchecked(i * N + 2)) as f32,
+                        coeff.weight,
+                    );
+                    k3 = mlaf(
+                        k3,
+                        (*shifted_src.get_unchecked(i * N + 3)) as f32,
+                        coeff.weight,
+                    );
+                }
+
+                *dst.get_unchecked_mut(cx) = k0.to_();
+                *dst.get_unchecked_mut(cx + 1) = k1.to_();
+                *dst.get_unchecked_mut(cx + 2) = k2.to_();
+                *dst.get_unchecked_mut(cx + 3) = k3.to_();
+                cx += 4;
+            }
+
+            for x in cx..max_width {
+                let shifted_src = local_src.get_unchecked(x..);
+                let mut k0 = ((*shifted_src.get_unchecked(0)) as f32).mul(coeff.weight);
+
+                for i in 1..length {
+                    let coeff = *scanned_kernel.get_unchecked(i);
+                    k0 = mlaf(k0, (*shifted_src.get_unchecked(i * N)) as f32, coeff.weight);
+                }
+                *dst.get_unchecked_mut(x) = k0.to_();
+            }
         }
     }
 }

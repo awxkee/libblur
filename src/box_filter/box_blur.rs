@@ -29,13 +29,13 @@ use crate::channels_configuration::FastBlurChannels;
 use crate::primitives::PrimitiveCast;
 use crate::to_storage::ToStorage;
 use crate::unsafe_slice::UnsafeSlice;
-use crate::util::check_slice_size;
+use crate::util::{ScratchBuffer, check_slice_size};
 use crate::{BlurError, BlurImage, BlurImageMut, ThreadingPolicy};
 #[cfg(feature = "nightly_f16")]
 use core::f16;
 use novtb::{ParallelZonedIterator, TbSliceMut};
-use num_traits::cast::FromPrimitive;
 use num_traits::AsPrimitive;
+use num_traits::cast::FromPrimitive;
 use std::fmt::Debug;
 
 /// Both kernels are expected to be odd.
@@ -92,10 +92,10 @@ impl BoxBlurParameters {
     }
 
     fn validate(&self) -> Result<(), BlurError> {
-        if self.x_axis_kernel % 2 == 0 {
+        if self.x_axis_kernel.is_multiple_of(2) {
             return Err(BlurError::OddKernel(self.x_axis_kernel as usize));
         }
-        if self.y_axis_kernel % 2 == 0 {
+        if self.y_axis_kernel.is_multiple_of(2) {
             return Err(BlurError::OddKernel(self.y_axis_kernel as usize));
         }
         Ok(())
@@ -251,8 +251,8 @@ trait BoxBlurHorizontalPass<T> {
 
 impl BoxBlurHorizontalPass<f32> for f32 {
     #[allow(clippy::type_complexity)]
-    fn get_horizontal_pass<const CN: usize>(
-    ) -> fn(&[f32], u32, &UnsafeSlice<f32>, u32, u32, u32, u32, u32) {
+    fn get_horizontal_pass<const CN: usize>()
+    -> fn(&[f32], u32, &UnsafeSlice<f32>, u32, u32, u32, u32, u32) {
         #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             use crate::box_filter::neon::box_blur_horizontal_pass_neon_rgba_f32;
@@ -282,16 +282,16 @@ impl BoxBlurHorizontalPass<f32> for f32 {
 #[cfg(feature = "nightly_f16")]
 impl BoxBlurHorizontalPass<f16> for f16 {
     #[allow(clippy::type_complexity)]
-    fn get_horizontal_pass<const CN: usize>(
-    ) -> fn(&[f16], u32, &UnsafeSlice<f16>, u32, u32, u32, u32, u32) {
+    fn get_horizontal_pass<const CN: usize>()
+    -> fn(&[f16], u32, &UnsafeSlice<f16>, u32, u32, u32, u32, u32) {
         box_blur_horizontal_pass_impl::<f16, f32, CN>
     }
 }
 
 impl BoxBlurHorizontalPass<u16> for u16 {
     #[allow(clippy::type_complexity)]
-    fn get_horizontal_pass<const CN: usize>(
-    ) -> fn(&[u16], u32, &UnsafeSlice<u16>, u32, u32, u32, u32, u32) {
+    fn get_horizontal_pass<const CN: usize>()
+    -> fn(&[u16], u32, &UnsafeSlice<u16>, u32, u32, u32, u32, u32) {
         #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             use crate::box_filter::neon::box_blur_horizontal_pass_neon_rgba16;
@@ -313,8 +313,8 @@ impl BoxBlurHorizontalPass<u16> for u16 {
 
 impl BoxBlurHorizontalPass<u8> for u8 {
     #[allow(clippy::type_complexity)]
-    fn get_horizontal_pass<const CN: usize>(
-    ) -> fn(&[u8], u32, &UnsafeSlice<u8>, u32, u32, u32, u32, u32) {
+    fn get_horizontal_pass<const CN: usize>()
+    -> fn(&[u8], u32, &UnsafeSlice<u8>, u32, u32, u32, u32, u32) {
         let mut _dispatcher_horizontal: fn(
             src: &[u8],
             src_stride: u32,
@@ -438,7 +438,8 @@ fn box_blur_vertical_pass_impl<T, J>(
     let buf_size = end_x - start_x;
 
     let buf_cap = buf_size as usize;
-    let mut buffer = vec![J::default(); buf_cap];
+    let mut scratch_buffer = ScratchBuffer::<J, 4096>::new(buf_cap);
+    let buffer = scratch_buffer.as_mut_slice();
 
     let src_lane = &src[start_x as usize..end_x as usize];
 
@@ -790,8 +791,8 @@ impl RingBufferHandler<f16> for f16 {
 
 trait VRowSum<T, J> {
     #[allow(clippy::type_complexity)]
-    fn ring_vertical_row_summ(
-    ) -> fn(src: &[&[T]; 2], dst: &mut [T], working_row: &mut [J], radius: u32);
+    fn ring_vertical_row_summ()
+    -> fn(src: &[&[T]; 2], dst: &mut [T], working_row: &mut [J], radius: u32);
 }
 
 impl VRowSum<u8, u32> for () {
@@ -963,7 +964,8 @@ where
             .for_each_enumerated(&pool, |cy, dst_rows| {
                 let source_y = cy * tile_size;
 
-                let mut working_row = vec![J::default(); working_stride];
+                let mut working_row_scratch = ScratchBuffer::<J, 4096>::new(working_stride);
+                let working_row = working_row_scratch.as_mut_slice();
                 let ring_size = y_kernel_size + 1;
                 let mut buffer = vec![T::default(); working_stride * ring_size];
 
@@ -1070,7 +1072,7 @@ where
                         ring_vsum(
                             &capture,
                             &mut dst0[..width as usize * CN],
-                            &mut working_row,
+                            working_row,
                             y_radius,
                         );
                     }
@@ -1080,7 +1082,8 @@ where
                 }
             });
     } else {
-        let mut working_row = vec![J::default(); working_stride];
+        let mut working_row_scratch = ScratchBuffer::<J, 4096>::new(working_stride);
+        let working_row = working_row_scratch.as_mut_slice();
         let ring_size = y_kernel_size + 1;
         let mut buffer = vec![T::default(); working_stride * ring_size];
 
@@ -1157,7 +1160,7 @@ where
                 ring_vsum(
                     &capture,
                     &mut dst0[..width as usize * CN],
-                    &mut working_row,
+                    working_row,
                     y_radius,
                 );
             }
@@ -1409,7 +1412,7 @@ fn create_box_gauss(sigma: f32, n: usize) -> Vec<u32> {
     let w_ideal = (12.0 * sigma * sigma / n_float).sqrt() + 1.0;
     let mut wl: u32 = w_ideal.floor() as u32;
 
-    if wl % 2 == 0 {
+    if wl.is_multiple_of(2) {
         wl -= 1;
     };
 
@@ -1428,13 +1431,13 @@ fn create_box_gauss(sigma: f32, n: usize) -> Vec<u32> {
     for i in 0..n {
         if i < m {
             let mut new_val = wl / 2;
-            if new_val % 2 == 0 {
+            if new_val.is_multiple_of(2) {
                 new_val += 1;
             }
             sizes.push(new_val);
         } else {
             let mut new_val = wu / 2;
-            if new_val % 2 == 0 {
+            if new_val.is_multiple_of(2) {
                 new_val += 1;
             }
             sizes.push(new_val);

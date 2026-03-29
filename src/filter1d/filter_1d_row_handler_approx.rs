@@ -26,12 +26,12 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::ImageSize;
 use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_row_approx::filter_row_approx;
 use crate::filter1d::filter_row_symmetric_approx::filter_row_symmetric_approx;
 use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::region::FilterRegion;
-use crate::ImageSize;
 
 pub trait Filter1DRowHandlerApprox<T, F> {
     #[allow(clippy::type_complexity)]
@@ -158,7 +158,7 @@ impl Filter1DRowHandlerApprox<u16, u32> for u16 {
     fn get_row_handler_apr<const N: usize>(
         is_kernel_symmetric: bool,
     ) -> fn(Arena, &[u16], &mut [u16], ImageSize, FilterRegion, &[ScanPoint1d<u32>]) {
-        #[cfg(all(target_arch = "x86_64", feature = "nightly_avx512"))]
+        #[cfg(all(target_arch = "x86_64", feature = "avx512"))]
         if std::arch::is_x86_feature_detected!("avx512bw") && is_kernel_symmetric {
             use crate::filter1d::avx512::filter_row_avx512_symm_uq15_u16;
             return filter_row_avx512_symm_uq15_u16::<N>;

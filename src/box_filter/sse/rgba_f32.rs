@@ -79,7 +79,7 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
 
         let mut yy = start_y;
 
-        while yy + 4 < end_y {
+        while yy + 4 <= end_y {
             let y = yy;
             let y_src_shift = y as usize * src_stride as usize;
             let y_dst_shift = y as usize * dst_stride as usize;

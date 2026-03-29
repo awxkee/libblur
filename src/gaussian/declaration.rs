@@ -30,8 +30,8 @@ use crate::gaussian::gaussian_hint::IeeeBinaryConvolutionMode;
 use crate::gaussian::gaussian_kernel::gaussian_kernel_1d;
 use crate::gaussian::gaussian_util::{kernel_size as get_kernel_size, kernel_size_d};
 use crate::{
-    filter_1d_approx, filter_1d_exact, gaussian_kernel_1d_f64, sigma_size, sigma_size_d, BlurError,
-    BlurImage, BlurImageMut, ConvolutionMode, EdgeMode2D, Scalar, ThreadingPolicy,
+    BlurError, BlurImage, BlurImageMut, ConvolutionMode, EdgeMode2D, Scalar, ThreadingPolicy,
+    filter_1d_approx, filter_1d_exact, gaussian_kernel_1d_f64, sigma_size, sigma_size_d,
 };
 #[cfg(feature = "nightly_f16")]
 use core::f16;
@@ -194,10 +194,10 @@ impl GaussianBlurParams {
         if self.x_sigma < 0. || self.y_sigma < 0. {
             return Err(BlurError::NegativeOrZeroSigma);
         }
-        if self.x_kernel > 0 && self.x_kernel % 2 == 0 {
+        if self.x_kernel > 0 && self.x_kernel.is_multiple_of(2) {
             return Err(BlurError::OddKernel(self.x_kernel as usize));
         }
-        if self.y_kernel > 0 && self.y_kernel % 2 == 0 {
+        if self.y_kernel > 0 && self.y_kernel.is_multiple_of(2) {
             return Err(BlurError::OddKernel(self.y_kernel as usize));
         }
         if self.x_sigma == 0. && self.x_kernel == 0 {

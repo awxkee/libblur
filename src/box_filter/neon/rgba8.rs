@@ -31,80 +31,89 @@ use crate::neon::{
     load_u8, load_u8_u16, store_u8_s32_x4, store_u8_u32, vmulq_u16_low_f32, vmulq_u32_f32,
 };
 use crate::unsafe_slice::UnsafeSlice;
+use crate::util::ScratchBuffer;
 
 #[inline(always)]
-unsafe fn mul_set_v4(
+fn mul_set_v4(
     s1: uint32x4_t,
     s2: uint32x4_t,
     s3: uint32x4_t,
     s4: uint32x4_t,
     w: float32x4_t,
 ) -> (uint32x4_t, uint32x4_t, uint32x4_t, uint32x4_t) {
-    let cv1 = vcvtq_f32_u32(s1);
-    let cv2 = vcvtq_f32_u32(s2);
-    let cv3 = vcvtq_f32_u32(s3);
-    let cv4 = vcvtq_f32_u32(s4);
+    unsafe {
+        let cv1 = vcvtq_f32_u32(s1);
+        let cv2 = vcvtq_f32_u32(s2);
+        let cv3 = vcvtq_f32_u32(s3);
+        let cv4 = vcvtq_f32_u32(s4);
 
-    let m1 = vmulq_f32(cv1, w);
-    let m2 = vmulq_f32(cv2, w);
-    let m3 = vmulq_f32(cv3, w);
-    let m4 = vmulq_f32(cv4, w);
+        let m1 = vmulq_f32(cv1, w);
+        let m2 = vmulq_f32(cv2, w);
+        let m3 = vmulq_f32(cv3, w);
+        let m4 = vmulq_f32(cv4, w);
 
-    let cv1 = vcvtaq_u32_f32(m1);
-    let cv2 = vcvtaq_u32_f32(m2);
-    let cv3 = vcvtaq_u32_f32(m3);
-    let cv4 = vcvtaq_u32_f32(m4);
-    (cv1, cv2, cv3, cv4)
+        let cv1 = vcvtaq_u32_f32(m1);
+        let cv2 = vcvtaq_u32_f32(m2);
+        let cv3 = vcvtaq_u32_f32(m3);
+        let cv4 = vcvtaq_u32_f32(m4);
+        (cv1, cv2, cv3, cv4)
+    }
 }
 
 #[inline(always)]
-unsafe fn mul_set_v2(s1: uint32x4_t, s2: uint32x4_t, w: float32x4_t) -> (uint32x4_t, uint32x4_t) {
-    let cv1 = vcvtq_f32_u32(s1);
-    let cv2 = vcvtq_f32_u32(s2);
+fn mul_set_v2(s1: uint32x4_t, s2: uint32x4_t, w: float32x4_t) -> (uint32x4_t, uint32x4_t) {
+    unsafe {
+        let cv1 = vcvtq_f32_u32(s1);
+        let cv2 = vcvtq_f32_u32(s2);
 
-    let m1 = vmulq_f32(cv1, w);
-    let m2 = vmulq_f32(cv2, w);
+        let m1 = vmulq_f32(cv1, w);
+        let m2 = vmulq_f32(cv2, w);
 
-    let cv1 = vcvtaq_u32_f32(m1);
-    let cv2 = vcvtaq_u32_f32(m2);
-    (cv1, cv2)
+        let cv1 = vcvtaq_u32_f32(m1);
+        let cv2 = vcvtaq_u32_f32(m2);
+        (cv1, cv2)
+    }
 }
 
 #[inline(always)]
-unsafe fn mul_set(s1: uint32x4_t, w: float32x4_t) -> uint32x4_t {
-    let cv1 = vcvtq_f32_u32(s1);
-    let m1 = vmulq_f32(cv1, w);
-    vcvtaq_u32_f32(m1)
+fn mul_set(s1: uint32x4_t, w: float32x4_t) -> uint32x4_t {
+    unsafe {
+        let cv1 = vcvtq_f32_u32(s1);
+        let m1 = vmulq_f32(cv1, w);
+        vcvtaq_u32_f32(m1)
+    }
 }
 
 #[inline(always)]
-unsafe fn mul_set_low_u16_v4(
+fn mul_set_low_u16_v4(
     s1: uint16x8_t,
     s2: uint16x8_t,
     s3: uint16x8_t,
     s4: uint16x8_t,
     w: float32x4_t,
 ) -> (uint32x4_t, uint32x4_t, uint32x4_t, uint32x4_t) {
-    let s1 = vmovl_u16(vget_low_u16(s1));
-    let s2 = vmovl_u16(vget_low_u16(s2));
-    let s3 = vmovl_u16(vget_low_u16(s3));
-    let s4 = vmovl_u16(vget_low_u16(s4));
+    unsafe {
+        let s1 = vmovl_u16(vget_low_u16(s1));
+        let s2 = vmovl_u16(vget_low_u16(s2));
+        let s3 = vmovl_u16(vget_low_u16(s3));
+        let s4 = vmovl_u16(vget_low_u16(s4));
 
-    let cv1 = vcvtq_f32_u32(s1);
-    let cv2 = vcvtq_f32_u32(s2);
-    let cv3 = vcvtq_f32_u32(s3);
-    let cv4 = vcvtq_f32_u32(s4);
+        let cv1 = vcvtq_f32_u32(s1);
+        let cv2 = vcvtq_f32_u32(s2);
+        let cv3 = vcvtq_f32_u32(s3);
+        let cv4 = vcvtq_f32_u32(s4);
 
-    let m1 = vmulq_f32(cv1, w);
-    let m2 = vmulq_f32(cv2, w);
-    let m3 = vmulq_f32(cv3, w);
-    let m4 = vmulq_f32(cv4, w);
+        let m1 = vmulq_f32(cv1, w);
+        let m2 = vmulq_f32(cv2, w);
+        let m3 = vmulq_f32(cv3, w);
+        let m4 = vmulq_f32(cv4, w);
 
-    let cv1 = vcvtaq_u32_f32(m1);
-    let cv2 = vcvtaq_u32_f32(m2);
-    let cv3 = vcvtaq_u32_f32(m3);
-    let cv4 = vcvtaq_u32_f32(m4);
-    (cv1, cv2, cv3, cv4)
+        let cv1 = vcvtaq_u32_f32(m1);
+        let cv2 = vcvtaq_u32_f32(m2);
+        let cv3 = vcvtaq_u32_f32(m3);
+        let cv4 = vcvtaq_u32_f32(m4);
+        (cv1, cv2, cv3, cv4)
+    }
 }
 
 pub(crate) fn box_blur_horizontal_pass_neon<const CN: usize>(
@@ -117,17 +126,20 @@ pub(crate) fn box_blur_horizontal_pass_neon<const CN: usize>(
     start_y: u32,
     end_y: u32,
 ) {
-    if radius < 240 {
-        box_blur_horizontal_pass_neon_impl_low_rad::<CN>(
-            src, src_stride, dst, dst_stride, width, radius, start_y, end_y,
-        );
-    } else {
-        box_blur_horizontal_pass_neon_impl::<CN>(
-            src, src_stride, dst, dst_stride, width, radius, start_y, end_y,
-        );
+    unsafe {
+        if radius < 240 {
+            box_blur_horizontal_pass_neon_impl_low_rad::<CN>(
+                src, src_stride, dst, dst_stride, width, radius, start_y, end_y,
+            );
+        } else {
+            box_blur_horizontal_pass_neon_impl::<CN>(
+                src, src_stride, dst, dst_stride, width, radius, start_y, end_y,
+            );
+        }
     }
 }
 
+#[target_feature(enable = "neon")]
 fn box_blur_horizontal_pass_neon_impl_low_rad<const CN: usize>(
     src: &[u8],
     src_stride: u32,
@@ -140,9 +152,9 @@ fn box_blur_horizontal_pass_neon_impl_low_rad<const CN: usize>(
 ) {
     let kernel_size = radius * 2 + 1;
     let edge_count = (kernel_size / 2) + 1;
-    let v_edge_count = unsafe { vdup_n_u8(edge_count as u8) };
+    let v_edge_count = vdup_n_u8(edge_count as u8);
 
-    let v_weight = unsafe { vdupq_n_f32(1f32 / (radius * 2 + 1) as f32) };
+    let v_weight = vdupq_n_f32(1f32 / (radius * 2 + 1) as f32);
 
     let half_kernel = kernel_size / 2;
 
@@ -377,7 +389,7 @@ fn box_blur_horizontal_pass_neon_impl_low_rad<const CN: usize>(
         for x in 0..width {
             let px = x as usize * CN;
 
-            let scale_store = unsafe { vmulq_u16_low_f32(store, v_weight) };
+            let scale_store = vmulq_u16_low_f32(store, v_weight);
 
             let bytes_offset = y_dst_shift + px;
 
@@ -409,6 +421,7 @@ fn box_blur_horizontal_pass_neon_impl_low_rad<const CN: usize>(
     }
 }
 
+#[target_feature(enable = "neon")]
 fn box_blur_horizontal_pass_neon_impl<const CN: usize>(
     src: &[u8],
     src_stride: u32,
@@ -421,9 +434,9 @@ fn box_blur_horizontal_pass_neon_impl<const CN: usize>(
 ) {
     let kernel_size = radius * 2 + 1;
     let edge_count = (kernel_size / 2) + 1;
-    let v_edge_count = unsafe { vdupq_n_u16(edge_count as u16) };
+    let v_edge_count = vdupq_n_u16(edge_count as u16);
 
-    let v_weight = unsafe { vdupq_n_f32(1f32 / (radius * 2 + 1) as f32) };
+    let v_weight = vdupq_n_f32(1f32 / (radius * 2 + 1) as f32);
 
     let half_kernel = kernel_size / 2;
 
@@ -592,7 +605,7 @@ fn box_blur_horizontal_pass_neon_impl<const CN: usize>(
         for x in 0..width {
             let px = x as usize * CN;
 
-            let scale_store = unsafe { vmulq_u32_f32(store, v_weight) };
+            let scale_store = vmulq_u32_f32(store, v_weight);
 
             let bytes_offset = y_dst_shift + px;
             unsafe {
@@ -647,7 +660,8 @@ pub(crate) fn box_blur_vertical_pass_neon(
     }
 }
 
-unsafe fn box_blur_vertical_pass_neon_low_rad(
+#[target_feature(enable = "neon")]
+fn box_blur_vertical_pass_neon_low_rad(
     src: &[u8],
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<u8>,
@@ -658,235 +672,60 @@ unsafe fn box_blur_vertical_pass_neon_low_rad(
     start_x: u32,
     end_x: u32,
 ) {
-    let kernel_size = radius * 2 + 1;
-    let edge_count = (kernel_size / 2) + 1;
-    let v_edge_count = vdupq_n_u8(edge_count as u8);
+    unsafe {
+        let kernel_size = radius * 2 + 1;
+        let edge_count = (kernel_size / 2) + 1;
+        let v_edge_count = vdupq_n_u8(edge_count as u8);
 
-    let half_kernel = kernel_size / 2;
+        let half_kernel = kernel_size / 2;
 
-    let start_x = start_x as usize;
-    let end_x = end_x as usize;
+        let start_x = start_x as usize;
+        let end_x = end_x as usize;
 
-    let v_weight = vdupq_n_f32(1f32 / (radius * 2 + 1) as f32);
+        let v_weight = vdupq_n_f32(1f32 / (radius * 2 + 1) as f32);
 
-    assert!(end_x >= start_x);
+        assert!(end_x >= start_x);
 
-    let buf_size = end_x - start_x;
+        let buf_size = end_x - start_x;
 
-    let buf_cap = buf_size.div_ceil(8) * 8 + 8;
+        let buf_cap = buf_size.div_ceil(8) * 8 + 8;
 
-    let mut buffer = vec![0u16; buf_cap];
+        let mut scratch_buffer = ScratchBuffer::<u16, 4096>::new(buf_cap);
+        let buffer = scratch_buffer.as_mut_slice();
 
-    let mut cx = start_x;
-
-    // Configure initial accumulator
-
-    let mut buf_cx = 0usize;
-
-    while cx + 32 < end_x {
-        let px = cx;
-
-        let mut store_0: uint16x8_t;
-        let mut store_1: uint16x8_t;
-        let mut store_2: uint16x8_t;
-        let mut store_3: uint16x8_t;
-
-        let s_ptr = src.as_ptr().add(px);
-        let edge0 = vld1q_u8(s_ptr);
-        let edge1 = vld1q_u8(s_ptr.add(16));
-
-        store_0 = vmull_u8(vget_low_u8(edge0), vget_low_u8(v_edge_count));
-        store_1 = vmull_high_u8(edge0, v_edge_count);
-
-        store_2 = vmull_u8(vget_low_u8(edge1), vget_low_u8(v_edge_count));
-        store_3 = vmull_high_u8(edge1, v_edge_count);
-
-        for y in 1..=half_kernel as usize {
-            let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
-            let s_ptr = src.as_ptr().add(y_src_shift + px);
-
-            let edge0 = vld1q_u8(s_ptr);
-            let edge1 = vld1q_u8(s_ptr.add(16));
-
-            store_0 = vaddw_u8(store_0, vget_low_u8(edge0));
-            store_1 = vaddw_high_u8(store_1, edge0);
-            store_2 = vaddw_u8(store_2, vget_low_u8(edge1));
-            store_3 = vaddw_high_u8(store_3, edge1);
-        }
-
-        vst1q_u16(buffer.get_unchecked_mut(buf_cx..).as_mut_ptr(), store_0);
-        vst1q_u16(buffer.get_unchecked_mut(buf_cx + 8..).as_mut_ptr(), store_1);
-        vst1q_u16(
-            buffer.get_unchecked_mut(buf_cx + 16..).as_mut_ptr(),
-            store_2,
-        );
-        vst1q_u16(
-            buffer.get_unchecked_mut(buf_cx + 24..).as_mut_ptr(),
-            store_3,
-        );
-
-        cx += 32;
-        buf_cx += 32;
-    }
-
-    while cx + 16 < end_x {
-        let px = cx;
-
-        let mut store_0: uint16x8_t;
-        let mut store_1: uint16x8_t;
-
-        let s_ptr = src.as_ptr().add(px);
-        let edge0 = vld1q_u8(s_ptr);
-
-        store_0 = vmull_u8(vget_low_u8(edge0), vget_low_u8(v_edge_count));
-        store_1 = vmull_high_u8(edge0, v_edge_count);
-
-        for y in 1..=half_kernel as usize {
-            let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
-            let s_ptr = src.as_ptr().add(y_src_shift + px);
-
-            let edge0 = vld1q_u8(s_ptr);
-
-            store_0 = vaddw_u8(store_0, vget_low_u8(edge0));
-            store_1 = vaddw_high_u8(store_1, edge0);
-        }
-
-        vst1q_u16(buffer.get_unchecked_mut(buf_cx..).as_mut_ptr(), store_0);
-        vst1q_u16(buffer.get_unchecked_mut(buf_cx + 8..).as_mut_ptr(), store_1);
-
-        cx += 16;
-        buf_cx += 16;
-    }
-
-    while cx + 8 < end_x {
-        let px = cx;
-
-        let mut store_0: uint16x8_t;
-
-        let s_ptr = src.as_ptr().add(px);
-        let edge0 = vld1_u8(s_ptr);
-
-        store_0 = vmull_u8(edge0, vget_low_u8(v_edge_count));
-
-        for y in 1..=half_kernel as usize {
-            let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
-            let s_ptr = src.as_ptr().add(y_src_shift + px);
-
-            let edge0 = vld1_u8(s_ptr);
-
-            store_0 = vaddw_u8(store_0, edge0);
-        }
-
-        vst1q_u16(buffer.get_unchecked_mut(buf_cx..).as_mut_ptr(), store_0);
-
-        cx += 8;
-        buf_cx += 8;
-    }
-
-    while cx < end_x {
-        let px = cx;
-
-        let mut store_0: uint16x8_t;
-
-        let s_ptr = src.as_ptr().add(px);
-        let edge0 = vld1q_lane_u8::<0>(s_ptr, vdupq_n_u8(0));
-
-        store_0 = vmull_u8(vget_low_u8(edge0), vget_low_u8(v_edge_count));
-
-        for y in 1..=half_kernel as usize {
-            let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
-            let s_ptr = src.as_ptr().add(y_src_shift + px);
-
-            let edge0 = vld1q_lane_u8::<0>(s_ptr, vdupq_n_u8(0));
-
-            store_0 = vaddw_u8(store_0, vget_low_u8(edge0));
-        }
-
-        vst1q_lane_u16::<0>(buffer.get_unchecked_mut(buf_cx..).as_mut_ptr(), store_0);
-
-        cx += 1;
-        buf_cx += 1;
-    }
-
-    for y in 0..height as usize {
         let mut cx = start_x;
+
+        // Configure initial accumulator
 
         let mut buf_cx = 0usize;
 
-        while cx + 32 < end_x {
+        while cx + 32 <= end_x {
             let px = cx;
 
-            let mut store_0 = vld1q_u16(buffer.get_unchecked(buf_cx..).as_ptr());
-            let mut store_1 = vld1q_u16(buffer.get_unchecked(buf_cx + 8..).as_ptr());
-            let mut store_2 = vld1q_u16(buffer.get_unchecked(buf_cx + 16..).as_ptr());
-            let mut store_3 = vld1q_u16(buffer.get_unchecked(buf_cx + 24..).as_ptr());
+            let mut store_0: uint16x8_t;
+            let mut store_1: uint16x8_t;
+            let mut store_2: uint16x8_t;
+            let mut store_3: uint16x8_t;
 
-            let next =
-                (y + half_kernel as usize + 1).min(height as usize - 1) * src_stride as usize;
-            let previous =
-                (y as isize - half_kernel as isize).max(0) as usize * src_stride as usize;
-            let y_dst_shift = dst_stride as usize * y;
+            let s_ptr = src.as_ptr().add(px);
+            let edge0 = vld1q_u8(s_ptr);
+            let edge1 = vld1q_u8(s_ptr.add(16));
 
-            {
-                let px = cx;
+            store_0 = vmull_u8(vget_low_u8(edge0), vget_low_u8(v_edge_count));
+            store_1 = vmull_high_u8(edge0, v_edge_count);
 
-                let lw0 = vmovl_u16(vget_low_u16(store_0));
-                let lw1 = vmovl_high_u16(store_0);
-                let lw2 = vmovl_u16(vget_low_u16(store_1));
-                let lw3 = vmovl_high_u16(store_1);
+            store_2 = vmull_u8(vget_low_u8(edge1), vget_low_u8(v_edge_count));
+            store_3 = vmull_high_u8(edge1, v_edge_count);
 
-                let lw4 = vmovl_u16(vget_low_u16(store_2));
-                let lw5 = vmovl_high_u16(store_2);
-                let lw6 = vmovl_u16(vget_low_u16(store_3));
-                let lw7 = vmovl_high_u16(store_3);
+            for y in 1..=half_kernel as usize {
+                let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
+                let s_ptr = src.as_ptr().add(y_src_shift + px);
 
-                let (scale_store_0, scale_store_1, scale_store_2, scale_store_3) =
-                    mul_set_v4(lw0, lw1, lw2, lw3, v_weight);
-
-                let (scale_store_4, scale_store_5, scale_store_6, scale_store_7) =
-                    mul_set_v4(lw4, lw5, lw6, lw7, v_weight);
-
-                let offset = y_dst_shift + px;
-                let ptr = unsafe_dst.slice.get_unchecked(offset).get();
-                let px_16_lo0 = vqmovn_u32(scale_store_0);
-                let px_16_hi0 = vqmovn_u32(scale_store_1);
-                let px_16_lo1 = vqmovn_u32(scale_store_2);
-                let px_16_hi2 = vqmovn_u32(scale_store_3);
-                let px_16_lo3 = vqmovn_u32(scale_store_4);
-                let px_16_hi4 = vqmovn_u32(scale_store_5);
-                let px_16_lo5 = vqmovn_u32(scale_store_6);
-                let px_16_hi6 = vqmovn_u32(scale_store_7);
-
-                let px0 = vqmovn_u16(vcombine_u16(px_16_lo0, px_16_hi0));
-                let px1 = vqmovn_u16(vcombine_u16(px_16_lo1, px_16_hi2));
-                let px2 = vqmovn_u16(vcombine_u16(px_16_lo3, px_16_hi4));
-                let px3 = vqmovn_u16(vcombine_u16(px_16_lo5, px_16_hi6));
-                vst1q_u8(ptr, vcombine_u8(px0, px1));
-                vst1q_u8(ptr.add(16), vcombine_u8(px2, px3));
-            }
-
-            // subtract previous
-            {
-                let s_ptr = src.as_ptr().add(previous + px);
-                let edge0 = vld1q_u8(s_ptr);
-                let edge1 = vld1q_u8(s_ptr.add(16));
-
-                store_0 = vsubw_u8(store_0, vget_low_u8(edge0));
-                store_1 = vsubw_high_u8(store_1, edge0);
-
-                store_2 = vsubw_u8(store_2, vget_low_u8(edge1));
-                store_3 = vsubw_high_u8(store_3, edge1);
-            }
-
-            // add next
-            {
-                let s_ptr = src.as_ptr().add(next + px);
                 let edge0 = vld1q_u8(s_ptr);
                 let edge1 = vld1q_u8(s_ptr.add(16));
 
                 store_0 = vaddw_u8(store_0, vget_low_u8(edge0));
                 store_1 = vaddw_high_u8(store_1, edge0);
-
                 store_2 = vaddw_u8(store_2, vget_low_u8(edge1));
                 store_3 = vaddw_high_u8(store_3, edge1);
             }
@@ -906,57 +745,26 @@ unsafe fn box_blur_vertical_pass_neon_low_rad(
             buf_cx += 32;
         }
 
-        while cx + 16 < end_x {
+        while cx + 16 <= end_x {
             let px = cx;
 
-            let mut store_0 = vld1q_u16(buffer.get_unchecked(buf_cx..).as_ptr());
-            let mut store_1 = vld1q_u16(buffer.get_unchecked(buf_cx + 8..).as_ptr());
+            let mut store_0: uint16x8_t;
+            let mut store_1: uint16x8_t;
 
-            let next =
-                (y + half_kernel as usize + 1).min(height as usize - 1) * src_stride as usize;
-            let previous =
-                (y as isize - half_kernel as isize).max(0) as usize * src_stride as usize;
-            let y_dst_shift = dst_stride as usize * y;
+            let s_ptr = src.as_ptr().add(px);
+            let edge0 = vld1q_u8(s_ptr);
 
-            {
-                let px = cx;
+            store_0 = vmull_u8(vget_low_u8(edge0), vget_low_u8(v_edge_count));
+            store_1 = vmull_high_u8(edge0, v_edge_count);
 
-                let lw0 = vmovl_u16(vget_low_u16(store_0));
-                let lw1 = vmovl_high_u16(store_0);
-                let lw2 = vmovl_u16(vget_low_u16(store_1));
-                let lw3 = vmovl_high_u16(store_1);
+            for y in 1..=half_kernel as usize {
+                let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
+                let s_ptr = src.as_ptr().add(y_src_shift + px);
 
-                let (scale_store_0, scale_store_1, scale_store_2, scale_store_3) =
-                    mul_set_v4(lw0, lw1, lw2, lw3, v_weight);
+                let edge0 = vld1q_u8(s_ptr);
 
-                let offset = y_dst_shift + px;
-                let ptr = unsafe_dst.slice.get_unchecked(offset).get();
-                let px_16_lo0 = vqmovn_u32(scale_store_0);
-                let px_16_hi0 = vqmovn_u32(scale_store_1);
-                let px_16_lo1 = vqmovn_u32(scale_store_2);
-                let px_16_hi2 = vqmovn_u32(scale_store_3);
-
-                let px0 = vqmovn_u16(vcombine_u16(px_16_lo0, px_16_hi0));
-                let px1 = vqmovn_u16(vcombine_u16(px_16_lo1, px_16_hi2));
-                vst1q_u8(ptr, vcombine_u8(px0, px1));
-            }
-
-            // subtract previous
-            {
-                let s_ptr = src.as_ptr().add(previous + px);
-                let edge = vld1q_u8(s_ptr);
-
-                store_0 = vsubw_u8(store_0, vget_low_u8(edge));
-                store_1 = vsubw_high_u8(store_1, edge);
-            }
-
-            // add next
-            {
-                let s_ptr = src.as_ptr().add(next + px);
-                let edge = vld1q_u8(s_ptr);
-
-                store_0 = vaddw_u8(store_0, vget_low_u8(edge));
-                store_1 = vaddw_high_u8(store_1, edge);
+                store_0 = vaddw_u8(store_0, vget_low_u8(edge0));
+                store_1 = vaddw_high_u8(store_1, edge0);
             }
 
             vst1q_u16(buffer.get_unchecked_mut(buf_cx..).as_mut_ptr(), store_0);
@@ -966,49 +774,23 @@ unsafe fn box_blur_vertical_pass_neon_low_rad(
             buf_cx += 16;
         }
 
-        while cx + 8 < end_x {
+        while cx + 8 <= end_x {
             let px = cx;
 
-            let mut store_0 = vld1q_u16(buffer.get_unchecked(buf_cx..).as_ptr());
+            let mut store_0: uint16x8_t;
 
-            // preload edge pixels
-            let next =
-                (y + half_kernel as usize + 1).min(height as usize - 1) * src_stride as usize;
-            let previous =
-                (y as isize - half_kernel as isize).max(0) as usize * src_stride as usize;
-            let y_dst_shift = dst_stride as usize * y;
+            let s_ptr = src.as_ptr().add(px);
+            let edge0 = vld1_u8(s_ptr);
 
-            {
-                let px = cx;
+            store_0 = vmull_u8(edge0, vget_low_u8(v_edge_count));
 
-                let lw0 = vmovl_u16(vget_low_u16(store_0));
-                let lw1 = vmovl_high_u16(store_0);
+            for y in 1..=half_kernel as usize {
+                let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
+                let s_ptr = src.as_ptr().add(y_src_shift + px);
 
-                let scale_store_0 = vmulq_u32_f32(lw0, v_weight);
-                let scale_store_1 = vmulq_u32_f32(lw1, v_weight);
+                let edge0 = vld1_u8(s_ptr);
 
-                let offset = y_dst_shift + px;
-                let ptr = unsafe_dst.slice.get_unchecked(offset).get();
-                let px_16_lo0 = vqmovn_u32(scale_store_0);
-                let px_16_hi0 = vqmovn_u32(scale_store_1);
-                let px0 = vqmovn_u16(vcombine_u16(px_16_lo0, px_16_hi0));
-                vst1_u8(ptr, px0);
-            }
-
-            // subtract previous
-            {
-                let s_ptr = src.as_ptr().add(previous + px);
-                let edge = vld1_u8(s_ptr);
-
-                store_0 = vsubw_u8(store_0, edge);
-            }
-
-            // add next
-            {
-                let s_ptr = src.as_ptr().add(next + px);
-                let edge = vld1_u8(s_ptr);
-
-                store_0 = vaddw_u8(store_0, edge);
+                store_0 = vaddw_u8(store_0, edge0);
             }
 
             vst1q_u16(buffer.get_unchecked_mut(buf_cx..).as_mut_ptr(), store_0);
@@ -1017,50 +799,287 @@ unsafe fn box_blur_vertical_pass_neon_low_rad(
             buf_cx += 8;
         }
 
-        const TAIL_CN: usize = 1;
+        while cx < end_x {
+            let px = cx;
 
-        for (x, buf_cx) in (cx..end_x).zip(buf_cx..buf_cap) {
-            let px = x;
+            let mut store_0: uint16x8_t;
 
-            let mut store =
-                vld1q_lane_u16::<0>(buffer.get_unchecked(buf_cx..).as_ptr(), vdupq_n_u16(0));
+            let s_ptr = src.as_ptr().add(px);
+            let edge0 = vld1q_lane_u8::<0>(s_ptr, vdupq_n_u8(0));
 
-            // preload edge pixels
-            let next =
-                (y + half_kernel as usize + 1).min(height as usize - 1) * src_stride as usize;
-            let previous = (y as i64 - half_kernel as i64).max(0) as usize * src_stride as usize;
-            let y_dst_shift = dst_stride as usize * y;
+            store_0 = vmull_u8(vget_low_u8(edge0), vget_low_u8(v_edge_count));
 
-            {
+            for y in 1..=half_kernel as usize {
+                let y_src_shift = y.min(height as usize - 1) * src_stride as usize;
+                let s_ptr = src.as_ptr().add(y_src_shift + px);
+
+                let edge0 = vld1q_lane_u8::<0>(s_ptr, vdupq_n_u8(0));
+
+                store_0 = vaddw_u8(store_0, vget_low_u8(edge0));
+            }
+
+            vst1q_lane_u16::<0>(buffer.get_unchecked_mut(buf_cx..).as_mut_ptr(), store_0);
+
+            cx += 1;
+            buf_cx += 1;
+        }
+
+        for y in 0..height as usize {
+            let mut cx = start_x;
+
+            let mut buf_cx = 0usize;
+
+            while cx + 32 <= end_x {
+                let px = cx;
+
+                let mut store_0 = vld1q_u16(buffer.get_unchecked(buf_cx..).as_ptr());
+                let mut store_1 = vld1q_u16(buffer.get_unchecked(buf_cx + 8..).as_ptr());
+                let mut store_2 = vld1q_u16(buffer.get_unchecked(buf_cx + 16..).as_ptr());
+                let mut store_3 = vld1q_u16(buffer.get_unchecked(buf_cx + 24..).as_ptr());
+
+                let next =
+                    (y + half_kernel as usize + 1).min(height as usize - 1) * src_stride as usize;
+                let previous =
+                    (y as isize - half_kernel as isize).max(0) as usize * src_stride as usize;
+                let y_dst_shift = dst_stride as usize * y;
+
+                {
+                    let px = cx;
+
+                    let lw0 = vmovl_u16(vget_low_u16(store_0));
+                    let lw1 = vmovl_high_u16(store_0);
+                    let lw2 = vmovl_u16(vget_low_u16(store_1));
+                    let lw3 = vmovl_high_u16(store_1);
+
+                    let lw4 = vmovl_u16(vget_low_u16(store_2));
+                    let lw5 = vmovl_high_u16(store_2);
+                    let lw6 = vmovl_u16(vget_low_u16(store_3));
+                    let lw7 = vmovl_high_u16(store_3);
+
+                    let (scale_store_0, scale_store_1, scale_store_2, scale_store_3) =
+                        mul_set_v4(lw0, lw1, lw2, lw3, v_weight);
+
+                    let (scale_store_4, scale_store_5, scale_store_6, scale_store_7) =
+                        mul_set_v4(lw4, lw5, lw6, lw7, v_weight);
+
+                    let offset = y_dst_shift + px;
+                    let ptr = unsafe_dst.slice.get_unchecked(offset).get();
+                    let px_16_lo0 = vqmovn_u32(scale_store_0);
+                    let px_16_hi0 = vqmovn_u32(scale_store_1);
+                    let px_16_lo1 = vqmovn_u32(scale_store_2);
+                    let px_16_hi2 = vqmovn_u32(scale_store_3);
+                    let px_16_lo3 = vqmovn_u32(scale_store_4);
+                    let px_16_hi4 = vqmovn_u32(scale_store_5);
+                    let px_16_lo5 = vqmovn_u32(scale_store_6);
+                    let px_16_hi6 = vqmovn_u32(scale_store_7);
+
+                    let px0 = vqmovn_u16(vcombine_u16(px_16_lo0, px_16_hi0));
+                    let px1 = vqmovn_u16(vcombine_u16(px_16_lo1, px_16_hi2));
+                    let px2 = vqmovn_u16(vcombine_u16(px_16_lo3, px_16_hi4));
+                    let px3 = vqmovn_u16(vcombine_u16(px_16_lo5, px_16_hi6));
+                    vst1q_u8(ptr, vcombine_u8(px0, px1));
+                    vst1q_u8(ptr.add(16), vcombine_u8(px2, px3));
+                }
+
+                // subtract previous
+                {
+                    let s_ptr = src.as_ptr().add(previous + px);
+                    let edge0 = vld1q_u8(s_ptr);
+                    let edge1 = vld1q_u8(s_ptr.add(16));
+
+                    store_0 = vsubw_u8(store_0, vget_low_u8(edge0));
+                    store_1 = vsubw_high_u8(store_1, edge0);
+
+                    store_2 = vsubw_u8(store_2, vget_low_u8(edge1));
+                    store_3 = vsubw_high_u8(store_3, edge1);
+                }
+
+                // add next
+                {
+                    let s_ptr = src.as_ptr().add(next + px);
+                    let edge0 = vld1q_u8(s_ptr);
+                    let edge1 = vld1q_u8(s_ptr.add(16));
+
+                    store_0 = vaddw_u8(store_0, vget_low_u8(edge0));
+                    store_1 = vaddw_high_u8(store_1, edge0);
+
+                    store_2 = vaddw_u8(store_2, vget_low_u8(edge1));
+                    store_3 = vaddw_high_u8(store_3, edge1);
+                }
+
+                vst1q_u16(buffer.get_unchecked_mut(buf_cx..).as_mut_ptr(), store_0);
+                vst1q_u16(buffer.get_unchecked_mut(buf_cx + 8..).as_mut_ptr(), store_1);
+                vst1q_u16(
+                    buffer.get_unchecked_mut(buf_cx + 16..).as_mut_ptr(),
+                    store_2,
+                );
+                vst1q_u16(
+                    buffer.get_unchecked_mut(buf_cx + 24..).as_mut_ptr(),
+                    store_3,
+                );
+
+                cx += 32;
+                buf_cx += 32;
+            }
+
+            while cx + 16 <= end_x {
+                let px = cx;
+
+                let mut store_0 = vld1q_u16(buffer.get_unchecked(buf_cx..).as_ptr());
+                let mut store_1 = vld1q_u16(buffer.get_unchecked(buf_cx + 8..).as_ptr());
+
+                let next =
+                    (y + half_kernel as usize + 1).min(height as usize - 1) * src_stride as usize;
+                let previous =
+                    (y as isize - half_kernel as isize).max(0) as usize * src_stride as usize;
+                let y_dst_shift = dst_stride as usize * y;
+
+                {
+                    let px = cx;
+
+                    let lw0 = vmovl_u16(vget_low_u16(store_0));
+                    let lw1 = vmovl_high_u16(store_0);
+                    let lw2 = vmovl_u16(vget_low_u16(store_1));
+                    let lw3 = vmovl_high_u16(store_1);
+
+                    let (scale_store_0, scale_store_1, scale_store_2, scale_store_3) =
+                        mul_set_v4(lw0, lw1, lw2, lw3, v_weight);
+
+                    let offset = y_dst_shift + px;
+                    let ptr = unsafe_dst.slice.get_unchecked(offset).get();
+                    let px_16_lo0 = vqmovn_u32(scale_store_0);
+                    let px_16_hi0 = vqmovn_u32(scale_store_1);
+                    let px_16_lo1 = vqmovn_u32(scale_store_2);
+                    let px_16_hi2 = vqmovn_u32(scale_store_3);
+
+                    let px0 = vqmovn_u16(vcombine_u16(px_16_lo0, px_16_hi0));
+                    let px1 = vqmovn_u16(vcombine_u16(px_16_lo1, px_16_hi2));
+                    vst1q_u8(ptr, vcombine_u8(px0, px1));
+                }
+
+                // subtract previous
+                {
+                    let s_ptr = src.as_ptr().add(previous + px);
+                    let edge = vld1q_u8(s_ptr);
+
+                    store_0 = vsubw_u8(store_0, vget_low_u8(edge));
+                    store_1 = vsubw_high_u8(store_1, edge);
+                }
+
+                // add next
+                {
+                    let s_ptr = src.as_ptr().add(next + px);
+                    let edge = vld1q_u8(s_ptr);
+
+                    store_0 = vaddw_u8(store_0, vget_low_u8(edge));
+                    store_1 = vaddw_high_u8(store_1, edge);
+                }
+
+                vst1q_u16(buffer.get_unchecked_mut(buf_cx..).as_mut_ptr(), store_0);
+                vst1q_u16(buffer.get_unchecked_mut(buf_cx + 8..).as_mut_ptr(), store_1);
+
+                cx += 16;
+                buf_cx += 16;
+            }
+
+            while cx + 8 <= end_x {
+                let px = cx;
+
+                let mut store_0 = vld1q_u16(buffer.get_unchecked(buf_cx..).as_ptr());
+
+                // preload edge pixels
+                let next =
+                    (y + half_kernel as usize + 1).min(height as usize - 1) * src_stride as usize;
+                let previous =
+                    (y as isize - half_kernel as isize).max(0) as usize * src_stride as usize;
+                let y_dst_shift = dst_stride as usize * y;
+
+                {
+                    let px = cx;
+
+                    let lw0 = vmovl_u16(vget_low_u16(store_0));
+                    let lw1 = vmovl_high_u16(store_0);
+
+                    let scale_store_0 = vmulq_u32_f32(lw0, v_weight);
+                    let scale_store_1 = vmulq_u32_f32(lw1, v_weight);
+
+                    let offset = y_dst_shift + px;
+                    let ptr = unsafe_dst.slice.get_unchecked(offset).get();
+                    let px_16_lo0 = vqmovn_u32(scale_store_0);
+                    let px_16_hi0 = vqmovn_u32(scale_store_1);
+                    let px0 = vqmovn_u16(vcombine_u16(px_16_lo0, px_16_hi0));
+                    vst1_u8(ptr, px0);
+                }
+
+                // subtract previous
+                {
+                    let s_ptr = src.as_ptr().add(previous + px);
+                    let edge = vld1_u8(s_ptr);
+
+                    store_0 = vsubw_u8(store_0, edge);
+                }
+
+                // add next
+                {
+                    let s_ptr = src.as_ptr().add(next + px);
+                    let edge = vld1_u8(s_ptr);
+
+                    store_0 = vaddw_u8(store_0, edge);
+                }
+
+                vst1q_u16(buffer.get_unchecked_mut(buf_cx..).as_mut_ptr(), store_0);
+
+                cx += 8;
+                buf_cx += 8;
+            }
+
+            const TAIL_CN: usize = 1;
+
+            for (x, buf_cx) in (cx..end_x).zip(buf_cx..buf_cap) {
                 let px = x;
 
-                let scale_store = vmulq_u16_low_f32(store, v_weight);
+                let mut store =
+                    vld1q_lane_u16::<0>(buffer.get_unchecked(buf_cx..).as_ptr(), vdupq_n_u16(0));
 
-                let bytes_offset = y_dst_shift + px;
-                let dst_ptr = unsafe_dst.slice.as_ptr().add(bytes_offset) as *mut u8;
-                store_u8_u32::<TAIL_CN>(dst_ptr, scale_store);
+                // preload edge pixels
+                let next =
+                    (y + half_kernel as usize + 1).min(height as usize - 1) * src_stride as usize;
+                let previous =
+                    (y as i64 - half_kernel as i64).max(0) as usize * src_stride as usize;
+                let y_dst_shift = dst_stride as usize * y;
+
+                {
+                    let px = x;
+
+                    let scale_store = vmulq_u16_low_f32(store, v_weight);
+
+                    let bytes_offset = y_dst_shift + px;
+                    let dst_ptr = unsafe_dst.slice.as_ptr().add(bytes_offset) as *mut u8;
+                    store_u8_u32::<TAIL_CN>(dst_ptr, scale_store);
+                }
+
+                // subtract previous
+                {
+                    let s_ptr = src.as_ptr().add(previous + px);
+                    let edge_colors = load_u8::<TAIL_CN>(s_ptr);
+                    store = vsubw_u8(store, edge_colors);
+                }
+
+                // add next
+                {
+                    let s_ptr = src.as_ptr().add(next + px);
+                    let edge_colors = load_u8::<TAIL_CN>(s_ptr);
+                    store = vaddw_u8(store, edge_colors);
+                }
+
+                vst1q_lane_u16::<0>(buffer.get_unchecked_mut(buf_cx..).as_mut_ptr(), store);
             }
-
-            // subtract previous
-            {
-                let s_ptr = src.as_ptr().add(previous + px);
-                let edge_colors = load_u8::<TAIL_CN>(s_ptr);
-                store = vsubw_u8(store, edge_colors);
-            }
-
-            // add next
-            {
-                let s_ptr = src.as_ptr().add(next + px);
-                let edge_colors = load_u8::<TAIL_CN>(s_ptr);
-                store = vaddw_u8(store, edge_colors);
-            }
-
-            vst1q_lane_u16::<0>(buffer.get_unchecked_mut(buf_cx..).as_mut_ptr(), store);
         }
     }
 }
 
-unsafe fn box_blur_vertical_pass_neon_any(
+#[target_feature(enable = "neon")]
+fn box_blur_vertical_pass_neon_any(
     src: &[u8],
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<u8>,
@@ -1080,66 +1099,34 @@ unsafe fn box_blur_vertical_pass_neon_any(
     let start_x = start_x as usize;
     let end_x = end_x as usize;
 
-    let v_weight = vdupq_n_f32(1f32 / (radius * 2 + 1) as f32);
+    unsafe {
+        let v_weight = vdupq_n_f32(1f32 / (radius * 2 + 1) as f32);
 
-    assert!(end_x >= start_x);
+        assert!(end_x >= start_x);
 
-    let buf_size = end_x - start_x;
+        let buf_size = end_x - start_x;
 
-    let buf_cap = buf_size.div_ceil(4) * 4 + 4;
+        let buf_cap = buf_size.div_ceil(4) * 4 + 4;
 
-    let mut buffer = vec![0u32; buf_cap];
+        let mut scratch_buffer = ScratchBuffer::<u32, 4096>::new(buf_cap);
+        let buffer = scratch_buffer.as_mut_slice();
 
-    let mut cx = start_x;
-    let mut buf_cx = 0usize;
+        let mut cx = start_x;
+        let mut buf_cx = 0usize;
 
-    while cx + 32 < end_x {
-        let px = cx;
+        while cx + 32 <= end_x {
+            let px = cx;
 
-        let mut store_0: uint32x4_t;
-        let mut store_1: uint32x4_t;
-        let mut store_2: uint32x4_t;
-        let mut store_3: uint32x4_t;
-        let mut store_4: uint32x4_t;
-        let mut store_5: uint32x4_t;
-        let mut store_6: uint32x4_t;
-        let mut store_7: uint32x4_t;
+            let mut store_0: uint32x4_t;
+            let mut store_1: uint32x4_t;
+            let mut store_2: uint32x4_t;
+            let mut store_3: uint32x4_t;
+            let mut store_4: uint32x4_t;
+            let mut store_5: uint32x4_t;
+            let mut store_6: uint32x4_t;
+            let mut store_7: uint32x4_t;
 
-        let s_ptr = src.as_ptr().add(px);
-        let edge0 = vld1q_u8(s_ptr);
-        let edge1 = vld1q_u8(s_ptr.add(16));
-
-        let lo0 = vmovl_u8(vget_low_u8(edge0));
-        let hi0 = vmovl_high_u8(edge0);
-        let lo1 = vmovl_u8(vget_low_u8(edge1));
-        let hi1 = vmovl_high_u8(edge1);
-
-        let i16_l0 = vget_low_u16(lo0);
-        let i16_h0 = lo0;
-        let i16_l1 = vget_low_u16(hi0);
-        let i16_h1 = hi0;
-
-        let i16_l01 = vget_low_u16(lo1);
-        let i16_h01 = lo1;
-        let i16_l11 = vget_low_u16(hi1);
-        let i16_h11 = hi1;
-
-        store_0 = vmull_u16(i16_l0, vget_low_u16(v_edge_count));
-        store_1 = vmull_high_u16(i16_h0, v_edge_count);
-
-        store_2 = vmull_u16(i16_l1, vget_low_u16(v_edge_count));
-        store_3 = vmull_high_u16(i16_h1, v_edge_count);
-
-        store_4 = vmull_u16(i16_l01, vget_low_u16(v_edge_count));
-        store_5 = vmull_high_u16(i16_h01, v_edge_count);
-
-        store_6 = vmull_u16(i16_l11, vget_low_u16(v_edge_count));
-        store_7 = vmull_high_u16(i16_h11, v_edge_count);
-
-        for y in 1..=half_kernel.min(height) {
-            let y_src_shift = y as usize * src_stride as usize;
-            let s_ptr = src.as_ptr().add(y_src_shift + px);
-
+            let s_ptr = src.as_ptr().add(px);
             let edge0 = vld1q_u8(s_ptr);
             let edge1 = vld1q_u8(s_ptr.add(16));
 
@@ -1158,255 +1145,22 @@ unsafe fn box_blur_vertical_pass_neon_any(
             let i16_l11 = vget_low_u16(hi1);
             let i16_h11 = hi1;
 
-            store_0 = vaddw_u16(store_0, i16_l0);
-            store_1 = vaddw_high_u16(store_1, i16_h0);
-            store_2 = vaddw_u16(store_2, i16_l1);
-            store_3 = vaddw_high_u16(store_3, i16_h1);
+            store_0 = vmull_u16(i16_l0, vget_low_u16(v_edge_count));
+            store_1 = vmull_high_u16(i16_h0, v_edge_count);
 
-            store_4 = vaddw_u16(store_4, i16_l01);
-            store_5 = vaddw_high_u16(store_5, i16_h01);
-            store_6 = vaddw_u16(store_6, i16_l11);
-            store_7 = vaddw_high_u16(store_7, i16_h11);
-        }
+            store_2 = vmull_u16(i16_l1, vget_low_u16(v_edge_count));
+            store_3 = vmull_high_u16(i16_h1, v_edge_count);
 
-        vst1q_u32(buffer.get_unchecked_mut(buf_cx..).as_mut_ptr(), store_0);
-        vst1q_u32(buffer.get_unchecked_mut(buf_cx + 4..).as_mut_ptr(), store_1);
-        vst1q_u32(buffer.get_unchecked_mut(buf_cx + 8..).as_mut_ptr(), store_2);
-        vst1q_u32(
-            buffer.get_unchecked_mut(buf_cx + 12..).as_mut_ptr(),
-            store_3,
-        );
-        vst1q_u32(
-            buffer.get_unchecked_mut(buf_cx + 16..).as_mut_ptr(),
-            store_4,
-        );
-        vst1q_u32(
-            buffer.get_unchecked_mut(buf_cx + 20..).as_mut_ptr(),
-            store_5,
-        );
-        vst1q_u32(
-            buffer.get_unchecked_mut(buf_cx + 24..).as_mut_ptr(),
-            store_6,
-        );
-        vst1q_u32(
-            buffer.get_unchecked_mut(buf_cx + 28..).as_mut_ptr(),
-            store_7,
-        );
+            store_4 = vmull_u16(i16_l01, vget_low_u16(v_edge_count));
+            store_5 = vmull_high_u16(i16_h01, v_edge_count);
 
-        cx += 32;
-        buf_cx += 32;
-    }
+            store_6 = vmull_u16(i16_l11, vget_low_u16(v_edge_count));
+            store_7 = vmull_high_u16(i16_h11, v_edge_count);
 
-    while cx + 16 < end_x {
-        let px = cx;
+            for y in 1..=half_kernel.min(height) {
+                let y_src_shift = y as usize * src_stride as usize;
+                let s_ptr = src.as_ptr().add(y_src_shift + px);
 
-        let mut store_0: uint32x4_t;
-        let mut store_1: uint32x4_t;
-        let mut store_2: uint32x4_t;
-        let mut store_3: uint32x4_t;
-
-        let s_ptr = src.as_ptr().add(px);
-        let edge0 = vld1q_u8(s_ptr);
-
-        let lo0 = vmovl_u8(vget_low_u8(edge0));
-        let hi0 = vmovl_high_u8(edge0);
-
-        let i16_l0 = vget_low_u16(lo0);
-        let i16_h0 = lo0;
-        let i16_l1 = vget_low_u16(hi0);
-        let i16_h1 = hi0;
-
-        store_0 = vmull_u16(i16_l0, vget_low_u16(v_edge_count));
-        store_1 = vmull_high_u16(i16_h0, v_edge_count);
-
-        store_2 = vmull_u16(i16_l1, vget_low_u16(v_edge_count));
-        store_3 = vmull_high_u16(i16_h1, v_edge_count);
-
-        for y in 1..=half_kernel.min(height) {
-            let y_src_shift = y as usize * src_stride as usize;
-            let s_ptr = src.as_ptr().add(y_src_shift + px);
-
-            let edge0 = vld1q_u8(s_ptr);
-
-            let lo0 = vmovl_u8(vget_low_u8(edge0));
-            let hi0 = vmovl_high_u8(edge0);
-
-            let i16_l0 = vget_low_u16(lo0);
-            let i16_h0 = lo0;
-            let i16_l1 = vget_low_u16(hi0);
-            let i16_h1 = hi0;
-
-            store_0 = vaddw_u16(store_0, i16_l0);
-            store_1 = vaddw_high_u16(store_1, i16_h0);
-            store_2 = vaddw_u16(store_2, i16_l1);
-            store_3 = vaddw_high_u16(store_3, i16_h1);
-        }
-
-        vst1q_u32(buffer.get_unchecked_mut(buf_cx..).as_mut_ptr(), store_0);
-        vst1q_u32(buffer.get_unchecked_mut(buf_cx + 4..).as_mut_ptr(), store_1);
-        vst1q_u32(buffer.get_unchecked_mut(buf_cx + 8..).as_mut_ptr(), store_2);
-        vst1q_u32(
-            buffer.get_unchecked_mut(buf_cx + 12..).as_mut_ptr(),
-            store_3,
-        );
-
-        cx += 16;
-        buf_cx += 16;
-    }
-
-    while cx + 8 < end_x {
-        let px = cx;
-
-        let mut store_0: uint32x4_t;
-        let mut store_1: uint32x4_t;
-
-        let s_ptr = src.as_ptr().add(px);
-        let edge0 = vld1_u8(s_ptr);
-
-        let lo0 = vmovl_u8(edge0);
-
-        let i16_l0 = vget_low_u16(lo0);
-        let i16_h0 = lo0;
-
-        store_0 = vmull_u16(i16_l0, vget_low_u16(v_edge_count));
-        store_1 = vmull_high_u16(i16_h0, v_edge_count);
-
-        for y in 1..=half_kernel.min(height) {
-            let y_src_shift = y as usize * src_stride as usize;
-            let s_ptr = src.as_ptr().add(y_src_shift + px);
-
-            let edge0 = vld1_u8(s_ptr);
-
-            let lo0 = vmovl_u8(edge0);
-
-            let i16_l0 = vget_low_u16(lo0);
-            let i16_h0 = lo0;
-
-            store_0 = vaddw_u16(store_0, i16_l0);
-            store_1 = vaddw_high_u16(store_1, i16_h0);
-        }
-
-        vst1q_u32(buffer.get_unchecked_mut(buf_cx..).as_mut_ptr(), store_0);
-        vst1q_u32(buffer.get_unchecked_mut(buf_cx + 4..).as_mut_ptr(), store_1);
-
-        cx += 8;
-        buf_cx += 8;
-    }
-
-    while cx < end_x {
-        let px = cx;
-
-        let mut store_0: uint32x4_t;
-
-        let s_ptr = src.as_ptr().add(px);
-        let edge0 = vld1_lane_u8::<0>(s_ptr, vdup_n_u8(0));
-
-        let lo0 = vmovl_u8(edge0);
-
-        let i16_l0 = vget_low_u16(lo0);
-
-        store_0 = vmull_u16(i16_l0, vget_low_u16(v_edge_count));
-
-        for y in 1..=half_kernel.min(height) {
-            let y_src_shift = y as usize * src_stride as usize;
-            let s_ptr = src.as_ptr().add(y_src_shift + px);
-
-            let edge0 = vld1_lane_u8::<0>(s_ptr, vdup_n_u8(0));
-            let lo0 = vmovl_u8(edge0);
-            let i16_l0 = vget_low_u16(lo0);
-            store_0 = vaddw_u16(store_0, i16_l0);
-        }
-
-        vst1q_lane_u32::<0>(buffer.get_unchecked_mut(buf_cx..).as_mut_ptr(), store_0);
-
-        cx += 1;
-        buf_cx += 1;
-    }
-
-    for y in 0..height {
-        let mut buf_cx = 0usize;
-        let mut cx = start_x;
-
-        // preload edge pixels
-        let next = (y + half_kernel + 1).min(height - 1) as usize * src_stride as usize;
-        let previous = (y as isize - half_kernel as isize).max(0) as usize * src_stride as usize;
-        let y_dst_shift = dst_stride as usize * y as usize;
-
-        while cx + 32 < end_x {
-            let px = cx;
-
-            let mut store_0 = vld1q_u32(buffer.get_unchecked(buf_cx..).as_ptr());
-            let mut store_1 = vld1q_u32(buffer.get_unchecked(buf_cx + 4..).as_ptr());
-            let mut store_2 = vld1q_u32(buffer.get_unchecked(buf_cx + 8..).as_ptr());
-            let mut store_3 = vld1q_u32(buffer.get_unchecked(buf_cx + 12..).as_ptr());
-            let mut store_4 = vld1q_u32(buffer.get_unchecked(buf_cx + 16..).as_ptr());
-            let mut store_5 = vld1q_u32(buffer.get_unchecked(buf_cx + 20..).as_ptr());
-            let mut store_6 = vld1q_u32(buffer.get_unchecked(buf_cx + 24..).as_ptr());
-            let mut store_7 = vld1q_u32(buffer.get_unchecked(buf_cx + 28..).as_ptr());
-
-            {
-                let px = cx;
-
-                let (scale_store_0, scale_store_1, scale_store_2, scale_store_3) =
-                    mul_set_v4(store_0, store_1, store_2, store_3, v_weight);
-
-                let (scale_store_4, scale_store_5, scale_store_6, scale_store_7) =
-                    mul_set_v4(store_4, store_5, store_6, store_7, v_weight);
-
-                let offset = y_dst_shift + px;
-                let ptr = unsafe_dst.slice.get_unchecked(offset).get();
-                let px_16_lo0 = vqmovn_u32(scale_store_0);
-                let px_16_hi0 = vqmovn_u32(scale_store_1);
-                let px_16_lo1 = vqmovn_u32(scale_store_2);
-                let px_16_hi2 = vqmovn_u32(scale_store_3);
-                let px_16_lo3 = vqmovn_u32(scale_store_4);
-                let px_16_hi4 = vqmovn_u32(scale_store_5);
-                let px_16_lo5 = vqmovn_u32(scale_store_6);
-                let px_16_hi6 = vqmovn_u32(scale_store_7);
-                let px0 = vqmovn_u16(vcombine_u16(px_16_lo0, px_16_hi0));
-                let px1 = vqmovn_u16(vcombine_u16(px_16_lo1, px_16_hi2));
-                let px2 = vqmovn_u16(vcombine_u16(px_16_lo3, px_16_hi4));
-                let px3 = vqmovn_u16(vcombine_u16(px_16_lo5, px_16_hi6));
-
-                vst1q_u8(ptr, vcombine_u8(px0, px1));
-                vst1q_u8(ptr.add(16), vcombine_u8(px2, px3));
-            }
-
-            // subtract previous
-            {
-                let s_ptr = src.as_ptr().add(previous + px);
-                let edge0 = vld1q_u8(s_ptr);
-                let edge1 = vld1q_u8(s_ptr.add(16));
-
-                let lo0 = vmovl_u8(vget_low_u8(edge0));
-                let hi0 = vmovl_high_u8(edge0);
-                let lo1 = vmovl_u8(vget_low_u8(edge1));
-                let hi1 = vmovl_high_u8(edge1);
-
-                let i16_l0 = vget_low_u16(lo0);
-                let i16_h0 = lo0;
-                let i16_l1 = vget_low_u16(hi0);
-                let i16_h1 = hi0;
-
-                let i16_l01 = vget_low_u16(lo1);
-                let i16_h01 = lo1;
-                let i16_l11 = vget_low_u16(hi1);
-                let i16_h11 = hi1;
-
-                store_0 = vsubw_u16(store_0, i16_l0);
-                store_1 = vsubw_high_u16(store_1, i16_h0);
-                store_2 = vsubw_u16(store_2, i16_l1);
-                store_3 = vsubw_high_u16(store_3, i16_h1);
-
-                store_4 = vsubw_u16(store_4, i16_l01);
-                store_5 = vsubw_high_u16(store_5, i16_h01);
-                store_6 = vsubw_u16(store_6, i16_l11);
-                store_7 = vsubw_high_u16(store_7, i16_h11);
-            }
-
-            // add next
-            {
-                let s_ptr = src.as_ptr().add(next + px);
                 let edge0 = vld1q_u8(s_ptr);
                 let edge1 = vld1q_u8(s_ptr.add(16));
 
@@ -1464,55 +1218,39 @@ unsafe fn box_blur_vertical_pass_neon_any(
             buf_cx += 32;
         }
 
-        while cx + 16 < end_x {
+        while cx + 16 <= end_x {
             let px = cx;
 
-            let mut store_0 = vld1q_u32(buffer.get_unchecked(buf_cx..).as_ptr());
-            let mut store_1 = vld1q_u32(buffer.get_unchecked(buf_cx + 4..).as_ptr());
-            let mut store_2 = vld1q_u32(buffer.get_unchecked(buf_cx + 8..).as_ptr());
-            let mut store_3 = vld1q_u32(buffer.get_unchecked(buf_cx + 12..).as_ptr());
+            let mut store_0: uint32x4_t;
+            let mut store_1: uint32x4_t;
+            let mut store_2: uint32x4_t;
+            let mut store_3: uint32x4_t;
 
-            {
-                let px = cx;
+            let s_ptr = src.as_ptr().add(px);
+            let edge0 = vld1q_u8(s_ptr);
 
-                let (scale_store_0, scale_store_1, scale_store_2, scale_store_3) =
-                    mul_set_v4(store_0, store_1, store_2, store_3, v_weight);
+            let lo0 = vmovl_u8(vget_low_u8(edge0));
+            let hi0 = vmovl_high_u8(edge0);
 
-                let offset = y_dst_shift + px;
-                let ptr = unsafe_dst.slice.get_unchecked(offset).get();
-                let px_16_lo0 = vqmovn_u32(scale_store_0);
-                let px_16_hi0 = vqmovn_u32(scale_store_1);
-                let px_16_lo1 = vqmovn_u32(scale_store_2);
-                let px_16_hi2 = vqmovn_u32(scale_store_3);
-                let px0 = vqmovn_u16(vcombine_u16(px_16_lo0, px_16_hi0));
-                let px1 = vqmovn_u16(vcombine_u16(px_16_lo1, px_16_hi2));
-                vst1q_u8(ptr, vcombine_u8(px0, px1));
-            }
+            let i16_l0 = vget_low_u16(lo0);
+            let i16_h0 = lo0;
+            let i16_l1 = vget_low_u16(hi0);
+            let i16_h1 = hi0;
 
-            // subtract previous
-            {
-                let s_ptr = src.as_ptr().add(previous + px);
-                let edge = vld1q_u8(s_ptr);
-                let lo0 = vmovl_u8(vget_low_u8(edge));
-                let hi0 = vmovl_high_u8(edge);
+            store_0 = vmull_u16(i16_l0, vget_low_u16(v_edge_count));
+            store_1 = vmull_high_u16(i16_h0, v_edge_count);
 
-                let i16_l0 = vget_low_u16(lo0);
-                let i16_h0 = lo0;
-                let i16_l1 = vget_low_u16(hi0);
-                let i16_h1 = hi0;
+            store_2 = vmull_u16(i16_l1, vget_low_u16(v_edge_count));
+            store_3 = vmull_high_u16(i16_h1, v_edge_count);
 
-                store_0 = vsubw_u16(store_0, i16_l0);
-                store_1 = vsubw_high_u16(store_1, i16_h0);
-                store_2 = vsubw_u16(store_2, i16_l1);
-                store_3 = vsubw_high_u16(store_3, i16_h1);
-            }
+            for y in 1..=half_kernel.min(height) {
+                let y_src_shift = y as usize * src_stride as usize;
+                let s_ptr = src.as_ptr().add(y_src_shift + px);
 
-            // add next
-            {
-                let s_ptr = src.as_ptr().add(next + px);
-                let edge = vld1q_u8(s_ptr);
-                let lo0 = vmovl_u8(vget_low_u8(edge));
-                let hi0 = vmovl_high_u8(edge);
+                let edge0 = vld1q_u8(s_ptr);
+
+                let lo0 = vmovl_u8(vget_low_u8(edge0));
+                let hi0 = vmovl_high_u8(edge0);
 
                 let i16_l0 = vget_low_u16(lo0);
                 let i16_h0 = lo0;
@@ -1537,43 +1275,30 @@ unsafe fn box_blur_vertical_pass_neon_any(
             buf_cx += 16;
         }
 
-        while cx + 8 < end_x {
+        while cx + 8 <= end_x {
             let px = cx;
 
-            let mut store_0 = vld1q_u32(buffer.get_unchecked(buf_cx..).as_ptr());
-            let mut store_1 = vld1q_u32(buffer.get_unchecked(buf_cx + 4..).as_ptr());
+            let mut store_0: uint32x4_t;
+            let mut store_1: uint32x4_t;
 
-            {
-                let px = cx;
+            let s_ptr = src.as_ptr().add(px);
+            let edge0 = vld1_u8(s_ptr);
 
-                let (scale_store_0, scale_store_1) = mul_set_v2(store_0, store_1, v_weight);
+            let lo0 = vmovl_u8(edge0);
 
-                let offset = y_dst_shift + px;
-                let ptr = unsafe_dst.slice.get_unchecked(offset).get();
-                let px_16_lo0 = vqmovn_u32(scale_store_0);
-                let px_16_hi0 = vqmovn_u32(scale_store_1);
-                let px0 = vqmovn_u16(vcombine_u16(px_16_lo0, px_16_hi0));
-                vst1_u8(ptr, px0);
-            }
+            let i16_l0 = vget_low_u16(lo0);
+            let i16_h0 = lo0;
 
-            // subtract previous
-            {
-                let s_ptr = src.as_ptr().add(previous + px);
-                let edge = vld1_u8(s_ptr);
-                let lo0 = vmovl_u8(edge);
+            store_0 = vmull_u16(i16_l0, vget_low_u16(v_edge_count));
+            store_1 = vmull_high_u16(i16_h0, v_edge_count);
 
-                let i16_l0 = vget_low_u16(lo0);
-                let i16_h0 = lo0;
+            for y in 1..=half_kernel.min(height) {
+                let y_src_shift = y as usize * src_stride as usize;
+                let s_ptr = src.as_ptr().add(y_src_shift + px);
 
-                store_0 = vsubw_u16(store_0, i16_l0);
-                store_1 = vsubw_high_u16(store_1, i16_h0);
-            }
+                let edge0 = vld1_u8(s_ptr);
 
-            // add next
-            {
-                let s_ptr = src.as_ptr().add(next + px);
-                let edge = vld1_u8(s_ptr);
-                let lo0 = vmovl_u8(edge);
+                let lo0 = vmovl_u8(edge0);
 
                 let i16_l0 = vget_low_u16(lo0);
                 let i16_h0 = lo0;
@@ -1592,40 +1317,24 @@ unsafe fn box_blur_vertical_pass_neon_any(
         while cx < end_x {
             let px = cx;
 
-            let mut store_0 =
-                vld1q_lane_u32::<0>(buffer.get_unchecked(buf_cx..).as_ptr(), vdupq_n_u32(0));
+            let mut store_0: uint32x4_t;
 
-            {
-                let px = cx;
+            let s_ptr = src.as_ptr().add(px);
+            let edge0 = vld1_lane_u8::<0>(s_ptr, vdup_n_u8(0));
 
-                let scale_store_0 = mul_set(store_0, v_weight);
+            let lo0 = vmovl_u8(edge0);
 
-                let offset = y_dst_shift + px;
-                let ptr = unsafe_dst.slice.get_unchecked(offset).get();
-                let px_16_lo0 = vqmovn_u32(scale_store_0);
-                let px0 = vqmovn_u16(vcombine_u16(px_16_lo0, vdup_n_u16(0)));
-                vst1_lane_u8::<0>(ptr, px0);
-            }
+            let i16_l0 = vget_low_u16(lo0);
 
-            // subtract previous
-            {
-                let s_ptr = src.as_ptr().add(previous + px);
-                let edge = vld1_lane_u8::<0>(s_ptr, vdup_n_u8(0));
-                let lo0 = vmovl_u8(edge);
+            store_0 = vmull_u16(i16_l0, vget_low_u16(v_edge_count));
 
+            for y in 1..=half_kernel.min(height) {
+                let y_src_shift = y as usize * src_stride as usize;
+                let s_ptr = src.as_ptr().add(y_src_shift + px);
+
+                let edge0 = vld1_lane_u8::<0>(s_ptr, vdup_n_u8(0));
+                let lo0 = vmovl_u8(edge0);
                 let i16_l0 = vget_low_u16(lo0);
-
-                store_0 = vsubw_u16(store_0, i16_l0);
-            }
-
-            // add next
-            {
-                let s_ptr = src.as_ptr().add(next + px);
-                let edge = vld1_lane_u8::<0>(s_ptr, vdup_n_u8(0));
-                let lo0 = vmovl_u8(edge);
-
-                let i16_l0 = vget_low_u16(lo0);
-
                 store_0 = vaddw_u16(store_0, i16_l0);
             }
 
@@ -1633,6 +1342,320 @@ unsafe fn box_blur_vertical_pass_neon_any(
 
             cx += 1;
             buf_cx += 1;
+        }
+
+        for y in 0..height {
+            let mut buf_cx = 0usize;
+            let mut cx = start_x;
+
+            // preload edge pixels
+            let next = (y + half_kernel + 1).min(height - 1) as usize * src_stride as usize;
+            let previous =
+                (y as isize - half_kernel as isize).max(0) as usize * src_stride as usize;
+            let y_dst_shift = dst_stride as usize * y as usize;
+
+            while cx + 32 <= end_x {
+                let px = cx;
+
+                let mut store_0 = vld1q_u32(buffer.get_unchecked(buf_cx..).as_ptr());
+                let mut store_1 = vld1q_u32(buffer.get_unchecked(buf_cx + 4..).as_ptr());
+                let mut store_2 = vld1q_u32(buffer.get_unchecked(buf_cx + 8..).as_ptr());
+                let mut store_3 = vld1q_u32(buffer.get_unchecked(buf_cx + 12..).as_ptr());
+                let mut store_4 = vld1q_u32(buffer.get_unchecked(buf_cx + 16..).as_ptr());
+                let mut store_5 = vld1q_u32(buffer.get_unchecked(buf_cx + 20..).as_ptr());
+                let mut store_6 = vld1q_u32(buffer.get_unchecked(buf_cx + 24..).as_ptr());
+                let mut store_7 = vld1q_u32(buffer.get_unchecked(buf_cx + 28..).as_ptr());
+
+                {
+                    let px = cx;
+
+                    let (scale_store_0, scale_store_1, scale_store_2, scale_store_3) =
+                        mul_set_v4(store_0, store_1, store_2, store_3, v_weight);
+
+                    let (scale_store_4, scale_store_5, scale_store_6, scale_store_7) =
+                        mul_set_v4(store_4, store_5, store_6, store_7, v_weight);
+
+                    let offset = y_dst_shift + px;
+                    let ptr = unsafe_dst.slice.get_unchecked(offset).get();
+                    let px_16_lo0 = vqmovn_u32(scale_store_0);
+                    let px_16_hi0 = vqmovn_u32(scale_store_1);
+                    let px_16_lo1 = vqmovn_u32(scale_store_2);
+                    let px_16_hi2 = vqmovn_u32(scale_store_3);
+                    let px_16_lo3 = vqmovn_u32(scale_store_4);
+                    let px_16_hi4 = vqmovn_u32(scale_store_5);
+                    let px_16_lo5 = vqmovn_u32(scale_store_6);
+                    let px_16_hi6 = vqmovn_u32(scale_store_7);
+                    let px0 = vqmovn_u16(vcombine_u16(px_16_lo0, px_16_hi0));
+                    let px1 = vqmovn_u16(vcombine_u16(px_16_lo1, px_16_hi2));
+                    let px2 = vqmovn_u16(vcombine_u16(px_16_lo3, px_16_hi4));
+                    let px3 = vqmovn_u16(vcombine_u16(px_16_lo5, px_16_hi6));
+
+                    vst1q_u8(ptr, vcombine_u8(px0, px1));
+                    vst1q_u8(ptr.add(16), vcombine_u8(px2, px3));
+                }
+
+                // subtract previous
+                {
+                    let s_ptr = src.as_ptr().add(previous + px);
+                    let edge0 = vld1q_u8(s_ptr);
+                    let edge1 = vld1q_u8(s_ptr.add(16));
+
+                    let lo0 = vmovl_u8(vget_low_u8(edge0));
+                    let hi0 = vmovl_high_u8(edge0);
+                    let lo1 = vmovl_u8(vget_low_u8(edge1));
+                    let hi1 = vmovl_high_u8(edge1);
+
+                    let i16_l0 = vget_low_u16(lo0);
+                    let i16_h0 = lo0;
+                    let i16_l1 = vget_low_u16(hi0);
+                    let i16_h1 = hi0;
+
+                    let i16_l01 = vget_low_u16(lo1);
+                    let i16_h01 = lo1;
+                    let i16_l11 = vget_low_u16(hi1);
+                    let i16_h11 = hi1;
+
+                    store_0 = vsubw_u16(store_0, i16_l0);
+                    store_1 = vsubw_high_u16(store_1, i16_h0);
+                    store_2 = vsubw_u16(store_2, i16_l1);
+                    store_3 = vsubw_high_u16(store_3, i16_h1);
+
+                    store_4 = vsubw_u16(store_4, i16_l01);
+                    store_5 = vsubw_high_u16(store_5, i16_h01);
+                    store_6 = vsubw_u16(store_6, i16_l11);
+                    store_7 = vsubw_high_u16(store_7, i16_h11);
+                }
+
+                // add next
+                {
+                    let s_ptr = src.as_ptr().add(next + px);
+                    let edge0 = vld1q_u8(s_ptr);
+                    let edge1 = vld1q_u8(s_ptr.add(16));
+
+                    let lo0 = vmovl_u8(vget_low_u8(edge0));
+                    let hi0 = vmovl_high_u8(edge0);
+                    let lo1 = vmovl_u8(vget_low_u8(edge1));
+                    let hi1 = vmovl_high_u8(edge1);
+
+                    let i16_l0 = vget_low_u16(lo0);
+                    let i16_h0 = lo0;
+                    let i16_l1 = vget_low_u16(hi0);
+                    let i16_h1 = hi0;
+
+                    let i16_l01 = vget_low_u16(lo1);
+                    let i16_h01 = lo1;
+                    let i16_l11 = vget_low_u16(hi1);
+                    let i16_h11 = hi1;
+
+                    store_0 = vaddw_u16(store_0, i16_l0);
+                    store_1 = vaddw_high_u16(store_1, i16_h0);
+                    store_2 = vaddw_u16(store_2, i16_l1);
+                    store_3 = vaddw_high_u16(store_3, i16_h1);
+
+                    store_4 = vaddw_u16(store_4, i16_l01);
+                    store_5 = vaddw_high_u16(store_5, i16_h01);
+                    store_6 = vaddw_u16(store_6, i16_l11);
+                    store_7 = vaddw_high_u16(store_7, i16_h11);
+                }
+
+                vst1q_u32(buffer.get_unchecked_mut(buf_cx..).as_mut_ptr(), store_0);
+                vst1q_u32(buffer.get_unchecked_mut(buf_cx + 4..).as_mut_ptr(), store_1);
+                vst1q_u32(buffer.get_unchecked_mut(buf_cx + 8..).as_mut_ptr(), store_2);
+                vst1q_u32(
+                    buffer.get_unchecked_mut(buf_cx + 12..).as_mut_ptr(),
+                    store_3,
+                );
+                vst1q_u32(
+                    buffer.get_unchecked_mut(buf_cx + 16..).as_mut_ptr(),
+                    store_4,
+                );
+                vst1q_u32(
+                    buffer.get_unchecked_mut(buf_cx + 20..).as_mut_ptr(),
+                    store_5,
+                );
+                vst1q_u32(
+                    buffer.get_unchecked_mut(buf_cx + 24..).as_mut_ptr(),
+                    store_6,
+                );
+                vst1q_u32(
+                    buffer.get_unchecked_mut(buf_cx + 28..).as_mut_ptr(),
+                    store_7,
+                );
+
+                cx += 32;
+                buf_cx += 32;
+            }
+
+            while cx + 16 <= end_x {
+                let px = cx;
+
+                let mut store_0 = vld1q_u32(buffer.get_unchecked(buf_cx..).as_ptr());
+                let mut store_1 = vld1q_u32(buffer.get_unchecked(buf_cx + 4..).as_ptr());
+                let mut store_2 = vld1q_u32(buffer.get_unchecked(buf_cx + 8..).as_ptr());
+                let mut store_3 = vld1q_u32(buffer.get_unchecked(buf_cx + 12..).as_ptr());
+
+                {
+                    let px = cx;
+
+                    let (scale_store_0, scale_store_1, scale_store_2, scale_store_3) =
+                        mul_set_v4(store_0, store_1, store_2, store_3, v_weight);
+
+                    let offset = y_dst_shift + px;
+                    let ptr = unsafe_dst.slice.get_unchecked(offset).get();
+                    let px_16_lo0 = vqmovn_u32(scale_store_0);
+                    let px_16_hi0 = vqmovn_u32(scale_store_1);
+                    let px_16_lo1 = vqmovn_u32(scale_store_2);
+                    let px_16_hi2 = vqmovn_u32(scale_store_3);
+                    let px0 = vqmovn_u16(vcombine_u16(px_16_lo0, px_16_hi0));
+                    let px1 = vqmovn_u16(vcombine_u16(px_16_lo1, px_16_hi2));
+                    vst1q_u8(ptr, vcombine_u8(px0, px1));
+                }
+
+                // subtract previous
+                {
+                    let s_ptr = src.as_ptr().add(previous + px);
+                    let edge = vld1q_u8(s_ptr);
+                    let lo0 = vmovl_u8(vget_low_u8(edge));
+                    let hi0 = vmovl_high_u8(edge);
+
+                    let i16_l0 = vget_low_u16(lo0);
+                    let i16_h0 = lo0;
+                    let i16_l1 = vget_low_u16(hi0);
+                    let i16_h1 = hi0;
+
+                    store_0 = vsubw_u16(store_0, i16_l0);
+                    store_1 = vsubw_high_u16(store_1, i16_h0);
+                    store_2 = vsubw_u16(store_2, i16_l1);
+                    store_3 = vsubw_high_u16(store_3, i16_h1);
+                }
+
+                // add next
+                {
+                    let s_ptr = src.as_ptr().add(next + px);
+                    let edge = vld1q_u8(s_ptr);
+                    let lo0 = vmovl_u8(vget_low_u8(edge));
+                    let hi0 = vmovl_high_u8(edge);
+
+                    let i16_l0 = vget_low_u16(lo0);
+                    let i16_h0 = lo0;
+                    let i16_l1 = vget_low_u16(hi0);
+                    let i16_h1 = hi0;
+
+                    store_0 = vaddw_u16(store_0, i16_l0);
+                    store_1 = vaddw_high_u16(store_1, i16_h0);
+                    store_2 = vaddw_u16(store_2, i16_l1);
+                    store_3 = vaddw_high_u16(store_3, i16_h1);
+                }
+
+                vst1q_u32(buffer.get_unchecked_mut(buf_cx..).as_mut_ptr(), store_0);
+                vst1q_u32(buffer.get_unchecked_mut(buf_cx + 4..).as_mut_ptr(), store_1);
+                vst1q_u32(buffer.get_unchecked_mut(buf_cx + 8..).as_mut_ptr(), store_2);
+                vst1q_u32(
+                    buffer.get_unchecked_mut(buf_cx + 12..).as_mut_ptr(),
+                    store_3,
+                );
+
+                cx += 16;
+                buf_cx += 16;
+            }
+
+            while cx + 8 <= end_x {
+                let px = cx;
+
+                let mut store_0 = vld1q_u32(buffer.get_unchecked(buf_cx..).as_ptr());
+                let mut store_1 = vld1q_u32(buffer.get_unchecked(buf_cx + 4..).as_ptr());
+
+                {
+                    let px = cx;
+
+                    let (scale_store_0, scale_store_1) = mul_set_v2(store_0, store_1, v_weight);
+
+                    let offset = y_dst_shift + px;
+                    let ptr = unsafe_dst.slice.get_unchecked(offset).get();
+                    let px_16_lo0 = vqmovn_u32(scale_store_0);
+                    let px_16_hi0 = vqmovn_u32(scale_store_1);
+                    let px0 = vqmovn_u16(vcombine_u16(px_16_lo0, px_16_hi0));
+                    vst1_u8(ptr, px0);
+                }
+
+                // subtract previous
+                {
+                    let s_ptr = src.as_ptr().add(previous + px);
+                    let edge = vld1_u8(s_ptr);
+                    let lo0 = vmovl_u8(edge);
+
+                    let i16_l0 = vget_low_u16(lo0);
+                    let i16_h0 = lo0;
+
+                    store_0 = vsubw_u16(store_0, i16_l0);
+                    store_1 = vsubw_high_u16(store_1, i16_h0);
+                }
+
+                // add next
+                {
+                    let s_ptr = src.as_ptr().add(next + px);
+                    let edge = vld1_u8(s_ptr);
+                    let lo0 = vmovl_u8(edge);
+
+                    let i16_l0 = vget_low_u16(lo0);
+                    let i16_h0 = lo0;
+
+                    store_0 = vaddw_u16(store_0, i16_l0);
+                    store_1 = vaddw_high_u16(store_1, i16_h0);
+                }
+
+                vst1q_u32(buffer.get_unchecked_mut(buf_cx..).as_mut_ptr(), store_0);
+                vst1q_u32(buffer.get_unchecked_mut(buf_cx + 4..).as_mut_ptr(), store_1);
+
+                cx += 8;
+                buf_cx += 8;
+            }
+
+            while cx < end_x {
+                let px = cx;
+
+                let mut store_0 =
+                    vld1q_lane_u32::<0>(buffer.get_unchecked(buf_cx..).as_ptr(), vdupq_n_u32(0));
+
+                {
+                    let px = cx;
+
+                    let scale_store_0 = mul_set(store_0, v_weight);
+
+                    let offset = y_dst_shift + px;
+                    let ptr = unsafe_dst.slice.get_unchecked(offset).get();
+                    let px_16_lo0 = vqmovn_u32(scale_store_0);
+                    let px0 = vqmovn_u16(vcombine_u16(px_16_lo0, vdup_n_u16(0)));
+                    vst1_lane_u8::<0>(ptr, px0);
+                }
+
+                // subtract previous
+                {
+                    let s_ptr = src.as_ptr().add(previous + px);
+                    let edge = vld1_lane_u8::<0>(s_ptr, vdup_n_u8(0));
+                    let lo0 = vmovl_u8(edge);
+
+                    let i16_l0 = vget_low_u16(lo0);
+
+                    store_0 = vsubw_u16(store_0, i16_l0);
+                }
+
+                // add next
+                {
+                    let s_ptr = src.as_ptr().add(next + px);
+                    let edge = vld1_lane_u8::<0>(s_ptr, vdup_n_u8(0));
+                    let lo0 = vmovl_u8(edge);
+
+                    let i16_l0 = vget_low_u16(lo0);
+
+                    store_0 = vaddw_u16(store_0, i16_l0);
+                }
+
+                vst1q_lane_u32::<0>(buffer.get_unchecked_mut(buf_cx..).as_mut_ptr(), store_0);
+
+                cx += 1;
+                buf_cx += 1;
+            }
         }
     }
 }

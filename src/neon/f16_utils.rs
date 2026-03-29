@@ -45,18 +45,20 @@ use core::f16;
 
 #[inline]
 pub unsafe fn xvld_f16(ptr: *const f16) -> x_float16x4_t {
-    let store: uint16x4_t = vld1_u16(std::mem::transmute::<*const f16, *const u16>(ptr));
-    std::mem::transmute(store)
+    unsafe {
+        let store: uint16x4_t = vld1_u16(std::mem::transmute::<*const f16, *const u16>(ptr));
+        std::mem::transmute(store)
+    }
 }
 
 #[inline]
-pub unsafe fn xreinterpret_u16_f16(x: x_float16x4_t) -> uint16x4_t {
-    std::mem::transmute(x)
+pub fn xreinterpret_u16_f16(x: x_float16x4_t) -> uint16x4_t {
+    unsafe { std::mem::transmute(x) }
 }
 
 #[inline]
-pub unsafe fn xreinterpret_f16_u16(x: uint16x4_t) -> x_float16x4_t {
-    std::mem::transmute(x)
+pub fn xreinterpret_f16_u16(x: uint16x4_t) -> x_float16x4_t {
+    unsafe { std::mem::transmute(x) }
 }
 
 // #[inline]
@@ -66,31 +68,37 @@ pub unsafe fn xreinterpret_f16_u16(x: uint16x4_t) -> x_float16x4_t {
 
 #[inline]
 pub unsafe fn xvcvt_f32_f16(x: x_float16x4_t) -> float32x4_t {
-    let src: uint16x4_t = xreinterpret_u16_f16(x);
-    let dst: float32x4_t;
-    asm!(
-    "fcvtl {0:v}.4s, {1:v}.4h",
-    out(vreg) dst,
-    in(vreg) src,
-    options(pure, nomem, nostack));
-    dst
+    unsafe {
+        let src: uint16x4_t = xreinterpret_u16_f16(x);
+        let dst: float32x4_t;
+        asm!(
+       "fcvtl {0:v}.4s, {1:v}.4h",
+       out(vreg) dst,
+       in(vreg) src,
+       options(pure, nomem, nostack));
+        dst
+    }
 }
 
 #[inline]
 pub(super) unsafe fn xvcvt_f16_f32(v: float32x4_t) -> x_float16x4_t {
-    let result: uint16x4_t;
-    asm!(
-    "fcvtn {0:v}.4h, {1:v}.4s",
-    out(vreg) result,
-    in(vreg) v,
-    options(pure, nomem, nostack));
-    xreinterpret_f16_u16(result)
+    unsafe {
+        let result: uint16x4_t;
+        asm!(
+     "fcvtn {0:v}.4h, {1:v}.4s",
+     out(vreg) result,
+     in(vreg) v,
+     options(pure, nomem, nostack));
+        xreinterpret_f16_u16(result)
+    }
 }
 
 #[inline]
 pub unsafe fn xvst_f16(ptr: *mut f16, x: x_float16x4_t) {
-    vst1_u16(
-        std::mem::transmute::<*mut f16, *mut u16>(ptr),
-        xreinterpret_u16_f16(x),
-    )
+    unsafe {
+        vst1_u16(
+            std::mem::transmute::<*mut f16, *mut u16>(ptr),
+            xreinterpret_u16_f16(x),
+        )
+    }
 }

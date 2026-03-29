@@ -204,10 +204,10 @@ fn fg_vertical_pass<T, J, M, const CN: usize>(
     f64: PrimitiveCast<M>,
 {
     let zero_j: J = PrimitiveCast::cast_(0i32);
-    let mut buffer_r = Box::new([zero_j; 1024]);
-    let mut buffer_g = Box::new([zero_j; 1024]);
-    let mut buffer_b = Box::new([zero_j; 1024]);
-    let mut buffer_a = Box::new([zero_j; 1024]);
+    let mut buffer_r = [zero_j; 1024];
+    let mut buffer_g = [zero_j; 1024];
+    let mut buffer_b = [zero_j; 1024];
+    let mut buffer_a = [zero_j; 1024];
     let radius_64 = radius as i64;
     let height_wide = height as i64;
     let initial: J = PrimitiveCast::cast_(T::get_initial(radius as usize));
@@ -324,10 +324,10 @@ fn fg_horizontal_pass<T, J, M, const CN: usize>(
     f64: PrimitiveCast<M>,
     i64: PrimitiveCast<J>,
 {
-    let mut buffer_r = Box::new([0i32.cast_(); 1024]);
-    let mut buffer_g = Box::new([0i32.cast_(); 1024]);
-    let mut buffer_b = Box::new([0i32.cast_(); 1024]);
-    let mut buffer_a = Box::new([0i32.cast_(); 1024]);
+    let mut buffer_r = [0i32.cast_(); 1024];
+    let mut buffer_g = [0i32.cast_(); 1024];
+    let mut buffer_b = [0i32.cast_(); 1024];
+    let mut buffer_a = [0i32.cast_(); 1024];
     let radius_64 = radius as i64;
     let width_wide = width as i64;
     let weight: M = (1f64 / (radius as f64 * radius as f64)).cast_();
@@ -517,12 +517,12 @@ impl FastGaussianDispatchProvider<u8> for u8 {
         #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             if BASE_RADIUS_I64_CUTOFF > radius {
-                _dispatcher_horizontal = fg_horizontal_pass_neon_u8::<u8, CN>;
+                _dispatcher_horizontal = fg_horizontal_pass_neon_u8::<CN>;
                 #[cfg(feature = "rdm")]
                 {
                     if std::arch::is_aarch64_feature_detected!("rdm") {
                         use crate::neon::fg_horizontal_pass_neon_u8_rdm;
-                        _dispatcher_horizontal = fg_horizontal_pass_neon_u8_rdm::<u8, CN>;
+                        _dispatcher_horizontal = fg_horizontal_pass_neon_u8_rdm::<CN>;
                     }
                 }
             }
@@ -530,7 +530,7 @@ impl FastGaussianDispatchProvider<u8> for u8 {
         #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
         {
             if BASE_RADIUS_I64_CUTOFF > radius {
-                _dispatcher_horizontal = fg_horizontal_pass_wasm_u8::<u8, CN>;
+                _dispatcher_horizontal = fg_horizontal_pass_wasm_u8::<CN>;
             }
         }
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]
@@ -538,14 +538,14 @@ impl FastGaussianDispatchProvider<u8> for u8 {
             let has_avx = std::arch::is_x86_feature_detected!("avx2");
             if has_avx && BASE_RADIUS_I64_CUTOFF > radius {
                 use crate::avx::fg_horizontal_pass_sse_u8;
-                return fg_horizontal_pass_sse_u8::<u8, CN>;
+                return fg_horizontal_pass_sse_u8::<CN>;
             }
         }
         #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
             let is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
             if is_sse_available && BASE_RADIUS_I64_CUTOFF > radius {
-                _dispatcher_horizontal = fg_horizontal_pass_sse_u8::<u8, CN>;
+                _dispatcher_horizontal = fg_horizontal_pass_sse_u8::<CN>;
             }
         }
         _dispatcher_horizontal
@@ -571,12 +571,12 @@ impl FastGaussianDispatchProvider<u8> for u8 {
         #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             if BASE_RADIUS_I64_CUTOFF > radius {
-                _dispatcher_vertical = fg_vertical_pass_neon_u8::<u8, CN>;
+                _dispatcher_vertical = fg_vertical_pass_neon_u8::<CN>;
                 #[cfg(feature = "rdm")]
                 {
                     if std::arch::is_aarch64_feature_detected!("rdm") {
                         use crate::neon::fg_vertical_pass_neon_u8_rdm;
-                        _dispatcher_vertical = fg_vertical_pass_neon_u8_rdm::<u8, CN>;
+                        _dispatcher_vertical = fg_vertical_pass_neon_u8_rdm::<CN>;
                     }
                 }
             }
@@ -584,7 +584,7 @@ impl FastGaussianDispatchProvider<u8> for u8 {
         #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
         {
             if BASE_RADIUS_I64_CUTOFF > radius {
-                _dispatcher_vertical = fg_vertical_pass_wasm_u8::<u8, CN>;
+                _dispatcher_vertical = fg_vertical_pass_wasm_u8::<CN>;
             }
         }
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]
@@ -592,14 +592,14 @@ impl FastGaussianDispatchProvider<u8> for u8 {
             let has_avx = std::arch::is_x86_feature_detected!("avx2");
             if has_avx && BASE_RADIUS_I64_CUTOFF > radius {
                 use crate::avx::fg_vertical_pass_avx_u8;
-                return fg_vertical_pass_avx_u8::<u8, CN>;
+                return fg_vertical_pass_avx_u8::<CN>;
             }
         }
         #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
             let is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
             if is_sse_available && BASE_RADIUS_I64_CUTOFF > radius {
-                _dispatcher_vertical = fg_vertical_pass_sse_u8::<u8, CN>;
+                _dispatcher_vertical = fg_vertical_pass_sse_u8::<CN>;
             }
         }
         _dispatcher_vertical
@@ -629,19 +629,19 @@ impl FastGaussianDispatchProvider<f32> for f32 {
             let has_avx = std::arch::is_x86_feature_detected!("avx2");
             if has_avx {
                 use crate::avx::fg_vertical_pass_avx_f32;
-                return fg_vertical_pass_avx_f32::<f32, CN>;
+                return fg_vertical_pass_avx_f32::<CN>;
             }
         }
         #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
             let is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
             if is_sse_available {
-                _dispatcher_vertical = fg_vertical_pass_sse_f32::<f32, CN>;
+                _dispatcher_vertical = fg_vertical_pass_sse_f32::<CN>;
             }
         }
         #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
-            _dispatcher_vertical = fg_vertical_pass_neon_f32::<f32, CN>;
+            _dispatcher_vertical = fg_vertical_pass_neon_f32::<CN>;
         }
         _dispatcher_vertical
     }
@@ -668,19 +668,19 @@ impl FastGaussianDispatchProvider<f32> for f32 {
             let has_avx = std::arch::is_x86_feature_detected!("avx2");
             if has_avx {
                 use crate::avx::fg_horizontal_pass_avx_f32;
-                return fg_horizontal_pass_avx_f32::<f32, CN>;
+                return fg_horizontal_pass_avx_f32::<CN>;
             }
         }
         #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
             let is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
             if is_sse_available {
-                _dispatcher_horizontal = fg_horizontal_pass_sse_f32::<f32, CN>;
+                _dispatcher_horizontal = fg_horizontal_pass_sse_f32::<CN>;
             }
         }
         #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
-            _dispatcher_horizontal = fg_horizontal_pass_neon_f32::<f32, CN>;
+            _dispatcher_horizontal = fg_horizontal_pass_neon_f32::<CN>;
         }
         _dispatcher_horizontal
     }
@@ -707,7 +707,7 @@ impl FastGaussianDispatchProvider<f16> for f16 {
         };
         #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
-            _dispatcher_vertical = fg_vertical_pass_neon_f16::<f16, CN>;
+            _dispatcher_vertical = fg_vertical_pass_neon_f16::<CN>;
         }
         #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
@@ -739,14 +739,14 @@ impl FastGaussianDispatchProvider<f16> for f16 {
         };
         #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
-            _dispatcher_horizontal = fg_horizontal_pass_neon_f16::<f16, CN>;
+            _dispatcher_horizontal = fg_horizontal_pass_neon_f16::<CN>;
         }
         #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
         {
             if std::arch::is_x86_feature_detected!("sse4.1")
                 && std::arch::is_x86_feature_detected!("f16c")
             {
-                _dispatcher_horizontal = fg_horizontal_pass_sse_f16::<f16, CN>;
+                _dispatcher_horizontal = fg_horizontal_pass_sse_f16::<CN>;
             }
         }
         _dispatcher_horizontal

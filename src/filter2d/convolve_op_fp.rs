@@ -27,10 +27,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![allow(dead_code)]
+use crate::ImageSize;
 use crate::filter1d::{Arena, ToApproxStorage};
 use crate::filter2d::scan_point_2d::ScanPoint2d;
 use crate::mlaf::mlaf;
-use crate::ImageSize;
 use num_traits::AsPrimitive;
 use std::ops::Mul;
 

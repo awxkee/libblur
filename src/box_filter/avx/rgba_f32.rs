@@ -51,30 +51,32 @@ pub(crate) fn box_blur_horizontal_pass_avx_f32<const CN: usize>(
 
 #[inline(always)]
 pub(crate) unsafe fn load_f32_x2<const CN: usize>(ptr0: *const f32, ptr1: *const f32) -> __m256 {
-    if CN == 4 {
-        let x0 = _mm_loadu_ps(ptr0);
-        let x1 = _mm_loadu_ps(ptr1);
-        _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(x0), x1)
-    } else if CN == 3 {
-        let mut j0 = _mm_loadu_si64(ptr0 as *const _);
-        let mut j1 = _mm_loadu_si64(ptr1 as *const _);
-        j0 = _mm_insert_epi32::<2>(j0, ptr0.add(2).read_unaligned().to_bits() as i32);
-        j1 = _mm_insert_epi32::<2>(j1, ptr1.add(2).read_unaligned().to_bits() as i32);
-        _mm256_insertf128_ps::<1>(
-            _mm256_castps128_ps256(_mm_castsi128_ps(j0)),
-            _mm_castsi128_ps(j1),
-        )
-    } else if CN == 2 {
-        let j0 = _mm_loadu_si64(ptr0 as *const _);
-        let j1 = _mm_loadu_si64(ptr1 as *const _);
-        _mm256_insertf128_ps::<1>(
-            _mm256_castps128_ps256(_mm_castsi128_ps(j0)),
-            _mm_castsi128_ps(j1),
-        )
-    } else {
-        let x0 = _mm_load_ss(ptr0 as *const _);
-        let x1 = _mm_load_ss(ptr1 as *const _);
-        _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(x0), x1)
+    unsafe {
+        if CN == 4 {
+            let x0 = _mm_loadu_ps(ptr0);
+            let x1 = _mm_loadu_ps(ptr1);
+            _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(x0), x1)
+        } else if CN == 3 {
+            let mut j0 = _mm_loadu_si64(ptr0 as *const _);
+            let mut j1 = _mm_loadu_si64(ptr1 as *const _);
+            j0 = _mm_insert_epi32::<2>(j0, ptr0.add(2).read_unaligned().to_bits() as i32);
+            j1 = _mm_insert_epi32::<2>(j1, ptr1.add(2).read_unaligned().to_bits() as i32);
+            _mm256_insertf128_ps::<1>(
+                _mm256_castps128_ps256(_mm_castsi128_ps(j0)),
+                _mm_castsi128_ps(j1),
+            )
+        } else if CN == 2 {
+            let j0 = _mm_loadu_si64(ptr0 as *const _);
+            let j1 = _mm_loadu_si64(ptr1 as *const _);
+            _mm256_insertf128_ps::<1>(
+                _mm256_castps128_ps256(_mm_castsi128_ps(j0)),
+                _mm_castsi128_ps(j1),
+            )
+        } else {
+            let x0 = _mm_load_ss(ptr0 as *const _);
+            let x1 = _mm_load_ss(ptr1 as *const _);
+            _mm256_insertf128_ps::<1>(_mm256_castps128_ps256(x0), x1)
+        }
     }
 }
 
@@ -83,7 +85,7 @@ struct HorizontalExecutionUnit<const CN: usize> {}
 
 impl<const CN: usize> HorizontalExecutionUnit<CN> {
     #[target_feature(enable = "avx2")]
-    unsafe fn pass(
+    fn pass(
         &self,
         src: &[f32],
         src_stride: u32,
@@ -104,7 +106,7 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
 
         let mut yy = start_y;
 
-        while yy + 6 < end_y {
+        while yy + 6 <= end_y {
             let y = yy;
             let y_src_shift = y as usize * src_stride as usize;
             let y_dst_shift = y as usize * dst_stride as usize;

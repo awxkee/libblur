@@ -28,7 +28,7 @@
  */
 
 use crate::fast_divide::{DividerIsize, RemEuclidFast};
-use crate::filter1d::{make_arena, ArenaPads};
+use crate::filter1d::{ArenaPads, make_arena};
 use crate::filter2d::fft_utils::fft_next_good_size_real;
 use crate::filter2d::mul_spectrum::SpectrumMultiplier;
 use crate::to_storage::ToStorage;

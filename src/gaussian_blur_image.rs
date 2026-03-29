@@ -27,8 +27,9 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::{
-    gaussian_blur, gaussian_blur_f32, gaussian_blur_u16, BlurImage, BlurImageMut, ConvolutionMode,
-    EdgeMode2D, FastBlurChannels, GaussianBlurParams, IeeeBinaryConvolutionMode, ThreadingPolicy,
+    BlurImage, BlurImageMut, ConvolutionMode, EdgeMode2D, FastBlurChannels, GaussianBlurParams,
+    IeeeBinaryConvolutionMode, ThreadingPolicy, gaussian_blur, gaussian_blur_f32,
+    gaussian_blur_u16,
 };
 use image::{
     DynamicImage, GrayAlphaImage, GrayImage, ImageBuffer, Luma, LumaA, Rgb, Rgb32FImage, RgbImage,

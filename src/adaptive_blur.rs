@@ -29,9 +29,9 @@
 #![allow(clippy::manual_clamp)]
 
 use crate::{
-    filter_2d, filter_2d_fft, gaussian_blur, stack_blur, AnisotropicRadius, BlurError, BlurImage,
-    BlurImageMut, ConvolutionMode, EdgeMode, EdgeMode2D, FastBlurChannels, GaussianBlurParams,
-    KernelShape, Scalar, ThreadingPolicy, TransferFunction,
+    AnisotropicRadius, BlurError, BlurImage, BlurImageMut, ConvolutionMode, EdgeMode, EdgeMode2D,
+    FastBlurChannels, GaussianBlurParams, KernelShape, Scalar, ThreadingPolicy, TransferFunction,
+    filter_2d, filter_2d_fft, gaussian_blur, stack_blur,
 };
 use num_traits::AsPrimitive;
 use std::fmt::Debug;
@@ -123,7 +123,7 @@ impl Blur<u8> for u8 {
         channels: FastBlurChannels,
     ) {
         let mut rad = (radius / 2).saturating_sub(1).max(1);
-        if rad % 2 == 0 {
+        if rad.is_multiple_of(2) {
             rad += 1;
         }
         let src = BlurImage::borrow(image, width as u32, height as u32, channels);
@@ -249,7 +249,7 @@ impl Edges<u8> for u8 {
         let mut dst = vec![0u8; width * height];
 
         let mut radius = radius;
-        if radius % 2 == 0 {
+        if radius.is_multiple_of(2) {
             radius += 1;
         }
 

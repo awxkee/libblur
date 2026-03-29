@@ -29,5 +29,5 @@
 mod horizontal;
 mod vertical;
 
-pub use horizontal::HorizontalWasmStackBlurPass;
-pub use vertical::VerticalWasmStackBlurPass;
+pub(crate) use horizontal::HorizontalWasmStackBlurPass;
+pub(crate) use vertical::VerticalWasmStackBlurPass;

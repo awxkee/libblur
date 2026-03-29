@@ -29,6 +29,7 @@ use std::arch::aarch64::*;
 
 use crate::neon::{load_f32_fast, store_f32};
 use crate::unsafe_slice::UnsafeSlice;
+use crate::util::ScratchBuffer;
 
 pub(crate) fn box_blur_horizontal_pass_neon_rgba_f32<const CN: usize>(
     src: &[f32],
@@ -65,7 +66,7 @@ fn box_blur_horizontal_pass_neon_impl_f32<const CN: usize>(
 
     let mut yy = start_y;
 
-    while yy + 4 < end_y {
+    while yy + 4 <= end_y {
         let y = yy;
         let y_src_shift = y as usize * src_stride as usize;
         let y_dst_shift = y as usize * dst_stride as usize;
@@ -270,7 +271,8 @@ pub(crate) fn box_blur_vertical_pass_neon_rgba_f32(
     }
 }
 
-unsafe fn box_blur_vertical_pass_neon_any_rgba_f32(
+#[target_feature(enable = "neon")]
+fn box_blur_vertical_pass_neon_any_rgba_f32(
     src: &[f32],
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<f32>,
@@ -281,206 +283,53 @@ unsafe fn box_blur_vertical_pass_neon_any_rgba_f32(
     start_x: u32,
     end_x: u32,
 ) {
-    let kernel_size = radius * 2 + 1;
-    let edge_count = (kernel_size / 2) + 1;
-    let v_edge_count = vdupq_n_f32(edge_count as f32);
+    unsafe {
+        let kernel_size = radius * 2 + 1;
+        let edge_count = (kernel_size / 2) + 1;
+        let v_edge_count = vdupq_n_f32(edge_count as f32);
 
-    let half_kernel = kernel_size / 2;
+        let half_kernel = kernel_size / 2;
 
-    let start_x = start_x as usize;
-    let end_x = end_x as usize;
+        let start_x = start_x as usize;
+        let end_x = end_x as usize;
 
-    let v_weight = vdupq_n_f32(1f32 / (radius * 2 + 1) as f32);
+        let v_weight = vdupq_n_f32(1f32 / (radius * 2 + 1) as f32);
 
-    assert!(end_x >= start_x);
+        assert!(end_x >= start_x);
 
-    let buf_size = end_x - start_x;
+        let buf_size = end_x - start_x;
 
-    let buf_cap = buf_size.div_ceil(4) * 4 + 4;
+        let buf_cap = buf_size.div_ceil(4) * 4 + 4;
 
-    let mut buffer = vec![0f32; buf_cap];
+        let mut scratch_buffer = ScratchBuffer::<f32, 4096>::new(buf_cap);
+        let buffer = scratch_buffer.as_mut_slice();
 
-    let mut cx = start_x;
-    let mut buf_cx = 0usize;
+        let mut cx = start_x;
+        let mut buf_cx = 0usize;
 
-    while cx + 16 < end_x {
-        let px = cx;
+        while cx + 16 <= end_x {
+            let px = cx;
 
-        let mut store_0: float32x4_t;
-        let mut store_1: float32x4_t;
-        let mut store_2: float32x4_t;
-        let mut store_3: float32x4_t;
+            let mut store_0: float32x4_t;
+            let mut store_1: float32x4_t;
+            let mut store_2: float32x4_t;
+            let mut store_3: float32x4_t;
 
-        let s_ptr = src.as_ptr().add(px);
-        let edge0 = vld1q_f32(s_ptr);
-        let edge1 = vld1q_f32(s_ptr.add(4));
-        let edge2 = vld1q_f32(s_ptr.add(8));
-        let edge3 = vld1q_f32(s_ptr.add(12));
-
-        store_0 = vmulq_f32(edge0, v_edge_count);
-        store_1 = vmulq_f32(edge1, v_edge_count);
-
-        store_2 = vmulq_f32(edge2, v_edge_count);
-        store_3 = vmulq_f32(edge3, v_edge_count);
-
-        for y in 1..=half_kernel {
-            let y_src_shift = y.min(height - 1) as usize * src_stride as usize;
-            let s_ptr = src.as_ptr().add(y_src_shift + px);
-
+            let s_ptr = src.as_ptr().add(px);
             let edge0 = vld1q_f32(s_ptr);
             let edge1 = vld1q_f32(s_ptr.add(4));
             let edge2 = vld1q_f32(s_ptr.add(8));
             let edge3 = vld1q_f32(s_ptr.add(12));
 
-            store_0 = vaddq_f32(store_0, edge0);
-            store_1 = vaddq_f32(store_1, edge1);
-            store_2 = vaddq_f32(store_2, edge2);
-            store_3 = vaddq_f32(store_3, edge3);
-        }
+            store_0 = vmulq_f32(edge0, v_edge_count);
+            store_1 = vmulq_f32(edge1, v_edge_count);
 
-        vst1q_f32(buffer.get_unchecked_mut(buf_cx..).as_mut_ptr(), store_0);
-        vst1q_f32(buffer.get_unchecked_mut(buf_cx + 4..).as_mut_ptr(), store_1);
-        vst1q_f32(buffer.get_unchecked_mut(buf_cx + 8..).as_mut_ptr(), store_2);
-        vst1q_f32(
-            buffer.get_unchecked_mut(buf_cx + 12..).as_mut_ptr(),
-            store_3,
-        );
+            store_2 = vmulq_f32(edge2, v_edge_count);
+            store_3 = vmulq_f32(edge3, v_edge_count);
 
-        cx += 16;
-        buf_cx += 16;
-    }
-
-    while cx + 8 < end_x {
-        let px = cx;
-
-        let mut store_0: float32x4_t;
-        let mut store_1: float32x4_t;
-
-        let s_ptr = src.as_ptr().add(px);
-        let edge0 = vld1q_f32(s_ptr);
-        let edge1 = vld1q_f32(s_ptr.add(4));
-
-        store_0 = vmulq_f32(edge0, v_edge_count);
-        store_1 = vmulq_f32(edge1, v_edge_count);
-
-        for y in 1..=half_kernel {
-            let y_src_shift = y.min(height - 1) as usize * src_stride as usize;
-            let s_ptr = src.as_ptr().add(y_src_shift + px);
-
-            let edge0 = vld1q_f32(s_ptr);
-            let edge1 = vld1q_f32(s_ptr.add(4));
-
-            store_0 = vaddq_f32(store_0, edge0);
-            store_1 = vaddq_f32(store_1, edge1);
-        }
-
-        vst1q_f32(buffer.get_unchecked_mut(buf_cx..).as_mut_ptr(), store_0);
-        vst1q_f32(buffer.get_unchecked_mut(buf_cx + 4..).as_mut_ptr(), store_1);
-
-        cx += 8;
-        buf_cx += 8;
-    }
-
-    while cx + 4 < end_x {
-        let px = cx;
-
-        let mut store_0: float32x4_t;
-
-        let s_ptr = src.as_ptr().add(px);
-        let edge0 = vld1q_f32(s_ptr);
-
-        store_0 = vmulq_f32(edge0, v_edge_count);
-
-        for y in 1..=half_kernel {
-            let y_src_shift = y.min(height - 1) as usize * src_stride as usize;
-            let s_ptr = src.as_ptr().add(y_src_shift + px);
-
-            let edge0 = vld1q_f32(s_ptr);
-
-            store_0 = vaddq_f32(store_0, edge0);
-        }
-
-        vst1q_f32(buffer.get_unchecked_mut(buf_cx..).as_mut_ptr(), store_0);
-
-        cx += 4;
-        buf_cx += 4;
-    }
-
-    while cx < end_x {
-        let px = cx;
-
-        let mut store_0: float32x4_t;
-
-        let s_ptr = src.as_ptr().add(px);
-        let edge0 = vld1q_lane_f32::<0>(s_ptr, vdupq_n_f32(0.));
-
-        store_0 = vmulq_f32(edge0, v_edge_count);
-
-        for y in 1..=half_kernel {
-            let y_src_shift = y.min(height - 1) as usize * src_stride as usize;
-            let s_ptr = src.as_ptr().add(y_src_shift + px);
-
-            let edge0 = vld1q_lane_f32::<0>(s_ptr, vdupq_n_f32(0.));
-            store_0 = vaddq_f32(store_0, edge0);
-        }
-
-        vst1q_lane_f32::<0>(buffer.get_unchecked_mut(buf_cx..).as_mut_ptr(), store_0);
-
-        cx += 1;
-        buf_cx += 1;
-    }
-
-    for y in 0..height {
-        let mut buf_cx = 0usize;
-        let mut cx = start_x;
-
-        // preload edge pixels
-        let next = (y + half_kernel + 1).min(height - 1) as usize * src_stride as usize;
-        let previous = (y as isize - half_kernel as isize).max(0) as usize * src_stride as usize;
-        let y_dst_shift = dst_stride as usize * y as usize;
-
-        while cx + 16 < end_x {
-            let px = cx;
-
-            let mut store_0 = vld1q_f32(buffer.get_unchecked(buf_cx..).as_ptr());
-            let mut store_1 = vld1q_f32(buffer.get_unchecked(buf_cx + 4..).as_ptr());
-            let mut store_2 = vld1q_f32(buffer.get_unchecked(buf_cx + 8..).as_ptr());
-            let mut store_3 = vld1q_f32(buffer.get_unchecked(buf_cx + 12..).as_ptr());
-
-            {
-                let px = cx;
-
-                let offset = y_dst_shift + px;
-                let ptr = unsafe_dst.slice.get_unchecked(offset).get();
-                let px_16_lo0 = vmulq_f32(store_0, v_weight);
-                let px_16_hi0 = vmulq_f32(store_1, v_weight);
-                let px_16_lo1 = vmulq_f32(store_2, v_weight);
-                let px_16_hi2 = vmulq_f32(store_3, v_weight);
-
-                vst1q_f32(ptr, px_16_lo0);
-                vst1q_f32(ptr.add(4), px_16_hi0);
-                vst1q_f32(ptr.add(8), px_16_lo1);
-                vst1q_f32(ptr.add(12), px_16_hi2);
-            }
-
-            // subtract previous
-            {
-                let s_ptr = src.as_ptr().add(previous + px);
-
-                let edge0 = vld1q_f32(s_ptr);
-                let edge1 = vld1q_f32(s_ptr.add(4));
-                let edge2 = vld1q_f32(s_ptr.add(8));
-                let edge3 = vld1q_f32(s_ptr.add(12));
-
-                store_0 = vsubq_f32(store_0, edge0);
-                store_1 = vsubq_f32(store_1, edge1);
-                store_2 = vsubq_f32(store_2, edge2);
-                store_3 = vsubq_f32(store_3, edge3);
-            }
-
-            // add next
-            {
-                let s_ptr = src.as_ptr().add(next + px);
+            for y in 1..=half_kernel {
+                let y_src_shift = y.min(height - 1) as usize * src_stride as usize;
+                let s_ptr = src.as_ptr().add(y_src_shift + px);
 
                 let edge0 = vld1q_f32(s_ptr);
                 let edge1 = vld1q_f32(s_ptr.add(4));
@@ -505,38 +354,23 @@ unsafe fn box_blur_vertical_pass_neon_any_rgba_f32(
             buf_cx += 16;
         }
 
-        while cx + 8 < end_x {
+        while cx + 8 <= end_x {
             let px = cx;
 
-            let mut store_0 = vld1q_f32(buffer.get_unchecked(buf_cx..).as_ptr());
-            let mut store_1 = vld1q_f32(buffer.get_unchecked(buf_cx + 4..).as_ptr());
+            let mut store_0: float32x4_t;
+            let mut store_1: float32x4_t;
 
-            {
-                let px = cx;
+            let s_ptr = src.as_ptr().add(px);
+            let edge0 = vld1q_f32(s_ptr);
+            let edge1 = vld1q_f32(s_ptr.add(4));
 
-                let px_16_lo0 = vmulq_f32(store_0, v_weight);
-                let px_16_hi0 = vmulq_f32(store_1, v_weight);
+            store_0 = vmulq_f32(edge0, v_edge_count);
+            store_1 = vmulq_f32(edge1, v_edge_count);
 
-                let offset = y_dst_shift + px;
-                let ptr = unsafe_dst.slice.get_unchecked(offset).get();
+            for y in 1..=half_kernel {
+                let y_src_shift = y.min(height - 1) as usize * src_stride as usize;
+                let s_ptr = src.as_ptr().add(y_src_shift + px);
 
-                vst1q_f32(ptr, px_16_lo0);
-                vst1q_f32(ptr.add(4), px_16_hi0);
-            }
-
-            // subtract previous
-            {
-                let s_ptr = src.as_ptr().add(previous + px);
-                let edge0 = vld1q_f32(s_ptr);
-                let edge1 = vld1q_f32(s_ptr.add(4));
-
-                store_0 = vsubq_f32(store_0, edge0);
-                store_1 = vsubq_f32(store_1, edge1);
-            }
-
-            // add next
-            {
-                let s_ptr = src.as_ptr().add(next + px);
                 let edge0 = vld1q_f32(s_ptr);
                 let edge1 = vld1q_f32(s_ptr.add(4));
 
@@ -551,33 +385,23 @@ unsafe fn box_blur_vertical_pass_neon_any_rgba_f32(
             buf_cx += 8;
         }
 
-        while cx + 4 < end_x {
+        while cx + 4 <= end_x {
             let px = cx;
 
-            let mut store_0 = vld1q_f32(buffer.get_unchecked(buf_cx..).as_ptr());
+            let mut store_0: float32x4_t;
 
-            {
-                let px = cx;
-                let offset = y_dst_shift + px;
-                let ptr = unsafe_dst.slice.get_unchecked(offset).get();
-                let px_16_lo0 = vmulq_f32(store_0, v_weight);
-                vst1q_f32(ptr, px_16_lo0);
-            }
+            let s_ptr = src.as_ptr().add(px);
+            let edge0 = vld1q_f32(s_ptr);
 
-            // subtract previous
-            {
-                let s_ptr = src.as_ptr().add(previous + px);
-                let edge = vld1q_f32(s_ptr);
+            store_0 = vmulq_f32(edge0, v_edge_count);
 
-                store_0 = vsubq_f32(store_0, edge);
-            }
+            for y in 1..=half_kernel {
+                let y_src_shift = y.min(height - 1) as usize * src_stride as usize;
+                let s_ptr = src.as_ptr().add(y_src_shift + px);
 
-            // add next
-            {
-                let s_ptr = src.as_ptr().add(next + px);
-                let edge = vld1q_f32(s_ptr);
+                let edge0 = vld1q_f32(s_ptr);
 
-                store_0 = vaddq_f32(store_0, edge);
+                store_0 = vaddq_f32(store_0, edge0);
             }
 
             vst1q_f32(buffer.get_unchecked_mut(buf_cx..).as_mut_ptr(), store_0);
@@ -589,36 +413,218 @@ unsafe fn box_blur_vertical_pass_neon_any_rgba_f32(
         while cx < end_x {
             let px = cx;
 
-            let mut store_0 =
-                vld1q_lane_f32::<0>(buffer.get_unchecked(buf_cx..).as_ptr(), vdupq_n_f32(0.));
+            let mut store_0: float32x4_t;
 
-            {
-                let px = cx;
-                let offset = y_dst_shift + px;
-                let ptr = unsafe_dst.slice.get_unchecked(offset).get();
-                let px_16_lo0 = vmulq_f32(store_0, v_weight);
-                vst1q_lane_f32::<0>(ptr, px_16_lo0);
-            }
+            let s_ptr = src.as_ptr().add(px);
+            let edge0 = vld1q_lane_f32::<0>(s_ptr, vdupq_n_f32(0.));
 
-            // subtract previous
-            {
-                let s_ptr = src.as_ptr().add(previous + px);
-                let edge = vld1q_lane_f32::<0>(s_ptr, vdupq_n_f32(0.));
+            store_0 = vmulq_f32(edge0, v_edge_count);
 
-                store_0 = vsubq_f32(store_0, edge);
-            }
+            for y in 1..=half_kernel {
+                let y_src_shift = y.min(height - 1) as usize * src_stride as usize;
+                let s_ptr = src.as_ptr().add(y_src_shift + px);
 
-            // add next
-            {
-                let s_ptr = src.as_ptr().add(next + px);
-                let edge = vld1q_lane_f32::<0>(s_ptr, vdupq_n_f32(0.));
-                store_0 = vaddq_f32(store_0, edge);
+                let edge0 = vld1q_lane_f32::<0>(s_ptr, vdupq_n_f32(0.));
+                store_0 = vaddq_f32(store_0, edge0);
             }
 
             vst1q_lane_f32::<0>(buffer.get_unchecked_mut(buf_cx..).as_mut_ptr(), store_0);
 
             cx += 1;
             buf_cx += 1;
+        }
+
+        for y in 0..height {
+            let mut buf_cx = 0usize;
+            let mut cx = start_x;
+
+            // preload edge pixels
+            let next = (y + half_kernel + 1).min(height - 1) as usize * src_stride as usize;
+            let previous =
+                (y as isize - half_kernel as isize).max(0) as usize * src_stride as usize;
+            let y_dst_shift = dst_stride as usize * y as usize;
+
+            while cx + 16 < end_x {
+                let px = cx;
+
+                let mut store_0 = vld1q_f32(buffer.get_unchecked(buf_cx..).as_ptr());
+                let mut store_1 = vld1q_f32(buffer.get_unchecked(buf_cx + 4..).as_ptr());
+                let mut store_2 = vld1q_f32(buffer.get_unchecked(buf_cx + 8..).as_ptr());
+                let mut store_3 = vld1q_f32(buffer.get_unchecked(buf_cx + 12..).as_ptr());
+
+                {
+                    let px = cx;
+
+                    let offset = y_dst_shift + px;
+                    let ptr = unsafe_dst.slice.get_unchecked(offset).get();
+                    let px_16_lo0 = vmulq_f32(store_0, v_weight);
+                    let px_16_hi0 = vmulq_f32(store_1, v_weight);
+                    let px_16_lo1 = vmulq_f32(store_2, v_weight);
+                    let px_16_hi2 = vmulq_f32(store_3, v_weight);
+
+                    vst1q_f32(ptr, px_16_lo0);
+                    vst1q_f32(ptr.add(4), px_16_hi0);
+                    vst1q_f32(ptr.add(8), px_16_lo1);
+                    vst1q_f32(ptr.add(12), px_16_hi2);
+                }
+
+                // subtract previous
+                {
+                    let s_ptr = src.as_ptr().add(previous + px);
+
+                    let edge0 = vld1q_f32(s_ptr);
+                    let edge1 = vld1q_f32(s_ptr.add(4));
+                    let edge2 = vld1q_f32(s_ptr.add(8));
+                    let edge3 = vld1q_f32(s_ptr.add(12));
+
+                    store_0 = vsubq_f32(store_0, edge0);
+                    store_1 = vsubq_f32(store_1, edge1);
+                    store_2 = vsubq_f32(store_2, edge2);
+                    store_3 = vsubq_f32(store_3, edge3);
+                }
+
+                // add next
+                {
+                    let s_ptr = src.as_ptr().add(next + px);
+
+                    let edge0 = vld1q_f32(s_ptr);
+                    let edge1 = vld1q_f32(s_ptr.add(4));
+                    let edge2 = vld1q_f32(s_ptr.add(8));
+                    let edge3 = vld1q_f32(s_ptr.add(12));
+
+                    store_0 = vaddq_f32(store_0, edge0);
+                    store_1 = vaddq_f32(store_1, edge1);
+                    store_2 = vaddq_f32(store_2, edge2);
+                    store_3 = vaddq_f32(store_3, edge3);
+                }
+
+                vst1q_f32(buffer.get_unchecked_mut(buf_cx..).as_mut_ptr(), store_0);
+                vst1q_f32(buffer.get_unchecked_mut(buf_cx + 4..).as_mut_ptr(), store_1);
+                vst1q_f32(buffer.get_unchecked_mut(buf_cx + 8..).as_mut_ptr(), store_2);
+                vst1q_f32(
+                    buffer.get_unchecked_mut(buf_cx + 12..).as_mut_ptr(),
+                    store_3,
+                );
+
+                cx += 16;
+                buf_cx += 16;
+            }
+
+            while cx + 8 < end_x {
+                let px = cx;
+
+                let mut store_0 = vld1q_f32(buffer.get_unchecked(buf_cx..).as_ptr());
+                let mut store_1 = vld1q_f32(buffer.get_unchecked(buf_cx + 4..).as_ptr());
+
+                {
+                    let px = cx;
+
+                    let px_16_lo0 = vmulq_f32(store_0, v_weight);
+                    let px_16_hi0 = vmulq_f32(store_1, v_weight);
+
+                    let offset = y_dst_shift + px;
+                    let ptr = unsafe_dst.slice.get_unchecked(offset).get();
+
+                    vst1q_f32(ptr, px_16_lo0);
+                    vst1q_f32(ptr.add(4), px_16_hi0);
+                }
+
+                // subtract previous
+                {
+                    let s_ptr = src.as_ptr().add(previous + px);
+                    let edge0 = vld1q_f32(s_ptr);
+                    let edge1 = vld1q_f32(s_ptr.add(4));
+
+                    store_0 = vsubq_f32(store_0, edge0);
+                    store_1 = vsubq_f32(store_1, edge1);
+                }
+
+                // add next
+                {
+                    let s_ptr = src.as_ptr().add(next + px);
+                    let edge0 = vld1q_f32(s_ptr);
+                    let edge1 = vld1q_f32(s_ptr.add(4));
+
+                    store_0 = vaddq_f32(store_0, edge0);
+                    store_1 = vaddq_f32(store_1, edge1);
+                }
+
+                vst1q_f32(buffer.get_unchecked_mut(buf_cx..).as_mut_ptr(), store_0);
+                vst1q_f32(buffer.get_unchecked_mut(buf_cx + 4..).as_mut_ptr(), store_1);
+
+                cx += 8;
+                buf_cx += 8;
+            }
+
+            while cx + 4 < end_x {
+                let px = cx;
+
+                let mut store_0 = vld1q_f32(buffer.get_unchecked(buf_cx..).as_ptr());
+
+                {
+                    let px = cx;
+                    let offset = y_dst_shift + px;
+                    let ptr = unsafe_dst.slice.get_unchecked(offset).get();
+                    let px_16_lo0 = vmulq_f32(store_0, v_weight);
+                    vst1q_f32(ptr, px_16_lo0);
+                }
+
+                // subtract previous
+                {
+                    let s_ptr = src.as_ptr().add(previous + px);
+                    let edge = vld1q_f32(s_ptr);
+
+                    store_0 = vsubq_f32(store_0, edge);
+                }
+
+                // add next
+                {
+                    let s_ptr = src.as_ptr().add(next + px);
+                    let edge = vld1q_f32(s_ptr);
+
+                    store_0 = vaddq_f32(store_0, edge);
+                }
+
+                vst1q_f32(buffer.get_unchecked_mut(buf_cx..).as_mut_ptr(), store_0);
+
+                cx += 4;
+                buf_cx += 4;
+            }
+
+            while cx < end_x {
+                let px = cx;
+
+                let mut store_0 =
+                    vld1q_lane_f32::<0>(buffer.get_unchecked(buf_cx..).as_ptr(), vdupq_n_f32(0.));
+
+                {
+                    let px = cx;
+                    let offset = y_dst_shift + px;
+                    let ptr = unsafe_dst.slice.get_unchecked(offset).get();
+                    let px_16_lo0 = vmulq_f32(store_0, v_weight);
+                    vst1q_lane_f32::<0>(ptr, px_16_lo0);
+                }
+
+                // subtract previous
+                {
+                    let s_ptr = src.as_ptr().add(previous + px);
+                    let edge = vld1q_lane_f32::<0>(s_ptr, vdupq_n_f32(0.));
+
+                    store_0 = vsubq_f32(store_0, edge);
+                }
+
+                // add next
+                {
+                    let s_ptr = src.as_ptr().add(next + px);
+                    let edge = vld1q_lane_f32::<0>(s_ptr, vdupq_n_f32(0.));
+                    store_0 = vaddq_f32(store_0, edge);
+                }
+
+                vst1q_lane_f32::<0>(buffer.get_unchecked_mut(buf_cx..).as_mut_ptr(), store_0);
+
+                cx += 1;
+                buf_cx += 1;
+            }
         }
     }
 }

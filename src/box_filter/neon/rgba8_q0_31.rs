@@ -29,55 +29,62 @@ use std::arch::aarch64::*;
 
 use crate::neon::{load_u8, load_u8_u16, store_u8_s32, vmulq_u16_low_s32};
 use crate::unsafe_slice::UnsafeSlice;
+use crate::util::ScratchBuffer;
 
 #[inline(always)]
-unsafe fn mul_set_v4(
+fn mul_set_v4(
     s1: uint32x4_t,
     s2: uint32x4_t,
     s3: uint32x4_t,
     s4: uint32x4_t,
     w: int32x4_t,
 ) -> (int32x4_t, int32x4_t, int32x4_t, int32x4_t) {
-    let m1 = vqrdmulhq_s32(vreinterpretq_s32_u32(s1), w);
-    let m2 = vqrdmulhq_s32(vreinterpretq_s32_u32(s2), w);
-    let m3 = vqrdmulhq_s32(vreinterpretq_s32_u32(s3), w);
-    let m4 = vqrdmulhq_s32(vreinterpretq_s32_u32(s4), w);
+    unsafe {
+        let m1 = vqrdmulhq_s32(vreinterpretq_s32_u32(s1), w);
+        let m2 = vqrdmulhq_s32(vreinterpretq_s32_u32(s2), w);
+        let m3 = vqrdmulhq_s32(vreinterpretq_s32_u32(s3), w);
+        let m4 = vqrdmulhq_s32(vreinterpretq_s32_u32(s4), w);
 
-    (m1, m2, m3, m4)
+        (m1, m2, m3, m4)
+    }
 }
 
 #[inline(always)]
-unsafe fn mul_set_v2(s1: uint32x4_t, s2: uint32x4_t, w: int32x4_t) -> (int32x4_t, int32x4_t) {
-    let m1 = vqrdmulhq_s32(vreinterpretq_s32_u32(s1), w);
-    let m2 = vqrdmulhq_s32(vreinterpretq_s32_u32(s2), w);
+fn mul_set_v2(s1: uint32x4_t, s2: uint32x4_t, w: int32x4_t) -> (int32x4_t, int32x4_t) {
+    unsafe {
+        let m1 = vqrdmulhq_s32(vreinterpretq_s32_u32(s1), w);
+        let m2 = vqrdmulhq_s32(vreinterpretq_s32_u32(s2), w);
 
-    (m1, m2)
+        (m1, m2)
+    }
 }
 
 #[inline(always)]
-unsafe fn mul_set(s1: uint32x4_t, w: int32x4_t) -> int32x4_t {
-    vqrdmulhq_s32(vreinterpretq_s32_u32(s1), w)
+fn mul_set(s1: uint32x4_t, w: int32x4_t) -> int32x4_t {
+    unsafe { vqrdmulhq_s32(vreinterpretq_s32_u32(s1), w) }
 }
 
 #[inline(always)]
-unsafe fn mul_set_low_u16_v4(
+fn mul_set_low_u16_v4(
     s1: uint16x8_t,
     s2: uint16x8_t,
     s3: uint16x8_t,
     s4: uint16x8_t,
     w: int32x4_t,
 ) -> (int32x4_t, int32x4_t, int32x4_t, int32x4_t) {
-    let s1 = vmovl_u16(vget_low_u16(s1));
-    let s2 = vmovl_u16(vget_low_u16(s2));
-    let s3 = vmovl_u16(vget_low_u16(s3));
-    let s4 = vmovl_u16(vget_low_u16(s4));
+    unsafe {
+        let s1 = vmovl_u16(vget_low_u16(s1));
+        let s2 = vmovl_u16(vget_low_u16(s2));
+        let s3 = vmovl_u16(vget_low_u16(s3));
+        let s4 = vmovl_u16(vget_low_u16(s4));
 
-    let m1 = vqrdmulhq_s32(vreinterpretq_s32_u32(s1), w);
-    let m2 = vqrdmulhq_s32(vreinterpretq_s32_u32(s2), w);
-    let m3 = vqrdmulhq_s32(vreinterpretq_s32_u32(s3), w);
-    let m4 = vqrdmulhq_s32(vreinterpretq_s32_u32(s4), w);
+        let m1 = vqrdmulhq_s32(vreinterpretq_s32_u32(s1), w);
+        let m2 = vqrdmulhq_s32(vreinterpretq_s32_u32(s2), w);
+        let m3 = vqrdmulhq_s32(vreinterpretq_s32_u32(s3), w);
+        let m4 = vqrdmulhq_s32(vreinterpretq_s32_u32(s4), w);
 
-    (m1, m2, m3, m4)
+        (m1, m2, m3, m4)
+    }
 }
 
 pub(crate) fn box_blur_horizontal_pass_neon_rdm<const CN: usize>(
@@ -104,7 +111,7 @@ pub(crate) fn box_blur_horizontal_pass_neon_rdm<const CN: usize>(
 }
 
 #[target_feature(enable = "rdm")]
-unsafe fn box_blur_horizontal_pass_neon_impl_low_rad<const CN: usize>(
+fn box_blur_horizontal_pass_neon_impl_low_rad<const CN: usize>(
     src: &[u8],
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<u8>,
@@ -127,7 +134,7 @@ unsafe fn box_blur_horizontal_pass_neon_impl_low_rad<const CN: usize>(
 
         let mut yy = start_y;
 
-        while yy + 4 < end_y {
+        while yy + 4 <= end_y {
             let y = yy;
             let y_src_shift = y as usize * src_stride as usize;
             let y_dst_shift = y as usize * dst_stride as usize;
@@ -388,7 +395,7 @@ unsafe fn box_blur_horizontal_pass_neon_impl_low_rad<const CN: usize>(
 }
 
 #[target_feature(enable = "rdm")]
-unsafe fn box_blur_horizontal_pass_neon_impl<const CN: usize>(
+fn box_blur_horizontal_pass_neon_impl<const CN: usize>(
     src: &[u8],
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<u8>,
@@ -411,7 +418,7 @@ unsafe fn box_blur_horizontal_pass_neon_impl<const CN: usize>(
 
         let mut yy = start_y;
 
-        while yy + 4 < end_y {
+        while yy + 4 <= end_y {
             let y = yy;
             let y_src_shift = y as usize * src_stride as usize;
             let y_dst_shift = y as usize * dst_stride as usize;
@@ -656,7 +663,7 @@ pub(crate) fn box_blur_vertical_pass_neon_rdm(
 }
 
 #[target_feature(enable = "rdm")]
-unsafe fn box_blur_vertical_pass_neon_low_rad(
+fn box_blur_vertical_pass_neon_low_rad(
     src: &[u8],
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<u8>,
@@ -687,7 +694,8 @@ unsafe fn box_blur_vertical_pass_neon_low_rad(
 
         let buf_cap = buf_size.div_ceil(8) * 8 + 8;
 
-        let mut buffer = vec![0u16; buf_cap];
+        let mut scratch_buffer = ScratchBuffer::<u16, 4096>::new(buf_cap);
+        let buffer = scratch_buffer.as_mut_slice();
 
         let mut cx = start_x;
 
@@ -695,7 +703,7 @@ unsafe fn box_blur_vertical_pass_neon_low_rad(
 
         let mut buf_cx = 0usize;
 
-        while cx + 32 < end_x {
+        while cx + 32 <= end_x {
             let px = cx;
 
             let mut store_0: uint16x8_t;
@@ -741,7 +749,7 @@ unsafe fn box_blur_vertical_pass_neon_low_rad(
             buf_cx += 32;
         }
 
-        while cx + 16 < end_x {
+        while cx + 16 <= end_x {
             let px = cx;
 
             let mut store_0: uint16x8_t;
@@ -770,7 +778,7 @@ unsafe fn box_blur_vertical_pass_neon_low_rad(
             buf_cx += 16;
         }
 
-        while cx + 8 < end_x {
+        while cx + 8 <= end_x {
             let px = cx;
 
             let mut store_0: uint16x8_t;
@@ -919,7 +927,7 @@ unsafe fn box_blur_vertical_pass_neon_low_rad(
                 buf_cx += 32;
             }
 
-            while cx + 16 < end_x {
+            while cx + 16 <= end_x {
                 let px = cx;
 
                 let mut store_0 = vld1q_u16(buffer.get_unchecked(buf_cx..).as_ptr());
@@ -980,7 +988,7 @@ unsafe fn box_blur_vertical_pass_neon_low_rad(
                 buf_cx += 16;
             }
 
-            while cx + 8 < end_x {
+            while cx + 8 <= end_x {
                 let px = cx;
 
                 let mut store_0 = vld1q_u16(buffer.get_unchecked(buf_cx..).as_ptr());
@@ -1077,7 +1085,7 @@ unsafe fn box_blur_vertical_pass_neon_low_rad(
 }
 
 #[target_feature(enable = "rdm")]
-unsafe fn box_blur_vertical_pass_neon_any(
+fn box_blur_vertical_pass_neon_any(
     src: &[u8],
     src_stride: u32,
     unsafe_dst: &UnsafeSlice<u8>,
@@ -1108,12 +1116,13 @@ unsafe fn box_blur_vertical_pass_neon_any(
 
         let buf_cap = buf_size.div_ceil(4) * 4 + 4;
 
-        let mut buffer = vec![0u32; buf_cap];
+        let mut scratch_buffer = ScratchBuffer::<u32, 4096>::new(buf_cap);
+        let buffer = scratch_buffer.as_mut_slice();
 
         let mut cx = start_x;
         let mut buf_cx = 0usize;
 
-        while cx + 32 < end_x {
+        while cx + 32 <= end_x {
             let px = cx;
 
             let mut store_0: uint32x4_t;
@@ -1217,7 +1226,7 @@ unsafe fn box_blur_vertical_pass_neon_any(
             buf_cx += 32;
         }
 
-        while cx + 16 < end_x {
+        while cx + 16 <= end_x {
             let px = cx;
 
             let mut store_0: uint32x4_t;
@@ -1274,7 +1283,7 @@ unsafe fn box_blur_vertical_pass_neon_any(
             buf_cx += 16;
         }
 
-        while cx + 8 < end_x {
+        while cx + 8 <= end_x {
             let px = cx;
 
             let mut store_0: uint32x4_t;
@@ -1353,7 +1362,7 @@ unsafe fn box_blur_vertical_pass_neon_any(
                 (y as isize - half_kernel as isize).max(0) as usize * src_stride as usize;
             let y_dst_shift = dst_stride as usize * y as usize;
 
-            while cx + 32 < end_x {
+            while cx + 32 <= end_x {
                 let px = cx;
 
                 let mut store_0 = vld1q_u32(buffer.get_unchecked(buf_cx..).as_ptr());
@@ -1485,7 +1494,7 @@ unsafe fn box_blur_vertical_pass_neon_any(
                 buf_cx += 32;
             }
 
-            while cx + 16 < end_x {
+            while cx + 16 <= end_x {
                 let px = cx;
 
                 let mut store_0 = vld1q_u32(buffer.get_unchecked(buf_cx..).as_ptr());
@@ -1558,7 +1567,7 @@ unsafe fn box_blur_vertical_pass_neon_any(
                 buf_cx += 16;
             }
 
-            while cx + 8 < end_x {
+            while cx + 8 <= end_x {
                 let px = cx;
 
                 let mut store_0 = vld1q_u32(buffer.get_unchecked(buf_cx..).as_ptr());

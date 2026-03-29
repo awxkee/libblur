@@ -30,14 +30,14 @@ use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
 
+use crate::EdgeMode;
 use crate::edge_mode::clamp_edge;
 use crate::sse::{load_f32_f16, store_f32_f16};
 use crate::unsafe_slice::UnsafeSlice;
-use crate::EdgeMode;
 use core::f16;
 
-pub(crate) fn fg_horizontal_pass_sse_f16<T, const CN: usize>(
-    undefined_slice: &UnsafeSlice<T>,
+pub(crate) fn fg_horizontal_pass_sse_f16<const CN: usize>(
+    undefined_slice: &UnsafeSlice<f16>,
     stride: u32,
     width: u32,
     height: u32,
@@ -47,7 +47,7 @@ pub(crate) fn fg_horizontal_pass_sse_f16<T, const CN: usize>(
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        fast_gaussian_horizontal_pass_sse_f16_impl::<T, CN>(
+        fast_gaussian_horizontal_pass_sse_f16_impl::<CN>(
             undefined_slice,
             stride,
             width,
@@ -62,8 +62,8 @@ pub(crate) fn fg_horizontal_pass_sse_f16<T, const CN: usize>(
 
 #[inline]
 #[target_feature(enable = "sse4.1,f16c")]
-unsafe fn fast_gaussian_horizontal_pass_sse_f16_impl<T, const CN: usize>(
-    undefined_slice: &UnsafeSlice<T>,
+fn fast_gaussian_horizontal_pass_sse_f16_impl<const CN: usize>(
+    bytes: &UnsafeSlice<f16>,
     stride: u32,
     width: u32,
     height: u32,
@@ -72,70 +72,71 @@ unsafe fn fast_gaussian_horizontal_pass_sse_f16_impl<T, const CN: usize>(
     end: u32,
     edge_mode: EdgeMode,
 ) {
-    let bytes: &UnsafeSlice<'_, f16> = std::mem::transmute(undefined_slice);
-    let mut buffer: [[f32; 4]; 1024] = [[0.; 4]; 1024];
+    unsafe {
+        let mut buffer: [[f32; 4]; 1024] = [[0.; 4]; 1024];
 
-    let radius_64 = radius as i64;
-    let width_wide = width as i64;
+        let radius_64 = radius as i64;
+        let width_wide = width as i64;
 
-    let v_half = _mm_set1_ps(2.);
-    let v_weight = _mm_set1_ps(1f32 / (radius as f32 * radius as f32));
+        let v_half = _mm_set1_ps(2.);
+        let v_weight = _mm_set1_ps(1f32 / (radius as f32 * radius as f32));
 
-    for y in start..std::cmp::min(height, end) {
-        let mut diffs = _mm_setzero_ps();
-        let mut summs = _mm_setzero_ps();
+        for y in start..std::cmp::min(height, end) {
+            let mut diffs = _mm_setzero_ps();
+            let mut summs = _mm_setzero_ps();
 
-        let current_y = ((y as i64) * (stride as i64)) as usize;
+            let current_y = ((y as i64) * (stride as i64)) as usize;
 
-        let start_x = 0 - 2 * radius_64;
-        for x in start_x..(width as i64) {
-            if x >= 0 {
-                let current_px = x as usize * CN;
+            let start_x = 0 - 2 * radius_64;
+            for x in start_x..(width as i64) {
+                if x >= 0 {
+                    let current_px = x as usize * CN;
 
-                let pixel = _mm_mul_ps(summs, v_weight);
+                    let pixel = _mm_mul_ps(summs, v_weight);
 
-                let bytes_offset = current_y + current_px;
+                    let bytes_offset = current_y + current_px;
 
-                let dst_ptr = bytes.slice.as_ptr().add(bytes_offset) as *mut f16;
-                store_f32_f16::<CN>(dst_ptr, pixel);
+                    let dst_ptr = bytes.slice.as_ptr().add(bytes_offset) as *mut f16;
+                    store_f32_f16::<CN>(dst_ptr, pixel);
 
-                let arr_index = ((x - radius_64) & 1023) as usize;
-                let d_arr_index = (x & 1023) as usize;
+                    let arr_index = ((x - radius_64) & 1023) as usize;
+                    let d_arr_index = (x & 1023) as usize;
 
-                let d_buf_ptr = buffer.get_unchecked_mut(d_arr_index).as_mut_ptr();
-                let mut d_stored = _mm_loadu_ps(d_buf_ptr);
-                d_stored = _mm_mul_ps(d_stored, v_half);
+                    let d_buf_ptr = buffer.get_unchecked_mut(d_arr_index).as_mut_ptr();
+                    let mut d_stored = _mm_loadu_ps(d_buf_ptr);
+                    d_stored = _mm_mul_ps(d_stored, v_half);
 
-                let buf_ptr = buffer.as_mut_ptr().add(arr_index) as *mut f32;
-                let a_stored = _mm_loadu_ps(buf_ptr);
+                    let buf_ptr = buffer.as_mut_ptr().add(arr_index) as *mut f32;
+                    let a_stored = _mm_loadu_ps(buf_ptr);
 
-                diffs = _mm_add_ps(diffs, _mm_sub_ps(a_stored, d_stored));
-            } else if x + radius_64 >= 0 {
-                let arr_index = (x & 1023) as usize;
+                    diffs = _mm_add_ps(diffs, _mm_sub_ps(a_stored, d_stored));
+                } else if x + radius_64 >= 0 {
+                    let arr_index = (x & 1023) as usize;
+                    let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr();
+                    let mut stored = _mm_loadu_ps(buf_ptr);
+                    stored = _mm_mul_ps(stored, v_half);
+                    diffs = _mm_sub_ps(diffs, stored);
+                }
+
+                let next_row_y = (y as usize) * (stride as usize);
+                let next_row_x = clamp_edge!(edge_mode, x + radius_64, 0, width_wide);
+                let next_row_px = next_row_x * CN;
+
+                let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut f16;
+                let pixel_color = load_f32_f16::<CN>(s_ptr);
+
+                let arr_index = ((x + radius_64) & 1023) as usize;
                 let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr();
-                let mut stored = _mm_loadu_ps(buf_ptr);
-                stored = _mm_mul_ps(stored, v_half);
-                diffs = _mm_sub_ps(diffs, stored);
+
+                diffs = _mm_add_ps(diffs, pixel_color);
+                summs = _mm_add_ps(summs, diffs);
+                _mm_storeu_ps(buf_ptr, pixel_color);
             }
-
-            let next_row_y = (y as usize) * (stride as usize);
-            let next_row_x = clamp_edge!(edge_mode, x + radius_64, 0, width_wide);
-            let next_row_px = next_row_x * CN;
-
-            let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut f16;
-            let pixel_color = load_f32_f16::<CN>(s_ptr);
-
-            let arr_index = ((x + radius_64) & 1023) as usize;
-            let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr();
-
-            diffs = _mm_add_ps(diffs, pixel_color);
-            summs = _mm_add_ps(summs, diffs);
-            _mm_storeu_ps(buf_ptr, pixel_color);
         }
     }
 }
 
-pub(crate) fn fg_vertical_pass_sse_f16<T, const CHANNELS_COUNT: usize>(
+pub(crate) fn fg_vertical_pass_sse_f16<T, const CN: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -146,7 +147,7 @@ pub(crate) fn fg_vertical_pass_sse_f16<T, const CHANNELS_COUNT: usize>(
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        fast_gaussian_vertical_pass_sse_f16_impl::<T, CHANNELS_COUNT>(
+        fast_gaussian_vertical_pass_sse_f16_impl::<T, CN>(
             undefined_slice,
             stride,
             width,
@@ -161,7 +162,7 @@ pub(crate) fn fg_vertical_pass_sse_f16<T, const CHANNELS_COUNT: usize>(
 
 #[inline]
 #[target_feature(enable = "sse4.1,f16c")]
-unsafe fn fast_gaussian_vertical_pass_sse_f16_impl<T, const CHANNELS_COUNT: usize>(
+fn fast_gaussian_vertical_pass_sse_f16_impl<T, const CN: usize>(
     undefined_slice: &UnsafeSlice<T>,
     stride: u32,
     width: u32,
@@ -171,65 +172,67 @@ unsafe fn fast_gaussian_vertical_pass_sse_f16_impl<T, const CHANNELS_COUNT: usiz
     end: u32,
     edge_mode: EdgeMode,
 ) {
-    let bytes: &UnsafeSlice<'_, f16> = std::mem::transmute(undefined_slice);
-    let mut buffer: [[f32; 4]; 1024] = [[0.; 4]; 1024];
+    unsafe {
+        let bytes: &UnsafeSlice<'_, f16> = std::mem::transmute(undefined_slice);
+        let mut buffer: [[f32; 4]; 1024] = [[0.; 4]; 1024];
 
-    let v_half = _mm_set1_ps(2.);
-    let v_weight = _mm_set1_ps(1f32 / (radius as f32 * radius as f32));
+        let v_half = _mm_set1_ps(2.);
+        let v_weight = _mm_set1_ps(1f32 / (radius as f32 * radius as f32));
 
-    let height_wide = height as i64;
+        let height_wide = height as i64;
 
-    let radius_64 = radius as i64;
-    for x in start..std::cmp::min(width, end) {
-        let mut diffs = _mm_setzero_ps();
-        let mut summs = _mm_setzero_ps();
+        let radius_64 = radius as i64;
+        for x in start..std::cmp::min(width, end) {
+            let mut diffs = _mm_setzero_ps();
+            let mut summs = _mm_setzero_ps();
 
-        let start_y = 0 - 2 * radius as i64;
-        for y in start_y..height_wide {
-            let current_y = (y * (stride as i64)) as usize;
+            let start_y = 0 - 2 * radius as i64;
+            for y in start_y..height_wide {
+                let current_y = (y * (stride as i64)) as usize;
 
-            if y >= 0 {
-                let current_px = ((std::cmp::max(x, 0)) * CHANNELS_COUNT as u32) as usize;
+                if y >= 0 {
+                    let current_px = ((std::cmp::max(x, 0)) * CN as u32) as usize;
 
-                let pixel = _mm_mul_ps(summs, v_weight);
+                    let pixel = _mm_mul_ps(summs, v_weight);
 
-                let bytes_offset = current_y + current_px;
+                    let bytes_offset = current_y + current_px;
 
-                let dst_ptr = bytes.slice.as_ptr().add(bytes_offset) as *mut f16;
-                store_f32_f16::<CHANNELS_COUNT>(dst_ptr, pixel);
+                    let dst_ptr = bytes.slice.as_ptr().add(bytes_offset) as *mut f16;
+                    store_f32_f16::<CN>(dst_ptr, pixel);
 
-                let arr_index = ((y - radius_64) & 1023) as usize;
-                let d_arr_index = (y & 1023) as usize;
+                    let arr_index = ((y - radius_64) & 1023) as usize;
+                    let d_arr_index = (y & 1023) as usize;
 
-                let d_buf_ptr = buffer.get_unchecked_mut(d_arr_index).as_mut_ptr();
-                let mut d_stored = _mm_loadu_ps(d_buf_ptr);
-                d_stored = _mm_mul_ps(d_stored, v_half);
+                    let d_buf_ptr = buffer.get_unchecked_mut(d_arr_index).as_mut_ptr();
+                    let mut d_stored = _mm_loadu_ps(d_buf_ptr);
+                    d_stored = _mm_mul_ps(d_stored, v_half);
 
-                let buf_ptr = buffer.as_mut_ptr().add(arr_index) as *mut f32;
-                let a_stored = _mm_loadu_ps(buf_ptr);
+                    let buf_ptr = buffer.as_mut_ptr().add(arr_index) as *mut f32;
+                    let a_stored = _mm_loadu_ps(buf_ptr);
 
-                diffs = _mm_add_ps(diffs, _mm_sub_ps(a_stored, d_stored));
-            } else if y + radius_64 >= 0 {
-                let arr_index = (y & 1023) as usize;
+                    diffs = _mm_add_ps(diffs, _mm_sub_ps(a_stored, d_stored));
+                } else if y + radius_64 >= 0 {
+                    let arr_index = (y & 1023) as usize;
+                    let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr();
+                    let mut stored = _mm_loadu_ps(buf_ptr);
+                    stored = _mm_mul_ps(stored, v_half);
+                    diffs = _mm_sub_ps(diffs, stored);
+                }
+
+                let next_row_y =
+                    clamp_edge!(edge_mode, y + radius_64, 0, height_wide) * (stride as usize);
+                let next_row_x = (x * CN as u32) as usize;
+
+                let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_x) as *mut f16;
+                let pixel_color = load_f32_f16::<CN>(s_ptr);
+
+                let arr_index = ((y + radius_64) & 1023) as usize;
                 let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr();
-                let mut stored = _mm_loadu_ps(buf_ptr);
-                stored = _mm_mul_ps(stored, v_half);
-                diffs = _mm_sub_ps(diffs, stored);
+
+                diffs = _mm_add_ps(diffs, pixel_color);
+                summs = _mm_add_ps(summs, diffs);
+                _mm_storeu_ps(buf_ptr, pixel_color);
             }
-
-            let next_row_y =
-                clamp_edge!(edge_mode, y + radius_64, 0, height_wide) * (stride as usize);
-            let next_row_x = (x * CHANNELS_COUNT as u32) as usize;
-
-            let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_x) as *mut f16;
-            let pixel_color = load_f32_f16::<CHANNELS_COUNT>(s_ptr);
-
-            let arr_index = ((y + radius_64) & 1023) as usize;
-            let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr();
-
-            diffs = _mm_add_ps(diffs, pixel_color);
-            summs = _mm_add_ps(summs, diffs);
-            _mm_storeu_ps(buf_ptr, pixel_color);
         }
     }
 }

@@ -29,6 +29,7 @@
 use crate::neon::{load_u8_s32_fast, store_u8_s32, store_u8_s32_x4};
 use crate::stackblur::stack_blur_pass::StackBlurWorkingPass;
 use crate::unsafe_slice::UnsafeSlice;
+use crate::util::ScratchBuffer;
 use std::arch::aarch64::*;
 
 pub(crate) struct HorizontalNeonStackBlurPassQ0_31<const CN: usize> {}
@@ -56,7 +57,7 @@ impl<const CN: usize> StackBlurWorkingPass<u8, CN> for HorizontalNeonStackBlurPa
 
 impl<const CN: usize> HorizontalNeonStackBlurPassQ0_31<CN> {
     #[target_feature(enable = "rdm")]
-    unsafe fn pass_impl(
+    fn pass_impl(
         &self,
         pixels: &UnsafeSlice<u8>,
         stride: u32,
@@ -74,7 +75,8 @@ impl<const CN: usize> HorizontalNeonStackBlurPassQ0_31<CN> {
             let mut _xp;
             let mut sp;
             let mut stack_start;
-            let mut stacks0 = vec![0i32; 4 * div * 4];
+            let mut scratch_buffer = ScratchBuffer::<i32, 2048>::new(4 * div * 4);
+            let stacks0 = scratch_buffer.as_mut_slice();
 
             const Q: f64 = ((1i64 << 31i64) - 1) as f64;
             let recip_scale = Q / ((radius as f64 + 1.) * (radius as f64 + 1.));

@@ -31,7 +31,7 @@ mod arena;
 mod arena_roi;
 #[cfg(all(target_arch = "x86_64", feature = "avx"))]
 mod avx;
-#[cfg(all(target_arch = "x86_64", feature = "nightly_avx512"))]
+#[cfg(all(target_arch = "x86_64", feature = "avx512"))]
 mod avx512;
 mod filter;
 mod filter_1d_approx;
@@ -67,7 +67,7 @@ pub(crate) mod sse;
 mod to_approx_storage;
 mod to_approx_storage_complex;
 
-pub(crate) use arena::{make_arena, Arena, ArenaPads};
+pub(crate) use arena::{Arena, ArenaPads, make_arena};
 pub use filter::filter_1d_exact;
 pub use filter_1d_approx::filter_1d_approx;
 pub use filter_complex::filter_1d_complex;

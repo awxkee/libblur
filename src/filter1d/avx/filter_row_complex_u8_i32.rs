@@ -45,43 +45,51 @@ pub(crate) fn filter_avx_row_complex_u8_i32(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn widen_mul(a: __m128i, b: __m128i) -> (__m128i, __m128i) {
-    let lo = _mm_mullo_epi16(a, b);
-    let hi = _mm_mulhi_epi16(a, b);
-    (_mm_unpacklo_epi16(lo, hi), _mm_unpackhi_epi16(lo, hi))
+pub(crate) fn widen_mul(a: __m128i, b: __m128i) -> (__m128i, __m128i) {
+    unsafe {
+        let lo = _mm_mullo_epi16(a, b);
+        let hi = _mm_mulhi_epi16(a, b);
+        (_mm_unpacklo_epi16(lo, hi), _mm_unpackhi_epi16(lo, hi))
+    }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn widen_mul256(a: __m256i, b: __m256i) -> (__m256i, __m256i) {
-    let lo = _mm256_mullo_epi16(a, b);
-    let hi = _mm256_mulhi_epi16(a, b);
-    let c_lo = _mm256_unpacklo_epi16(lo, hi);
-    let c_hi = _mm256_unpackhi_epi16(lo, hi);
+pub(crate) fn widen_mul256(a: __m256i, b: __m256i) -> (__m256i, __m256i) {
+    unsafe {
+        let lo = _mm256_mullo_epi16(a, b);
+        let hi = _mm256_mulhi_epi16(a, b);
+        let c_lo = _mm256_unpacklo_epi16(lo, hi);
+        let c_hi = _mm256_unpackhi_epi16(lo, hi);
 
-    let xy0 = _mm256_permute2x128_si256::<32>(c_lo, c_hi);
-    let xy1 = _mm256_permute2x128_si256::<49>(c_lo, c_hi);
-    (xy0, xy1)
+        let xy0 = _mm256_permute2x128_si256::<32>(c_lo, c_hi);
+        let xy1 = _mm256_permute2x128_si256::<49>(c_lo, c_hi);
+        (xy0, xy1)
+    }
 }
 
 #[inline(always)]
-unsafe fn v_interleave_i16x8(a: __m256i, b: __m256i) -> (__m256i, __m256i) {
-    let xy_l = _mm256_unpacklo_epi16(a, b);
-    let xy_h = _mm256_unpacklo_epi16(a, b);
+fn v_interleave_i16x8(a: __m256i, b: __m256i) -> (__m256i, __m256i) {
+    unsafe {
+        let xy_l = _mm256_unpacklo_epi16(a, b);
+        let xy_h = _mm256_unpacklo_epi16(a, b);
 
-    let xy0 = _mm256_permute2x128_si256::<32>(xy_l, xy_h);
-    let xy1 = _mm256_permute2x128_si256::<49>(xy_l, xy_h);
-    (xy0, xy1)
+        let xy0 = _mm256_permute2x128_si256::<32>(xy_l, xy_h);
+        let xy1 = _mm256_permute2x128_si256::<49>(xy_l, xy_h);
+        (xy0, xy1)
+    }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn widen_mul_lo(a: __m128i, b: __m128i) -> __m128i {
-    let lo = _mm_mullo_epi16(a, b);
-    let hi = _mm_mulhi_epi16(a, b);
-    _mm_unpacklo_epi16(lo, hi)
+pub(crate) fn widen_mul_lo(a: __m128i, b: __m128i) -> __m128i {
+    unsafe {
+        let lo = _mm_mullo_epi16(a, b);
+        let hi = _mm_mulhi_epi16(a, b);
+        _mm_unpacklo_epi16(lo, hi)
+    }
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn filter_avx_row_complex_u8_i32_impl(
+fn filter_avx_row_complex_u8_i32_impl(
     arena: Arena,
     arena_src: &[u8],
     dst: &mut [Complex<i16>],

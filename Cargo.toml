@@ -2,8 +2,8 @@ workspace = { members = ["app/accelerate", "app"], exclude = ["fuzz"] }
 
 [package]
 name = "libblur"
-version = "0.23.3"
-edition = "2021"
+version = "0.24.0"
+edition = "2024"
 description = "Fast image blurring in pure Rust"
 readme = "./README.md"
 keywords = ["blur", "gauss_blur", "image_blur", "fast_blur", "stack_blur"]
@@ -15,7 +15,7 @@ homepage = "https://github.com/awxkee/libblur"
 repository = "https://github.com/awxkee/libblur.git"
 exclude = ["*.jpg", "./assets/*", "*.png"]
 include = ["/src/", "/README.md", "/LICENSE.md", "/LICENSE-APACHE.md"]
-rust-version = "1.82.0"
+rust-version = "1.89.0"
 
 [lib]
 name = "libblur"
@@ -36,7 +36,7 @@ fft = ["dep:zaft"]
 # Enables NEON RDM intrinsics
 rdm = ["neon"]
 # Enables AVX-512. Requires nightly on rust compiler before 1.89.
-nightly_avx512 = []
+avx512 = []
 # Enables NEON fcma, used in FFT and filter 1d complex. Requires nightly.
 nightly_fcma = ["zaft?/fcma"]
 # Enables core::f16 support. Requires nightly.

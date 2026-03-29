@@ -26,6 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::ImageSize;
 use crate::filter1d::arena::Arena;
 #[cfg(all(target_arch = "x86_64", feature = "avx"))]
 use crate::filter1d::avx::{
@@ -45,7 +46,6 @@ use crate::filter1d::sse::{
     filter_column_sse_f32_f32, filter_column_sse_u8_f32, filter_column_sse_u8_i16,
     filter_column_symm_sse_u8_f32, filter_column_symm_sse_u8_i16,
 };
-use crate::ImageSize;
 #[cfg(feature = "nightly_f16")]
 use core::f16;
 

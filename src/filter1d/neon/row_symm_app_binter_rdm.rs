@@ -26,17 +26,16 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::BorderHandle;
 use crate::edge_mode::{border_interpolate, clamp_edge};
-use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::neon::utils::{
     vmla_symm_hi_u8_s16, vmlaq_symm_hi_u8_s16, vmull_expand_i16, vmullq_expand_i16, vqmovn_s16_u8,
-    vqmovnq_s16x2_u8, xvld1q_u8_x3, xvld1q_u8_x4, xvld4u8, xvst1q_u8_x3, xvst1q_u8_x4,
-    xvst_u8x4_q15,
+    vqmovnq_s16x2_u8, xvld1q_u8_x3, xvld1q_u8_x4, xvld4u8, xvst_u8x4_q15, xvst1q_u8_x3,
+    xvst1q_u8_x4,
 };
 use crate::filter1d::row_handler_small_approx::{RowsHolder, RowsHolderMut};
 use crate::filter1d::to_approx_storage::ToApproxStorage;
 use crate::img_size::ImageSize;
-use crate::BorderHandle;
 use std::arch::aarch64::*;
 
 pub(crate) fn filter_row_symm_neon_binter_u8_i32_rdm<const N: usize>(
@@ -44,28 +43,28 @@ pub(crate) fn filter_row_symm_neon_binter_u8_i32_rdm<const N: usize>(
     m_src: &RowsHolder<u8>,
     m_dst: &mut RowsHolderMut<u8>,
     image_size: ImageSize,
-    scanned_kernel: &[ScanPoint1d<i32>],
+    kernel: &[i32],
 ) {
     unsafe {
-        executor_unit::<N>(edge_mode, m_src, m_dst, image_size, scanned_kernel);
+        executor_unit::<N>(edge_mode, m_src, m_dst, image_size, kernel);
     }
 }
 
 #[target_feature(enable = "rdm")]
-unsafe fn executor_unit<const N: usize>(
+fn executor_unit<const N: usize>(
     edge_mode: BorderHandle,
     m_src: &RowsHolder<u8>,
     m_dst: &mut RowsHolderMut<u8>,
     image_size: ImageSize,
-    scanned_kernel: &[ScanPoint1d<i32>],
+    kernel: &[i32],
 ) {
     unsafe {
-        let length = scanned_kernel.len();
+        let length = kernel.len();
 
         if length == 5 {
-            executor_unit_5::<N>(edge_mode, m_src, m_dst, image_size, scanned_kernel);
+            executor_unit_5::<N>(edge_mode, m_src, m_dst, image_size, kernel);
         } else {
-            executor_unit_any::<N>(edge_mode, m_src, m_dst, image_size, scanned_kernel);
+            executor_unit_any::<N>(edge_mode, m_src, m_dst, image_size, kernel);
         }
     }
 }
@@ -76,12 +75,12 @@ unsafe fn executor_unit_5<const N: usize>(
     m_src: &RowsHolder<u8>,
     m_dst: &mut RowsHolderMut<u8>,
     image_size: ImageSize,
-    scanned_kernel: &[ScanPoint1d<i32>],
+    kernel: &[i32],
 ) {
     unsafe {
         let width = image_size.width;
 
-        let length = scanned_kernel.len();
+        let length = kernel.len();
         let half_len = length / 2;
 
         let min_left = half_len.min(width);
@@ -91,9 +90,9 @@ unsafe fn executor_unit_5<const N: usize>(
             let dst = &mut **dst;
             let mut f_cx = 0usize;
 
-            let c0 = scanned_kernel[0].weight;
-            let c1 = scanned_kernel[1].weight;
-            let c2 = scanned_kernel[2].weight;
+            let c0 = kernel[0];
+            let c1 = kernel[1];
+            let c2 = kernel[2];
             while f_cx < min_left {
                 let mx = f_cx as i64 - s_kernel;
                 let e0 = clamp_edge!(edge_mode.edge_mode, mx, 0, width as i64);
@@ -124,11 +123,11 @@ unsafe fn executor_unit_5<const N: usize>(
             let m_right = width.saturating_sub(half_len);
             let max_width = m_right * N;
 
-            let c0 = vdupq_n_s16(scanned_kernel[0].weight as i16);
-            let c1 = vdupq_n_s16(scanned_kernel[1].weight as i16);
-            let c2 = vdupq_n_s16(scanned_kernel[2].weight as i16);
+            let c0 = vdupq_n_s16(kernel[0] as i16);
+            let c1 = vdupq_n_s16(kernel[1] as i16);
+            let c2 = vdupq_n_s16(kernel[2] as i16);
 
-            while m_cx + 64 < max_width {
+            while m_cx + 64 <= max_width {
                 let cx = m_cx - s_half;
 
                 let shifted_src = src.get_unchecked(cx..);
@@ -167,7 +166,7 @@ unsafe fn executor_unit_5<const N: usize>(
                 m_cx += 64;
             }
 
-            while m_cx + 48 < max_width {
+            while m_cx + 48 <= max_width {
                 let cx = m_cx - s_half;
 
                 let shifted_src = src.get_unchecked(cx..);
@@ -201,7 +200,7 @@ unsafe fn executor_unit_5<const N: usize>(
                 m_cx += 48;
             }
 
-            while m_cx + 16 < max_width {
+            while m_cx + 16 <= max_width {
                 let cx = m_cx - s_half;
 
                 let shifted_src = src.get_unchecked(cx..);
@@ -222,7 +221,7 @@ unsafe fn executor_unit_5<const N: usize>(
                 m_cx += 16;
             }
 
-            while m_cx + 8 < max_width {
+            while m_cx + 8 <= max_width {
                 let cx = m_cx - s_half;
 
                 let shifted_src = src.get_unchecked(cx..);
@@ -264,9 +263,9 @@ unsafe fn executor_unit_5<const N: usize>(
                 m_cx += 4;
             }
 
-            let c0 = scanned_kernel[0].weight;
-            let c1 = scanned_kernel[1].weight;
-            let c2 = scanned_kernel[2].weight;
+            let c0 = kernel[0];
+            let c1 = kernel[1];
+            let c2 = kernel[2];
 
             for zx in m_cx..max_width {
                 let x = zx - s_half;
@@ -315,17 +314,17 @@ unsafe fn executor_unit_5<const N: usize>(
 }
 
 #[target_feature(enable = "rdm")]
-unsafe fn executor_unit_any<const N: usize>(
+fn executor_unit_any<const N: usize>(
     edge_mode: BorderHandle,
     m_src: &RowsHolder<u8>,
     m_dst: &mut RowsHolderMut<u8>,
     image_size: ImageSize,
-    scanned_kernel: &[ScanPoint1d<i32>],
+    kernel: &[i32],
 ) {
     unsafe {
         let width = image_size.width;
 
-        let length = scanned_kernel.len();
+        let length = kernel.len();
         let half_len = length / 2;
 
         let min_left = half_len.min(width);
@@ -338,14 +337,14 @@ unsafe fn executor_unit_any<const N: usize>(
             let dst = &mut **dst;
             let mut f_cx = 0usize;
 
-            let coeff = *scanned_kernel.get_unchecked(half_len);
+            let coeff = *kernel.get_unchecked(half_len);
             while f_cx < min_left {
                 for c in 0..N {
                     let mx = f_cx as i64 - s_kernel;
-                    let mut k0: i32 = *src.get_unchecked(f_cx * N + c) as i32 * coeff.weight;
+                    let mut k0: i32 = *src.get_unchecked(f_cx * N + c) as i32 * coeff;
 
                     for i in 0..half_len {
-                        let coeff = *scanned_kernel.get_unchecked(i);
+                        let coeff = *kernel.get_unchecked(i);
                         let rollback = length - i - 1;
 
                         let src0 = border_interpolate!(
@@ -367,7 +366,7 @@ unsafe fn executor_unit_any<const N: usize>(
                             c
                         );
 
-                        k0 += (src0 as i32 + src1 as i32) * coeff.weight;
+                        k0 += (src0 as i32 + src1 as i32) * coeff;
                     }
 
                     *dst.get_unchecked_mut(f_cx * N + c) = k0.to_approx_();
@@ -381,9 +380,9 @@ unsafe fn executor_unit_any<const N: usize>(
             let m_right = width.saturating_sub(half_len);
             let max_width = m_right * N;
 
-            let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(half_len).weight as i16);
+            let coeff = vdupq_n_s16(*kernel.get_unchecked(half_len) as i16);
 
-            while m_cx + 48 < max_width {
+            while m_cx + 48 <= max_width {
                 let cx = m_cx - s_half;
 
                 let shifted_src = src.get_unchecked(cx..);
@@ -394,7 +393,7 @@ unsafe fn executor_unit_any<const N: usize>(
                 let mut k2 = vmullq_expand_i16(source.2, coeff);
 
                 for i in 0..half_len {
-                    let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight as i16);
+                    let coeff = vdupq_n_s16(*kernel.get_unchecked(i) as i16);
                     let rollback = length - i - 1;
                     let v_source0 = xvld1q_u8_x3(shifted_src.get_unchecked((i * N)..).as_ptr());
                     let v_source1 =
@@ -416,7 +415,7 @@ unsafe fn executor_unit_any<const N: usize>(
                 m_cx += 48;
             }
 
-            while m_cx + 16 < max_width {
+            while m_cx + 16 <= max_width {
                 let cx = m_cx - s_half;
 
                 let shifted_src = src.get_unchecked(cx..);
@@ -425,7 +424,7 @@ unsafe fn executor_unit_any<const N: usize>(
                 let mut k0 = vmullq_expand_i16(source, coeff);
 
                 for i in 0..half_len {
-                    let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight as i16);
+                    let coeff = vdupq_n_s16(*kernel.get_unchecked(i) as i16);
                     let rollback = length - i - 1;
                     let v_source0 = vld1q_u8(shifted_src.get_unchecked((i * N)..).as_ptr());
                     let v_source1 = vld1q_u8(shifted_src.get_unchecked((rollback * N)..).as_ptr());
@@ -437,7 +436,7 @@ unsafe fn executor_unit_any<const N: usize>(
                 m_cx += 16;
             }
 
-            while m_cx + 8 < max_width {
+            while m_cx + 8 <= max_width {
                 let cx = m_cx - s_half;
 
                 let shifted_src = src.get_unchecked(cx..);
@@ -446,7 +445,7 @@ unsafe fn executor_unit_any<const N: usize>(
                 let mut k0 = vmull_expand_i16(source, coeff);
 
                 for i in 0..half_len {
-                    let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight as i16);
+                    let coeff = vdupq_n_s16(*kernel.get_unchecked(i) as i16);
                     let rollback = length - i - 1;
                     let v_source0 = vld1_u8(shifted_src.get_unchecked((i * N)..).as_ptr());
                     let v_source1 = vld1_u8(shifted_src.get_unchecked((rollback * N)..).as_ptr());
@@ -458,7 +457,7 @@ unsafe fn executor_unit_any<const N: usize>(
                 m_cx += 8;
             }
 
-            while m_cx + 4 < max_width {
+            while m_cx + 4 <= max_width {
                 let cx = m_cx - s_half;
 
                 let shifted_src = src.get_unchecked(cx..);
@@ -467,7 +466,7 @@ unsafe fn executor_unit_any<const N: usize>(
                 let mut k0 = vmull_expand_i16(source, coeff);
 
                 for i in 0..half_len {
-                    let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight as i16);
+                    let coeff = vdupq_n_s16(*kernel.get_unchecked(i) as i16);
                     let rollback = length - i - 1;
                     let v_source0 = xvld4u8(shifted_src.get_unchecked((i * N)..).as_ptr());
                     let v_source1 = xvld4u8(shifted_src.get_unchecked((rollback * N)..).as_ptr());
@@ -479,22 +478,22 @@ unsafe fn executor_unit_any<const N: usize>(
                 m_cx += 4;
             }
 
-            let coeff = *scanned_kernel.get_unchecked(half_len);
+            let coeff = *kernel.get_unchecked(half_len);
 
             for zx in m_cx..max_width {
                 let x = zx - s_half;
 
                 let shifted_src = src.get_unchecked(x..);
-                let mut k0 = *shifted_src.get_unchecked(half_len * N) as i32 * coeff.weight;
+                let mut k0 = *shifted_src.get_unchecked(half_len * N) as i32 * coeff;
 
                 for i in 0..half_len {
-                    let coeff = *scanned_kernel.get_unchecked(i);
+                    let coeff = *kernel.get_unchecked(i);
                     let rollback = length - i - 1;
 
                     k0 += (*shifted_src.get_unchecked(i * N) as i16
                         + *shifted_src.get_unchecked(rollback * N) as i16)
                         as i32
-                        * coeff.weight;
+                        * coeff;
                 }
 
                 *dst.get_unchecked_mut(zx) = k0.to_approx_();
@@ -504,13 +503,13 @@ unsafe fn executor_unit_any<const N: usize>(
 
             while f_cx < width {
                 let mx = f_cx as i64 - s_kernel;
-                let coeff = *scanned_kernel.get_unchecked(half_len);
+                let coeff = *kernel.get_unchecked(half_len);
 
                 for c in 0..N {
-                    let mut k0 = *src.get_unchecked(f_cx * N + c) as i32 * coeff.weight;
+                    let mut k0 = *src.get_unchecked(f_cx * N + c) as i32 * coeff;
 
                     for i in 0..half_len {
-                        let coeff = *scanned_kernel.get_unchecked(i);
+                        let coeff = *kernel.get_unchecked(i);
                         let rollback = length - i - 1;
 
                         let src0 = border_interpolate!(
@@ -532,7 +531,7 @@ unsafe fn executor_unit_any<const N: usize>(
                             c
                         );
 
-                        k0 += (src0 as i32 + src1 as i32) * coeff.weight;
+                        k0 += (src0 as i32 + src1 as i32) * coeff;
                     }
 
                     *dst.get_unchecked_mut(f_cx * N + c) = k0.to_approx_();

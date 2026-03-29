@@ -27,7 +27,7 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::fast_divide::{DividerIsize, RemEuclidFast};
-use crate::filter1d::{make_arena, ArenaPads};
+use crate::filter1d::{ArenaPads, make_arena};
 use crate::filter2d::fft_utils::fft_next_good_size;
 use crate::filter2d::scan_se_2d::scan_se_2d_complex;
 use crate::to_storage::ToStorage;

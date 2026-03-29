@@ -25,15 +25,15 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use crate::EdgeMode;
 use crate::edge_mode::clamp_edge;
 use crate::neon::fast_gaussian::NeonI32x4;
 use crate::neon::{load_u8_s32_fast, store_u8_s32_x4, store_u8x8_m4, vmulq_by_3_s32};
 use crate::unsafe_slice::UnsafeSlice;
-use crate::EdgeMode;
 use std::arch::aarch64::*;
 
-pub(crate) fn fgn_vertical_pass_neon_u8_rdm<T, const CN: usize>(
-    undefined_slice: &UnsafeSlice<T>,
+pub(crate) fn fgn_vertical_pass_neon_u8_rdm<const CN: usize>(
+    undefined_slice: &UnsafeSlice<u8>,
     stride: u32,
     width: u32,
     height: u32,
@@ -43,7 +43,7 @@ pub(crate) fn fgn_vertical_pass_neon_u8_rdm<T, const CN: usize>(
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        fgn_vertical_pass_neon_impl_rdm::<T, CN>(
+        fgn_vertical_pass_neon_impl_rdm::<CN>(
             undefined_slice,
             stride,
             width,
@@ -57,8 +57,8 @@ pub(crate) fn fgn_vertical_pass_neon_u8_rdm<T, const CN: usize>(
 }
 
 #[target_feature(enable = "rdm")]
-unsafe fn fgn_vertical_pass_neon_impl_rdm<T, const CN: usize>(
-    undefined_slice: &UnsafeSlice<T>,
+fn fgn_vertical_pass_neon_impl_rdm<const CN: usize>(
+    bytes: &UnsafeSlice<u8>,
     stride: u32,
     width: u32,
     height: u32,
@@ -68,9 +68,7 @@ unsafe fn fgn_vertical_pass_neon_impl_rdm<T, const CN: usize>(
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        let bytes: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_slice);
-
-        let mut full_buffer = Box::new([NeonI32x4::default(); 1024 * 4]);
+        let mut full_buffer = [NeonI32x4::default(); 1024 * 4];
 
         let (buffer0, rem) = full_buffer.split_at_mut(1024);
         let (buffer1, rem) = rem.split_at_mut(1024);
@@ -85,7 +83,7 @@ unsafe fn fgn_vertical_pass_neon_impl_rdm<T, const CN: usize>(
 
         let mut xx = start;
 
-        while xx + 4 < width.min(end) {
+        while xx + 4 <= width.min(end) {
             let mut diffs0 = vdupq_n_s32(0);
             let mut diffs1 = vdupq_n_s32(0);
             let mut diffs2 = vdupq_n_s32(0);
@@ -338,8 +336,8 @@ unsafe fn fgn_vertical_pass_neon_impl_rdm<T, const CN: usize>(
     }
 }
 
-pub(crate) fn fgn_horizontal_pass_neon_u8_rdm<T, const CN: usize>(
-    undefined_slice: &UnsafeSlice<T>,
+pub(crate) fn fgn_horizontal_pass_neon_u8_rdm<const CN: usize>(
+    undefined_slice: &UnsafeSlice<u8>,
     stride: u32,
     width: u32,
     height: u32,
@@ -349,7 +347,7 @@ pub(crate) fn fgn_horizontal_pass_neon_u8_rdm<T, const CN: usize>(
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        fgn_horizontal_pass_neon_impl::<T, CN>(
+        fgn_horizontal_pass_neon_impl::<CN>(
             undefined_slice,
             stride,
             width,
@@ -363,8 +361,8 @@ pub(crate) fn fgn_horizontal_pass_neon_u8_rdm<T, const CN: usize>(
 }
 
 #[target_feature(enable = "rdm")]
-unsafe fn fgn_horizontal_pass_neon_impl<T, const CN: usize>(
-    undefined_slice: &UnsafeSlice<T>,
+fn fgn_horizontal_pass_neon_impl<const CN: usize>(
+    bytes: &UnsafeSlice<u8>,
     stride: u32,
     width: u32,
     height: u32,
@@ -374,9 +372,7 @@ unsafe fn fgn_horizontal_pass_neon_impl<T, const CN: usize>(
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        let bytes: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_slice);
-
-        let mut full_buffer = Box::new([NeonI32x4::default(); 1024 * 4]);
+        let mut full_buffer = [NeonI32x4::default(); 1024 * 4];
 
         let (buffer0, rem) = full_buffer.split_at_mut(1024);
         let (buffer1, rem) = rem.split_at_mut(1024);

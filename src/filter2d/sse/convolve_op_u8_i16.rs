@@ -26,12 +26,12 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::filter1d::sse::utils::{_mm_mull_add_epi8_by_epi16_x4, _mm_mull_epi8_by_epi16_x4};
+use crate::ImageSize;
 use crate::filter1d::Arena;
+use crate::filter1d::sse::utils::{_mm_mull_add_epi8_by_epi16_x4, _mm_mull_epi8_by_epi16_x4};
 use crate::filter2d::scan_point_2d::ScanPoint2d;
 use crate::sse::{_mm_load_pack_x2, _mm_load_pack_x4, _mm_store_pack_x2, _mm_store_pack_x4};
 use crate::to_storage::ToStorage;
-use crate::ImageSize;
 use num_traits::MulAdd;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;

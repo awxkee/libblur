@@ -40,22 +40,26 @@ use std::arch::x86::*;
 use std::arch::x86_64::*;
 
 #[inline(always)]
-pub(crate) unsafe fn mq_complex_mla(
+pub(crate) fn mq_complex_mla(
     acc_r: __m128i,
     r0i0: __m128i,
     r: __m128i,
     r_swop: __m128i,
 ) -> __m128i {
-    let c0 = _mm_mullo_epi32(r0i0, r);
-    let c1 = _mm_mullo_epi32(_mm_shuffle_epi32::<{ _shuffle(2, 3, 0, 1) }>(r0i0), r_swop);
-    _mm_add_epi32(acc_r, _mm_addsub_epi32(c0, c1))
+    unsafe {
+        let c0 = _mm_mullo_epi32(r0i0, r);
+        let c1 = _mm_mullo_epi32(_mm_shuffle_epi32::<{ _shuffle(2, 3, 0, 1) }>(r0i0), r_swop);
+        _mm_add_epi32(acc_r, _mm_addsub_epi32(c0, c1))
+    }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn mq_complex_mul(r0i0: __m128i, r: __m128i, r_swop: __m128i) -> __m128i {
-    let c0 = _mm_mullo_epi32(r0i0, r);
-    let c1 = _mm_mullo_epi32(_mm_shuffle_epi32::<{ _shuffle(2, 3, 0, 1) }>(r0i0), r_swop);
-    _mm_addsub_epi32(c0, c1)
+pub(crate) fn mq_complex_mul(r0i0: __m128i, r: __m128i, r_swop: __m128i) -> __m128i {
+    unsafe {
+        let c0 = _mm_mullo_epi32(r0i0, r);
+        let c1 = _mm_mullo_epi32(_mm_shuffle_epi32::<{ _shuffle(2, 3, 0, 1) }>(r0i0), r_swop);
+        _mm_addsub_epi32(c0, c1)
+    }
 }
 
 pub(crate) fn filter_sse_column_complex_u16_i32(
@@ -71,7 +75,7 @@ pub(crate) fn filter_sse_column_complex_u16_i32(
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn filter_sse_column_complex_u16_i32_impl(
+fn filter_sse_column_complex_u16_i32_impl(
     arena: Arena,
     arena_src: &[&[Complex<i32>]],
     dst: &mut [u16],
@@ -101,7 +105,7 @@ unsafe fn filter_sse_column_complex_u16_i32_impl(
 
         let shuf_table = _mm_set_epi8(29, 28, 25, 24, 21, 20, 17, 16, 13, 12, 9, 8, 5, 4, 1, 0);
 
-        while cx + 8 < full_width {
+        while cx + 8 <= full_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let values0 = _mm_loadu_si128(v_src.as_ptr().cast());
@@ -145,7 +149,7 @@ unsafe fn filter_sse_column_complex_u16_i32_impl(
             cx += 8;
         }
 
-        while cx + 4 < full_width {
+        while cx + 4 <= full_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let values0 = _mm_loadu_si128(v_src.as_ptr().cast());

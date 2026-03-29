@@ -36,44 +36,50 @@ use num_traits::MulAdd;
 use std::arch::x86_64::*;
 
 #[inline(always)]
-pub(crate) unsafe fn v_interleave_i32x8(a: __m256i, b: __m256i) -> (__m256i, __m256i) {
-    let xy_l = _mm256_unpacklo_epi32(a, b);
-    let xy_h = _mm256_unpackhi_epi32(a, b);
+pub(crate) fn v_interleave_i32x8(a: __m256i, b: __m256i) -> (__m256i, __m256i) {
+    unsafe {
+        let xy_l = _mm256_unpacklo_epi32(a, b);
+        let xy_h = _mm256_unpackhi_epi32(a, b);
 
-    let xy0 = _mm256_permute2x128_si256::<32>(xy_l, xy_h);
-    let xy1 = _mm256_permute2x128_si256::<49>(xy_l, xy_h);
-    (xy0, xy1)
+        let xy0 = _mm256_permute2x128_si256::<32>(xy_l, xy_h);
+        let xy1 = _mm256_permute2x128_si256::<49>(xy_l, xy_h);
+        (xy0, xy1)
+    }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn mq_complex_mla(
+pub(crate) fn mq_complex_mla(
     acc: (__m128i, __m128i),
     r0i0: __m128i,
     r: __m128i,
     r_swop: __m128i,
 ) -> (__m128i, __m128i) {
-    let xc00 = _mm_madd_epi16(r0i0, r);
-    let xc10 = _mm_madd_epi16(r0i0, r_swop);
+    unsafe {
+        let xc00 = _mm_madd_epi16(r0i0, r);
+        let xc10 = _mm_madd_epi16(r0i0, r_swop);
 
-    let x_r = _mm_unpacklo_epi32(xc00, xc10);
-    let x_c = _mm_unpackhi_epi32(xc00, xc10);
+        let x_r = _mm_unpacklo_epi32(xc00, xc10);
+        let x_c = _mm_unpackhi_epi32(xc00, xc10);
 
-    (_mm_add_epi32(acc.0, x_r), _mm_add_epi32(acc.1, x_c))
+        (_mm_add_epi32(acc.0, x_r), _mm_add_epi32(acc.1, x_c))
+    }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn mq256_complex_mla(
+pub(crate) fn mq256_complex_mla(
     acc: (__m256i, __m256i),
     r0i0: __m256i,
     r: __m256i,
     r_swop: __m256i,
 ) -> (__m256i, __m256i) {
-    let x_r = _mm256_madd_epi16(r0i0, r);
-    let x_c = _mm256_madd_epi16(r0i0, r_swop);
+    unsafe {
+        let x_r = _mm256_madd_epi16(r0i0, r);
+        let x_c = _mm256_madd_epi16(r0i0, r_swop);
 
-    let (z_r, z_c) = v_interleave_i32x8(x_r, x_c);
+        let (z_r, z_c) = v_interleave_i32x8(x_r, x_c);
 
-    (_mm256_add_epi32(acc.0, z_r), _mm256_add_epi32(acc.1, z_c))
+        (_mm256_add_epi32(acc.0, z_r), _mm256_add_epi32(acc.1, z_c))
+    }
 }
 
 pub(crate) fn filter_avx_column_complex_u8_i32(
@@ -89,7 +95,7 @@ pub(crate) fn filter_avx_column_complex_u8_i32(
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn filter_avx_column_complex_u8_i32_impl(
+fn filter_avx_column_complex_u8_i32_impl(
     arena: Arena,
     arena_src: &[&[Complex<i16>]],
     dst: &mut [u8],
