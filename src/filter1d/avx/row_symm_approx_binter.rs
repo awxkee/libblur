@@ -132,7 +132,7 @@ impl<const N: usize> ExecutionUnit<N> {
 
             let coeff = _mm256_set1_epi32(*v_prepared.get_unchecked(half_len));
 
-            while m_cx + 32 < max_width {
+            while m_cx + 32 <= max_width {
                 let cx = m_cx - s_half;
                 let shifted_src = src.get_unchecked(cx..);
 
@@ -158,7 +158,7 @@ impl<const N: usize> ExecutionUnit<N> {
                 m_cx += 32;
             }
 
-            while m_cx + 16 < max_width {
+            while m_cx + 16 <= max_width {
                 let cx = m_cx - s_half;
                 let shifted_src = src.get_unchecked(cx..);
 
@@ -182,7 +182,7 @@ impl<const N: usize> ExecutionUnit<N> {
                 m_cx += 16;
             }
 
-            while m_cx + 8 < max_width {
+            while m_cx + 8 <= max_width {
                 let cx = m_cx - s_half;
                 let shifted_src = src.get_unchecked(cx..);
 
@@ -206,7 +206,7 @@ impl<const N: usize> ExecutionUnit<N> {
                 m_cx += 8;
             }
 
-            while m_cx + 4 < max_width {
+            while m_cx + 4 <= max_width {
                 let cx = m_cx - s_half;
                 let shifted_src = src.get_unchecked(cx..);
 

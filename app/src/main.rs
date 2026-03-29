@@ -124,12 +124,12 @@ fn main() {
     //     FastBlurChannels::Channels4,
     // );
 
-    let mut z0 = v_vec
-        .iter()
-        .map(|&x| (x as f32 * (1. / 255.)))
-        .collect::<Vec<_>>();
-    let mut cvt = BlurImageMut::borrow(
-        &mut z0,
+    // let mut z0 = v_vec
+    //     .iter()
+    //     .map(|&x| (x as f32 * (1. / 255.)))
+    //     .collect::<Vec<_>>();
+    let mut cvt = BlurImage::borrow(
+        &mut v_vec,
         dyn_image.width(),
         dyn_image.height(),
         FastBlurChannels::Channels3,
@@ -148,7 +148,7 @@ fn main() {
     let gaussian_kernel = gaussian_kernel_2d(500., 500 / 2);
     // let gaussian_kernel = complex_gaussian_kernel(500., 0.75, 5.);
 
-    // let mut dst_image = BlurImageMut::default(); //cvt.clone_as_mut();
+    let mut dst_image = BlurImageMut::default(); //cvt.clone_as_mut();
 
     // gaussian_blur(
     //     &cvt,
@@ -160,17 +160,17 @@ fn main() {
     // )
     //     .unwrap();
     //
-    // gaussian_blur(
-    //     &cvt,
-    //     &mut dst_image,
-    //     GaussianBlurParams::new_from_sigma(500.),
-    //     EdgeMode::Reflect.as_2d(),
-    //     ThreadingPolicy::Single,
-    //     ConvolutionMode::Exact,
-    // )
-    //     .unwrap();
+    gaussian_blur(
+        &cvt,
+        &mut dst_image,
+        GaussianBlurParams::new_from_sigma(31.),
+        EdgeMode::Reflect.as_2d(),
+        ThreadingPolicy::Single,
+        ConvolutionMode::Exact,
+    )
+        .unwrap();
 
-    stack_blur_f32(&mut cvt, AnisotropicRadius::new(8), ThreadingPolicy::Single).unwrap();
+    // stack_blur_f32(&mut cvt, AnisotropicRadius::new(8), ThreadingPolicy::Single).unwrap();
 
     // filter_2d_rgb_fft::<u8, f32>(
     //     &cvt,
@@ -238,12 +238,12 @@ fn main() {
 
     // dst_image = vzd.gamma8(TransferFunction::Srgb, false).unwrap();
     //
-    dst_bytes = cvt
+    dst_bytes = dst_image
         .data
         .borrow_mut()
         .iter()
-        // .map(|&x| x)
-        .map(|&x| (x * 255f32).round() as u8)
+        .map(|&x| x)
+        // .map(|&x| (x * 255f32).round() as u8)
         // .map(|&x| (x >> 8) as u8)
         .collect::<Vec<u8>>();
 

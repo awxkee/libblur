@@ -97,7 +97,7 @@ unsafe fn filter_column_avx_symm_u8_i32_impl_x2(
 
         let coeff = _mm256_set1_epi32(*v_prepared.get_unchecked(half_len));
 
-        while cx + 64 < image_width {
+        while cx + 64 <= image_width {
             let v_src0 = ref0.get_unchecked(cx..);
             let v_src1 = ref1.get_unchecked(cx..);
 
@@ -153,7 +153,7 @@ unsafe fn filter_column_avx_symm_u8_i32_impl_x2(
             cx += 64;
         }
 
-        while cx + 32 < image_width {
+        while cx + 32 <= image_width {
             let v_src0 = ref0.get_unchecked(cx..);
             let v_src1 = ref1.get_unchecked(cx..);
 
@@ -231,7 +231,7 @@ unsafe fn filter_column_avx_symm_u8_i32_impl_x2(
             cx += 16;
         }
 
-        while cx + 8 < image_width {
+        while cx + 8 <= image_width {
             let v_src0 = ref0.get_unchecked(cx..);
             let v_src1 = ref1.get_unchecked(cx..);
 
@@ -269,7 +269,7 @@ unsafe fn filter_column_avx_symm_u8_i32_impl_x2(
             cx += 8;
         }
 
-        while cx + 4 < image_width {
+        while cx + 4 <= image_width {
             let v_src0 = ref0.get_unchecked(cx..);
             let v_src1 = ref1.get_unchecked(cx..);
 
