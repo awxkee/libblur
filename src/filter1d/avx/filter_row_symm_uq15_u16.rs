@@ -86,7 +86,7 @@ unsafe fn filter_row_avx_symm_uq15_u16_impl<const N: usize>(
 
     let coeff = _mm256_set1_epi32(scanned_kernel.get_unchecked(half_len).weight as i32);
 
-    while cx + 64 < max_width {
+    while cx + 64 <= max_width {
         let shifted_src = local_src.get_unchecked(cx..);
 
         let source =
@@ -123,7 +123,7 @@ unsafe fn filter_row_avx_symm_uq15_u16_impl<const N: usize>(
         cx += 64;
     }
 
-    while cx + 32 < max_width {
+    while cx + 32 <= max_width {
         let shifted_src = local_src.get_unchecked(cx..);
 
         let source =
@@ -177,7 +177,7 @@ unsafe fn filter_row_avx_symm_uq15_u16_impl<const N: usize>(
         cx += 16;
     }
 
-    while cx + 8 < max_width {
+    while cx + 8 <= max_width {
         let shifted_src = local_src.get_unchecked(cx..);
 
         let source =
@@ -199,7 +199,7 @@ unsafe fn filter_row_avx_symm_uq15_u16_impl<const N: usize>(
         cx += 8;
     }
 
-    while cx + 4 < max_width {
+    while cx + 4 <= max_width {
         let shifted_src = local_src.get_unchecked(cx..);
 
         let source = _mm_loadu_si64(shifted_src.get_unchecked(half_len * N..).as_ptr() as *const _);

@@ -147,7 +147,7 @@ impl<const FMA: bool, const N: usize> RowSymmExecutionUnit<FMA, N> {
 
         let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
 
-        while cx + 64 < max_width {
+        while cx + 64 <= max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source =
@@ -184,7 +184,7 @@ impl<const FMA: bool, const N: usize> RowSymmExecutionUnit<FMA, N> {
             cx += 64;
         }
 
-        while cx + 32 < max_width {
+        while cx + 32 <= max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source =
@@ -212,7 +212,7 @@ impl<const FMA: bool, const N: usize> RowSymmExecutionUnit<FMA, N> {
             cx += 32;
         }
 
-        while cx + 16 < max_width {
+        while cx + 16 <= max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source =
@@ -235,7 +235,7 @@ impl<const FMA: bool, const N: usize> RowSymmExecutionUnit<FMA, N> {
             cx += 16;
         }
 
-        while cx + 8 < max_width {
+        while cx + 8 <= max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source =
@@ -258,7 +258,7 @@ impl<const FMA: bool, const N: usize> RowSymmExecutionUnit<FMA, N> {
             cx += 8;
         }
 
-        while cx + 4 < max_width {
+        while cx + 4 <= max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source =
