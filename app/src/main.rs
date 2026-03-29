@@ -32,7 +32,15 @@ mod split;
 
 use image::imageops::FilterType;
 use image::{EncodableLayout, FlatSamples, GenericImageView, ImageReader};
-use libblur::{bilateral_filter, complex_gaussian_kernel, fast_bilateral_filter, fast_bilateral_filter_u16, fast_gaussian, filter_1d_complex, filter_1d_complex_fixed_point, filter_2d_rgb_fft, filter_2d_rgb_fft_complex, filter_2d_rgba_fft, gaussian_blur, gaussian_kernel_1d, lens_kernel, sigma_size, stack_blur, AnisotropicRadius, BilateralBlurParams, BlurImage, BlurImageMut, BoxBlurParameters, CLTParameters, ConvolutionMode, EdgeMode, EdgeMode2D, FastBlurChannels, GaussianBlurParams, ImageSize, KernelShape, Scalar, ThreadingPolicy, TransferFunction};
+use libblur::{
+    bilateral_filter, complex_gaussian_kernel, fast_bilateral_filter, fast_bilateral_filter_u16,
+    fast_gaussian, filter_1d_complex, filter_1d_complex_fixed_point, filter_2d_fft_complex,
+    filter_2d_rgb_fft, filter_2d_rgb_fft_complex, filter_2d_rgba_fft, gaussian_blur,
+    gaussian_kernel_1d, lens_kernel, sigma_size, stack_blur, stack_blur_f32, AnisotropicRadius,
+    BilateralBlurParams, BlurImage, BlurImageMut, BoxBlurParameters, CLTParameters,
+    ConvolutionMode, EdgeMode, EdgeMode2D, FastBlurChannels, GaussianBlurParams, ImageSize,
+    KernelShape, Scalar, ThreadingPolicy, TransferFunction,
+};
 use num_complex::Complex;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 use std::any::Any;
@@ -55,6 +63,24 @@ fn f16_to_f32(bytes: Vec<u16>) -> Vec<f32> {
         .iter()
         .map(|&x| half::f16::from_bits(x).to_f32())
         .collect()
+}
+
+fn gaussian_kernel_2d(sigma: f32, radius: usize) -> Vec<f32> {
+    let size = 2 * radius + 1;
+    let mut kernel = vec![0.; size * size];
+    let s2 = 2.0 * sigma * sigma;
+
+    for y in 0..size {
+        for x in 0..size {
+            let dx = x as f32 - radius as f32;
+            let dy = y as f32 - radius as f32;
+            kernel[y * size + x] = (-(dx * dx + dy * dy) / s2).exp();
+        }
+    }
+
+    let sum: f32 = kernel.iter().sum();
+    kernel.iter_mut().for_each(|v| *v /= sum);
+    kernel
 }
 
 fn main() {
@@ -98,13 +124,16 @@ fn main() {
     //     FastBlurChannels::Channels4,
     // );
 
-    // let z0 = v_vec.iter().map(|&x| (x as f32 * (1. / 255.))).collect::<Vec<_>>();
-    let mut cvt = BlurImage::borrow(
-        &v_vec,
+    let mut z0 = v_vec
+        .iter()
+        .map(|&x| (x as f32 * (1. / 255.)))
+        .collect::<Vec<_>>();
+    let mut cvt = BlurImageMut::borrow(
+        &mut z0,
         dyn_image.width(),
         dyn_image.height(),
         FastBlurChannels::Channels3,
-    ).clone_as_mut();
+    );
     // let vcvt = cvt.linearize(TransferFunction::Srgb, true).unwrap();
 
     // let kernel = gaussian_kernel_1d_f64(5, sigma_size_d(2.5));
@@ -112,12 +141,12 @@ fn main() {
 
     // for i in 0..10 {
     let ks = KernelShape::new(55, 55);
-    let motion = lens_kernel(ks, 10., 3., 0.3, 0.5).unwrap();
+    // let motion = lens_kernel(ks, 10., 3., 0.3, 0.5).unwrap();
     // let motion = lens_kernel(KernelShape::new(35, 35), 15., 6., 0.5, 0.2).unwrap();
     // let bokeh = generate_complex_bokeh_kernel(35, 30.);
     let start_time = Instant::now();
-    // let gaussian_kernel = gaussian_kernel_1d(31, sigma_size(31.)).iter().map(|&x| Complex::new(x, 0.0)).collect::<Vec<Complex<f32>>>();
-    let gaussian_kernel = complex_gaussian_kernel(51., 0.75, 5.);
+    let gaussian_kernel = gaussian_kernel_2d(500., 500 / 2);
+    // let gaussian_kernel = complex_gaussian_kernel(500., 0.75, 5.);
 
     // let mut dst_image = BlurImageMut::default(); //cvt.clone_as_mut();
 
@@ -130,31 +159,25 @@ fn main() {
     //     ConvolutionMode::FixedPoint,
     // )
     //     .unwrap();
-
+    //
     // gaussian_blur(
     //     &cvt,
     //     &mut dst_image,
-    //     GaussianBlurParams::new_from_kernel(52.),
-    //     EdgeMode::Clamp.as_2d(),
+    //     GaussianBlurParams::new_from_sigma(500.),
+    //     EdgeMode::Reflect.as_2d(),
     //     ThreadingPolicy::Single,
-    //     ConvolutionMode::FixedPoint,
+    //     ConvolutionMode::Exact,
     // )
     //     .unwrap();
 
-    fast_gaussian(
-        &mut cvt,
-        AnisotropicRadius::new(5),
-        ThreadingPolicy::Single,
-        EdgeMode::Clamp.as_2d(),
-    )
-        .unwrap();
+    stack_blur_f32(&mut cvt, AnisotropicRadius::new(8), ThreadingPolicy::Single).unwrap();
 
-    // filter_2d_rgba_fft::<u8, f32, f32>(
+    // filter_2d_rgb_fft::<u8, f32>(
     //     &cvt,
     //     &mut dst_image,
-    //     &motion,
-    //     KernelShape::new(151, 151),
-    //     EdgeMode::Clamp,
+    //     &gaussian_kernel,
+    //     KernelShape::new(501, 501),
+    //     EdgeMode::Reflect.as_2d(),
     //     Scalar::default(),
     //     ThreadingPolicy::Adaptive,
     // )
@@ -201,7 +224,7 @@ fn main() {
 
     // let gamma = cvt.linearize(TransferFunction::Srgb, false).unwrap();
     // let mut vzd = BlurImageMut::default();
-    
+
     // filter_2d_rgb_fft::<u8, f32>(
     //     &cvt,
     //     &mut dst_image,
@@ -215,16 +238,16 @@ fn main() {
 
     // dst_image = vzd.gamma8(TransferFunction::Srgb, false).unwrap();
     //
-    // dst_bytes = dst_image
-    //     .data
-    //     .borrow_mut()
-    //     .iter()
-    //     .map(|&x| x)
-    //     // .map(|&x| (x * 255f32).round() as u8)
-    //     // .map(|&x| (x >> 8) as u8)
-    //     .collect::<Vec<u8>>();
+    dst_bytes = cvt
+        .data
+        .borrow_mut()
+        .iter()
+        // .map(|&x| x)
+        .map(|&x| (x * 255f32).round() as u8)
+        // .map(|&x| (x >> 8) as u8)
+        .collect::<Vec<u8>>();
 
-    dst_bytes = cvt.data.borrow().to_vec();
+    // dst_bytes = dst_image.data.borrow().to_vec();
     //
 
     let elapsed_time = start_time.elapsed();

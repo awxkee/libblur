@@ -26,54 +26,27 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::primitives::PrimitiveCast;
 use crate::sse::{load_u8_s32_fast, store_u8_s32};
 use crate::stackblur::stack_blur_pass::StackBlurWorkingPass;
 use crate::unsafe_slice::UnsafeSlice;
-use num_traits::{AsPrimitive, FromPrimitive};
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
-use std::marker::PhantomData;
-use std::ops::{AddAssign, Mul, Sub, SubAssign};
 
-pub(crate) struct VerticalSseStackBlurPass<T, J, const CN: usize> {
-    _phantom_t: PhantomData<T>,
-    _phantom_j: PhantomData<J>,
-}
+pub(crate) struct VerticalSseStackBlurPass<const CN: usize> {}
 
-impl<T, J, const CN: usize> Default for VerticalSseStackBlurPass<T, J, CN> {
+impl<const CN: usize> Default for VerticalSseStackBlurPass<CN> {
     fn default() -> Self {
-        VerticalSseStackBlurPass::<T, J, CN> {
-            _phantom_t: Default::default(),
-            _phantom_j: Default::default(),
-        }
+        VerticalSseStackBlurPass::<CN> {}
     }
 }
 
-impl<T, J, const CN: usize> VerticalSseStackBlurPass<T, J, CN>
-where
-    J: Copy
-        + 'static
-        + FromPrimitive
-        + AddAssign<J>
-        + Mul<Output = J>
-        + Sub<Output = J>
-        + AsPrimitive<f32>
-        + SubAssign
-        + AsPrimitive<T>
-        + Default,
-    T: Copy + AsPrimitive<J> + Default,
-    i32: AsPrimitive<J>,
-    u32: AsPrimitive<J>,
-    f32: PrimitiveCast<T>,
-    usize: AsPrimitive<J>,
-{
+impl<const CN: usize> VerticalSseStackBlurPass<CN> {
     #[target_feature(enable = "sse4.1")]
     unsafe fn pass_impl(
         &self,
-        pixels: &UnsafeSlice<T>,
+        pixels: &UnsafeSlice<u8>,
         stride: u32,
         width: u32,
         height: u32,
@@ -101,7 +74,7 @@ where
 
         let mut cx = min_x;
 
-        while cx + 8 < max_x {
+        while cx + 8 <= max_x {
             let mut sums0 = _mm_setzero_si128();
             let mut sums1 = _mm_setzero_si128();
 
@@ -436,27 +409,10 @@ where
     }
 }
 
-impl<T, J, const CN: usize> StackBlurWorkingPass<T, CN> for VerticalSseStackBlurPass<T, J, CN>
-where
-    J: Copy
-        + 'static
-        + FromPrimitive
-        + AddAssign<J>
-        + Mul<Output = J>
-        + Sub<Output = J>
-        + AsPrimitive<f32>
-        + SubAssign
-        + AsPrimitive<T>
-        + Default,
-    T: Copy + AsPrimitive<J> + Default,
-    i32: AsPrimitive<J>,
-    u32: AsPrimitive<J>,
-    f32: PrimitiveCast<T>,
-    usize: AsPrimitive<J>,
-{
+impl<const CN: usize> StackBlurWorkingPass<u8, CN> for VerticalSseStackBlurPass<CN> {
     fn pass(
         &self,
-        pixels: &UnsafeSlice<T>,
+        pixels: &UnsafeSlice<u8>,
         stride: u32,
         width: u32,
         height: u32,

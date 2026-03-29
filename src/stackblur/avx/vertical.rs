@@ -27,26 +27,16 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![allow(clippy::incompatible_msrv)]
-use crate::primitives::PrimitiveCast;
 use crate::sse::{load_u8_s32_fast, store_u8_s32};
 use crate::stackblur::stack_blur_pass::StackBlurWorkingPass;
 use crate::unsafe_slice::UnsafeSlice;
-use num_traits::{AsPrimitive, FromPrimitive};
 use std::arch::x86_64::*;
-use std::marker::PhantomData;
-use std::ops::{AddAssign, Mul, Shr, Sub, SubAssign};
 
-pub(crate) struct VerticalAvxStackBlurPass<T, J, const CN: usize> {
-    _phantom_t: PhantomData<T>,
-    _phantom_j: PhantomData<J>,
-}
+pub(crate) struct VerticalAvxStackBlurPass<const CN: usize> {}
 
-impl<T, J, const CN: usize> Default for VerticalAvxStackBlurPass<T, J, CN> {
+impl<const CN: usize> Default for VerticalAvxStackBlurPass<CN> {
     fn default() -> Self {
-        VerticalAvxStackBlurPass::<T, J, CN> {
-            _phantom_t: Default::default(),
-            _phantom_j: Default::default(),
-        }
+        VerticalAvxStackBlurPass::<CN> {}
     }
 }
 
@@ -710,28 +700,10 @@ unsafe fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
     }
 }
 
-impl<T, J, const CN: usize> StackBlurWorkingPass<T, CN> for VerticalAvxStackBlurPass<T, J, CN>
-where
-    J: Copy
-        + 'static
-        + FromPrimitive
-        + AddAssign<J>
-        + Mul<Output = J>
-        + Shr<Output = J>
-        + Sub<Output = J>
-        + AsPrimitive<f32>
-        + SubAssign
-        + AsPrimitive<T>
-        + Default,
-    T: Copy + AsPrimitive<J> + Default,
-    i32: AsPrimitive<J>,
-    u32: AsPrimitive<J>,
-    f32: PrimitiveCast<T>,
-    usize: AsPrimitive<J>,
-{
+impl<const CN: usize> StackBlurWorkingPass<u8, CN> for VerticalAvxStackBlurPass<CN> {
     fn pass(
         &self,
-        pixels: &UnsafeSlice<T>,
+        pixels: &UnsafeSlice<u8>,
         stride: u32,
         width: u32,
         height: u32,
@@ -740,7 +712,6 @@ where
         total_threads: usize,
     ) {
         unsafe {
-            let pixels: &UnsafeSlice<u8> = std::mem::transmute(pixels);
             stack_blur_avx_vertical_def::<CN>(
                 pixels,
                 stride,

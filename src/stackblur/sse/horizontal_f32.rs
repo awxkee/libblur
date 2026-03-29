@@ -27,29 +27,20 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter1d::sse::utils::_mm_opt_fmlaf_ps;
-use crate::primitives::PrimitiveCast;
 use crate::sse::{load_f32, store_f32};
+use crate::stackblur::sse::vertical_f32::SseF32x4;
 use crate::stackblur::stack_blur_pass::StackBlurWorkingPass;
 use crate::unsafe_slice::UnsafeSlice;
-use num_traits::{AsPrimitive, FromPrimitive};
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
-use std::marker::PhantomData;
-use std::ops::{AddAssign, Mul, Sub, SubAssign};
 
-pub(crate) struct HorizontalSseStackBlurPassFloat32<T, J, const CN: usize> {
-    _phantom_t: PhantomData<T>,
-    _phantom_j: PhantomData<J>,
-}
+pub(crate) struct HorizontalSseStackBlurPassFloat32<const CN: usize> {}
 
-impl<T, J, const CN: usize> Default for HorizontalSseStackBlurPassFloat32<T, J, CN> {
+impl<const CN: usize> Default for HorizontalSseStackBlurPassFloat32<CN> {
     fn default() -> Self {
-        HorizontalSseStackBlurPassFloat32::<T, J, CN> {
-            _phantom_t: Default::default(),
-            _phantom_j: Default::default(),
-        }
+        HorizontalSseStackBlurPassFloat32::<CN> {}
     }
 }
 
@@ -68,7 +59,7 @@ unsafe fn horiz_f32_pass_stack_impl<const CN: usize>(
     let mut xp;
     let mut sp;
     let mut stack_start;
-    let mut stacks = vec![0f32; 4 * div];
+    let mut stacks = vec![SseF32x4::default(); div];
 
     let wm = width - 1;
     let div = (radius * 2) + 1;
@@ -90,8 +81,8 @@ unsafe fn horiz_f32_pass_stack_impl<const CN: usize>(
         let src_pixel = load_f32::<CN>(src_ld);
 
         for i in 0..=radius {
-            let stack_value = stacks.as_mut_ptr().add(i as usize * 4);
-            _mm_storeu_ps(stack_value, src_pixel);
+            let stack_value = stacks.as_mut_ptr().add(i as usize);
+            _mm_store_ps(stack_value.cast(), src_pixel);
             sums = _mm_opt_fmlaf_ps(sums, src_pixel, _mm_set1_ps((i + 1) as f32));
             sum_out = _mm_add_ps(sum_out, src_pixel);
         }
@@ -100,10 +91,10 @@ unsafe fn horiz_f32_pass_stack_impl<const CN: usize>(
             if i <= wm {
                 src_ptr += CN;
             }
-            let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4);
+            let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize);
             let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f32;
             let src_pixel = load_f32::<CN>(src_ld);
-            _mm_storeu_ps(stack_ptr, src_pixel);
+            _mm_store_ps(stack_ptr.cast(), src_pixel);
             sums = _mm_opt_fmlaf_ps(sums, src_pixel, _mm_set1_ps((radius + 1 - i) as f32));
 
             sum_in = _mm_add_ps(sum_in, src_pixel);
@@ -129,9 +120,9 @@ unsafe fn horiz_f32_pass_stack_impl<const CN: usize>(
             if stack_start >= div {
                 stack_start -= div;
             }
-            let stack = stacks.as_mut_ptr().add(stack_start as usize * 4);
+            let stack = stacks.as_mut_ptr().add(stack_start as usize);
 
-            let stack_val = _mm_loadu_ps(stack);
+            let stack_val = _mm_load_ps(stack.cast());
 
             sum_out = _mm_sub_ps(sum_out, stack_val);
 
@@ -142,7 +133,7 @@ unsafe fn horiz_f32_pass_stack_impl<const CN: usize>(
 
             let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f32;
             let src_pixel = load_f32::<CN>(src_ld);
-            _mm_storeu_ps(stack, src_pixel);
+            _mm_store_ps(stack.cast(), src_pixel);
 
             sum_in = _mm_add_ps(sum_in, src_pixel);
             sums = _mm_add_ps(sums, sum_in);
@@ -151,8 +142,8 @@ unsafe fn horiz_f32_pass_stack_impl<const CN: usize>(
             if sp >= div {
                 sp = 0;
             }
-            let stack = stacks.as_mut_ptr().add(sp as usize * 4);
-            let stack_val = _mm_loadu_ps(stack);
+            let stack = stacks.as_mut_ptr().add(sp as usize);
+            let stack_val = _mm_load_ps(stack.cast());
 
             sum_out = _mm_add_ps(sum_out, stack_val);
             sum_in = _mm_sub_ps(sum_in, stack_val);
@@ -160,28 +151,10 @@ unsafe fn horiz_f32_pass_stack_impl<const CN: usize>(
     }
 }
 
-impl<T, J, const CN: usize> StackBlurWorkingPass<T, CN>
-    for HorizontalSseStackBlurPassFloat32<T, J, CN>
-where
-    J: Copy
-        + 'static
-        + FromPrimitive
-        + AddAssign<J>
-        + Mul<Output = J>
-        + Sub<Output = J>
-        + AsPrimitive<f32>
-        + SubAssign
-        + AsPrimitive<T>
-        + Default,
-    T: Copy + AsPrimitive<J> + Default,
-    i32: AsPrimitive<J>,
-    u32: AsPrimitive<J>,
-    f32: PrimitiveCast<T>,
-    usize: AsPrimitive<J>,
-{
+impl<const CN: usize> StackBlurWorkingPass<f32, CN> for HorizontalSseStackBlurPassFloat32<CN> {
     fn pass(
         &self,
-        pixels: &UnsafeSlice<T>,
+        pixels: &UnsafeSlice<f32>,
         stride: u32,
         width: u32,
         height: u32,
@@ -190,7 +163,6 @@ where
         total_threads: usize,
     ) {
         unsafe {
-            let pixels: &UnsafeSlice<f32> = std::mem::transmute(pixels);
             horiz_f32_pass_stack_impl::<CN>(
                 pixels,
                 stride,

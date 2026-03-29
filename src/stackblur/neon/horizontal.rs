@@ -27,48 +27,22 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::neon::{load_u8_s32_fast, store_u8_s32, store_u8_s32_x4};
-use crate::primitives::PrimitiveCast;
 use crate::stackblur::stack_blur_pass::StackBlurWorkingPass;
 use crate::unsafe_slice::UnsafeSlice;
 use std::arch::aarch64::*;
-use std::marker::PhantomData;
-use std::ops::{AddAssign, Mul, Shr, Sub, SubAssign};
 
-pub(crate) struct HorizontalNeonStackBlurPass<T, J, const CN: usize> {
-    _phantom_t: PhantomData<T>,
-    _phantom_j: PhantomData<J>,
-}
+pub(crate) struct HorizontalNeonStackBlurPass<const CN: usize> {}
 
-impl<T, J, const CN: usize> Default for HorizontalNeonStackBlurPass<T, J, CN> {
+impl<const CN: usize> Default for HorizontalNeonStackBlurPass<CN> {
     fn default() -> Self {
-        HorizontalNeonStackBlurPass::<T, J, CN> {
-            _phantom_t: Default::default(),
-            _phantom_j: Default::default(),
-        }
+        HorizontalNeonStackBlurPass::<CN> {}
     }
 }
 
-impl<T, J, const CN: usize> StackBlurWorkingPass<T, CN> for HorizontalNeonStackBlurPass<T, J, CN>
-where
-    J: Copy
-        + 'static
-        + AddAssign<J>
-        + Mul<Output = J>
-        + Shr<Output = J>
-        + Sub<Output = J>
-        + PrimitiveCast<f32>
-        + SubAssign
-        + PrimitiveCast<T>
-        + Default,
-    T: Copy + PrimitiveCast<J> + Default,
-    i32: PrimitiveCast<J>,
-    u32: PrimitiveCast<J>,
-    f32: PrimitiveCast<T>,
-    usize: PrimitiveCast<J>,
-{
+impl<const CN: usize> StackBlurWorkingPass<u8, CN> for HorizontalNeonStackBlurPass<CN> {
     fn pass(
         &self,
-        pixels: &UnsafeSlice<T>,
+        pixels: &UnsafeSlice<u8>,
         stride: u32,
         width: u32,
         height: u32,
@@ -77,7 +51,6 @@ where
         total_threads: usize,
     ) {
         unsafe {
-            let pixels: &UnsafeSlice<u8> = std::mem::transmute(pixels);
             let min_y = thread * height as usize / total_threads;
             let max_y = (thread + 1) * height as usize / total_threads;
 
@@ -94,7 +67,7 @@ where
 
             let mut yy = min_y;
 
-            while yy + 4 < max_y {
+            while yy + 4 <= max_y {
                 let mut sums0 = vdupq_n_s32(0i32);
                 let mut sums1 = vdupq_n_s32(0i32);
                 let mut sums2 = vdupq_n_s32(0i32);

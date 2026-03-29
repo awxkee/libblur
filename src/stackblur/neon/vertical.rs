@@ -27,48 +27,22 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::neon::{load_u8_s32_fast, store_u8_s32};
-use crate::primitives::PrimitiveCast;
 use crate::stackblur::stack_blur_pass::StackBlurWorkingPass;
 use crate::unsafe_slice::UnsafeSlice;
 use std::arch::aarch64::*;
-use std::marker::PhantomData;
-use std::ops::{AddAssign, Mul, Shr, Sub, SubAssign};
 
-pub(crate) struct VerticalNeonStackBlurPass<T, J, const CN: usize> {
-    _phantom_t: PhantomData<T>,
-    _phantom_j: PhantomData<J>,
-}
+pub(crate) struct VerticalNeonStackBlurPass<const CN: usize> {}
 
-impl<T, J, const CN: usize> Default for VerticalNeonStackBlurPass<T, J, CN> {
+impl<const CN: usize> Default for VerticalNeonStackBlurPass<CN> {
     fn default() -> Self {
-        VerticalNeonStackBlurPass {
-            _phantom_t: Default::default(),
-            _phantom_j: Default::default(),
-        }
+        VerticalNeonStackBlurPass {}
     }
 }
 
-impl<T, J, const CN: usize> StackBlurWorkingPass<T, CN> for VerticalNeonStackBlurPass<T, J, CN>
-where
-    J: Copy
-        + 'static
-        + AddAssign<J>
-        + Mul<Output = J>
-        + Shr<Output = J>
-        + Sub<Output = J>
-        + PrimitiveCast<f32>
-        + SubAssign
-        + PrimitiveCast<T>
-        + Default,
-    T: Copy + PrimitiveCast<J> + Default,
-    i32: PrimitiveCast<J>,
-    u32: PrimitiveCast<J>,
-    f32: PrimitiveCast<T>,
-    usize: PrimitiveCast<J>,
-{
+impl<const CN: usize> StackBlurWorkingPass<u8, CN> for VerticalNeonStackBlurPass<CN> {
     fn pass(
         &self,
-        pixels: &UnsafeSlice<T>,
+        pixels: &UnsafeSlice<u8>,
         stride: u32,
         width: u32,
         height: u32,
@@ -92,7 +66,7 @@ where
 
             let mut cx = min_x;
 
-            while cx + 16 < max_x {
+            while cx + 16 <= max_x {
                 let mut sums0 = vdupq_n_s32(0i32);
                 let mut sums1 = vdupq_n_s32(0i32);
                 let mut sums2 = vdupq_n_s32(0i32);
@@ -292,7 +266,7 @@ where
                 cx += 16;
             }
 
-            while cx + 8 < max_x {
+            while cx + 8 <= max_x {
                 let mut sums0 = vdupq_n_s32(0i32);
                 let mut sums1 = vdupq_n_s32(0i32);
 

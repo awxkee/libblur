@@ -1,7 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use image::{EncodableLayout, GenericImageView, ImageReader};
 use libblur::{AnisotropicRadius, BlurImageMut, FastBlurChannels, ThreadingPolicy};
-use opencv::core::{find_file, AlgorithmHint, Mat, Size, CV_8UC3, CV_8UC4};
+use opencv::core::{find_file, AlgorithmHint, Mat, Size, CV_32FC4, CV_8UC3, CV_8UC4};
 use opencv::imgcodecs::{imread, IMREAD_COLOR};
 
 pub fn criterion_benchmark(c: &mut Criterion) {
@@ -64,8 +64,43 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     .unwrap();
 
     c.bench_function("OpenCV: RGBA stack blur", |b| {
+        let mut dst = Mat::default();
         b.iter(|| {
-            let mut dst = Mat::default();
+            opencv::imgproc::stack_blur(&src, &mut dst, Size::new(77, 77)).unwrap();
+        })
+    });
+
+    c.bench_function("libblur: RGBA F32 stack blur", |b| {
+        let mut dst_bytes: Vec<f32> = src_bytes.iter().map(|&x| x as f32).collect::<Vec<f32>>();
+        let mut dst_image = BlurImageMut::borrow(
+            &mut dst_bytes,
+            dimensions.0,
+            dimensions.1,
+            FastBlurChannels::Channels4,
+        );
+        b.iter(|| {
+            libblur::stack_blur_f32(
+                &mut dst_image,
+                AnisotropicRadius::new(77),
+                ThreadingPolicy::Adaptive,
+            )
+            .unwrap();
+        })
+    });
+
+    c.bench_function("OpenCV: RGBA F32 stack blur", |b| {
+        let mut src = Mat::default();
+        opencv::imgproc::cvt_color(
+            &src0,
+            &mut src,
+            CV_8UC3,
+            CV_32FC4,
+            AlgorithmHint::ALGO_HINT_DEFAULT,
+        )
+        .unwrap();
+
+        let mut dst = Mat::default();
+        b.iter(|| {
             opencv::imgproc::stack_blur(&src, &mut dst, Size::new(77, 77)).unwrap();
         })
     });
