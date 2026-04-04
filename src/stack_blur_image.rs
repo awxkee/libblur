@@ -27,8 +27,8 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::{
-    stack_blur, stack_blur_f32, stack_blur_u16, AnisotropicRadius, BlurImageMut, FastBlurChannels,
-    ThreadingPolicy,
+    AnisotropicRadius, BlurImageMut, FastBlurChannels, ThreadingPolicy, stack_blur, stack_blur_f32,
+    stack_blur_u16,
 };
 use image::{
     DynamicImage, GrayAlphaImage, GrayImage, ImageBuffer, Luma, LumaA, Rgb, RgbImage, Rgba,

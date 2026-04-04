@@ -38,78 +38,96 @@ use std::arch::x86_64::*;
 
 #[inline(always)]
 pub(crate) unsafe fn _mm256_load_pack_x4(ptr: *const u8) -> (__m256i, __m256i, __m256i, __m256i) {
-    let row0 = _mm256_loadu_si256(ptr as *const __m256i);
-    let row1 = _mm256_loadu_si256(ptr.add(32) as *const __m256i);
-    let row2 = _mm256_loadu_si256(ptr.add(64) as *const __m256i);
-    let row3 = _mm256_loadu_si256(ptr.add(96) as *const __m256i);
-    (row0, row1, row2, row3)
+    unsafe {
+        let row0 = _mm256_loadu_si256(ptr as *const __m256i);
+        let row1 = _mm256_loadu_si256(ptr.add(32) as *const __m256i);
+        let row2 = _mm256_loadu_si256(ptr.add(64) as *const __m256i);
+        let row3 = _mm256_loadu_si256(ptr.add(96) as *const __m256i);
+        (row0, row1, row2, row3)
+    }
 }
 
 #[inline(always)]
 pub(crate) unsafe fn _mm256_load_pack_x3(ptr: *const u8) -> (__m256i, __m256i, __m256i) {
-    let row0 = _mm256_loadu_si256(ptr as *const __m256i);
-    let row1 = _mm256_loadu_si256(ptr.add(32) as *const __m256i);
-    let row2 = _mm256_loadu_si256(ptr.add(64) as *const __m256i);
-    (row0, row1, row2)
+    unsafe {
+        let row0 = _mm256_loadu_si256(ptr as *const __m256i);
+        let row1 = _mm256_loadu_si256(ptr.add(32) as *const __m256i);
+        let row2 = _mm256_loadu_si256(ptr.add(64) as *const __m256i);
+        (row0, row1, row2)
+    }
 }
 
 #[inline(always)]
 pub(crate) unsafe fn _mm256_load_pack_x2(ptr: *const u8) -> (__m256i, __m256i) {
-    let row0 = _mm256_loadu_si256(ptr as *const __m256i);
-    let row1 = _mm256_loadu_si256(ptr.add(32) as *const __m256i);
-    (row0, row1)
+    unsafe {
+        let row0 = _mm256_loadu_si256(ptr as *const __m256i);
+        let row1 = _mm256_loadu_si256(ptr.add(32) as *const __m256i);
+        (row0, row1)
+    }
 }
 
 #[inline(always)]
 pub(crate) unsafe fn _mm256_load_deinterleave_rgb(ptr: *const u8) -> (__m256i, __m256i, __m256i) {
-    let row0 = _mm256_loadu_si256(ptr as *const __m256i);
-    let row1 = _mm256_loadu_si256(ptr.add(32) as *const __m256i);
-    let row2 = _mm256_loadu_si256(ptr.add(64) as *const __m256i);
-    _mm256_deinterleave_rgb(row0, row1, row2)
+    unsafe {
+        let row0 = _mm256_loadu_si256(ptr as *const __m256i);
+        let row1 = _mm256_loadu_si256(ptr.add(32) as *const __m256i);
+        let row2 = _mm256_loadu_si256(ptr.add(64) as *const __m256i);
+        _mm256_deinterleave_rgb(row0, row1, row2)
+    }
 }
 
 #[inline(always)]
 pub(crate) unsafe fn _mm256_load_deinterleave_rgba(
     ptr: *const u8,
 ) -> (__m256i, __m256i, __m256i, __m256i) {
-    let row0 = _mm256_loadu_si256(ptr as *const __m256i);
-    let row1 = _mm256_loadu_si256(ptr.add(32) as *const __m256i);
-    let row2 = _mm256_loadu_si256(ptr.add(64) as *const __m256i);
-    let row3 = _mm256_loadu_si256(ptr.add(96) as *const __m256i);
-    _mm256_deinterleave_rgba_epi8(row0, row1, row2, row3)
+    unsafe {
+        let row0 = _mm256_loadu_si256(ptr as *const __m256i);
+        let row1 = _mm256_loadu_si256(ptr.add(32) as *const __m256i);
+        let row2 = _mm256_loadu_si256(ptr.add(64) as *const __m256i);
+        let row3 = _mm256_loadu_si256(ptr.add(96) as *const __m256i);
+        _mm256_deinterleave_rgba_epi8(row0, row1, row2, row3)
+    }
 }
 
 #[inline(always)]
 pub(crate) unsafe fn _mm256_load_pack_ps_x4(ptr: *const f32) -> (__m256, __m256, __m256, __m256) {
-    let row0 = _mm256_loadu_ps(ptr);
-    let row1 = _mm256_loadu_ps(ptr.add(8));
-    let row2 = _mm256_loadu_ps(ptr.add(16));
-    let row3 = _mm256_loadu_ps(ptr.add(24));
-    (row0, row1, row2, row3)
+    unsafe {
+        let row0 = _mm256_loadu_ps(ptr);
+        let row1 = _mm256_loadu_ps(ptr.add(8));
+        let row2 = _mm256_loadu_ps(ptr.add(16));
+        let row3 = _mm256_loadu_ps(ptr.add(24));
+        (row0, row1, row2, row3)
+    }
 }
 
 #[inline(always)]
 pub(crate) unsafe fn _mm256_load_pack_ps_x2(ptr: *const f32) -> (__m256, __m256) {
-    let row0 = _mm256_loadu_ps(ptr);
-    let row1 = _mm256_loadu_ps(ptr.add(8));
-    (row0, row1)
+    unsafe {
+        let row0 = _mm256_loadu_ps(ptr);
+        let row1 = _mm256_loadu_ps(ptr.add(8));
+        (row0, row1)
+    }
 }
 
 #[inline(always)]
 pub(crate) unsafe fn _mm256_load_deinterleave_rgb_ps(ptr: *const f32) -> (__m256, __m256, __m256) {
-    let row0 = _mm256_loadu_ps(ptr);
-    let row1 = _mm256_loadu_ps(ptr.add(8));
-    let row2 = _mm256_loadu_ps(ptr.add(16));
-    _mm256_deinterleave_rgb_ps((row0, row1, row2))
+    unsafe {
+        let row0 = _mm256_loadu_ps(ptr);
+        let row1 = _mm256_loadu_ps(ptr.add(8));
+        let row2 = _mm256_loadu_ps(ptr.add(16));
+        _mm256_deinterleave_rgb_ps((row0, row1, row2))
+    }
 }
 
 #[inline(always)]
 pub(crate) unsafe fn _mm256_load_deinterleave_rgba_ps(
     ptr: *const f32,
 ) -> (__m256, __m256, __m256, __m256) {
-    let row0 = _mm256_loadu_ps(ptr);
-    let row1 = _mm256_loadu_ps(ptr.add(8));
-    let row2 = _mm256_loadu_ps(ptr.add(16));
-    let row3 = _mm256_loadu_ps(ptr.add(24));
-    _mm256_deinterleave_rgba_ps((row0, row1, row2, row3))
+    unsafe {
+        let row0 = _mm256_loadu_ps(ptr);
+        let row1 = _mm256_loadu_ps(ptr.add(8));
+        let row2 = _mm256_loadu_ps(ptr.add(16));
+        let row3 = _mm256_loadu_ps(ptr.add(24));
+        _mm256_deinterleave_rgba_ps((row0, row1, row2, row3))
+    }
 }

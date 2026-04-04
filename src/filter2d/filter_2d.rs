@@ -26,7 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::filter1d::{make_arena, ArenaPads, KernelShape};
+use crate::filter1d::{ArenaPads, KernelShape, make_arena};
 use crate::filter2d::filter_2d_handler::Filter2dHandler;
 use crate::filter2d::scan_point_2d::ScanPoint2d;
 use crate::filter2d::scan_se_2d::scan_se_2d;

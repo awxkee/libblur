@@ -26,10 +26,10 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::ImageSize;
+use crate::filter1d::Arena;
 use crate::filter1d::filter_column_complex::filter_column_complex;
 use crate::filter1d::filter_row_complex::filter_row_complex;
-use crate::filter1d::Arena;
-use crate::ImageSize;
 use num_complex::Complex;
 
 pub trait ComplexDispatch<T, F> {

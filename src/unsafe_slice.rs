@@ -50,7 +50,9 @@ impl<'a, T> UnsafeSlice<'a, T> {
     #[inline(always)]
     pub unsafe fn write(&self, i: usize, value: T) {
         let ptr = unsafe { self.slice.get_unchecked(i) }.get();
-        *ptr = value;
+        unsafe {
+            *ptr = value;
+        }
     }
     #[allow(dead_code)]
     #[inline(always)]

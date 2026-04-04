@@ -25,11 +25,11 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use crate::EdgeMode;
 use crate::edge_mode::clamp_edge;
 use crate::neon::fast_gaussian::NeonI32x4;
 use crate::neon::{load_u16_s32_fast, store_u16_s32_x4, store_u16x4, vmulq_by_3_s32};
 use crate::unsafe_slice::UnsafeSlice;
-use crate::EdgeMode;
 use std::arch::aarch64::*;
 
 pub(crate) fn fgn_vertical_pass_neon_u16_q0_31<const CN: usize>(
@@ -50,7 +50,7 @@ pub(crate) fn fgn_vertical_pass_neon_u16_q0_31<const CN: usize>(
 }
 
 #[target_feature(enable = "rdm")]
-unsafe fn fgn_vertical_pass_q0_31_impl<const CN: usize>(
+fn fgn_vertical_pass_q0_31_impl<const CN: usize>(
     bytes: &UnsafeSlice<u16>,
     stride: u32,
     width: u32,
@@ -61,7 +61,7 @@ unsafe fn fgn_vertical_pass_q0_31_impl<const CN: usize>(
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        let mut full_buffer = Box::new([NeonI32x4::default(); 1024 * 4]);
+        let mut full_buffer = [NeonI32x4::default(); 1024 * 4];
 
         let (buffer0, rem) = full_buffer.split_at_mut(1024);
         let (buffer1, rem) = rem.split_at_mut(1024);
@@ -347,7 +347,7 @@ pub(crate) fn fgn_horizontal_pass_neon_u16_q0_31<const CN: usize>(
 }
 
 #[target_feature(enable = "rdm")]
-unsafe fn fgn_horizontal_pass_q0_31_impl<const CN: usize>(
+fn fgn_horizontal_pass_q0_31_impl<const CN: usize>(
     bytes: &UnsafeSlice<u16>,
     stride: u32,
     width: u32,
@@ -358,7 +358,7 @@ unsafe fn fgn_horizontal_pass_q0_31_impl<const CN: usize>(
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        let mut full_buffer = Box::new([NeonI32x4::default(); 1024 * 4]);
+        let mut full_buffer = [NeonI32x4::default(); 1024 * 4];
 
         let (buffer0, rem) = full_buffer.split_at_mut(1024);
         let (buffer1, rem) = rem.split_at_mut(1024);
@@ -374,7 +374,7 @@ unsafe fn fgn_horizontal_pass_q0_31_impl<const CN: usize>(
 
         let mut yy = start;
 
-        while yy + 4 < height.min(end) {
+        while yy + 4 <= height.min(end) {
             let mut diffs0 = vdupq_n_s32(0);
             let mut diffs1 = vdupq_n_s32(0);
             let mut diffs2 = vdupq_n_s32(0);

@@ -85,7 +85,7 @@ fn stack_blur_worker_horizontal(
 
         #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
         fn select_blur_pass<const N: usize>() -> impl StackBlurWorkingPass<u8, N> {
-            HorizontalWasmStackBlurPass::<u8, i32, N>::default()
+            HorizontalWasmStackBlurPass::<N>::default()
         }
 
         #[cfg(not(any(
@@ -163,7 +163,7 @@ fn stack_blur_worker_vertical(
 
         #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
         fn select_blur_pass<const N: usize>() -> impl StackBlurWorkingPass<u8, N> {
-            VerticalWasmStackBlurPass::<u8, i32, N>::default()
+            VerticalWasmStackBlurPass::<N>::default()
         }
 
         #[cfg(not(any(

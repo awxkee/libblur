@@ -29,6 +29,7 @@
 use crate::neon::{load_u8_s32_fast, store_u8_s32};
 use crate::stackblur::stack_blur_pass::StackBlurWorkingPass;
 use crate::unsafe_slice::UnsafeSlice;
+use crate::util::ScratchBuffer;
 use std::arch::aarch64::*;
 
 pub(crate) struct VerticalNeonStackBlurPass<const CN: usize> {}
@@ -55,7 +56,8 @@ impl<const CN: usize> StackBlurWorkingPass<u8, CN> for VerticalNeonStackBlurPass
             let mut yp;
             let mut sp;
             let mut stack_start;
-            let mut stacks0 = vec![0i32; 4 * div * 4];
+            let mut scratch_buffer = ScratchBuffer::<i32, 2048>::new(4 * div * 4);
+            let stacks0 = scratch_buffer.as_mut_slice();
 
             let hm = height - 1;
             let div = (radius * 2) + 1;

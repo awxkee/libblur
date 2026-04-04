@@ -27,7 +27,6 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter1d::arena::Arena;
-use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::neon::utils::{xvld1q_u8_x2, xvst1q_u8_x2};
 use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
@@ -40,50 +39,35 @@ pub(crate) fn filter_column_symm_neon_u8_uq0_7(
     dst: &mut [u8],
     image_size: ImageSize,
     zf: FilterRegion,
-    scanned_kernel: &[ScanPoint1d<i32>],
+    kernel: &[u8],
 ) {
-    let mut shifted = scanned_kernel
-        .iter()
-        .map(|&x| ((x.weight) >> 8) as u8)
-        .collect::<Vec<_>>();
-    let mut sum: u32 = shifted.iter().map(|&x| x as u32).sum();
-    if sum > 128 {
-        let half = shifted.len() / 2;
-        while sum > 128 {
-            shifted[half] = shifted[half].saturating_sub(1);
-            sum -= 1;
-        }
-    } else if sum < 128 {
-        let half = shifted.len() / 2;
-        while sum < 128 {
-            shifted[half] = shifted[half].saturating_add(1);
-            sum += 1;
-        }
+    unsafe {
+        executor_unit(arena, arena_src, dst, image_size, zf, kernel);
     }
-    executor_unit(arena, arena_src, dst, image_size, zf, &shifted);
 }
 
+#[target_feature(enable = "neon")]
 fn executor_unit(
     arena: Arena,
     arena_src: &[&[u8]],
     dst: &mut [u8],
     image_size: ImageSize,
     _: FilterRegion,
-    scanned_kernel: &[u8],
+    kernel: &[u8],
 ) {
     unsafe {
         let image_width = image_size.width * arena.components;
 
-        let length = scanned_kernel.len();
+        let length = kernel.len();
         let half_len = length / 2;
 
         let mut cx = 0usize;
 
         let ref0 = arena_src.get_unchecked(half_len);
 
-        let coeff = vdupq_n_u8(*scanned_kernel.get_unchecked(half_len));
+        let coeff = vdupq_n_u8(*kernel.get_unchecked(half_len));
 
-        while cx + 32 < image_width {
+        while cx + 32 <= image_width {
             let v_src = ref0.get_unchecked(cx..);
 
             let source = xvld1q_u8_x2(v_src.as_ptr());
@@ -93,7 +77,7 @@ fn executor_unit(
             let mut k3 = vmull_high_u8(source.1, coeff);
 
             for i in 0..half_len {
-                let coeff = vdupq_n_u16(*scanned_kernel.get_unchecked(i) as u16);
+                let coeff = vdupq_n_u16(*kernel.get_unchecked(i) as u16);
                 let rollback = length - i - 1;
                 let v_source0 =
                     xvld1q_u8_x2(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
@@ -128,7 +112,7 @@ fn executor_unit(
             cx += 32;
         }
 
-        while cx + 16 < image_width {
+        while cx + 16 <= image_width {
             let v_src = ref0.get_unchecked(cx..);
 
             let source = vld1q_u8(v_src.as_ptr());
@@ -136,7 +120,7 @@ fn executor_unit(
             let mut k1 = vmull_high_u8(source, coeff);
 
             for i in 0..half_len {
-                let coeff = vdupq_n_u16(*scanned_kernel.get_unchecked(i) as u16);
+                let coeff = vdupq_n_u16(*kernel.get_unchecked(i) as u16);
                 let rollback = length - i - 1;
                 let v_source0 = vld1q_u8(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 let v_source1 = vld1q_u8(
@@ -161,8 +145,8 @@ fn executor_unit(
             cx += 16;
         }
 
-        while cx + 4 < image_width {
-            let coeff = *scanned_kernel.get_unchecked(half_len);
+        while cx + 4 <= image_width {
+            let coeff = *kernel.get_unchecked(half_len);
 
             let v_src = ref0.get_unchecked(cx..);
 
@@ -172,7 +156,7 @@ fn executor_unit(
             let mut k3 = (*v_src.get_unchecked(3) as u16).mul(coeff as u16);
 
             for i in 0..half_len {
-                let coeff = *scanned_kernel.get_unchecked(i);
+                let coeff = *kernel.get_unchecked(i);
                 let rollback = length - i - 1;
                 k0 = ((*arena_src.get_unchecked(i).get_unchecked(cx)) as u16)
                     .add((*arena_src.get_unchecked(rollback).get_unchecked(cx)) as u16)
@@ -200,14 +184,14 @@ fn executor_unit(
         }
 
         for x in cx..image_width {
-            let coeff = *scanned_kernel.get_unchecked(half_len);
+            let coeff = *kernel.get_unchecked(half_len);
 
             let v_src = ref0.get_unchecked(x..);
 
             let mut k0 = ((*v_src.get_unchecked(0)) as u16).mul(coeff as u16);
 
             for i in 0..half_len {
-                let coeff = *scanned_kernel.get_unchecked(i);
+                let coeff = *kernel.get_unchecked(i);
                 let rollback = length - i - 1;
                 k0 = ((*arena_src.get_unchecked(i).get_unchecked(x)) as u16)
                     .add((*arena_src.get_unchecked(rollback).get_unchecked(x)) as u16)

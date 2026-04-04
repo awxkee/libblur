@@ -53,8 +53,6 @@ unsafe fn sse_ring_vertical_row_summ_impl16(
     let weight = 1. / (radius as f32 * 2. + 1.);
     let v_weight = _mm_set1_ps(weight);
 
-    let chunks = previous_row.chunks_exact(16).len();
-
     for (((src_next, src_previous), buffer), dst) in next_row
         .chunks_exact(16)
         .zip(previous_row.chunks_exact(16))
@@ -119,12 +117,16 @@ unsafe fn sse_ring_vertical_row_summ_impl16(
         }
     }
 
+    let next_row = next_row.chunks_exact(16).remainder();
+    let previous_row = previous_row.chunks_exact(16).remainder();
+    let working_row = working_row.chunks_exact_mut(16).into_remainder();
+    let dst = dst.chunks_exact_mut(16).into_remainder();
+
     for (((src_next, src_previous), buffer), dst) in next_row
         .iter()
         .zip(previous_row.iter())
         .zip(working_row.iter_mut())
         .zip(dst.iter_mut())
-        .skip(chunks * 16)
     {
         let mut weight0 = *buffer;
 

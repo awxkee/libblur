@@ -91,7 +91,7 @@ unsafe fn filter_column_avx_f32_f32_impl_fma(
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn filter_column_avx_f32_f32_impl_def(
+fn filter_column_avx_f32_f32_impl_def(
     arena: Arena,
     arena_src: &[&[f32]],
     dst: &mut [f32],
@@ -115,7 +115,7 @@ struct ExecutionUnit<const FMA: bool> {}
 
 impl<const FMA: bool> ExecutionUnit<FMA> {
     #[inline(always)]
-    unsafe fn pass(
+    fn pass(
         &self,
         arena: Arena,
         arena_src: &[&[f32]],

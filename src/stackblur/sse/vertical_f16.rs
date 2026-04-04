@@ -26,55 +26,28 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::primitives::PrimitiveCast;
 use crate::sse::{load_f32_f16, store_f32_f16};
 use crate::stackblur::stack_blur_pass::StackBlurWorkingPass;
 use crate::unsafe_slice::UnsafeSlice;
 use core::f16;
-use num_traits::{AsPrimitive, FromPrimitive};
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::*;
-use std::marker::PhantomData;
-use std::ops::{AddAssign, Mul, Sub, SubAssign};
 
-pub(crate) struct VerticalSseStackBlurPassFloat16<T, J, const CN: usize> {
-    _phantom_t: PhantomData<T>,
-    _phantom_j: PhantomData<J>,
-}
+pub(crate) struct VerticalSseStackBlurPassFloat16<const CN: usize> {}
 
-impl<T, J, const CN: usize> Default for VerticalSseStackBlurPassFloat16<T, J, CN> {
+impl<const CN: usize> Default for VerticalSseStackBlurPassFloat16<CN> {
     fn default() -> Self {
-        VerticalSseStackBlurPassFloat16::<T, J, CN> {
-            _phantom_t: Default::default(),
-            _phantom_j: Default::default(),
-        }
+        VerticalSseStackBlurPassFloat16::<CN> {}
     }
 }
 
-impl<T, J, const CN: usize> VerticalSseStackBlurPassFloat16<T, J, CN>
-where
-    J: Copy
-        + 'static
-        + FromPrimitive
-        + AddAssign<J>
-        + Mul<Output = J>
-        + Sub<Output = J>
-        + PrimitiveCast<f32>
-        + SubAssign
-        + PrimitiveCast<T>
-        + Default,
-    T: Copy + PrimitiveCast<J> + Default,
-    i32: AsPrimitive<J>,
-    u32: AsPrimitive<J>,
-    f32: PrimitiveCast<T>,
-    usize: AsPrimitive<J>,
-{
+impl<const CN: usize> VerticalSseStackBlurPassFloat16<CN> {
     #[target_feature(enable = "sse4.1")]
-    unsafe fn pass_impl(
+    fn pass_impl(
         &self,
-        pixels: &UnsafeSlice<T>,
+        pixels: &UnsafeSlice<f16>,
         stride: u32,
         width: u32,
         height: u32,
@@ -83,12 +56,11 @@ where
         total_threads: usize,
     ) {
         unsafe {
-            let pixels: &UnsafeSlice<f16> = std::mem::transmute(pixels);
             let div = ((radius * 2) + 1) as usize;
             let mut yp;
             let mut sp;
             let mut stack_start;
-            let mut stacks = vec![0.; 4 * div * total_threads];
+            let mut stacks = vec![0.; 4 * div];
 
             let v_mul_value = _mm_set1_ps(1. / ((radius as f32 + 1.) * (radius as f32 + 1.)));
 
@@ -188,28 +160,10 @@ where
     }
 }
 
-impl<T, J, const CN: usize> StackBlurWorkingPass<T, CN>
-    for VerticalSseStackBlurPassFloat16<T, J, CN>
-where
-    J: Copy
-        + 'static
-        + FromPrimitive
-        + AddAssign<J>
-        + Mul<Output = J>
-        + Sub<Output = J>
-        + PrimitiveCast<f32>
-        + SubAssign
-        + PrimitiveCast<T>
-        + Default,
-    T: Copy + PrimitiveCast<J> + Default,
-    i32: AsPrimitive<J>,
-    u32: AsPrimitive<J>,
-    f32: PrimitiveCast<T>,
-    usize: AsPrimitive<J>,
-{
+impl<const CN: usize> StackBlurWorkingPass<f16, CN> for VerticalSseStackBlurPassFloat16<CN> {
     fn pass(
         &self,
-        pixels: &UnsafeSlice<T>,
+        pixels: &UnsafeSlice<f16>,
         stride: u32,
         width: u32,
         height: u32,

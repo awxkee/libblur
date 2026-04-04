@@ -26,11 +26,11 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::ImageSize;
 use crate::filter1d::Arena;
 use crate::filter2d::scan_point_2d::ScanPoint2d;
 use crate::mlaf::mlaf;
 use crate::to_storage::ToStorage;
-use crate::ImageSize;
 use num_traits::{AsPrimitive, MulAdd};
 use std::ops::{Add, Mul};
 

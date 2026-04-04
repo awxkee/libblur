@@ -27,9 +27,9 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![allow(clippy::manual_clamp)]
+use crate::BilateralBlurParams;
 use crate::bilateral::bp8::{BilateralStore, BilateralUnit};
 use crate::filter1d::Arena;
-use crate::BilateralBlurParams;
 use std::arch::aarch64::*;
 
 pub(crate) struct BilateralExecutionUnitNeon<'a, const N: usize> {
@@ -40,29 +40,33 @@ pub(crate) struct BilateralExecutionUnitNeon<'a, const N: usize> {
 }
 
 #[inline(always)]
-unsafe fn v_lut(v: uint16x8_t, lut: &[f32; 65536]) -> (float32x4_t, float32x4_t) {
-    let v0 = vld1q_lane_f32::<0>(
-        lut.get_unchecked(vgetq_lane_u16::<0>(v) as usize),
-        vdupq_n_f32(0.),
-    );
-    let v1 = vld1q_lane_f32::<1>(lut.get_unchecked(vgetq_lane_u16::<1>(v) as usize), v0);
-    let v2 = vld1q_lane_f32::<2>(lut.get_unchecked(vgetq_lane_u16::<2>(v) as usize), v1);
-    let v3 = vld1q_lane_f32::<3>(lut.get_unchecked(vgetq_lane_u16::<3>(v) as usize), v2);
+fn v_lut(v: uint16x8_t, lut: &[f32; 65536]) -> (float32x4_t, float32x4_t) {
+    unsafe {
+        let v0 = vld1q_lane_f32::<0>(
+            lut.get_unchecked(vgetq_lane_u16::<0>(v) as usize),
+            vdupq_n_f32(0.),
+        );
+        let v1 = vld1q_lane_f32::<1>(lut.get_unchecked(vgetq_lane_u16::<1>(v) as usize), v0);
+        let v2 = vld1q_lane_f32::<2>(lut.get_unchecked(vgetq_lane_u16::<2>(v) as usize), v1);
+        let v3 = vld1q_lane_f32::<3>(lut.get_unchecked(vgetq_lane_u16::<3>(v) as usize), v2);
 
-    let v4 = vld1q_lane_f32::<0>(
-        lut.get_unchecked(vgetq_lane_u16::<4>(v) as usize),
-        vdupq_n_f32(0.),
-    );
-    let v5 = vld1q_lane_f32::<1>(lut.get_unchecked(vgetq_lane_u16::<5>(v) as usize), v4);
-    let v6 = vld1q_lane_f32::<2>(lut.get_unchecked(vgetq_lane_u16::<6>(v) as usize), v5);
-    let v7 = vld1q_lane_f32::<3>(lut.get_unchecked(vgetq_lane_u16::<7>(v) as usize), v6);
-    (v3, v7)
+        let v4 = vld1q_lane_f32::<0>(
+            lut.get_unchecked(vgetq_lane_u16::<4>(v) as usize),
+            vdupq_n_f32(0.),
+        );
+        let v5 = vld1q_lane_f32::<1>(lut.get_unchecked(vgetq_lane_u16::<5>(v) as usize), v4);
+        let v6 = vld1q_lane_f32::<2>(lut.get_unchecked(vgetq_lane_u16::<6>(v) as usize), v5);
+        let v7 = vld1q_lane_f32::<3>(lut.get_unchecked(vgetq_lane_u16::<7>(v) as usize), v6);
+        (v3, v7)
+    }
 }
 
 #[inline(always)]
-unsafe fn replace_zeros_with_ones(input: float32x4_t) -> float32x4_t {
-    let is_zero = vceqq_f32(input, vdupq_n_f32(0.0));
-    vbslq_f32(is_zero, vdupq_n_f32(1.0), input)
+fn replace_zeros_with_ones(input: float32x4_t) -> float32x4_t {
+    unsafe {
+        let is_zero = vceqq_f32(input, vdupq_n_f32(0.0));
+        vbslq_f32(is_zero, vdupq_n_f32(1.0), input)
+    }
 }
 
 impl<const N: usize> BilateralUnit<u8> for BilateralExecutionUnitNeon<'_, N> {

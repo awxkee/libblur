@@ -43,7 +43,7 @@ pub(crate) fn avx_ring_vertical_row_summ(
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn avx_ring_vertical_row_summ_impl(
+fn avx_ring_vertical_row_summ_impl(
     src: &[&[u8]; 2],
     dst: &mut [u8],
     working_row: &mut [u32],
@@ -155,8 +155,6 @@ unsafe fn avx_ring_vertical_row_summ_impl(
     let working_rem = working_row.chunks_exact_mut(32).into_remainder();
     let dst_rem = dst.chunks_exact_mut(32).into_remainder();
 
-    let chunks16 = previous_row.chunks_exact(16).len();
-
     for (((src_next, src_previous), buffer), dst) in next_rem
         .chunks_exact(16)
         .zip(previous_rem.chunks_exact(16))
@@ -224,12 +222,16 @@ unsafe fn avx_ring_vertical_row_summ_impl(
         }
     }
 
+    let next_rem = next_rem.chunks_exact(16).remainder();
+    let previous_rem = previous_row.chunks_exact(16).remainder();
+    let working_rem = working_row.chunks_exact_mut(16).into_remainder();
+    let dst_rem = dst.chunks_exact_mut(16).into_remainder();
+
     for (((src_next, src_previous), buffer), dst) in next_rem
         .iter()
         .zip(previous_rem.iter())
         .zip(working_rem.iter_mut())
         .zip(dst_rem.iter_mut())
-        .skip(chunks16 * 16)
     {
         let mut weight0 = *buffer;
 

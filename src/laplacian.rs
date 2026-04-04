@@ -28,8 +28,8 @@
  */
 
 use crate::{
-    filter_2d, sigma_size, BlurError, BlurImage, BlurImageMut, EdgeMode2D, KernelShape, Scalar,
-    ThreadingPolicy,
+    BlurError, BlurImage, BlurImageMut, EdgeMode2D, KernelShape, Scalar, ThreadingPolicy,
+    filter_2d, sigma_size,
 };
 
 pub fn laplacian_kernel(size: usize) -> Vec<f32> {

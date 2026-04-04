@@ -28,7 +28,6 @@
  */
 
 use crate::filter1d::arena::Arena;
-use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::region::FilterRegion;
 use crate::filter1d::to_approx_storage::ToApproxStorage;
 use crate::img_size::ImageSize;
@@ -41,7 +40,7 @@ pub(crate) fn filter_column_symmetric_approx<T, I>(
     dst: &mut [T],
     image_size: ImageSize,
     _: FilterRegion,
-    scanned_kernel: &[ScanPoint1d<I>],
+    scanned_kernel: &[I],
 ) where
     T: Copy + AsPrimitive<I> + Default,
     I: Copy
@@ -62,7 +61,7 @@ pub(crate) fn filter_column_symmetric_approx<T, I>(
 
         let ref0 = arena_src[half_len];
 
-        let coeff = scanned_kernel[half_len].weight;
+        let coeff = scanned_kernel[half_len];
 
         while cx + 32 < dst_stride {
             let mut store: [I; 32] = [I::default(); 32];
@@ -73,13 +72,13 @@ pub(crate) fn filter_column_symmetric_approx<T, I>(
                 *dst = src.as_().mul(coeff);
             }
 
-            for (i, coeff) in scanned_kernel.iter().take(half_len).enumerate() {
+            for (i, &coeff) in scanned_kernel.iter().take(half_len).enumerate() {
                 let rollback = length - i - 1;
                 let fw = &arena_src[i][cx..(cx + 32)];
                 let bw = &arena_src[rollback][cx..(cx + 32)];
 
                 for ((dst, fw), bw) in store.iter_mut().zip(fw).zip(bw) {
-                    *dst = *dst + fw.as_().add(bw.as_()).mul(coeff.weight);
+                    *dst = *dst + fw.as_().add(bw.as_()).mul(coeff);
                 }
             }
 
@@ -99,13 +98,13 @@ pub(crate) fn filter_column_symmetric_approx<T, I>(
                 *dst = src.as_().mul(coeff);
             }
 
-            for (i, coeff) in scanned_kernel.iter().take(half_len).enumerate() {
+            for (i, &coeff) in scanned_kernel.iter().take(half_len).enumerate() {
                 let rollback = length - i - 1;
                 let fw = &arena_src[i][cx..(cx + 16)];
                 let bw = &arena_src[rollback][cx..(cx + 16)];
 
                 for ((dst, fw), bw) in store.iter_mut().zip(fw).zip(bw) {
-                    *dst = *dst + fw.as_().add(bw.as_()).mul(coeff.weight);
+                    *dst = *dst + fw.as_().add(bw.as_()).mul(coeff);
                 }
             }
 
@@ -124,14 +123,14 @@ pub(crate) fn filter_column_symmetric_approx<T, I>(
             let mut k2 = v_src[2].as_().mul(coeff);
             let mut k3 = v_src[3].as_().mul(coeff);
 
-            for (i, coeff) in scanned_kernel.iter().take(half_len).enumerate() {
+            for (i, &coeff) in scanned_kernel.iter().take(half_len).enumerate() {
                 let rollback = length - i - 1;
                 let fw = &arena_src[i][cx..(cx + 4)];
                 let bw = &arena_src[rollback][cx..(cx + 4)];
-                k0 = fw[0].as_().add(bw[0].as_()).mul(coeff.weight).add(k0);
-                k1 = fw[1].as_().add(bw[1].as_()).mul(coeff.weight).add(k1);
-                k2 = fw[2].as_().add(bw[2].as_()).mul(coeff.weight).add(k2);
-                k3 = fw[3].as_().add(bw[3].as_()).mul(coeff.weight).add(k3);
+                k0 = fw[0].as_().add(bw[0].as_()).mul(coeff).add(k0);
+                k1 = fw[1].as_().add(bw[1].as_()).mul(coeff).add(k1);
+                k2 = fw[2].as_().add(bw[2].as_()).mul(coeff).add(k2);
+                k3 = fw[3].as_().add(bw[3].as_()).mul(coeff).add(k3);
             }
 
             *dst.get_unchecked_mut(cx) = k0.to_approx_();
@@ -147,11 +146,11 @@ pub(crate) fn filter_column_symmetric_approx<T, I>(
 
             let mut k0 = v_src.as_().mul(coeff);
 
-            for (i, coeff) in scanned_kernel.iter().take(half_len).enumerate() {
+            for (i, &coeff) in scanned_kernel.iter().take(half_len).enumerate() {
                 let rollback = length - i - 1;
                 let fw = arena_src[i][x];
                 let bw = arena_src[rollback][x];
-                k0 = fw.as_().add(bw.as_()).mul(coeff.weight).add(k0);
+                k0 = fw.as_().add(bw.as_()).mul(coeff).add(k0);
             }
 
             *dst.get_unchecked_mut(x) = k0.to_approx_();

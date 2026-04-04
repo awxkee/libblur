@@ -77,7 +77,7 @@ unsafe fn box_blur_vertical_pass_avx2_def(
     let v_edge_count = _mm256_set1_epi32(edge_count as i32);
     let v_weight = _mm256_set1_ps(1f32 / (radius * 2 + 1) as f32);
 
-    while cx + 64 < end_x {
+    while cx + 64 <= end_x {
         let px = cx as usize;
 
         let mut store_0: __m256i;
@@ -285,7 +285,7 @@ unsafe fn box_blur_vertical_pass_avx2_def(
         cx += 64;
     }
 
-    while cx + 32 < end_x {
+    while cx + 32 <= end_x {
         let px = cx as usize;
 
         let mut store_0: __m256i;
@@ -415,7 +415,7 @@ unsafe fn box_blur_vertical_pass_avx2_def(
     let v_edge_count = _mm_set1_epi32(edge_count as i32);
     let v_weight = _mm_set1_ps(1f32 / (radius * 2 + 1) as f32);
 
-    while cx + 16 < end_x {
+    while cx + 16 <= end_x {
         let px = cx as usize;
 
         let mut store_0: __m128i;
@@ -543,7 +543,7 @@ unsafe fn box_blur_vertical_pass_avx2_def(
         cx += 16;
     }
 
-    while cx + 8 < end_x {
+    while cx + 8 <= end_x {
         let px = cx as usize;
 
         let mut store_0: __m128i;

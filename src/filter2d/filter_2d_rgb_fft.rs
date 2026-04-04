@@ -27,7 +27,7 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter2d::filter_2d_fft::filter_2d_fft_impl;
-use crate::filter2d::filter_2d_fft_real::{filter_2d_fft_real_impl, FftNumber};
+use crate::filter2d::filter_2d_fft_real::{FftNumber, filter_2d_fft_real_impl};
 use crate::filter2d::gather_channel::{gather_channel, squash_channel};
 use crate::filter2d::scan_se_2d::{scan_se_2d, scan_se_2d_complex};
 use crate::to_storage::ToStorage;

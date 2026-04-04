@@ -28,7 +28,7 @@
  */
 #![allow(clippy::manual_clamp)]
 
-use crate::filter1d::{make_arena, Arena, ArenaPads};
+use crate::filter1d::{Arena, ArenaPads, make_arena};
 use crate::{
     BlurError, BlurImage, BlurImageMut, EdgeMode2D, FastBlurChannels, Scalar, ThreadingPolicy,
 };
@@ -341,7 +341,7 @@ pub struct BilateralBlurParams {
 
 impl BilateralBlurParams {
     fn validate(&self) -> Result<(), BlurError> {
-        if self.kernel_size % 2 == 0 {
+        if self.kernel_size.is_multiple_of(2) {
             return Err(BlurError::OddKernel(self.kernel_size));
         }
         if self.spatial_sigma <= 0.0 {

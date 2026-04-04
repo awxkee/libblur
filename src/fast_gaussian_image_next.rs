@@ -27,8 +27,8 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::{
-    fast_gaussian_next, fast_gaussian_next_f32, fast_gaussian_next_u16, AnisotropicRadius,
-    BlurImageMut, EdgeMode2D, FastBlurChannels, ThreadingPolicy,
+    AnisotropicRadius, BlurImageMut, EdgeMode2D, FastBlurChannels, ThreadingPolicy,
+    fast_gaussian_next, fast_gaussian_next_f32, fast_gaussian_next_u16,
 };
 use image::{
     DynamicImage, GrayAlphaImage, GrayImage, ImageBuffer, Luma, LumaA, Rgb, Rgb32FImage, RgbImage,

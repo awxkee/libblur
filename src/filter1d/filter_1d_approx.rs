@@ -27,23 +27,20 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![forbid(unsafe_code)]
-use crate::edge_mode::{clamp_edge, BorderHandle};
-use crate::filter1d::arena::{make_arena_columns, make_arena_row, write_arena_row, Arena};
+use crate::edge_mode::{BorderHandle, clamp_edge};
+use crate::filter1d::arena::{Arena, make_arena_columns, make_arena_row, write_arena_row};
 use crate::filter1d::filter::create_brows;
-use crate::filter1d::filter_1d_column_handler_approx::{
-    Filter1DColumnHandlerApprox, Filter1DColumnMultipleRowsApprox,
-};
+use crate::filter1d::filter_1d_column_handler_approx::BuildColumnHandlerApprox;
 use crate::filter1d::filter_1d_row_handler_approx::Filter1DRowHandlerApprox;
 use crate::filter1d::filter_element::KernelShape;
 use crate::filter1d::filter_scan::{is_symmetric_1d, scan_se_1d};
 use crate::filter1d::region::FilterRegion;
-use crate::filter1d::row_handler_small_approx::{
-    Filter1DRowHandlerBInterpolateApr, RowsHolder, RowsHolderMut,
-};
+use crate::filter1d::row_handler_small_approx::{BuildRowHandlerBInter, RowsHolder, RowsHolderMut};
 use crate::filter1d::to_approx_storage::{ApproxLevel, ToApproxStorage};
 use crate::primitives::PrimitiveCast;
 use crate::safe_math::{SafeAdd, SafeMul};
 use crate::to_storage::ToStorage;
+use crate::util::{CowScratch, ScratchBuffer};
 use crate::{BlurError, BlurImage, BlurImageMut, EdgeMode, EdgeMode2D, Scalar, ThreadingPolicy};
 use novtb::{ParallelZonedIterator, TbSliceMut};
 use num_traits::{Float, MulAdd};
@@ -86,9 +83,8 @@ where
         + Send
         + Sync
         + Filter1DRowHandlerApprox<T, I>
-        + Filter1DColumnHandlerApprox<T, I>
-        + Filter1DColumnMultipleRowsApprox<T, I>
-        + Filter1DRowHandlerBInterpolateApr<T, I>
+        + BuildColumnHandlerApprox<T, I>
+        + BuildRowHandlerBInter<T, I>
         + Debug,
     F: ToStorage<T> + Mul<F> + MulAdd<F, Output = F> + Send + Sync + PrimitiveCast<I> + Float,
     I: Copy
@@ -214,7 +210,7 @@ where
     let bottom_pad = column_arena_k.bottom_pad.as_slice();
 
     let pad_h = column_kernel_shape.height / 2;
-    let column_handler = T::get_column_handler(is_column_kernel_symmetric);
+    let column_handler = T::build_column_handler(is_column_kernel_symmetric, &scaled_column_kernel);
     let src_stride = image_size.width * N;
     let dst_stride = destination.row_stride() as usize;
 
@@ -223,9 +219,7 @@ where
     let mut _processed_y = 0usize;
 
     #[cfg(all(target_arch = "aarch64", feature = "neon"))]
-    if let Some(handler) =
-        T::get_column_multiple_rows(is_column_kernel_symmetric, &scanned_column_kernel)
-    {
+    if column_handler.has_multiple_rows() {
         _dest_slice
             .tb_par_chunks_exact_mut(dst_stride * 3)
             .for_each_enumerated(&pool, |y, row| {
@@ -272,13 +266,12 @@ where
 
                 let brows = FilterBrows { brows: brows_vec };
 
-                handler(
+                column_handler.multiple_rows(
                     Arena::new(image_size.width, pad_h, 0, pad_h, N),
                     brows,
                     row,
                     image_size,
                     dst_stride,
-                    scanned_column_kernel_slice,
                 );
             });
         _processed_y = _dest_slice.chunks_exact_mut(dst_stride * 3).len() * 3;
@@ -288,9 +281,7 @@ where
     }
 
     #[cfg(any(target_arch = "x86_64", target_arch = "x86"))]
-    if let Some(handler) =
-        T::get_column_multiple_rows(is_column_kernel_symmetric, &scanned_column_kernel)
-    {
+    if column_handler.has_multiple_rows() {
         _dest_slice
             .tb_par_chunks_exact_mut(dst_stride * 2)
             .for_each_enumerated(&pool, |y, row| {
@@ -325,13 +316,12 @@ where
 
                 let brows = FilterBrows { brows: brows_vec };
 
-                handler(
+                column_handler.multiple_rows(
                     Arena::new(image_size.width, pad_h, 0, pad_h, N),
                     brows,
                     row,
                     image_size,
                     dst_stride,
-                    scanned_column_kernel_slice,
                 );
             });
         _processed_y = _dest_slice.chunks_exact_mut(dst_stride * 2).len() * 2;
@@ -357,13 +347,12 @@ where
             let brows_slice = brows.as_slice();
             let row = &mut row[..image_size.width * N];
 
-            column_handler(
+            column_handler.single_row(
                 Arena::new(image_size.width, pad_h, 0, pad_h, N),
                 brows_slice,
                 row,
                 image_size,
                 FilterRegion::new(y, y + 1),
-                scanned_column_kernel_slice,
             );
         });
 
@@ -386,9 +375,8 @@ where
         + Send
         + Sync
         + Filter1DRowHandlerApprox<T, I>
-        + Filter1DColumnHandlerApprox<T, I>
-        + Filter1DColumnMultipleRowsApprox<T, I>
-        + Filter1DRowHandlerBInterpolateApr<T, I>
+        + BuildColumnHandlerApprox<T, I>
+        + BuildRowHandlerBInter<T, I>
         + Debug,
     F: ToStorage<T> + Mul<F> + MulAdd<F, Output = F> + Send + Sync + PrimitiveCast<I> + Float,
     I: Copy
@@ -408,6 +396,7 @@ where
     i64: PrimitiveCast<I> + PrimitiveCast<F>,
     f64: PrimitiveCast<T>,
 {
+    const MAX_STACK_KERNEL: usize = 35;
     image.check_layout_channels(N)?;
     destination.check_layout_channels(N, Some(image))?;
     image.only_size_matches_mut(destination)?;
@@ -442,8 +431,6 @@ where
 
     let scanned_row_kernel = scan_se_1d::<I>(&scaled_row_kernel);
     let scanned_row_kernel_slice = scanned_row_kernel.as_slice();
-    let scanned_column_kernel = scan_se_1d::<I>(&scaled_column_kernel);
-    let scanned_column_kernel_slice = scanned_column_kernel.as_slice();
     let is_column_kernel_symmetric = is_symmetric_1d(column_kernel);
     let is_row_kernel_symmetric = is_symmetric_1d(row_kernel);
 
@@ -456,9 +443,9 @@ where
     let tile_size = (image_size.height as u32 / thread_count).clamp(1, image_size.height as u32);
 
     let row_handler_binter =
-        T::get_row_handler_binter_apr::<N>(is_row_kernel_symmetric, &scanned_row_kernel);
+        T::build_row_handler_binter::<N>(is_row_kernel_symmetric, &scaled_row_kernel);
     let row_handler = T::get_row_handler_apr::<N>(is_row_kernel_symmetric);
-    let column_handler = T::get_column_handler(is_column_kernel_symmetric);
+    let column_handler = T::build_column_handler(is_column_kernel_symmetric, &scaled_column_kernel);
 
     let row_stride = image_size.width * N;
     let src_row_stride = image.row_stride() as usize;
@@ -472,42 +459,39 @@ where
             .tb_par_chunks_mut(dest_stride * tile_size as usize)
             .for_each_enumerated(&pool, |cy, dst_rows| {
                 let source_y = cy * tile_size as usize;
-                let mut buffer = vec![T::default(); row_stride * scanned_column_kernel.len()];
+                let mut scratch_buffer =
+                    ScratchBuffer::<T, 4096>::new(row_stride * scaled_column_kernel.len());
+                let buffer = scratch_buffer.as_mut_slice();
 
-                let mut row_buffer: Vec<T> = vec![];
+                let mut row_buffer: CowScratch<T, 4096> = CowScratch::new();
 
-                let column_kernel_len = scanned_column_kernel.len();
+                let column_kernel_len = scaled_column_kernel.len();
                 let half_kernel = column_kernel_len / 2;
 
                 // preload top edge
                 if source_y == 0 {
-                    #[allow(clippy::unnecessary_unwrap)]
-                    if row_kernel.len() < B_INTER_CUTOFF
-                        && row_handler_binter.is_some()
+                    if let Some(handler) = row_handler_binter.as_ref()
+                        && row_kernel.len() < B_INTER_CUTOFF
                         && edge_modes.horizontal != EdgeMode::Constant
                     {
-                        let handler = row_handler_binter.unwrap();
-                        handler(
+                        handler.handle_row(
                             BorderHandle {
                                 edge_mode: edge_modes.horizontal,
                                 scalar: border_constant,
                             },
                             &RowsHolder {
-                                holder: vec![&image.data.as_ref()[..src_row_stride]],
+                                holder: [&image.data.as_ref()[..src_row_stride]],
                             },
                             &mut RowsHolderMut {
-                                holder: vec![&mut buffer[..row_stride]],
+                                holder: [&mut buffer[..row_stride]],
                             },
                             image_size,
-                            scanned_row_kernel_slice,
                         );
                     } else {
                         let pad_w = scanned_row_kernel.len() / 2;
-                        if row_buffer.is_empty() {
-                            row_buffer = vec![T::default(); image_size.width * N + pad_w * 2 * N];
-                        }
+                        let row = row_buffer.get_or_init(image_size.width * N + pad_w * 2 * N);
                         write_arena_row::<T, N>(
-                            &mut row_buffer,
+                            row,
                             image,
                             0,
                             KernelShape::new(row_kernel.len(), 0),
@@ -517,7 +501,7 @@ where
                         .unwrap();
                         row_handler(
                             Arena::new(image_size.width, 1, row_kernel.len() / 2, 0, N),
-                            &row_buffer,
+                            row,
                             &mut buffer[..row_stride],
                             image_size,
                             FilterRegion::new(0, 1),
@@ -539,39 +523,31 @@ where
                             0i64,
                             image_size.height as i64
                         );
-                        #[allow(clippy::unnecessary_unwrap)]
-                        if row_kernel.len() < B_INTER_CUTOFF
-                            && row_handler_binter.is_some()
+                        if let Some(handler) = row_handler_binter.as_ref()
+                            && row_kernel.len() < B_INTER_CUTOFF
                             && edge_modes.horizontal != EdgeMode::Constant
                         {
-                            let handler = row_handler_binter.unwrap();
-                            handler(
+                            handler.handle_row(
                                 BorderHandle {
                                     edge_mode: edge_modes.horizontal,
                                     scalar: border_constant,
                                 },
                                 &RowsHolder {
-                                    holder: vec![
-                                        &image.data.as_ref()
-                                            [s_y * src_row_stride..(s_y + 1) * src_row_stride],
-                                    ],
+                                    holder: [&image.data.as_ref()
+                                        [s_y * src_row_stride..(s_y + 1) * src_row_stride]],
                                 },
                                 &mut RowsHolderMut {
-                                    holder: vec![
-                                        &mut buffer[src_y * row_stride..(src_y + 1) * row_stride],
+                                    holder: [
+                                        &mut buffer[src_y * row_stride..(src_y + 1) * row_stride]
                                     ],
                                 },
                                 image_size,
-                                scanned_row_kernel_slice,
                             );
                         } else {
                             let pad_w = scanned_row_kernel.len() / 2;
-                            if row_buffer.is_empty() {
-                                row_buffer =
-                                    vec![T::default(); image_size.width * N + pad_w * 2 * N];
-                            }
+                            let row = row_buffer.get_or_init(image_size.width * N + pad_w * 2 * N);
                             write_arena_row::<T, N>(
-                                &mut row_buffer,
+                                row,
                                 image,
                                 s_y,
                                 KernelShape::new(row_kernel.len(), 0),
@@ -581,7 +557,7 @@ where
                             .unwrap();
                             row_handler(
                                 Arena::new(image_size.width, 1, row_kernel.len() / 2, 0, N),
-                                &row_buffer,
+                                row,
                                 &mut buffer[src_y * row_stride..(src_y + 1) * row_stride],
                                 image_size,
                                 FilterRegion::new(0, 1),
@@ -611,34 +587,30 @@ where
                         )
                     };
 
-                    #[allow(clippy::unnecessary_unwrap)]
-                    if row_kernel.len() < B_INTER_CUTOFF
-                        && row_handler_binter.is_some()
+                    if let Some(handler) = row_handler_binter.as_ref()
+                        && row_kernel.len() < B_INTER_CUTOFF
                         && edge_modes.horizontal != EdgeMode::Constant
                     {
-                        let handler = row_handler_binter.unwrap();
-                        handler(
+                        handler.handle_row(
                             BorderHandle {
                                 edge_mode: edge_modes.horizontal,
                                 scalar: border_constant,
                             },
                             &RowsHolder {
-                                holder: vec![
-                                    &image.data.as_ref()
-                                        [new_y * src_row_stride..(new_y + 1) * src_row_stride],
-                                ],
+                                holder: [&image.data.as_ref()
+                                    [new_y * src_row_stride..(new_y + 1) * src_row_stride]],
                             },
                             &mut RowsHolderMut {
-                                holder: vec![
-                                    &mut buffer[start_ky * row_stride..(start_ky + 1) * row_stride],
+                                holder: [
+                                    &mut buffer[start_ky * row_stride..(start_ky + 1) * row_stride]
                                 ],
                             },
                             image_size,
-                            scanned_row_kernel_slice,
                         );
                     } else {
+                        let row = row_buffer.get_or_unwrap_mut();
                         write_arena_row::<T, N>(
-                            &mut row_buffer,
+                            row,
                             image,
                             new_y,
                             KernelShape::new(row_kernel.len(), 0),
@@ -648,7 +620,7 @@ where
                         .unwrap();
                         row_handler(
                             Arena::new(image_size.width, 1, row_kernel.len() / 2, 0, N),
-                            &row_buffer,
+                            row,
                             &mut buffer[start_ky * row_stride..(start_ky + 1) * row_stride],
                             image_size,
                             FilterRegion::new(0, 1),
@@ -657,9 +629,10 @@ where
                     }
 
                     if dy >= half_kernel {
-                        let mut brows = vec![image.data.as_ref(); column_kernel_len];
-
-                        for (i, brow) in brows.iter_mut().enumerate() {
+                        let mut brows_stack =
+                            ScratchBuffer::<&[T], MAX_STACK_KERNEL>::new(column_kernel_len);
+                        let brows_storage = brows_stack.as_mut_slice();
+                        for (i, brow) in brows_storage.iter_mut().enumerate() {
                             let ky = (i + start_ky + 1) % column_kernel_len;
                             *brow = &buffer[ky * row_stride..(ky + 1) * row_stride];
                         }
@@ -668,13 +641,12 @@ where
 
                         let dst = &mut dst_rows[dy * dest_stride..(dy + 1) * dest_stride];
 
-                        column_handler(
+                        column_handler.single_row(
                             Arena::new(image_size.width, half_kernel, 0, half_kernel, N),
-                            &brows,
+                            brows_storage,
                             dst,
                             image_size,
                             FilterRegion::new(0, 1),
-                            scanned_column_kernel_slice,
                         );
                     }
 
@@ -683,38 +655,35 @@ where
                 }
             });
     } else {
-        let mut buffer = vec![T::default(); row_stride * scanned_column_kernel.len()];
+        let mut scratch_buffer =
+            ScratchBuffer::<T, 4096>::new(row_stride * scaled_column_kernel.len());
+        let buffer = scratch_buffer.as_mut_slice();
 
-        let mut row_buffer: Vec<T> = vec![];
+        let mut row_buffer: CowScratch<T, 4096> = CowScratch::new();
 
-        #[allow(clippy::unnecessary_unwrap)]
         // preload top edge
-        if row_kernel.len() < B_INTER_CUTOFF
-            && row_handler_binter.is_some()
+        if let Some(handler) = row_handler_binter.as_ref()
+            && row_kernel.len() < B_INTER_CUTOFF
             && edge_modes.horizontal != EdgeMode::Constant
         {
-            let handler = row_handler_binter.unwrap();
-            handler(
+            handler.handle_row(
                 BorderHandle {
                     edge_mode: edge_modes.horizontal,
                     scalar: border_constant,
                 },
                 &RowsHolder {
-                    holder: vec![&image.data.as_ref()[..src_row_stride]],
+                    holder: [&image.data.as_ref()[..src_row_stride]],
                 },
                 &mut RowsHolderMut {
-                    holder: vec![&mut buffer[..row_stride]],
+                    holder: [&mut buffer[..row_stride]],
                 },
                 image_size,
-                scanned_row_kernel_slice,
             );
         } else {
             let pad_w = scanned_row_kernel.len() / 2;
-            if row_buffer.is_empty() {
-                row_buffer = vec![T::default(); image_size.width * N + pad_w * 2 * N];
-            }
+            let row = row_buffer.get_or_init(image_size.width * N + pad_w * 2 * N);
             write_arena_row::<T, N>(
-                &mut row_buffer,
+                row,
                 image,
                 0,
                 KernelShape::new(row_kernel.len(), 0),
@@ -723,7 +692,7 @@ where
             )?;
             row_handler(
                 Arena::new(image_size.width, 1, row_kernel.len() / 2, 0, N),
-                &row_buffer,
+                row,
                 &mut buffer[..row_stride],
                 image_size,
                 FilterRegion::new(0, 1),
@@ -731,7 +700,7 @@ where
             );
         }
 
-        let column_kernel_len = scanned_column_kernel.len();
+        let column_kernel_len = scaled_column_kernel.len();
 
         let half_kernel = column_kernel_len / 2;
 
@@ -758,34 +727,28 @@ where
                 )
             };
 
-            #[allow(clippy::unnecessary_unwrap)]
-            if row_kernel.len() < B_INTER_CUTOFF
-                && row_handler_binter.is_some()
+            if let Some(handler) = row_handler_binter.as_ref()
+                && row_kernel.len() < B_INTER_CUTOFF
                 && edge_modes.horizontal != EdgeMode::Constant
             {
-                let handler = row_handler_binter.unwrap();
-                handler(
+                handler.handle_row(
                     BorderHandle {
                         edge_mode: edge_modes.horizontal,
                         scalar: border_constant,
                     },
                     &RowsHolder {
-                        holder: vec![
-                            &image.data.as_ref()
-                                [new_y * src_row_stride..(new_y + 1) * src_row_stride],
-                        ],
+                        holder: [&image.data.as_ref()
+                            [new_y * src_row_stride..(new_y + 1) * src_row_stride]],
                     },
                     &mut RowsHolderMut {
-                        holder: vec![
-                            &mut buffer[start_ky * row_stride..(start_ky + 1) * row_stride],
-                        ],
+                        holder: [&mut buffer[start_ky * row_stride..(start_ky + 1) * row_stride]],
                     },
                     image_size,
-                    scanned_row_kernel_slice,
                 );
             } else {
+                let row = row_buffer.get_or_unwrap_mut();
                 write_arena_row::<T, N>(
-                    &mut row_buffer,
+                    row,
                     image,
                     new_y,
                     KernelShape::new(row_kernel.len(), 0),
@@ -794,7 +757,7 @@ where
                 )?;
                 row_handler(
                     Arena::new(image_size.width, 1, row_kernel.len() / 2, 0, N),
-                    &row_buffer,
+                    row,
                     &mut buffer[start_ky * row_stride..(start_ky + 1) * row_stride],
                     image_size,
                     FilterRegion::new(0, 1),
@@ -803,9 +766,10 @@ where
             }
 
             if y >= half_kernel {
-                let mut brows = vec![image.data.as_ref(); column_kernel_len];
-
-                for (i, brow) in brows.iter_mut().enumerate() {
+                let mut brows_stack =
+                    ScratchBuffer::<&[T], MAX_STACK_KERNEL>::new(column_kernel_len);
+                let brows_storage = brows_stack.as_mut_slice();
+                for (i, brow) in brows_storage.iter_mut().enumerate() {
                     let ky = (i + start_ky + 1) % column_kernel_len;
                     *brow = &buffer[ky * row_stride..(ky + 1) * row_stride];
                 }
@@ -815,13 +779,12 @@ where
                 let dst =
                     &mut destination.data.borrow_mut()[dy * dest_stride..(dy + 1) * dest_stride];
 
-                column_handler(
+                column_handler.single_row(
                     Arena::new(image_size.width, half_kernel, 0, half_kernel, N),
-                    &brows,
+                    brows_storage,
                     dst,
                     image_size,
                     FilterRegion::new(0, 1),
-                    scanned_column_kernel_slice,
                 );
             }
 

@@ -37,104 +37,127 @@ use std::arch::x86_64::*;
 
 #[inline(always)]
 pub(crate) unsafe fn _mm_load_pack_x4(ptr: *const u8) -> (__m128i, __m128i, __m128i, __m128i) {
-    let row0 = _mm_loadu_si128(ptr as *const __m128i);
-    let row1 = _mm_loadu_si128(ptr.add(16) as *const __m128i);
-    let row2 = _mm_loadu_si128(ptr.add(32) as *const __m128i);
-    let row3 = _mm_loadu_si128(ptr.add(48) as *const __m128i);
-    (row0, row1, row2, row3)
+    unsafe {
+        let row0 = _mm_loadu_si128(ptr as *const __m128i);
+        let row1 = _mm_loadu_si128(ptr.add(16) as *const __m128i);
+        let row2 = _mm_loadu_si128(ptr.add(32) as *const __m128i);
+        let row3 = _mm_loadu_si128(ptr.add(48) as *const __m128i);
+        (row0, row1, row2, row3)
+    }
 }
 
 #[inline(always)]
 pub(crate) unsafe fn _mm_load_pack_ps_x4(ptr: *const f32) -> (__m128, __m128, __m128, __m128) {
-    let row0 = _mm_loadu_ps(ptr);
-    let row1 = _mm_loadu_ps(ptr.add(4));
-    let row2 = _mm_loadu_ps(ptr.add(8));
-    let row3 = _mm_loadu_ps(ptr.add(12));
-    (row0, row1, row2, row3)
+    unsafe {
+        let row0 = _mm_loadu_ps(ptr);
+        let row1 = _mm_loadu_ps(ptr.add(4));
+        let row2 = _mm_loadu_ps(ptr.add(8));
+        let row3 = _mm_loadu_ps(ptr.add(12));
+        (row0, row1, row2, row3)
+    }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_load_pack_ps_x2(ptr: *const f32) -> (__m128, __m128) {
-    let row0 = _mm_loadu_ps(ptr);
-    let row1 = _mm_loadu_ps(ptr.add(4));
-    (row0, row1)
+pub(crate) fn _mm_load_pack_ps_x2(ptr: *const f32) -> (__m128, __m128) {
+    unsafe {
+        let row0 = _mm_loadu_ps(ptr);
+        let row1 = _mm_loadu_ps(ptr.add(4));
+        (row0, row1)
+    }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_store_pack_x4(ptr: *mut u8, v: (__m128i, __m128i, __m128i, __m128i)) {
-    _mm_storeu_si128(ptr as *mut __m128i, v.0);
-    _mm_storeu_si128(ptr.add(16) as *mut __m128i, v.1);
-    _mm_storeu_si128(ptr.add(32) as *mut __m128i, v.2);
-    _mm_storeu_si128(ptr.add(48) as *mut __m128i, v.3);
+pub(crate) fn _mm_store_pack_x4(ptr: *mut u8, v: (__m128i, __m128i, __m128i, __m128i)) {
+    unsafe {
+        _mm_storeu_si128(ptr as *mut __m128i, v.0);
+        _mm_storeu_si128(ptr.add(16) as *mut __m128i, v.1);
+        _mm_storeu_si128(ptr.add(32) as *mut __m128i, v.2);
+        _mm_storeu_si128(ptr.add(48) as *mut __m128i, v.3);
+    }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_store_pack_ps_x4(ptr: *mut f32, v: (__m128, __m128, __m128, __m128)) {
-    _mm_storeu_ps(ptr, v.0);
-    _mm_storeu_ps(ptr.add(4), v.1);
-    _mm_storeu_ps(ptr.add(8), v.2);
-    _mm_storeu_ps(ptr.add(12), v.3);
+pub(crate) fn _mm_store_pack_ps_x4(ptr: *mut f32, v: (__m128, __m128, __m128, __m128)) {
+    unsafe {
+        _mm_storeu_ps(ptr, v.0);
+        _mm_storeu_ps(ptr.add(4), v.1);
+        _mm_storeu_ps(ptr.add(8), v.2);
+        _mm_storeu_ps(ptr.add(12), v.3);
+    }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_store_pack_ps_x3(ptr: *mut f32, v: (__m128, __m128, __m128)) {
-    _mm_storeu_ps(ptr, v.0);
-    _mm_storeu_ps(ptr.add(4), v.1);
-    _mm_storeu_ps(ptr.add(8), v.2);
+pub(crate) fn _mm_store_pack_ps_x3(ptr: *mut f32, v: (__m128, __m128, __m128)) {
+    unsafe {
+        _mm_storeu_ps(ptr, v.0);
+        _mm_storeu_ps(ptr.add(4), v.1);
+        _mm_storeu_ps(ptr.add(8), v.2);
+    }
 }
 
 #[inline(always)]
 pub(crate) unsafe fn _mm_store_pack_ps_x2(ptr: *mut f32, v: (__m128, __m128)) {
-    _mm_storeu_ps(ptr, v.0);
-    _mm_storeu_ps(ptr.add(4), v.1);
+    unsafe {
+        _mm_storeu_ps(ptr, v.0);
+        _mm_storeu_ps(ptr.add(4), v.1);
+    }
 }
 
 #[inline(always)]
 pub(crate) unsafe fn _mm_load_pack_x3(ptr: *const u8) -> (__m128i, __m128i, __m128i) {
-    let row0 = _mm_loadu_si128(ptr as *const __m128i);
-    let row1 = _mm_loadu_si128(ptr.add(16) as *const __m128i);
-    let row2 = _mm_loadu_si128(ptr.add(32) as *const __m128i);
-    (row0, row1, row2)
+    unsafe {
+        let row0 = _mm_loadu_si128(ptr as *const __m128i);
+        let row1 = _mm_loadu_si128(ptr.add(16) as *const __m128i);
+        let row2 = _mm_loadu_si128(ptr.add(32) as *const __m128i);
+        (row0, row1, row2)
+    }
 }
 
 #[inline(always)]
 pub(crate) unsafe fn _mm_load_pack_x2(ptr: *const u8) -> (__m128i, __m128i) {
-    let row0 = _mm_loadu_si128(ptr as *const __m128i);
-    let row1 = _mm_loadu_si128(ptr.add(16) as *const __m128i);
-    (row0, row1)
+    unsafe {
+        let row0 = _mm_loadu_si128(ptr as *const __m128i);
+        let row1 = _mm_loadu_si128(ptr.add(16) as *const __m128i);
+        (row0, row1)
+    }
 }
 
 #[inline(always)]
 pub(crate) unsafe fn _mm_store_pack_x3(ptr: *mut u8, v: (__m128i, __m128i, __m128i)) {
-    _mm_storeu_si128(ptr as *mut __m128i, v.0);
-    _mm_storeu_si128(ptr.add(16) as *mut __m128i, v.1);
-    _mm_storeu_si128(ptr.add(32) as *mut __m128i, v.2);
+    unsafe {
+        _mm_storeu_si128(ptr as *mut __m128i, v.0);
+        _mm_storeu_si128(ptr.add(16) as *mut __m128i, v.1);
+        _mm_storeu_si128(ptr.add(32) as *mut __m128i, v.2);
+    }
 }
 
 #[inline(always)]
 pub(crate) unsafe fn _mm_store_pack_x2(ptr: *mut u8, v: (__m128i, __m128i)) {
-    _mm_storeu_si128(ptr as *mut __m128i, v.0);
-    _mm_storeu_si128(ptr.add(16) as *mut __m128i, v.1);
+    unsafe {
+        _mm_storeu_si128(ptr as *mut __m128i, v.0);
+        _mm_storeu_si128(ptr.add(16) as *mut __m128i, v.1);
+    }
 }
 
 #[inline(always)]
 pub(crate) unsafe fn _mm_store_interleave_rgb(ptr: *mut u8, v: (__m128i, __m128i, __m128i)) {
-    let (v0, v1, v2) = _mm_interleave_rgb(v.0, v.1, v.2);
-    _mm_store_pack_x3(ptr, (v0, v1, v2));
+    unsafe {
+        let (v0, v1, v2) = _mm_interleave_rgb(v.0, v.1, v.2);
+        _mm_store_pack_x3(ptr, (v0, v1, v2));
+    }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_store_interleave_rgb_half(ptr: *mut u8, v: (__m128i, __m128i, __m128i)) {
-    let (v0, v1, _) = _mm_interleave_rgb(v.0, v.1, v.2);
-    _mm_storeu_si128(ptr as *mut __m128i, v0);
-    _mm_storeu_si64(ptr.add(16), v1);
+pub(crate) fn _mm_store_interleave_rgb_half(ptr: *mut u8, v: (__m128i, __m128i, __m128i)) {
+    unsafe {
+        let (v0, v1, _) = _mm_interleave_rgb(v.0, v.1, v.2);
+        _mm_storeu_si128(ptr as *mut __m128i, v0);
+        _mm_storeu_si64(ptr.add(16), v1);
+    }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_store_interleave_rgba(
-    ptr: *mut u8,
-    v: (__m128i, __m128i, __m128i, __m128i),
-) {
+pub(crate) fn _mm_store_interleave_rgba(ptr: *mut u8, v: (__m128i, __m128i, __m128i, __m128i)) {
     let (v0, v1, v2, v3) = _mm_interleave_rgba(v.0, v.1, v.2, v.3);
     _mm_store_pack_x4(ptr, (v0, v1, v2, v3));
 }
@@ -144,63 +167,75 @@ pub(crate) unsafe fn _mm_store_interleave_rgba_half(
     ptr: *mut u8,
     v: (__m128i, __m128i, __m128i, __m128i),
 ) {
-    let (v0, v1, _, _) = _mm_interleave_rgba(v.0, v.1, v.2, v.3);
-    _mm_storeu_si128(ptr as *mut __m128i, v0);
-    _mm_storeu_si128(ptr.add(16) as *mut __m128i, v1);
+    unsafe {
+        let (v0, v1, _, _) = _mm_interleave_rgba(v.0, v.1, v.2, v.3);
+        _mm_storeu_si128(ptr as *mut __m128i, v0);
+        _mm_storeu_si128(ptr.add(16) as *mut __m128i, v1);
+    }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_load_deinterleave_rgb(ptr: *const u8) -> (__m128i, __m128i, __m128i) {
-    let row0 = _mm_loadu_si128(ptr as *const __m128i);
-    let row1 = _mm_loadu_si128(ptr.add(16) as *const __m128i);
-    let row2 = _mm_loadu_si128(ptr.add(32) as *const __m128i);
-    _mm_deinterleave_rgb(row0, row1, row2)
+pub(crate) fn _mm_load_deinterleave_rgb(ptr: *const u8) -> (__m128i, __m128i, __m128i) {
+    unsafe {
+        let row0 = _mm_loadu_si128(ptr as *const __m128i);
+        let row1 = _mm_loadu_si128(ptr.add(16) as *const __m128i);
+        let row2 = _mm_loadu_si128(ptr.add(32) as *const __m128i);
+        _mm_deinterleave_rgb(row0, row1, row2)
+    }
 }
 
 #[inline(always)]
 pub(crate) unsafe fn _mm_load_deinterleave_rgb_half(ptr: *const u8) -> (__m128i, __m128i, __m128i) {
-    let row0 = _mm_loadu_si128(ptr as *const __m128i);
-    let row1 = _mm_loadu_si64(ptr.add(16));
-    _mm_deinterleave_rgb(row0, row1, _mm_setzero_si128())
+    unsafe {
+        let row0 = _mm_loadu_si128(ptr as *const __m128i);
+        let row1 = _mm_loadu_si64(ptr.add(16));
+        _mm_deinterleave_rgb(row0, row1, _mm_setzero_si128())
+    }
 }
 
 #[inline(always)]
 pub(crate) unsafe fn _mm_load_deinterleave_rgba(
     ptr: *const u8,
 ) -> (__m128i, __m128i, __m128i, __m128i) {
-    let row0 = _mm_loadu_si128(ptr as *const __m128i);
-    let row1 = _mm_loadu_si128(ptr.add(16) as *const __m128i);
-    let row2 = _mm_loadu_si128(ptr.add(32) as *const __m128i);
-    let row3 = _mm_loadu_si128(ptr.add(48) as *const __m128i);
-    _mm_deinterleave_rgba(row0, row1, row2, row3)
+    unsafe {
+        let row0 = _mm_loadu_si128(ptr as *const __m128i);
+        let row1 = _mm_loadu_si128(ptr.add(16) as *const __m128i);
+        let row2 = _mm_loadu_si128(ptr.add(32) as *const __m128i);
+        let row3 = _mm_loadu_si128(ptr.add(48) as *const __m128i);
+        _mm_deinterleave_rgba(row0, row1, row2, row3)
+    }
 }
 
 #[inline(always)]
 pub(crate) unsafe fn _mm_load_deinterleave_rgba_half(
     ptr: *const u8,
 ) -> (__m128i, __m128i, __m128i, __m128i) {
-    let row0 = _mm_loadu_si128(ptr as *const __m128i);
-    let row1 = _mm_loadu_si128(ptr.add(16) as *const __m128i);
-    _mm_deinterleave_rgba(row0, row1, _mm_setzero_si128(), _mm_setzero_si128())
+    unsafe {
+        let row0 = _mm_loadu_si128(ptr as *const __m128i);
+        let row1 = _mm_loadu_si128(ptr.add(16) as *const __m128i);
+        _mm_deinterleave_rgba(row0, row1, _mm_setzero_si128(), _mm_setzero_si128())
+    }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_load_deinterleave_rgba_ps(
-    ptr: *const f32,
-) -> (__m128, __m128, __m128, __m128) {
-    let row0 = _mm_loadu_ps(ptr);
-    let row1 = _mm_loadu_ps(ptr.add(4));
-    let row2 = _mm_loadu_ps(ptr.add(8));
-    let row3 = _mm_loadu_ps(ptr.add(12));
-    _mm_deinterleave_rgba_ps(row0, row1, row2, row3)
+pub(crate) fn _mm_load_deinterleave_rgba_ps(ptr: *const f32) -> (__m128, __m128, __m128, __m128) {
+    unsafe {
+        let row0 = _mm_loadu_ps(ptr);
+        let row1 = _mm_loadu_ps(ptr.add(4));
+        let row2 = _mm_loadu_ps(ptr.add(8));
+        let row3 = _mm_loadu_ps(ptr.add(12));
+        _mm_deinterleave_rgba_ps(row0, row1, row2, row3)
+    }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_load_deinterleave_rgb_ps(ptr: *const f32) -> (__m128, __m128, __m128) {
-    let row0 = _mm_loadu_ps(ptr);
-    let row1 = _mm_loadu_ps(ptr.add(4));
-    let row2 = _mm_loadu_ps(ptr.add(8));
-    _mm_deinterleave_rgb_ps(row0, row1, row2)
+pub(crate) fn _mm_load_deinterleave_rgb_ps(ptr: *const f32) -> (__m128, __m128, __m128) {
+    unsafe {
+        let row0 = _mm_loadu_ps(ptr);
+        let row1 = _mm_loadu_ps(ptr.add(4));
+        let row2 = _mm_loadu_ps(ptr.add(8));
+        _mm_deinterleave_rgb_ps(row0, row1, row2)
+    }
 }
 
 #[inline(always)]

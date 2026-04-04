@@ -37,31 +37,19 @@
     feature(stdarch_neon_fcma)
 )]
 #![cfg_attr(
-    all(
-        feature = "nightly_avx512",
-        any(target_arch = "x86", target_arch = "x86_64")
-    ),
+    all(feature = "avx512", any(target_arch = "x86", target_arch = "x86_64")),
     feature(cfg_version)
 )]
 #![cfg_attr(
-    all(
-        feature = "nightly_avx512",
-        any(target_arch = "x86", target_arch = "x86_64")
-    ),
+    all(feature = "avx512", any(target_arch = "x86", target_arch = "x86_64")),
     feature(avx512_target_feature)
 )]
 #![cfg_attr(
-    all(
-        feature = "nightly_avx512",
-        any(target_arch = "x86", target_arch = "x86_64")
-    ),
+    all(feature = "avx512", any(target_arch = "x86", target_arch = "x86_64")),
     feature(stdarch_x86_avx512)
 )]
 #![cfg_attr(
-    all(
-        feature = "nightly_avx512",
-        any(target_arch = "x86", target_arch = "x86_64")
-    ),
+    all(feature = "avx512", any(target_arch = "x86", target_arch = "x86_64")),
     feature(x86_amx_intrinsics)
 )]
 #![cfg_attr(feature = "nightly_f16", feature(f16))]
@@ -129,11 +117,10 @@ mod wasm32;
 #[cfg(feature = "fft")]
 #[cfg_attr(docsrs, doc(cfg(feature = "fft")))]
 pub use adaptive_blur::adaptive_blur;
-pub use bilateral::{bilateral_filter, BilateralBlurParams};
+pub use bilateral::{BilateralBlurParams, bilateral_filter};
 pub use box_filter::{
-    box_blur, box_blur_f32, box_blur_u16, gaussian_box_blur, gaussian_box_blur_f32,
-    gaussian_box_blur_u16, tent_blur, tent_blur_f32, tent_blur_u16, BoxBlurParameters,
-    CLTParameters,
+    BoxBlurParameters, CLTParameters, box_blur, box_blur_f32, box_blur_u16, gaussian_box_blur,
+    gaussian_box_blur_f32, gaussian_box_blur_u16, tent_blur, tent_blur_f32, tent_blur_u16,
 };
 pub use channels_configuration::FastBlurChannels;
 pub use edge_mode::{BorderHandle, EdgeMode, EdgeMode2D, Scalar};
@@ -156,23 +143,23 @@ pub use fast_gaussian_image_next::fast_gaussian_next_blur_image;
 pub use fast_gaussian_next::fast_gaussian_next_f16;
 pub use fast_gaussian_next::{fast_gaussian_next, fast_gaussian_next_f32, fast_gaussian_next_u16};
 pub use filter1d::{
-    filter_1d_approx, filter_1d_complex, filter_1d_complex_fixed_point, filter_1d_exact,
-    KernelShape,
+    KernelShape, filter_1d_approx, filter_1d_complex, filter_1d_complex_fixed_point,
+    filter_1d_exact,
 };
 #[cfg(feature = "fft")]
 #[cfg_attr(docsrs, doc(cfg(feature = "fft")))]
 pub use filter2d::{
-    fft_next_good_size, filter_2d_fft, filter_2d_fft_complex, filter_2d_rgb_fft,
-    filter_2d_rgb_fft_complex, filter_2d_rgba_fft, filter_2d_rgba_fft_complex, FftNumber,
+    FftNumber, fft_next_good_size, filter_2d_fft, filter_2d_fft_complex, filter_2d_rgb_fft,
+    filter_2d_rgb_fft_complex, filter_2d_rgba_fft, filter_2d_rgba_fft_complex,
 };
 pub use filter2d::{filter_2d, filter_2d_arbitrary, filter_2d_rgb, filter_2d_rgba};
 pub use gamma_curves::TransferFunction;
 #[cfg(feature = "nightly_f16")]
 pub use gaussian::gaussian_blur_f16;
 pub use gaussian::{
-    complex_gaussian_kernel, gaussian_blur, gaussian_blur_f32, gaussian_blur_u16,
-    gaussian_kernel_1d, gaussian_kernel_1d_f64, sigma_size, sigma_size_d, ConvolutionMode,
-    GaussianBlurParams, IeeeBinaryConvolutionMode,
+    ConvolutionMode, GaussianBlurParams, IeeeBinaryConvolutionMode, complex_gaussian_kernel,
+    gaussian_blur, gaussian_blur_f32, gaussian_blur_u16, gaussian_kernel_1d,
+    gaussian_kernel_1d_f64, sigma_size, sigma_size_d,
 };
 #[cfg(feature = "image")]
 #[cfg_attr(docsrs, doc(cfg(feature = "image")))]

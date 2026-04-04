@@ -34,59 +34,57 @@ use num_complex::Complex;
 use std::arch::x86_64::*;
 
 #[inline(always)]
-pub(crate) unsafe fn mq_complex_mla(
-    acc_r: __m128,
-    r0i0: __m128,
-    r: __m128,
-    r_swop: __m128,
-) -> __m128 {
-    let c0 = _mm_mul_ps(r0i0, r);
-    let c1 = _mm_mul_ps(
-        _mm_shuffle_ps::<{ shuffle(2, 3, 0, 1) }>(r0i0, r0i0),
-        r_swop,
-    );
-    _mm_add_ps(acc_r, _mm_addsub_ps(c0, c1))
+pub(crate) fn mq_complex_mla(acc_r: __m128, r0i0: __m128, r: __m128, r_swop: __m128) -> __m128 {
+    unsafe {
+        let c0 = _mm_mul_ps(r0i0, r);
+        let c1 = _mm_mul_ps(
+            _mm_shuffle_ps::<{ shuffle(2, 3, 0, 1) }>(r0i0, r0i0),
+            r_swop,
+        );
+        _mm_add_ps(acc_r, _mm_addsub_ps(c0, c1))
+    }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm256_correct4x64_ps(a: __m256) -> __m256 {
+pub(crate) fn _mm256_correct4x64_ps(a: __m256) -> __m256 {
     const M: i32 = shuffle(3, 1, 2, 0);
-    _mm256_castsi256_ps(_mm256_permute4x64_epi64::<M>(_mm256_castps_si256(a)))
+    unsafe { _mm256_castsi256_ps(_mm256_permute4x64_epi64::<M>(_mm256_castps_si256(a))) }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn mq256_complex_mla(
-    acc_r: __m256,
-    r0i0: __m256,
-    r: __m256,
-    r_swop: __m256,
-) -> __m256 {
-    let c0 = _mm256_mul_ps(r0i0, r);
-    let c1 = _mm256_mul_ps(
-        _mm256_correct4x64_ps(_mm256_shuffle_ps::<{ shuffle(2, 3, 0, 1) }>(r0i0, r0i0)),
-        r_swop,
-    );
-    _mm256_add_ps(acc_r, _mm256_addsub_ps(c0, c1))
+pub(crate) fn mq256_complex_mla(acc_r: __m256, r0i0: __m256, r: __m256, r_swop: __m256) -> __m256 {
+    unsafe {
+        let c0 = _mm256_mul_ps(r0i0, r);
+        let c1 = _mm256_mul_ps(
+            _mm256_correct4x64_ps(_mm256_shuffle_ps::<{ shuffle(2, 3, 0, 1) }>(r0i0, r0i0)),
+            r_swop,
+        );
+        _mm256_add_ps(acc_r, _mm256_addsub_ps(c0, c1))
+    }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn mq256_complex_mul(r0i0: __m256, r: __m256, r_swop: __m256) -> __m256 {
-    let c0 = _mm256_mul_ps(r0i0, r);
-    let c1 = _mm256_mul_ps(
-        _mm256_correct4x64_ps(_mm256_shuffle_ps::<{ shuffle(2, 3, 0, 1) }>(r0i0, r0i0)),
-        r_swop,
-    );
-    _mm256_addsub_ps(c0, c1)
+pub(crate) fn mq256_complex_mul(r0i0: __m256, r: __m256, r_swop: __m256) -> __m256 {
+    unsafe {
+        let c0 = _mm256_mul_ps(r0i0, r);
+        let c1 = _mm256_mul_ps(
+            _mm256_correct4x64_ps(_mm256_shuffle_ps::<{ shuffle(2, 3, 0, 1) }>(r0i0, r0i0)),
+            r_swop,
+        );
+        _mm256_addsub_ps(c0, c1)
+    }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn mq_complex_mul(r0i0: __m128, r: __m128, r_swop: __m128) -> __m128 {
-    let c0 = _mm_mul_ps(r0i0, r);
-    let c1 = _mm_mul_ps(
-        _mm_shuffle_ps::<{ shuffle(2, 3, 0, 1) }>(r0i0, r0i0),
-        r_swop,
-    );
-    _mm_addsub_ps(c0, c1)
+pub(crate) fn mq_complex_mul(r0i0: __m128, r: __m128, r_swop: __m128) -> __m128 {
+    unsafe {
+        let c0 = _mm_mul_ps(r0i0, r);
+        let c1 = _mm_mul_ps(
+            _mm_shuffle_ps::<{ shuffle(2, 3, 0, 1) }>(r0i0, r0i0),
+            r_swop,
+        );
+        _mm_addsub_ps(c0, c1)
+    }
 }
 
 pub(crate) fn filter_avx_column_complex_u8_f32(

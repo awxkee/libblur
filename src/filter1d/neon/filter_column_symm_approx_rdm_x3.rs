@@ -28,10 +28,9 @@
  */
 use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_1d_column_handler::FilterBrows;
-use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::neon::utils::{
     vmla_symm_hi_u8_s16, vmlaq_symm_hi_u8_s16, vmull_expand_i16, vmullq_expand_i16,
-    vqmovnq_s16x2_u8, xvld1q_u8_x2, xvld4u8, xvst1q_u8_x2, xvst_u8x4_q15,
+    vqmovnq_s16x2_u8, xvld1q_u8_x2, xvld4u8, xvst_u8x4_q15, xvst1q_u8_x2,
 };
 use crate::filter1d::to_approx_storage::ToApproxStorage;
 use crate::img_size::ImageSize;
@@ -44,7 +43,7 @@ pub(crate) fn filter_column_symm_neon_u8_i32_rdm_x3(
     dst: &mut [u8],
     image_size: ImageSize,
     dst_stride: usize,
-    scanned_kernel: &[ScanPoint1d<i32>],
+    scanned_kernel: &[i32],
 ) {
     unsafe {
         executor_unit(arena, brows, dst, image_size, dst_stride, scanned_kernel);
@@ -58,7 +57,7 @@ unsafe fn executor_unit(
     dst: &mut [u8],
     image_size: ImageSize,
     dst_stride: usize,
-    scanned_kernel: &[ScanPoint1d<i32>],
+    scanned_kernel: &[i32],
 ) {
     unsafe {
         let image_width = image_size.width * arena.components;
@@ -77,7 +76,7 @@ unsafe fn executor_unit(
         let ref1 = brows1.get_unchecked(half_len);
         let ref2 = brows2.get_unchecked(half_len);
 
-        let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(half_len).weight as i16);
+        let coeff = vdupq_n_s16(*scanned_kernel.get_unchecked(half_len) as i16);
 
         let mut cx = 0usize;
 
@@ -100,7 +99,7 @@ unsafe fn executor_unit(
             let mut k1_2 = vmullq_expand_i16(source2.1, coeff);
 
             for i in 0..half_len {
-                let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight as i16);
+                let coeff = vdupq_n_s16(*scanned_kernel.get_unchecked(i) as i16);
                 let rollback = length - i - 1;
                 let v_source0_0 =
                     xvld1q_u8_x2(brows0.get_unchecked(i).get_unchecked(cx..).as_ptr());
@@ -157,7 +156,7 @@ unsafe fn executor_unit(
             let mut k2 = vmullq_expand_i16(source2, coeff);
 
             for i in 0..half_len {
-                let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight as i16);
+                let coeff = vdupq_n_s16(*scanned_kernel.get_unchecked(i) as i16);
                 let rollback = length - i - 1;
                 let v_source0_0 = vld1q_u8(brows0.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 let v_source1_0 =
@@ -197,7 +196,7 @@ unsafe fn executor_unit(
             let mut k2 = vmull_expand_i16(source2, coeff);
 
             for i in 0..half_len {
-                let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(i).weight as i16);
+                let coeff = vdupq_n_s16(*scanned_kernel.get_unchecked(i) as i16);
                 let rollback = length - i - 1;
                 let v_source0_0 = xvld4u8(brows0.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 let v_source1_0 =
@@ -230,26 +229,26 @@ unsafe fn executor_unit(
             let v_src1 = ref1.get_unchecked(x..);
             let v_src2 = ref2.get_unchecked(x..);
 
-            let mut k0 = ((*v_src0.get_unchecked(0)) as i32).mul(coeff.weight);
-            let mut k1 = ((*v_src1.get_unchecked(0)) as i32).mul(coeff.weight);
-            let mut k2 = ((*v_src2.get_unchecked(0)) as i32).mul(coeff.weight);
+            let mut k0 = ((*v_src0.get_unchecked(0)) as i32).mul(coeff);
+            let mut k1 = ((*v_src1.get_unchecked(0)) as i32).mul(coeff);
+            let mut k2 = ((*v_src2.get_unchecked(0)) as i32).mul(coeff);
 
             for i in 0..half_len {
                 let coeff = *scanned_kernel.get_unchecked(i);
                 let rollback = length - i - 1;
                 k0 = ((*brows0.get_unchecked(i).get_unchecked(x)) as i32)
                     .add((*brows0.get_unchecked(rollback).get_unchecked(x)) as i32)
-                    .mul(coeff.weight)
+                    .mul(coeff)
                     .add(k0);
 
                 k1 = ((*brows1.get_unchecked(i).get_unchecked(x)) as i32)
                     .add((*brows1.get_unchecked(rollback).get_unchecked(x)) as i32)
-                    .mul(coeff.weight)
+                    .mul(coeff)
                     .add(k1);
 
                 k2 = ((*brows2.get_unchecked(i).get_unchecked(x)) as i32)
                     .add((*brows2.get_unchecked(rollback).get_unchecked(x)) as i32)
-                    .mul(coeff.weight)
+                    .mul(coeff)
                     .add(k2);
             }
 

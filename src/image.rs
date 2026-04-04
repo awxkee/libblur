@@ -314,11 +314,11 @@ impl<'a, T: Clone + Copy + Default + Debug> BlurImageMut<'a, T> {
     /// Checks if layout matches necessary requirements
     #[inline]
     pub fn check_layout(&mut self, other: Option<&BlurImage<'_, T>>) -> Result<(), BlurError> {
-        if let Some(other) = other {
-            if matches!(self.data, BufferStore::Owned(_)) {
-                self.resize(other.width, other.height, other.channels);
-                return Ok(());
-            }
+        if let Some(other) = other
+            && matches!(self.data, BufferStore::Owned(_))
+        {
+            self.resize(other.width, other.height, other.channels);
+            return Ok(());
         }
         if self.width == 0 || self.height == 0 {
             return Err(BlurError::ZeroBaseSize);
@@ -347,11 +347,11 @@ impl<'a, T: Clone + Copy + Default + Debug> BlurImageMut<'a, T> {
         cn: usize,
         other: Option<&BlurImage<'_, T>>,
     ) -> Result<(), BlurError> {
-        if let Some(other) = other {
-            if matches!(self.data, BufferStore::Owned(_)) {
-                self.resize_arbitrary(other.width, other.height, cn);
-                return Ok(());
-            }
+        if let Some(other) = other
+            && matches!(self.data, BufferStore::Owned(_))
+        {
+            self.resize_arbitrary(other.width, other.height, cn);
+            return Ok(());
         }
         if self.width == 0 || self.height == 0 {
             return Err(BlurError::ZeroBaseSize);

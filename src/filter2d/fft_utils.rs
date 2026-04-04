@@ -36,17 +36,17 @@ pub fn fft_next_good_size(mut n: usize) -> usize {
         let mut m = n;
 
         // Divide by 2 until it's no longer divisible
-        while m % 2 == 0 {
+        while m.is_multiple_of(2) {
             m /= 2;
         }
 
         // Divide by 3 until it's no longer divisible
-        while m % 3 == 0 {
+        while m.is_multiple_of(3) {
             m /= 3;
         }
 
         // Divide by 5 until it's no longer divisible
-        while m % 5 == 0 {
+        while m.is_multiple_of(5) {
             m /= 5;
         }
 
@@ -69,27 +69,27 @@ pub(crate) fn fft_next_good_size_real(mut n: usize) -> usize {
         let mut m = n;
 
         // Divide by 2 until it's no longer divisible
-        while m % 2 == 0 {
+        while m.is_multiple_of(2) {
             m /= 2;
         }
 
         // Divide by 3 until it's no longer divisible
-        while m % 3 == 0 {
+        while m.is_multiple_of(3) {
             m /= 3;
         }
 
         // Divide by 5 until it's no longer divisible
-        while m % 5 == 0 {
+        while m.is_multiple_of(5) {
             m /= 5;
         }
 
         // Divide by 7 until it's no longer divisible
-        while m % 7 == 0 {
+        while m.is_multiple_of(7) {
             m /= 7;
         }
 
         // If m is reduced to 1, n is a good FFT size
-        if m <= 1 && n % 2 != 0 {
+        if m <= 1 && !n.is_multiple_of(2) {
             return n;
         }
 

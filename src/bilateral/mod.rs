@@ -30,4 +30,4 @@ mod bp8;
 #[cfg(all(target_arch = "aarch64", feature = "neon"))]
 mod neon;
 
-pub use bp8::{bilateral_filter, BilateralBlurParams};
+pub use bp8::{BilateralBlurParams, bilateral_filter};

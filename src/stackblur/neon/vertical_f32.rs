@@ -29,6 +29,7 @@
 use crate::neon::{load_f32_fast, p_vfmaq_f32, store_f32};
 use crate::stackblur::stack_blur_pass::StackBlurWorkingPass;
 use crate::unsafe_slice::UnsafeSlice;
+use crate::util::ScratchBuffer;
 use std::arch::aarch64::*;
 
 pub(crate) struct VerticalNeonStackBlurPassFloat32<const CN: usize> {}
@@ -40,8 +41,8 @@ impl<const CN: usize> Default for VerticalNeonStackBlurPassFloat32<CN> {
 }
 
 impl<const CN: usize> VerticalNeonStackBlurPassFloat32<CN> {
-    #[inline]
-    unsafe fn pass_impl(
+    #[target_feature(enable = "neon")]
+    fn pass_impl(
         &self,
         pixels: &UnsafeSlice<f32>,
         stride: u32,
@@ -52,12 +53,12 @@ impl<const CN: usize> VerticalNeonStackBlurPassFloat32<CN> {
         total_threads: usize,
     ) {
         unsafe {
-            let pixels: &UnsafeSlice<f32> = std::mem::transmute(pixels);
             let div = ((radius * 2) + 1) as usize;
             let mut yp;
             let mut sp;
             let mut stack_start;
-            let mut stacks = vec![0.; 4 * div * total_threads];
+            let mut scratch_buffer = ScratchBuffer::<f32, 2048>::new(4 * div);
+            let stacks = scratch_buffer.as_mut_slice();
 
             let v_mul_value = vdupq_n_f32(1. / ((radius as f32 + 1.) * (radius as f32 + 1.)));
 

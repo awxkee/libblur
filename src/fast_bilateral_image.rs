@@ -28,8 +28,8 @@
  */
 use crate::fast_bilateral_filter::fast_bilateral_filter_gray_alpha_impl;
 use crate::{
-    fast_bilateral_filter, fast_bilateral_filter_f32, fast_bilateral_filter_u16, BlurImage,
-    BlurImageMut, BufferStore, FastBlurChannels, ThreadingPolicy,
+    BlurImage, BlurImageMut, BufferStore, FastBlurChannels, ThreadingPolicy, fast_bilateral_filter,
+    fast_bilateral_filter_f32, fast_bilateral_filter_u16,
 };
 use image::{
     DynamicImage, GrayAlphaImage, GrayImage, ImageBuffer, Luma, LumaA, Rgb, Rgb32FImage, RgbImage,

@@ -33,9 +33,9 @@ mod vsum16;
 mod vsum8;
 mod vsum_f32;
 
-pub(crate) use rgba16::{box_blur_horizontal_pass_sse16, box_blur_vertical_pass_sse16};
-pub(crate) use rgba8::{box_blur_horizontal_pass_sse, box_blur_vertical_pass_sse};
 pub(crate) use rgba_f32::box_blur_horizontal_pass_sse_f32;
-pub(crate) use vsum16::sse_ring_vertical_row_summ16;
-pub(crate) use vsum8::sse_ring_vertical_row_summ;
+pub(crate) use rgba8::{box_blur_horizontal_pass_sse, box_blur_vertical_pass_sse};
+pub(crate) use rgba16::{box_blur_horizontal_pass_sse16, box_blur_vertical_pass_sse16};
 pub(crate) use vsum_f32::sse_ring_vertical_row_summ_f32;
+pub(crate) use vsum8::sse_ring_vertical_row_summ;
+pub(crate) use vsum16::sse_ring_vertical_row_summ16;

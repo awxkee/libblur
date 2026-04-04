@@ -26,6 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::ImageSize;
 use crate::filter1d::neon::utils::{
     vfmlaq_u8_s16, vmullq_u8_by_i16, vqmovnq_s32_u8, xvld1q_u8_x2, xvld1q_u8_x4, xvst1q_u8_x2,
     xvst1q_u8_x4,
@@ -33,7 +34,6 @@ use crate::filter1d::neon::utils::{
 use crate::filter1d::{Arena, ToApproxStorage};
 use crate::filter2d::scan_point_2d::ScanPoint2d;
 use crate::mlaf::mlaf;
-use crate::ImageSize;
 use std::arch::aarch64::*;
 use std::ops::Mul;
 

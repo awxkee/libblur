@@ -25,15 +25,15 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use crate::EdgeMode;
 use crate::edge_mode::clamp_edge;
 use crate::neon::{load_f32_f16, store_f32_f16};
 use crate::unsafe_slice::UnsafeSlice;
-use crate::EdgeMode;
 use core::f16;
 use std::arch::aarch64::*;
 
-pub(crate) fn fg_vertical_pass_neon_f16<T, const CN: usize>(
-    undef_bytes: &UnsafeSlice<T>,
+pub(crate) fn fg_vertical_pass_neon_f16<const CN: usize>(
+    bytes: &UnsafeSlice<f16>,
     stride: u32,
     width: u32,
     height: u32,
@@ -43,8 +43,7 @@ pub(crate) fn fg_vertical_pass_neon_f16<T, const CN: usize>(
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        let bytes: &UnsafeSlice<'_, f16> = std::mem::transmute(undef_bytes);
-        let mut buffer = Box::new([[0f32; 4]; 1024]);
+        let mut buffer = [[0f32; 4]; 1024];
 
         let height_wide = height as i64;
 
@@ -104,8 +103,8 @@ pub(crate) fn fg_vertical_pass_neon_f16<T, const CN: usize>(
     }
 }
 
-pub(crate) fn fg_horizontal_pass_neon_f16<T, const CN: usize>(
-    undef_bytes: &UnsafeSlice<T>,
+pub(crate) fn fg_horizontal_pass_neon_f16<const CN: usize>(
+    bytes: &UnsafeSlice<f16>,
     stride: u32,
     width: u32,
     height: u32,
@@ -115,7 +114,6 @@ pub(crate) fn fg_horizontal_pass_neon_f16<T, const CN: usize>(
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        let bytes: &UnsafeSlice<'_, f16> = std::mem::transmute(undef_bytes);
         let mut buffer: [[f32; 4]; 1024] = [[0f32; 4]; 1024];
         let radius_64 = radius as i64;
         let width_wide = width as i64;

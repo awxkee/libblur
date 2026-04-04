@@ -30,8 +30,8 @@ use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::neon::utils::{
     vmla_symm_hi_u8_s16, vmlaq_symm_hi_u8_s16, vmull_expand_i16, vmullq_expand_i16, vqmovn_s16_u8,
-    vqmovnq_s16x2_u8, xvld1q_u8_x3, xvld1q_u8_x4, xvld4u8, xvst1q_u8_x3, xvst1q_u8_x4,
-    xvst_u8x4_q15,
+    vqmovnq_s16x2_u8, xvld1q_u8_x3, xvld1q_u8_x4, xvld4u8, xvst_u8x4_q15, xvst1q_u8_x3,
+    xvst1q_u8_x4,
 };
 use crate::filter1d::region::FilterRegion;
 use crate::filter1d::to_approx_storage::ToApproxStorage;

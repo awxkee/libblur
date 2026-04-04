@@ -26,18 +26,18 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::edge_mode::BorderHandle;
-use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::ImageSize;
+use crate::edge_mode::BorderHandle;
+use std::sync::Arc;
 
 #[allow(dead_code)]
 pub struct RowsHolder<'a, T> {
-    pub(crate) holder: Vec<&'a [T]>,
+    pub(crate) holder: [&'a [T]; 1],
 }
 
 #[allow(dead_code)]
 pub struct RowsHolderMut<'a, T> {
-    pub(crate) holder: Vec<&'a mut [T]>,
+    pub(crate) holder: [&'a mut [T]; 1],
 }
 
 type BInterpolateHandler<T, F> = fn(
@@ -45,136 +45,183 @@ type BInterpolateHandler<T, F> = fn(
     m_src: &RowsHolder<T>,
     m_dst: &mut RowsHolderMut<T>,
     image_size: ImageSize,
-    scanned_kernel: &[ScanPoint1d<F>],
+    scanned_kernel: &[F],
 );
 
-pub trait Filter1DRowHandlerBInterpolateApr<T, F> {
-    fn get_row_handler_binter_apr<const N: usize>(
-        is_kernel_symmetric: bool,
-        kernel: &[ScanPoint1d<F>],
-    ) -> Option<BInterpolateHandler<T, F>>;
+pub trait ResolveRowHandlerBInter<T>: Send + Sync {
+    fn handle_row(
+        &self,
+        edge_mode: BorderHandle,
+        src: &RowsHolder<T>,
+        dst: &mut RowsHolderMut<T>,
+        image_size: ImageSize,
+    );
 }
 
-impl Filter1DRowHandlerBInterpolateApr<u8, i32> for u8 {
-    fn get_row_handler_binter_apr<const N: usize>(
+struct RowHandlerBInter<T, F> {
+    handler: BInterpolateHandler<T, F>,
+    kernel: Vec<F>,
+}
+
+impl<T: Send + Sync, F: Send + Sync> ResolveRowHandlerBInter<T> for RowHandlerBInter<T, F> {
+    fn handle_row(
+        &self,
+        edge_mode: BorderHandle,
+        src: &RowsHolder<T>,
+        dst: &mut RowsHolderMut<T>,
+        image_size: ImageSize,
+    ) {
+        (self.handler)(edge_mode, src, dst, image_size, &self.kernel)
+    }
+}
+
+pub trait BuildRowHandlerBInter<T, F> {
+    fn build_row_handler_binter<const N: usize>(
         is_kernel_symmetric: bool,
-        _kernel: &[ScanPoint1d<i32>],
-    ) -> Option<BInterpolateHandler<u8, i32>> {
-        if is_kernel_symmetric {
-            #[cfg(all(target_arch = "x86_64", feature = "nightly_avx512"))]
-            {
-                if std::arch::is_x86_feature_detected!("avx512bw") {
-                    if _kernel.len() == 3 {
-                        let all_positive = _kernel.iter().all(|&x| x.weight > 0);
-                        if all_positive {
-                            use crate::filter1d::avx512::filter_row_avx512_symm_u8_uq0_7_k3;
-                            return Some(filter_row_avx512_symm_u8_uq0_7_k3::<N>);
-                        }
-                    }
-                    // if _kernel.len() == 5 {
-                    //     let all_positive = _kernel.iter().all(|&x| x.weight > 0);
-                    //     if all_positive {
-                    //         use crate::filter1d::avx::filter_row_avx_symm_u8_uq0_7_k5;
-                    //         return Some(filter_row_avx_symm_u8_uq0_7_k5::<N>);
-                    //     }
-                    // }
-                    // if _kernel.len() < 9 {
-                    //     let all_positive = _kernel.iter().all(|&x| x.weight > 0);
-                    //     if all_positive {
-                    //         use crate::filter1d::avx::filter_row_avx_symm_u8_uq0_7_any;
-                    //         return Some(filter_row_avx_symm_u8_uq0_7_any::<N>);
-                    //     }
-                    // }
-                    use crate::filter1d::avx512::filter_row_avx512_symm_u8_i32_app_binter;
-                    return Some(filter_row_avx512_symm_u8_i32_app_binter::<N>);
-                }
-            }
-            #[cfg(all(target_arch = "x86_64", feature = "avx"))]
-            {
-                if std::arch::is_x86_feature_detected!("avx2") {
-                    if _kernel.len() == 3 {
-                        let all_positive = _kernel.iter().all(|&x| x.weight > 0);
-                        if all_positive {
-                            use crate::filter1d::avx::filter_row_avx_symm_u8_uq0_7_k3;
-                            return Some(filter_row_avx_symm_u8_uq0_7_k3::<N>);
-                        }
-                    }
-                    if _kernel.len() == 5 {
-                        let all_positive = _kernel.iter().all(|&x| x.weight > 0);
-                        if all_positive {
-                            use crate::filter1d::avx::filter_row_avx_symm_u8_uq0_7_k5;
-                            return Some(filter_row_avx_symm_u8_uq0_7_k5::<N>);
-                        }
-                    }
-                    if _kernel.len() < 9 {
-                        let all_positive = _kernel.iter().all(|&x| x.weight > 0);
-                        if all_positive {
-                            use crate::filter1d::avx::filter_row_avx_symm_u8_uq0_7_any;
-                            return Some(filter_row_avx_symm_u8_uq0_7_any::<N>);
-                        }
-                    }
-                    use crate::filter1d::avx::filter_row_avx_symm_u8_i32_app_binter;
-                    return Some(filter_row_avx_symm_u8_i32_app_binter::<N>);
-                }
-            }
-            #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
-            {
-                if _kernel.len() < 9 {
-                    let all_positive = _kernel.iter().all(|&x| x.weight > 0);
-                    if all_positive {
-                        use crate::filter1d::sse::filter_row_sse_symm_u8_uq0_7_any;
-                        return Some(filter_row_sse_symm_u8_uq0_7_any::<N>);
-                    }
-                }
-            }
-            #[cfg(all(target_arch = "aarch64", feature = "neon"))]
-            {
-                if _kernel.len() == 3 {
-                    let all_positive = _kernel.iter().all(|&x| x.weight > 0);
-                    if all_positive {
-                        use crate::filter1d::neon::filter_row_symm_neon_binter_u8_uq0_7_k3;
-                        return Some(filter_row_symm_neon_binter_u8_uq0_7_k3::<N>);
-                    }
-                }
-                if _kernel.len() == 5 {
-                    let all_positive = _kernel.iter().all(|&x| x.weight > 0);
-                    if all_positive {
-                        use crate::filter1d::neon::filter_row_symm_neon_binter_u8_uq0_7_x5;
-                        return Some(filter_row_symm_neon_binter_u8_uq0_7_x5::<N>);
-                    }
-                }
-                if _kernel.len() < 9 {
-                    let all_positive = _kernel.iter().all(|&x| x.weight > 0);
-                    if all_positive {
-                        use crate::filter1d::neon::filter_row_symm_neon_binter_u8_u0_7;
-                        return Some(filter_row_symm_neon_binter_u8_u0_7::<N>);
-                    }
-                }
-            }
-            #[cfg(all(target_arch = "aarch64", feature = "rdm"))]
-            {
-                if std::arch::is_aarch64_feature_detected!("rdm") {
-                    use crate::filter1d::neon::filter_row_symm_neon_binter_u8_i32_rdm;
-                    return Some(filter_row_symm_neon_binter_u8_i32_rdm::<N>);
-                }
-            }
-            #[cfg(all(target_arch = "aarch64", feature = "neon"))]
-            {
-                use crate::filter1d::neon::filter_row_symm_neon_binter_u8_i32;
-                return Some(filter_row_symm_neon_binter_u8_i32::<N>);
-            }
+        kernel: &[F],
+    ) -> Option<Arc<dyn ResolveRowHandlerBInter<T> + Send + Sync>>;
+}
+
+// ── helper to wrap a found handler ───────────────────────────────────────────
+#[allow(unused)]
+fn wrap_binter<T: Send + Sync + 'static, F: Send + Sync + Clone + 'static>(
+    handler: BInterpolateHandler<T, F>,
+    kernel: Vec<F>,
+) -> Option<Arc<dyn ResolveRowHandlerBInter<T> + Send + Sync>> {
+    Some(Arc::new(RowHandlerBInter { handler, kernel }))
+}
+
+// ── u8 / i32 ─────────────────────────────────────────────────────────────────
+impl BuildRowHandlerBInter<u8, i32> for u8 {
+    fn build_row_handler_binter<const N: usize>(
+        is_kernel_symmetric: bool,
+        kernel: &[i32],
+    ) -> Option<Arc<dyn ResolveRowHandlerBInter<u8> + Send + Sync>> {
+        if !is_kernel_symmetric {
+            return None;
         }
+
+        let _all_positive = kernel.iter().all(|&x| x > 0);
+
+        #[cfg(all(target_arch = "x86_64", feature = "avx512"))]
+        if std::arch::is_x86_feature_detected!("avx512bw") {
+            if kernel.len() == 3 && _all_positive {
+                use crate::filter1d::avx512::filter_row_avx512_symm_u8_uq0_7_k3;
+                use crate::filter1d::filter_1d_column_handler_approx::make_q07_weights;
+                return wrap_binter(
+                    filter_row_avx512_symm_u8_uq0_7_k3::<N>,
+                    make_q07_weights(kernel),
+                );
+            }
+            use crate::filter1d::avx512::filter_row_avx512_symm_u8_i32_app_binter;
+
+            let v_prepared = kernel
+                .iter()
+                .map(|&x| {
+                    let z = x.to_ne_bytes();
+                    i32::from_ne_bytes([z[0], z[1], z[0], z[1]])
+                })
+                .collect::<Vec<_>>();
+            return wrap_binter(filter_row_avx512_symm_u8_i32_app_binter::<N>, v_prepared);
+        }
+
+        #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+        if std::arch::is_x86_feature_detected!("avx2") {
+            if kernel.len() == 3 && _all_positive {
+                use crate::filter1d::avx::filter_row_avx_symm_u8_uq0_7_k3;
+                use crate::filter1d::filter_1d_column_handler_approx::make_q07_weights;
+                return wrap_binter(
+                    filter_row_avx_symm_u8_uq0_7_k3::<N>,
+                    make_q07_weights(kernel),
+                );
+            }
+            if kernel.len() == 5 && _all_positive {
+                use crate::filter1d::avx::filter_row_avx_symm_u8_uq0_7_k5;
+                use crate::filter1d::filter_1d_column_handler_approx::make_q07_weights;
+                return wrap_binter(
+                    filter_row_avx_symm_u8_uq0_7_k5::<N>,
+                    make_q07_weights(kernel),
+                );
+            }
+            if kernel.len() < 9 && _all_positive {
+                use crate::filter1d::avx::filter_row_avx_symm_u8_uq0_7_any;
+                use crate::filter1d::filter_1d_column_handler_approx::make_q07_weights;
+                return wrap_binter(
+                    filter_row_avx_symm_u8_uq0_7_any::<N>,
+                    make_q07_weights(kernel),
+                );
+            }
+            use crate::filter1d::avx::filter_row_avx_symm_u8_i32_app_binter;
+            let v_prepared = kernel
+                .iter()
+                .map(|&x| {
+                    let z = x.to_ne_bytes();
+                    i32::from_ne_bytes([z[0], z[1], z[0], z[1]])
+                })
+                .collect::<Vec<_>>();
+            return wrap_binter(filter_row_avx_symm_u8_i32_app_binter::<N>, v_prepared);
+        }
+
+        #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
+        if std::arch::is_x86_feature_detected!("sse4.1") && kernel.len() < 9 && _all_positive {
+            use crate::filter1d::filter_1d_column_handler_approx::make_q07_weights;
+            use crate::filter1d::sse::filter_row_sse_symm_u8_uq0_7_any;
+            let v_prepared = make_q07_weights(kernel)
+                .iter()
+                .map(|&x| {
+                    let z = x.to_ne_bytes();
+                    i32::from_ne_bytes([z[0], z[0], z[0], z[0]])
+                })
+                .collect::<Vec<_>>();
+
+            return wrap_binter(filter_row_sse_symm_u8_uq0_7_any::<N>, v_prepared);
+        }
+
+        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
+        {
+            use crate::filter1d::filter_1d_column_handler_approx::make_uq07_weights;
+            if kernel.len() == 3 && _all_positive {
+                use crate::filter1d::neon::filter_row_symm_neon_binter_u8_uq0_7_k3;
+                return wrap_binter(
+                    filter_row_symm_neon_binter_u8_uq0_7_k3::<N>,
+                    make_uq07_weights(kernel),
+                );
+            }
+            if kernel.len() == 5 && _all_positive {
+                use crate::filter1d::neon::filter_row_symm_neon_binter_u8_uq0_7_x5;
+                return wrap_binter(
+                    filter_row_symm_neon_binter_u8_uq0_7_x5::<N>,
+                    make_uq07_weights(kernel),
+                );
+            }
+            if kernel.len() < 9 && _all_positive {
+                use crate::filter1d::neon::filter_row_symm_neon_binter_u8_u0_7;
+                return wrap_binter(
+                    filter_row_symm_neon_binter_u8_u0_7::<N>,
+                    make_uq07_weights(kernel),
+                );
+            }
+            #[cfg(feature = "rdm")]
+            if std::arch::is_aarch64_feature_detected!("rdm") {
+                use crate::filter1d::neon::filter_row_symm_neon_binter_u8_i32_rdm;
+                return wrap_binter(filter_row_symm_neon_binter_u8_i32_rdm::<N>, kernel.to_vec());
+            }
+            use crate::filter1d::neon::filter_row_symm_neon_binter_u8_i32;
+            wrap_binter(filter_row_symm_neon_binter_u8_i32::<N>, kernel.to_vec())
+        }
+
+        #[cfg(not(all(target_arch = "aarch64", feature = "neon")))]
         None
     }
 }
 
 macro_rules! d_binter {
     ($store:ty, $intermediate:ty) => {
-        impl Filter1DRowHandlerBInterpolateApr<$store, $intermediate> for $store {
-            fn get_row_handler_binter_apr<const N: usize>(
+        impl BuildRowHandlerBInter<$store, $intermediate> for $store {
+            fn build_row_handler_binter<const N: usize>(
                 _: bool,
-                _: &[ScanPoint1d<$intermediate>],
-            ) -> Option<BInterpolateHandler<$store, $intermediate>> {
+                _: &[$intermediate],
+            ) -> Option<Arc<dyn ResolveRowHandlerBInter<$store> + Send + Sync>> {
                 None
             }
         }

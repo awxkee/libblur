@@ -29,7 +29,7 @@
 use crate::avx::shuffle;
 use crate::filter1d::arena::Arena;
 use crate::filter1d::avx::filter_column_complex_u8_f32::{
-    _mm256_correct4x64_ps, mq256_complex_mla, mq256_complex_mul, mq_complex_mla, mq_complex_mul,
+    _mm256_correct4x64_ps, mq_complex_mla, mq_complex_mul, mq256_complex_mla, mq256_complex_mul,
 };
 use crate::img_size::ImageSize;
 use crate::to_storage::ToStorage;

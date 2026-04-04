@@ -113,3 +113,86 @@ pub(crate) fn check_slice_size<T>(
     }
     Ok(())
 }
+
+pub(crate) enum ScratchBuffer<T, const N: usize> {
+    Stack([T; N], usize),
+    Heap(Vec<T>),
+}
+
+impl<T: Default + Copy, const N: usize> ScratchBuffer<T, N> {
+    pub(crate) fn new(size: usize) -> Self {
+        if size <= N {
+            Self::Stack([T::default(); N], size)
+        } else {
+            Self::Heap(vec![T::default(); size])
+        }
+    }
+
+    pub(crate) fn as_mut_slice(&mut self) -> &mut [T] {
+        match self {
+            Self::Stack(buf, len) => &mut buf[..*len],
+            Self::Heap(buf) => buf.as_mut_slice(),
+        }
+    }
+
+    // pub(crate) fn as_slice(&self) -> &[T] {
+    //     match self {
+    //         Self::Stack(buf, len) => &buf[..*len],
+    //         Self::Heap(buf) => buf.as_slice(),
+    //     }
+    // }
+}
+
+use std::fmt::Debug;
+
+pub(crate) enum CowScratch<T: Copy + Debug + Default, const N: usize> {
+    Uninit,
+    Stack([T; N], usize),
+    Heap(Vec<T>),
+}
+
+impl<T: Copy + Debug + Default, const N: usize> CowScratch<T, N> {
+    pub(crate) const fn new() -> Self {
+        Self::Uninit
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        matches!(self, Self::Uninit)
+    }
+
+    /// Lazily initialize with a given size, no-op if already initialized
+    pub(crate) fn get_or_init(&mut self, size: usize) -> &mut [T] {
+        if self.is_empty() {
+            *self = if size <= N {
+                Self::Stack([T::default(); N], size)
+            } else {
+                Self::Heap(vec![T::default(); size])
+            };
+        }
+        self.borrow_mut()
+    }
+
+    // pub(crate) fn borrow(&self) -> &[T] {
+    //     match self {
+    //         Self::Uninit => &[],
+    //         Self::Stack(buf, len) => &buf[..*len],
+    //         Self::Heap(v) => v,
+    //     }
+    // }
+
+    pub(crate) fn borrow_mut(&mut self) -> &mut [T] {
+        match self {
+            Self::Uninit => &mut [],
+            Self::Stack(buf, len) => &mut buf[..*len],
+            Self::Heap(v) => v,
+        }
+    }
+
+    pub(crate) fn get_or_unwrap_mut(&mut self) -> &mut [T] {
+        match self {
+            Self::Uninit => panic!("CowScratch is uninitialized"),
+            Self::Stack(buf, len) => &mut buf[..*len],
+            Self::Heap(v) => v,
+        }
+    }
+}

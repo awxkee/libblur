@@ -47,21 +47,25 @@ pub(crate) fn filter_sse_row_complex_u8_i32(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn widen_mul(a: __m128i, b: __m128i) -> (__m128i, __m128i) {
-    let lo = _mm_mullo_epi16(a, b);
-    let hi = _mm_mulhi_epi16(a, b);
-    (_mm_unpacklo_epi16(lo, hi), _mm_unpackhi_epi16(lo, hi))
+pub(crate) fn widen_mul(a: __m128i, b: __m128i) -> (__m128i, __m128i) {
+    unsafe {
+        let lo = _mm_mullo_epi16(a, b);
+        let hi = _mm_mulhi_epi16(a, b);
+        (_mm_unpacklo_epi16(lo, hi), _mm_unpackhi_epi16(lo, hi))
+    }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn widen_mul_lo(a: __m128i, b: __m128i) -> __m128i {
-    let lo = _mm_mullo_epi16(a, b);
-    let hi = _mm_mulhi_epi16(a, b);
-    _mm_unpacklo_epi16(lo, hi)
+pub(crate) fn widen_mul_lo(a: __m128i, b: __m128i) -> __m128i {
+    unsafe {
+        let lo = _mm_mullo_epi16(a, b);
+        let hi = _mm_mulhi_epi16(a, b);
+        _mm_unpacklo_epi16(lo, hi)
+    }
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn filter_row_complex_u8_i32_impl(
+fn filter_row_complex_u8_i32_impl(
     arena: Arena,
     arena_src: &[u8],
     dst: &mut [Complex<i16>],

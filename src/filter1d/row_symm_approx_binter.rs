@@ -27,7 +27,7 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![allow(dead_code)]
-use crate::edge_mode::{border_interpolate, BorderHandle};
+use crate::edge_mode::{BorderHandle, border_interpolate};
 use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::to_approx_storage::ToApproxStorage;
 use crate::img_size::ImageSize;

@@ -29,11 +29,11 @@
 use crate::gaussian::gaussian_kernel_1d;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::{BlurError, BlurImage, BlurImageMut, FastBlurChannels, ThreadingPolicy};
-use num_traits::real::Real;
 use num_traits::AsPrimitive;
+use num_traits::real::Real;
+use rayon::ThreadPool;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
 use rayon::prelude::{IntoParallelIterator, ParallelSliceMut};
-use rayon::ThreadPool;
 use std::fmt::{Debug, Display};
 use std::ops::{Add, AddAssign, Div, Index, Mul, MulAssign, Sub};
 

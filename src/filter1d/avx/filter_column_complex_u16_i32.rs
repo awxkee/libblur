@@ -36,47 +36,57 @@ use num_traits::MulAdd;
 use std::arch::x86_64::*;
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_addsub_epi32(a: __m128i, b: __m128i) -> __m128i {
-    let c = _mm_sign_epi32(b, _mm_setr_epi32(-1, 1, -1, 1));
-    _mm_add_epi32(a, c)
+pub(crate) fn _mm_addsub_epi32(a: __m128i, b: __m128i) -> __m128i {
+    unsafe {
+        let c = _mm_sign_epi32(b, _mm_setr_epi32(-1, 1, -1, 1));
+        _mm_add_epi32(a, c)
+    }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm256_addsub_epi32(a: __m256i, b: __m256i) -> __m256i {
-    let c = _mm256_sign_epi32(b, _mm256_setr_epi32(-1, 1, -1, 1, -1, 1, -1, 1));
-    _mm256_add_epi32(a, c)
+pub(crate) fn _mm256_addsub_epi32(a: __m256i, b: __m256i) -> __m256i {
+    unsafe {
+        let c = _mm256_sign_epi32(b, _mm256_setr_epi32(-1, 1, -1, 1, -1, 1, -1, 1));
+        _mm256_add_epi32(a, c)
+    }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn mq_complex_mla(
+pub(crate) fn mq_complex_mla(
     acc_r: __m128i,
     r0i0: __m128i,
     r: __m128i,
     r_swop: __m128i,
 ) -> __m128i {
-    let c0 = _mm_mullo_epi32(r0i0, r);
-    let c1 = _mm_mullo_epi32(_mm_shuffle_epi32::<{ _shuffle(2, 3, 0, 1) }>(r0i0), r_swop);
-    _mm_add_epi32(acc_r, _mm_addsub_epi32(c0, c1))
+    unsafe {
+        let c0 = _mm_mullo_epi32(r0i0, r);
+        let c1 = _mm_mullo_epi32(_mm_shuffle_epi32::<{ _shuffle(2, 3, 0, 1) }>(r0i0), r_swop);
+        _mm_add_epi32(acc_r, _mm_addsub_epi32(c0, c1))
+    }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn mq_complex_mul(r0i0: __m128i, r: __m128i, r_swop: __m128i) -> __m128i {
-    let c0 = _mm_mullo_epi32(r0i0, r);
-    let c1 = _mm_mullo_epi32(_mm_shuffle_epi32::<{ _shuffle(2, 3, 0, 1) }>(r0i0), r_swop);
-    _mm_addsub_epi32(c0, c1)
+pub(crate) fn mq_complex_mul(r0i0: __m128i, r: __m128i, r_swop: __m128i) -> __m128i {
+    unsafe {
+        let c0 = _mm_mullo_epi32(r0i0, r);
+        let c1 = _mm_mullo_epi32(_mm_shuffle_epi32::<{ _shuffle(2, 3, 0, 1) }>(r0i0), r_swop);
+        _mm_addsub_epi32(c0, c1)
+    }
 }
 
 #[inline(always)]
-pub(crate) unsafe fn mq256_complex_mla(
+pub(crate) fn mq256_complex_mla(
     acc: __m256i,
     r0i0: __m256i,
     r: __m256i,
     r_swop: __m256i,
     idx: __m256i,
 ) -> __m256i {
-    let c0 = _mm256_mullo_epi32(r0i0, r);
-    let c1 = _mm256_mullo_epi32(_mm256_permutevar8x32_epi32(r0i0, idx), r_swop);
-    _mm256_add_epi32(acc, _mm256_addsub_epi32(c0, c1))
+    unsafe {
+        let c0 = _mm256_mullo_epi32(r0i0, r);
+        let c1 = _mm256_mullo_epi32(_mm256_permutevar8x32_epi32(r0i0, idx), r_swop);
+        _mm256_add_epi32(acc, _mm256_addsub_epi32(c0, c1))
+    }
 }
 
 pub(crate) fn filter_avx_column_complex_u16_i32(
@@ -92,7 +102,7 @@ pub(crate) fn filter_avx_column_complex_u16_i32(
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn filter_avx_column_complex_u16_i32_impl(
+fn filter_avx_column_complex_u16_i32_impl(
     arena: Arena,
     arena_src: &[&[Complex<i32>]],
     dst: &mut [u16],

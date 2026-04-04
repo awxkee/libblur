@@ -26,6 +26,7 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+use crate::ImageSize;
 use crate::filter1d::Arena;
 use crate::filter2d::convolve_op::convolve_segment_2d;
 #[cfg(all(target_arch = "aarch64", feature = "neon"))]
@@ -33,7 +34,6 @@ use crate::filter2d::neon::{convolve_segment_neon_2d_u8_f32, convolve_segment_ne
 use crate::filter2d::scan_point_2d::ScanPoint2d;
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 use crate::filter2d::sse::{convolve_segment_sse_2d_u8_f32, convolve_segment_sse_2d_u8_i16};
-use crate::ImageSize;
 
 pub type Executor2DConvolution<T, F> = fn(
     arena: Arena,

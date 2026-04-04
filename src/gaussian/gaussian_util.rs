@@ -42,7 +42,7 @@ pub fn sigma_size_d(kernel_size: f64) -> f64 {
 /// Computes kernel size from sigma
 pub fn kernel_size(sigma: f32) -> u32 {
     let possible_size = (((((sigma - 0.8) / 0.3) + 1.) * 2.) + 1.).max(3.) as u32;
-    if possible_size % 2 == 0 {
+    if possible_size.is_multiple_of(2) {
         return possible_size + 1;
     }
     possible_size
@@ -51,7 +51,7 @@ pub fn kernel_size(sigma: f32) -> u32 {
 /// Computes kernel size from sigma
 pub fn kernel_size_d(sigma: f64) -> u32 {
     let possible_size = (((((sigma - 0.8) / 0.3) + 1.) * 2.) + 1.).max(3.) as u32;
-    if possible_size % 2 == 0 {
+    if possible_size.is_multiple_of(2) {
         return possible_size + 1;
     }
     possible_size

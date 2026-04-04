@@ -58,13 +58,12 @@ fn stack_blur_worker_horizontal(
                 if std::arch::is_x86_feature_detected!("sse4.1")
                     && std::arch::is_x86_feature_detected!("f16c")
                 {
-                    _executor =
-                        Box::new(HorizontalSseStackBlurPassFloat16::<f16, f32, 1>::default());
+                    _executor = Box::new(HorizontalSseStackBlurPassFloat16::<1>::default());
                 }
             }
             #[cfg(all(target_arch = "aarch64", feature = "neon"))]
             {
-                _executor = Box::new(HorizontalNeonStackBlurPassFloat16::<f16, f32, 1>::default());
+                _executor = Box::new(HorizontalNeonStackBlurPassFloat16::<1>::default());
             }
             _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }
@@ -77,13 +76,12 @@ fn stack_blur_worker_horizontal(
                 if std::arch::is_x86_feature_detected!("sse4.1")
                     && std::arch::is_x86_feature_detected!("f16c")
                 {
-                    _executor =
-                        Box::new(HorizontalSseStackBlurPassFloat16::<f16, f32, 3>::default());
+                    _executor = Box::new(HorizontalSseStackBlurPassFloat16::<3>::default());
                 }
             }
             #[cfg(all(target_arch = "aarch64", feature = "neon"))]
             {
-                _executor = Box::new(HorizontalNeonStackBlurPassFloat16::<f16, f32, 3>::default());
+                _executor = Box::new(HorizontalNeonStackBlurPassFloat16::<3>::default());
             }
             _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }
@@ -96,13 +94,12 @@ fn stack_blur_worker_horizontal(
                 if std::arch::is_x86_feature_detected!("sse4.1")
                     && std::arch::is_x86_feature_detected!("f16c")
                 {
-                    _executor =
-                        Box::new(HorizontalSseStackBlurPassFloat16::<f16, f32, 4>::default());
+                    _executor = Box::new(HorizontalSseStackBlurPassFloat16::<4>::default());
                 }
             }
             #[cfg(all(target_arch = "aarch64", feature = "neon"))]
             {
-                _executor = Box::new(HorizontalNeonStackBlurPassFloat16::<f16, f32, 4>::default());
+                _executor = Box::new(HorizontalNeonStackBlurPassFloat16::<4>::default());
             }
             _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }
@@ -129,12 +126,12 @@ fn stack_blur_worker_vertical(
                 if std::arch::is_x86_feature_detected!("sse4.1")
                     && std::arch::is_x86_feature_detected!("f16c")
                 {
-                    _executor = Box::new(VerticalSseStackBlurPassFloat16::<f16, f32, 1>::default());
+                    _executor = Box::new(VerticalSseStackBlurPassFloat16::<1>::default());
                 }
             }
             #[cfg(all(target_arch = "aarch64", feature = "neon"))]
             {
-                _executor = Box::new(VerticalNeonStackBlurPassFloat16::<f16, f32, 1>::default());
+                _executor = Box::new(VerticalNeonStackBlurPassFloat16::<1>::default());
             }
             _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }
@@ -147,12 +144,12 @@ fn stack_blur_worker_vertical(
                 if std::arch::is_x86_feature_detected!("sse4.1")
                     && std::arch::is_x86_feature_detected!("f16c")
                 {
-                    _executor = Box::new(VerticalSseStackBlurPassFloat16::<f16, f32, 3>::default());
+                    _executor = Box::new(VerticalSseStackBlurPassFloat16::<3>::default());
                 }
             }
             #[cfg(all(target_arch = "aarch64", feature = "neon"))]
             {
-                _executor = Box::new(VerticalNeonStackBlurPassFloat16::<f16, f32, 3>::default());
+                _executor = Box::new(VerticalNeonStackBlurPassFloat16::<3>::default());
             }
             _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }
@@ -165,12 +162,12 @@ fn stack_blur_worker_vertical(
                 if std::arch::is_x86_feature_detected!("sse4.1")
                     && std::arch::is_x86_feature_detected!("f16c")
                 {
-                    _executor = Box::new(VerticalSseStackBlurPassFloat16::<f16, f32, 4>::default());
+                    _executor = Box::new(VerticalSseStackBlurPassFloat16::<4>::default());
                 }
             }
             #[cfg(all(target_arch = "aarch64", feature = "neon"))]
             {
-                _executor = Box::new(VerticalNeonStackBlurPassFloat16::<f16, f32, 4>::default());
+                _executor = Box::new(VerticalNeonStackBlurPassFloat16::<4>::default());
             }
             _executor.pass(slice, stride, width, height, radius, thread, thread_count);
         }
