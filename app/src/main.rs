@@ -128,7 +128,7 @@ fn main() {
     //     .iter()
     //     .map(|&x| (x as f32 * (1. / 255.)))
     //     .collect::<Vec<_>>();
-    let mut cvt = BlurImageMut::borrow(
+    let mut cvt = BlurImage::borrow(
         &mut v_vec,
         dyn_image.width(),
         dyn_image.height(),
@@ -148,7 +148,7 @@ fn main() {
     let gaussian_kernel = gaussian_kernel_2d(500., 500 / 2);
     // let gaussian_kernel = complex_gaussian_kernel(500., 0.75, 5.);
 
-    // let mut dst_image = BlurImageMut::default(); //cvt.clone_as_mut();
+    let mut dst_image = BlurImageMut::default(); //cvt.clone_as_mut();
 
     // gaussian_blur(
     //     &cvt,
@@ -160,17 +160,17 @@ fn main() {
     // )
     //     .unwrap();
     //
-    // gaussian_blur(
-    //     &cvt,
-    //     &mut dst_image,
-    //     GaussianBlurParams::new_from_kernel(3.),
-    //     EdgeMode::Reflect.as_2d(),
-    //     ThreadingPolicy::Single,
-    //     ConvolutionMode::FixedPoint,
-    // )
-    // .unwrap();
+    gaussian_blur(
+        &cvt,
+        &mut dst_image,
+        GaussianBlurParams::new_from_kernel(9.),
+        EdgeMode::Reflect.as_2d(),
+        ThreadingPolicy::Single,
+        ConvolutionMode::FixedPoint,
+    )
+    .unwrap();
 
-    stack_blur(&mut cvt, AnisotropicRadius::new(8), ThreadingPolicy::Single).unwrap();
+    // stack_blur(&mut cvt, AnisotropicRadius::new(8), ThreadingPolicy::Single).unwrap();
 
     // filter_2d_rgb_fft::<u8, f32>(
     //     &cvt,
@@ -238,7 +238,7 @@ fn main() {
 
     // dst_image = vzd.gamma8(TransferFunction::Srgb, false).unwrap();
     //
-    dst_bytes = cvt
+    dst_bytes = dst_image
         .data
         .borrow_mut()
         .iter()
@@ -263,7 +263,7 @@ fn main() {
 
     if components == 3 {
         image::save_buffer(
-            "blurred_stack_next.jpg",
+            "q_blurred_stack_next.png",
             bytes.as_bytes(),
             dimensions.0,
             dimensions.1,

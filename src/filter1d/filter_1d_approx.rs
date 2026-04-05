@@ -105,17 +105,17 @@ where
     f64: PrimitiveCast<T>,
 {
     const SMALL_KERNEL_CUTOFF: usize = 61;
-    if column_kernel.len() <= SMALL_KERNEL_CUTOFF {
-        return filter_1d_approx_sliding_buffer::<T, F, I, N>(
-            image,
-            destination,
-            row_kernel,
-            column_kernel,
-            edge_modes,
-            border_constant,
-            threading_policy,
-        );
-    }
+    // if column_kernel.len() <= SMALL_KERNEL_CUTOFF {
+    //     return filter_1d_approx_sliding_buffer::<T, F, I, N>(
+    //         image,
+    //         destination,
+    //         row_kernel,
+    //         column_kernel,
+    //         edge_modes,
+    //         border_constant,
+    //         threading_policy,
+    //     );
+    // }
     image.check_layout_channels(N)?;
     destination.check_layout_channels(N, Some(image))?;
     image.only_size_matches_mut(destination)?;

@@ -94,28 +94,33 @@ fn filter_column_avx_symm_u8_i32_impl_x2(
             let mut k0_1 = _mm256_mul_epi8_by_epi16_x4(source1.0, coeff);
             let mut k1_1 = _mm256_mul_epi8_by_epi16_x4(source1.1, coeff);
 
+            let mut cached_fwd = _mm256_load_pack_x2(
+                brows0.get_unchecked(0).get_unchecked(cx..).as_ptr()
+            );
+            let mut cached_rev = _mm256_load_pack_x2(
+                brows1.get_unchecked(length - 1).get_unchecked(cx..).as_ptr()
+            );
+
             for i in 0..half_len {
                 let rollback = length - i - 1;
                 let coeff = _mm256_set1_epi32(*kernel.get_unchecked(i));
-                let v_source0_0 =
-                    _mm256_load_pack_x2(brows0.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 let v_source1_0 = _mm256_load_pack_x2(
                     brows0.get_unchecked(rollback).get_unchecked(cx..).as_ptr(),
                 );
                 let v_source0_1 =
                     _mm256_load_pack_x2(brows1.get_unchecked(i).get_unchecked(cx..).as_ptr());
-                let v_source1_1 = _mm256_load_pack_x2(
-                    brows1.get_unchecked(rollback).get_unchecked(cx..).as_ptr(),
-                );
                 k0_0 =
-                    _mm256_mul_add_symm_epi8_by_epi16_x4(k0_0, v_source0_0.0, v_source1_0.0, coeff);
+                    _mm256_mul_add_symm_epi8_by_epi16_x4(k0_0, cached_fwd.0, v_source1_0.0, coeff);
                 k1_0 =
-                    _mm256_mul_add_symm_epi8_by_epi16_x4(k1_0, v_source0_0.1, v_source1_0.1, coeff);
+                    _mm256_mul_add_symm_epi8_by_epi16_x4(k1_0, cached_fwd.1, v_source1_0.1, coeff);
 
                 k0_1 =
-                    _mm256_mul_add_symm_epi8_by_epi16_x4(k0_1, v_source0_1.0, v_source1_1.0, coeff);
+                    _mm256_mul_add_symm_epi8_by_epi16_x4(k0_1, v_source0_1.0, cached_rev.0, coeff);
                 k1_1 =
-                    _mm256_mul_add_symm_epi8_by_epi16_x4(k1_1, v_source0_1.1, v_source1_1.1, coeff);
+                    _mm256_mul_add_symm_epi8_by_epi16_x4(k1_1, v_source0_1.1, cached_rev.1, coeff);
+
+                cached_fwd = v_source0_1;
+                cached_rev = v_source1_0;
             }
 
             let dst_ptr0 = dst0.get_unchecked_mut(cx..).as_mut_ptr();
