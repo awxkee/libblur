@@ -105,17 +105,17 @@ where
     f64: PrimitiveCast<T>,
 {
     const SMALL_KERNEL_CUTOFF: usize = 61;
-    // if column_kernel.len() <= SMALL_KERNEL_CUTOFF {
-    //     return filter_1d_approx_sliding_buffer::<T, F, I, N>(
-    //         image,
-    //         destination,
-    //         row_kernel,
-    //         column_kernel,
-    //         edge_modes,
-    //         border_constant,
-    //         threading_policy,
-    //     );
-    // }
+    if column_kernel.len() <= SMALL_KERNEL_CUTOFF {
+        return filter_1d_approx_sliding_buffer::<T, F, I, N>(
+            image,
+            destination,
+            row_kernel,
+            column_kernel,
+            edge_modes,
+            border_constant,
+            threading_policy,
+        );
+    }
     image.check_layout_channels(N)?;
     destination.check_layout_channels(N, Some(image))?;
     image.only_size_matches_mut(destination)?;
@@ -262,7 +262,7 @@ where
                 let brows_slice1 = brows1.as_slice();
                 let brows_slice2 = brows2.as_slice();
 
-                let brows_vec = vec![brows_slice0, brows_slice1, brows_slice2];
+                let brows_vec = [brows_slice0, brows_slice1, brows_slice2];
 
                 let brows = FilterBrows { brows: brows_vec };
 
@@ -312,7 +312,7 @@ where
                 let brows_slice0 = brows0.as_slice();
                 let brows_slice1 = brows1.as_slice();
 
-                let brows_vec = vec![brows_slice0, brows_slice1];
+                let brows_vec = [brows_slice0, brows_slice1, brows_slice1];
 
                 let brows = FilterBrows { brows: brows_vec };
 
