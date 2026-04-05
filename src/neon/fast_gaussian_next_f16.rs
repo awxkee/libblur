@@ -65,7 +65,7 @@ pub(crate) fn fgn_vertical_pass_neon_f16<const CN: usize>(
                     let current_px = (std::cmp::max(x, 0)) as usize * CN;
 
                     let prepared_px = vmulq_f32(summs, f_weight);
-                    let dst_ptr = bytes.slice.as_ptr().add(current_y + current_px) as *mut f16;
+                    let dst_ptr = bytes.get_ptr(current_y + current_px);
                     store_f32_f16::<CN>(dst_ptr, prepared_px);
 
                     let d_arr_index_1 = ((y + radius_64) & 1023) as usize;
@@ -107,7 +107,7 @@ pub(crate) fn fgn_vertical_pass_neon_f16<const CN: usize>(
                     * (stride as usize);
                 let next_row_x = x as usize * CN;
 
-                let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_x) as *mut f16;
+                let s_ptr = bytes.get_ptr(next_row_y + next_row_x);
 
                 let pixel_color = load_f32_f16::<CN>(s_ptr);
 
@@ -155,7 +155,7 @@ pub(crate) fn fgn_horizontal_pass_neon_f16<const CN: usize>(
 
                     let prepared_px = vmulq_f32(summs, f_weight);
 
-                    let dst_ptr = bytes.slice.as_ptr().add(current_y + current_px) as *mut f16;
+                    let dst_ptr = bytes.get_ptr(current_y + current_px);
                     store_f32_f16::<CN>(dst_ptr, prepared_px);
 
                     let d_arr_index_1 = ((x + radius_64) & 1023) as usize;
@@ -197,7 +197,7 @@ pub(crate) fn fgn_horizontal_pass_neon_f16<const CN: usize>(
                 let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide);
                 let next_row_px = next_row_x * CN;
 
-                let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut f16;
+                let s_ptr = bytes.get_ptr(next_row_y + next_row_px);
                 let pixel_color = load_f32_f16::<CN>(s_ptr);
 
                 let arr_index = ((x + 2 * radius_64) & 1023) as usize;

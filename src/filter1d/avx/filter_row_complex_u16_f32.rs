@@ -48,7 +48,7 @@ pub(crate) fn filter_avx_row_complex_u16_f32(
 }
 
 #[target_feature(enable = "avx2", enable = "fma")]
-unsafe fn filter_avx_row_complex_u16_f32_impl(
+fn filter_avx_row_complex_u16_f32_impl(
     arena: Arena,
     arena_src: &[u16],
     dst: &mut [Complex<f32>],
@@ -71,7 +71,7 @@ unsafe fn filter_avx_row_complex_u16_f32_impl(
         let c_re = _mm256_set1_ps(kernel.get_unchecked(0).re);
         let c_im = _mm256_set1_ps(kernel.get_unchecked(0).im);
 
-        while cx + 16 < max_width {
+        while cx + 16 <= max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let values = _mm256_loadu_si256(shifted_src.as_ptr().cast());
@@ -136,7 +136,7 @@ unsafe fn filter_avx_row_complex_u16_f32_impl(
             cx += 16;
         }
 
-        while cx + 8 < max_width {
+        while cx + 8 <= max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let values = _mm_loadu_si128(shifted_src.as_ptr().cast());
@@ -180,7 +180,7 @@ unsafe fn filter_avx_row_complex_u16_f32_impl(
             cx += 8;
         }
 
-        while cx + 4 < max_width {
+        while cx + 4 <= max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let values = _mm_loadu_si64(shifted_src.as_ptr().cast());

@@ -275,31 +275,31 @@ fn box_blur_horizontal_pass_neon_impl_low_rad<const CN: usize>(
                 let bytes_offset_2 = y_dst_shift + dst_stride as usize * 2 + px;
                 let bytes_offset_3 = y_dst_shift + dst_stride as usize * 3 + px;
                 if CN == 4 {
-                    let dst_ptr_0 = unsafe_dst.slice.as_ptr().add(bytes_offset_0) as *mut u32;
+                    let dst_ptr_0 = unsafe_dst.get_ptr(bytes_offset_0) as *mut u32;
                     vst1_lane_u32::<0>(dst_ptr_0, vreinterpret_u32_u8(px_80));
 
-                    let dst_ptr_1 = unsafe_dst.slice.as_ptr().add(bytes_offset_1) as *mut u32;
+                    let dst_ptr_1 = unsafe_dst.get_ptr(bytes_offset_1) as *mut u32;
                     vst1_lane_u32::<0>(dst_ptr_1, vreinterpret_u32_u8(px_81));
 
-                    let dst_ptr_2 = unsafe_dst.slice.as_ptr().add(bytes_offset_2) as *mut u32;
+                    let dst_ptr_2 = unsafe_dst.get_ptr(bytes_offset_2) as *mut u32;
                     vst1_lane_u32::<0>(dst_ptr_2, vreinterpret_u32_u8(px_82));
 
-                    let dst_ptr_3 = unsafe_dst.slice.as_ptr().add(bytes_offset_3) as *mut u32;
+                    let dst_ptr_3 = unsafe_dst.get_ptr(bytes_offset_3) as *mut u32;
                     vst1_lane_u32::<0>(dst_ptr_3, vreinterpret_u32_u8(px_83));
                 } else {
-                    let dst_ptr_0 = unsafe_dst.slice.as_ptr().add(bytes_offset_0) as *mut u8;
+                    let dst_ptr_0 = unsafe_dst.get_ptr(bytes_offset_0);
                     vst1_lane_u16::<0>(dst_ptr_0 as *mut u16, vreinterpret_u16_u8(px_80));
                     vst1_lane_u8::<2>(dst_ptr_0.add(2), px_80);
 
-                    let dst_ptr_1 = unsafe_dst.slice.as_ptr().add(bytes_offset_1) as *mut u8;
+                    let dst_ptr_1 = unsafe_dst.get_ptr(bytes_offset_1);
                     vst1_lane_u16::<0>(dst_ptr_1 as *mut u16, vreinterpret_u16_u8(px_81));
                     vst1_lane_u8::<2>(dst_ptr_1.add(2), px_81);
 
-                    let dst_ptr_2 = unsafe_dst.slice.as_ptr().add(bytes_offset_2) as *mut u8;
+                    let dst_ptr_2 = unsafe_dst.get_ptr(bytes_offset_2);
                     vst1_lane_u16::<0>(dst_ptr_2 as *mut u16, vreinterpret_u16_u8(px_82));
                     vst1_lane_u8::<2>(dst_ptr_2.add(2), px_82);
 
-                    let dst_ptr_3 = unsafe_dst.slice.as_ptr().add(bytes_offset_3) as *mut u8;
+                    let dst_ptr_3 = unsafe_dst.get_ptr(bytes_offset_3);
                     vst1_lane_u16::<0>(dst_ptr_3 as *mut u16, vreinterpret_u16_u8(px_83));
                     vst1_lane_u8::<2>(dst_ptr_3.add(2), px_83);
                 }
@@ -394,7 +394,7 @@ fn box_blur_horizontal_pass_neon_impl_low_rad<const CN: usize>(
             let bytes_offset = y_dst_shift + px;
 
             unsafe {
-                let dst_ptr = unsafe_dst.slice.as_ptr().add(bytes_offset) as *mut u8;
+                let dst_ptr = unsafe_dst.get_ptr(bytes_offset);
                 store_u8_u32::<CN>(dst_ptr, scale_store);
             }
 
@@ -507,10 +507,10 @@ fn box_blur_horizontal_pass_neon_impl<const CN: usize>(
 
                 store_u8_s32_x4::<CN>(
                     (
-                        unsafe_dst.slice.as_ptr().add(bytes_offset_0) as *mut _,
-                        unsafe_dst.slice.as_ptr().add(bytes_offset_1) as *mut _,
-                        unsafe_dst.slice.as_ptr().add(bytes_offset_2) as *mut _,
-                        unsafe_dst.slice.as_ptr().add(bytes_offset_3) as *mut _,
+                        unsafe_dst.get_ptr(bytes_offset_0).cast(),
+                        unsafe_dst.get_ptr(bytes_offset_1).cast(),
+                        unsafe_dst.get_ptr(bytes_offset_2).cast(),
+                        unsafe_dst.get_ptr(bytes_offset_3).cast(),
                     ),
                     int32x4x4_t(
                         vreinterpretq_s32_u32(ss0),
@@ -609,7 +609,7 @@ fn box_blur_horizontal_pass_neon_impl<const CN: usize>(
 
             let bytes_offset = y_dst_shift + px;
             unsafe {
-                let dst_ptr = unsafe_dst.slice.as_ptr().add(bytes_offset) as *mut u8;
+                let dst_ptr = unsafe_dst.get_ptr(bytes_offset);
                 store_u8_u32::<CN>(dst_ptr, scale_store);
             }
 
@@ -863,7 +863,6 @@ fn box_blur_vertical_pass_neon_low_rad(
                         mul_set_v4(lw4, lw5, lw6, lw7, v_weight);
 
                     let offset = y_dst_shift + px;
-                    let ptr = unsafe_dst.slice.get_unchecked(offset).get();
                     let px_16_lo0 = vqmovn_u32(scale_store_0);
                     let px_16_hi0 = vqmovn_u32(scale_store_1);
                     let px_16_lo1 = vqmovn_u32(scale_store_2);
@@ -877,6 +876,8 @@ fn box_blur_vertical_pass_neon_low_rad(
                     let px1 = vqmovn_u16(vcombine_u16(px_16_lo1, px_16_hi2));
                     let px2 = vqmovn_u16(vcombine_u16(px_16_lo3, px_16_hi4));
                     let px3 = vqmovn_u16(vcombine_u16(px_16_lo5, px_16_hi6));
+
+                    let ptr = unsafe_dst.get_ptr(offset);
                     vst1q_u8(ptr, vcombine_u8(px0, px1));
                     vst1q_u8(ptr.add(16), vcombine_u8(px2, px3));
                 }
@@ -946,7 +947,6 @@ fn box_blur_vertical_pass_neon_low_rad(
                         mul_set_v4(lw0, lw1, lw2, lw3, v_weight);
 
                     let offset = y_dst_shift + px;
-                    let ptr = unsafe_dst.slice.get_unchecked(offset).get();
                     let px_16_lo0 = vqmovn_u32(scale_store_0);
                     let px_16_hi0 = vqmovn_u32(scale_store_1);
                     let px_16_lo1 = vqmovn_u32(scale_store_2);
@@ -954,6 +954,8 @@ fn box_blur_vertical_pass_neon_low_rad(
 
                     let px0 = vqmovn_u16(vcombine_u16(px_16_lo0, px_16_hi0));
                     let px1 = vqmovn_u16(vcombine_u16(px_16_lo1, px_16_hi2));
+
+                    let ptr = unsafe_dst.get_ptr(offset);
                     vst1q_u8(ptr, vcombine_u8(px0, px1));
                 }
 
@@ -1004,10 +1006,11 @@ fn box_blur_vertical_pass_neon_low_rad(
                     let scale_store_1 = vmulq_u32_f32(lw1, v_weight);
 
                     let offset = y_dst_shift + px;
-                    let ptr = unsafe_dst.slice.get_unchecked(offset).get();
                     let px_16_lo0 = vqmovn_u32(scale_store_0);
                     let px_16_hi0 = vqmovn_u32(scale_store_1);
                     let px0 = vqmovn_u16(vcombine_u16(px_16_lo0, px_16_hi0));
+
+                    let ptr = unsafe_dst.get_ptr(offset);
                     vst1_u8(ptr, px0);
                 }
 
@@ -1054,7 +1057,7 @@ fn box_blur_vertical_pass_neon_low_rad(
                     let scale_store = vmulq_u16_low_f32(store, v_weight);
 
                     let bytes_offset = y_dst_shift + px;
-                    let dst_ptr = unsafe_dst.slice.as_ptr().add(bytes_offset) as *mut u8;
+                    let dst_ptr = unsafe_dst.get_ptr(bytes_offset);
                     store_u8_u32::<TAIL_CN>(dst_ptr, scale_store);
                 }
 
@@ -1158,7 +1161,7 @@ fn box_blur_vertical_pass_neon_any(
             store_7 = vmull_high_u16(i16_h11, v_edge_count);
 
             for y in 1..=half_kernel.min(height) {
-                let y_src_shift = y as usize * src_stride as usize;
+                let y_src_shift = (y as usize).min(height as usize - 1) * src_stride as usize;
                 let s_ptr = src.as_ptr().add(y_src_shift + px);
 
                 let edge0 = vld1q_u8(s_ptr);
@@ -1244,7 +1247,7 @@ fn box_blur_vertical_pass_neon_any(
             store_3 = vmull_high_u16(i16_h1, v_edge_count);
 
             for y in 1..=half_kernel.min(height) {
-                let y_src_shift = y as usize * src_stride as usize;
+                let y_src_shift = (y as usize).min(height as usize - 1) * src_stride as usize;
                 let s_ptr = src.as_ptr().add(y_src_shift + px);
 
                 let edge0 = vld1q_u8(s_ptr);
@@ -1293,7 +1296,7 @@ fn box_blur_vertical_pass_neon_any(
             store_1 = vmull_high_u16(i16_h0, v_edge_count);
 
             for y in 1..=half_kernel.min(height) {
-                let y_src_shift = y as usize * src_stride as usize;
+                let y_src_shift = (y as usize).min(height as usize - 1) * src_stride as usize;
                 let s_ptr = src.as_ptr().add(y_src_shift + px);
 
                 let edge0 = vld1_u8(s_ptr);
@@ -1329,7 +1332,7 @@ fn box_blur_vertical_pass_neon_any(
             store_0 = vmull_u16(i16_l0, vget_low_u16(v_edge_count));
 
             for y in 1..=half_kernel.min(height) {
-                let y_src_shift = y as usize * src_stride as usize;
+                let y_src_shift = (y as usize).min(height as usize - 1) * src_stride as usize;
                 let s_ptr = src.as_ptr().add(y_src_shift + px);
 
                 let edge0 = vld1_lane_u8::<0>(s_ptr, vdup_n_u8(0));
@@ -1376,7 +1379,6 @@ fn box_blur_vertical_pass_neon_any(
                         mul_set_v4(store_4, store_5, store_6, store_7, v_weight);
 
                     let offset = y_dst_shift + px;
-                    let ptr = unsafe_dst.slice.get_unchecked(offset).get();
                     let px_16_lo0 = vqmovn_u32(scale_store_0);
                     let px_16_hi0 = vqmovn_u32(scale_store_1);
                     let px_16_lo1 = vqmovn_u32(scale_store_2);
@@ -1390,6 +1392,7 @@ fn box_blur_vertical_pass_neon_any(
                     let px2 = vqmovn_u16(vcombine_u16(px_16_lo3, px_16_hi4));
                     let px3 = vqmovn_u16(vcombine_u16(px_16_lo5, px_16_hi6));
 
+                    let ptr = unsafe_dst.get_ptr(offset);
                     vst1q_u8(ptr, vcombine_u8(px0, px1));
                     vst1q_u8(ptr.add(16), vcombine_u8(px2, px3));
                 }
@@ -1501,13 +1504,14 @@ fn box_blur_vertical_pass_neon_any(
                         mul_set_v4(store_0, store_1, store_2, store_3, v_weight);
 
                     let offset = y_dst_shift + px;
-                    let ptr = unsafe_dst.slice.get_unchecked(offset).get();
                     let px_16_lo0 = vqmovn_u32(scale_store_0);
                     let px_16_hi0 = vqmovn_u32(scale_store_1);
                     let px_16_lo1 = vqmovn_u32(scale_store_2);
                     let px_16_hi2 = vqmovn_u32(scale_store_3);
                     let px0 = vqmovn_u16(vcombine_u16(px_16_lo0, px_16_hi0));
                     let px1 = vqmovn_u16(vcombine_u16(px_16_lo1, px_16_hi2));
+
+                    let ptr = unsafe_dst.get_ptr(offset);
                     vst1q_u8(ptr, vcombine_u8(px0, px1));
                 }
 
@@ -1571,10 +1575,11 @@ fn box_blur_vertical_pass_neon_any(
                     let (scale_store_0, scale_store_1) = mul_set_v2(store_0, store_1, v_weight);
 
                     let offset = y_dst_shift + px;
-                    let ptr = unsafe_dst.slice.get_unchecked(offset).get();
                     let px_16_lo0 = vqmovn_u32(scale_store_0);
                     let px_16_hi0 = vqmovn_u32(scale_store_1);
                     let px0 = vqmovn_u16(vcombine_u16(px_16_lo0, px_16_hi0));
+
+                    let ptr = unsafe_dst.get_ptr(offset);
                     vst1_u8(ptr, px0);
                 }
 
@@ -1623,9 +1628,10 @@ fn box_blur_vertical_pass_neon_any(
                     let scale_store_0 = mul_set(store_0, v_weight);
 
                     let offset = y_dst_shift + px;
-                    let ptr = unsafe_dst.slice.get_unchecked(offset).get();
                     let px_16_lo0 = vqmovn_u32(scale_store_0);
                     let px0 = vqmovn_u16(vcombine_u16(px_16_lo0, vdup_n_u16(0)));
+
+                    let ptr = unsafe_dst.get_ptr(offset);
                     vst1_lane_u8::<0>(ptr, px0);
                 }
 

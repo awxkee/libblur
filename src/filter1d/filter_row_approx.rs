@@ -64,7 +64,7 @@ pub(crate) fn filter_row_approx<T, I, const N: usize>(
 
         let mut cx = 0usize;
 
-        while cx + 4 < max_width {
+        while cx + 4 <= max_width {
             let coeff = *scanned_kernel.get_unchecked(0);
             let shifted_src = local_src.get_unchecked(cx..);
             let mut k0 = shifted_src.get_unchecked(0).as_() * coeff.weight;

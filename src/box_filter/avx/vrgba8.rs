@@ -199,8 +199,6 @@ unsafe fn box_blur_vertical_pass_avx2_def(
                     let scale_store_7 = _mm256_cvtps_epi32(r7);
 
                     let offset = y_dst_shift + px;
-                    let ptr = unsafe_dst.slice.get_unchecked(offset).get();
-
                     let set0 = _mm256_packus_epi32(scale_store_0, scale_store_1);
                     let set1 = _mm256_packus_epi32(scale_store_2, scale_store_3);
                     let set2 = _mm256_packus_epi32(scale_store_4, scale_store_5);
@@ -208,7 +206,9 @@ unsafe fn box_blur_vertical_pass_avx2_def(
 
                     let full_set0 = _mm256_packus_epi16(set0, set1);
                     let full_set1 = _mm256_packus_epi16(set2, set3);
-                    _mm256_storeu_si256(ptr as *mut _, full_set0);
+
+                    let ptr = unsafe_dst.get_ptr(offset);
+                    _mm256_storeu_si256(ptr.cast(), full_set0);
                     _mm256_storeu_si256(ptr.add(32) as *mut _, full_set1);
                 }
 
@@ -360,13 +360,12 @@ unsafe fn box_blur_vertical_pass_avx2_def(
                     let scale_store_3 = _mm256_cvtps_epi32(r3);
 
                     let offset = y_dst_shift + px;
-                    let ptr = unsafe_dst.slice.get_unchecked(offset).get();
 
                     let set0 = _mm256_packus_epi32(scale_store_0, scale_store_1);
                     let set1 = _mm256_packus_epi32(scale_store_2, scale_store_3);
 
                     let full_set = _mm256_packus_epi16(set0, set1);
-                    _mm256_storeu_si256(ptr as *mut _, full_set);
+                    _mm256_storeu_si256(unsafe_dst.get_ptr(offset).cast(), full_set);
                 }
 
                 // subtract previous
@@ -491,13 +490,12 @@ unsafe fn box_blur_vertical_pass_avx2_def(
                     let scale_store_3 = _mm_cvtps_epi32(r3);
 
                     let offset = y_dst_shift + px;
-                    let ptr = unsafe_dst.slice.get_unchecked(offset).get();
 
                     let set0 = _mm_packus_epi32(scale_store_0, scale_store_1);
                     let set1 = _mm_packus_epi32(scale_store_2, scale_store_3);
 
                     let full_set = _mm_packus_epi16(set0, set1);
-                    _mm_storeu_si128(ptr as *mut _, full_set);
+                    _mm_storeu_si128(unsafe_dst.get_ptr(offset).cast(), full_set);
                 }
 
                 // subtract previous
@@ -599,12 +597,11 @@ unsafe fn box_blur_vertical_pass_avx2_def(
                     let scale_store_1 = _mm_cvtps_epi32(r1);
 
                     let offset = y_dst_shift + px;
-                    let ptr = unsafe_dst.slice.get_unchecked(offset).get();
 
                     let set0 = _mm_packus_epi32(scale_store_0, scale_store_1);
 
                     let full_set = _mm_packus_epi16(set0, _mm_setzero_si128());
-                    _mm_storeu_si64(ptr as *mut _, full_set);
+                    _mm_storeu_si64(unsafe_dst.get_ptr(offset).cast(), full_set);
                 }
 
                 // subtract previous
@@ -671,7 +668,7 @@ unsafe fn box_blur_vertical_pass_avx2_def(
 
             unsafe {
                 let r0 = _mm_mul_ps(_mm_cvtepi32_ps(store), v_weight);
-                let ptr = unsafe_dst.slice.as_ptr().add(y_dst_shift + px) as *mut u8;
+                let ptr = unsafe_dst.get_ptr(y_dst_shift + px);
                 store_u8_u32::<TAIL_CN>(ptr, _mm_cvtps_epi32(r0));
             }
 

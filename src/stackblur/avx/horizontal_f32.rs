@@ -83,18 +83,18 @@ fn horiz_f32_pass_stack_impl<const CN: usize>(
             let mut src_ptr2 = stride as usize * (cy + 2);
             let mut src_ptr3 = stride as usize * (cy + 3);
 
-            let src_pixel0 = load_f32::<CN>(pixels.slice.as_ptr().add(src_ptr0) as *const f32);
-            let src_pixel1 = load_f32::<CN>(pixels.slice.as_ptr().add(src_ptr1) as *const f32);
-            let src_pixel2 = load_f32::<CN>(pixels.slice.as_ptr().add(src_ptr2) as *const f32);
-            let src_pixel3 = load_f32::<CN>(pixels.slice.as_ptr().add(src_ptr3) as *const f32);
+            let src_pixel0 = load_f32::<CN>(pixels.get_ptr(src_ptr0));
+            let src_pixel1 = load_f32::<CN>(pixels.get_ptr(src_ptr1));
+            let src_pixel2 = load_f32::<CN>(pixels.get_ptr(src_ptr2));
+            let src_pixel3 = load_f32::<CN>(pixels.get_ptr(src_ptr3));
 
             let x0 = _mm256_setr_m128(src_pixel0, src_pixel1);
             let x1 = _mm256_setr_m128(src_pixel2, src_pixel3);
 
             for i in 0..=radius {
-                let stack_value = stacks.as_mut_ptr().add(i as usize * 2);
-                _mm256_store_ps(stack_value.cast(), x0);
-                _mm256_store_ps(stack_value.add(1).cast(), x1);
+                let stack_value = stacks.get_unchecked_mut(i as usize * 2..);
+                _mm256_store_ps(stack_value.as_mut_ptr().cast(), x0);
+                _mm256_store_ps(stack_value.get_unchecked_mut(1..).as_mut_ptr().cast(), x1);
                 let w = _mm256_set1_ps((i + 1) as f32);
                 sums0 = _mm256_fmadd_ps(x0, w, sums0);
                 sums1 = _mm256_fmadd_ps(x1, w, sums1);
@@ -109,17 +109,17 @@ fn horiz_f32_pass_stack_impl<const CN: usize>(
                     src_ptr2 += CN;
                     src_ptr3 += CN;
                 }
-                let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 2);
-                let src_pixel0 = load_f32::<CN>(pixels.slice.as_ptr().add(src_ptr0) as *const f32);
-                let src_pixel1 = load_f32::<CN>(pixels.slice.as_ptr().add(src_ptr1) as *const f32);
-                let src_pixel2 = load_f32::<CN>(pixels.slice.as_ptr().add(src_ptr2) as *const f32);
-                let src_pixel3 = load_f32::<CN>(pixels.slice.as_ptr().add(src_ptr3) as *const f32);
+                let stack_ptr = stacks.get_unchecked_mut((i + radius) as usize * 2..);
+                let src_pixel0 = load_f32::<CN>(pixels.get_ptr(src_ptr0));
+                let src_pixel1 = load_f32::<CN>(pixels.get_ptr(src_ptr1));
+                let src_pixel2 = load_f32::<CN>(pixels.get_ptr(src_ptr2));
+                let src_pixel3 = load_f32::<CN>(pixels.get_ptr(src_ptr3));
 
                 let x0 = _mm256_setr_m128(src_pixel0, src_pixel1);
                 let x1 = _mm256_setr_m128(src_pixel2, src_pixel3);
 
-                _mm256_store_ps(stack_ptr.cast(), x0);
-                _mm256_store_ps(stack_ptr.add(1).cast(), x1);
+                _mm256_store_ps(stack_ptr.as_mut_ptr().cast(), x0);
+                _mm256_store_ps(stack_ptr.get_unchecked_mut(1..).as_mut_ptr().cast(), x1);
 
                 let w = _mm256_set1_ps((radius + 1 - i) as f32);
                 sums0 = _mm256_fmadd_ps(x0, w, sums0);
@@ -144,18 +144,13 @@ fn horiz_f32_pass_stack_impl<const CN: usize>(
             let mut dst_ptr2 = (cy + 2) * stride as usize;
             let mut dst_ptr3 = (cy + 3) * stride as usize;
             for _ in 0..width {
-                let store_ld0 = pixels.slice.as_ptr().add(dst_ptr0) as *mut f32;
-                let store_ld1 = pixels.slice.as_ptr().add(dst_ptr1) as *mut f32;
-                let store_ld2 = pixels.slice.as_ptr().add(dst_ptr2) as *mut f32;
-                let store_ld3 = pixels.slice.as_ptr().add(dst_ptr3) as *mut f32;
-
                 let bx0 = _mm256_mul_ps(sums0, v_mul_value);
                 let bx1 = _mm256_mul_ps(sums1, v_mul_value);
 
-                store_f32::<CN>(store_ld0, _mm256_castps256_ps128(bx0));
-                store_f32::<CN>(store_ld1, _mm256_extractf128_ps::<1>(bx0));
-                store_f32::<CN>(store_ld2, _mm256_castps256_ps128(bx1));
-                store_f32::<CN>(store_ld3, _mm256_extractf128_ps::<1>(bx1));
+                store_f32::<CN>(pixels.get_ptr(dst_ptr0), _mm256_castps256_ps128(bx0));
+                store_f32::<CN>(pixels.get_ptr(dst_ptr1), _mm256_extractf128_ps::<1>(bx0));
+                store_f32::<CN>(pixels.get_ptr(dst_ptr2), _mm256_castps256_ps128(bx1));
+                store_f32::<CN>(pixels.get_ptr(dst_ptr3), _mm256_extractf128_ps::<1>(bx1));
 
                 dst_ptr0 += CN;
                 dst_ptr1 += CN;
@@ -169,10 +164,10 @@ fn horiz_f32_pass_stack_impl<const CN: usize>(
                 if stack_start >= div {
                     stack_start -= div;
                 }
-                let stack = stacks.as_mut_ptr().add(stack_start as usize * 2);
+                let stack = stacks.get_unchecked_mut(stack_start as usize * 2..);
 
-                let stack_val0 = _mm256_load_ps(stack.cast());
-                let stack_val1 = _mm256_load_ps(stack.add(1).cast());
+                let stack_val0 = _mm256_load_ps(stack.as_mut_ptr().cast());
+                let stack_val1 = _mm256_load_ps(stack.get_unchecked_mut(1..).as_mut_ptr().cast());
 
                 sum_out0 = _mm256_sub_ps(sum_out0, stack_val0);
                 sum_out1 = _mm256_sub_ps(sum_out1, stack_val1);
@@ -185,16 +180,16 @@ fn horiz_f32_pass_stack_impl<const CN: usize>(
                     xp += 1;
                 }
 
-                let src_pixel0 = load_f32::<CN>(pixels.slice.as_ptr().add(src_ptr0) as *const f32);
-                let src_pixel1 = load_f32::<CN>(pixels.slice.as_ptr().add(src_ptr1) as *const f32);
-                let src_pixel2 = load_f32::<CN>(pixels.slice.as_ptr().add(src_ptr2) as *const f32);
-                let src_pixel3 = load_f32::<CN>(pixels.slice.as_ptr().add(src_ptr3) as *const f32);
+                let src_pixel0 = load_f32::<CN>(pixels.get_ptr(src_ptr0).cast());
+                let src_pixel1 = load_f32::<CN>(pixels.get_ptr(src_ptr1).cast());
+                let src_pixel2 = load_f32::<CN>(pixels.get_ptr(src_ptr2).cast());
+                let src_pixel3 = load_f32::<CN>(pixels.get_ptr(src_ptr3).cast());
 
                 let x0 = _mm256_setr_m128(src_pixel0, src_pixel1);
                 let x1 = _mm256_setr_m128(src_pixel2, src_pixel3);
 
-                _mm256_store_ps(stack.cast(), x0);
-                _mm256_store_ps(stack.add(1).cast(), x1);
+                _mm256_store_ps(stack.as_mut_ptr().cast(), x0);
+                _mm256_store_ps(stack.get_unchecked_mut(1..).as_mut_ptr().cast(), x1);
 
                 sum_in0 = _mm256_add_ps(sum_in0, x0);
                 sum_in1 = _mm256_add_ps(sum_in1, x1);
@@ -206,9 +201,9 @@ fn horiz_f32_pass_stack_impl<const CN: usize>(
                 if sp >= div {
                     sp = 0;
                 }
-                let stack = stacks.as_mut_ptr().add(sp as usize * 2);
-                let stack_val0 = _mm256_load_ps(stack.cast());
-                let stack_val1 = _mm256_load_ps(stack.add(1).cast());
+                let stack = stacks.get_unchecked(sp as usize * 2..);
+                let stack_val0 = _mm256_load_ps(stack.as_ptr().cast());
+                let stack_val1 = _mm256_load_ps(stack.get_unchecked(1..).as_ptr().cast());
 
                 sum_out0 = _mm256_add_ps(sum_out0, stack_val0);
                 sum_out1 = _mm256_add_ps(sum_out1, stack_val1);
@@ -231,12 +226,11 @@ fn horiz_f32_pass_stack_impl<const CN: usize>(
 
             src_ptr = stride as usize * y;
 
-            let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f32;
-            let src_pixel = load_f32::<CN>(src_ld);
+            let src_pixel = load_f32::<CN>(pixels.get_ptr(src_ptr));
 
             for i in 0..=radius {
-                let stack_value = stacks.as_mut_ptr().add(i as usize);
-                _mm_store_ps(stack_value.cast(), src_pixel);
+                let stack_value = stacks.get_unchecked_mut(i as usize..);
+                _mm_store_ps(stack_value.as_mut_ptr().cast(), src_pixel);
                 sums = _mm_fmadd_ps(src_pixel, _mm_set1_ps((i + 1) as f32), sums);
                 sum_out = _mm_add_ps(sum_out, src_pixel);
             }
@@ -245,10 +239,10 @@ fn horiz_f32_pass_stack_impl<const CN: usize>(
                 if i <= wm {
                     src_ptr += CN;
                 }
-                let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize);
-                let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f32;
+                let stack_ptr = stacks.get_unchecked_mut((i + radius) as usize..);
+                let src_ld = pixels.get_ptr(src_ptr) as *const f32;
                 let src_pixel = load_f32::<CN>(src_ld);
-                _mm_store_ps(stack_ptr.cast(), src_pixel);
+                _mm_store_ps(stack_ptr.as_mut_ptr().cast(), src_pixel);
                 sums = _mm_fmadd_ps(src_pixel, _mm_set1_ps((radius + 1 - i) as f32), sums);
 
                 sum_in = _mm_add_ps(sum_in, src_pixel);
@@ -263,9 +257,8 @@ fn horiz_f32_pass_stack_impl<const CN: usize>(
             src_ptr = CN * xp as usize + y * stride as usize;
             dst_ptr = y * stride as usize;
             for _ in 0..width {
-                let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut f32;
                 let blurred = _mm_mul_ps(sums, v_mul_value);
-                store_f32::<CN>(store_ld, blurred);
+                store_f32::<CN>(pixels.get_ptr(dst_ptr), blurred);
                 dst_ptr += CN;
 
                 sums = _mm_sub_ps(sums, sum_out);
@@ -274,9 +267,9 @@ fn horiz_f32_pass_stack_impl<const CN: usize>(
                 if stack_start >= div {
                     stack_start -= div;
                 }
-                let stack = stacks.as_mut_ptr().add(stack_start as usize);
+                let stack = stacks.get_unchecked_mut(stack_start as usize..);
 
-                let stack_val = _mm_load_ps(stack.cast());
+                let stack_val = _mm_load_ps(stack.as_mut_ptr().cast());
 
                 sum_out = _mm_sub_ps(sum_out, stack_val);
 
@@ -285,9 +278,8 @@ fn horiz_f32_pass_stack_impl<const CN: usize>(
                     xp += 1;
                 }
 
-                let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f32;
-                let src_pixel = load_f32::<CN>(src_ld);
-                _mm_store_ps(stack.cast(), src_pixel);
+                let src_pixel = load_f32::<CN>(pixels.get_ptr(src_ptr));
+                _mm_store_ps(stack.as_mut_ptr().cast(), src_pixel);
 
                 sum_in = _mm_add_ps(sum_in, src_pixel);
                 sums = _mm_add_ps(sums, sum_in);
@@ -296,8 +288,8 @@ fn horiz_f32_pass_stack_impl<const CN: usize>(
                 if sp >= div {
                     sp = 0;
                 }
-                let stack = stacks.as_mut_ptr().add(sp as usize);
-                let stack_val = _mm_load_ps(stack.cast());
+                let stack = stacks.get_unchecked(sp as usize..);
+                let stack_val = _mm_load_ps(stack.as_ptr().cast());
 
                 sum_out = _mm_add_ps(sum_out, stack_val);
                 sum_in = _mm_sub_ps(sum_in, stack_val);

@@ -71,7 +71,7 @@ unsafe fn filter_avx_row_complex_f32_f32_impl(
         let c_re = _mm256_set1_ps(kernel.get_unchecked(0).re);
         let c_im = _mm256_set1_ps(kernel.get_unchecked(0).im);
 
-        while cx + 16 < max_width {
+        while cx + 16 <= max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let a0 = _mm256_loadu_ps(shifted_src.as_ptr().cast());
@@ -132,7 +132,7 @@ unsafe fn filter_avx_row_complex_f32_f32_impl(
             cx += 16;
         }
 
-        while cx + 8 < max_width {
+        while cx + 8 <= max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let a0 = _mm256_loadu_ps(shifted_src.as_ptr().cast());
@@ -172,7 +172,7 @@ unsafe fn filter_avx_row_complex_f32_f32_impl(
             cx += 8;
         }
 
-        while cx + 4 < max_width {
+        while cx + 4 <= max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let a0 = _mm_loadu_ps(shifted_src.as_ptr().cast());

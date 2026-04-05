@@ -52,7 +52,7 @@ use core::f16;
 #[allow(dead_code, unused)]
 #[derive(Clone, Debug)]
 pub struct FilterBrows<'a, T> {
-    pub(crate) brows: Vec<&'a [&'a [T]]>,
+    pub(crate) brows: [&'a [&'a [T]]; 3],
 }
 
 pub trait Filter1DColumnHandlerMultipleRows<T, F> {

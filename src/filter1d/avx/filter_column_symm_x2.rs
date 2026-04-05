@@ -135,7 +135,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
 
             let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
 
-            while cx + 32 < image_width {
+            while cx + 32 <= image_width {
                 let shifted_src0 = ref0.get_unchecked(cx..);
                 let shifted_src1 = ref1.get_unchecked(cx..);
 
@@ -185,7 +185,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
                 cx += 32;
             }
 
-            while cx + 16 < image_width {
+            while cx + 16 <= image_width {
                 let shifted_src0 = ref0.get_unchecked(cx..);
                 let shifted_src1 = ref1.get_unchecked(cx..);
 
@@ -235,7 +235,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
                 cx += 16;
             }
 
-            while cx + 4 < image_width {
+            while cx + 4 <= image_width {
                 let shifted_src0 = ref0.get_unchecked(cx..);
                 let shifted_src1 = ref1.get_unchecked(cx..);
 

@@ -60,7 +60,7 @@ pub(crate) fn filter_row<T, F, const N: usize>(
 
         let max_width = width * N;
 
-        while cx + 4 < max_width {
+        while cx + 4 <= max_width {
             let coeff = *scanned_kernel.get_unchecked(0);
 
             let shifted_src = local_src.get_unchecked(cx..);

@@ -89,7 +89,7 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
         &self,
         src: &[f32],
         src_stride: u32,
-        unsafe_dst: &UnsafeSlice<f32>,
+        dst: &UnsafeSlice<f32>,
         dst_stride: u32,
         width: u32,
         radius: u32,
@@ -156,7 +156,7 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
             for x in 0..width {
                 let px = x as usize * CN;
 
-                unsafe {
+                {
                     let r0 = _mm256_mul_ps(store_0, v_weight);
                     let r1 = _mm256_mul_ps(store_1, v_weight);
                     let r2 = _mm256_mul_ps(store_2, v_weight);
@@ -168,27 +168,27 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
                     let bytes_offset_4 = y_dst_shift + dst_stride as usize * 4 + px;
                     let bytes_offset_5 = y_dst_shift + dst_stride as usize * 5 + px;
                     store_f32::<CN>(
-                        unsafe_dst.slice.as_ptr().add(bytes_offset_0) as *mut _,
+                        dst.get_ptr(bytes_offset_0) as *mut _,
                         _mm256_castps256_ps128(r0),
                     );
                     store_f32::<CN>(
-                        unsafe_dst.slice.as_ptr().add(bytes_offset_1) as *mut _,
+                        dst.get_ptr(bytes_offset_1) as *mut _,
                         _mm256_extractf128_ps::<1>(r0),
                     );
                     store_f32::<CN>(
-                        unsafe_dst.slice.as_ptr().add(bytes_offset_2) as *mut _,
+                        dst.get_ptr(bytes_offset_2) as *mut _,
                         _mm256_castps256_ps128(r1),
                     );
                     store_f32::<CN>(
-                        unsafe_dst.slice.as_ptr().add(bytes_offset_3) as *mut _,
+                        dst.get_ptr(bytes_offset_3) as *mut _,
                         _mm256_extractf128_ps::<1>(r1),
                     );
                     store_f32::<CN>(
-                        unsafe_dst.slice.as_ptr().add(bytes_offset_4) as *mut _,
+                        dst.get_ptr(bytes_offset_4) as *mut _,
                         _mm256_castps256_ps128(r2),
                     );
                     store_f32::<CN>(
-                        unsafe_dst.slice.as_ptr().add(bytes_offset_5) as *mut _,
+                        dst.get_ptr(bytes_offset_5) as *mut _,
                         _mm256_extractf128_ps::<1>(r2),
                     );
                 }
@@ -282,10 +282,10 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
             for x in 0..width {
                 let px = x as usize * CN;
 
-                unsafe {
+                {
                     let r0 = _mm_mul_ps(store, _mm256_castps256_ps128(v_weight));
                     let bytes_offset = y_dst_shift + px;
-                    let ptr = unsafe_dst.slice.as_ptr().add(bytes_offset) as *mut f32;
+                    let ptr = dst.get_ptr(bytes_offset);
                     store_f32::<CN>(ptr, r0);
                 }
 

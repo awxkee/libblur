@@ -45,7 +45,7 @@ pub(crate) fn gather_channel<'a, T: Copy + Default + Debug, const CN: usize>(
             .as_ref()
             .chunks_exact(image.row_stride() as usize),
     ) {
-        for (dst, src) in dst.iter_mut().zip(src.chunks_exact(CN)) {
+        for (dst, src) in dst.iter_mut().zip(src.as_chunks::<CN>().0.iter()) {
             *dst = src[order];
         }
     }
@@ -64,7 +64,7 @@ pub fn squash_channel<T: Copy + Default + Debug, const CN: usize>(
             .as_ref()
             .chunks_exact(source.row_stride() as usize),
     ) {
-        for (dst, src) in dst.chunks_exact_mut(CN).zip(src.iter()) {
+        for (dst, src) in dst.as_chunks_mut::<CN>().0.iter_mut().zip(src.iter()) {
             dst[order] = *src;
         }
     }

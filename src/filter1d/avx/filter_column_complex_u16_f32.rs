@@ -49,7 +49,7 @@ pub(crate) fn filter_avx_column_complex_u16_f32(
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn filter_avx_column_complex_u16_f32_impl(
+fn filter_avx_column_complex_u16_f32_impl(
     arena: Arena,
     arena_src: &[&[Complex<f32>]],
     dst: &mut [u16],
@@ -76,7 +76,7 @@ unsafe fn filter_avx_column_complex_u16_f32_impl(
             1, 0,
         );
 
-        while cx + 16 < full_width {
+        while cx + 16 <= full_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let values0 = _mm256_loadu_ps(v_src.as_ptr().cast());
@@ -136,7 +136,7 @@ unsafe fn filter_avx_column_complex_u16_f32_impl(
             cx += 16;
         }
 
-        while cx + 8 < full_width {
+        while cx + 8 <= full_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let values0 = _mm_loadu_ps(v_src.as_ptr().cast());
@@ -199,7 +199,7 @@ unsafe fn filter_avx_column_complex_u16_f32_impl(
             cx += 8;
         }
 
-        while cx + 4 < full_width {
+        while cx + 4 <= full_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let values0 = _mm_loadu_ps(v_src.as_ptr().cast());

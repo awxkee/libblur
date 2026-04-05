@@ -2,9 +2,9 @@
 
 There are some very good and blazing fast algorithms that do blurring images.
 Also providing convenient api for doing convolution and some edge detection filters.\
-Best optimized for NEON, SSE and AVX, partially done WASM.
+Best optimized for NEON, SSE and AVX, SVE, partially done WASM.
 
-You may receive gaussian blur in 100 FPS for 4K photo.
+You may receive Gaussian blur in 100 FPS for 4K photo.
 
 Much faster than `image` default blur.
 

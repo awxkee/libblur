@@ -193,19 +193,30 @@ fn box_blur_horizontal_pass_impl<const CN: usize>(
                 let bytes_offset_4 = y_dst_shift + dst_stride as usize * 4 + px;
                 let bytes_offset_5 = y_dst_shift + dst_stride as usize * 5 + px;
 
-                let dst_ptr_0 = unsafe_dst.slice.as_ptr().add(bytes_offset_0) as *mut u8;
-                let dst_ptr_1 = unsafe_dst.slice.as_ptr().add(bytes_offset_1) as *mut u8;
-                let dst_ptr_2 = unsafe_dst.slice.as_ptr().add(bytes_offset_2) as *mut u8;
-                let dst_ptr_3 = unsafe_dst.slice.as_ptr().add(bytes_offset_3) as *mut u8;
-                let dst_ptr_4 = unsafe_dst.slice.as_ptr().add(bytes_offset_4) as *mut u8;
-                let dst_ptr_5 = unsafe_dst.slice.as_ptr().add(bytes_offset_5) as *mut u8;
-
-                write_u8::<CN>(dst_ptr_0, _mm256_castsi256_si128(px_80));
-                write_u8::<CN>(dst_ptr_1, _mm256_extracti128_si256::<1>(px_80));
-                write_u8::<CN>(dst_ptr_2, _mm256_castsi256_si128(px_81));
-                write_u8::<CN>(dst_ptr_3, _mm256_extracti128_si256::<1>(px_81));
-                write_u8::<CN>(dst_ptr_4, _mm256_castsi256_si128(px_82));
-                write_u8::<CN>(dst_ptr_5, _mm256_extracti128_si256::<1>(px_82));
+                write_u8::<CN>(
+                    unsafe_dst.get_ptr(bytes_offset_0),
+                    _mm256_castsi256_si128(px_80),
+                );
+                write_u8::<CN>(
+                    unsafe_dst.get_ptr(bytes_offset_1),
+                    _mm256_extracti128_si256::<1>(px_80),
+                );
+                write_u8::<CN>(
+                    unsafe_dst.get_ptr(bytes_offset_2),
+                    _mm256_castsi256_si128(px_81),
+                );
+                write_u8::<CN>(
+                    unsafe_dst.get_ptr(bytes_offset_3),
+                    _mm256_extracti128_si256::<1>(px_81),
+                );
+                write_u8::<CN>(
+                    unsafe_dst.get_ptr(bytes_offset_4),
+                    _mm256_castsi256_si128(px_82),
+                );
+                write_u8::<CN>(
+                    unsafe_dst.get_ptr(bytes_offset_5),
+                    _mm256_extracti128_si256::<1>(px_82),
+                );
             }
 
             // subtract previous
@@ -300,7 +311,7 @@ fn box_blur_horizontal_pass_impl<const CN: usize>(
             unsafe {
                 let r0 = _mm_mul_ps(_mm_cvtepi32_ps(store), _mm256_castps256_ps128(v_weight));
                 let bytes_offset = y_dst_shift + px;
-                let ptr = unsafe_dst.slice.as_ptr().add(bytes_offset) as *mut u8;
+                let ptr = unsafe_dst.get_ptr(bytes_offset);
                 store_u8_u32::<CN>(ptr, _mm_cvtps_epi32(r0));
             }
 

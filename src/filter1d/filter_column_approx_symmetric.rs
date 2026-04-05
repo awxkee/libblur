@@ -63,7 +63,7 @@ pub(crate) fn filter_column_symmetric_approx<T, I>(
 
         let coeff = scanned_kernel[half_len];
 
-        while cx + 32 < dst_stride {
+        while cx + 32 <= dst_stride {
             let mut store: [I; 32] = [I::default(); 32];
 
             let v_src = &ref0[cx..(cx + 32)];
@@ -89,7 +89,7 @@ pub(crate) fn filter_column_symmetric_approx<T, I>(
             cx += 32;
         }
 
-        while cx + 16 < dst_stride {
+        while cx + 16 <= dst_stride {
             let mut store: [I; 16] = [I::default(); 16];
 
             let v_src = &ref0[cx..(cx + 16)];
@@ -115,7 +115,7 @@ pub(crate) fn filter_column_symmetric_approx<T, I>(
             cx += 16;
         }
 
-        while cx + 4 < dst_stride {
+        while cx + 4 <= dst_stride {
             let v_src = &ref0[cx..(cx + 4)];
 
             let mut k0 = v_src[0].as_().mul(coeff);

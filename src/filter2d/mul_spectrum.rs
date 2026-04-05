@@ -150,7 +150,7 @@ fn mul_spectrum_in_place_impl<V: FftNumber>(
 
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 #[target_feature(enable = "sse4.1")]
-unsafe fn mul_spectrum_in_place_sse_4_1<V: FftNumber>(
+fn mul_spectrum_in_place_sse_4_1<V: FftNumber>(
     value1: &mut [Complex<V>],
     other: &[Complex<V>],
     width: usize,
@@ -164,7 +164,7 @@ unsafe fn mul_spectrum_in_place_sse_4_1<V: FftNumber>(
 
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "avx"))]
 #[target_feature(enable = "avx2")]
-unsafe fn mul_spectrum_in_place_avx2<V: FftNumber>(
+fn mul_spectrum_in_place_avx2<V: FftNumber>(
     value1: &mut [Complex<V>],
     other: &[Complex<V>],
     width: usize,

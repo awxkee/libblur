@@ -122,7 +122,7 @@ unsafe fn filter_avx_column_complex_u8_f32_impl(
 
         let shuf_table = _mm_set_epi8(29, 28, 25, 24, 21, 20, 17, 16, 13, 12, 9, 8, 5, 4, 1, 0);
 
-        while cx + 16 < full_width {
+        while cx + 16 <= full_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let values0 = _mm256_loadu_ps(v_src.as_ptr().cast());
@@ -182,7 +182,7 @@ unsafe fn filter_avx_column_complex_u8_f32_impl(
         let c_real = _mm256_castps256_ps128(c_real);
         let c_img = _mm256_castps256_ps128(c_img);
 
-        while cx + 8 < full_width {
+        while cx + 8 <= full_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let values0 = _mm_loadu_ps(v_src.as_ptr().cast());
@@ -228,7 +228,7 @@ unsafe fn filter_avx_column_complex_u8_f32_impl(
             cx += 8;
         }
 
-        while cx + 4 < full_width {
+        while cx + 4 <= full_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let values0 = _mm_loadu_ps(v_src.as_ptr().cast());

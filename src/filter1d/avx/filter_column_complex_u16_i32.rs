@@ -134,7 +134,7 @@ fn filter_avx_column_complex_u16_i32_impl(
 
         let pack_even = _mm256_setr_epi32(0, 2, 4, 6, -1, -1, -1, -1);
 
-        while cx + 16 < full_width {
+        while cx + 16 <= full_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let values0 = _mm256_loadu_si256(v_src.as_ptr().cast());
@@ -184,7 +184,7 @@ fn filter_avx_column_complex_u16_i32_impl(
             cx += 16;
         }
 
-        while cx + 8 < full_width {
+        while cx + 8 <= full_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let values0 = _mm256_loadu_si256(v_src.as_ptr().cast());
@@ -228,7 +228,7 @@ fn filter_avx_column_complex_u16_i32_impl(
 
         let shuf_table = _mm_set_epi8(29, 28, 25, 24, 21, 20, 17, 16, 13, 12, 9, 8, 5, 4, 1, 0);
 
-        while cx + 4 < full_width {
+        while cx + 4 <= full_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let values0 = _mm_loadu_si128(v_src.as_ptr().cast());

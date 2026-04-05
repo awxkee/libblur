@@ -114,7 +114,7 @@ fn filter_avx_row_complex_u8_i32_impl(
 
         let rnd = _mm256_set1_epi32(1 << 14);
 
-        while cx + 16 < max_width {
+        while cx + 16 <= max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             const M: i32 = shuffle(3, 1, 2, 0);
@@ -174,7 +174,7 @@ fn filter_avx_row_complex_u8_i32_impl(
         let c_re = _mm256_castsi256_si128(c_re);
         let c_im = _mm256_castsi256_si128(c_im);
 
-        while cx + 8 < max_width {
+        while cx + 8 <= max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let values = _mm_loadu_si64(shifted_src.as_ptr().cast());
@@ -233,7 +233,7 @@ fn filter_avx_row_complex_u8_i32_impl(
             cx += 8;
         }
 
-        while cx + 4 < max_width {
+        while cx + 4 <= max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let values = _mm_loadu_si32(shifted_src.as_ptr().cast());

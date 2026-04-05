@@ -467,7 +467,7 @@ pub(crate) unsafe fn store_u16x4<const CN: usize>(dst_ptr: *mut u16, a0: uint16x
 }
 
 #[inline(always)]
-pub unsafe fn store_u16_s32_x4<const CN: usize>(
+pub(crate) unsafe fn store_u16_s32_x4<const CN: usize>(
     dst_ptr: (*mut u16, *mut u16, *mut u16, *mut u16),
     regi: int32x4x4_t,
 ) {

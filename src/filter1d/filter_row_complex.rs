@@ -58,7 +58,7 @@ pub(crate) fn filter_row_complex<T, F>(
 
         let coeff = *kernel.get_unchecked(0);
 
-        while cx + 4 < max_width {
+        while cx + 4 <= max_width {
             let s_src = local_src.get_unchecked(cx..);
 
             let mut k0 = coeff * ((*s_src.get_unchecked(0)).as_());
