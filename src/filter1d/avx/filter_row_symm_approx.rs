@@ -94,7 +94,7 @@ fn filter_row_avx_symm_u8_i32_impl<const N: usize>(
 
         let coeff = _mm256_set1_epi32(*v_prepared.get_unchecked(half_len));
 
-        while cx + 64 < max_width {
+        while cx + 64 <= max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source = _mm256_load_pack_x2(shifted_src.get_unchecked(half_len * N..).as_ptr());
@@ -119,7 +119,7 @@ fn filter_row_avx_symm_u8_i32_impl<const N: usize>(
             cx += 64;
         }
 
-        while cx + 32 < max_width {
+        while cx + 32 <= max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source =
@@ -142,7 +142,7 @@ fn filter_row_avx_symm_u8_i32_impl<const N: usize>(
             cx += 32;
         }
 
-        while cx + 16 < max_width {
+        while cx + 16 <= max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source =
@@ -165,7 +165,7 @@ fn filter_row_avx_symm_u8_i32_impl<const N: usize>(
             cx += 16;
         }
 
-        while cx + 8 < max_width {
+        while cx + 8 <= max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source =
@@ -188,7 +188,7 @@ fn filter_row_avx_symm_u8_i32_impl<const N: usize>(
             cx += 8;
         }
 
-        while cx + 4 < max_width {
+        while cx + 4 <= max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source =

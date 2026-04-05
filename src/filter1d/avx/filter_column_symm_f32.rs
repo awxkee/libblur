@@ -136,7 +136,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
 
             let mut cx = 0usize;
 
-            while cx + 32 < dst_stride {
+            while cx + 32 <= dst_stride {
                 let v_src = ref0.get_unchecked(cx..);
 
                 let source = _mm256_load_pack_ps_x4(v_src.as_ptr());
@@ -220,7 +220,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
                 cx += 16;
             }
 
-            while cx + 8 < dst_stride {
+            while cx + 8 <= dst_stride {
                 let v_src = ref0.get_unchecked(cx..);
 
                 let source = _mm256_loadu_ps(v_src.as_ptr());
@@ -246,7 +246,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
                 cx += 8;
             }
 
-            while cx + 4 < dst_stride {
+            while cx + 4 <= dst_stride {
                 let v_src = ref0.get_unchecked(cx..);
 
                 let source_0 = _mm_loadu_ps(v_src.as_ptr());

@@ -71,7 +71,7 @@ pub(crate) fn filter_column_avx_f32_f32(
 }
 
 #[target_feature(enable = "avx2", enable = "fma")]
-unsafe fn filter_column_avx_f32_f32_impl_fma(
+fn filter_column_avx_f32_f32_impl_fma(
     arena: Arena,
     arena_src: &[&[f32]],
     dst: &mut [f32],
@@ -133,7 +133,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
 
             let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(0).weight);
 
-            while cx + 32 < dst_stride {
+            while cx + 32 <= dst_stride {
                 let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
                 let source = _mm256_load_pack_ps_x4(v_src.as_ptr());
@@ -158,7 +158,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
                 cx += 32;
             }
 
-            while cx + 16 < dst_stride {
+            while cx + 16 <= dst_stride {
                 let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
                 let source = _mm256_load_pack_ps_x2(v_src.as_ptr());
@@ -198,7 +198,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
                 cx += 8;
             }
 
-            while cx + 4 < dst_stride {
+            while cx + 4 <= dst_stride {
                 let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
                 let source_0 = _mm_loadu_ps(v_src.as_ptr());
