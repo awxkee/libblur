@@ -142,42 +142,38 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
                 let source0 = _mm256_loadu_si256(shifted_src0.as_ptr() as *const __m256i);
                 let source1 = _mm256_loadu_si256(shifted_src1.as_ptr() as *const __m256i);
 
-                let mut cached_fwd = _mm256_loadu_si256(
-                    brows0.get_unchecked(0).get_unchecked(cx..).as_ptr() as *const __m256i
-                ); // y
-                let mut cached_rev = _mm256_loadu_si256(
-                    brows1.get_unchecked(length - 1).get_unchecked(cx..).as_ptr() as *const __m256i
-                ); // y + length
-
                 let mut k0 = _mm256_mul_epi8_by_ps_x4::<FMA>(source0, coeff);
                 let mut k1 = _mm256_mul_epi8_by_ps_x4::<FMA>(source1, coeff);
 
                 for i in 0..half_len {
                     let rollback = length - i - 1;
                     let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(i).weight);
-
-                    let v_source0_1 = _mm256_loadu_si256(
-                        brows1.get_unchecked(i).get_unchecked(cx..).as_ptr() as *const __m256i
-                    ); // y + 1
+                    let v_source0_0 = _mm256_loadu_si256(
+                        brows0.get_unchecked(i).get_unchecked(cx..).as_ptr() as *const __m256i,
+                    );
                     let v_source1_0 = _mm256_loadu_si256(
-                        brows0.get_unchecked(rollback).get_unchecked(cx..).as_ptr() as *const __m256i
-                    ); // y + length - 1
-
+                        brows0.get_unchecked(rollback).get_unchecked(cx..).as_ptr()
+                            as *const __m256i,
+                    );
+                    let v_source0_1 = _mm256_loadu_si256(
+                        brows1.get_unchecked(i).get_unchecked(cx..).as_ptr() as *const __m256i,
+                    );
+                    let v_source1_1 = _mm256_loadu_si256(
+                        brows1.get_unchecked(rollback).get_unchecked(cx..).as_ptr()
+                            as *const __m256i,
+                    );
                     k0 = _mm256_mul_add_symm_epi8_by_ps_x4::<FMA>(
                         k0,
-                        cached_fwd,
+                        v_source0_0,
                         v_source1_0,
                         coeff,
                     );
                     k1 = _mm256_mul_add_symm_epi8_by_ps_x4::<FMA>(
                         k1,
                         v_source0_1,
-                        cached_rev,
+                        v_source1_1,
                         coeff,
                     );
-
-                    cached_fwd = v_source0_1;
-                    cached_rev = v_source1_0;
                 }
 
                 let dst_ptr0 = dst0.get_unchecked_mut(cx..).as_mut_ptr();
