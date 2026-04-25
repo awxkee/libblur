@@ -64,29 +64,6 @@ fn mul_set(s1: uint32x4_t, w: int32x4_t) -> int32x4_t {
     unsafe { vqrdmulhq_s32(vreinterpretq_s32_u32(s1), w) }
 }
 
-#[inline(always)]
-fn mul_set_low_u16_v4(
-    s1: uint16x8_t,
-    s2: uint16x8_t,
-    s3: uint16x8_t,
-    s4: uint16x8_t,
-    w: int32x4_t,
-) -> (int32x4_t, int32x4_t, int32x4_t, int32x4_t) {
-    unsafe {
-        let s1 = vmovl_u16(vget_low_u16(s1));
-        let s2 = vmovl_u16(vget_low_u16(s2));
-        let s3 = vmovl_u16(vget_low_u16(s3));
-        let s4 = vmovl_u16(vget_low_u16(s4));
-
-        let m1 = vqrdmulhq_s32(vreinterpretq_s32_u32(s1), w);
-        let m2 = vqrdmulhq_s32(vreinterpretq_s32_u32(s2), w);
-        let m3 = vqrdmulhq_s32(vreinterpretq_s32_u32(s3), w);
-        let m4 = vqrdmulhq_s32(vreinterpretq_s32_u32(s4), w);
-
-        (m1, m2, m3, m4)
-    }
-}
-
 pub(crate) fn box_blur_horizontal_pass_neon_rdm<const CN: usize>(
     src: &[u8],
     src_stride: u32,

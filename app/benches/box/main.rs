@@ -308,7 +308,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             libblur::box_blur(
                 &src_image,
                 &mut dst_image,
-                BoxBlurParameters::new(77),
+                BoxBlurParameters::new(35),
                 ThreadingPolicy::Adaptive,
             )
             .unwrap();
@@ -328,7 +328,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
                 &src_rgb,
                 &mut dst,
                 -1,
-                Size::new(77, 77),
+                Size::new(35, 35),
                 Point::new(-1, -1),
                 false,
                 BORDER_DEFAULT,
