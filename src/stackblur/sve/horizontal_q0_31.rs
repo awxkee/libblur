@@ -442,7 +442,7 @@ impl<const CN: usize> HorizontalSveStackBlurPassQ0_31<CN> {
                     let stack_val = svld1_s32(pv_cn, stack.as_ptr().cast());
 
                     sum_out = svadd_s32_x(pv_cn, sum_out, stack_val);
-                    sum_in = svadd_s32_x(pv_cn, sum_in, stack_val);
+                    sum_in = svsub_s32_x(pv_cn, sum_in, stack_val);
                 }
             }
         }
