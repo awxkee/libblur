@@ -28,4 +28,6 @@
  */
 mod fast_gaussian_q0_31;
 
-pub(crate) use fast_gaussian_q0_31::fg_horizontal_pass_neon_u8_sve;
+pub(crate) use fast_gaussian_q0_31::{
+    fg_horizontal_pass_neon_u8_sve, fg_vertical_pass_neon_u8_sve,
+};
