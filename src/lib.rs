@@ -111,6 +111,8 @@ mod sse;
 #[cfg_attr(docsrs, doc(cfg(feature = "image")))]
 mod stack_blur_image;
 mod stackblur;
+#[cfg(all(target_arch = "aarch64", feature = "sve"))]
+mod sve;
 mod threading_policy;
 mod to_storage;
 mod unsafe_slice;
