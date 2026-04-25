@@ -73,14 +73,28 @@ fn stack_blur_worker_horizontal(
             Box::new(HorizontalStackBlurPass::<u8, i32, f32, N>::default())
         }
 
-        #[cfg(all(target_arch = "aarch64", feature = "neon"))]
+        #[cfg(all(target_arch = "aarch64"))]
         fn select_blur_pass<const N: usize>() -> Box<dyn StackBlurWorkingPass<u8, N>> {
-            #[cfg(feature = "rdm")]
-            if std::arch::is_aarch64_feature_detected!("rdm") {
-                use crate::stackblur::neon::HorizontalNeonStackBlurPassQ0_31;
-                return Box::new(HorizontalNeonStackBlurPassQ0_31::<N>::default());
+            #[cfg(feature = "sve")]
+            {
+                if std::arch::is_aarch64_feature_detected!("sve2") {
+                    use crate::stackblur::sve::HorizontalSveStackBlurPassQ0_31;
+                    return Box::new(HorizontalSveStackBlurPassQ0_31::<N>::default());
+                }
             }
-            Box::new(HorizontalNeonStackBlurPass::<N>::default())
+            #[cfg(feature = "neon")]
+            {
+                #[cfg(feature = "rdm")]
+                if std::arch::is_aarch64_feature_detected!("rdm") {
+                    use crate::stackblur::neon::HorizontalNeonStackBlurPassQ0_31;
+                    return Box::new(HorizontalNeonStackBlurPassQ0_31::<N>::default());
+                }
+                Box::new(HorizontalNeonStackBlurPass::<N>::default())
+            }
+            #[cfg(not(feature = "neon"))]
+            {
+                Box::new(HorizontalStackBlurPass::<u8, i32, f32, N>::default())
+            }
         }
 
         #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
@@ -89,7 +103,7 @@ fn stack_blur_worker_horizontal(
         }
 
         #[cfg(not(any(
-            all(target_arch = "aarch64", feature = "neon"),
+            target_arch = "aarch64",
             all(target_arch = "wasm32", target_feature = "simd128"),
             target_arch = "x86_64",
             target_arch = "x86"

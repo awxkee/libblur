@@ -70,7 +70,7 @@ pub(crate) fn filter_row_complex_q<T, I>(
 
         let coeff = *kernel.get_unchecked(0);
 
-        while cx + 4 < max_width {
+        while cx + 4 <= max_width {
             let s_src = local_src.get_unchecked(cx..);
 
             let q_coeff = Complex::new(coeff.re as i32, coeff.im as i32);

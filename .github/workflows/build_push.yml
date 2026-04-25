@@ -40,7 +40,7 @@ jobs:
     name: Clippy
     strategy:
       matrix:
-        os: [ ubuntu-latest, macos-latest ]
+        os: [ ubuntu-latest, ubuntu-24.04-arm ]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
@@ -60,7 +60,7 @@ jobs:
 
   tests_arm:
     name: Tests ARM
-    runs-on: macos-latest
+    runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
         feature: [ neon, rdm, "" ]
@@ -82,7 +82,7 @@ jobs:
 
   fuzz_box_mac:
     name: Fuzzing Box
-    runs-on: macos-latest
+    runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
         feature: [ neon, rdm, "" ]
@@ -110,7 +110,7 @@ jobs:
 
   fuzz_filters_arm:
     name: Fuzzing Filter 1D/2D ARM
-    runs-on: macos-latest
+    runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
         feature: [ neon, rdm ]
@@ -128,7 +128,7 @@ jobs:
 
   fuzz_filter_arm_complex:
     name: Fuzzing Filter 1D/2D ARM FCMA
-    runs-on: macos-latest
+    runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@nightly
@@ -156,7 +156,7 @@ jobs:
 
   fuzz_stack_blur:
     name: Fuzzing Stack Blur
-    runs-on: macos-latest
+    runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
         feature: [ neon, rdm ]
@@ -184,7 +184,7 @@ jobs:
 
   fuzz_fast_gaussian_blur:
     name: Fuzzing Fast Gaussian Blur
-    runs-on: macos-latest
+    runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
         feature: [ neon, rdm ]

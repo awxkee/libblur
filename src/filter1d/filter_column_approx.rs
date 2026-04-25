@@ -59,7 +59,7 @@ pub(crate) fn filter_column_approx<T, I>(
 
         let coeff = *scanned_kernel.get_unchecked(0);
 
-        while cx + 4 < dst_stride {
+        while cx + 4 <= dst_stride {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let mut k0 = v_src.get_unchecked(0).as_().mul(coeff);

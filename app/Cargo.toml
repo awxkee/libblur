@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 half = "2.4.1"
 image = "0.25.5"
-libblur = { path = "../", features = ["nightly_f16", "sse", "avx", "fft", "neon", "rdm", "avx512", "nightly_fcma", "image"], default-features = false }
+libblur = { path = "../", features = ["sve", "nightly_f16", "sse", "avx", "fft", "neon", "rdm", "avx512", "nightly_fcma", "image"], default-features = false }
 accelerate = { path = "accelerate" }
 rayon = "1.10.0"
 num-complex = "0.4"

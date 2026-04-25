@@ -124,12 +124,12 @@ impl<const CN: usize> HorizontalNeonStackBlurPassQ0_31<CN> {
                     vst1q_s32(stack_value.add(8), src_pixel2);
                     vst1q_s32(stack_value.add(12), src_pixel3);
 
-                    let w = vdupq_n_s32(i as i32 + 1);
+                    let w = i as i32 + 1;
 
-                    sums0 = vmlaq_s32(sums0, src_pixel0, w);
-                    sums1 = vmlaq_s32(sums1, src_pixel1, w);
-                    sums2 = vmlaq_s32(sums2, src_pixel2, w);
-                    sums3 = vmlaq_s32(sums3, src_pixel3, w);
+                    sums0 = vmlaq_n_s32(sums0, src_pixel0, w);
+                    sums1 = vmlaq_n_s32(sums1, src_pixel1, w);
+                    sums2 = vmlaq_n_s32(sums2, src_pixel2, w);
+                    sums3 = vmlaq_n_s32(sums3, src_pixel3, w);
 
                     sum_out0 = vaddq_s32(sum_out0, src_pixel0);
                     sum_out1 = vaddq_s32(sum_out1, src_pixel1);
@@ -160,12 +160,12 @@ impl<const CN: usize> HorizontalNeonStackBlurPassQ0_31<CN> {
                     vst1q_s32(stack_ptr.add(8), src_pixel2);
                     vst1q_s32(stack_ptr.add(12), src_pixel3);
 
-                    let w = vdupq_n_s32(radius as i32 + 1 - i as i32);
+                    let w = radius as i32 + 1 - i as i32;
 
-                    sums0 = vmlaq_s32(sums0, src_pixel0, w);
-                    sums1 = vmlaq_s32(sums1, src_pixel1, w);
-                    sums2 = vmlaq_s32(sums2, src_pixel2, w);
-                    sums3 = vmlaq_s32(sums3, src_pixel3, w);
+                    sums0 = vmlaq_n_s32(sums0, src_pixel0, w);
+                    sums1 = vmlaq_n_s32(sums1, src_pixel1, w);
+                    sums2 = vmlaq_n_s32(sums2, src_pixel2, w);
+                    sums3 = vmlaq_n_s32(sums3, src_pixel3, w);
 
                     sum_in0 = vaddq_s32(sum_in0, src_pixel0);
                     sum_in1 = vaddq_s32(sum_in1, src_pixel1);
@@ -313,7 +313,7 @@ impl<const CN: usize> HorizontalNeonStackBlurPassQ0_31<CN> {
                     let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
                     let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
                     vst1q_s32(stack_ptr, src_pixel);
-                    sums = vmlaq_s32(sums, src_pixel, vdupq_n_s32(radius as i32 + 1 - i as i32));
+                    sums = vmlaq_n_s32(sums, src_pixel, radius as i32 + 1 - i as i32);
 
                     sum_in = vaddq_s32(sum_in, src_pixel);
                 }

@@ -1,5 +1,5 @@
 /*
- * // Copyright (c) Radzivon Bartoshyk. All rights reserved.
+ * // Copyright (c) Radzivon Bartoshyk 4/2026. All rights reserved.
  * //
  * // Redistribution and use in source and binary forms, with or without modification,
  * // are permitted provided that the following conditions are met:
@@ -26,28 +26,6 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#[cfg(all(target_arch = "x86_64", feature = "avx"))]
-mod avx;
-#[deny(unused, unreachable_pub)]
-mod horizontal;
-#[cfg(all(target_arch = "aarch64", feature = "neon"))]
-mod neon;
-mod sliding_window;
-#[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
-pub(crate) mod sse;
-pub mod stack_blur;
-#[cfg(feature = "nightly_f16")]
-pub mod stack_blur_f16;
-pub mod stack_blur_f32;
-mod stack_blur_pass;
-mod stack_blur_u16;
-#[cfg(all(target_arch = "aarch64", feature = "sve"))]
-mod sve;
-mod vertical;
-#[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
-mod wasm;
+mod horizontal_q0_31;
 
-pub(crate) use horizontal::HorizontalStackBlurPass;
-pub(crate) use stack_blur_pass::StackBlurWorkingPass;
-pub use stack_blur_u16::stack_blur_u16;
-pub use vertical::VerticalStackBlurPass;
+pub(crate) use horizontal_q0_31::HorizontalSveStackBlurPassQ0_31;

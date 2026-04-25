@@ -59,6 +59,10 @@
     clippy::print_literal,
     clippy::print_in_format_impl
 )]
+#![cfg_attr(
+    all(feature = "sve", target_arch = "aarch64"),
+    feature(stdarch_aarch64_sve)
+)]
 #[cfg(feature = "fft")]
 #[cfg_attr(docsrs, doc(cfg(feature = "fft")))]
 mod adaptive_blur;

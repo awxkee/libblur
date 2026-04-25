@@ -111,11 +111,8 @@ fn remove_rgb_pixels<const CN: usize>(
         let y_shift = i as usize * src_stride as usize;
         let bytes_offset = y_shift + px;
         let v0 = unsafe { *src.get_unchecked(bytes_offset) };
-        unsafe {
-            let k = histogram.r.get_unchecked_mut(v0 as usize);
-            let x = *k - 1;
-            *k = x;
-        }
+        let x = histogram.r[v0 as usize] - 1;
+        histogram.r[v0 as usize] = x;
         if CN > 1 {
             let v1 = unsafe { *src.get_unchecked(bytes_offset + 1) };
             unsafe {
