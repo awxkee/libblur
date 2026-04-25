@@ -96,7 +96,7 @@ fn fast_gaussian_horizontal_pass_sse_f16_impl<const CN: usize>(
 
                     let bytes_offset = current_y + current_px;
 
-                    let dst_ptr = bytes.slice.as_ptr().add(bytes_offset) as *mut f16;
+                    let dst_ptr = bytes.get_ptr(bytes_offset) as *mut f16;
                     store_f32_f16::<CN>(dst_ptr, pixel);
 
                     let arr_index = ((x - radius_64) & 1023) as usize;
@@ -122,7 +122,7 @@ fn fast_gaussian_horizontal_pass_sse_f16_impl<const CN: usize>(
                 let next_row_x = clamp_edge!(edge_mode, x + radius_64, 0, width_wide);
                 let next_row_px = next_row_x * CN;
 
-                let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut f16;
+                let s_ptr = bytes.get_ptr(next_row_y + next_row_px) as *mut f16;
                 let pixel_color = load_f32_f16::<CN>(s_ptr);
 
                 let arr_index = ((x + radius_64) & 1023) as usize;
@@ -197,7 +197,7 @@ fn fast_gaussian_vertical_pass_sse_f16_impl<T, const CN: usize>(
 
                     let bytes_offset = current_y + current_px;
 
-                    let dst_ptr = bytes.slice.as_ptr().add(bytes_offset) as *mut f16;
+                    let dst_ptr = bytes.get_ptr(bytes_offset) as *mut f16;
                     store_f32_f16::<CN>(dst_ptr, pixel);
 
                     let arr_index = ((y - radius_64) & 1023) as usize;
@@ -223,7 +223,7 @@ fn fast_gaussian_vertical_pass_sse_f16_impl<T, const CN: usize>(
                     clamp_edge!(edge_mode, y + radius_64, 0, height_wide) * (stride as usize);
                 let next_row_x = (x * CN as u32) as usize;
 
-                let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_x) as *mut f16;
+                let s_ptr = bytes.get_ptr(next_row_y + next_row_x) as *mut f16;
                 let pixel_color = load_f32_f16::<CN>(s_ptr);
 
                 let arr_index = ((y + radius_64) & 1023) as usize;

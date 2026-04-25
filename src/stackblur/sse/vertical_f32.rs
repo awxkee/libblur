@@ -82,7 +82,7 @@ unsafe fn stack_blur_pass_vert_sse<const CN: usize>(
 
             let mut src_ptr = cx;
 
-            let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
+            let src_ld = pixels.get_ptr(src_ptr) as *const i32;
 
             {
                 let src_pixel0 = _mm_loadu_ps(src_ld as *const _);
@@ -105,7 +105,7 @@ unsafe fn stack_blur_pass_vert_sse<const CN: usize>(
                     }
 
                     let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize);
-                    let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
+                    let src_ld = pixels.get_ptr(src_ptr) as *const i32;
                     let src_pixel0 = _mm_loadu_ps(src_ld as *const _);
 
                     _mm_store_ps(stack_ptr as *mut _, src_pixel0);
@@ -124,7 +124,7 @@ unsafe fn stack_blur_pass_vert_sse<const CN: usize>(
             src_ptr = cx + yp as usize * stride as usize;
             let mut dst_ptr = cx;
             for _ in 0..height {
-                let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut _;
+                let store_ld = pixels.get_ptr(dst_ptr) as *mut _;
 
                 let a0 = _mm_mul_ps(sums0, v_mul_value);
 
@@ -150,7 +150,7 @@ unsafe fn stack_blur_pass_vert_sse<const CN: usize>(
                     yp += 1;
                 }
 
-                let src_ld = pixels.slice.as_ptr().add(src_ptr);
+                let src_ld = pixels.get_ptr(src_ptr);
 
                 let src_pixel0 = _mm_loadu_ps(src_ld as *const _);
 
@@ -182,7 +182,7 @@ unsafe fn stack_blur_pass_vert_sse<const CN: usize>(
 
             src_ptr = x;
 
-            let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f32;
+            let src_ld = pixels.get_ptr(src_ptr) as *const f32;
 
             let src_pixel = _mm_load_ss(src_ld);
 
@@ -199,7 +199,7 @@ unsafe fn stack_blur_pass_vert_sse<const CN: usize>(
                 }
 
                 let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize);
-                let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f32;
+                let src_ld = pixels.get_ptr(src_ptr) as *const f32;
                 let src_pixel = _mm_load_ss(src_ld);
                 _mm_store_ps(stack_ptr.cast(), src_pixel);
                 sums = _mm_opt_fmlaf_ps(sums, src_pixel, _mm_set1_ps((radius + 1 - i) as f32));
@@ -215,9 +215,8 @@ unsafe fn stack_blur_pass_vert_sse<const CN: usize>(
             src_ptr = cx + yp as usize * stride as usize;
             let mut dst_ptr = cx;
             for _ in 0..height {
-                let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut f32;
                 let blurred = _mm_mul_ps(sums, v_mul_value);
-                _mm_store_ss(store_ld, blurred);
+                _mm_store_ss(pixels.get_ptr(dst_ptr), blurred);
 
                 dst_ptr += stride as usize;
 
@@ -237,7 +236,7 @@ unsafe fn stack_blur_pass_vert_sse<const CN: usize>(
                     yp += 1;
                 }
 
-                let src_ld = pixels.slice.as_ptr().add(src_ptr);
+                let src_ld = pixels.get_ptr(src_ptr);
                 let src_pixel = _mm_load_ss(src_ld as *const f32);
                 _mm_store_ps(stack_ptr.cast(), src_pixel);
 

@@ -73,7 +73,7 @@ fn stack_blur_worker_horizontal(
             Box::new(HorizontalStackBlurPass::<u8, i32, f32, N>::default())
         }
 
-        #[cfg(all(target_arch = "aarch64"))]
+        #[cfg(target_arch = "aarch64")]
         fn select_blur_pass<const N: usize>() -> Box<dyn StackBlurWorkingPass<u8, N>> {
             #[cfg(feature = "sve")]
             {

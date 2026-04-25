@@ -141,13 +141,9 @@ fn fgn_vertical_pass_sse_f32_impl<const CN: usize, const FMA: bool>(
                     let prepared_px1 = _mm_mul_ps(summs1, v_weight);
                     let prepared_px2 = _mm_mul_ps(summs2, v_weight);
 
-                    let dst_ptr0 = bytes.slice.as_ptr().add(current_y + current_px0) as *mut f32;
-                    let dst_ptr1 = bytes.slice.as_ptr().add(current_y + current_px1) as *mut f32;
-                    let dst_ptr2 = bytes.slice.as_ptr().add(current_y + current_px2) as *mut f32;
-
-                    store_f32::<CN>(dst_ptr0, prepared_px0);
-                    store_f32::<CN>(dst_ptr1, prepared_px1);
-                    store_f32::<CN>(dst_ptr2, prepared_px2);
+                    store_f32::<CN>(bytes.get_ptr(current_y + current_px0), prepared_px0);
+                    store_f32::<CN>(bytes.get_ptr(current_y + current_px1), prepared_px1);
+                    store_f32::<CN>(bytes.get_ptr(current_y + current_px2), prepared_px2);
 
                     let d_a_1 = ((y + radius_64) & 1023) as usize;
                     let d_a_2 = ((y - radius_64) & 1023) as usize;
@@ -204,9 +200,9 @@ fn fgn_vertical_pass_sse_f32_impl<const CN: usize, const FMA: bool>(
                 let next_row_y = clamp_edge!(edge_mode, y + ((3 * radius_64) >> 1), 0, height_wide)
                     * (stride as usize);
 
-                let s_ptr0 = bytes.slice.as_ptr().add(next_row_y + current_px0) as *mut f32;
-                let s_ptr1 = bytes.slice.as_ptr().add(next_row_y + current_px1) as *mut f32;
-                let s_ptr2 = bytes.slice.as_ptr().add(next_row_y + current_px2) as *mut f32;
+                let s_ptr0 = bytes.get_ptr(next_row_y + current_px0);
+                let s_ptr1 = bytes.get_ptr(next_row_y + current_px1);
+                let s_ptr2 = bytes.get_ptr(next_row_y + current_px2);
 
                 let pixel_color0 = load_f32::<CN>(s_ptr0);
                 let pixel_color1 = load_f32::<CN>(s_ptr1);
@@ -248,7 +244,7 @@ fn fgn_vertical_pass_sse_f32_impl<const CN: usize, const FMA: bool>(
                     let bytes_offset = current_y + current_px;
 
                     let pixel = _mm_mul_ps(summs, v_weight);
-                    let dst_ptr = bytes.slice.as_ptr().add(bytes_offset) as *mut f32;
+                    let dst_ptr = bytes.get_ptr(bytes_offset);
                     store_f32::<CN>(dst_ptr, pixel);
 
                     let d_arr_index_1 = ((y + radius_64) & 1023) as usize;
@@ -288,7 +284,7 @@ fn fgn_vertical_pass_sse_f32_impl<const CN: usize, const FMA: bool>(
                     * (stride as usize);
                 let next_row_x = x * CN;
 
-                let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_x) as *mut f32;
+                let s_ptr = bytes.get_ptr(next_row_y + next_row_x);
 
                 let pixel_color = load_f32::<CN>(s_ptr);
 
@@ -412,9 +408,9 @@ fn fgn_horizontal_pass_sse_f32_impl<const CN: usize, const FMA: bool>(
                     let prepared_px1 = _mm_mul_ps(summs1, v_weight);
                     let prepared_px2 = _mm_mul_ps(summs2, v_weight);
 
-                    let dst_ptr0 = bytes.slice.as_ptr().add(current_y0 + current_px) as *mut f32;
-                    let dst_ptr1 = bytes.slice.as_ptr().add(current_y1 + current_px) as *mut f32;
-                    let dst_ptr2 = bytes.slice.as_ptr().add(current_y2 + current_px) as *mut f32;
+                    let dst_ptr0 = bytes.get_ptr(current_y0 + current_px);
+                    let dst_ptr1 = bytes.get_ptr(current_y1 + current_px);
+                    let dst_ptr2 = bytes.get_ptr(current_y2 + current_px);
 
                     store_f32::<CN>(dst_ptr0, prepared_px0);
                     store_f32::<CN>(dst_ptr1, prepared_px1);
@@ -475,9 +471,9 @@ fn fgn_horizontal_pass_sse_f32_impl<const CN: usize, const FMA: bool>(
                 let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide);
                 let next_row_px = next_row_x * CN;
 
-                let s_ptr0 = bytes.slice.as_ptr().add(current_y0 + next_row_px) as *mut f32;
-                let s_ptr1 = bytes.slice.as_ptr().add(current_y1 + next_row_px) as *mut f32;
-                let s_ptr2 = bytes.slice.as_ptr().add(current_y2 + next_row_px) as *mut f32;
+                let s_ptr0 = bytes.get_ptr(current_y0 + next_row_px);
+                let s_ptr1 = bytes.get_ptr(current_y1 + next_row_px);
+                let s_ptr2 = bytes.get_ptr(current_y2 + next_row_px);
 
                 let pixel_color0 = load_f32::<CN>(s_ptr0);
                 let pixel_color1 = load_f32::<CN>(s_ptr1);
@@ -519,7 +515,7 @@ fn fgn_horizontal_pass_sse_f32_impl<const CN: usize, const FMA: bool>(
                     let bytes_offset = current_y + current_px;
 
                     let pixel = _mm_mul_ps(summs, v_weight);
-                    let dst_ptr = bytes.slice.as_ptr().add(bytes_offset) as *mut f32;
+                    let dst_ptr = bytes.get_ptr(bytes_offset);
                     store_f32::<CN>(dst_ptr, pixel);
 
                     let d_arr_index_1 = ((x + radius_64) & 1023) as usize;
@@ -559,7 +555,7 @@ fn fgn_horizontal_pass_sse_f32_impl<const CN: usize, const FMA: bool>(
                 let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide);
                 let next_row_px = next_row_x * CN;
 
-                let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut f32;
+                let s_ptr = bytes.get_ptr(next_row_y + next_row_px);
 
                 let pixel_color = load_f32::<CN>(s_ptr);
 

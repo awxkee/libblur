@@ -113,7 +113,7 @@ fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
             let mut src_ptr = cx; // x,0
 
             {
-                let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
+                let src_ld = pixels.get_ptr(src_ptr) as *const i32;
                 let src_pixel0 = _mm256_loadu_si256(src_ld as *const _);
                 let lo0 = _mm256_unpacklo_epi8(src_pixel0, _mm256_setzero_si256());
                 let hi1 = _mm256_unpackhi_epi8(src_pixel0, _mm256_setzero_si256());
@@ -167,8 +167,7 @@ fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
                     }
 
                     let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4);
-                    let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
-                    let src_pixel0 = _mm256_loadu_si256(src_ld as *const _);
+                    let src_pixel0 = _mm256_loadu_si256(pixels.get_ptr(src_ptr).cast());
                     let lo0 = _mm256_unpacklo_epi8(src_pixel0, _mm256_setzero_si256());
                     let hi1 = _mm256_unpackhi_epi8(src_pixel0, _mm256_setzero_si256());
 
@@ -219,8 +218,6 @@ fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
             src_ptr = cx + yp as usize * stride as usize;
             let mut dst_ptr = cx;
             for _ in 0..height {
-                let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
-
                 let casted_sum0 = _mm256_cvtepi32_ps(sums0);
                 let casted_sum1 = _mm256_cvtepi32_ps(sums1);
                 let casted_sum2 = _mm256_cvtepi32_ps(sums2);
@@ -239,7 +236,10 @@ fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
                 let jv0 = _mm256_packus_epi32(scaled_val0, scaled_val1);
                 let jv1 = _mm256_packus_epi32(scaled_val2, scaled_val3);
 
-                _mm256_storeu_si256(store_ld as *mut _, _mm256_packus_epi16(jv0, jv1));
+                _mm256_storeu_si256(
+                    pixels.get_ptr(dst_ptr).cast(),
+                    _mm256_packus_epi16(jv0, jv1),
+                );
 
                 dst_ptr += stride as usize;
 
@@ -270,7 +270,7 @@ fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
                     yp += 1;
                 }
 
-                let src_ld = pixels.slice.as_ptr().add(src_ptr);
+                let src_ld = pixels.get_ptr(src_ptr);
 
                 let src_pixel0 = _mm256_loadu_si256(src_ld as *const _);
                 let lo0 = _mm256_unpacklo_epi8(src_pixel0, _mm256_setzero_si256());
@@ -336,7 +336,7 @@ fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
 
             let mut src_ptr = cx; // x,0
 
-            let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
+            let src_ld = pixels.get_ptr(src_ptr) as *const i32;
 
             {
                 let src_pixel0 = _mm_loadu_si64(src_ld as *const _);
@@ -378,7 +378,7 @@ fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
                     }
 
                     let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4);
-                    let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
+                    let src_ld = pixels.get_ptr(src_ptr) as *const i32;
                     let src_pixel0 = _mm_loadu_si64(src_ld as *const u8);
                     let lo0 = _mm_unpacklo_epi8(src_pixel0, _mm_setzero_si128());
 
@@ -416,8 +416,6 @@ fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
             src_ptr = cx + yp as usize * stride as usize;
             let mut dst_ptr = cx;
             for _ in 0..height {
-                let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
-
                 let casted_sum0 = _mm_cvtepi32_ps(sums0);
                 let casted_sum1 = _mm_cvtepi32_ps(sums1);
 
@@ -429,7 +427,10 @@ fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
 
                 let jv0 = _mm_packus_epi32(scaled_val0, scaled_val1);
 
-                _mm_storeu_si64(store_ld, _mm_packus_epi16(jv0, _mm_setzero_si128()));
+                _mm_storeu_si64(
+                    pixels.get_ptr(dst_ptr),
+                    _mm_packus_epi16(jv0, _mm_setzero_si128()),
+                );
 
                 dst_ptr += stride as usize;
 
@@ -453,7 +454,7 @@ fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
                     yp += 1;
                 }
 
-                let src_ld = pixels.slice.as_ptr().add(src_ptr);
+                let src_ld = pixels.get_ptr(src_ptr);
 
                 let src_pixel0 = _mm_loadu_si64(src_ld as *const u8);
                 let lo0 = _mm_unpacklo_epi8(src_pixel0, _mm_setzero_si128());
@@ -497,7 +498,7 @@ fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
 
             src_ptr = cx; // x,0
 
-            let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
+            let src_ld = pixels.get_ptr(src_ptr) as *const i32;
 
             let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
 
@@ -524,7 +525,7 @@ fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
                 }
 
                 let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4);
-                let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
+                let src_ld = pixels.get_ptr(src_ptr) as *const i32;
                 let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
                 _mm_store_si128(stack_ptr as *mut __m128i, src_pixel);
 
@@ -550,9 +551,8 @@ fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
             src_ptr = cx + yp as usize * stride as usize;
             dst_ptr = cx;
             for _ in 0..height {
-                let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
                 let result = _mm_cvtps_epi32(_mm_mul_ps(_mm_cvtepi32_ps(sums), v_mul_value));
-                store_u8_s32::<CN>(store_ld, result);
+                store_u8_s32::<CN>(pixels.get_ptr(dst_ptr), result);
 
                 dst_ptr += stride as usize;
 
@@ -572,7 +572,7 @@ fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
                     yp += 1;
                 }
 
-                let src_ld = pixels.slice.as_ptr().add(src_ptr);
+                let src_ld = pixels.get_ptr(src_ptr);
                 let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
                 _mm_store_si128(stack_ptr as *mut __m128i, src_pixel);
 
@@ -603,9 +603,7 @@ fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
 
             src_ptr = cx; // x,0
 
-            let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
-
-            let src_pixel = load_u8_s32_fast::<TAIL>(src_ld as *const u8);
+            let src_pixel = load_u8_s32_fast::<TAIL>(pixels.get_ptr(src_ptr));
 
             for i in 0..=radius {
                 let stack_ptr = stacks.as_mut_ptr().add(i as usize * 4);
@@ -630,7 +628,7 @@ fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
                 }
 
                 let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4);
-                let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
+                let src_ld = pixels.get_ptr(src_ptr) as *const i32;
                 let src_pixel = load_u8_s32_fast::<TAIL>(src_ld as *const u8);
                 _mm_store_si128(stack_ptr as *mut __m128i, src_pixel);
 
@@ -656,9 +654,8 @@ fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
             src_ptr = cx + yp as usize * stride as usize;
             dst_ptr = cx;
             for _ in 0..height {
-                let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
                 let result = _mm_cvtps_epi32(_mm_mul_ps(_mm_cvtepi32_ps(sums), v_mul_value));
-                store_u8_s32::<TAIL>(store_ld, result);
+                store_u8_s32::<TAIL>(pixels.get_ptr(dst_ptr), result);
 
                 dst_ptr += stride as usize;
 
@@ -678,7 +675,7 @@ fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
                     yp += 1;
                 }
 
-                let src_ld = pixels.slice.as_ptr().add(src_ptr);
+                let src_ld = pixels.get_ptr(src_ptr);
                 let src_pixel = load_u8_s32_fast::<TAIL>(src_ld as *const u8);
                 _mm_store_si128(stack_ptr as *mut __m128i, src_pixel);
 

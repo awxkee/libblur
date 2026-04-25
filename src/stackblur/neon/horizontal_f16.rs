@@ -80,8 +80,7 @@ impl<const CN: usize> HorizontalNeonStackBlurPassFloat16<CN> {
 
                 src_ptr = stride as usize * y; // start of line (0,y)
 
-                let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f16;
-                let src_pixel = load_f32_f16::<CN>(src_ld);
+                let src_pixel = load_f32_f16::<CN>(pixels.get_ptr(src_ptr));
 
                 for i in 0..=radius {
                     let stack_value = stacks.as_mut_ptr().add(i as usize * 4);
@@ -95,8 +94,7 @@ impl<const CN: usize> HorizontalNeonStackBlurPassFloat16<CN> {
                         src_ptr += CN;
                     }
                     let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4);
-                    let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f16;
-                    let src_pixel = load_f32_f16::<CN>(src_ld);
+                    let src_pixel = load_f32_f16::<CN>(pixels.get_ptr(src_ptr));
                     vst1q_f32(stack_ptr, src_pixel);
                     sums = p_vfmaq_f32(
                         sums,
@@ -116,9 +114,8 @@ impl<const CN: usize> HorizontalNeonStackBlurPassFloat16<CN> {
                 src_ptr = CN * xp as usize + y * stride as usize;
                 dst_ptr = y * stride as usize;
                 for _ in 0..width {
-                    let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut f16;
                     let blurred = vmulq_f32(sums, v_mul_value);
-                    store_f32_f16::<CN>(store_ld, blurred);
+                    store_f32_f16::<CN>(pixels.get_ptr(dst_ptr), blurred);
                     dst_ptr += CN;
 
                     sums = vsubq_f32(sums, sum_out);
@@ -138,8 +135,7 @@ impl<const CN: usize> HorizontalNeonStackBlurPassFloat16<CN> {
                         xp += 1;
                     }
 
-                    let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f16;
-                    let src_pixel = load_f32_f16::<CN>(src_ld);
+                    let src_pixel = load_f32_f16::<CN>(pixels.get_ptr(src_ptr));
                     vst1q_f32(stack, src_pixel);
 
                     sum_in = vaddq_f32(sum_in, src_pixel);

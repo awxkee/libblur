@@ -130,7 +130,7 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
             for x in 0..width {
                 let px = x as usize * CN;
 
-                unsafe {
+                {
                     let r0 = _mm_mul_ps(store_0, v_weight);
                     let r1 = _mm_mul_ps(store_1, v_weight);
                     let r2 = _mm_mul_ps(store_2, v_weight);
@@ -140,10 +140,10 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
                     let bytes_offset_1 = y_dst_shift + dst_stride as usize + px;
                     let bytes_offset_2 = y_dst_shift + dst_stride as usize * 2 + px;
                     let bytes_offset_3 = y_dst_shift + dst_stride as usize * 3 + px;
-                    store_f32::<CN>(unsafe_dst.slice.as_ptr().add(bytes_offset_0) as *mut _, r0);
-                    store_f32::<CN>(unsafe_dst.slice.as_ptr().add(bytes_offset_1) as *mut _, r1);
-                    store_f32::<CN>(unsafe_dst.slice.as_ptr().add(bytes_offset_2) as *mut _, r2);
-                    store_f32::<CN>(unsafe_dst.slice.as_ptr().add(bytes_offset_3) as *mut _, r3);
+                    store_f32::<CN>(unsafe_dst.get_ptr(bytes_offset_0).cast(), r0);
+                    store_f32::<CN>(unsafe_dst.get_ptr(bytes_offset_1).cast(), r1);
+                    store_f32::<CN>(unsafe_dst.get_ptr(bytes_offset_2).cast(), r2);
+                    store_f32::<CN>(unsafe_dst.get_ptr(bytes_offset_3).cast(), r3);
                 }
 
                 // subtract previous
@@ -227,12 +227,10 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
             for x in 0..width {
                 let px = x as usize * CN;
 
-                unsafe {
-                    let r0 = _mm_mul_ps(store, v_weight);
-                    let bytes_offset = y_dst_shift + px;
-                    let ptr = unsafe_dst.slice.as_ptr().add(bytes_offset) as *mut f32;
-                    store_f32::<CN>(ptr, r0);
-                }
+                let r0 = _mm_mul_ps(store, v_weight);
+                let bytes_offset = y_dst_shift + px;
+                let ptr = unsafe_dst.get_ptr(bytes_offset);
+                store_f32::<CN>(ptr, r0);
 
                 // subtract previous
                 unsafe {

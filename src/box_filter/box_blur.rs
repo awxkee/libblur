@@ -133,10 +133,7 @@ fn box_blur_horizontal_pass_impl<T, J, const CN: usize>(
         let y_dst_shift = (y * dst_stride) as usize;
 
         let dst_row = unsafe {
-            std::slice::from_raw_parts_mut(
-                unsafe_dst.slice.get_unchecked(y_dst_shift).get(),
-                width as usize * CN,
-            )
+            std::slice::from_raw_parts_mut(unsafe_dst.get_ptr(y_dst_shift), width as usize * CN)
         };
 
         // replicate edge
@@ -474,10 +471,7 @@ fn box_blur_vertical_pass_impl<T, J>(
 
         let dst = unsafe {
             std::slice::from_raw_parts_mut(
-                unsafe_dst
-                    .slice
-                    .as_ptr()
-                    .add(y_dst_shift + start_x as usize) as *mut T,
+                unsafe_dst.get_ptr(y_dst_shift + start_x as usize),
                 end_x as usize - start_x as usize,
             )
         };

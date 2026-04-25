@@ -113,22 +113,10 @@ impl<const CN: usize> HorizontalSveStackBlurPassQ0_31<CN> {
                 let mut src_ptr2 = stride as usize * (yy + 2);
                 let mut src_ptr3 = stride as usize * (yy + 3);
 
-                let src_pixel0 = svld1ub_s32(
-                    pv_cn,
-                    pixels.slice.get_unchecked(src_ptr0..).as_ptr().cast(),
-                );
-                let src_pixel1 = svld1ub_s32(
-                    pv_cn,
-                    pixels.slice.get_unchecked(src_ptr1..).as_ptr().cast(),
-                );
-                let src_pixel2 = svld1ub_s32(
-                    pv_cn,
-                    pixels.slice.get_unchecked(src_ptr2..).as_ptr().cast(),
-                );
-                let src_pixel3 = svld1ub_s32(
-                    pv_cn,
-                    pixels.slice.get_unchecked(src_ptr3..).as_ptr().cast(),
-                );
+                let src_pixel0 = svld1ub_s32(pv_cn, pixels.get_ptr(src_ptr0).cast());
+                let src_pixel1 = svld1ub_s32(pv_cn, pixels.get_ptr(src_ptr1).cast());
+                let src_pixel2 = svld1ub_s32(pv_cn, pixels.get_ptr(src_ptr2));
+                let src_pixel3 = svld1ub_s32(pv_cn, pixels.get_ptr(src_ptr3));
 
                 for i in 0..=radius {
                     let stack_value = stacks0.get_unchecked_mut(i as usize * 4..);
@@ -171,22 +159,10 @@ impl<const CN: usize> HorizontalSveStackBlurPassQ0_31<CN> {
                     }
                     let stack_ptr = stacks0.get_unchecked_mut((i + radius) as usize * 4..);
 
-                    let src_pixel0 = svld1ub_s32(
-                        pv_cn,
-                        pixels.slice.get_unchecked(src_ptr0..).as_ptr().cast(),
-                    );
-                    let src_pixel1 = svld1ub_s32(
-                        pv_cn,
-                        pixels.slice.get_unchecked(src_ptr1..).as_ptr().cast(),
-                    );
-                    let src_pixel2 = svld1ub_s32(
-                        pv_cn,
-                        pixels.slice.get_unchecked(src_ptr2..).as_ptr().cast(),
-                    );
-                    let src_pixel3 = svld1ub_s32(
-                        pv_cn,
-                        pixels.slice.get_unchecked(src_ptr3..).as_ptr().cast(),
-                    );
+                    let src_pixel0 = svld1ub_s32(pv_cn, pixels.get_ptr(src_ptr0));
+                    let src_pixel1 = svld1ub_s32(pv_cn, pixels.get_ptr(src_ptr1));
+                    let src_pixel2 = svld1ub_s32(pv_cn, pixels.get_ptr(src_ptr2));
+                    let src_pixel3 = svld1ub_s32(pv_cn, pixels.get_ptr(src_ptr3));
 
                     svst1_s32(pv_cn, stack_ptr.as_mut_ptr().cast(), src_pixel0);
                     svst1_s32(
@@ -242,22 +218,22 @@ impl<const CN: usize> HorizontalSveStackBlurPassQ0_31<CN> {
 
                     svst1b_u32(
                         pv_cn,
-                        pixels.slice.as_ptr().add(dst_ptr0) as *mut u8,
+                        pixels.get_ptr(dst_ptr0),
                         svreinterpret_u32_s32(scaled_val0),
                     );
                     svst1b_u32(
                         pv_cn,
-                        pixels.slice.as_ptr().add(dst_ptr1) as *mut u8,
+                        pixels.get_ptr(dst_ptr1),
                         svreinterpret_u32_s32(scaled_val1),
                     );
                     svst1b_u32(
                         pv_cn,
-                        pixels.slice.as_ptr().add(dst_ptr2) as *mut u8,
+                        pixels.get_ptr(dst_ptr2),
                         svreinterpret_u32_s32(scaled_val2),
                     );
                     svst1b_u32(
                         pv_cn,
-                        pixels.slice.as_ptr().add(dst_ptr3) as *mut u8,
+                        pixels.get_ptr(dst_ptr3),
                         svreinterpret_u32_s32(scaled_val3),
                     );
 
@@ -296,22 +272,10 @@ impl<const CN: usize> HorizontalSveStackBlurPassQ0_31<CN> {
                         _xp += 1;
                     }
 
-                    let src_pixel0 = svld1ub_s32(
-                        pv_cn,
-                        pixels.slice.get_unchecked(src_ptr0..).as_ptr().cast(),
-                    );
-                    let src_pixel1 = svld1ub_s32(
-                        pv_cn,
-                        pixels.slice.get_unchecked(src_ptr1..).as_ptr().cast(),
-                    );
-                    let src_pixel2 = svld1ub_s32(
-                        pv_cn,
-                        pixels.slice.get_unchecked(src_ptr2..).as_ptr().cast(),
-                    );
-                    let src_pixel3 = svld1ub_s32(
-                        pv_cn,
-                        pixels.slice.get_unchecked(src_ptr3..).as_ptr().cast(),
-                    );
+                    let src_pixel0 = svld1ub_s32(pv_cn, pixels.get_ptr(src_ptr0));
+                    let src_pixel1 = svld1ub_s32(pv_cn, pixels.get_ptr(src_ptr1));
+                    let src_pixel2 = svld1ub_s32(pv_cn, pixels.get_ptr(src_ptr2));
+                    let src_pixel3 = svld1ub_s32(pv_cn, pixels.get_ptr(src_ptr3));
 
                     svst1_s32(pv_cn, stack.as_mut_ptr().cast(), src_pixel0);
                     svst1_s32(
@@ -372,8 +336,7 @@ impl<const CN: usize> HorizontalSveStackBlurPassQ0_31<CN> {
 
                 let mut src_ptr = stride as usize * y; // start of line (0,y)
 
-                let src_ld = pixels.slice.get_unchecked(src_ptr..);
-                let src_pixel = svld1ub_s32(pv_cn, src_ld.as_ptr().cast());
+                let src_pixel = svld1ub_s32(pv_cn, pixels.get_ptr(src_ptr).cast());
 
                 for i in 0..=radius {
                     let stack_value = stacks0.get_unchecked_mut(i as usize * 4..);
@@ -387,8 +350,7 @@ impl<const CN: usize> HorizontalSveStackBlurPassQ0_31<CN> {
                         src_ptr += CN;
                     }
                     let stack_ptr = stacks0.get_unchecked_mut((i + radius) as usize * 4..);
-                    let src_ld = pixels.slice.get_unchecked(src_ptr..);
-                    let src_pixel = svld1ub_s32(pv_cn, src_ld.as_ptr().cast());
+                    let src_pixel = svld1ub_s32(pv_cn, pixels.get_ptr(src_ptr).cast());
                     svst1_s32(pv_cn, stack_ptr.as_mut_ptr().cast(), src_pixel);
                     sums = svmla_n_s32_x(pv_cn, sums, src_pixel, radius as i32 + 1 - i as i32);
                     sum_in = svadd_s32_x(pv_cn, sum_in, src_pixel);
@@ -404,7 +366,7 @@ impl<const CN: usize> HorizontalSveStackBlurPassQ0_31<CN> {
 
                 let mut dst_ptr = y * stride as usize;
                 for _ in 0..width {
-                    let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
+                    let store_ld = pixels.get_ptr(dst_ptr) as *mut u8;
 
                     let scaled_val = svqrdmulh_s32(sums, mul_value);
                     svst1b_u32(pv_cn, store_ld, svreinterpret_u32_s32(scaled_val));
@@ -427,8 +389,7 @@ impl<const CN: usize> HorizontalSveStackBlurPassQ0_31<CN> {
                         _xp += 1;
                     }
 
-                    let src_ld = pixels.slice.get_unchecked(src_ptr..);
-                    let src_pixel = svld1ub_s32(pv_cn, src_ld.as_ptr().cast());
+                    let src_pixel = svld1ub_s32(pv_cn, pixels.get_ptr(src_ptr).cast());
                     svst1_s32(pv_cn, stack.as_mut_ptr().cast(), src_pixel);
 
                     sum_in = svadd_s32_x(pv_cn, sum_in, src_pixel);

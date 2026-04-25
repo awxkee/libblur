@@ -30,7 +30,7 @@ use std::ops::Index;
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct UnsafeSlice<'a, T> {
-    pub slice: &'a [UnsafeCell<T>],
+    slice: &'a [UnsafeCell<T>],
 }
 
 unsafe impl<T: Send + Sync> Send for UnsafeSlice<'_, T> {}
@@ -56,7 +56,8 @@ impl<'a, T> UnsafeSlice<'a, T> {
     }
 
     #[inline(always)]
-    pub fn get(&self, i: usize) -> &mut T {
+    #[allow(clippy::mut_from_ref)]
+    pub(crate) fn get(&self, i: usize) -> &mut T {
         let ptr = unsafe { self.slice.get_unchecked(i) }.get();
         unsafe { &mut *ptr }
     }
@@ -64,8 +65,7 @@ impl<'a, T> UnsafeSlice<'a, T> {
     #[allow(dead_code)]
     #[inline(always)]
     pub(crate) fn get_ptr(&self, i: usize) -> *mut T {
-        let ptr = unsafe { self.slice.get_unchecked(i) }.get();
-        unsafe { &mut *ptr as *mut T }
+        unsafe { self.slice.get_unchecked(i) }.get()
     }
 
     #[allow(dead_code)]

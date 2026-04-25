@@ -86,10 +86,8 @@ impl<const CN: usize> StackBlurWorkingPass<u8, CN> for VerticalNeonStackBlurPass
 
                 let mut src_ptr = cx; // x,0
 
-                let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
-
                 {
-                    let src_pixel0 = vld1q_u8(src_ld as *const u8);
+                    let src_pixel0 = vld1q_u8(pixels.get_ptr(src_ptr));
                     let lo0 = vmovl_u8(vget_low_u8(src_pixel0));
                     let hi0 = vmovl_high_u8(src_pixel0);
 
@@ -127,8 +125,7 @@ impl<const CN: usize> StackBlurWorkingPass<u8, CN> for VerticalNeonStackBlurPass
                         }
 
                         let stack_ptr = stacks0.as_mut_ptr().add((i + radius) as usize * 4 * 4);
-                        let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
-                        let src_pixel0 = vld1q_u8(src_ld as *const u8);
+                        let src_pixel0 = vld1q_u8(pixels.get_ptr(src_ptr));
                         let lo0 = vmovl_u8(vget_low_u8(src_pixel0));
                         let hi0 = vmovl_high_u8(src_pixel0);
 
@@ -164,8 +161,6 @@ impl<const CN: usize> StackBlurWorkingPass<u8, CN> for VerticalNeonStackBlurPass
                 src_ptr = cx + yp as usize * stride as usize;
                 let mut dst_ptr = cx;
                 for _ in 0..height {
-                    let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
-
                     let casted_sum0 = vcvtq_f32_s32(sums0);
                     let casted_sum1 = vcvtq_f32_s32(sums1);
                     let casted_sum2 = vcvtq_f32_s32(sums2);
@@ -185,7 +180,7 @@ impl<const CN: usize> StackBlurWorkingPass<u8, CN> for VerticalNeonStackBlurPass
                     let jv1 = vcombine_u16(vqmovun_s32(scaled_val2), vqmovun_s32(scaled_val3));
 
                     let values = vcombine_u8(vqmovn_u16(jv0), vqmovn_u16(jv1));
-                    vst1q_u8(store_ld, values);
+                    vst1q_u8(pixels.get_ptr(dst_ptr), values);
 
                     dst_ptr += stride as usize;
 
@@ -216,7 +211,7 @@ impl<const CN: usize> StackBlurWorkingPass<u8, CN> for VerticalNeonStackBlurPass
                         yp += 1;
                     }
 
-                    let src_ld = pixels.slice.as_ptr().add(src_ptr);
+                    let src_ld = pixels.get_ptr(src_ptr);
 
                     let src_pixel0 = vld1q_u8(src_ld as *const u8);
                     let lo0 = vmovl_u8(vget_low_u8(src_pixel0));
@@ -280,7 +275,7 @@ impl<const CN: usize> StackBlurWorkingPass<u8, CN> for VerticalNeonStackBlurPass
 
                 let mut src_ptr = cx; // x,0
 
-                let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
+                let src_ld = pixels.get_ptr(src_ptr) as *const i32;
 
                 {
                     let src_pixel0 = vld1_u8(src_ld as *const u8);
@@ -312,7 +307,7 @@ impl<const CN: usize> StackBlurWorkingPass<u8, CN> for VerticalNeonStackBlurPass
                         }
 
                         let stack_ptr = stacks0.as_mut_ptr().add((i + radius) as usize * 4 * 4);
-                        let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
+                        let src_ld = pixels.get_ptr(src_ptr) as *const i32;
                         let src_pixel0 = vld1_u8(src_ld as *const u8);
                         let lo0 = vmovl_u8(src_pixel0);
 
@@ -340,7 +335,7 @@ impl<const CN: usize> StackBlurWorkingPass<u8, CN> for VerticalNeonStackBlurPass
                 src_ptr = cx + yp as usize * stride as usize;
                 let mut dst_ptr = cx;
                 for _ in 0..height {
-                    let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
+                    let store_ld = pixels.get_ptr(dst_ptr);
 
                     let casted_sum0 = vcvtq_f32_s32(sums0);
                     let casted_sum1 = vcvtq_f32_s32(sums1);
@@ -378,7 +373,7 @@ impl<const CN: usize> StackBlurWorkingPass<u8, CN> for VerticalNeonStackBlurPass
                         yp += 1;
                     }
 
-                    let src_ld = pixels.slice.as_ptr().add(src_ptr);
+                    let src_ld = pixels.get_ptr(src_ptr);
 
                     let src_pixel0 = vld1_u8(src_ld as *const u8);
                     let lo0 = vmovl_u8(src_pixel0);
@@ -422,7 +417,7 @@ impl<const CN: usize> StackBlurWorkingPass<u8, CN> for VerticalNeonStackBlurPass
 
                 let mut src_ptr = cx; // x,0
 
-                let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
+                let src_ld = pixels.get_ptr(src_ptr) as *const i32;
 
                 let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
 
@@ -439,8 +434,7 @@ impl<const CN: usize> StackBlurWorkingPass<u8, CN> for VerticalNeonStackBlurPass
                     }
 
                     let stack_ptr = stacks0.as_mut_ptr().add((i + radius) as usize * 4);
-                    let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
-                    let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
+                    let src_pixel = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr));
                     vst1q_s32(stack_ptr, src_pixel);
                     sums = vmlaq_s32(sums, src_pixel, vdupq_n_s32(radius as i32 + 1 - i as i32));
 
@@ -455,7 +449,7 @@ impl<const CN: usize> StackBlurWorkingPass<u8, CN> for VerticalNeonStackBlurPass
                 src_ptr = cx + yp as usize * stride as usize;
                 let mut dst_ptr = cx;
                 for _ in 0..height {
-                    let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
+                    let store_ld = pixels.get_ptr(dst_ptr);
                     let casted_sum = vcvtq_f32_s32(sums);
                     let scaled_val = vcvtaq_s32_f32(vmulq_f32(casted_sum, mul_value));
                     store_u8_s32::<CN>(store_ld, scaled_val);
@@ -478,7 +472,7 @@ impl<const CN: usize> StackBlurWorkingPass<u8, CN> for VerticalNeonStackBlurPass
                         yp += 1;
                     }
 
-                    let src_ld = pixels.slice.as_ptr().add(src_ptr);
+                    let src_ld = pixels.get_ptr(src_ptr);
                     let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
                     vst1q_s32(stack_ptr, src_pixel);
 
@@ -509,7 +503,7 @@ impl<const CN: usize> StackBlurWorkingPass<u8, CN> for VerticalNeonStackBlurPass
 
                 let mut src_ptr = cx; // x,0
 
-                let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
+                let src_ld = pixels.get_ptr(src_ptr) as *const i32;
 
                 let src_pixel = load_u8_s32_fast::<TAIL>(src_ld as *const u8);
 
@@ -526,7 +520,7 @@ impl<const CN: usize> StackBlurWorkingPass<u8, CN> for VerticalNeonStackBlurPass
                     }
 
                     let stack_ptr = stacks0.as_mut_ptr().add((i + radius) as usize * 4);
-                    let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
+                    let src_ld = pixels.get_ptr(src_ptr) as *const i32;
                     let src_pixel = load_u8_s32_fast::<TAIL>(src_ld as *const u8);
                     vst1q_s32(stack_ptr, src_pixel);
                     sums = vmlaq_s32(sums, src_pixel, vdupq_n_s32(radius as i32 + 1 - i as i32));
@@ -542,10 +536,9 @@ impl<const CN: usize> StackBlurWorkingPass<u8, CN> for VerticalNeonStackBlurPass
                 src_ptr = cx + yp as usize * stride as usize;
                 let mut dst_ptr = cx;
                 for _ in 0..height {
-                    let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
                     let casted_sum = vcvtq_f32_s32(sums);
                     let scaled_val = vcvtaq_s32_f32(vmulq_f32(casted_sum, mul_value));
-                    store_u8_s32::<TAIL>(store_ld, scaled_val);
+                    store_u8_s32::<TAIL>(pixels.get_ptr(dst_ptr), scaled_val);
 
                     dst_ptr += stride as usize;
 
@@ -565,8 +558,7 @@ impl<const CN: usize> StackBlurWorkingPass<u8, CN> for VerticalNeonStackBlurPass
                         yp += 1;
                     }
 
-                    let src_ld = pixels.slice.as_ptr().add(src_ptr);
-                    let src_pixel = load_u8_s32_fast::<TAIL>(src_ld as *const u8);
+                    let src_pixel = load_u8_s32_fast::<TAIL>(pixels.get_ptr(src_ptr));
                     vst1q_s32(stack_ptr, src_pixel);
 
                     sum_in = vaddq_s32(sum_in, src_pixel);

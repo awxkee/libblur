@@ -85,11 +85,8 @@ fn sse_horiz_pass_impl<const CN: usize>(
             let mut src_ptr0 = stride as usize * yy;
             let mut src_ptr1 = stride as usize * (yy + 1);
 
-            let src_ld0 = pixels.slice.as_ptr().add(src_ptr0) as *const i32;
-            let src_ld1 = pixels.slice.as_ptr().add(src_ptr1) as *const i32;
-
-            let src_pixel0 = load_u8_s32_fast::<CN>(src_ld0 as *const u8);
-            let src_pixel1 = load_u8_s32_fast::<CN>(src_ld1 as *const u8);
+            let src_pixel0 = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr0));
+            let src_pixel1 = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr1));
 
             for i in 0..=radius {
                 let stack_value = stacks.as_mut_ptr().add(i as usize * 4 * 2);
@@ -110,10 +107,8 @@ fn sse_horiz_pass_impl<const CN: usize>(
                     src_ptr1 += CN;
                 }
                 let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4 * 2);
-                let src_pixel0 =
-                    load_u8_s32_fast::<CN>(pixels.slice.as_ptr().add(src_ptr0) as *const u8);
-                let src_pixel1 =
-                    load_u8_s32_fast::<CN>(pixels.slice.as_ptr().add(src_ptr1) as *const u8);
+                let src_pixel0 = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr0) as *const u8);
+                let src_pixel1 = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr1) as *const u8);
 
                 _mm_storeu_si128(stack_ptr as *mut __m128i, src_pixel0);
                 _mm_storeu_si128(stack_ptr.add(4) as *mut __m128i, src_pixel1);
@@ -140,17 +135,14 @@ fn sse_horiz_pass_impl<const CN: usize>(
             let mut dst_ptr1 = (yy + 1) * stride as usize;
 
             for _ in 0..width {
-                let store_ld0 = pixels.slice.as_ptr().add(dst_ptr0) as *mut u8;
-                let store_ld1 = pixels.slice.as_ptr().add(dst_ptr1) as *mut u8;
-
                 let o0 = _mm_cvtepi32_ps(sums0);
                 let o1 = _mm_cvtepi32_ps(sums1);
 
                 let r0 = _mm_mul_ps(o0, v_mul_value);
                 let r1 = _mm_mul_ps(o1, v_mul_value);
 
-                store_u8_s32::<CN>(store_ld0, _mm_cvtps_epi32(r0));
-                store_u8_s32::<CN>(store_ld1, _mm_cvtps_epi32(r1));
+                store_u8_s32::<CN>(pixels.get_ptr(dst_ptr0), _mm_cvtps_epi32(r0));
+                store_u8_s32::<CN>(pixels.get_ptr(dst_ptr1), _mm_cvtps_epi32(r1));
 
                 dst_ptr0 += CN;
                 dst_ptr1 += CN;
@@ -176,11 +168,8 @@ fn sse_horiz_pass_impl<const CN: usize>(
                     xp += 1;
                 }
 
-                let src_ld0 = pixels.slice.as_ptr().add(src_ptr0);
-                let src_ld1 = pixels.slice.as_ptr().add(src_ptr1);
-
-                let src_pixel0 = load_u8_s32_fast::<CN>(src_ld0 as *const u8);
-                let src_pixel1 = load_u8_s32_fast::<CN>(src_ld1 as *const u8);
+                let src_pixel0 = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr0));
+                let src_pixel1 = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr1));
 
                 _mm_storeu_si128(stack as *mut __m128i, src_pixel0);
                 _mm_storeu_si128(stack.add(4) as *mut __m128i, src_pixel1);
@@ -216,7 +205,7 @@ fn sse_horiz_pass_impl<const CN: usize>(
 
             let mut src_ptr = stride as usize * y;
 
-            let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
+            let src_ld = pixels.get_ptr(src_ptr) as *const i32;
             let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
 
             for i in 0..=radius {
@@ -234,8 +223,7 @@ fn sse_horiz_pass_impl<const CN: usize>(
                     src_ptr += CN;
                 }
                 let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4);
-                let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
-                let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
+                let src_pixel = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr));
                 _mm_storeu_si128(stack_ptr as *mut __m128i, src_pixel);
                 sums = _mm_add_epi32(
                     sums,
@@ -254,9 +242,8 @@ fn sse_horiz_pass_impl<const CN: usize>(
             src_ptr = CN * xp as usize + y * stride as usize;
             let mut dst_ptr = y * stride as usize;
             for _ in 0..width {
-                let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
                 let result = _mm_cvtps_epi32(_mm_mul_ps(_mm_cvtepi32_ps(sums), v_mul_value));
-                store_u8_s32::<CN>(store_ld, result);
+                store_u8_s32::<CN>(pixels.get_ptr(dst_ptr), result);
                 dst_ptr += CN;
 
                 sums = _mm_sub_epi32(sums, sum_out);
@@ -276,8 +263,7 @@ fn sse_horiz_pass_impl<const CN: usize>(
                     xp += 1;
                 }
 
-                let src_ld = pixels.slice.as_ptr().add(src_ptr);
-                let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
+                let src_pixel = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr));
                 _mm_storeu_si128(stack as *mut __m128i, src_pixel);
 
                 sum_in = _mm_add_epi32(sum_in, src_pixel);

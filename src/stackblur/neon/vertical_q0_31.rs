@@ -103,10 +103,8 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
 
                 let mut src_ptr = cx; // x,0
 
-                let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
-
                 {
-                    let src_pixel0 = vld1q_u8(src_ld as *const u8);
+                    let src_pixel0 = vld1q_u8(pixels.get_ptr(src_ptr).cast());
                     let lo0 = vmovl_u8(vget_low_u8(src_pixel0));
                     let hi0 = vmovl_high_u8(src_pixel0);
 
@@ -116,7 +114,8 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                     let i16_h1 = vreinterpretq_s32_u32(vmovl_high_u16(hi0));
 
                     for i in 0..=radius {
-                        let stack_ptr = stacks0.as_mut_ptr().add(i as usize * 4 * 4);
+                        let stack_ptr =
+                            stacks0.get_unchecked_mut(i as usize * 4 * 4..).as_mut_ptr();
 
                         vst1q_s32(stack_ptr, i16_l0);
                         vst1q_s32(stack_ptr.add(4), i16_h0);
@@ -144,8 +143,7 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                         }
 
                         let stack_ptr = stacks0.as_mut_ptr().add((i + radius) as usize * 4 * 4);
-                        let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
-                        let src_pixel0 = vld1q_u8(src_ld as *const u8);
+                        let src_pixel0 = vld1q_u8(pixels.get_ptr(src_ptr).cast());
                         let lo0 = vmovl_u8(vget_low_u8(src_pixel0));
                         let hi0 = vmovl_high_u8(src_pixel0);
 
@@ -181,7 +179,7 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                 src_ptr = cx + yp as usize * stride as usize;
                 let mut dst_ptr = cx;
                 for _ in 0..height {
-                    let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
+                    let store_ld = pixels.get_ptr(dst_ptr);
 
                     let scaled_val0 = vqrdmulhq_s32(sums0, mul_value);
                     let scaled_val1 = vqrdmulhq_s32(sums1, mul_value);
@@ -223,7 +221,7 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                         yp += 1;
                     }
 
-                    let src_ld = pixels.slice.as_ptr().add(src_ptr);
+                    let src_ld = pixels.get_ptr(src_ptr);
 
                     let src_pixel0 = vld1q_u8(src_ld as *const u8);
                     let lo0 = vmovl_u8(vget_low_u8(src_pixel0));
@@ -287,10 +285,8 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
 
                 let mut src_ptr = cx; // x,0
 
-                let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
-
                 {
-                    let src_pixel0 = vld1_u8(src_ld as *const u8);
+                    let src_pixel0 = vld1_u8(pixels.get_ptr(src_ptr));
                     let lo0 = vmovl_u8(src_pixel0);
 
                     let i16_l0 = vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(lo0)));
@@ -319,7 +315,7 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                         }
 
                         let stack_ptr = stacks0.as_mut_ptr().add((i + radius) as usize * 4 * 4);
-                        let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
+                        let src_ld = pixels.get_ptr(src_ptr) as *const i32;
                         let src_pixel0 = vld1_u8(src_ld as *const u8);
                         let lo0 = vmovl_u8(src_pixel0);
 
@@ -347,7 +343,7 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                 src_ptr = cx + yp as usize * stride as usize;
                 let mut dst_ptr = cx;
                 for _ in 0..height {
-                    let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
+                    let store_ld = pixels.get_ptr(dst_ptr);
 
                     let scaled_val0 = vqrdmulhq_s32(sums0, mul_value);
                     let scaled_val1 = vqrdmulhq_s32(sums1, mul_value);
@@ -379,7 +375,7 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                         yp += 1;
                     }
 
-                    let src_ld = pixels.slice.as_ptr().add(src_ptr);
+                    let src_ld = pixels.get_ptr(src_ptr);
 
                     let src_pixel0 = vld1_u8(src_ld as *const u8);
                     let lo0 = vmovl_u8(src_pixel0);
@@ -423,7 +419,7 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
 
                 let mut src_ptr = cx; // x,0
 
-                let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
+                let src_ld = pixels.get_ptr(src_ptr) as *const i32;
 
                 let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
 
@@ -440,7 +436,7 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                     }
 
                     let stack_ptr = stacks0.as_mut_ptr().add((i + radius) as usize * 4);
-                    let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
+                    let src_ld = pixels.get_ptr(src_ptr) as *const i32;
                     let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
                     vst1q_s32(stack_ptr, src_pixel);
                     sums = vmlaq_s32(sums, src_pixel, vdupq_n_s32(radius as i32 + 1 - i as i32));
@@ -456,7 +452,7 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                 src_ptr = cx + yp as usize * stride as usize;
                 let mut dst_ptr = cx;
                 for _ in 0..height {
-                    let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
+                    let store_ld = pixels.get_ptr(dst_ptr);
                     let scaled_val = vqrdmulhq_s32(sums, mul_value);
                     store_u8_s32::<CN>(store_ld, scaled_val);
 
@@ -478,7 +474,7 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                         yp += 1;
                     }
 
-                    let src_ld = pixels.slice.as_ptr().add(src_ptr);
+                    let src_ld = pixels.get_ptr(src_ptr);
                     let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
                     vst1q_s32(stack_ptr, src_pixel);
 
@@ -509,7 +505,7 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
 
                 let mut src_ptr = cx; // x,0
 
-                let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
+                let src_ld = pixels.get_ptr(src_ptr) as *const i32;
 
                 let src_pixel = load_u8_s32_fast::<TAIL>(src_ld as *const u8);
 
@@ -526,7 +522,7 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                     }
 
                     let stack_ptr = stacks0.as_mut_ptr().add((i + radius) as usize * 4);
-                    let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
+                    let src_ld = pixels.get_ptr(src_ptr) as *const i32;
                     let src_pixel = load_u8_s32_fast::<TAIL>(src_ld as *const u8);
                     vst1q_s32(stack_ptr, src_pixel);
                     sums = vmlaq_s32(sums, src_pixel, vdupq_n_s32(radius as i32 + 1 - i as i32));
@@ -542,7 +538,7 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                 src_ptr = cx + yp as usize * stride as usize;
                 let mut dst_ptr = cx;
                 for _ in 0..height {
-                    let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
+                    let store_ld = pixels.get_ptr(dst_ptr);
                     let scaled_val = vqrdmulhq_s32(sums, mul_value);
 
                     store_u8_s32::<TAIL>(store_ld, scaled_val);
@@ -565,7 +561,7 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                         yp += 1;
                     }
 
-                    let src_ld = pixels.slice.as_ptr().add(src_ptr);
+                    let src_ld = pixels.get_ptr(src_ptr);
                     let src_pixel = load_u8_s32_fast::<TAIL>(src_ld as *const u8);
                     vst1q_s32(stack_ptr, src_pixel);
 
@@ -577,8 +573,8 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                     if sp >= div {
                         sp = 0;
                     }
-                    let stack_ptr = stacks0.as_mut_ptr().add(sp as usize * 4);
-                    let stack_val = vld1q_s32(stack_ptr);
+                    let stack_ptr = stacks0.get_unchecked(sp as usize * 4..);
+                    let stack_val = vld1q_s32(stack_ptr.as_ptr());
 
                     sum_out = vaddq_s32(sum_out, stack_val);
                     sum_in = vsubq_s32(sum_in, stack_val);

@@ -90,15 +90,10 @@ fn avx_horiz_pass_impl<const CN: usize>(
             let mut src_ptr2 = stride as usize * (yy + 2);
             let mut src_ptr3 = stride as usize * (yy + 3);
 
-            let src_ld0 = pixels.slice.as_ptr().add(src_ptr0) as *const i32;
-            let src_ld1 = pixels.slice.as_ptr().add(src_ptr1) as *const i32;
-            let src_ld2 = pixels.slice.as_ptr().add(src_ptr2) as *const i32;
-            let src_ld3 = pixels.slice.as_ptr().add(src_ptr3) as *const i32;
-
-            let src_pixel0 = load_u8_s32_fast::<CN>(src_ld0 as *const u8);
-            let src_pixel1 = load_u8_s32_fast::<CN>(src_ld1 as *const u8);
-            let src_pixel2 = load_u8_s32_fast::<CN>(src_ld2 as *const u8);
-            let src_pixel3 = load_u8_s32_fast::<CN>(src_ld3 as *const u8);
+            let src_pixel0 = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr0));
+            let src_pixel1 = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr1));
+            let src_pixel2 = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr2));
+            let src_pixel3 = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr3));
 
             let px0 = _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(src_pixel0), src_pixel1);
             let px1 = _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(src_pixel2), src_pixel3);
@@ -123,14 +118,10 @@ fn avx_horiz_pass_impl<const CN: usize>(
                 }
                 let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 2);
 
-                let src_pixel0 =
-                    load_u8_s32_fast::<CN>(pixels.slice.as_ptr().add(src_ptr0) as *const u8);
-                let src_pixel1 =
-                    load_u8_s32_fast::<CN>(pixels.slice.as_ptr().add(src_ptr1) as *const u8);
-                let src_pixel2 =
-                    load_u8_s32_fast::<CN>(pixels.slice.as_ptr().add(src_ptr2) as *const u8);
-                let src_pixel3 =
-                    load_u8_s32_fast::<CN>(pixels.slice.as_ptr().add(src_ptr3) as *const u8);
+                let src_pixel0 = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr0));
+                let src_pixel1 = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr1));
+                let src_pixel2 = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr2));
+                let src_pixel3 = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr3));
 
                 let px0 =
                     _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(src_pixel0), src_pixel1);
@@ -166,11 +157,6 @@ fn avx_horiz_pass_impl<const CN: usize>(
             let mut dst_ptr3 = (yy + 3) * stride as usize;
 
             for _ in 0..width {
-                let store_ld0 = pixels.slice.as_ptr().add(dst_ptr0) as *mut u8;
-                let store_ld1 = pixels.slice.as_ptr().add(dst_ptr1) as *mut u8;
-                let store_ld2 = pixels.slice.as_ptr().add(dst_ptr2) as *mut u8;
-                let store_ld3 = pixels.slice.as_ptr().add(dst_ptr3) as *mut u8;
-
                 let o0 = _mm256_cvtepi32_ps(sums0);
                 let o1 = _mm256_cvtepi32_ps(sums1);
 
@@ -180,10 +166,10 @@ fn avx_horiz_pass_impl<const CN: usize>(
                 let cv0 = _mm256_cvtps_epi32(r0);
                 let cv1 = _mm256_cvtps_epi32(r1);
 
-                store_u8_s32::<CN>(store_ld0, _mm256_castsi256_si128(cv0));
-                store_u8_s32::<CN>(store_ld1, _mm256_extracti128_si256::<1>(cv0));
-                store_u8_s32::<CN>(store_ld2, _mm256_castsi256_si128(cv1));
-                store_u8_s32::<CN>(store_ld3, _mm256_extracti128_si256::<1>(cv1));
+                store_u8_s32::<CN>(pixels.get_ptr(dst_ptr0), _mm256_castsi256_si128(cv0));
+                store_u8_s32::<CN>(pixels.get_ptr(dst_ptr1), _mm256_extracti128_si256::<1>(cv0));
+                store_u8_s32::<CN>(pixels.get_ptr(dst_ptr2), _mm256_castsi256_si128(cv1));
+                store_u8_s32::<CN>(pixels.get_ptr(dst_ptr3), _mm256_extracti128_si256::<1>(cv1));
 
                 dst_ptr0 += CN;
                 dst_ptr1 += CN;
@@ -213,10 +199,10 @@ fn avx_horiz_pass_impl<const CN: usize>(
                     xp += 1;
                 }
 
-                let src_ld0 = pixels.slice.as_ptr().add(src_ptr0);
-                let src_ld1 = pixels.slice.as_ptr().add(src_ptr1);
-                let src_ld2 = pixels.slice.as_ptr().add(src_ptr2);
-                let src_ld3 = pixels.slice.as_ptr().add(src_ptr3);
+                let src_ld0 = pixels.get_ptr(src_ptr0);
+                let src_ld1 = pixels.get_ptr(src_ptr1);
+                let src_ld2 = pixels.get_ptr(src_ptr2);
+                let src_ld3 = pixels.get_ptr(src_ptr3);
 
                 let src_pixel0 = load_u8_s32_fast::<CN>(src_ld0 as *const u8);
                 let src_pixel1 = load_u8_s32_fast::<CN>(src_ld1 as *const u8);
@@ -265,8 +251,8 @@ fn avx_horiz_pass_impl<const CN: usize>(
             let mut src_ptr0 = stride as usize * yy;
             let mut src_ptr1 = stride as usize * (yy + 1);
 
-            let src_ld0 = pixels.slice.as_ptr().add(src_ptr0) as *const i32;
-            let src_ld1 = pixels.slice.as_ptr().add(src_ptr1) as *const i32;
+            let src_ld0 = pixels.get_ptr(src_ptr0) as *const i32;
+            let src_ld1 = pixels.get_ptr(src_ptr1) as *const i32;
 
             let src_pixel0 = load_u8_s32_fast::<CN>(src_ld0 as *const u8);
             let src_pixel1 = load_u8_s32_fast::<CN>(src_ld1 as *const u8);
@@ -289,10 +275,8 @@ fn avx_horiz_pass_impl<const CN: usize>(
                     src_ptr1 += CN;
                 }
                 let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 2);
-                let src_pixel0 =
-                    load_u8_s32_fast::<CN>(pixels.slice.as_ptr().add(src_ptr0) as *const u8);
-                let src_pixel1 =
-                    load_u8_s32_fast::<CN>(pixels.slice.as_ptr().add(src_ptr1) as *const u8);
+                let src_pixel0 = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr0) as *const u8);
+                let src_pixel1 = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr1) as *const u8);
 
                 let px0 =
                     _mm256_inserti128_si256::<1>(_mm256_castsi128_si256(src_pixel0), src_pixel1);
@@ -319,17 +303,14 @@ fn avx_horiz_pass_impl<const CN: usize>(
             let mut dst_ptr1 = (yy + 1) * stride as usize;
 
             for _ in 0..width {
-                let store_ld0 = pixels.slice.as_ptr().add(dst_ptr0) as *mut u8;
-                let store_ld1 = pixels.slice.as_ptr().add(dst_ptr1) as *mut u8;
-
                 let o0 = _mm256_cvtepi32_ps(sums0);
 
                 let r0 = _mm256_mul_ps(o0, v_mul_value);
 
                 let cv0 = _mm256_cvtps_epi32(r0);
 
-                store_u8_s32::<CN>(store_ld0, _mm256_castsi256_si128(cv0));
-                store_u8_s32::<CN>(store_ld1, _mm256_extracti128_si256::<1>(cv0));
+                store_u8_s32::<CN>(pixels.get_ptr(dst_ptr0), _mm256_castsi256_si128(cv0));
+                store_u8_s32::<CN>(pixels.get_ptr(dst_ptr1), _mm256_extracti128_si256::<1>(cv0));
 
                 dst_ptr0 += CN;
                 dst_ptr1 += CN;
@@ -352,8 +333,8 @@ fn avx_horiz_pass_impl<const CN: usize>(
                     xp += 1;
                 }
 
-                let src_ld0 = pixels.slice.as_ptr().add(src_ptr0);
-                let src_ld1 = pixels.slice.as_ptr().add(src_ptr1);
+                let src_ld0 = pixels.get_ptr(src_ptr0);
+                let src_ld1 = pixels.get_ptr(src_ptr1);
 
                 let src_pixel0 = load_u8_s32_fast::<CN>(src_ld0 as *const u8);
                 let src_pixel1 = load_u8_s32_fast::<CN>(src_ld1 as *const u8);
@@ -389,7 +370,7 @@ fn avx_horiz_pass_impl<const CN: usize>(
 
             let mut src_ptr = stride as usize * y;
 
-            let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
+            let src_ld = pixels.get_ptr(src_ptr) as *const i32;
             let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
 
             for i in 0..=radius {
@@ -407,7 +388,7 @@ fn avx_horiz_pass_impl<const CN: usize>(
                     src_ptr += CN;
                 }
                 let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 2);
-                let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
+                let src_ld = pixels.get_ptr(src_ptr) as *const i32;
                 let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
                 _mm_store_si128(stack_ptr as *mut __m128i, src_pixel);
                 sums = _mm_add_epi32(
@@ -427,12 +408,11 @@ fn avx_horiz_pass_impl<const CN: usize>(
             src_ptr = CN * xp as usize + y * stride as usize;
             let mut dst_ptr = y * stride as usize;
             for _ in 0..width {
-                let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
                 let result = _mm_cvtps_epi32(_mm_mul_ps(
                     _mm_cvtepi32_ps(sums),
                     _mm256_castps256_ps128(v_mul_value),
                 ));
-                store_u8_s32::<CN>(store_ld, result);
+                store_u8_s32::<CN>(pixels.get_ptr(dst_ptr), result);
                 dst_ptr += CN;
 
                 sums = _mm_sub_epi32(sums, sum_out);
@@ -452,7 +432,7 @@ fn avx_horiz_pass_impl<const CN: usize>(
                     xp += 1;
                 }
 
-                let src_ld = pixels.slice.as_ptr().add(src_ptr);
+                let src_ld = pixels.get_ptr(src_ptr);
                 let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
                 _mm_store_si128(stack as *mut __m128i, src_pixel);
 

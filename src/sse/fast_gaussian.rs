@@ -135,15 +135,10 @@ fn fg_horizontal_pass_sse_u8_impl<const CN: usize>(
                     let prepared_px2 = _mm_cvtps_epi32(r2);
                     let prepared_px3 = _mm_cvtps_epi32(r3);
 
-                    let dst_ptr0 = (bytes.slice.as_ptr() as *mut u8).add(current_y0 + current_px);
-                    let dst_ptr1 = (bytes.slice.as_ptr() as *mut u8).add(current_y1 + current_px);
-                    let dst_ptr2 = (bytes.slice.as_ptr() as *mut u8).add(current_y2 + current_px);
-                    let dst_ptr3 = (bytes.slice.as_ptr() as *mut u8).add(current_y3 + current_px);
-
-                    store_u8_u32::<CN>(dst_ptr0, prepared_px0);
-                    store_u8_u32::<CN>(dst_ptr1, prepared_px1);
-                    store_u8_u32::<CN>(dst_ptr2, prepared_px2);
-                    store_u8_u32::<CN>(dst_ptr3, prepared_px3);
+                    store_u8_u32::<CN>(bytes.get_ptr(current_y0 + current_px), prepared_px0);
+                    store_u8_u32::<CN>(bytes.get_ptr(current_y1 + current_px), prepared_px1);
+                    store_u8_u32::<CN>(bytes.get_ptr(current_y2 + current_px), prepared_px2);
+                    store_u8_u32::<CN>(bytes.get_ptr(current_y3 + current_px), prepared_px3);
 
                     let arr_index = ((x - radius_64) & 1023) as usize;
                     let d_arr_index = (x & 1023) as usize;
@@ -212,10 +207,10 @@ fn fg_horizontal_pass_sse_u8_impl<const CN: usize>(
                 let next_row_x = clamp_edge!(edge_mode, x + radius_64, 0, width_wide);
                 let next_row_px = next_row_x * CN;
 
-                let s_ptr0 = bytes.slice.as_ptr().add(current_y0 + next_row_px) as *mut u8;
-                let s_ptr1 = bytes.slice.as_ptr().add(current_y1 + next_row_px) as *mut u8;
-                let s_ptr2 = bytes.slice.as_ptr().add(current_y2 + next_row_px) as *mut u8;
-                let s_ptr3 = bytes.slice.as_ptr().add(current_y3 + next_row_px) as *mut u8;
+                let s_ptr0 = bytes.get_ptr(current_y0 + next_row_px);
+                let s_ptr1 = bytes.get_ptr(current_y1 + next_row_px);
+                let s_ptr2 = bytes.get_ptr(current_y2 + next_row_px);
+                let s_ptr3 = bytes.get_ptr(current_y3 + next_row_px);
 
                 let pixel_color0 = load_u8_s32_fast::<CN>(s_ptr0);
                 let pixel_color1 = load_u8_s32_fast::<CN>(s_ptr1);
@@ -271,7 +266,7 @@ fn fg_horizontal_pass_sse_u8_impl<const CN: usize>(
 
                     let bytes_offset = current_y + current_px;
 
-                    let dst_ptr = (bytes.slice.as_ptr() as *mut u8).add(bytes_offset);
+                    let dst_ptr = bytes.get_ptr(bytes_offset);
                     store_u8_u32::<CN>(dst_ptr, pixel_u32);
 
                     let arr_index = ((x - radius_64) & 1023) as usize;
@@ -297,7 +292,7 @@ fn fg_horizontal_pass_sse_u8_impl<const CN: usize>(
                 let next_row_x = clamp_edge!(edge_mode, x + radius_64, 0, width_wide);
                 let next_row_px = next_row_x * CN;
 
-                let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut u8;
+                let s_ptr = bytes.get_ptr(next_row_y + next_row_px);
                 let pixel_color = load_u8_s32_fast::<CN>(s_ptr);
 
                 let arr_index = ((x + radius_64) & 1023) as usize;
@@ -394,10 +389,10 @@ fn fg_vertical_pass_sse_u8_def<const CN: usize>(
 
                     let current_y = (y * (stride as i64)) as usize;
 
-                    let dst_ptr0 = (bytes.slice.as_ptr() as *mut u8).add(current_y + current_px0);
-                    let dst_ptr1 = (bytes.slice.as_ptr() as *mut u8).add(current_y + current_px1);
-                    let dst_ptr2 = (bytes.slice.as_ptr() as *mut u8).add(current_y + current_px2);
-                    let dst_ptr3 = (bytes.slice.as_ptr() as *mut u8).add(current_y + current_px3);
+                    let dst_ptr0 = bytes.get_ptr(current_y + current_px0);
+                    let dst_ptr1 = bytes.get_ptr(current_y + current_px1);
+                    let dst_ptr2 = bytes.get_ptr(current_y + current_px2);
+                    let dst_ptr3 = bytes.get_ptr(current_y + current_px3);
 
                     store_u8_u32::<CN>(dst_ptr0, prepared_px0);
                     store_u8_u32::<CN>(dst_ptr1, prepared_px1);
@@ -472,15 +467,10 @@ fn fg_vertical_pass_sse_u8_def<const CN: usize>(
                 let next_row_y =
                     clamp_edge!(edge_mode, y + radius_64, 0, height_wide) * (stride as usize);
 
-                let s_ptr0 = bytes.slice.as_ptr().add(next_row_y + current_px0) as *mut u8;
-                let s_ptr1 = bytes.slice.as_ptr().add(next_row_y + current_px1) as *mut u8;
-                let s_ptr2 = bytes.slice.as_ptr().add(next_row_y + current_px2) as *mut u8;
-                let s_ptr3 = bytes.slice.as_ptr().add(next_row_y + current_px3) as *mut u8;
-
-                let pixel_color0 = load_u8_s32_fast::<CN>(s_ptr0);
-                let pixel_color1 = load_u8_s32_fast::<CN>(s_ptr1);
-                let pixel_color2 = load_u8_s32_fast::<CN>(s_ptr2);
-                let pixel_color3 = load_u8_s32_fast::<CN>(s_ptr3);
+                let pixel_color0 = load_u8_s32_fast::<CN>(bytes.get_ptr(next_row_y + current_px0));
+                let pixel_color1 = load_u8_s32_fast::<CN>(bytes.get_ptr(next_row_y + current_px1));
+                let pixel_color2 = load_u8_s32_fast::<CN>(bytes.get_ptr(next_row_y + current_px2));
+                let pixel_color3 = load_u8_s32_fast::<CN>(bytes.get_ptr(next_row_y + current_px3));
 
                 let arr_index = ((y + radius_64) & 1023) as usize;
 
@@ -532,7 +522,7 @@ fn fg_vertical_pass_sse_u8_def<const CN: usize>(
 
                     let bytes_offset = current_y + current_px;
 
-                    let dst_ptr = (bytes.slice.as_ptr() as *mut u8).add(bytes_offset);
+                    let dst_ptr = bytes.get_ptr(bytes_offset);
                     store_u8_u32::<CN>(dst_ptr, pixel_u32);
 
                     let arr_index = ((y - radius_64) & 1023) as usize;
@@ -558,7 +548,7 @@ fn fg_vertical_pass_sse_u8_def<const CN: usize>(
                     clamp_edge!(edge_mode, y + radius_64, 0, height_wide) * (stride as usize);
                 let next_row_x = (x * CN as u32) as usize;
 
-                let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_x) as *mut u8;
+                let s_ptr = bytes.get_ptr(next_row_y + next_row_x);
                 let pixel_color = load_u8_s32_fast::<CN>(s_ptr);
 
                 let arr_index = ((y + radius_64) & 1023) as usize;
