@@ -32,6 +32,8 @@ mod box_blur;
 mod neon;
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
 mod sse;
+#[cfg(all(target_arch = "aarch64", feature = "sve"))]
+mod sve;
 
 pub use box_blur::*;
 

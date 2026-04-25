@@ -47,6 +47,7 @@ avx = ["zaft?/avx"]
 sse = []
 # Enables NEON intrinsics
 neon = ["zaft?/neon"]
+# Enables SVE intrinsics, nightly 1.97+ required
 sve = ["neon"]
 
 [package.metadata.docs.rs]

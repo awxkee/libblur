@@ -325,6 +325,13 @@ impl BoxBlurHorizontalPass<u8> for u8 {
             start_y: u32,
             end_y: u32,
         ) = box_blur_horizontal_pass_impl::<u8, u32, CN>;
+        #[cfg(all(target_arch = "aarch64", feature = "sve"))]
+        {
+            if std::arch::is_aarch64_feature_detected!("sve2") {
+                use crate::box_filter::sve::box_blur_horizontal_pass_sve;
+                return box_blur_horizontal_pass_sve::<CN>;
+            }
+        }
         if CN >= 3 {
             #[cfg(all(target_arch = "aarch64", feature = "neon"))]
             {
