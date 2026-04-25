@@ -98,7 +98,7 @@ pub(crate) fn box_blur_horizontal_pass_neon_rdm<const CN: usize>(
     end_y: u32,
 ) {
     unsafe {
-        if radius < 240 {
+        if radius < 240 && CN == 3 {
             box_blur_horizontal_pass_neon_impl_low_rad::<CN>(
                 src, src_stride, dst, dst_stride, width, radius, start_y, end_y,
             );
