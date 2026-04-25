@@ -113,8 +113,8 @@ impl<const CN: usize> HorizontalSveStackBlurPassQ0_31<CN> {
                 let mut src_ptr2 = stride as usize * (yy + 2);
                 let mut src_ptr3 = stride as usize * (yy + 3);
 
-                let src_pixel0 = svld1ub_s32(pv_cn, pixels.get_ptr(src_ptr0).cast());
-                let src_pixel1 = svld1ub_s32(pv_cn, pixels.get_ptr(src_ptr1).cast());
+                let src_pixel0 = svld1ub_s32(pv_cn, pixels.get_ptr(src_ptr0));
+                let src_pixel1 = svld1ub_s32(pv_cn, pixels.get_ptr(src_ptr1));
                 let src_pixel2 = svld1ub_s32(pv_cn, pixels.get_ptr(src_ptr2));
                 let src_pixel3 = svld1ub_s32(pv_cn, pixels.get_ptr(src_ptr3));
 
