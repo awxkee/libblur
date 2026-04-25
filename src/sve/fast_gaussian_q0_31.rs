@@ -27,7 +27,6 @@
 
 use crate::EdgeMode;
 use crate::edge_mode::clamp_edge;
-use crate::neon::{load_u8_s32_fast, store_u8_s32_x5, store_u8x8_m4};
 use crate::unsafe_slice::UnsafeSlice;
 use std::arch::aarch64::*;
 
@@ -461,22 +460,28 @@ fn fg_vertical_pass_neon_sve<const CN: usize>(
                 } else if y + radius_64 >= 0 {
                     let arr_index = (y & 1023) as usize;
 
-                    let stored0 =
+                    let mut stored0 =
                         svld1_s32(pv_cn, buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr());
-                    let stored1 =
+                    let mut stored1 =
                         svld1_s32(pv_cn, buffer1.get_unchecked_mut(arr_index).0.as_mut_ptr());
-                    let stored2 =
+                    let mut stored2 =
                         svld1_s32(pv_cn, buffer2.get_unchecked_mut(arr_index).0.as_mut_ptr());
-                    let stored3 =
+                    let mut stored3 =
                         svld1_s32(pv_cn, buffer3.get_unchecked_mut(arr_index).0.as_mut_ptr());
-                    let stored4 =
+                    let mut stored4 =
                         svld1_s32(pv_cn, buffer4.get_unchecked_mut(arr_index).0.as_mut_ptr());
 
-                    diffs0 = svsub_s32_x(pv_cn, diffs0, svlsl_n_s32_x(pv_cn, stored0, 1));
-                    diffs1 = svsub_s32_x(pv_cn, diffs1, svlsl_n_s32_x(pv_cn, stored1, 1));
-                    diffs2 = svsub_s32_x(pv_cn, diffs2, svlsl_n_s32_x(pv_cn, stored2, 1));
-                    diffs3 = svsub_s32_x(pv_cn, diffs3, svlsl_n_s32_x(pv_cn, stored3, 1));
-                    diffs4 = svsub_s32_x(pv_cn, diffs4, svlsl_n_s32_x(pv_cn, stored4, 1));
+                    stored0 = svlsl_n_s32_x(pv_cn, stored0, 1);
+                    stored1 = svlsl_n_s32_x(pv_cn, stored1, 1);
+                    stored2 = svlsl_n_s32_x(pv_cn, stored2, 1);
+                    stored3 = svlsl_n_s32_x(pv_cn, stored3, 1);
+                    stored4 = svlsl_n_s32_x(pv_cn, stored4, 1);
+
+                    diffs0 = svsub_s32_x(pv_cn, diffs0, stored0);
+                    diffs1 = svsub_s32_x(pv_cn, diffs1, stored1);
+                    diffs2 = svsub_s32_x(pv_cn, diffs2, stored2);
+                    diffs3 = svsub_s32_x(pv_cn, diffs3, stored3);
+                    diffs4 = svsub_s32_x(pv_cn, diffs4, stored4);
                 }
 
                 let next_row_y =
