@@ -32,6 +32,7 @@ mod fast_gaussian_f32;
 mod fast_gaussian_next;
 mod fast_gaussian_next_f32;
 mod fast_gaussian_next_u16;
+mod fast_gaussian_next_u16_large;
 mod fast_gaussian_u16;
 mod pack;
 mod utils;
@@ -43,6 +44,9 @@ pub(crate) use fast_gaussian_f32::{fg_horizontal_pass_avx_f32, fg_vertical_pass_
 pub(crate) use fast_gaussian_next::{fgn_horizontal_pass_avx2_u8, fgn_vertical_pass_avx_u8};
 pub(crate) use fast_gaussian_next_f32::{fgn_horizontal_pass_avx_f32, fgn_vertical_pass_avx_f32};
 pub(crate) use fast_gaussian_next_u16::{fgn_horizontal_pass_avx_u16, fgn_vertical_pass_avx_u16};
+pub(crate) use fast_gaussian_next_u16_large::{
+    fgn_horizontal_pass_avx_u16_large, fgn_vertical_pass_avx_u16_large,
+};
 pub(crate) use fast_gaussian_u16::{fg_horizontal_pass_avx_u16, fg_vertical_pass_avx_u16};
 pub(crate) use pack::*;
 pub(crate) use v_load::*;

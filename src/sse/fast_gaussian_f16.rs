@@ -102,17 +102,17 @@ fn fast_gaussian_horizontal_pass_sse_f16_impl<const CN: usize>(
                     let arr_index = ((x - radius_64) & 1023) as usize;
                     let d_arr_index = (x & 1023) as usize;
 
-                    let d_buf_ptr = buffer.get_unchecked_mut(d_arr_index).as_mut_ptr();
+                    let d_buf_ptr = buffer.get_unchecked(d_arr_index).as_ptr();
                     let mut d_stored = _mm_loadu_ps(d_buf_ptr);
                     d_stored = _mm_mul_ps(d_stored, v_half);
 
-                    let buf_ptr = buffer.as_mut_ptr().add(arr_index) as *mut f32;
+                    let buf_ptr = buffer.get_unchecked(arr_index).as_ptr();
                     let a_stored = _mm_loadu_ps(buf_ptr);
 
                     diffs = _mm_add_ps(diffs, _mm_sub_ps(a_stored, d_stored));
                 } else if x + radius_64 >= 0 {
                     let arr_index = (x & 1023) as usize;
-                    let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr();
+                    let buf_ptr = buffer.get_unchecked(arr_index).as_ptr();
                     let mut stored = _mm_loadu_ps(buf_ptr);
                     stored = _mm_mul_ps(stored, v_half);
                     diffs = _mm_sub_ps(diffs, stored);
@@ -202,17 +202,17 @@ fn fast_gaussian_vertical_pass_sse_f16_impl<T, const CN: usize>(
                     let arr_index = ((y - radius_64) & 1023) as usize;
                     let d_arr_index = (y & 1023) as usize;
 
-                    let d_buf_ptr = buffer.get_unchecked_mut(d_arr_index).as_mut_ptr();
+                    let d_buf_ptr = buffer.get_unchecked(d_arr_index).as_ptr();
                     let mut d_stored = _mm_loadu_ps(d_buf_ptr);
                     d_stored = _mm_mul_ps(d_stored, v_half);
 
-                    let buf_ptr = buffer.as_mut_ptr().add(arr_index) as *mut f32;
+                    let buf_ptr = buffer.get_unchecked(arr_index).as_ptr();
                     let a_stored = _mm_loadu_ps(buf_ptr);
 
                     diffs = _mm_add_ps(diffs, _mm_sub_ps(a_stored, d_stored));
                 } else if y + radius_64 >= 0 {
                     let arr_index = (y & 1023) as usize;
-                    let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr();
+                    let buf_ptr = buffer.get_unchecked(arr_index).as_ptr();
                     let mut stored = _mm_loadu_ps(buf_ptr);
                     stored = _mm_mul_ps(stored, v_half);
                     diffs = _mm_sub_ps(diffs, stored);

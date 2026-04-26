@@ -62,23 +62,22 @@ pub(crate) fn fgn_vertical_pass_neon_f16<const CN: usize>(
                 let current_y = (y * (stride as i64)) as usize;
 
                 if y >= 0 {
-                    let current_px = (std::cmp::max(x, 0)) as usize * CN;
+                    let current_px = std::cmp::max(x, 0) as usize * CN;
 
                     let prepared_px = vmulq_f32(summs, f_weight);
-                    let dst_ptr = bytes.get_ptr(current_y + current_px);
-                    store_f32_f16::<CN>(dst_ptr, prepared_px);
+                    store_f32_f16::<CN>(bytes.get_ptr(current_y + current_px), prepared_px);
 
                     let d_arr_index_1 = ((y + radius_64) & 1023) as usize;
                     let d_arr_index_2 = ((y - radius_64) & 1023) as usize;
                     let d_arr_index = (y & 1023) as usize;
 
-                    let buf_ptr = buffer.as_mut_ptr().add(d_arr_index) as *mut f32;
+                    let buf_ptr = buffer.get_unchecked(d_arr_index).as_ptr();
                     let stored = vld1q_f32(buf_ptr);
 
-                    let buf_ptr_1 = buffer.as_mut_ptr().add(d_arr_index_1) as *mut f32;
+                    let buf_ptr_1 = buffer.get_unchecked(d_arr_index_1).as_ptr();
                     let stored_1 = vld1q_f32(buf_ptr_1);
 
-                    let buf_ptr_2 = buffer.as_mut_ptr().add(d_arr_index_2) as *mut f32;
+                    let buf_ptr_2 = buffer.get_unchecked(d_arr_index_2).as_ptr();
                     let stored_2 = vld1q_f32(buf_ptr_2);
 
                     let new_diff =
@@ -87,10 +86,11 @@ pub(crate) fn fgn_vertical_pass_neon_f16<const CN: usize>(
                 } else if y + radius_64 >= 0 {
                     let arr_index = (y & 1023) as usize;
                     let arr_index_1 = ((y + radius_64) & 1023) as usize;
-                    let buf_ptr = buffer.as_mut_ptr().add(arr_index) as *mut f32;
+
+                    let buf_ptr = buffer.get_unchecked(arr_index).as_ptr();
                     let stored = vld1q_f32(buf_ptr);
 
-                    let buf_ptr_1 = buffer.as_mut_ptr().add(arr_index_1) as *mut f32;
+                    let buf_ptr_1 = buffer.get_unchecked(arr_index_1).as_ptr();
                     let stored_1 = vld1q_f32(buf_ptr_1);
 
                     let new_diff = vmulq_n_f32(vsubq_f32(stored, stored_1), 3f32);
@@ -98,7 +98,7 @@ pub(crate) fn fgn_vertical_pass_neon_f16<const CN: usize>(
                     diffs = vaddq_f32(diffs, new_diff);
                 } else if y + 2 * radius_64 >= 0 {
                     let arr_index = ((y + radius_64) & 1023) as usize;
-                    let buf_ptr = buffer.as_mut_ptr().add(arr_index) as *mut f32;
+                    let buf_ptr = buffer.get_unchecked(arr_index).as_ptr();
                     let stored = vld1q_f32(buf_ptr);
                     diffs = vsubq_f32(diffs, vmulq_n_f32(stored, 3f32));
                 }
@@ -112,7 +112,7 @@ pub(crate) fn fgn_vertical_pass_neon_f16<const CN: usize>(
                 let pixel_color = load_f32_f16::<CN>(s_ptr);
 
                 let arr_index = ((y + 2 * radius_64) & 1023) as usize;
-                let buf_ptr = buffer.as_mut_ptr().add(arr_index) as *mut f32;
+                let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr();
 
                 diffs = vaddq_f32(diffs, pixel_color);
                 ders = vaddq_f32(ders, diffs);
@@ -155,20 +155,19 @@ pub(crate) fn fgn_horizontal_pass_neon_f16<const CN: usize>(
 
                     let prepared_px = vmulq_f32(summs, f_weight);
 
-                    let dst_ptr = bytes.get_ptr(current_y + current_px);
-                    store_f32_f16::<CN>(dst_ptr, prepared_px);
+                    store_f32_f16::<CN>(bytes.get_ptr(current_y + current_px), prepared_px);
 
                     let d_arr_index_1 = ((x + radius_64) & 1023) as usize;
                     let d_arr_index_2 = ((x - radius_64) & 1023) as usize;
                     let d_arr_index = (x & 1023) as usize;
 
-                    let buf_ptr = buffer.as_mut_ptr().add(d_arr_index) as *mut f32;
+                    let buf_ptr = buffer.get_unchecked(d_arr_index).as_ptr();
                     let stored = vld1q_f32(buf_ptr);
 
-                    let buf_ptr_1 = buffer.as_mut_ptr().add(d_arr_index_1) as *mut f32;
+                    let buf_ptr_1 = buffer.get_unchecked(d_arr_index_1).as_ptr();
                     let stored_1 = vld1q_f32(buf_ptr_1);
 
-                    let buf_ptr_2 = buffer.as_mut_ptr().add(d_arr_index_2) as *mut f32;
+                    let buf_ptr_2 = buffer.get_unchecked(d_arr_index_2).as_ptr();
                     let stored_2 = vld1q_f32(buf_ptr_2);
 
                     let new_diff =
@@ -177,10 +176,11 @@ pub(crate) fn fgn_horizontal_pass_neon_f16<const CN: usize>(
                 } else if x + radius_64 >= 0 {
                     let arr_index = (x & 1023) as usize;
                     let arr_index_1 = ((x + radius_64) & 1023) as usize;
-                    let buf_ptr = buffer.as_mut_ptr().add(arr_index) as *mut f32;
+
+                    let buf_ptr = buffer.get_unchecked(arr_index).as_ptr();
                     let stored = vld1q_f32(buf_ptr);
 
-                    let buf_ptr_1 = buffer.as_mut_ptr().add(arr_index_1) as *mut f32;
+                    let buf_ptr_1 = buffer.get_unchecked(arr_index_1).as_ptr();
                     let stored_1 = vld1q_f32(buf_ptr_1);
 
                     let new_diff = vmulq_n_f32(vsubq_f32(stored, stored_1), 3f32);
@@ -188,7 +188,7 @@ pub(crate) fn fgn_horizontal_pass_neon_f16<const CN: usize>(
                     diffs = vaddq_f32(diffs, new_diff);
                 } else if x + 2 * radius_64 >= 0 {
                     let arr_index = ((x + radius_64) & 1023) as usize;
-                    let buf_ptr = buffer.as_mut_ptr().add(arr_index) as *mut f32;
+                    let buf_ptr = buffer.get_unchecked(arr_index).as_ptr();
                     let stored = vld1q_f32(buf_ptr);
                     diffs = vsubq_f32(diffs, vmulq_n_f32(stored, 3f32));
                 }
@@ -201,7 +201,7 @@ pub(crate) fn fgn_horizontal_pass_neon_f16<const CN: usize>(
                 let pixel_color = load_f32_f16::<CN>(s_ptr);
 
                 let arr_index = ((x + 2 * radius_64) & 1023) as usize;
-                let buf_ptr = buffer.as_mut_ptr().add(arr_index) as *mut f32;
+                let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr();
 
                 diffs = vaddq_f32(diffs, pixel_color);
                 ders = vaddq_f32(ders, diffs);

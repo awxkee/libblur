@@ -34,12 +34,12 @@ use image::imageops::FilterType;
 use image::{EncodableLayout, FlatSamples, GenericImageView, ImageReader};
 use libblur::{
     bilateral_filter, complex_gaussian_kernel, fast_bilateral_filter, fast_bilateral_filter_u16,
-    fast_gaussian, filter_1d_complex, filter_1d_complex_fixed_point, filter_2d_fft_complex,
-    filter_2d_rgb_fft, filter_2d_rgb_fft_complex, filter_2d_rgba_fft, gaussian_blur,
-    gaussian_kernel_1d, lens_kernel, sigma_size, stack_blur, stack_blur_f32, tent_blur,
-    AnisotropicRadius, BilateralBlurParams, BlurImage, BlurImageMut, BoxBlurParameters,
-    CLTParameters, ConvolutionMode, EdgeMode, EdgeMode2D, FastBlurChannels, GaussianBlurParams,
-    ImageSize, KernelShape, Scalar, ThreadingPolicy, TransferFunction,
+    fast_gaussian, fast_gaussian_next_u16, filter_1d_complex, filter_1d_complex_fixed_point,
+    filter_2d_fft_complex, filter_2d_rgb_fft, filter_2d_rgb_fft_complex, filter_2d_rgba_fft,
+    gaussian_blur, gaussian_kernel_1d, lens_kernel, sigma_size, stack_blur, stack_blur_f32,
+    stack_blur_u16, tent_blur, AnisotropicRadius, BilateralBlurParams, BlurImage, BlurImageMut,
+    BoxBlurParameters, CLTParameters, ConvolutionMode, EdgeMode, EdgeMode2D, FastBlurChannels,
+    GaussianBlurParams, ImageSize, KernelShape, Scalar, ThreadingPolicy, TransferFunction,
 };
 use num_complex::Complex;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
@@ -166,7 +166,10 @@ fn main() {
     //     .iter()
     //     .map(|&x| (x as f32 * (1. / 255.)))
     //     .collect::<Vec<_>>();
-    let mut lc = src_bytes.to_vec();
+    let mut lc = src_bytes
+        .iter()
+        .map(|&x| u16::from_ne_bytes([x, x]))
+        .collect::<Vec<u16>>();
     let mut cvt = BlurImageMut::borrow(
         &mut lc,
         dyn_image.width(),
@@ -199,15 +202,21 @@ fn main() {
     // )
     //     .unwrap();
 
-    tent_blur(
-        &cvt.to_immutable_ref(),
-        &mut dst_image,
-        CLTParameters::new(3.),
+    // tent_blur(
+    //     &cvt.to_immutable_ref(),
+    //     &mut dst_image,
+    //     CLTParameters::new(3.),
+    //     ThreadingPolicy::Single,
+    // )
+    // .unwrap();
+
+    fast_gaussian_next_u16(
+        &mut cvt,
+        AnisotropicRadius::new(55),
         ThreadingPolicy::Single,
+        EdgeMode::Clamp.as_2d(),
     )
     .unwrap();
-
-    // stack_blur(&mut cvt, AnisotropicRadius::new(8), ThreadingPolicy::Single).unwrap();
 
     // filter_2d_rgb_fft::<u8, f32>(
     //     &cvt,
@@ -275,13 +284,13 @@ fn main() {
 
     // dst_image = vzd.gamma8(TransferFunction::Srgb, false).unwrap();
     //
-    dst_bytes = dst_image
+    dst_bytes = cvt
         .data
         .borrow_mut()
         .iter()
-        .map(|&x| x)
+        // .map(|&x| x)
         // .map(|&x| (x * 255f32).round() as u8)
-        // .map(|&x| (x >> 8) as u8)
+        .map(|&x| (x >> 8) as u8)
         .collect::<Vec<u8>>();
 
     // dst_bytes = dst_image.data.borrow().to_vec();
