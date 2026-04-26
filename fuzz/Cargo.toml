@@ -18,6 +18,7 @@ neon = ["libblur/neon"]
 avx = ["libblur/avx"]
 sse = ["libblur/sse"]
 rdm = ["libblur/rdm", "neon"]
+sve = ["libblur/sve"]
 avx512 = ["libblur/avx512"]
 nightly_fcma = ["libblur/nightly_fcma"]
 

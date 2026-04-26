@@ -26,7 +26,7 @@ num-traits = "0.2"
 rayon = "1.10"
 image = { version = "0.25", optional = true, default-features = false }
 num-complex = "0.4"
-novtb = "^0.1.7"
+novtb = "^0.1.10"
 zaft = { version = "0.3.4", default-features = false, optional = true }
 
 [features]
@@ -47,6 +47,8 @@ avx = ["zaft?/avx"]
 sse = []
 # Enables NEON intrinsics
 neon = ["zaft?/neon"]
+# Enables SVE intrinsics, nightly 1.97+ required
+sve = ["neon"]
 
 [package.metadata.docs.rs]
 # To build locally:

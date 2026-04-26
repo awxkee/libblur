@@ -54,7 +54,7 @@ pub(crate) fn filter_column_neon_u8_i32_app(
 
         let coeff = vdupq_n_s16(*scanned_kernel.get_unchecked(0) as i16);
 
-        while cx + 64 < image_width {
+        while cx + 64 <= image_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let source = xvld1q_u8_x4(v_src.as_ptr());
@@ -87,7 +87,7 @@ pub(crate) fn filter_column_neon_u8_i32_app(
             cx += 64;
         }
 
-        while cx + 48 < image_width {
+        while cx + 48 <= image_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let source = xvld1q_u8_x3(v_src.as_ptr());
@@ -112,7 +112,7 @@ pub(crate) fn filter_column_neon_u8_i32_app(
             cx += 48;
         }
 
-        while cx + 32 < image_width {
+        while cx + 32 <= image_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let source = xvld1q_u8_x2(v_src.as_ptr());
@@ -135,7 +135,7 @@ pub(crate) fn filter_column_neon_u8_i32_app(
             cx += 32;
         }
 
-        while cx + 16 < image_width {
+        while cx + 16 <= image_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let source = vld1q_u8(v_src.as_ptr());
@@ -154,7 +154,7 @@ pub(crate) fn filter_column_neon_u8_i32_app(
 
         let coeff = *scanned_kernel.get_unchecked(0);
 
-        while cx + 4 < image_width {
+        while cx + 4 <= image_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let mut k0 = (*v_src.get_unchecked(0) as i32).mul(coeff);

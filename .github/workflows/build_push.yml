@@ -40,7 +40,7 @@ jobs:
     name: Clippy
     strategy:
       matrix:
-        os: [ ubuntu-latest, macos-latest ]
+        os: [ ubuntu-latest, ubuntu-24.04-arm ]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
@@ -60,7 +60,7 @@ jobs:
 
   tests_arm:
     name: Tests ARM
-    runs-on: macos-latest
+    runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
         feature: [ neon, rdm, "" ]
@@ -80,37 +80,47 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo test --features "${{ matrix.feature }}" --features fft --no-default-features
 
-  fuzz_box_mac:
-    name: Fuzzing Box
-    runs-on: macos-latest
+  fuzz_arm:
+    name: Fuzzing Stack blur & Box & Fast Gaussian ARM
+    runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
-        feature: [ neon, rdm, "" ]
+        feature: [ neon, rdm ]
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo install cargo-fuzz
+      - run: cargo fuzz run stack_blur --features ${{ matrix.feature }} -- -max_total_time=17
+      - run: cargo fuzz run stack_blur_u16 --features ${{ matrix.feature }} -- -max_total_time=17
+      - run: cargo fuzz run stack_blur_f32 --features ${{ matrix.feature }} -- -max_total_time=17
       - run: cargo fuzz run box --features "${{ matrix.feature }}" -- -max_total_time=14
       - run: cargo fuzz run box_u16 --features "${{ matrix.feature }}" -- -max_total_time=14
       - run: cargo fuzz run box_f32 --features "${{ matrix.feature }}" -- -max_total_time=14
+      - run: cargo fuzz run fast_gaussian --features ${{ matrix.feature }} -- -max_total_time=14
+      - run: cargo fuzz run fast_gaussian_u16 --features ${{ matrix.feature }} -- -max_total_time=14
+      - run: cargo fuzz run fast_gaussian_f32 --features ${{ matrix.feature }} -- -max_total_time=14
+      - run: cargo fuzz run fast_gaussian_next --features "${{ matrix.feature }}" -- -max_total_time=14
+      - run: cargo fuzz run fast_gaussian_next_u16 --features "${{ matrix.feature }}" -- -max_total_time=14
+      - run: cargo fuzz run fast_gaussian_next_f32 --features "${{ matrix.feature }}" -- -max_total_time=14
 
-  fuzz_box_x86:
-    name: Fuzzing Box
+  fuzz_sve:
+    name: Fuzzing Stack blur & Box & Fast Gaussian SVE
+    runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
-        feature: [ avx, sse ]
-    runs-on: ubuntu-latest
+        feature: [ sve ]
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo install cargo-fuzz
+      - run: cargo fuzz run stack_blur --features ${{ matrix.feature }} -- -max_total_time=17
       - run: cargo fuzz run box --features "${{ matrix.feature }}" -- -max_total_time=14
-      - run: cargo fuzz run box_u16 --features "${{ matrix.feature }}" -- -max_total_time=14
-      - run: cargo fuzz run box_f32 --features "${{ matrix.feature }}" -- -max_total_time=14
+      - run: cargo fuzz run fast_gaussian --features ${{ matrix.feature }} -- -max_total_time=14
+      - run: cargo fuzz run fast_gaussian_next --features "${{ matrix.feature }}" -- -max_total_time=14
 
   fuzz_filters_arm:
     name: Fuzzing Filter 1D/2D ARM
-    runs-on: macos-latest
+    runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
         feature: [ neon, rdm ]
@@ -128,7 +138,7 @@ jobs:
 
   fuzz_filter_arm_complex:
     name: Fuzzing Filter 1D/2D ARM FCMA
-    runs-on: macos-latest
+    runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@nightly
@@ -154,22 +164,8 @@ jobs:
       - run: cargo fuzz run filter_complex --features "${{ matrix.feature }}" -- -max_total_time=17
       - run: cargo fuzz run filter_complex_q --features "${{ matrix.feature }}" -- -max_total_time=17
 
-  fuzz_stack_blur:
-    name: Fuzzing Stack Blur
-    runs-on: macos-latest
-    strategy:
-      matrix:
-        feature: [ neon, rdm ]
-    steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@nightly
-      - run: cargo install cargo-fuzz
-      - run: cargo fuzz run stack_blur --features ${{ matrix.feature }} -- -max_total_time=17
-      - run: cargo fuzz run stack_blur_u16 --features ${{ matrix.feature }} -- -max_total_time=17
-      - run: cargo fuzz run stack_blur_f32 --features ${{ matrix.feature }} -- -max_total_time=17
-
   fuzz_stack_blur_x86:
-    name: Fuzzing Stack Blur
+    name: Fuzzing Stack Blur & Fast Gaussian & Box
     strategy:
       matrix:
         feature: [ sse, avx, "" ]
@@ -181,37 +177,12 @@ jobs:
       - run: cargo fuzz run stack_blur --features "${{ matrix.feature }}" -- -max_total_time=17
       - run: cargo fuzz run stack_blur_u16 --features "${{ matrix.feature }}" -- -max_total_time=17
       - run: cargo fuzz run stack_blur_f32 --features "${{ matrix.feature }}" -- -max_total_time=17
-
-  fuzz_fast_gaussian_blur:
-    name: Fuzzing Fast Gaussian Blur
-    runs-on: macos-latest
-    strategy:
-      matrix:
-        feature: [ neon, rdm ]
-    steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@nightly
-      - run: cargo install cargo-fuzz
-      - run: cargo fuzz run fast_gaussian --features ${{ matrix.feature }} -- -max_total_time=14
-      - run: cargo fuzz run fast_gaussian_u16 --features ${{ matrix.feature }} -- -max_total_time=14
-      - run: cargo fuzz run fast_gaussian_f32 --features ${{ matrix.feature }} -- -max_total_time=14
-      - run: cargo fuzz run fast_gaussian_next --features "${{ matrix.feature }}" -- -max_total_time=14
-      - run: cargo fuzz run fast_gaussian_next_u16 --features "${{ matrix.feature }}" -- -max_total_time=14
-      - run: cargo fuzz run fast_gaussian_next_f32 --features "${{ matrix.feature }}" -- -max_total_time=14
-
-  fuzz_fast_gaussian_blur_x86:
-    name: Fuzzing Fast Gaussian Blur
-    strategy:
-      matrix:
-        feature: [ sse, avx, "" ]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@nightly
-      - run: cargo install cargo-fuzz
       - run: cargo fuzz run fast_gaussian --features "${{ matrix.feature }}" -- -max_total_time=14
       - run: cargo fuzz run fast_gaussian_u16 --features "${{ matrix.feature }}" -- -max_total_time=14
       - run: cargo fuzz run fast_gaussian_f32 --features "${{ matrix.feature }}" -- -max_total_time=14
       - run: cargo fuzz run fast_gaussian_next --features "${{ matrix.feature }}" -- -max_total_time=14
       - run: cargo fuzz run fast_gaussian_next_u16 --features "${{ matrix.feature }}" -- -max_total_time=14
       - run: cargo fuzz run fast_gaussian_next_f32 --features "${{ matrix.feature }}" -- -max_total_time=14
+      - run: cargo fuzz run box --features "${{ matrix.feature }}" -- -max_total_time=14
+      - run: cargo fuzz run box_u16 --features "${{ matrix.feature }}" -- -max_total_time=14
+      - run: cargo fuzz run box_f32 --features "${{ matrix.feature }}" -- -max_total_time=14

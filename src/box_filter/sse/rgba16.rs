@@ -152,19 +152,19 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
                         let bytes_offset_2 = y_dst_shift + dst_stride as usize * 2 + px;
                         let bytes_offset_3 = y_dst_shift + dst_stride as usize * 3 + px;
                         store_u16_u32::<CN>(
-                            unsafe_dst.slice.as_ptr().add(bytes_offset_0) as *mut _,
+                            unsafe_dst.get_ptr(bytes_offset_0).cast(),
                             scale_store0,
                         );
                         store_u16_u32::<CN>(
-                            unsafe_dst.slice.as_ptr().add(bytes_offset_1) as *mut _,
+                            unsafe_dst.get_ptr(bytes_offset_1).cast(),
                             scale_store1,
                         );
                         store_u16_u32::<CN>(
-                            unsafe_dst.slice.as_ptr().add(bytes_offset_2) as *mut _,
+                            unsafe_dst.get_ptr(bytes_offset_2).cast(),
                             scale_store2,
                         );
                         store_u16_u32::<CN>(
-                            unsafe_dst.slice.as_ptr().add(bytes_offset_3) as *mut _,
+                            unsafe_dst.get_ptr(bytes_offset_3).cast(),
                             scale_store3,
                         );
                     }
@@ -253,7 +253,7 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
                     {
                         let r0 = _mm_mul_ps(_mm_cvtepi32_ps(store), v_weight);
                         let bytes_offset = y_dst_shift + px;
-                        let ptr = unsafe_dst.slice.as_ptr().add(bytes_offset) as *mut u16;
+                        let ptr = unsafe_dst.get_ptr(bytes_offset);
                         store_u16_u32::<CN>(ptr, _mm_cvtps_epi32(r0));
                     }
 
@@ -396,11 +396,11 @@ fn box_blur_vertical_pass_sse_impl16(
                         let scale_store_3 = _mm_cvtps_epi32(r3);
 
                         let offset = y_dst_shift + px;
-                        let ptr = unsafe_dst.slice.get_unchecked(offset).get();
 
                         let set0 = _mm_packus_epi32(scale_store_0, scale_store_1);
                         let set1 = _mm_packus_epi32(scale_store_2, scale_store_3);
 
+                        let ptr = unsafe_dst.get_ptr(offset);
                         _mm_storeu_si128(ptr as *mut _, set0);
                         _mm_storeu_si128(ptr.add(8) as *mut _, set1);
                     }
@@ -500,10 +500,10 @@ fn box_blur_vertical_pass_sse_impl16(
                         let scale_store_1 = _mm_cvtps_epi32(scale_store_1_ps);
 
                         let offset = y_dst_shift + px;
-                        let ptr = unsafe_dst.slice.get_unchecked(offset).get();
 
                         let set0 = _mm_packus_epi32(scale_store_0, scale_store_1);
 
+                        let ptr = unsafe_dst.get_ptr(offset);
                         _mm_storeu_si128(ptr as *mut _, set0);
                     }
 
@@ -567,7 +567,7 @@ fn box_blur_vertical_pass_sse_impl16(
 
                 let scale_store = _mm_mul_ps_epi32(store, v_weight);
 
-                let ptr = unsafe_dst.slice.as_ptr().add(y_dst_shift + px) as *mut u16;
+                let ptr = unsafe_dst.get_ptr(y_dst_shift + px);
                 store_u16_u32::<TAIL_CN>(ptr, scale_store);
 
                 // subtract previous

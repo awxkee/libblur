@@ -64,7 +64,7 @@ pub(crate) fn filter_column_avx_symm_u8_i32_app(
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn filter_column_avx_symm_u8_i32_impl(
+fn filter_column_avx_symm_u8_i32_impl(
     arena: Arena,
     arena_src: &[&[u8]],
     dst: &mut [u8],

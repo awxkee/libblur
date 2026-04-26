@@ -32,6 +32,10 @@ use crate::unsafe_slice::UnsafeSlice;
 use crate::util::ScratchBuffer;
 use std::arch::aarch64::*;
 
+#[derive(Clone, Copy, Default)]
+#[repr(C, align(16))]
+pub(crate) struct NeonVectorI32x4([i32; 4]);
+
 pub(crate) struct VerticalNeonStackBlurPassQ0_31<const CN: usize> {}
 
 impl<const CN: usize> Default for VerticalNeonStackBlurPassQ0_31<CN> {
@@ -56,7 +60,7 @@ impl<const CN: usize> StackBlurWorkingPass<u8, CN> for VerticalNeonStackBlurPass
 
 impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
     #[target_feature(enable = "rdm")]
-    unsafe fn pass_impl(
+    fn pass_impl(
         &self,
         pixels: &UnsafeSlice<u8>,
         stride: u32,
@@ -71,7 +75,7 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
             let mut yp;
             let mut sp;
             let mut stack_start;
-            let mut scratch_buffer = ScratchBuffer::<i32, 2048>::new(4 * div * 4);
+            let mut scratch_buffer = ScratchBuffer::<NeonVectorI32x4, 2048>::new(div * 4);
             let stacks0 = scratch_buffer.as_mut_slice();
 
             let hm = height - 1;
@@ -103,10 +107,8 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
 
                 let mut src_ptr = cx; // x,0
 
-                let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
-
                 {
-                    let src_pixel0 = vld1q_u8(src_ld as *const u8);
+                    let src_pixel0 = vld1q_u8(pixels.get_ptr(src_ptr).cast());
                     let lo0 = vmovl_u8(vget_low_u8(src_pixel0));
                     let hi0 = vmovl_high_u8(src_pixel0);
 
@@ -116,12 +118,12 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                     let i16_h1 = vreinterpretq_s32_u32(vmovl_high_u16(hi0));
 
                     for i in 0..=radius {
-                        let stack_ptr = stacks0.as_mut_ptr().add(i as usize * 4 * 4);
+                        let stack_ptr = stacks0.get_unchecked_mut(i as usize * 4..);
 
-                        vst1q_s32(stack_ptr, i16_l0);
-                        vst1q_s32(stack_ptr.add(4), i16_h0);
-                        vst1q_s32(stack_ptr.add(8), i16_l1);
-                        vst1q_s32(stack_ptr.add(12), i16_h1);
+                        vst1q_s32(stack_ptr.as_mut_ptr().cast(), i16_l0);
+                        vst1q_s32(stack_ptr.get_unchecked_mut(1..).as_mut_ptr().cast(), i16_h0);
+                        vst1q_s32(stack_ptr.get_unchecked_mut(2..).as_mut_ptr().cast(), i16_l1);
+                        vst1q_s32(stack_ptr.get_unchecked_mut(3..).as_mut_ptr().cast(), i16_h1);
 
                         let w = vdupq_n_s32(i as i32 + 1);
 
@@ -143,9 +145,8 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                             src_ptr += stride as usize;
                         }
 
-                        let stack_ptr = stacks0.as_mut_ptr().add((i + radius) as usize * 4 * 4);
-                        let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
-                        let src_pixel0 = vld1q_u8(src_ld as *const u8);
+                        let stack_ptr = stacks0.get_unchecked_mut((i + radius) as usize * 4..);
+                        let src_pixel0 = vld1q_u8(pixels.get_ptr(src_ptr).cast());
                         let lo0 = vmovl_u8(vget_low_u8(src_pixel0));
                         let hi0 = vmovl_high_u8(src_pixel0);
 
@@ -154,10 +155,10 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                         let i16_l1 = vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(hi0)));
                         let i16_h1 = vreinterpretq_s32_u32(vmovl_high_u16(hi0));
 
-                        vst1q_s32(stack_ptr, i16_l0);
-                        vst1q_s32(stack_ptr.add(4), i16_h0);
-                        vst1q_s32(stack_ptr.add(8), i16_l1);
-                        vst1q_s32(stack_ptr.add(12), i16_h1);
+                        vst1q_s32(stack_ptr.as_mut_ptr().cast(), i16_l0);
+                        vst1q_s32(stack_ptr.get_unchecked_mut(1..).as_mut_ptr().cast(), i16_h0);
+                        vst1q_s32(stack_ptr.get_unchecked_mut(2..).as_mut_ptr().cast(), i16_l1);
+                        vst1q_s32(stack_ptr.get_unchecked_mut(3..).as_mut_ptr().cast(), i16_h1);
 
                         let vj = vdupq_n_s32(radius as i32 + 1 - i as i32);
 
@@ -181,7 +182,7 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                 src_ptr = cx + yp as usize * stride as usize;
                 let mut dst_ptr = cx;
                 for _ in 0..height {
-                    let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
+                    let store_ld = pixels.get_ptr(dst_ptr);
 
                     let scaled_val0 = vqrdmulhq_s32(sums0, mul_value);
                     let scaled_val1 = vqrdmulhq_s32(sums1, mul_value);
@@ -206,12 +207,15 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                         stack_start -= div;
                     }
 
-                    let stack_ptr = stacks0.as_mut_ptr().add(stack_start as usize * 4 * 4);
+                    let stack_ptr = stacks0.get_unchecked_mut(stack_start as usize * 4..);
 
-                    let stack_val0 = vld1q_s32(stack_ptr);
-                    let stack_val1 = vld1q_s32(stack_ptr.add(4));
-                    let stack_val2 = vld1q_s32(stack_ptr.add(8));
-                    let stack_val3 = vld1q_s32(stack_ptr.add(12));
+                    let stack_val0 = vld1q_s32(stack_ptr.as_mut_ptr().cast());
+                    let stack_val1 =
+                        vld1q_s32(stack_ptr.get_unchecked_mut(1..).as_mut_ptr().cast());
+                    let stack_val2 =
+                        vld1q_s32(stack_ptr.get_unchecked_mut(2..).as_mut_ptr().cast());
+                    let stack_val3 =
+                        vld1q_s32(stack_ptr.get_unchecked_mut(3..).as_mut_ptr().cast());
 
                     sum_out0 = vsubq_s32(sum_out0, stack_val0);
                     sum_out1 = vsubq_s32(sum_out1, stack_val1);
@@ -223,9 +227,7 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                         yp += 1;
                     }
 
-                    let src_ld = pixels.slice.as_ptr().add(src_ptr);
-
-                    let src_pixel0 = vld1q_u8(src_ld as *const u8);
+                    let src_pixel0 = vld1q_u8(pixels.get_ptr(src_ptr));
                     let lo0 = vmovl_u8(vget_low_u8(src_pixel0));
                     let hi0 = vmovl_high_u8(src_pixel0);
 
@@ -234,10 +236,10 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                     let i16_l1 = vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(hi0)));
                     let i16_h1 = vreinterpretq_s32_u32(vmovl_high_u16(hi0));
 
-                    vst1q_s32(stack_ptr, i16_l0);
-                    vst1q_s32(stack_ptr.add(4), i16_h0);
-                    vst1q_s32(stack_ptr.add(8), i16_l1);
-                    vst1q_s32(stack_ptr.add(12), i16_h1);
+                    vst1q_s32(stack_ptr.as_mut_ptr().cast(), i16_l0);
+                    vst1q_s32(stack_ptr.get_unchecked_mut(1..).as_mut_ptr().cast(), i16_h0);
+                    vst1q_s32(stack_ptr.get_unchecked_mut(2..).as_mut_ptr().cast(), i16_l1);
+                    vst1q_s32(stack_ptr.get_unchecked_mut(3..).as_mut_ptr().cast(), i16_h1);
 
                     sum_in0 = vaddq_s32(sum_in0, i16_l0);
                     sum_in1 = vaddq_s32(sum_in1, i16_h0);
@@ -254,12 +256,15 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                     if sp >= div {
                         sp = 0;
                     }
-                    let stack_ptr = stacks0.as_mut_ptr().add(sp as usize * 4 * 4);
+                    let stack_ptr = stacks0.get_unchecked_mut(sp as usize * 4..);
 
-                    let stack_val0 = vld1q_s32(stack_ptr);
-                    let stack_val1 = vld1q_s32(stack_ptr.add(4));
-                    let stack_val2 = vld1q_s32(stack_ptr.add(8));
-                    let stack_val3 = vld1q_s32(stack_ptr.add(12));
+                    let stack_val0 = vld1q_s32(stack_ptr.as_mut_ptr().cast());
+                    let stack_val1 =
+                        vld1q_s32(stack_ptr.get_unchecked_mut(1..).as_mut_ptr().cast());
+                    let stack_val2 =
+                        vld1q_s32(stack_ptr.get_unchecked_mut(2..).as_mut_ptr().cast());
+                    let stack_val3 =
+                        vld1q_s32(stack_ptr.get_unchecked_mut(3..).as_mut_ptr().cast());
 
                     sum_out0 = vaddq_s32(sum_out0, stack_val0);
                     sum_out1 = vaddq_s32(sum_out1, stack_val1);
@@ -287,20 +292,18 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
 
                 let mut src_ptr = cx; // x,0
 
-                let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
-
                 {
-                    let src_pixel0 = vld1_u8(src_ld as *const u8);
+                    let src_pixel0 = vld1_u8(pixels.get_ptr(src_ptr));
                     let lo0 = vmovl_u8(src_pixel0);
 
                     let i16_l0 = vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(lo0)));
                     let i16_h0 = vreinterpretq_s32_u32(vmovl_high_u16(lo0));
 
                     for i in 0..=radius {
-                        let stack_ptr = stacks0.as_mut_ptr().add(i as usize * 4 * 4);
+                        let stack_ptr = stacks0.get_unchecked_mut(i as usize * 4..);
 
-                        vst1q_s32(stack_ptr, i16_l0);
-                        vst1q_s32(stack_ptr.add(4), i16_h0);
+                        vst1q_s32(stack_ptr.as_mut_ptr().cast(), i16_l0);
+                        vst1q_s32(stack_ptr.get_unchecked_mut(1..).as_mut_ptr().cast(), i16_h0);
 
                         let w = vdupq_n_s32(i as i32 + 1);
 
@@ -318,16 +321,15 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                             src_ptr += stride as usize;
                         }
 
-                        let stack_ptr = stacks0.as_mut_ptr().add((i + radius) as usize * 4 * 4);
-                        let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
-                        let src_pixel0 = vld1_u8(src_ld as *const u8);
+                        let stack_ptr = stacks0.get_unchecked_mut((i + radius) as usize * 4..);
+                        let src_pixel0 = vld1_u8(pixels.get_ptr(src_ptr));
                         let lo0 = vmovl_u8(src_pixel0);
 
                         let i16_l0 = vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(lo0)));
                         let i16_h0 = vreinterpretq_s32_u32(vmovl_high_u16(lo0));
 
-                        vst1q_s32(stack_ptr, i16_l0);
-                        vst1q_s32(stack_ptr.add(4), i16_h0);
+                        vst1q_s32(stack_ptr.as_mut_ptr().cast(), i16_l0);
+                        vst1q_s32(stack_ptr.get_unchecked_mut(1..).as_mut_ptr().cast(), i16_h0);
 
                         let vj = vdupq_n_s32(radius as i32 + 1 - i as i32);
 
@@ -347,14 +349,12 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                 src_ptr = cx + yp as usize * stride as usize;
                 let mut dst_ptr = cx;
                 for _ in 0..height {
-                    let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
-
                     let scaled_val0 = vqrdmulhq_s32(sums0, mul_value);
                     let scaled_val1 = vqrdmulhq_s32(sums1, mul_value);
 
                     let jv0 = vcombine_u16(vqmovun_s32(scaled_val0), vqmovun_s32(scaled_val1));
 
-                    vst1_u8(store_ld, vqmovn_u16(jv0));
+                    vst1_u8(pixels.get_ptr(dst_ptr), vqmovn_u16(jv0));
 
                     dst_ptr += stride as usize;
 
@@ -366,10 +366,11 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                         stack_start -= div;
                     }
 
-                    let stack_ptr = stacks0.as_mut_ptr().add(stack_start as usize * 4 * 4);
+                    let stack_ptr = stacks0.get_unchecked_mut(stack_start as usize * 4..);
 
-                    let stack_val0 = vld1q_s32(stack_ptr);
-                    let stack_val1 = vld1q_s32(stack_ptr.add(4));
+                    let stack_val0 = vld1q_s32(stack_ptr.as_mut_ptr().cast());
+                    let stack_val1 =
+                        vld1q_s32(stack_ptr.get_unchecked_mut(1..).as_mut_ptr().cast());
 
                     sum_out0 = vsubq_s32(sum_out0, stack_val0);
                     sum_out1 = vsubq_s32(sum_out1, stack_val1);
@@ -379,16 +380,14 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                         yp += 1;
                     }
 
-                    let src_ld = pixels.slice.as_ptr().add(src_ptr);
-
-                    let src_pixel0 = vld1_u8(src_ld as *const u8);
+                    let src_pixel0 = vld1_u8(pixels.get_ptr(src_ptr));
                     let lo0 = vmovl_u8(src_pixel0);
 
                     let i16_l0 = vreinterpretq_s32_u32(vmovl_u16(vget_low_u16(lo0)));
                     let i16_h0 = vreinterpretq_s32_u32(vmovl_high_u16(lo0));
 
-                    vst1q_s32(stack_ptr, i16_l0);
-                    vst1q_s32(stack_ptr.add(4), i16_h0);
+                    vst1q_s32(stack_ptr.as_mut_ptr().cast(), i16_l0);
+                    vst1q_s32(stack_ptr.get_unchecked_mut(1..).as_mut_ptr().cast(), i16_h0);
 
                     sum_in0 = vaddq_s32(sum_in0, i16_l0);
                     sum_in1 = vaddq_s32(sum_in1, i16_h0);
@@ -401,10 +400,11 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                     if sp >= div {
                         sp = 0;
                     }
-                    let stack_ptr = stacks0.as_mut_ptr().add(sp as usize * 4 * 4);
+                    let stack_ptr = stacks0.get_unchecked_mut(sp as usize * 4..);
 
-                    let stack_val0 = vld1q_s32(stack_ptr);
-                    let stack_val1 = vld1q_s32(stack_ptr.add(4));
+                    let stack_val0 = vld1q_s32(stack_ptr.as_mut_ptr().cast());
+                    let stack_val1 =
+                        vld1q_s32(stack_ptr.get_unchecked_mut(1..).as_mut_ptr().cast());
 
                     sum_out0 = vaddq_s32(sum_out0, stack_val0);
                     sum_out1 = vaddq_s32(sum_out1, stack_val1);
@@ -423,13 +423,11 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
 
                 let mut src_ptr = cx; // x,0
 
-                let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
-
-                let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
+                let src_pixel = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr));
 
                 for i in 0..=radius {
-                    let stack_ptr = stacks0.as_mut_ptr().add(i as usize * 4);
-                    vst1q_s32(stack_ptr, src_pixel);
+                    let stack_ptr = stacks0.get_unchecked_mut(i as usize * 4..);
+                    vst1q_s32(stack_ptr.as_mut_ptr().cast(), src_pixel);
                     sums = vmlaq_s32(sums, src_pixel, vdupq_n_s32(i as i32 + 1));
                     sum_out = vaddq_s32(sum_out, src_pixel);
                 }
@@ -439,10 +437,9 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                         src_ptr += stride as usize;
                     }
 
-                    let stack_ptr = stacks0.as_mut_ptr().add((i + radius) as usize * 4);
-                    let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
-                    let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
-                    vst1q_s32(stack_ptr, src_pixel);
+                    let stack_ptr = stacks0.get_unchecked_mut((i + radius) as usize * 4..);
+                    let src_pixel = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr));
+                    vst1q_s32(stack_ptr.as_mut_ptr().cast(), src_pixel);
                     sums = vmlaq_s32(sums, src_pixel, vdupq_n_s32(radius as i32 + 1 - i as i32));
 
                     sum_in = vaddq_s32(sum_in, src_pixel);
@@ -456,9 +453,8 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                 src_ptr = cx + yp as usize * stride as usize;
                 let mut dst_ptr = cx;
                 for _ in 0..height {
-                    let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
                     let scaled_val = vqrdmulhq_s32(sums, mul_value);
-                    store_u8_s32::<CN>(store_ld, scaled_val);
+                    store_u8_s32::<CN>(pixels.get_ptr(dst_ptr), scaled_val);
 
                     dst_ptr += stride as usize;
 
@@ -469,8 +465,8 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                         stack_start -= div;
                     }
 
-                    let stack_ptr = stacks0.as_mut_ptr().add(stack_start as usize * 4);
-                    let stack_val = vld1q_s32(stack_ptr);
+                    let stack_ptr = stacks0.get_unchecked_mut(stack_start as usize * 4..);
+                    let stack_val = vld1q_s32(stack_ptr.as_mut_ptr().cast());
                     sum_out = vsubq_s32(sum_out, stack_val);
 
                     if yp < hm {
@@ -478,9 +474,8 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                         yp += 1;
                     }
 
-                    let src_ld = pixels.slice.as_ptr().add(src_ptr);
-                    let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
-                    vst1q_s32(stack_ptr, src_pixel);
+                    let src_pixel = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr));
+                    vst1q_s32(stack_ptr.as_mut_ptr().cast(), src_pixel);
 
                     sum_in = vaddq_s32(sum_in, src_pixel);
                     sums = vaddq_s32(sums, sum_in);
@@ -490,8 +485,8 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                     if sp >= div {
                         sp = 0;
                     }
-                    let stack_ptr = stacks0.as_mut_ptr().add(sp as usize * 4);
-                    let stack_val = vld1q_s32(stack_ptr);
+                    let stack_ptr = stacks0.get_unchecked(sp as usize * 4..);
+                    let stack_val = vld1q_s32(stack_ptr.as_ptr().cast());
 
                     sum_out = vaddq_s32(sum_out, stack_val);
                     sum_in = vsubq_s32(sum_in, stack_val);
@@ -509,14 +504,12 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
 
                 let mut src_ptr = cx; // x,0
 
-                let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
-
-                let src_pixel = load_u8_s32_fast::<TAIL>(src_ld as *const u8);
+                let src_pixel = load_u8_s32_fast::<TAIL>(pixels.get_ptr(src_ptr));
 
                 for i in 0..=radius {
-                    let stack_ptr = stacks0.as_mut_ptr().add(i as usize * 4);
-                    vst1q_s32(stack_ptr, src_pixel);
-                    sums = vmlaq_s32(sums, src_pixel, vdupq_n_s32(i as i32 + 1));
+                    let stack_ptr = stacks0.get_unchecked_mut(i as usize * 4..);
+                    vst1q_s32(stack_ptr.as_mut_ptr().cast(), src_pixel);
+                    sums = vmlaq_n_s32(sums, src_pixel, i as i32 + 1);
                     sum_out = vaddq_s32(sum_out, src_pixel);
                 }
 
@@ -525,11 +518,10 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                         src_ptr += stride as usize;
                     }
 
-                    let stack_ptr = stacks0.as_mut_ptr().add((i + radius) as usize * 4);
-                    let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const i32;
-                    let src_pixel = load_u8_s32_fast::<TAIL>(src_ld as *const u8);
-                    vst1q_s32(stack_ptr, src_pixel);
-                    sums = vmlaq_s32(sums, src_pixel, vdupq_n_s32(radius as i32 + 1 - i as i32));
+                    let stack_ptr = stacks0.get_unchecked_mut((i + radius) as usize * 4..);
+                    let src_pixel = load_u8_s32_fast::<TAIL>(pixels.get_ptr(src_ptr));
+                    vst1q_s32(stack_ptr.as_mut_ptr().cast(), src_pixel);
+                    sums = vmlaq_n_s32(sums, src_pixel, radius as i32 + 1 - i as i32);
 
                     sum_in = vaddq_s32(sum_in, src_pixel);
                 }
@@ -542,10 +534,9 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                 src_ptr = cx + yp as usize * stride as usize;
                 let mut dst_ptr = cx;
                 for _ in 0..height {
-                    let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut u8;
                     let scaled_val = vqrdmulhq_s32(sums, mul_value);
 
-                    store_u8_s32::<TAIL>(store_ld, scaled_val);
+                    store_u8_s32::<TAIL>(pixels.get_ptr(dst_ptr), scaled_val);
 
                     dst_ptr += stride as usize;
 
@@ -556,8 +547,8 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                         stack_start -= div;
                     }
 
-                    let stack_ptr = stacks0.as_mut_ptr().add(stack_start as usize * 4);
-                    let stack_val = vld1q_s32(stack_ptr);
+                    let stack_ptr = stacks0.get_unchecked_mut(stack_start as usize * 4..);
+                    let stack_val = vld1q_s32(stack_ptr.as_ptr().cast());
                     sum_out = vsubq_s32(sum_out, stack_val);
 
                     if yp < hm {
@@ -565,9 +556,8 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                         yp += 1;
                     }
 
-                    let src_ld = pixels.slice.as_ptr().add(src_ptr);
-                    let src_pixel = load_u8_s32_fast::<TAIL>(src_ld as *const u8);
-                    vst1q_s32(stack_ptr, src_pixel);
+                    let src_pixel = load_u8_s32_fast::<TAIL>(pixels.get_ptr(src_ptr));
+                    vst1q_s32(stack_ptr.as_mut_ptr().cast(), src_pixel);
 
                     sum_in = vaddq_s32(sum_in, src_pixel);
                     sums = vaddq_s32(sums, sum_in);
@@ -577,8 +567,8 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                     if sp >= div {
                         sp = 0;
                     }
-                    let stack_ptr = stacks0.as_mut_ptr().add(sp as usize * 4);
-                    let stack_val = vld1q_s32(stack_ptr);
+                    let stack_ptr = stacks0.get_unchecked(sp as usize * 4..);
+                    let stack_val = vld1q_s32(stack_ptr.as_ptr().cast());
 
                     sum_out = vaddq_s32(sum_out, stack_val);
                     sum_in = vsubq_s32(sum_in, stack_val);

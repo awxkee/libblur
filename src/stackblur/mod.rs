@@ -41,6 +41,8 @@ pub mod stack_blur_f16;
 pub mod stack_blur_f32;
 mod stack_blur_pass;
 mod stack_blur_u16;
+#[cfg(all(target_arch = "aarch64", feature = "sve"))]
+mod sve;
 mod vertical;
 #[cfg(all(target_arch = "wasm32", target_feature = "simd128"))]
 mod wasm;

@@ -58,7 +58,7 @@ pub(crate) fn filter_column_complex_q<T, I>(
 
         let coeff = *kernel.get_unchecked(0);
 
-        while cx + 4 < full_width {
+        while cx + 4 <= full_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let q_coeff = Complex::new(coeff.re as i32, coeff.im as i32);

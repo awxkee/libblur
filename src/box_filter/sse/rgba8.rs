@@ -238,28 +238,28 @@ fn box_blur_horizontal_pass_impl<const CN: usize>(
                     let bytes_offset_2 = y_dst_shift + dst_stride as usize * 2 + px;
                     let bytes_offset_3 = y_dst_shift + dst_stride as usize * 3 + px;
                     if CN == 4 {
-                        let dst_ptr_0 = unsafe_dst.slice.as_ptr().add(bytes_offset_0) as *mut u8;
+                        let dst_ptr_0 = unsafe_dst.get_ptr(bytes_offset_0);
                         _mm_storeu_si32(dst_ptr_0, px_80);
 
-                        let dst_ptr_1 = unsafe_dst.slice.as_ptr().add(bytes_offset_1) as *mut u8;
+                        let dst_ptr_1 = unsafe_dst.get_ptr(bytes_offset_1);
                         _mm_storeu_si32(dst_ptr_1, px_81);
 
-                        let dst_ptr_2 = unsafe_dst.slice.as_ptr().add(bytes_offset_2) as *mut u8;
+                        let dst_ptr_2 = unsafe_dst.get_ptr(bytes_offset_2);
                         _mm_storeu_si32(dst_ptr_2, px_82);
 
-                        let dst_ptr_3 = unsafe_dst.slice.as_ptr().add(bytes_offset_3) as *mut u8;
+                        let dst_ptr_3 = unsafe_dst.get_ptr(bytes_offset_3);
                         _mm_storeu_si32(dst_ptr_3, px_83);
                     } else {
-                        let dst_ptr_0 = unsafe_dst.slice.as_ptr().add(bytes_offset_0) as *mut u8;
+                        let dst_ptr_0 = unsafe_dst.get_ptr(bytes_offset_0);
                         write_u8::<CN>(dst_ptr_0, px_80);
 
-                        let dst_ptr_1 = unsafe_dst.slice.as_ptr().add(bytes_offset_1) as *mut u8;
+                        let dst_ptr_1 = unsafe_dst.get_ptr(bytes_offset_1);
                         write_u8::<CN>(dst_ptr_1, px_81);
 
-                        let dst_ptr_2 = unsafe_dst.slice.as_ptr().add(bytes_offset_2) as *mut u8;
+                        let dst_ptr_2 = unsafe_dst.get_ptr(bytes_offset_2);
                         write_u8::<CN>(dst_ptr_2, px_82);
 
-                        let dst_ptr_3 = unsafe_dst.slice.as_ptr().add(bytes_offset_3) as *mut u8;
+                        let dst_ptr_3 = unsafe_dst.get_ptr(bytes_offset_3);
                         write_u8::<CN>(dst_ptr_3, px_83);
                     }
                 }
@@ -390,7 +390,7 @@ fn box_blur_horizontal_pass_impl<const CN: usize>(
                 {
                     let r0 = _mm_mul_ps(_mm_cvtepi32_ps(store), v_weight);
                     let bytes_offset = y_dst_shift + px;
-                    let ptr = unsafe_dst.slice.as_ptr().add(bytes_offset) as *mut u8;
+                    let ptr = unsafe_dst.get_ptr(bytes_offset);
                     store_u8_u32::<CN>(ptr, _mm_cvtps_epi32(r0));
                 }
 
@@ -531,12 +531,13 @@ fn box_blur_vertical_pass_sse_impl(
                     let scale_store_3 = _mm_cvtps_epi32(r3);
 
                     let offset = y_dst_shift + px;
-                    let ptr = unsafe_dst.slice.get_unchecked(offset).get();
 
                     let set0 = _mm_packus_epi32(scale_store_0, scale_store_1);
                     let set1 = _mm_packus_epi32(scale_store_2, scale_store_3);
 
                     let full_set = _mm_packus_epi16(set0, set1);
+
+                    let ptr = unsafe_dst.get_ptr(offset);
                     _mm_storeu_si128(ptr as *mut _, full_set);
                 }
 
@@ -636,11 +637,12 @@ fn box_blur_vertical_pass_sse_impl(
                     let scale_store_1 = _mm_cvtps_epi32(scale_store_1_ps);
 
                     let offset = y_dst_shift + px;
-                    let ptr = unsafe_dst.slice.get_unchecked(offset).get();
 
                     let set0 = _mm_packus_epi32(scale_store_0, scale_store_1);
 
                     let full_set = _mm_packus_epi16(set0, _mm_setzero_si128());
+
+                    let ptr = unsafe_dst.get_ptr(offset);
                     _mm_storeu_si64(ptr as *mut _, full_set);
 
                     // subtract previous
@@ -704,7 +706,7 @@ fn box_blur_vertical_pass_sse_impl(
 
                 let scale_store = _mm_mul_ps_epi32(store, v_weight);
 
-                let ptr = unsafe_dst.slice.as_ptr().add(y_dst_shift + px) as *mut u8;
+                let ptr = unsafe_dst.get_ptr(y_dst_shift + px);
                 store_u8_u32::<TAIL_CN>(ptr, scale_store);
 
                 // subtract previous

@@ -80,7 +80,7 @@ impl<const CN: usize> VerticalSseStackBlurPassFloat16<CN> {
 
                 src_ptr = CN * x; // x,0
 
-                let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f16;
+                let src_ld = pixels.get_ptr(src_ptr) as *const f16;
                 let src_pixel = load_f32_f16::<CN>(src_ld);
 
                 for i in 0..=radius {
@@ -96,7 +96,7 @@ impl<const CN: usize> VerticalSseStackBlurPassFloat16<CN> {
                     }
 
                     let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4);
-                    let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f16;
+                    let src_ld = pixels.get_ptr(src_ptr) as *const f16;
                     let src_pixel = load_f32_f16::<CN>(src_ld);
                     _mm_storeu_ps(stack_ptr, src_pixel);
                     sums = _mm_add_ps(
@@ -115,7 +115,7 @@ impl<const CN: usize> VerticalSseStackBlurPassFloat16<CN> {
                 src_ptr = CN * x + yp as usize * stride as usize;
                 dst_ptr = CN * x;
                 for _ in 0..height {
-                    let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut f16;
+                    let store_ld = pixels.get_ptr(dst_ptr);
                     let blurred = _mm_mul_ps(sums, v_mul_value);
                     store_f32_f16::<CN>(store_ld, blurred);
 
@@ -137,7 +137,7 @@ impl<const CN: usize> VerticalSseStackBlurPassFloat16<CN> {
                         yp += 1;
                     }
 
-                    let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f16;
+                    let src_ld = pixels.get_ptr(src_ptr) as *const f16;
                     let src_pixel = load_f32_f16::<CN>(src_ld);
                     _mm_storeu_ps(stack_ptr, src_pixel);
 

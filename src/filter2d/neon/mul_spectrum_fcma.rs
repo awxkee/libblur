@@ -42,7 +42,7 @@ pub(crate) fn fcma_mul_spectrum_in_place_f32(
 }
 
 #[target_feature(enable = "fcma")]
-unsafe fn mul_spectrum_in_place_f32_impl(
+fn mul_spectrum_in_place_f32_impl(
     value1: &mut [Complex<f32>],
     other: &[Complex<f32>],
     width: usize,

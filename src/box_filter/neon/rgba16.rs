@@ -182,10 +182,10 @@ fn box_blur_horizontal_pass_neon_impl16<const CN: usize>(
 
                 store_u16_u32_x4::<CN>(
                     (
-                        unsafe_dst.slice.as_ptr().add(bytes_offset_0) as *mut _,
-                        unsafe_dst.slice.as_ptr().add(bytes_offset_1) as *mut _,
-                        unsafe_dst.slice.as_ptr().add(bytes_offset_2) as *mut _,
-                        unsafe_dst.slice.as_ptr().add(bytes_offset_3) as *mut _,
+                        unsafe_dst.get_ptr(bytes_offset_0).cast(),
+                        unsafe_dst.get_ptr(bytes_offset_1).cast(),
+                        unsafe_dst.get_ptr(bytes_offset_2).cast(),
+                        unsafe_dst.get_ptr(bytes_offset_3).cast(),
                     ),
                     uint32x4x4_t(ss0, ss1, ss2, ss3),
                 );
@@ -279,7 +279,7 @@ fn box_blur_horizontal_pass_neon_impl16<const CN: usize>(
 
             let bytes_offset = y_dst_shift + px;
             unsafe {
-                let dst_ptr = unsafe_dst.slice.as_ptr().add(bytes_offset) as *mut u16;
+                let dst_ptr = unsafe_dst.get_ptr(bytes_offset);
                 store_u16x4::<CN>(dst_ptr, vqmovn_u32(scale_store));
             }
 
@@ -505,7 +505,6 @@ fn box_blur_vertical_pass_neon_any_rgba16(
                         mul_set_v4(store_0, store_1, store_2, store_3, v_weight);
 
                     let offset = y_dst_shift + px;
-                    let ptr = unsafe_dst.slice.get_unchecked(offset).get();
                     let px_16_lo0 = vqmovn_u32(scale_store_0);
                     let px_16_hi0 = vqmovn_u32(scale_store_1);
                     let px_16_lo1 = vqmovn_u32(scale_store_2);
@@ -513,6 +512,7 @@ fn box_blur_vertical_pass_neon_any_rgba16(
                     let px0 = vcombine_u16(px_16_lo0, px_16_hi0);
                     let px1 = vcombine_u16(px_16_lo1, px_16_hi2);
 
+                    let ptr = unsafe_dst.get_ptr(offset);
                     vst1q_u16(ptr, px0);
                     vst1q_u16(ptr.add(8), px1);
                 }
@@ -564,10 +564,11 @@ fn box_blur_vertical_pass_neon_any_rgba16(
                     let (scale_store_0, scale_store_1) = mul_set_v2(store_0, store_1, v_weight);
 
                     let offset = y_dst_shift + px;
-                    let ptr = unsafe_dst.slice.get_unchecked(offset).get();
                     let px_16_lo0 = vqmovn_u32(scale_store_0);
                     let px_16_hi0 = vqmovn_u32(scale_store_1);
                     let px0 = vcombine_u16(px_16_lo0, px_16_hi0);
+
+                    let ptr = unsafe_dst.get_ptr(offset);
                     vst1q_u16(ptr, px0);
                 }
 
@@ -607,8 +608,9 @@ fn box_blur_vertical_pass_neon_any_rgba16(
                     let scale_store_0 = mul_set(store_0, v_weight);
 
                     let offset = y_dst_shift + px;
-                    let ptr = unsafe_dst.slice.get_unchecked(offset).get();
                     let px_16_lo0 = vqmovn_u32(scale_store_0);
+
+                    let ptr = unsafe_dst.get_ptr(offset);
                     vst1_u16(ptr, px_16_lo0);
                 }
 
@@ -644,8 +646,9 @@ fn box_blur_vertical_pass_neon_any_rgba16(
                     let px = cx;
                     let scale_store_0 = mul_set(store_0, v_weight);
                     let offset = y_dst_shift + px;
-                    let ptr = unsafe_dst.slice.get_unchecked(offset).get();
                     let px_16_lo0 = vqmovn_u32(scale_store_0);
+
+                    let ptr = unsafe_dst.get_ptr(offset);
                     vst1_lane_u16::<0>(ptr, px_16_lo0);
                 }
 

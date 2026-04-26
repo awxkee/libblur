@@ -238,7 +238,7 @@ where
                 let brows_slice1 = brows1.as_slice();
                 let brows_slice2 = brows2.as_slice();
 
-                let brows_vec = vec![brows_slice0, brows_slice1, brows_slice2];
+                let brows_vec = [brows_slice0, brows_slice1, brows_slice2];
 
                 let brows = FilterBrows { brows: brows_vec };
 
@@ -289,7 +289,7 @@ where
                 let brows_slice0 = brows0.as_slice();
                 let brows_slice1 = brows1.as_slice();
 
-                let brows_vec = vec![brows_slice0, brows_slice1];
+                let brows_vec = [brows_slice0, brows_slice1, brows_slice1];
 
                 let brows = FilterBrows { brows: brows_vec };
 

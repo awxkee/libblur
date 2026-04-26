@@ -514,6 +514,13 @@ impl FastGaussianDispatchProvider<u8> for u8 {
         } else {
             fg_horizontal_pass::<u8, i64, f64, CN>
         };
+        #[cfg(all(target_arch = "aarch64", feature = "sve"))]
+        {
+            if std::arch::is_aarch64_feature_detected!("sve2") {
+                use crate::sve::fg_horizontal_pass_neon_u8_sve;
+                return fg_horizontal_pass_neon_u8_sve::<CN>;
+            }
+        }
         #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             if BASE_RADIUS_I64_CUTOFF > radius {
@@ -568,6 +575,13 @@ impl FastGaussianDispatchProvider<u8> for u8 {
         } else {
             fg_vertical_pass::<u8, i64, f64, CN>
         };
+        #[cfg(all(target_arch = "aarch64", feature = "sve"))]
+        {
+            if std::arch::is_aarch64_feature_detected!("sve2") {
+                use crate::sve::fg_vertical_pass_neon_u8_sve;
+                return fg_vertical_pass_neon_u8_sve::<CN>;
+            }
+        }
         #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
             if BASE_RADIUS_I64_CUTOFF > radius {

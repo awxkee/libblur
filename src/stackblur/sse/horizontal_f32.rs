@@ -78,8 +78,7 @@ fn horiz_f32_pass_stack_impl<const CN: usize>(
 
             src_ptr = stride as usize * y;
 
-            let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f32;
-            let src_pixel = load_f32::<CN>(src_ld);
+            let src_pixel = load_f32::<CN>(pixels.get_ptr(src_ptr));
 
             for i in 0..=radius {
                 let stack_value = stacks.as_mut_ptr().add(i as usize);
@@ -93,7 +92,7 @@ fn horiz_f32_pass_stack_impl<const CN: usize>(
                     src_ptr += CN;
                 }
                 let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize);
-                let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f32;
+                let src_ld = pixels.get_ptr(src_ptr) as *const f32;
                 let src_pixel = load_f32::<CN>(src_ld);
                 _mm_store_ps(stack_ptr.cast(), src_pixel);
                 sums = _mm_opt_fmlaf_ps(sums, src_pixel, _mm_set1_ps((radius + 1 - i) as f32));
@@ -110,9 +109,8 @@ fn horiz_f32_pass_stack_impl<const CN: usize>(
             src_ptr = CN * xp as usize + y * stride as usize;
             dst_ptr = y * stride as usize;
             for _ in 0..width {
-                let store_ld = pixels.slice.as_ptr().add(dst_ptr) as *mut f32;
                 let blurred = _mm_mul_ps(sums, v_mul_value);
-                store_f32::<CN>(store_ld, blurred);
+                store_f32::<CN>(pixels.get_ptr(dst_ptr), blurred);
                 dst_ptr += CN;
 
                 sums = _mm_sub_ps(sums, sum_out);
@@ -132,7 +130,7 @@ fn horiz_f32_pass_stack_impl<const CN: usize>(
                     xp += 1;
                 }
 
-                let src_ld = pixels.slice.as_ptr().add(src_ptr) as *const f32;
+                let src_ld = pixels.get_ptr(src_ptr) as *const f32;
                 let src_pixel = load_f32::<CN>(src_ld);
                 _mm_store_ps(stack.cast(), src_pixel);
 

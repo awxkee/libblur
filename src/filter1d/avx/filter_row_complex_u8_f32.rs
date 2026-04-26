@@ -48,7 +48,7 @@ pub(crate) fn filter_avx_row_complex_u8_f32(
 }
 
 #[target_feature(enable = "avx2", enable = "fma")]
-unsafe fn filter_avx_row_complex_u8_f32_impl(
+fn filter_avx_row_complex_u8_f32_impl(
     arena: Arena,
     arena_src: &[u8],
     dst: &mut [Complex<f32>],

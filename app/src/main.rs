@@ -36,10 +36,10 @@ use libblur::{
     bilateral_filter, complex_gaussian_kernel, fast_bilateral_filter, fast_bilateral_filter_u16,
     fast_gaussian, filter_1d_complex, filter_1d_complex_fixed_point, filter_2d_fft_complex,
     filter_2d_rgb_fft, filter_2d_rgb_fft_complex, filter_2d_rgba_fft, gaussian_blur,
-    gaussian_kernel_1d, lens_kernel, sigma_size, stack_blur, stack_blur_f32, AnisotropicRadius,
-    BilateralBlurParams, BlurImage, BlurImageMut, BoxBlurParameters, CLTParameters,
-    ConvolutionMode, EdgeMode, EdgeMode2D, FastBlurChannels, GaussianBlurParams, ImageSize,
-    KernelShape, Scalar, ThreadingPolicy, TransferFunction,
+    gaussian_kernel_1d, lens_kernel, sigma_size, stack_blur, stack_blur_f32, tent_blur,
+    AnisotropicRadius, BilateralBlurParams, BlurImage, BlurImageMut, BoxBlurParameters,
+    CLTParameters, ConvolutionMode, EdgeMode, EdgeMode2D, FastBlurChannels, GaussianBlurParams,
+    ImageSize, KernelShape, Scalar, ThreadingPolicy, TransferFunction,
 };
 use num_complex::Complex;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
@@ -65,6 +65,32 @@ fn f16_to_f32(bytes: Vec<u16>) -> Vec<f32> {
         .collect()
 }
 
+fn fuzz_8bit(
+    width: usize,
+    height: usize,
+    x_kernel_size: usize,
+    y_kernel_size: usize,
+    channels: FastBlurChannels,
+    threading: ThreadingPolicy,
+) {
+    if width == 0 || height == 0 || x_kernel_size == 0 || y_kernel_size == 0 {
+        return;
+    }
+    let mut dst_image = BlurImageMut::alloc(width as u32, height as u32, channels);
+    let src_image = BlurImage::alloc(width as u32, height as u32, channels);
+
+    libblur::box_blur(
+        &src_image,
+        &mut dst_image,
+        BoxBlurParameters {
+            x_axis_kernel: x_kernel_size as u32,
+            y_axis_kernel: y_kernel_size as u32,
+        },
+        threading,
+    )
+    .unwrap();
+}
+
 fn gaussian_kernel_2d(sigma: f32, radius: usize) -> Vec<f32> {
     let size = 2 * radius + 1;
     let mut kernel = vec![0.; size * size];
@@ -84,7 +110,19 @@ fn gaussian_kernel_2d(sigma: f32, radius: usize) -> Vec<f32> {
 }
 
 fn main() {
-    let mut dyn_image = ImageReader::open("./assets/test_image_1_small.jpg")
+    fuzz_8bit(
+        4,
+        33,
+        255,
+        223,
+        match 255 {
+            0 => FastBlurChannels::Channels4,
+            1 => FastBlurChannels::Channels3,
+            _ => FastBlurChannels::Plane,
+        },
+        ThreadingPolicy::Single,
+    );
+    let mut dyn_image = ImageReader::open("./assets/test_image_2.png")
         .unwrap()
         .decode()
         .unwrap();
@@ -117,19 +155,20 @@ fn main() {
         // .map(|&x| u16::from_ne_bytes([x, x]))
         .collect::<Vec<u8>>();
 
-    // let mut dst_image = BlurImageMut::borrow(
-    //     &mut v_vec,
-    //     dyn_image.width(),
-    //     dyn_image.height(),
-    //     FastBlurChannels::Channels4,
-    // );
+    let mut dst_image = BlurImageMut::borrow(
+        &mut v_vec,
+        dyn_image.width(),
+        dyn_image.height(),
+        FastBlurChannels::Channels3,
+    );
 
     // let mut z0 = v_vec
     //     .iter()
     //     .map(|&x| (x as f32 * (1. / 255.)))
     //     .collect::<Vec<_>>();
+    let mut lc = src_bytes.to_vec();
     let mut cvt = BlurImageMut::borrow(
-        &mut v_vec,
+        &mut lc,
         dyn_image.width(),
         dyn_image.height(),
         FastBlurChannels::Channels3,
@@ -159,18 +198,16 @@ fn main() {
     //     ConvolutionMode::FixedPoint,
     // )
     //     .unwrap();
-    //
-    // gaussian_blur(
-    //     &cvt,
-    //     &mut dst_image,
-    //     GaussianBlurParams::new_from_kernel(3.),
-    //     EdgeMode::Reflect.as_2d(),
-    //     ThreadingPolicy::Single,
-    //     ConvolutionMode::FixedPoint,
-    // )
-    // .unwrap();
 
-    stack_blur(&mut cvt, AnisotropicRadius::new(8), ThreadingPolicy::Single).unwrap();
+    tent_blur(
+        &cvt.to_immutable_ref(),
+        &mut dst_image,
+        CLTParameters::new(3.),
+        ThreadingPolicy::Single,
+    )
+    .unwrap();
+
+    // stack_blur(&mut cvt, AnisotropicRadius::new(8), ThreadingPolicy::Single).unwrap();
 
     // filter_2d_rgb_fft::<u8, f32>(
     //     &cvt,
@@ -238,7 +275,7 @@ fn main() {
 
     // dst_image = vzd.gamma8(TransferFunction::Srgb, false).unwrap();
     //
-    dst_bytes = cvt
+    dst_bytes = dst_image
         .data
         .borrow_mut()
         .iter()

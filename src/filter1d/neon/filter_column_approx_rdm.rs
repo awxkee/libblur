@@ -51,7 +51,7 @@ pub(crate) fn filter_column_neon_u8_i32_i16_qrdm_app(
 }
 
 #[target_feature(enable = "rdm")]
-unsafe fn executor_unit(
+fn executor_unit(
     arena: Arena,
     arena_src: &[&[u8]],
     dst: &mut [u8],

@@ -58,7 +58,7 @@ pub(crate) fn filter_row_symmetrical<T, F, const N: usize>(
         let mut cx = 0usize;
         let max_width = width * N;
 
-        while cx + 4 < max_width {
+        while cx + 4 <= max_width {
             let coeff = *scanned_kernel.get_unchecked(half_len);
             let shifted_src = arena_src.get_unchecked(cx..);
             let mut k0 = shifted_src.get_unchecked(half_len * N).cast_() * coeff.weight;
