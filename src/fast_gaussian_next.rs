@@ -460,7 +460,7 @@ impl FastGaussianNextPassProvider<u16> for u16 {
     ) -> fn(&UnsafeSlice<u16>, u32, u32, u32, u32, u32, u32, EdgeMode) {
         #[cfg(all(target_arch = "aarch64", feature = "neon"))]
         {
-            if BASE_RADIUS_I64_CUTOFF_U16 > radius {
+            if radius < BASE_RADIUS_I64_CUTOFF_U16 {
                 #[cfg(feature = "rdm")]
                 {
                     if std::arch::is_aarch64_feature_detected!("rdm") {
@@ -470,6 +470,9 @@ impl FastGaussianNextPassProvider<u16> for u16 {
                 }
                 use crate::neon::fgn_horizontal_pass_neon_u16;
                 return fgn_horizontal_pass_neon_u16::<CN>;
+            } else if radius < 3000 {
+                use crate::neon::fgn_horizontal_pass_neon_u16_large_r;
+                return fgn_horizontal_pass_neon_u16_large_r::<CN>;
             }
         }
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]
@@ -479,6 +482,9 @@ impl FastGaussianNextPassProvider<u16> for u16 {
             if BASE_RADIUS_I64_CUTOFF_U16 > radius && has_avx {
                 use crate::avx::fgn_horizontal_pass_avx_u16;
                 return fgn_horizontal_pass_avx_u16::<CN>;
+            } else if radius < 3000 && has_avx {
+                use crate::avx::fgn_horizontal_pass_avx_u16_large;
+                return fgn_horizontal_pass_avx_u16_large::<CN>;
             }
         }
         #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
@@ -512,6 +518,9 @@ impl FastGaussianNextPassProvider<u16> for u16 {
                 }
                 use crate::neon::fgn_vertical_pass_neon_u16;
                 return fgn_vertical_pass_neon_u16::<CN>;
+            } else if radius < 3000 {
+                use crate::neon::fgn_vertical_pass_neon_u16_large_r;
+                return fgn_vertical_pass_neon_u16_large_r::<CN>;
             }
         }
         #[cfg(all(target_arch = "x86_64", feature = "avx"))]
@@ -521,6 +530,9 @@ impl FastGaussianNextPassProvider<u16> for u16 {
             if BASE_RADIUS_I64_CUTOFF_U16 > radius && has_avx {
                 use crate::avx::fgn_vertical_pass_avx_u16;
                 return fgn_vertical_pass_avx_u16::<CN>;
+            } else if radius < 3000 && has_avx {
+                use crate::avx::fgn_vertical_pass_avx_u16_large;
+                return fgn_vertical_pass_avx_u16_large::<CN>;
             }
         }
         #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]
@@ -699,7 +711,7 @@ impl FastGaussianNextPassProvider<f32> for f32 {
 
             if has_avx {
                 use crate::avx::fgn_horizontal_pass_avx_f32;
-                return fgn_horizontal_pass_avx_f32::<f32, CN>;
+                return fgn_horizontal_pass_avx_f32::<CN>;
             }
         }
         #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]

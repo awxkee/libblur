@@ -196,39 +196,23 @@ fn fgn_vertical_pass_neon_impl_sve<const CN: usize>(
                     let arr_index = (y & 1023) as usize;
                     let arr_index_1 = ((y + radius_64) & 1023) as usize;
 
-                    let stored0 = svld1_s32(
-                        pv_cn,
-                        buffer0.get_unchecked_mut(arr_index..).as_mut_ptr().cast(),
-                    );
-                    let stored1 = svld1_s32(
-                        pv_cn,
-                        buffer1.get_unchecked_mut(arr_index..).as_mut_ptr().cast(),
-                    );
-                    let stored2 = svld1_s32(
-                        pv_cn,
-                        buffer2.get_unchecked_mut(arr_index..).as_mut_ptr().cast(),
-                    );
-                    let stored3 = svld1_s32(
-                        pv_cn,
-                        buffer3.get_unchecked_mut(arr_index..).as_mut_ptr().cast(),
-                    );
+                    let stored0 =
+                        svld1_s32(pv_cn, buffer0.get_unchecked(arr_index..).as_ptr().cast());
+                    let stored1 =
+                        svld1_s32(pv_cn, buffer1.get_unchecked(arr_index..).as_ptr().cast());
+                    let stored2 =
+                        svld1_s32(pv_cn, buffer2.get_unchecked(arr_index..).as_ptr().cast());
+                    let stored3 =
+                        svld1_s32(pv_cn, buffer3.get_unchecked(arr_index..).as_ptr().cast());
 
-                    let stored_10 = svld1_s32(
-                        pv_cn,
-                        buffer0.get_unchecked_mut(arr_index_1..).as_mut_ptr().cast(),
-                    );
-                    let stored_11 = svld1_s32(
-                        pv_cn,
-                        buffer1.get_unchecked_mut(arr_index_1..).as_mut_ptr().cast(),
-                    );
-                    let stored_12 = svld1_s32(
-                        pv_cn,
-                        buffer2.get_unchecked_mut(arr_index_1..).as_mut_ptr().cast(),
-                    );
-                    let stored_13 = svld1_s32(
-                        pv_cn,
-                        buffer3.get_unchecked_mut(arr_index_1..).as_mut_ptr().cast(),
-                    );
+                    let stored_10 =
+                        svld1_s32(pv_cn, buffer0.get_unchecked(arr_index_1..).as_ptr().cast());
+                    let stored_11 =
+                        svld1_s32(pv_cn, buffer1.get_unchecked(arr_index_1..).as_ptr().cast());
+                    let stored_12 =
+                        svld1_s32(pv_cn, buffer2.get_unchecked(arr_index_1..).as_ptr().cast());
+                    let stored_13 =
+                        svld1_s32(pv_cn, buffer3.get_unchecked(arr_index_1..).as_ptr().cast());
 
                     let q0 = svsub_s32_x(pv_cn, stored0, stored_10);
                     let q1 = svsub_s32_x(pv_cn, stored1, stored_11);
@@ -242,22 +226,14 @@ fn fgn_vertical_pass_neon_impl_sve<const CN: usize>(
                 } else if y + 2 * radius_64 >= 0 {
                     let arr_index = ((y + radius_64) & 1023) as usize;
 
-                    let stored0 = svld1_s32(
-                        pv_cn,
-                        buffer0.get_unchecked_mut(arr_index..).as_mut_ptr().cast(),
-                    );
-                    let stored1 = svld1_s32(
-                        pv_cn,
-                        buffer1.get_unchecked_mut(arr_index..).as_mut_ptr().cast(),
-                    );
-                    let stored2 = svld1_s32(
-                        pv_cn,
-                        buffer2.get_unchecked_mut(arr_index..).as_mut_ptr().cast(),
-                    );
-                    let stored3 = svld1_s32(
-                        pv_cn,
-                        buffer3.get_unchecked_mut(arr_index..).as_mut_ptr().cast(),
-                    );
+                    let stored0 =
+                        svld1_s32(pv_cn, buffer0.get_unchecked(arr_index..).as_ptr().cast());
+                    let stored1 =
+                        svld1_s32(pv_cn, buffer1.get_unchecked(arr_index..).as_ptr().cast());
+                    let stored2 =
+                        svld1_s32(pv_cn, buffer2.get_unchecked(arr_index..).as_ptr().cast());
+                    let stored3 =
+                        svld1_s32(pv_cn, buffer3.get_unchecked(arr_index..).as_ptr().cast());
 
                     diffs0 = svmla_n_s32_x(pv_cn, diffs0, stored0, -3);
                     diffs1 = svmla_n_s32_x(pv_cn, diffs1, stored1, -3);
@@ -353,16 +329,16 @@ fn fgn_vertical_pass_neon_impl_sve<const CN: usize>(
                 } else if y + radius_64 >= 0 {
                     let arr_index = (y & 1023) as usize;
                     let arr_index_1 = ((y + radius_64) & 1023) as usize;
-                    let buf_ptr = buffer0.get_unchecked_mut(arr_index..).as_mut_ptr().cast();
+                    let buf_ptr = buffer0.get_unchecked(arr_index..).as_ptr().cast();
                     let stored = svld1_s32(pv_cn, buf_ptr);
 
-                    let buf_ptr_1 = buffer0.get_unchecked_mut(arr_index_1..).as_mut_ptr().cast();
+                    let buf_ptr_1 = buffer0.get_unchecked(arr_index_1..).as_ptr().cast();
                     let stored_1 = svld1_s32(pv_cn, buf_ptr_1);
 
                     diffs = svmla_n_s32_x(pv_cn, diffs, svsub_s32_x(pv_cn, stored, stored_1), 3);
                 } else if y + 2 * radius_64 >= 0 {
                     let arr_index = ((y + radius_64) & 1023) as usize;
-                    let buf_ptr = buffer0.get_unchecked_mut(arr_index).0.as_ptr().cast();
+                    let buf_ptr = buffer0.get_unchecked(arr_index).0.as_ptr().cast();
                     let stored = svld1_s32(pv_cn, buf_ptr);
                     diffs = svmla_n_s32_x(pv_cn, diffs, stored, -3);
                 }
@@ -550,39 +526,23 @@ fn fgn_horizontal_pass_neon_impl_sve<const CN: usize>(
                     let arr_index = (x & 1023) as usize;
                     let arr_index_1 = ((x + radius_64) & 1023) as usize;
 
-                    let stored0 = svld1_s32(
-                        pv_cn,
-                        buffer0.get_unchecked_mut(arr_index..).as_mut_ptr().cast(),
-                    );
-                    let stored1 = svld1_s32(
-                        pv_cn,
-                        buffer1.get_unchecked_mut(arr_index..).as_mut_ptr().cast(),
-                    );
-                    let stored2 = svld1_s32(
-                        pv_cn,
-                        buffer2.get_unchecked_mut(arr_index..).as_mut_ptr().cast(),
-                    );
-                    let stored3 = svld1_s32(
-                        pv_cn,
-                        buffer3.get_unchecked_mut(arr_index..).as_mut_ptr().cast(),
-                    );
+                    let stored0 =
+                        svld1_s32(pv_cn, buffer0.get_unchecked(arr_index..).as_ptr().cast());
+                    let stored1 =
+                        svld1_s32(pv_cn, buffer1.get_unchecked(arr_index..).as_ptr().cast());
+                    let stored2 =
+                        svld1_s32(pv_cn, buffer2.get_unchecked(arr_index..).as_ptr().cast());
+                    let stored3 =
+                        svld1_s32(pv_cn, buffer3.get_unchecked(arr_index..).as_ptr().cast());
 
-                    let stored_10 = svld1_s32(
-                        pv_cn,
-                        buffer0.get_unchecked_mut(arr_index_1..).as_mut_ptr().cast(),
-                    );
-                    let stored_11 = svld1_s32(
-                        pv_cn,
-                        buffer1.get_unchecked_mut(arr_index_1..).as_mut_ptr().cast(),
-                    );
-                    let stored_12 = svld1_s32(
-                        pv_cn,
-                        buffer2.get_unchecked_mut(arr_index_1..).as_mut_ptr().cast(),
-                    );
-                    let stored_13 = svld1_s32(
-                        pv_cn,
-                        buffer3.get_unchecked_mut(arr_index_1..).as_mut_ptr().cast(),
-                    );
+                    let stored_10 =
+                        svld1_s32(pv_cn, buffer0.get_unchecked(arr_index_1..).as_ptr().cast());
+                    let stored_11 =
+                        svld1_s32(pv_cn, buffer1.get_unchecked(arr_index_1..).as_ptr().cast());
+                    let stored_12 =
+                        svld1_s32(pv_cn, buffer2.get_unchecked(arr_index_1..).as_ptr().cast());
+                    let stored_13 =
+                        svld1_s32(pv_cn, buffer3.get_unchecked(arr_index_1..).as_ptr().cast());
 
                     let q0 = svsub_s32_x(pv_cn, stored0, stored_10);
                     let q1 = svsub_s32_x(pv_cn, stored1, stored_11);
@@ -595,22 +555,14 @@ fn fgn_horizontal_pass_neon_impl_sve<const CN: usize>(
                     diffs3 = svmla_n_s32_x(pv_cn, diffs3, q3, 3);
                 } else if x + 2 * radius_64 >= 0 {
                     let arr_index = ((x + radius_64) & 1023) as usize;
-                    let stored0 = svld1_s32(
-                        pv_cn,
-                        buffer0.get_unchecked_mut(arr_index..).as_mut_ptr().cast(),
-                    );
-                    let stored1 = svld1_s32(
-                        pv_cn,
-                        buffer1.get_unchecked_mut(arr_index..).as_mut_ptr().cast(),
-                    );
-                    let stored2 = svld1_s32(
-                        pv_cn,
-                        buffer2.get_unchecked_mut(arr_index..).as_mut_ptr().cast(),
-                    );
-                    let stored3 = svld1_s32(
-                        pv_cn,
-                        buffer3.get_unchecked_mut(arr_index..).as_mut_ptr().cast(),
-                    );
+                    let stored0 =
+                        svld1_s32(pv_cn, buffer0.get_unchecked(arr_index..).as_ptr().cast());
+                    let stored1 =
+                        svld1_s32(pv_cn, buffer1.get_unchecked(arr_index..).as_ptr().cast());
+                    let stored2 =
+                        svld1_s32(pv_cn, buffer2.get_unchecked(arr_index..).as_ptr().cast());
+                    let stored3 =
+                        svld1_s32(pv_cn, buffer3.get_unchecked(arr_index..).as_ptr().cast());
 
                     diffs0 = svmla_n_s32_x(pv_cn, diffs0, stored0, -3);
                     diffs1 = svmla_n_s32_x(pv_cn, diffs1, stored1, -3);
@@ -676,20 +628,23 @@ fn fgn_horizontal_pass_neon_impl_sve<const CN: usize>(
 
                     let bytes_offset = current_y + current_px;
 
-                    let dst_ptr = bytes.get_ptr(bytes_offset);
-                    svst1b_u32(pv_cn, dst_ptr, svreinterpret_u32_s32(next_px));
+                    svst1b_u32(
+                        pv_cn,
+                        bytes.get_ptr(bytes_offset),
+                        svreinterpret_u32_s32(next_px),
+                    );
 
                     let d_arr_index_1 = ((x + radius_64) & 1023) as usize;
                     let d_arr_index_2 = ((x - radius_64) & 1023) as usize;
                     let d_arr_index = (x & 1023) as usize;
 
-                    let buf_ptr = buffer0.get_unchecked_mut(d_arr_index..).as_ptr().cast();
+                    let buf_ptr = buffer0.get_unchecked(d_arr_index..).as_ptr().cast();
                     let stored = svld1_s32(pv_cn, buf_ptr);
 
-                    let buf_ptr_1 = buffer0.get_unchecked_mut(d_arr_index_1..).as_ptr().cast();
+                    let buf_ptr_1 = buffer0.get_unchecked(d_arr_index_1..).as_ptr().cast();
                     let stored_1 = svld1_s32(pv_cn, buf_ptr_1);
 
-                    let buf_ptr_2 = buffer0.get_unchecked_mut(d_arr_index_2..).as_ptr().cast();
+                    let buf_ptr_2 = buffer0.get_unchecked(d_arr_index_2..).as_ptr().cast();
                     let stored_2 = svld1_s32(pv_cn, buf_ptr_2);
 
                     let new_diff = svsub_s32_x(
@@ -701,16 +656,16 @@ fn fgn_horizontal_pass_neon_impl_sve<const CN: usize>(
                 } else if x + radius_64 >= 0 {
                     let arr_index = (x & 1023) as usize;
                     let arr_index_1 = ((x + radius_64) & 1023) as usize;
-                    let buf_ptr = buffer0.get_unchecked_mut(arr_index..).as_ptr().cast();
+                    let buf_ptr = buffer0.get_unchecked(arr_index..).as_ptr().cast();
                     let stored = svld1_s32(pv_cn, buf_ptr);
 
-                    let buf_ptr_1 = buffer0.get_unchecked_mut(arr_index_1..).as_ptr().cast();
+                    let buf_ptr_1 = buffer0.get_unchecked(arr_index_1..).as_ptr().cast();
                     let stored_1 = svld1_s32(pv_cn, buf_ptr_1);
 
                     diffs = svmla_n_s32_x(pv_cn, diffs, svsub_s32_x(pv_cn, stored, stored_1), 3);
                 } else if x + 2 * radius_64 >= 0 {
                     let arr_index = ((x + radius_64) & 1023) as usize;
-                    let buf_ptr = buffer0.get_unchecked_mut(arr_index..).as_ptr().cast();
+                    let buf_ptr = buffer0.get_unchecked(arr_index..).as_ptr().cast();
                     let stored = svld1_s32(pv_cn, buf_ptr);
                     diffs = svmla_n_s32_x(pv_cn, diffs, stored, -3);
                 }

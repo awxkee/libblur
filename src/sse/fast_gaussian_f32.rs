@@ -148,15 +148,15 @@ fn fg_horizontal_pass_sse_f32_impl<const CN: usize, const FMA: bool>(
                     let arr_index = ((x - radius_64) & 1023) as usize;
                     let d_arr_index = (x & 1023) as usize;
 
-                    let d_s0 = _mm_loadu_ps(bf0.as_mut_ptr().add(d_arr_index) as *mut f32);
-                    let d_s1 = _mm_loadu_ps(bf1.as_mut_ptr().add(d_arr_index) as *mut f32);
-                    let d_s2 = _mm_loadu_ps(bf2.as_mut_ptr().add(d_arr_index) as *mut f32);
-                    let d_s3 = _mm_loadu_ps(bf3.as_mut_ptr().add(d_arr_index) as *mut f32);
+                    let d_s0 = _mm_loadu_ps(bf0.get_unchecked(d_arr_index).as_ptr());
+                    let d_s1 = _mm_loadu_ps(bf1.get_unchecked(d_arr_index).as_ptr());
+                    let d_s2 = _mm_loadu_ps(bf2.get_unchecked(d_arr_index).as_ptr());
+                    let d_s3 = _mm_loadu_ps(bf3.get_unchecked(d_arr_index).as_ptr());
 
-                    let a_s0 = _mm_loadu_ps(bf0.as_mut_ptr().add(arr_index) as *mut f32);
-                    let a_s1 = _mm_loadu_ps(bf1.as_mut_ptr().add(arr_index) as *mut f32);
-                    let a_s2 = _mm_loadu_ps(bf2.as_mut_ptr().add(arr_index) as *mut f32);
-                    let a_s3 = _mm_loadu_ps(bf3.as_mut_ptr().add(arr_index) as *mut f32);
+                    let a_s0 = _mm_loadu_ps(bf0.get_unchecked(arr_index).as_ptr());
+                    let a_s1 = _mm_loadu_ps(bf1.get_unchecked(arr_index).as_ptr());
+                    let a_s2 = _mm_loadu_ps(bf2.get_unchecked(arr_index).as_ptr());
+                    let a_s3 = _mm_loadu_ps(bf3.get_unchecked(arr_index).as_ptr());
 
                     diffs0 = _mm_add_ps(diffs0, _mm_opt_fnmlaf_ps::<FMA>(a_s0, d_s0, v_double));
                     diffs1 = _mm_add_ps(diffs1, _mm_opt_fnmlaf_ps::<FMA>(a_s1, d_s1, v_double));
@@ -164,10 +164,10 @@ fn fg_horizontal_pass_sse_f32_impl<const CN: usize, const FMA: bool>(
                     diffs3 = _mm_add_ps(diffs3, _mm_opt_fnmlaf_ps::<FMA>(a_s3, d_s3, v_double));
                 } else if x + radius_64 >= 0 {
                     let arr_index = (x & 1023) as usize;
-                    let s0 = _mm_loadu_ps(bf0.as_mut_ptr().add(arr_index) as *mut f32);
-                    let s1 = _mm_loadu_ps(bf1.as_mut_ptr().add(arr_index) as *mut f32);
-                    let s2 = _mm_loadu_ps(bf2.as_mut_ptr().add(arr_index) as *mut f32);
-                    let s3 = _mm_loadu_ps(bf3.as_mut_ptr().add(arr_index) as *mut f32);
+                    let s0 = _mm_loadu_ps(bf0.get_unchecked(arr_index).as_ptr());
+                    let s1 = _mm_loadu_ps(bf1.get_unchecked(arr_index).as_ptr());
+                    let s2 = _mm_loadu_ps(bf2.get_unchecked(arr_index).as_ptr());
+                    let s3 = _mm_loadu_ps(bf3.get_unchecked(arr_index).as_ptr());
 
                     diffs0 = _mm_opt_fnmlaf_ps::<FMA>(diffs0, s0, v_double);
                     diffs1 = _mm_opt_fnmlaf_ps::<FMA>(diffs1, s1, v_double);
@@ -185,10 +185,10 @@ fn fg_horizontal_pass_sse_f32_impl<const CN: usize, const FMA: bool>(
 
                 let arr_index = ((x + radius_64) & 1023) as usize;
 
-                _mm_storeu_ps(bf0.as_mut_ptr().add(arr_index) as *mut f32, px0);
-                _mm_storeu_ps(bf1.as_mut_ptr().add(arr_index) as *mut f32, px1);
-                _mm_storeu_ps(bf2.as_mut_ptr().add(arr_index) as *mut f32, px2);
-                _mm_storeu_ps(bf3.as_mut_ptr().add(arr_index) as *mut f32, px3);
+                _mm_storeu_ps(bf0.get_unchecked_mut(arr_index).as_mut_ptr(), px0);
+                _mm_storeu_ps(bf1.get_unchecked_mut(arr_index).as_mut_ptr(), px1);
+                _mm_storeu_ps(bf2.get_unchecked_mut(arr_index).as_mut_ptr(), px2);
+                _mm_storeu_ps(bf3.get_unchecked_mut(arr_index).as_mut_ptr(), px3);
 
                 diffs0 = _mm_add_ps(diffs0, px0);
                 diffs1 = _mm_add_ps(diffs1, px1);
@@ -225,10 +225,10 @@ fn fg_horizontal_pass_sse_f32_impl<const CN: usize, const FMA: bool>(
                     let arr_index = ((x - radius_64) & 1023) as usize;
                     let d_arr_index = (x & 1023) as usize;
 
-                    let d_buf_ptr = bf0.get_unchecked_mut(d_arr_index).as_mut_ptr();
+                    let d_buf_ptr = bf0.get_unchecked(d_arr_index).as_ptr();
                     let d_stored = _mm_loadu_ps(d_buf_ptr);
 
-                    let buf_ptr = bf0.as_mut_ptr().add(arr_index) as *mut f32;
+                    let buf_ptr = bf0.get_unchecked(arr_index).as_ptr();
                     let a_stored = _mm_loadu_ps(buf_ptr);
 
                     diffs = _mm_add_ps(
@@ -237,7 +237,7 @@ fn fg_horizontal_pass_sse_f32_impl<const CN: usize, const FMA: bool>(
                     );
                 } else if x + radius_64 >= 0 {
                     let arr_index = (x & 1023) as usize;
-                    let buf_ptr = bf0.get_unchecked_mut(arr_index).as_mut_ptr();
+                    let buf_ptr = bf0.get_unchecked(arr_index).as_ptr();
                     let stored = _mm_loadu_ps(buf_ptr);
                     diffs = _mm_opt_fnmlaf_ps::<FMA>(diffs, stored, v_double);
                 }
@@ -375,15 +375,15 @@ fn fg_vertical_pass_sse_f32_impl<const CN: usize, const FMA: bool>(
                     let arr_index = ((y - radius_64) & 1023) as usize;
                     let d_arr_index = (y & 1023) as usize;
 
-                    let d_s0 = _mm_loadu_ps(bf0.as_mut_ptr().add(d_arr_index) as *mut f32);
-                    let d_s1 = _mm_loadu_ps(bf1.as_mut_ptr().add(d_arr_index) as *mut f32);
-                    let d_s2 = _mm_loadu_ps(bf2.as_mut_ptr().add(d_arr_index) as *mut f32);
-                    let d_s3 = _mm_loadu_ps(bf3.as_mut_ptr().add(d_arr_index) as *mut f32);
+                    let d_s0 = _mm_loadu_ps(bf0.get_unchecked(d_arr_index).as_ptr());
+                    let d_s1 = _mm_loadu_ps(bf1.get_unchecked(d_arr_index).as_ptr());
+                    let d_s2 = _mm_loadu_ps(bf2.get_unchecked(d_arr_index).as_ptr());
+                    let d_s3 = _mm_loadu_ps(bf3.get_unchecked(d_arr_index).as_ptr());
 
-                    let a_s0 = _mm_loadu_ps(bf0.as_mut_ptr().add(arr_index) as *mut f32);
-                    let a_s1 = _mm_loadu_ps(bf1.as_mut_ptr().add(arr_index) as *mut f32);
-                    let a_s2 = _mm_loadu_ps(bf2.as_mut_ptr().add(arr_index) as *mut f32);
-                    let a_s3 = _mm_loadu_ps(bf3.as_mut_ptr().add(arr_index) as *mut f32);
+                    let a_s0 = _mm_loadu_ps(bf0.get_unchecked(arr_index).as_ptr());
+                    let a_s1 = _mm_loadu_ps(bf1.get_unchecked(arr_index).as_ptr());
+                    let a_s2 = _mm_loadu_ps(bf2.get_unchecked(arr_index).as_ptr());
+                    let a_s3 = _mm_loadu_ps(bf3.get_unchecked(arr_index).as_ptr());
 
                     diffs0 = _mm_add_ps(diffs0, _mm_opt_fnmlaf_ps::<FMA>(a_s0, d_s0, v_double));
                     diffs1 = _mm_add_ps(diffs1, _mm_opt_fnmlaf_ps::<FMA>(a_s1, d_s1, v_double));
@@ -391,10 +391,10 @@ fn fg_vertical_pass_sse_f32_impl<const CN: usize, const FMA: bool>(
                     diffs3 = _mm_add_ps(diffs3, _mm_opt_fnmlaf_ps::<FMA>(a_s3, d_s3, v_double));
                 } else if y + radius_64 >= 0 {
                     let arr_index = (y & 1023) as usize;
-                    let s0 = _mm_loadu_ps(bf0.as_mut_ptr().add(arr_index) as *mut f32);
-                    let s1 = _mm_loadu_ps(bf1.as_mut_ptr().add(arr_index) as *mut f32);
-                    let s2 = _mm_loadu_ps(bf2.as_mut_ptr().add(arr_index) as *mut f32);
-                    let s3 = _mm_loadu_ps(bf3.as_mut_ptr().add(arr_index) as *mut f32);
+                    let s0 = _mm_loadu_ps(bf0.get_unchecked(arr_index).as_ptr());
+                    let s1 = _mm_loadu_ps(bf1.get_unchecked(arr_index).as_ptr());
+                    let s2 = _mm_loadu_ps(bf2.get_unchecked(arr_index).as_ptr());
+                    let s3 = _mm_loadu_ps(bf3.get_unchecked(arr_index).as_ptr());
 
                     diffs0 = _mm_opt_fnmlaf_ps::<FMA>(diffs0, s0, v_double);
                     diffs1 = _mm_opt_fnmlaf_ps::<FMA>(diffs1, s1, v_double);
@@ -412,10 +412,10 @@ fn fg_vertical_pass_sse_f32_impl<const CN: usize, const FMA: bool>(
 
                 let arr_index = ((y + radius_64) & 1023) as usize;
 
-                _mm_storeu_ps(bf0.as_mut_ptr().add(arr_index) as *mut f32, px0);
-                _mm_storeu_ps(bf1.as_mut_ptr().add(arr_index) as *mut f32, px1);
-                _mm_storeu_ps(bf2.as_mut_ptr().add(arr_index) as *mut f32, px2);
-                _mm_storeu_ps(bf3.as_mut_ptr().add(arr_index) as *mut f32, px3);
+                _mm_storeu_ps(bf0.get_unchecked_mut(arr_index).as_mut_ptr(), px0);
+                _mm_storeu_ps(bf1.get_unchecked_mut(arr_index).as_mut_ptr(), px1);
+                _mm_storeu_ps(bf2.get_unchecked_mut(arr_index).as_mut_ptr(), px2);
+                _mm_storeu_ps(bf3.get_unchecked_mut(arr_index).as_mut_ptr(), px3);
 
                 diffs0 = _mm_add_ps(diffs0, px0);
                 diffs1 = _mm_add_ps(diffs1, px1);
@@ -453,10 +453,10 @@ fn fg_vertical_pass_sse_f32_impl<const CN: usize, const FMA: bool>(
                     let arr_index = ((y - radius_64) & 1023) as usize;
                     let d_arr_index = (y & 1023) as usize;
 
-                    let d_buf_ptr = bf0.get_unchecked_mut(d_arr_index).as_mut_ptr();
+                    let d_buf_ptr = bf0.get_unchecked(d_arr_index).as_ptr();
                     let d_stored = _mm_loadu_ps(d_buf_ptr);
 
-                    let buf_ptr = bf0.as_mut_ptr().add(arr_index) as *mut f32;
+                    let buf_ptr = bf0.get_unchecked(arr_index).as_ptr();
                     let a_stored = _mm_loadu_ps(buf_ptr);
 
                     diffs = _mm_add_ps(
@@ -465,7 +465,7 @@ fn fg_vertical_pass_sse_f32_impl<const CN: usize, const FMA: bool>(
                     );
                 } else if y + radius_64 >= 0 {
                     let arr_index = (y & 1023) as usize;
-                    let buf_ptr = bf0.get_unchecked_mut(arr_index).as_mut_ptr();
+                    let buf_ptr = bf0.get_unchecked(arr_index).as_ptr();
                     let stored = _mm_loadu_ps(buf_ptr);
                     diffs = _mm_opt_fnmlaf_ps::<FMA>(diffs, stored, v_double);
                 }

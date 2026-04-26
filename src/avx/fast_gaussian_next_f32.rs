@@ -169,21 +169,21 @@ impl<const CN: usize, const FMA: bool> VerticalGaussianExecutorF32<CN, FMA> {
                         let d_a_2 = ((y - radius_64) & 1023) as usize;
                         let d_i = (y & 1023) as usize;
 
-                        let sd0 = _mm256_load_ps(bf0.as_mut_ptr().add(d_i) as *mut f32);
-                        let sd1 = _mm256_load_ps(bf1.as_mut_ptr().add(d_i) as *mut f32);
-                        let sd2 = _mm256_load_ps(bf2.as_mut_ptr().add(d_i) as *mut f32);
+                        let sd0 = _mm256_load_ps(bf0.get_unchecked(d_i).0.as_ptr());
+                        let sd1 = _mm256_load_ps(bf1.get_unchecked(d_i).0.as_ptr());
+                        let sd2 = _mm256_load_ps(bf2.get_unchecked(d_i).0.as_ptr());
 
-                        let sd_1_0 = _mm256_load_ps(bf0.as_mut_ptr().add(d_a_1) as *mut f32);
-                        let sd_1_1 = _mm256_load_ps(bf1.as_mut_ptr().add(d_a_1) as *mut f32);
-                        let sd_1_2 = _mm256_load_ps(bf2.as_mut_ptr().add(d_a_1) as *mut f32);
+                        let sd_1_0 = _mm256_load_ps(bf0.get_unchecked(d_a_1).0.as_ptr());
+                        let sd_1_1 = _mm256_load_ps(bf1.get_unchecked(d_a_1).0.as_ptr());
+                        let sd_1_2 = _mm256_load_ps(bf2.get_unchecked(d_a_1).0.as_ptr());
 
                         let j0 = _mm256_sub_ps(sd0, sd_1_0);
                         let j1 = _mm256_sub_ps(sd1, sd_1_1);
                         let j2 = _mm256_sub_ps(sd2, sd_1_2);
 
-                        let sd_2_0 = _mm256_load_ps(bf0.as_mut_ptr().add(d_a_2) as *mut f32);
-                        let sd_2_1 = _mm256_load_ps(bf1.as_mut_ptr().add(d_a_2) as *mut f32);
-                        let sd_2_2 = _mm256_load_ps(bf2.as_mut_ptr().add(d_a_2) as *mut f32);
+                        let sd_2_0 = _mm256_load_ps(bf0.get_unchecked(d_a_2).0.as_ptr());
+                        let sd_2_1 = _mm256_load_ps(bf1.get_unchecked(d_a_2).0.as_ptr());
+                        let sd_2_2 = _mm256_load_ps(bf2.get_unchecked(d_a_2).0.as_ptr());
 
                         let new_diff0 = _mm256_opt_fnmlsf_ps::<FMA>(sd_2_0, j0, threes);
                         let new_diff1 = _mm256_opt_fnmlsf_ps::<FMA>(sd_2_1, j1, threes);
@@ -195,13 +195,13 @@ impl<const CN: usize, const FMA: bool> VerticalGaussianExecutorF32<CN, FMA> {
                     } else if y + radius_64 >= 0 {
                         let a_i = (y & 1023) as usize;
                         let a_i_1 = ((y + radius_64) & 1023) as usize;
-                        let sd0 = _mm256_load_ps(bf0.as_mut_ptr().add(a_i) as *mut f32);
-                        let sd1 = _mm256_load_ps(bf1.as_mut_ptr().add(a_i) as *mut f32);
-                        let sd2 = _mm256_load_ps(bf2.as_mut_ptr().add(a_i) as *mut f32);
+                        let sd0 = _mm256_load_ps(bf0.get_unchecked(a_i).0.as_ptr());
+                        let sd1 = _mm256_load_ps(bf1.get_unchecked(a_i).0.as_ptr());
+                        let sd2 = _mm256_load_ps(bf2.get_unchecked(a_i).0.as_ptr());
 
-                        let sd_1_0 = _mm256_load_ps(bf0.as_mut_ptr().add(a_i_1) as *mut f32);
-                        let sd_1_1 = _mm256_load_ps(bf1.as_mut_ptr().add(a_i_1) as *mut f32);
-                        let sd_1_2 = _mm256_load_ps(bf2.as_mut_ptr().add(a_i_1) as *mut f32);
+                        let sd_1_0 = _mm256_load_ps(bf0.get_unchecked(a_i_1).0.as_ptr().cast());
+                        let sd_1_1 = _mm256_load_ps(bf1.get_unchecked(a_i_1).0.as_ptr().cast());
+                        let sd_1_2 = _mm256_load_ps(bf2.get_unchecked(a_i_1).0.as_ptr().cast());
 
                         diffs0 =
                             _mm256_opt_fmlaf_ps::<FMA>(diffs0, _mm256_sub_ps(sd0, sd_1_0), threes);
@@ -211,9 +211,9 @@ impl<const CN: usize, const FMA: bool> VerticalGaussianExecutorF32<CN, FMA> {
                             _mm256_opt_fmlaf_ps::<FMA>(diffs2, _mm256_sub_ps(sd2, sd_1_2), threes);
                     } else if y + 2 * radius_64 >= 0 {
                         let arr_index = ((y + radius_64) & 1023) as usize;
-                        let sd0 = _mm256_load_ps(bf0.as_mut_ptr().add(arr_index) as *mut f32);
-                        let sd1 = _mm256_load_ps(bf1.as_mut_ptr().add(arr_index) as *mut f32);
-                        let sd2 = _mm256_load_ps(bf2.as_mut_ptr().add(arr_index) as *mut f32);
+                        let sd0 = _mm256_load_ps(bf0.get_unchecked(arr_index).0.as_ptr().cast());
+                        let sd1 = _mm256_load_ps(bf1.get_unchecked(arr_index).0.as_ptr().cast());
+                        let sd2 = _mm256_load_ps(bf2.get_unchecked(arr_index).0.as_ptr().cast());
 
                         diffs0 = _mm256_opt_fnmlaf_ps::<FMA>(diffs0, sd0, threes);
                         diffs1 = _mm256_opt_fnmlaf_ps::<FMA>(diffs1, sd1, threes);
@@ -253,9 +253,9 @@ impl<const CN: usize, const FMA: bool> VerticalGaussianExecutorF32<CN, FMA> {
                         pixel_color5,
                     );
 
-                    _mm256_store_ps(bf0.as_mut_ptr().add(a_i) as *mut f32, px01);
-                    _mm256_store_ps(bf1.as_mut_ptr().add(a_i) as *mut f32, px23);
-                    _mm256_store_ps(bf2.as_mut_ptr().add(a_i) as *mut f32, px45);
+                    _mm256_store_ps(bf0.get_unchecked_mut(a_i..).as_mut_ptr().cast(), px01);
+                    _mm256_store_ps(bf1.get_unchecked_mut(a_i..).as_mut_ptr().cast(), px23);
+                    _mm256_store_ps(bf2.get_unchecked_mut(a_i..).as_mut_ptr().cast(), px45);
 
                     diffs0 = _mm256_add_ps(diffs0, px01);
                     diffs1 = _mm256_add_ps(diffs1, px23);
@@ -294,13 +294,13 @@ impl<const CN: usize, const FMA: bool> VerticalGaussianExecutorF32<CN, FMA> {
                         let d_arr_index_2 = ((y - radius_64) & 1023) as usize;
                         let d_arr_index = (y & 1023) as usize;
 
-                        let buf_ptr = bf0.get_unchecked_mut(d_arr_index).0.as_mut_ptr();
+                        let buf_ptr = bf0.get_unchecked(d_arr_index).0.as_ptr();
                         let stored = _mm_load_ps(buf_ptr);
 
-                        let buf_ptr_1 = bf0.as_mut_ptr().add(d_arr_index_1) as *mut f32;
+                        let buf_ptr_1 = bf0.get_unchecked(d_arr_index_1).0.as_ptr();
                         let stored_1 = _mm_load_ps(buf_ptr_1);
 
-                        let buf_ptr_2 = bf0.as_mut_ptr().add(d_arr_index_2) as *mut f32;
+                        let buf_ptr_2 = bf0.get_unchecked(d_arr_index_2).0.as_ptr();
                         let stored_2 = _mm_load_ps(buf_ptr_2);
 
                         let new_diff = _mm_opt_fnmlsf_ps::<FMA>(
@@ -312,10 +312,10 @@ impl<const CN: usize, const FMA: bool> VerticalGaussianExecutorF32<CN, FMA> {
                     } else if y + radius_64 >= 0 {
                         let arr_index = (y & 1023) as usize;
                         let arr_index_1 = ((y + radius_64) & 1023) as usize;
-                        let buf_ptr = bf0.get_unchecked_mut(arr_index).0.as_mut_ptr();
+                        let buf_ptr = bf0.get_unchecked(arr_index).0.as_ptr();
                         let stored = _mm_load_ps(buf_ptr);
 
-                        let buf_ptr_1 = bf0.get_unchecked_mut(arr_index_1).0.as_mut_ptr();
+                        let buf_ptr_1 = bf0.get_unchecked(arr_index_1).0.as_ptr();
                         let stored_1 = _mm_load_ps(buf_ptr_1);
 
                         diffs = _mm_opt_fmlaf_ps::<FMA>(
@@ -325,7 +325,7 @@ impl<const CN: usize, const FMA: bool> VerticalGaussianExecutorF32<CN, FMA> {
                         );
                     } else if y + 2 * radius_64 >= 0 {
                         let arr_index = ((y + radius_64) & 1023) as usize;
-                        let buf_ptr = bf0.get_unchecked_mut(arr_index).0.as_mut_ptr();
+                        let buf_ptr = bf0.get_unchecked(arr_index).0.as_ptr();
                         let stored = _mm_load_ps(buf_ptr);
                         diffs =
                             _mm_opt_fnmlaf_ps::<FMA>(diffs, stored, _mm256_castps256_ps128(threes));
@@ -353,8 +353,8 @@ impl<const CN: usize, const FMA: bool> VerticalGaussianExecutorF32<CN, FMA> {
     }
 }
 
-pub(crate) fn fgn_horizontal_pass_avx_f32<T, const CN: usize>(
-    undefined_slice: &UnsafeSlice<T>,
+pub(crate) fn fgn_horizontal_pass_avx_f32<const CN: usize>(
+    bytes: &UnsafeSlice<f32>,
     stride: u32,
     width: u32,
     height: u32,
@@ -364,7 +364,6 @@ pub(crate) fn fgn_horizontal_pass_avx_f32<T, const CN: usize>(
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        let bytes: &UnsafeSlice<'_, f32> = std::mem::transmute(undefined_slice);
         if std::arch::is_x86_feature_detected!("fma") {
             fgn_horizontal_pass_avx_f32_fma::<CN>(
                 bytes, stride, width, height, radius, start, end, edge_mode,
@@ -475,17 +474,17 @@ impl<const CN: usize, const FMA: bool> HorizontalAvxF32Executor<CN, FMA> {
                         let d_a_2 = ((x - radius_64) & 1023) as usize;
                         let d_i = (x & 1023) as usize;
 
-                        let sd0 = _mm256_load_ps(bf0.as_mut_ptr().add(d_i) as *mut f32);
-                        let sd1 = _mm256_load_ps(bf1.as_mut_ptr().add(d_i) as *mut f32);
+                        let sd0 = _mm256_load_ps(bf0.get_unchecked(d_i).0.as_ptr());
+                        let sd1 = _mm256_load_ps(bf1.get_unchecked(d_i).0.as_ptr());
 
-                        let sd_1_0 = _mm256_load_ps(bf0.as_mut_ptr().add(d_a_1) as *mut f32);
-                        let sd_1_1 = _mm256_load_ps(bf1.as_mut_ptr().add(d_a_1) as *mut f32);
+                        let sd_1_0 = _mm256_load_ps(bf0.get_unchecked(d_a_1).0.as_ptr());
+                        let sd_1_1 = _mm256_load_ps(bf1.get_unchecked(d_a_1).0.as_ptr());
 
                         let j0 = _mm256_sub_ps(sd0, sd_1_0);
                         let j1 = _mm256_sub_ps(sd1, sd_1_1);
 
-                        let sd_2_0 = _mm256_load_ps(bf0.as_mut_ptr().add(d_a_2) as *mut f32);
-                        let sd_2_1 = _mm256_load_ps(bf1.as_mut_ptr().add(d_a_2) as *mut f32);
+                        let sd_2_0 = _mm256_load_ps(bf0.get_unchecked(d_a_2).0.as_ptr());
+                        let sd_2_1 = _mm256_load_ps(bf1.get_unchecked(d_a_2).0.as_ptr());
 
                         let new_diff0 = _mm256_opt_fnmlsf_ps::<FMA>(sd_2_0, j0, threes);
                         let new_diff1 = _mm256_opt_fnmlsf_ps::<FMA>(sd_2_1, j1, threes);
@@ -495,11 +494,11 @@ impl<const CN: usize, const FMA: bool> HorizontalAvxF32Executor<CN, FMA> {
                     } else if x + radius_64 >= 0 {
                         let a_i = (x & 1023) as usize;
                         let a_i_1 = ((x + radius_64) & 1023) as usize;
-                        let sd0 = _mm256_load_ps(bf0.as_mut_ptr().add(a_i) as *mut f32);
-                        let sd1 = _mm256_load_ps(bf1.as_mut_ptr().add(a_i) as *mut f32);
+                        let sd0 = _mm256_load_ps(bf0.get_unchecked(a_i).0.as_ptr());
+                        let sd1 = _mm256_load_ps(bf1.get_unchecked(a_i).0.as_ptr());
 
-                        let sd_1_0 = _mm256_load_ps(bf0.as_mut_ptr().add(a_i_1) as *mut f32);
-                        let sd_1_1 = _mm256_load_ps(bf1.as_mut_ptr().add(a_i_1) as *mut f32);
+                        let sd_1_0 = _mm256_load_ps(bf0.get_unchecked(a_i_1).0.as_ptr());
+                        let sd_1_1 = _mm256_load_ps(bf1.get_unchecked(a_i_1).0.as_ptr());
 
                         diffs0 =
                             _mm256_opt_fmlaf_ps::<FMA>(diffs0, _mm256_sub_ps(sd0, sd_1_0), threes);
@@ -507,8 +506,8 @@ impl<const CN: usize, const FMA: bool> HorizontalAvxF32Executor<CN, FMA> {
                             _mm256_opt_fmlaf_ps::<FMA>(diffs1, _mm256_sub_ps(sd1, sd_1_1), threes);
                     } else if x + 2 * radius_64 >= 0 {
                         let arr_index = ((x + radius_64) & 1023) as usize;
-                        let sd0 = _mm256_load_ps(bf0.as_mut_ptr().add(arr_index) as *mut f32);
-                        let sd1 = _mm256_load_ps(bf1.as_mut_ptr().add(arr_index) as *mut f32);
+                        let sd0 = _mm256_load_ps(bf0.get_unchecked(arr_index).0.as_ptr());
+                        let sd1 = _mm256_load_ps(bf1.get_unchecked(arr_index).0.as_ptr());
 
                         diffs0 = _mm256_opt_fnmlaf_ps::<FMA>(diffs0, sd0, threes);
                         diffs1 = _mm256_opt_fnmlaf_ps::<FMA>(diffs1, sd1, threes);
@@ -538,8 +537,8 @@ impl<const CN: usize, const FMA: bool> HorizontalAvxF32Executor<CN, FMA> {
                         pixel_color3,
                     );
 
-                    _mm256_store_ps(bf0.as_mut_ptr().add(a_i) as *mut f32, px01);
-                    _mm256_store_ps(bf1.as_mut_ptr().add(a_i) as *mut f32, px23);
+                    _mm256_store_ps(bf0.get_unchecked_mut(a_i..).as_mut_ptr().cast(), px01);
+                    _mm256_store_ps(bf1.get_unchecked_mut(a_i..).as_mut_ptr().cast(), px23);
 
                     diffs0 = _mm256_add_ps(diffs0, px01);
                     diffs1 = _mm256_add_ps(diffs1, px23);
@@ -575,13 +574,13 @@ impl<const CN: usize, const FMA: bool> HorizontalAvxF32Executor<CN, FMA> {
                         let d_arr_index_2 = ((x - radius_64) & 1023) as usize;
                         let d_arr_index = (x & 1023) as usize;
 
-                        let buf_ptr = bf0.get_unchecked_mut(d_arr_index).0.as_mut_ptr();
+                        let buf_ptr = bf0.get_unchecked(d_arr_index).0.as_ptr();
                         let stored = _mm_load_ps(buf_ptr);
 
-                        let buf_ptr_1 = bf0.get_unchecked_mut(d_arr_index_1).0.as_mut_ptr();
+                        let buf_ptr_1 = bf0.get_unchecked(d_arr_index_1).0.as_ptr();
                         let stored_1 = _mm_load_ps(buf_ptr_1);
 
-                        let buf_ptr_2 = bf0.get_unchecked_mut(d_arr_index_2).0.as_mut_ptr();
+                        let buf_ptr_2 = bf0.get_unchecked(d_arr_index_2).0.as_ptr();
                         let stored_2 = _mm_load_ps(buf_ptr_2);
 
                         let new_diff = _mm_opt_fnmlsf_ps::<FMA>(
@@ -593,11 +592,11 @@ impl<const CN: usize, const FMA: bool> HorizontalAvxF32Executor<CN, FMA> {
                     } else if x + radius_64 >= 0 {
                         let arr_index = (x & 1023) as usize;
                         let arr_index_1 = ((x + radius_64) & 1023) as usize;
-                        let buf_ptr = bf0.as_mut_ptr().add(arr_index) as *mut f32;
-                        let stored = _mm_load_ps(buf_ptr);
+                        let buf_ptr = bf0.get_unchecked(arr_index).0.as_ptr();
+                        let stored = _mm_load_ps(buf_ptr.cast());
 
-                        let buf_ptr_1 = bf0.as_mut_ptr().add(arr_index_1);
-                        let stored_1 = _mm_load_ps(buf_ptr_1 as *const f32);
+                        let buf_ptr_1 = bf0.get_unchecked(arr_index_1).0.as_ptr();
+                        let stored_1 = _mm_load_ps(buf_ptr_1.cast());
 
                         diffs = _mm_opt_fmlaf_ps::<FMA>(
                             diffs,
@@ -606,8 +605,8 @@ impl<const CN: usize, const FMA: bool> HorizontalAvxF32Executor<CN, FMA> {
                         );
                     } else if x + 2 * radius_64 >= 0 {
                         let arr_index = ((x + radius_64) & 1023) as usize;
-                        let buf_ptr = bf0.as_mut_ptr().add(arr_index);
-                        let stored = _mm_load_ps(buf_ptr as *const f32);
+                        let buf_ptr = bf0.get_unchecked(arr_index).0.as_ptr();
+                        let stored = _mm_load_ps(buf_ptr.cast());
                         diffs =
                             _mm_opt_fnmlaf_ps::<FMA>(diffs, stored, _mm256_castps256_ps128(threes));
                     }

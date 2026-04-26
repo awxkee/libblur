@@ -447,7 +447,7 @@ pub(crate) fn _mm_mul_by_3_epi32(v: __m128i) -> __m128i {
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_opt_fnmlaf_ps<const FMA: bool>(a: __m128, b: __m128, c: __m128) -> __m128 {
+pub(crate) fn _mm_opt_fnmlaf_ps<const FMA: bool>(a: __m128, b: __m128, c: __m128) -> __m128 {
     unsafe {
         if FMA {
             _mm_fnmadd_ps(b, c, a)

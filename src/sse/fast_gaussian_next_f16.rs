@@ -94,13 +94,13 @@ fn fast_gaussian_next_vertical_pass_sse_f16_impl<const CN: usize>(
                     let d_arr_index_2 = ((y - radius_64) & 1023) as usize;
                     let d_arr_index = (y & 1023) as usize;
 
-                    let buf_ptr = buffer.get_unchecked_mut(d_arr_index).as_mut_ptr();
+                    let buf_ptr = buffer.get_unchecked(d_arr_index).as_ptr();
                     let stored = _mm_loadu_ps(buf_ptr);
 
-                    let buf_ptr_1 = buffer.as_mut_ptr().add(d_arr_index_1) as *mut f32;
+                    let buf_ptr_1 = buffer.get_unchecked(d_arr_index_1).as_ptr();
                     let stored_1 = _mm_loadu_ps(buf_ptr_1);
 
-                    let buf_ptr_2 = buffer.as_mut_ptr().add(d_arr_index_2) as *mut f32;
+                    let buf_ptr_2 = buffer.get_unchecked(d_arr_index_2).as_ptr();
                     let stored_2 = _mm_loadu_ps(buf_ptr_2);
 
                     let new_diff =
@@ -109,10 +109,10 @@ fn fast_gaussian_next_vertical_pass_sse_f16_impl<const CN: usize>(
                 } else if y + radius_64 >= 0 {
                     let arr_index = (y & 1023) as usize;
                     let arr_index_1 = ((y + radius_64) & 1023) as usize;
-                    let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr();
+                    let buf_ptr = buffer.get_unchecked(arr_index).as_ptr();
                     let stored = _mm_loadu_ps(buf_ptr);
 
-                    let buf_ptr_1 = buffer.get_unchecked_mut(arr_index_1).as_mut_ptr();
+                    let buf_ptr_1 = buffer.get_unchecked(arr_index_1).as_ptr();
                     let stored_1 = _mm_loadu_ps(buf_ptr_1);
 
                     let new_diff = _mm_mul_ps(_mm_sub_ps(stored, stored_1), threes);
@@ -120,7 +120,7 @@ fn fast_gaussian_next_vertical_pass_sse_f16_impl<const CN: usize>(
                     diffs = _mm_add_ps(diffs, new_diff);
                 } else if y + 2 * radius_64 >= 0 {
                     let arr_index = ((y + radius_64) & 1023) as usize;
-                    let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr();
+                    let buf_ptr = buffer.get_unchecked(arr_index).as_ptr();
                     let stored = _mm_loadu_ps(buf_ptr);
                     diffs = _mm_sub_ps(diffs, _mm_mul_ps(stored, threes));
                 }
@@ -204,13 +204,13 @@ fn fast_gaussian_next_horizontal_pass_sse_f16_impl<const CN: usize>(
                     let d_arr_index_2 = ((x - radius_64) & 1023) as usize;
                     let d_arr_index = (x & 1023) as usize;
 
-                    let buf_ptr = buffer.get_unchecked_mut(d_arr_index).as_mut_ptr();
+                    let buf_ptr = buffer.get_unchecked(d_arr_index).as_ptr();
                     let stored = _mm_loadu_ps(buf_ptr);
 
-                    let buf_ptr_1 = buffer.get_unchecked_mut(d_arr_index_1).as_mut_ptr();
+                    let buf_ptr_1 = buffer.get_unchecked(d_arr_index_1).as_ptr();
                     let stored_1 = _mm_loadu_ps(buf_ptr_1);
 
-                    let buf_ptr_2 = buffer.get_unchecked_mut(d_arr_index_2).as_mut_ptr();
+                    let buf_ptr_2 = buffer.get_unchecked(d_arr_index_2).as_ptr();
                     let stored_2 = _mm_loadu_ps(buf_ptr_2);
 
                     let new_diff =
@@ -219,19 +219,19 @@ fn fast_gaussian_next_horizontal_pass_sse_f16_impl<const CN: usize>(
                 } else if x + radius_64 >= 0 {
                     let arr_index = (x & 1023) as usize;
                     let arr_index_1 = ((x + radius_64) & 1023) as usize;
-                    let buf_ptr = buffer.as_mut_ptr().add(arr_index) as *mut f32;
+                    let buf_ptr = buffer.get_unchecked(arr_index).as_ptr();
                     let stored = _mm_loadu_ps(buf_ptr);
 
-                    let buf_ptr_1 = buffer.as_mut_ptr().add(arr_index_1);
-                    let stored_1 = _mm_loadu_ps(buf_ptr_1 as *const f32);
+                    let buf_ptr_1 = buffer.get_unchecked(arr_index_1).as_ptr();
+                    let stored_1 = _mm_loadu_ps(buf_ptr_1);
 
                     let new_diff = _mm_mul_ps(_mm_sub_ps(stored, stored_1), threes);
 
                     diffs = _mm_add_ps(diffs, new_diff);
                 } else if x + 2 * radius_64 >= 0 {
                     let arr_index = ((x + radius_64) & 1023) as usize;
-                    let buf_ptr = buffer.as_mut_ptr().add(arr_index);
-                    let stored = _mm_loadu_ps(buf_ptr as *const f32);
+                    let buf_ptr = buffer.get_unchecked(arr_index).as_ptr();
+                    let stored = _mm_loadu_ps(buf_ptr);
                     diffs = _mm_sub_ps(diffs, _mm_mul_ps(stored, threes));
                 }
 
