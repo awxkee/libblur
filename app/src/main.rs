@@ -122,7 +122,7 @@ fn main() {
         },
         ThreadingPolicy::Single,
     );
-    let mut dyn_image = ImageReader::open("./assets/test_image_2.png")
+    let mut dyn_image = ImageReader::open("./assets/sonderland.jpg")
         .unwrap()
         .decode()
         .unwrap();
@@ -168,8 +168,9 @@ fn main() {
     //     .collect::<Vec<_>>();
     let mut lc = src_bytes
         .iter()
-        .map(|&x| u16::from_ne_bytes([x, x]))
-        .collect::<Vec<u16>>();
+        // .map(|&x| u16::from_ne_bytes([x, x]))
+        .map(|&x| x)
+        .collect::<Vec<u8>>();
     let mut cvt = BlurImageMut::borrow(
         &mut lc,
         dyn_image.width(),
@@ -184,11 +185,12 @@ fn main() {
     // for i in 0..10 {
     let ks = KernelShape::new(55, 55);
     // let motion = lens_kernel(ks, 10., 3., 0.3, 0.5).unwrap();
-    // let motion = lens_kernel(KernelShape::new(35, 35), 15., 6., 0.5, 0.2).unwrap();
+    // let gaussian_kernel = lens_kernel(KernelShape::new(75, 75), 15., 6., 0.5, 0.2).unwrap();
     // let bokeh = generate_complex_bokeh_kernel(35, 30.);
     let start_time = Instant::now();
-    let gaussian_kernel = gaussian_kernel_2d(500., 500 / 2);
-    // let gaussian_kernel = complex_gaussian_kernel(500., 0.75, 5.);
+    let gaussian_kernel = gaussian_kernel_2d(115. / 6., 115 / 2);
+    // let  gaussian_kernel = generate_motion_blur_kernel(75, 75.);
+    // let gaussian_kernel = complex_gaussian_kernel(75., 0.75, 5.);
 
     // let mut dst_image = BlurImageMut::default(); //cvt.clone_as_mut();
 
@@ -210,24 +212,31 @@ fn main() {
     // )
     // .unwrap();
 
-    fast_gaussian_next_u16(
-        &mut cvt,
-        AnisotropicRadius::new(55),
-        ThreadingPolicy::Single,
-        EdgeMode::Clamp.as_2d(),
-    )
-    .unwrap();
-
-    // filter_2d_rgb_fft::<u8, f32>(
-    //     &cvt,
-    //     &mut dst_image,
-    //     &gaussian_kernel,
-    //     KernelShape::new(501, 501),
-    //     EdgeMode::Reflect.as_2d(),
-    //     Scalar::default(),
-    //     ThreadingPolicy::Adaptive,
+    // fast_gaussian_next_u16(
+    //     &mut cvt,
+    //     AnisotropicRadius::new(55),
+    //     ThreadingPolicy::Single,
+    //     EdgeMode::Clamp.as_2d(),
     // )
     // .unwrap();
+
+    for i in 0..10 {
+        let start_time = Instant::now();
+        filter_2d_rgb_fft::<u8, f32>(
+            &cvt.to_immutable_ref(),
+            &mut dst_image,
+            &gaussian_kernel,
+            KernelShape::new(115, 115),
+            EdgeMode::Clamp.as_2d(),
+            Scalar::default(),
+            ThreadingPolicy::Adaptive,
+        )
+        .unwrap();
+        println!(
+            "libblur::filter_2d_rgba_fft MultiThreading: {:?}",
+            start_time.elapsed()
+        );
+    }
     // for dst in dst_image.data.borrow_mut().chunks_exact_mut(4) {
     //     dst[3] = 255;
     // }
@@ -284,13 +293,13 @@ fn main() {
 
     // dst_image = vzd.gamma8(TransferFunction::Srgb, false).unwrap();
     //
-    dst_bytes = cvt
+    dst_bytes = dst_image
         .data
         .borrow_mut()
         .iter()
-        // .map(|&x| x)
+        .map(|&x| x)
         // .map(|&x| (x * 255f32).round() as u8)
-        .map(|&x| (x >> 8) as u8)
+        // .map(|&x| (x >> 8) as u8)
         .collect::<Vec<u8>>();
 
     // dst_bytes = dst_image.data.borrow().to_vec();

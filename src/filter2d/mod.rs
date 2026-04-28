@@ -31,6 +31,8 @@ mod avx;
 mod convolve_op;
 mod convolve_op_fp;
 #[cfg(feature = "fft")]
+mod convolver;
+#[cfg(feature = "fft")]
 mod fft_utils;
 mod filter_2d;
 #[cfg(feature = "fft")]

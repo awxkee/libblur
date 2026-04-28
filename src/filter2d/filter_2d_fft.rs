@@ -233,15 +233,14 @@ where
             .enumerate()
             .for_each(|(y, row)| {
                 for (x, item) in row.iter().enumerate() {
-                    let new_y =
-                        (y as isize - shift_y).rem_euclid(best_height as isize - 1) as usize;
-                    let new_x = (x as isize - shift_x).rem_euclid(best_width as isize - 1) as usize;
+                    let new_y = (y as isize - shift_y).rem_euclid(best_height as isize) as usize;
+                    let new_x = (x as isize - shift_x).rem_euclid(best_width as isize) as usize;
                     kernel_arena[new_y * best_width + new_x] = *item;
                 }
             });
     } else {
-        let divider_height = DividerIsize::new(best_height as isize - 1);
-        let divider_width = DividerIsize::new(best_width as isize - 1);
+        let divider_height = DividerIsize::new(best_height as isize);
+        let divider_width = DividerIsize::new(best_width as isize);
         kernel
             .chunks_exact(kernel_shape.width)
             .enumerate()
