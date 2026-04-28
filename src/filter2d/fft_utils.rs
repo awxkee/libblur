@@ -89,7 +89,7 @@ pub(crate) fn fft_next_good_size_real(mut n: usize) -> usize {
         }
 
         // If m is reduced to 1, n is a good FFT size
-        if m <= 1 && !n.is_multiple_of(2) {
+        if m <= 1 {
             return n;
         }
 

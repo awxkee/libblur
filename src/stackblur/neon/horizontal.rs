@@ -90,10 +90,10 @@ impl<const CN: usize> StackBlurWorkingPass<u8, CN> for HorizontalNeonStackBlurPa
                 let mut src_ptr2 = stride as usize * (yy + 2);
                 let mut src_ptr3 = stride as usize * (yy + 3);
 
-                let src_pixel0 = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr0) as *const _);
-                let src_pixel1 = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr1) as *const _);
-                let src_pixel2 = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr2) as *const _);
-                let src_pixel3 = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr3) as *const _);
+                let src_pixel0 = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr0).cast());
+                let src_pixel1 = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr1).cast());
+                let src_pixel2 = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr2).cast());
+                let src_pixel3 = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr3).cast());
 
                 for i in 0..=radius {
                     let stack_value = stacks0.as_mut_ptr().add(i as usize * 4 * 4);
@@ -122,17 +122,26 @@ impl<const CN: usize> StackBlurWorkingPass<u8, CN> for HorizontalNeonStackBlurPa
                         src_ptr2 += CN;
                         src_ptr3 += CN;
                     }
-                    let stack_ptr = stacks0.as_mut_ptr().add((i + radius) as usize * 4 * 4);
+                    let stack_ptr = stacks0.get_unchecked_mut((i + radius) as usize * 4 * 4..);
 
                     let src_pixel0 = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr0));
                     let src_pixel1 = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr1));
                     let src_pixel2 = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr2));
                     let src_pixel3 = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr3));
 
-                    vst1q_s32(stack_ptr, src_pixel0);
-                    vst1q_s32(stack_ptr.add(4), src_pixel1);
-                    vst1q_s32(stack_ptr.add(8), src_pixel2);
-                    vst1q_s32(stack_ptr.add(12), src_pixel3);
+                    vst1q_s32(stack_ptr.as_mut_ptr().cast(), src_pixel0);
+                    vst1q_s32(
+                        stack_ptr.get_unchecked_mut(4..).as_mut_ptr().cast(),
+                        src_pixel1,
+                    );
+                    vst1q_s32(
+                        stack_ptr.get_unchecked_mut(8..).as_mut_ptr().cast(),
+                        src_pixel2,
+                    );
+                    vst1q_s32(
+                        stack_ptr.get_unchecked_mut(12..).as_mut_ptr().cast(),
+                        src_pixel3,
+                    );
 
                     let w = vdupq_n_s32(radius as i32 + 1 - i as i32);
 
@@ -203,12 +212,12 @@ impl<const CN: usize> StackBlurWorkingPass<u8, CN> for HorizontalNeonStackBlurPa
                     if stack_start >= div {
                         stack_start -= div;
                     }
-                    let stack = stacks0.as_mut_ptr().add(stack_start as usize * 4 * 4);
+                    let stack = stacks0.get_unchecked_mut(stack_start as usize * 4 * 4..);
 
-                    let stack_val0 = vld1q_s32(stack);
-                    let stack_val1 = vld1q_s32(stack.add(4));
-                    let stack_val2 = vld1q_s32(stack.add(8));
-                    let stack_val3 = vld1q_s32(stack.add(12));
+                    let stack_val0 = vld1q_s32(stack.as_ptr().cast());
+                    let stack_val1 = vld1q_s32(stack.get_unchecked(4..).as_ptr().cast());
+                    let stack_val2 = vld1q_s32(stack.get_unchecked(8..).as_ptr().cast());
+                    let stack_val3 = vld1q_s32(stack.get_unchecked(12..).as_ptr().cast());
 
                     sum_out0 = vsubq_s32(sum_out0, stack_val0);
                     sum_out1 = vsubq_s32(sum_out1, stack_val1);
@@ -229,10 +238,13 @@ impl<const CN: usize> StackBlurWorkingPass<u8, CN> for HorizontalNeonStackBlurPa
                     let src_pixel2 = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr2));
                     let src_pixel3 = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr3));
 
-                    vst1q_s32(stack, src_pixel0);
-                    vst1q_s32(stack.add(4), src_pixel1);
-                    vst1q_s32(stack.add(8), src_pixel2);
-                    vst1q_s32(stack.add(12), src_pixel3);
+                    vst1q_s32(stack.as_mut_ptr().cast(), src_pixel0);
+                    vst1q_s32(stack.get_unchecked_mut(4..).as_mut_ptr().cast(), src_pixel1);
+                    vst1q_s32(stack.get_unchecked_mut(8..).as_mut_ptr().cast(), src_pixel2);
+                    vst1q_s32(
+                        stack.get_unchecked_mut(12..).as_mut_ptr().cast(),
+                        src_pixel3,
+                    );
 
                     sum_in0 = vaddq_s32(sum_in0, src_pixel0);
                     sum_in1 = vaddq_s32(sum_in1, src_pixel1);
@@ -248,11 +260,11 @@ impl<const CN: usize> StackBlurWorkingPass<u8, CN> for HorizontalNeonStackBlurPa
                     if sp >= div {
                         sp = 0;
                     }
-                    let stack = stacks0.as_mut_ptr().add(sp as usize * 4 * 4);
-                    let stack_val0 = vld1q_s32(stack);
-                    let stack_val1 = vld1q_s32(stack.add(4));
-                    let stack_val2 = vld1q_s32(stack.add(8));
-                    let stack_val3 = vld1q_s32(stack.add(12));
+                    let stack = stacks0.get_unchecked(sp as usize * 4 * 4..);
+                    let stack_val0 = vld1q_s32(stack.as_ptr().cast());
+                    let stack_val1 = vld1q_s32(stack.get_unchecked(4..).as_ptr().cast());
+                    let stack_val2 = vld1q_s32(stack.get_unchecked(8..).as_ptr().cast());
+                    let stack_val3 = vld1q_s32(stack.get_unchecked(12..).as_ptr().cast());
 
                     sum_out0 = vaddq_s32(sum_out0, stack_val0);
                     sum_out1 = vaddq_s32(sum_out1, stack_val1);
@@ -317,7 +329,10 @@ impl<const CN: usize> StackBlurWorkingPass<u8, CN> for HorizontalNeonStackBlurPa
                     if stack_start >= div {
                         stack_start -= div;
                     }
-                    let stack = stacks0.as_mut_ptr().add(stack_start as usize * 4);
+                    let stack = stacks0
+                        .get_unchecked_mut(stack_start as usize * 4..)
+                        .as_mut_ptr()
+                        .cast();
 
                     let stack_val = vld1q_s32(stack);
 
@@ -328,8 +343,7 @@ impl<const CN: usize> StackBlurWorkingPass<u8, CN> for HorizontalNeonStackBlurPa
                         _xp += 1;
                     }
 
-                    let src_ld = pixels.get_ptr(src_ptr);
-                    let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
+                    let src_pixel = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr));
                     vst1q_s32(stack, src_pixel);
 
                     sum_in = vaddq_s32(sum_in, src_pixel);
@@ -339,8 +353,8 @@ impl<const CN: usize> StackBlurWorkingPass<u8, CN> for HorizontalNeonStackBlurPa
                     if sp >= div {
                         sp = 0;
                     }
-                    let stack = stacks0.as_mut_ptr().add(sp as usize * 4);
-                    let stack_val = vld1q_s32(stack);
+                    let stack = stacks0.get_unchecked(sp as usize * 4..);
+                    let stack_val = vld1q_s32(stack.as_ptr());
 
                     sum_out = vaddq_s32(sum_out, stack_val);
                     sum_in = vsubq_s32(sum_in, stack_val);

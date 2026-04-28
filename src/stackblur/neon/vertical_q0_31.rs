@@ -258,13 +258,10 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                     }
                     let stack_ptr = stacks0.get_unchecked_mut(sp as usize * 4..);
 
-                    let stack_val0 = vld1q_s32(stack_ptr.as_mut_ptr().cast());
-                    let stack_val1 =
-                        vld1q_s32(stack_ptr.get_unchecked_mut(1..).as_mut_ptr().cast());
-                    let stack_val2 =
-                        vld1q_s32(stack_ptr.get_unchecked_mut(2..).as_mut_ptr().cast());
-                    let stack_val3 =
-                        vld1q_s32(stack_ptr.get_unchecked_mut(3..).as_mut_ptr().cast());
+                    let stack_val0 = vld1q_s32(stack_ptr.as_ptr().cast());
+                    let stack_val1 = vld1q_s32(stack_ptr.get_unchecked(1..).as_ptr().cast());
+                    let stack_val2 = vld1q_s32(stack_ptr.get_unchecked(2..).as_ptr().cast());
+                    let stack_val3 = vld1q_s32(stack_ptr.get_unchecked(3..).as_ptr().cast());
 
                     sum_out0 = vaddq_s32(sum_out0, stack_val0);
                     sum_out1 = vaddq_s32(sum_out1, stack_val1);
@@ -400,11 +397,10 @@ impl<const CN: usize> VerticalNeonStackBlurPassQ0_31<CN> {
                     if sp >= div {
                         sp = 0;
                     }
-                    let stack_ptr = stacks0.get_unchecked_mut(sp as usize * 4..);
+                    let stack_ptr = stacks0.get_unchecked(sp as usize * 4..);
 
-                    let stack_val0 = vld1q_s32(stack_ptr.as_mut_ptr().cast());
-                    let stack_val1 =
-                        vld1q_s32(stack_ptr.get_unchecked_mut(1..).as_mut_ptr().cast());
+                    let stack_val0 = vld1q_s32(stack_ptr.as_ptr().cast());
+                    let stack_val1 = vld1q_s32(stack_ptr.get_unchecked(1..).as_ptr().cast());
 
                     sum_out0 = vaddq_s32(sum_out0, stack_val0);
                     sum_out1 = vaddq_s32(sum_out1, stack_val1);

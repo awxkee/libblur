@@ -29,6 +29,7 @@
 
 use crate::fast_divide::{DividerIsize, RemEuclidFast};
 use crate::filter1d::{ArenaPads, make_arena};
+use crate::filter2d::convolver::FftConvolve;
 use crate::filter2d::fft_utils::fft_next_good_size_real;
 use crate::filter2d::mul_spectrum::SpectrumMultiplier;
 use crate::to_storage::ToStorage;
@@ -177,6 +178,47 @@ where
         }));
     }
 
+    if kernel_width < 200 && kernel_height < 200 {
+        let block_size_x = if kernel_width > 95 {
+            512
+        } else if kernel_width > 66 {
+            256
+        } else {
+            128
+        };
+        let block_size_y = if kernel_height > 95 {
+            512
+        } else if kernel_height > 66 {
+            256
+        } else {
+            128
+        };
+        let convolver = FftConvolve {
+            border_constant: border_constant.v0.as_(),
+            edge_mode: edge_modes,
+            thread_count,
+            block_cols: block_size_x,
+            block_rows: block_size_y,
+        };
+        let arena_source = src
+            .data
+            .as_ref()
+            .iter()
+            .map(|&v| v.as_())
+            .collect::<Vec<F>>();
+
+        convolver.overlap_save_2d(
+            dst,
+            &arena_source,
+            src.height as usize,
+            src.width as usize,
+            kernel,
+            kernel_shape.height,
+            kernel_shape.width,
+        );
+        return Ok(());
+    }
+
     let image_size = src.size();
 
     let best_width = fft_next_good_size_real(image_size.width + kernel_shape.width);
@@ -213,15 +255,14 @@ where
             .enumerate()
             .for_each(|(y, row)| {
                 for (x, item) in row.iter().enumerate() {
-                    let new_y =
-                        (y as isize - shift_y).rem_euclid(best_height as isize - 1) as usize;
-                    let new_x = (x as isize - shift_x).rem_euclid(best_width as isize - 1) as usize;
+                    let new_y = (y as isize - shift_y).rem_euclid(best_height as isize) as usize;
+                    let new_x = (x as isize - shift_x).rem_euclid(best_width as isize) as usize;
                     kernel_arena[new_y * best_width + new_x] = *item;
                 }
             });
     } else {
-        let divider_height = DividerIsize::new(best_height as isize - 1);
-        let divider_width = DividerIsize::new(best_width as isize - 1);
+        let divider_height = DividerIsize::new(best_height as isize);
+        let divider_width = DividerIsize::new(best_width as isize);
         kernel
             .chunks_exact(kernel_shape.width)
             .enumerate()

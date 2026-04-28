@@ -911,6 +911,11 @@ fn ring_vertical_row_summ<
     }
 }
 
+struct RingContext<J, T> {
+    scratch: ScratchBuffer<J, 4096>,
+    buffer: Vec<T>,
+}
+
 fn ring_box_filter<
     T: Default
         + Sync
@@ -962,47 +967,28 @@ where
         let tile_size = height as usize / thread_count as usize;
         let pool = novtb::ThreadPool::new(thread_count as usize);
         dst.tb_par_chunks_mut(dst_stride as usize * tile_size)
-            .for_each_enumerated(&pool, |cy, dst_rows| {
-                let source_y = cy * tile_size;
-
-                let mut working_row_scratch = ScratchBuffer::<J, 4096>::new(working_stride);
-                let working_row = working_row_scratch.as_mut_slice();
-                let ring_size = y_kernel_size + 1;
-                let mut buffer = vec![T::default(); working_stride * ring_size];
-
-                let half_kernel = y_kernel_size / 2;
-
-                if source_y == 0 {
-                    let dst0 = UnsafeSlice::new(&mut buffer[..working_stride]);
-                    let src0 =
-                        &src[source_y * src_stride as usize..(source_y + 1) * src_stride as usize];
-
-                    horizontal_handler(
-                        &src0[..width as usize * CN],
-                        src_stride,
-                        &dst0,
-                        working_stride as u32,
-                        width,
-                        x_radius,
-                        0,
-                        1,
-                    );
-
-                    let (src_row, rest) = buffer.split_at_mut(working_stride);
-                    for dst in rest.chunks_exact_mut(working_stride).take(half_kernel) {
-                        for (dst, src) in dst.iter_mut().zip(src_row.iter()) {
-                            *dst = *src;
-                        }
+            .for_each_enumerated_with_context(
+                &pool,
+                || {
+                    let ring_size = y_kernel_size + 1;
+                    RingContext {
+                        scratch: ScratchBuffer::<J, 4096>::new(working_stride),
+                        buffer: vec![T::default(); working_stride * ring_size],
                     }
-                } else {
-                    for src_y in 0..=half_kernel {
-                        let s_y = (src_y as i64 + source_y as i64 - half_kernel as i64 - 1)
-                            .clamp(0, height as i64 - 1) as usize;
+                },
+                |cy, ctx, dst_rows| {
+                    let source_y = cy * tile_size;
 
-                        let dst0 = UnsafeSlice::new(
-                            &mut buffer[src_y * working_stride..(src_y + 1) * working_stride],
-                        );
-                        let src0 = &src[s_y * src_stride as usize..(s_y + 1) * src_stride as usize];
+                    let working_row = ctx.scratch.as_mut_slice();
+                    let ring_size = y_kernel_size + 1;
+                    let buffer = ctx.buffer.as_mut_slice();
+
+                    let half_kernel = y_kernel_size / 2;
+
+                    if source_y == 0 {
+                        let dst0 = UnsafeSlice::new(&mut buffer[..working_stride]);
+                        let src0 = &src
+                            [source_y * src_stride as usize..(source_y + 1) * src_stride as usize];
 
                         horizontal_handler(
                             &src0[..width as usize * CN],
@@ -1014,74 +1000,105 @@ where
                             0,
                             1,
                         );
-                    }
-                }
 
-                let mut start_ky = y_kernel_size / 2;
-
-                start_ky %= ring_size;
-
-                let mut has_warmed_up = false;
-
-                let rows_count = dst_rows.len() / dst_stride as usize;
-
-                for (y, dy) in (source_y..source_y + rows_count + half_kernel + 1)
-                    .zip(0..rows_count + half_kernel + 1)
-                {
-                    let new_y = y.min(height as usize - 1);
-
-                    let src0 = &src[new_y * src_stride as usize..(new_y + 1) * src_stride as usize];
-
-                    let dst0 = UnsafeSlice::new(
-                        &mut buffer[start_ky * working_stride..(start_ky + 1) * working_stride],
-                    );
-
-                    horizontal_handler(
-                        &src0[..width as usize * CN],
-                        src_stride,
-                        &dst0,
-                        working_stride as u32,
-                        width,
-                        x_radius,
-                        0,
-                        1,
-                    );
-
-                    if dy > half_kernel {
-                        if !has_warmed_up {
-                            for row in buffer.chunks_exact(working_stride).take(ring_size - 1) {
-                                for (dst, src) in working_row.iter_mut().zip(row.iter()) {
-                                    *dst += src.cast_();
-                                }
+                        let (src_row, rest) = buffer.split_at_mut(working_stride);
+                        for dst in rest.chunks_exact_mut(working_stride).take(half_kernel) {
+                            for (dst, src) in dst.iter_mut().zip(src_row.iter()) {
+                                *dst = *src;
                             }
-                            has_warmed_up = true;
+                        }
+                    } else {
+                        for src_y in 0..=half_kernel {
+                            let s_y = (src_y as i64 + source_y as i64 - half_kernel as i64 - 1)
+                                .clamp(0, height as i64 - 1)
+                                as usize;
+
+                            let dst0 = UnsafeSlice::new(
+                                &mut buffer[src_y * working_stride..(src_y + 1) * working_stride],
+                            );
+                            let src0 =
+                                &src[s_y * src_stride as usize..(s_y + 1) * src_stride as usize];
+
+                            horizontal_handler(
+                                &src0[..width as usize * CN],
+                                src_stride,
+                                &dst0,
+                                working_stride as u32,
+                                width,
+                                x_radius,
+                                0,
+                                1,
+                            );
+                        }
+                    }
+
+                    let mut start_ky = y_kernel_size / 2;
+
+                    start_ky %= ring_size;
+
+                    let mut has_warmed_up = false;
+
+                    let rows_count = dst_rows.len() / dst_stride as usize;
+
+                    for (y, dy) in (source_y..source_y + rows_count + half_kernel + 1)
+                        .zip(0..rows_count + half_kernel + 1)
+                    {
+                        let new_y = y.min(height as usize - 1);
+
+                        let src0 =
+                            &src[new_y * src_stride as usize..(new_y + 1) * src_stride as usize];
+
+                        let dst0 = UnsafeSlice::new(
+                            &mut buffer[start_ky * working_stride..(start_ky + 1) * working_stride],
+                        );
+
+                        horizontal_handler(
+                            &src0[..width as usize * CN],
+                            src_stride,
+                            &dst0,
+                            working_stride as u32,
+                            width,
+                            x_radius,
+                            0,
+                            1,
+                        );
+
+                        if dy > half_kernel {
+                            if !has_warmed_up {
+                                for row in buffer.chunks_exact(working_stride).take(ring_size - 1) {
+                                    for (dst, src) in working_row.iter_mut().zip(row.iter()) {
+                                        *dst += src.cast_();
+                                    }
+                                }
+                                has_warmed_up = true;
+                            }
+
+                            let ky0 = (start_ky + 1) % ring_size;
+                            let ky1 = (start_ky) % ring_size;
+
+                            let brow0 = &buffer[ky0 * working_stride..(ky0 + 1) * working_stride];
+                            let brow1 = &buffer[ky1 * working_stride..(ky1 + 1) * working_stride];
+
+                            let capture = [brow0, brow1];
+
+                            let dy = dy - half_kernel - 1;
+
+                            let dst0 = &mut dst_rows
+                                [dy * dst_stride as usize..(dy + 1) * dst_stride as usize];
+
+                            ring_vsum(
+                                &capture,
+                                &mut dst0[..width as usize * CN],
+                                working_row,
+                                y_radius,
+                            );
                         }
 
-                        let ky0 = (start_ky + 1) % ring_size;
-                        let ky1 = (start_ky) % ring_size;
-
-                        let brow0 = &buffer[ky0 * working_stride..(ky0 + 1) * working_stride];
-                        let brow1 = &buffer[ky1 * working_stride..(ky1 + 1) * working_stride];
-
-                        let capture = [brow0, brow1];
-
-                        let dy = dy - half_kernel - 1;
-
-                        let dst0 =
-                            &mut dst_rows[dy * dst_stride as usize..(dy + 1) * dst_stride as usize];
-
-                        ring_vsum(
-                            &capture,
-                            &mut dst0[..width as usize * CN],
-                            working_row,
-                            y_radius,
-                        );
+                        start_ky += 1;
+                        start_ky %= ring_size;
                     }
-
-                    start_ky += 1;
-                    start_ky %= ring_size;
-                }
-            });
+                },
+            );
     } else {
         let mut working_row_scratch = ScratchBuffer::<J, 4096>::new(working_stride);
         let working_row = working_row_scratch.as_mut_slice();
