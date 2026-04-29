@@ -51,3 +51,7 @@ pub(crate) use vertical_f16::VerticalNeonStackBlurPassFloat16;
 pub(crate) use vertical_f32::VerticalNeonStackBlurPassFloat32;
 #[cfg(feature = "rdm")]
 pub(crate) use vertical_q0_31::VerticalNeonStackBlurPassQ0_31;
+
+#[derive(Clone, Copy, Default)]
+#[repr(C, align(16))]
+pub(crate) struct NeonVectorI32x4([i32; 4]);

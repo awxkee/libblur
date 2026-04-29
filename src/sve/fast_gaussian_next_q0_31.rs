@@ -29,6 +29,7 @@ use crate::EdgeMode;
 use crate::edge_mode::clamp_edge;
 use crate::sve::fast_gaussian_q0_31::SveI32x4;
 use crate::unsafe_slice::UnsafeSlice;
+use crate::util::ScratchBuffer;
 use std::arch::aarch64::*;
 
 pub(crate) fn fgn_vertical_pass_neon_u8_sve<const CN: usize>(
@@ -67,11 +68,8 @@ fn fgn_vertical_pass_neon_impl_sve<const CN: usize>(
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        let mut full_buffer = [SveI32x4::default(); 1024 * 4];
-
-        let (buffer0, rem) = full_buffer.split_at_mut(1024);
-        let (buffer1, rem) = rem.split_at_mut(1024);
-        let (buffer2, buffer3) = rem.split_at_mut(1024);
+        let mut buffer = ScratchBuffer::<[SveI32x4; 4], 1024>::new(1024);
+        let buffer = buffer.as_mut_slice();
 
         let height_wide = height as i64;
 
@@ -130,53 +128,29 @@ fn fgn_vertical_pass_neon_impl_sve<const CN: usize>(
                     let d_arr_index_2 = ((y - radius_64) & 1023) as usize;
                     let d_arr_index = (y & 1023) as usize;
 
-                    let stored0 =
-                        svld1_s32(pv_cn, buffer0.get_unchecked(d_arr_index..).as_ptr().cast());
-                    let stored1 =
-                        svld1_s32(pv_cn, buffer1.get_unchecked(d_arr_index..).as_ptr().cast());
-                    let stored2 =
-                        svld1_s32(pv_cn, buffer2.get_unchecked(d_arr_index..).as_ptr().cast());
-                    let stored3 =
-                        svld1_s32(pv_cn, buffer3.get_unchecked(d_arr_index..).as_ptr().cast());
+                    let da_b = buffer.get_unchecked(d_arr_index);
+                    let da_b1 = buffer.get_unchecked(d_arr_index_1);
+                    let da_b2 = buffer.get_unchecked(d_arr_index_2);
 
-                    let stored_10 = svld1_s32(
-                        pv_cn,
-                        buffer0.get_unchecked(d_arr_index_1..).as_ptr().cast(),
-                    );
-                    let stored_11 = svld1_s32(
-                        pv_cn,
-                        buffer1.get_unchecked(d_arr_index_1..).as_ptr().cast(),
-                    );
-                    let stored_12 = svld1_s32(
-                        pv_cn,
-                        buffer2.get_unchecked(d_arr_index_1..).as_ptr().cast(),
-                    );
-                    let stored_13 = svld1_s32(
-                        pv_cn,
-                        buffer3.get_unchecked(d_arr_index_1..).as_ptr().cast(),
-                    );
+                    let stored0 = svld1_s32(pv_cn, da_b.as_ptr().cast());
+                    let stored1 = svld1_s32(pv_cn, da_b[1..].as_ptr().cast());
+                    let stored2 = svld1_s32(pv_cn, da_b[2..].as_ptr().cast());
+                    let stored3 = svld1_s32(pv_cn, da_b[3..].as_ptr().cast());
+
+                    let stored_10 = svld1_s32(pv_cn, da_b1.as_ptr().cast());
+                    let stored_11 = svld1_s32(pv_cn, da_b1[1..].as_ptr().cast());
+                    let stored_12 = svld1_s32(pv_cn, da_b1[2..].as_ptr().cast());
+                    let stored_13 = svld1_s32(pv_cn, da_b1[3..].as_ptr().cast());
 
                     let j0 = svsub_s32_x(pv_cn, stored0, stored_10);
                     let j1 = svsub_s32_x(pv_cn, stored1, stored_11);
                     let j2 = svsub_s32_x(pv_cn, stored2, stored_12);
                     let j3 = svsub_s32_x(pv_cn, stored3, stored_13);
 
-                    let stored_20 = svld1_s32(
-                        pv_cn,
-                        buffer0.get_unchecked(d_arr_index_2..).as_ptr().cast(),
-                    );
-                    let stored_21 = svld1_s32(
-                        pv_cn,
-                        buffer1.get_unchecked(d_arr_index_2..).as_ptr().cast(),
-                    );
-                    let stored_22 = svld1_s32(
-                        pv_cn,
-                        buffer2.get_unchecked(d_arr_index_2..).as_ptr().cast(),
-                    );
-                    let stored_23 = svld1_s32(
-                        pv_cn,
-                        buffer3.get_unchecked(d_arr_index_2..).as_ptr().cast(),
-                    );
+                    let stored_20 = svld1_s32(pv_cn, da_b2.as_ptr().cast());
+                    let stored_21 = svld1_s32(pv_cn, da_b2[1..].as_ptr().cast());
+                    let stored_22 = svld1_s32(pv_cn, da_b2[2..].as_ptr().cast());
+                    let stored_23 = svld1_s32(pv_cn, da_b2[3..].as_ptr().cast());
 
                     let k0 = svmul_n_s32_x(pv_cn, j0, 3);
                     let k1 = svmul_n_s32_x(pv_cn, j1, 3);
@@ -196,23 +170,18 @@ fn fgn_vertical_pass_neon_impl_sve<const CN: usize>(
                     let arr_index = (y & 1023) as usize;
                     let arr_index_1 = ((y + radius_64) & 1023) as usize;
 
-                    let stored0 =
-                        svld1_s32(pv_cn, buffer0.get_unchecked(arr_index..).as_ptr().cast());
-                    let stored1 =
-                        svld1_s32(pv_cn, buffer1.get_unchecked(arr_index..).as_ptr().cast());
-                    let stored2 =
-                        svld1_s32(pv_cn, buffer2.get_unchecked(arr_index..).as_ptr().cast());
-                    let stored3 =
-                        svld1_s32(pv_cn, buffer3.get_unchecked(arr_index..).as_ptr().cast());
+                    let da_b = buffer.get_unchecked(arr_index);
+                    let da_b1 = buffer.get_unchecked(arr_index_1);
 
-                    let stored_10 =
-                        svld1_s32(pv_cn, buffer0.get_unchecked(arr_index_1..).as_ptr().cast());
-                    let stored_11 =
-                        svld1_s32(pv_cn, buffer1.get_unchecked(arr_index_1..).as_ptr().cast());
-                    let stored_12 =
-                        svld1_s32(pv_cn, buffer2.get_unchecked(arr_index_1..).as_ptr().cast());
-                    let stored_13 =
-                        svld1_s32(pv_cn, buffer3.get_unchecked(arr_index_1..).as_ptr().cast());
+                    let stored0 = svld1_s32(pv_cn, da_b.as_ptr().cast());
+                    let stored1 = svld1_s32(pv_cn, da_b[1..].as_ptr().cast());
+                    let stored2 = svld1_s32(pv_cn, da_b[2..].as_ptr().cast());
+                    let stored3 = svld1_s32(pv_cn, da_b[3..].as_ptr().cast());
+
+                    let stored_10 = svld1_s32(pv_cn, da_b1.as_ptr().cast());
+                    let stored_11 = svld1_s32(pv_cn, da_b1[1..].as_ptr().cast());
+                    let stored_12 = svld1_s32(pv_cn, da_b1[2..].as_ptr().cast());
+                    let stored_13 = svld1_s32(pv_cn, da_b1[3..].as_ptr().cast());
 
                     let q0 = svsub_s32_x(pv_cn, stored0, stored_10);
                     let q1 = svsub_s32_x(pv_cn, stored1, stored_11);
@@ -225,15 +194,12 @@ fn fgn_vertical_pass_neon_impl_sve<const CN: usize>(
                     diffs3 = svmla_n_s32_x(pv_cn, diffs3, q3, 3);
                 } else if y + 2 * radius_64 >= 0 {
                     let arr_index = ((y + radius_64) & 1023) as usize;
+                    let da_b = buffer.get_unchecked(arr_index);
 
-                    let stored0 =
-                        svld1_s32(pv_cn, buffer0.get_unchecked(arr_index..).as_ptr().cast());
-                    let stored1 =
-                        svld1_s32(pv_cn, buffer1.get_unchecked(arr_index..).as_ptr().cast());
-                    let stored2 =
-                        svld1_s32(pv_cn, buffer2.get_unchecked(arr_index..).as_ptr().cast());
-                    let stored3 =
-                        svld1_s32(pv_cn, buffer3.get_unchecked(arr_index..).as_ptr().cast());
+                    let stored0 = svld1_s32(pv_cn, da_b.as_ptr().cast());
+                    let stored1 = svld1_s32(pv_cn, da_b[1..].as_ptr().cast());
+                    let stored2 = svld1_s32(pv_cn, da_b[2..].as_ptr().cast());
+                    let stored3 = svld1_s32(pv_cn, da_b[3..].as_ptr().cast());
 
                     diffs0 = svmla_n_s32_x(pv_cn, diffs0, stored0, -3);
                     diffs1 = svmla_n_s32_x(pv_cn, diffs1, stored1, -3);
@@ -255,21 +221,17 @@ fn fgn_vertical_pass_neon_impl_sve<const CN: usize>(
                 let pixel_color3 = svld1ub_s32(pv_cn, s_ptr3);
 
                 let arr_index = ((y + 2 * radius_64) & 1023) as usize;
-
-                let buf_ptr0 = buffer0.get_unchecked_mut(arr_index..).as_mut_ptr().cast();
-                let buf_ptr1 = buffer1.get_unchecked_mut(arr_index..).as_mut_ptr().cast();
-                let buf_ptr2 = buffer2.get_unchecked_mut(arr_index..).as_mut_ptr().cast();
-                let buf_ptr3 = buffer3.get_unchecked_mut(arr_index..).as_mut_ptr().cast();
+                let da_b = buffer.get_unchecked_mut(arr_index);
 
                 diffs0 = svadd_s32_x(pv_cn, diffs0, pixel_color0);
                 diffs1 = svadd_s32_x(pv_cn, diffs1, pixel_color1);
                 diffs2 = svadd_s32_x(pv_cn, diffs2, pixel_color2);
                 diffs3 = svadd_s32_x(pv_cn, diffs3, pixel_color3);
 
-                svst1_s32(pv_cn, buf_ptr0, pixel_color0);
-                svst1_s32(pv_cn, buf_ptr1, pixel_color1);
-                svst1_s32(pv_cn, buf_ptr2, pixel_color2);
-                svst1_s32(pv_cn, buf_ptr3, pixel_color3);
+                svst1_s32(pv_cn, da_b.as_mut_ptr().cast(), pixel_color0);
+                svst1_s32(pv_cn, da_b[1..].as_mut_ptr().cast(), pixel_color1);
+                svst1_s32(pv_cn, da_b[2..].as_mut_ptr().cast(), pixel_color2);
+                svst1_s32(pv_cn, da_b[3..].as_mut_ptr().cast(), pixel_color3);
 
                 ders0 = svadd_s32_x(pv_cn, ders0, diffs0);
                 ders1 = svadd_s32_x(pv_cn, ders1, diffs1);
@@ -310,15 +272,11 @@ fn fgn_vertical_pass_neon_impl_sve<const CN: usize>(
                     let d_arr_index = (y & 1023) as usize;
 
                     let stored =
-                        svld1_s32(pv_cn, buffer0.get_unchecked(d_arr_index..).as_ptr().cast());
-                    let stored_1 = svld1_s32(
-                        pv_cn,
-                        buffer0.get_unchecked(d_arr_index_1..).as_ptr().cast(),
-                    );
-                    let stored_2 = svld1_s32(
-                        pv_cn,
-                        buffer0.get_unchecked(d_arr_index_2..).as_ptr().cast(),
-                    );
+                        svld1_s32(pv_cn, buffer.get_unchecked(d_arr_index).as_ptr().cast());
+                    let stored_1 =
+                        svld1_s32(pv_cn, buffer.get_unchecked(d_arr_index_1).as_ptr().cast());
+                    let stored_2 =
+                        svld1_s32(pv_cn, buffer.get_unchecked(d_arr_index_2).as_ptr().cast());
 
                     let new_diff = svsub_s32_x(
                         pv_cn,
@@ -329,16 +287,16 @@ fn fgn_vertical_pass_neon_impl_sve<const CN: usize>(
                 } else if y + radius_64 >= 0 {
                     let arr_index = (y & 1023) as usize;
                     let arr_index_1 = ((y + radius_64) & 1023) as usize;
-                    let buf_ptr = buffer0.get_unchecked(arr_index..).as_ptr().cast();
+                    let buf_ptr = buffer.get_unchecked(arr_index).as_ptr().cast();
                     let stored = svld1_s32(pv_cn, buf_ptr);
 
-                    let buf_ptr_1 = buffer0.get_unchecked(arr_index_1..).as_ptr().cast();
+                    let buf_ptr_1 = buffer.get_unchecked(arr_index_1).as_ptr().cast();
                     let stored_1 = svld1_s32(pv_cn, buf_ptr_1);
 
                     diffs = svmla_n_s32_x(pv_cn, diffs, svsub_s32_x(pv_cn, stored, stored_1), 3);
                 } else if y + 2 * radius_64 >= 0 {
                     let arr_index = ((y + radius_64) & 1023) as usize;
-                    let buf_ptr = buffer0.get_unchecked(arr_index).0.as_ptr().cast();
+                    let buf_ptr = buffer.get_unchecked(arr_index).as_ptr().cast();
                     let stored = svld1_s32(pv_cn, buf_ptr);
                     diffs = svmla_n_s32_x(pv_cn, diffs, stored, -3);
                 }
@@ -352,7 +310,7 @@ fn fgn_vertical_pass_neon_impl_sve<const CN: usize>(
                 let pixel_color = svld1ub_s32(pv_cn, s_ptr);
 
                 let arr_index = ((y + 2 * radius_64) & 1023) as usize;
-                let buf_ptr = buffer0.get_unchecked_mut(arr_index..).as_mut_ptr().cast();
+                let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr().cast();
 
                 diffs = svadd_s32_x(pv_cn, diffs, pixel_color);
                 ders = svadd_s32_x(pv_cn, ders, diffs);
@@ -399,11 +357,8 @@ fn fgn_horizontal_pass_neon_impl_sve<const CN: usize>(
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        let mut full_buffer = [SveI32x4::default(); 1024 * 4];
-
-        let (buffer0, rem) = full_buffer.split_at_mut(1024);
-        let (buffer1, rem) = rem.split_at_mut(1024);
-        let (buffer2, buffer3) = rem.split_at_mut(1024);
+        let mut buffer = ScratchBuffer::<[SveI32x4; 4], 1024>::new(1024);
+        let buffer = buffer.as_mut_slice();
 
         let width_wide = width as i64;
 
@@ -460,53 +415,29 @@ fn fgn_horizontal_pass_neon_impl_sve<const CN: usize>(
                     let d_arr_index_2 = ((x - radius_64) & 1023) as usize;
                     let d_arr_index = (x & 1023) as usize;
 
-                    let stored0 =
-                        svld1_s32(pv_cn, buffer0.get_unchecked(d_arr_index..).as_ptr().cast());
-                    let stored1 =
-                        svld1_s32(pv_cn, buffer1.get_unchecked(d_arr_index..).as_ptr().cast());
-                    let stored2 =
-                        svld1_s32(pv_cn, buffer2.get_unchecked(d_arr_index..).as_ptr().cast());
-                    let stored3 =
-                        svld1_s32(pv_cn, buffer3.get_unchecked(d_arr_index..).as_ptr().cast());
+                    let da_b = buffer.get_unchecked(d_arr_index);
+                    let da_b1 = buffer.get_unchecked(d_arr_index_1);
+                    let da_b2 = buffer.get_unchecked(d_arr_index_2);
 
-                    let stored_10 = svld1_s32(
-                        pv_cn,
-                        buffer0.get_unchecked(d_arr_index_1..).as_ptr().cast(),
-                    );
-                    let stored_11 = svld1_s32(
-                        pv_cn,
-                        buffer1.get_unchecked(d_arr_index_1..).as_ptr().cast(),
-                    );
-                    let stored_12 = svld1_s32(
-                        pv_cn,
-                        buffer2.get_unchecked(d_arr_index_1..).as_ptr().cast(),
-                    );
-                    let stored_13 = svld1_s32(
-                        pv_cn,
-                        buffer3.get_unchecked(d_arr_index_1..).as_ptr().cast(),
-                    );
+                    let stored0 = svld1_s32(pv_cn, da_b.as_ptr().cast());
+                    let stored1 = svld1_s32(pv_cn, da_b[1..].as_ptr().cast());
+                    let stored2 = svld1_s32(pv_cn, da_b[2..].as_ptr().cast());
+                    let stored3 = svld1_s32(pv_cn, da_b[3..].as_ptr().cast());
+
+                    let stored_10 = svld1_s32(pv_cn, da_b1.as_ptr().cast());
+                    let stored_11 = svld1_s32(pv_cn, da_b1[1..].as_ptr().cast());
+                    let stored_12 = svld1_s32(pv_cn, da_b1[2..].as_ptr().cast());
+                    let stored_13 = svld1_s32(pv_cn, da_b1[3..].as_ptr().cast());
 
                     let j0 = svsub_s32_x(pv_cn, stored0, stored_10);
                     let j1 = svsub_s32_x(pv_cn, stored1, stored_11);
                     let j2 = svsub_s32_x(pv_cn, stored2, stored_12);
                     let j3 = svsub_s32_x(pv_cn, stored3, stored_13);
 
-                    let stored_20 = svld1_s32(
-                        pv_cn,
-                        buffer0.get_unchecked(d_arr_index_2..).as_ptr().cast(),
-                    );
-                    let stored_21 = svld1_s32(
-                        pv_cn,
-                        buffer1.get_unchecked(d_arr_index_2..).as_ptr().cast(),
-                    );
-                    let stored_22 = svld1_s32(
-                        pv_cn,
-                        buffer2.get_unchecked(d_arr_index_2..).as_ptr().cast(),
-                    );
-                    let stored_23 = svld1_s32(
-                        pv_cn,
-                        buffer3.get_unchecked(d_arr_index_2..).as_ptr().cast(),
-                    );
+                    let stored_20 = svld1_s32(pv_cn, da_b2.as_ptr().cast());
+                    let stored_21 = svld1_s32(pv_cn, da_b2[1..].as_ptr().cast());
+                    let stored_22 = svld1_s32(pv_cn, da_b2[2..].as_ptr().cast());
+                    let stored_23 = svld1_s32(pv_cn, da_b2[3..].as_ptr().cast());
 
                     let k0 = svmul_n_s32_x(pv_cn, j0, 3);
                     let k1 = svmul_n_s32_x(pv_cn, j1, 3);
@@ -526,23 +457,18 @@ fn fgn_horizontal_pass_neon_impl_sve<const CN: usize>(
                     let arr_index = (x & 1023) as usize;
                     let arr_index_1 = ((x + radius_64) & 1023) as usize;
 
-                    let stored0 =
-                        svld1_s32(pv_cn, buffer0.get_unchecked(arr_index..).as_ptr().cast());
-                    let stored1 =
-                        svld1_s32(pv_cn, buffer1.get_unchecked(arr_index..).as_ptr().cast());
-                    let stored2 =
-                        svld1_s32(pv_cn, buffer2.get_unchecked(arr_index..).as_ptr().cast());
-                    let stored3 =
-                        svld1_s32(pv_cn, buffer3.get_unchecked(arr_index..).as_ptr().cast());
+                    let da_b = buffer.get_unchecked(arr_index);
+                    let da_b1 = buffer.get_unchecked(arr_index_1);
 
-                    let stored_10 =
-                        svld1_s32(pv_cn, buffer0.get_unchecked(arr_index_1..).as_ptr().cast());
-                    let stored_11 =
-                        svld1_s32(pv_cn, buffer1.get_unchecked(arr_index_1..).as_ptr().cast());
-                    let stored_12 =
-                        svld1_s32(pv_cn, buffer2.get_unchecked(arr_index_1..).as_ptr().cast());
-                    let stored_13 =
-                        svld1_s32(pv_cn, buffer3.get_unchecked(arr_index_1..).as_ptr().cast());
+                    let stored0 = svld1_s32(pv_cn, da_b.as_ptr().cast());
+                    let stored1 = svld1_s32(pv_cn, da_b[1..].as_ptr().cast());
+                    let stored2 = svld1_s32(pv_cn, da_b[2..].as_ptr().cast());
+                    let stored3 = svld1_s32(pv_cn, da_b[3..].as_ptr().cast());
+
+                    let stored_10 = svld1_s32(pv_cn, da_b1.as_ptr().cast());
+                    let stored_11 = svld1_s32(pv_cn, da_b1[1..].as_ptr().cast());
+                    let stored_12 = svld1_s32(pv_cn, da_b1[2..].as_ptr().cast());
+                    let stored_13 = svld1_s32(pv_cn, da_b1[3..].as_ptr().cast());
 
                     let q0 = svsub_s32_x(pv_cn, stored0, stored_10);
                     let q1 = svsub_s32_x(pv_cn, stored1, stored_11);
@@ -555,14 +481,12 @@ fn fgn_horizontal_pass_neon_impl_sve<const CN: usize>(
                     diffs3 = svmla_n_s32_x(pv_cn, diffs3, q3, 3);
                 } else if x + 2 * radius_64 >= 0 {
                     let arr_index = ((x + radius_64) & 1023) as usize;
-                    let stored0 =
-                        svld1_s32(pv_cn, buffer0.get_unchecked(arr_index..).as_ptr().cast());
-                    let stored1 =
-                        svld1_s32(pv_cn, buffer1.get_unchecked(arr_index..).as_ptr().cast());
-                    let stored2 =
-                        svld1_s32(pv_cn, buffer2.get_unchecked(arr_index..).as_ptr().cast());
-                    let stored3 =
-                        svld1_s32(pv_cn, buffer3.get_unchecked(arr_index..).as_ptr().cast());
+                    let da_b = buffer.get_unchecked(arr_index);
+
+                    let stored0 = svld1_s32(pv_cn, da_b.as_ptr().cast());
+                    let stored1 = svld1_s32(pv_cn, da_b[1..].as_ptr().cast());
+                    let stored2 = svld1_s32(pv_cn, da_b[2..].as_ptr().cast());
+                    let stored3 = svld1_s32(pv_cn, da_b[3..].as_ptr().cast());
 
                     diffs0 = svmla_n_s32_x(pv_cn, diffs0, stored0, -3);
                     diffs1 = svmla_n_s32_x(pv_cn, diffs1, stored1, -3);
@@ -584,20 +508,17 @@ fn fgn_horizontal_pass_neon_impl_sve<const CN: usize>(
                 let pixel_color3 = svld1ub_s32(pv_cn, s_ptr3);
 
                 let arr_index = ((x + 2 * radius_64) & 1023) as usize;
-                let buf_ptr0 = buffer0.get_unchecked_mut(arr_index..).as_mut_ptr().cast();
-                let buf_ptr1 = buffer1.get_unchecked_mut(arr_index..).as_mut_ptr().cast();
-                let buf_ptr2 = buffer2.get_unchecked_mut(arr_index..).as_mut_ptr().cast();
-                let buf_ptr3 = buffer3.get_unchecked_mut(arr_index..).as_mut_ptr().cast();
+                let da_b = buffer.get_unchecked_mut(arr_index);
 
                 diffs0 = svadd_s32_x(pv_cn, diffs0, pixel_color0);
                 diffs1 = svadd_s32_x(pv_cn, diffs1, pixel_color1);
                 diffs2 = svadd_s32_x(pv_cn, diffs2, pixel_color2);
                 diffs3 = svadd_s32_x(pv_cn, diffs3, pixel_color3);
 
-                svst1_s32(pv_cn, buf_ptr0, pixel_color0);
-                svst1_s32(pv_cn, buf_ptr1, pixel_color1);
-                svst1_s32(pv_cn, buf_ptr2, pixel_color2);
-                svst1_s32(pv_cn, buf_ptr3, pixel_color3);
+                svst1_s32(pv_cn, da_b.as_mut_ptr().cast(), pixel_color0);
+                svst1_s32(pv_cn, da_b[1..].as_mut_ptr().cast(), pixel_color1);
+                svst1_s32(pv_cn, da_b[2..].as_mut_ptr().cast(), pixel_color2);
+                svst1_s32(pv_cn, da_b[3..].as_mut_ptr().cast(), pixel_color3);
 
                 ders0 = svadd_s32_x(pv_cn, ders0, diffs0);
                 ders1 = svadd_s32_x(pv_cn, ders1, diffs1);
@@ -638,13 +559,13 @@ fn fgn_horizontal_pass_neon_impl_sve<const CN: usize>(
                     let d_arr_index_2 = ((x - radius_64) & 1023) as usize;
                     let d_arr_index = (x & 1023) as usize;
 
-                    let buf_ptr = buffer0.get_unchecked(d_arr_index..).as_ptr().cast();
+                    let buf_ptr = buffer.get_unchecked(d_arr_index).as_ptr().cast();
                     let stored = svld1_s32(pv_cn, buf_ptr);
 
-                    let buf_ptr_1 = buffer0.get_unchecked(d_arr_index_1..).as_ptr().cast();
+                    let buf_ptr_1 = buffer.get_unchecked(d_arr_index_1).as_ptr().cast();
                     let stored_1 = svld1_s32(pv_cn, buf_ptr_1);
 
-                    let buf_ptr_2 = buffer0.get_unchecked(d_arr_index_2..).as_ptr().cast();
+                    let buf_ptr_2 = buffer.get_unchecked(d_arr_index_2).as_ptr().cast();
                     let stored_2 = svld1_s32(pv_cn, buf_ptr_2);
 
                     let new_diff = svsub_s32_x(
@@ -656,16 +577,16 @@ fn fgn_horizontal_pass_neon_impl_sve<const CN: usize>(
                 } else if x + radius_64 >= 0 {
                     let arr_index = (x & 1023) as usize;
                     let arr_index_1 = ((x + radius_64) & 1023) as usize;
-                    let buf_ptr = buffer0.get_unchecked(arr_index..).as_ptr().cast();
+                    let buf_ptr = buffer.get_unchecked(arr_index).as_ptr().cast();
                     let stored = svld1_s32(pv_cn, buf_ptr);
 
-                    let buf_ptr_1 = buffer0.get_unchecked(arr_index_1..).as_ptr().cast();
+                    let buf_ptr_1 = buffer.get_unchecked(arr_index_1).as_ptr().cast();
                     let stored_1 = svld1_s32(pv_cn, buf_ptr_1);
 
                     diffs = svmla_n_s32_x(pv_cn, diffs, svsub_s32_x(pv_cn, stored, stored_1), 3);
                 } else if x + 2 * radius_64 >= 0 {
                     let arr_index = ((x + radius_64) & 1023) as usize;
-                    let buf_ptr = buffer0.get_unchecked(arr_index..).as_ptr().cast();
+                    let buf_ptr = buffer.get_unchecked(arr_index).as_ptr().cast();
                     let stored = svld1_s32(pv_cn, buf_ptr);
                     diffs = svmla_n_s32_x(pv_cn, diffs, stored, -3);
                 }
@@ -679,7 +600,7 @@ fn fgn_horizontal_pass_neon_impl_sve<const CN: usize>(
                 let pixel_color = svld1ub_s32(pv_cn, s_ptr);
 
                 let arr_index = ((x + 2 * radius_64) & 1023) as usize;
-                let buf_ptr = buffer0.get_unchecked_mut(arr_index..).as_mut_ptr().cast();
+                let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr().cast();
 
                 diffs = svadd_s32_x(pv_cn, diffs, pixel_color);
                 ders = svadd_s32_x(pv_cn, ders, diffs);

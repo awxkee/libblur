@@ -316,7 +316,7 @@ fn stack_blur_pass_vert_avx<const CN: usize>(
                     let stack_ptr = stacks.get_unchecked_mut((i + radius) as usize..);
                     let src_pixel0 = _mm_load_ss(pixels.get_ptr(src_ptr));
 
-                    _mm_storeu_ps(stack_ptr.as_mut_ptr().cast(), src_pixel0);
+                    _mm_store_ps(stack_ptr.as_mut_ptr().cast(), src_pixel0);
 
                     let w = _mm_set1_ps((radius as i32 + 1 - i as i32) as f32);
                     sums0 = _mm_fmadd_ps(src_pixel0, w, sums0);

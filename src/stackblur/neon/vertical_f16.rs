@@ -83,7 +83,7 @@ impl<const CN: usize> VerticalNeonStackBlurPassFloat16<CN> {
 
                 for i in 0..=radius {
                     let stack_ptr = stacks.as_mut_ptr().add(i as usize * 4);
-                    vst1q_f32(stack_ptr, src_pixel);
+                    vst1q_f32(stack_ptr.cast(), src_pixel);
                     sums = vfmaq_n_f32(sums, src_pixel, i as f32 + 1.);
                     sum_out = vaddq_f32(sum_out, src_pixel);
                 }
@@ -95,7 +95,7 @@ impl<const CN: usize> VerticalNeonStackBlurPassFloat16<CN> {
 
                     let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4);
                     let src_pixel = load_f32_f16::<CN>(pixels.get_ptr(src_ptr));
-                    vst1q_f32(stack_ptr, src_pixel);
+                    vst1q_f32(stack_ptr.cast(), src_pixel);
                     sums = vfmaq_n_f32(sums, src_pixel, radius as f32 + 1. - i as f32);
 
                     sum_in = vaddq_f32(sum_in, src_pixel);
@@ -122,7 +122,7 @@ impl<const CN: usize> VerticalNeonStackBlurPassFloat16<CN> {
                     }
 
                     let stack_ptr = stacks.as_mut_ptr().add(stack_start as usize * 4);
-                    let stack_val = vld1q_f32(stack_ptr);
+                    let stack_val = vld1q_f32(stack_ptr.cast());
                     sum_out = vsubq_f32(sum_out, stack_val);
 
                     if yp < hm {
@@ -131,7 +131,7 @@ impl<const CN: usize> VerticalNeonStackBlurPassFloat16<CN> {
                     }
 
                     let src_pixel = load_f32_f16::<CN>(pixels.get_ptr(src_ptr));
-                    vst1q_f32(stack_ptr, src_pixel);
+                    vst1q_f32(stack_ptr.cast(), src_pixel);
 
                     sum_in = vaddq_f32(sum_in, src_pixel);
                     sums = vaddq_f32(sums, sum_in);
@@ -142,7 +142,7 @@ impl<const CN: usize> VerticalNeonStackBlurPassFloat16<CN> {
                         sp = 0;
                     }
                     let stack_ptr = stacks.as_mut_ptr().add(sp as usize * 4);
-                    let stack_val = vld1q_f32(stack_ptr);
+                    let stack_val = vld1q_f32(stack_ptr.cast());
 
                     sum_out = vaddq_f32(sum_out, stack_val);
                     sum_in = vsubq_f32(sum_in, stack_val);

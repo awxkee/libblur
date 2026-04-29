@@ -59,7 +59,7 @@ pub(crate) fn fg_vertical_pass_neon_f16<const CN: usize>(
                 let current_y = (y * (stride as i64)) as usize;
 
                 if y >= 0 {
-                    let current_px = std::cmp::max(x, 0) as usize * CN;
+                    let current_px = x as usize * CN;
 
                     let prepared_px = vmulq_f32(summs, f_weight);
 

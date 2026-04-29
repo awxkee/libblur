@@ -81,8 +81,7 @@ impl<const CN: usize> HorizontalSseStackBlurPassFloat16<CN> {
 
                 src_ptr = stride as usize * y; // start of line (0,y)
 
-                let src_ld = pixels.get_ptr(src_ptr) as *const f16;
-                let src_pixel = load_f32_f16::<CN>(src_ld);
+                let src_pixel = load_f32_f16::<CN>(pixels.get_ptr(src_ptr));
 
                 for i in 0..=radius {
                     let stack_value = stacks.as_mut_ptr().add(i as usize * 4);
@@ -137,8 +136,7 @@ impl<const CN: usize> HorizontalSseStackBlurPassFloat16<CN> {
                         xp += 1;
                     }
 
-                    let src_ld = pixels.get_ptr(src_ptr) as *const f16;
-                    let src_pixel = load_f32_f16::<CN>(src_ld);
+                    let src_pixel = load_f32_f16::<CN>(pixels.get_ptr(src_ptr).cast());
                     _mm_storeu_ps(stack, src_pixel);
 
                     sum_in = _mm_add_ps(sum_in, src_pixel);

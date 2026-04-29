@@ -78,13 +78,11 @@ impl<const CN: usize> VerticalWasmStackBlurPass<CN> {
 
                 src_ptr = CN * x; // x,0
 
-                let src_ld = pixels.get_ptr(src_ptr) as *const i32;
-
-                let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
+                let src_pixel = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr));
 
                 for i in 0..=radius {
                     let stack_ptr = stacks.as_mut_ptr().add(i as usize * 4);
-                    v128_store(stack_ptr as *mut v128, src_pixel);
+                    v128_store(stack_ptr.cast(), src_pixel);
                     sums = i32x4_add(sums, i32x4_mul(src_pixel, i32x4_splat(i as i32 + 1)));
                     sum_out = i32x4_add(sum_out, src_pixel);
                 }
@@ -95,8 +93,7 @@ impl<const CN: usize> VerticalWasmStackBlurPass<CN> {
                     }
 
                     let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4);
-                    let src_ld = pixels.get_ptr(src_ptr) as *const i32;
-                    let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
+                    let src_pixel = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr));
                     v128_store(stack_ptr as *mut v128, src_pixel);
                     sums = i32x4_add(
                         sums,
@@ -114,11 +111,10 @@ impl<const CN: usize> VerticalWasmStackBlurPass<CN> {
                 src_ptr = CN * x + yp as usize * stride as usize;
                 dst_ptr = CN * x;
                 for _ in 0..height {
-                    let store_ld = pixels.get_ptr(dst_ptr);
                     let blurred = f32x4_nearest(f32x4_mul(f32x4_convert_i32x4(sums), v_mul_value));
                     let prepared_u16 = u32x4_pack_trunc_u16x8(blurred, blurred);
                     let blurred = u16x8_pack_trunc_u8x16(prepared_u16, prepared_u16);
-                    w_store_u8x8_m4::<CN>(store_ld, blurred);
+                    w_store_u8x8_m4::<CN>(pixels.get_ptr(dst_ptr), blurred);
 
                     dst_ptr += stride as usize;
 
@@ -138,8 +134,7 @@ impl<const CN: usize> VerticalWasmStackBlurPass<CN> {
                         yp += 1;
                     }
 
-                    let src_ld = pixels.get_ptr(src_ptr);
-                    let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
+                    let src_pixel = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr));
                     v128_store(stack_ptr as *mut v128, src_pixel);
 
                     sum_in = i32x4_add(sum_in, src_pixel);
@@ -150,8 +145,8 @@ impl<const CN: usize> VerticalWasmStackBlurPass<CN> {
                     if sp >= div {
                         sp = 0;
                     }
-                    let stack_ptr = stacks.as_mut_ptr().add(sp as usize * 4);
-                    let stack_val = v128_load(stack_ptr as *const v128);
+                    let stack_ptr = stacks.as_ptr().add(sp as usize * 4);
+                    let stack_val = v128_load(stack_ptr.cast());
 
                     sum_out = i32x4_add(sum_out, stack_val);
                     sum_in = i32x4_add(sum_in, stack_val);

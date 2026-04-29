@@ -196,7 +196,7 @@ impl Gamma<u8> for u8 {
         channels: FastBlurChannels,
         transfer_function: TransferFunction,
     ) {
-        let mut lut_table = vec![0u8; 256];
+        let mut lut_table = [0u8; 256];
         for (i, item) in lut_table.iter_mut().enumerate().take(256) {
             *item = (transfer_function.gamma(i as f32 * (1. / 255.0)) * 255.).min(255.) as u8;
         }

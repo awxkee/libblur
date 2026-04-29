@@ -164,7 +164,7 @@ pub(crate) fn fast_gaussian_next_horizontal_pass_sse_f16<const CN: usize>(
 
 #[target_feature(enable = "sse4.1", enable = "f16c")]
 fn fast_gaussian_next_horizontal_pass_sse_f16_impl<const CN: usize>(
-    undefined_slice: &UnsafeSlice<f16>,
+    bytes: &UnsafeSlice<f16>,
     stride: u32,
     width: u32,
     height: u32,
@@ -174,7 +174,6 @@ fn fast_gaussian_next_horizontal_pass_sse_f16_impl<const CN: usize>(
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        let bytes: &UnsafeSlice<'_, f16> = std::mem::transmute(undefined_slice);
         let mut buffer: [[f32; 4]; 1024] = [[0.; 4]; 1024];
 
         let width_wide = width as i64;

@@ -82,10 +82,8 @@ unsafe fn stack_blur_pass_vert_sse<const CN: usize>(
 
             let mut src_ptr = cx;
 
-            let src_ld = pixels.get_ptr(src_ptr) as *const i32;
-
             {
-                let src_pixel0 = _mm_loadu_ps(src_ld as *const _);
+                let src_pixel0 = _mm_loadu_ps(pixels.get_ptr(src_ptr).cast());
 
                 for i in 0..=radius {
                     let stack_ptr = stacks.as_mut_ptr().add(i as usize);
@@ -105,8 +103,7 @@ unsafe fn stack_blur_pass_vert_sse<const CN: usize>(
                     }
 
                     let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize);
-                    let src_ld = pixels.get_ptr(src_ptr) as *const i32;
-                    let src_pixel0 = _mm_loadu_ps(src_ld as *const _);
+                    let src_pixel0 = _mm_loadu_ps(pixels.get_ptr(src_ptr).cast());
 
                     _mm_store_ps(stack_ptr as *mut _, src_pixel0);
 
@@ -124,11 +121,9 @@ unsafe fn stack_blur_pass_vert_sse<const CN: usize>(
             src_ptr = cx + yp as usize * stride as usize;
             let mut dst_ptr = cx;
             for _ in 0..height {
-                let store_ld = pixels.get_ptr(dst_ptr) as *mut _;
-
                 let a0 = _mm_mul_ps(sums0, v_mul_value);
 
-                _mm_storeu_ps(store_ld, a0);
+                _mm_storeu_ps(pixels.get_ptr(dst_ptr).cast(), a0);
 
                 dst_ptr += stride as usize;
 
@@ -182,9 +177,7 @@ unsafe fn stack_blur_pass_vert_sse<const CN: usize>(
 
             src_ptr = x;
 
-            let src_ld = pixels.get_ptr(src_ptr) as *const f32;
-
-            let src_pixel = _mm_load_ss(src_ld);
+            let src_pixel = _mm_load_ss(pixels.get_ptr(src_ptr).cast());
 
             for i in 0..=radius {
                 let stack_ptr = stacks.as_mut_ptr().add(i as usize);
@@ -236,8 +229,7 @@ unsafe fn stack_blur_pass_vert_sse<const CN: usize>(
                     yp += 1;
                 }
 
-                let src_ld = pixels.get_ptr(src_ptr);
-                let src_pixel = _mm_load_ss(src_ld as *const f32);
+                let src_pixel = _mm_load_ss(pixels.get_ptr(src_ptr));
                 _mm_store_ps(stack_ptr.cast(), src_pixel);
 
                 sum_in = _mm_add_ps(sum_in, src_pixel);

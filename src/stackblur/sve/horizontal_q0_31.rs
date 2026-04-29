@@ -78,8 +78,8 @@ impl<const CN: usize> HorizontalSveStackBlurPassQ0_31<CN> {
             let mut _xp;
             let mut sp;
             let mut stack_start;
-            let mut scratch_buffer = ScratchBuffer::<SveVectori32x4, 2048>::new(4 * div);
-            let stacks0 = scratch_buffer.as_mut_slice();
+            let mut scratch_buffer = ScratchBuffer::<[SveVectori32x4; 4], 2048>::new(div);
+            let stacks = scratch_buffer.as_mut_slice();
 
             let pv_cn = svwhilelt_b32_u32(0u32, CN as u32);
 
@@ -119,23 +119,11 @@ impl<const CN: usize> HorizontalSveStackBlurPassQ0_31<CN> {
                 let src_pixel3 = svld1ub_s32(pv_cn, pixels.get_ptr(src_ptr3));
 
                 for i in 0..=radius {
-                    let stack_value = stacks0.get_unchecked_mut(i as usize * 4..);
+                    let stack_value = stacks.get_unchecked_mut(i as usize);
                     svst1_s32(pv_cn, stack_value.as_mut_ptr().cast(), src_pixel0);
-                    svst1_s32(
-                        pv_cn,
-                        stack_value.get_unchecked_mut(1..).as_mut_ptr().cast(),
-                        src_pixel1,
-                    );
-                    svst1_s32(
-                        pv_cn,
-                        stack_value.get_unchecked_mut(2..).as_mut_ptr().cast(),
-                        src_pixel2,
-                    );
-                    svst1_s32(
-                        pv_cn,
-                        stack_value.get_unchecked_mut(3..).as_mut_ptr().cast(),
-                        src_pixel3,
-                    );
+                    svst1_s32(pv_cn, stack_value[1..].as_mut_ptr().cast(), src_pixel1);
+                    svst1_s32(pv_cn, stack_value[2..].as_mut_ptr().cast(), src_pixel2);
+                    svst1_s32(pv_cn, stack_value[3..].as_mut_ptr().cast(), src_pixel3);
 
                     let w = i as i32 + 1;
 
@@ -157,7 +145,7 @@ impl<const CN: usize> HorizontalSveStackBlurPassQ0_31<CN> {
                         src_ptr2 += CN;
                         src_ptr3 += CN;
                     }
-                    let stack_ptr = stacks0.get_unchecked_mut((i + radius) as usize * 4..);
+                    let stack_ptr = stacks.get_unchecked_mut((i + radius) as usize);
 
                     let src_pixel0 = svld1ub_s32(pv_cn, pixels.get_ptr(src_ptr0));
                     let src_pixel1 = svld1ub_s32(pv_cn, pixels.get_ptr(src_ptr1));
@@ -165,21 +153,9 @@ impl<const CN: usize> HorizontalSveStackBlurPassQ0_31<CN> {
                     let src_pixel3 = svld1ub_s32(pv_cn, pixels.get_ptr(src_ptr3));
 
                     svst1_s32(pv_cn, stack_ptr.as_mut_ptr().cast(), src_pixel0);
-                    svst1_s32(
-                        pv_cn,
-                        stack_ptr.get_unchecked_mut(1..).as_mut_ptr().cast(),
-                        src_pixel1,
-                    );
-                    svst1_s32(
-                        pv_cn,
-                        stack_ptr.get_unchecked_mut(2..).as_mut_ptr().cast(),
-                        src_pixel2,
-                    );
-                    svst1_s32(
-                        pv_cn,
-                        stack_ptr.get_unchecked_mut(3..).as_mut_ptr().cast(),
-                        src_pixel3,
-                    );
+                    svst1_s32(pv_cn, stack_ptr[1..].as_mut_ptr().cast(), src_pixel1);
+                    svst1_s32(pv_cn, stack_ptr[2..].as_mut_ptr().cast(), src_pixel2);
+                    svst1_s32(pv_cn, stack_ptr[3..].as_mut_ptr().cast(), src_pixel3);
 
                     let w = radius as i32 + 1 - i as i32;
 
@@ -251,12 +227,12 @@ impl<const CN: usize> HorizontalSveStackBlurPassQ0_31<CN> {
                     if stack_start >= div {
                         stack_start -= div;
                     }
-                    let stack = stacks0.get_unchecked_mut(stack_start as usize * 4..);
+                    let stack = stacks.get_unchecked_mut(stack_start as usize);
 
                     let stack_val0 = svld1_s32(pv_cn, stack.as_ptr().cast());
-                    let stack_val1 = svld1_s32(pv_cn, stack.get_unchecked(1..).as_ptr().cast());
-                    let stack_val2 = svld1_s32(pv_cn, stack.get_unchecked(2..).as_ptr().cast());
-                    let stack_val3 = svld1_s32(pv_cn, stack.get_unchecked(3..).as_ptr().cast());
+                    let stack_val1 = svld1_s32(pv_cn, stack[1..].as_ptr().cast());
+                    let stack_val2 = svld1_s32(pv_cn, stack[2..].as_ptr().cast());
+                    let stack_val3 = svld1_s32(pv_cn, stack[3..].as_ptr().cast());
 
                     sum_out0 = svsub_s32_x(pv_cn, sum_out0, stack_val0);
                     sum_out1 = svsub_s32_x(pv_cn, sum_out1, stack_val1);
@@ -308,12 +284,12 @@ impl<const CN: usize> HorizontalSveStackBlurPassQ0_31<CN> {
                     if sp >= div {
                         sp = 0;
                     }
-                    let stack = stacks0.get_unchecked(sp as usize * 4..);
+                    let stack = stacks.get_unchecked(sp as usize);
 
                     let stack_val0 = svld1_s32(pv_cn, stack.as_ptr().cast());
-                    let stack_val1 = svld1_s32(pv_cn, stack.get_unchecked(1..).as_ptr().cast());
-                    let stack_val2 = svld1_s32(pv_cn, stack.get_unchecked(2..).as_ptr().cast());
-                    let stack_val3 = svld1_s32(pv_cn, stack.get_unchecked(3..).as_ptr().cast());
+                    let stack_val1 = svld1_s32(pv_cn, stack[1..].as_ptr().cast());
+                    let stack_val2 = svld1_s32(pv_cn, stack[2..].as_ptr().cast());
+                    let stack_val3 = svld1_s32(pv_cn, stack[3..].as_ptr().cast());
 
                     sum_out0 = svadd_s32_x(pv_cn, sum_out0, stack_val0);
                     sum_out1 = svadd_s32_x(pv_cn, sum_out1, stack_val1);
@@ -339,7 +315,7 @@ impl<const CN: usize> HorizontalSveStackBlurPassQ0_31<CN> {
                 let src_pixel = svld1ub_s32(pv_cn, pixels.get_ptr(src_ptr).cast());
 
                 for i in 0..=radius {
-                    let stack_value = stacks0.get_unchecked_mut(i as usize * 4..);
+                    let stack_value = stacks.get_unchecked_mut(i as usize);
                     svst1_s32(pv_cn, stack_value.as_mut_ptr().cast(), src_pixel);
                     sums = svmla_n_s32_x(pv_cn, sums, src_pixel, i as i32 + 1);
                     sum_out = svadd_s32_x(pv_cn, sum_out, src_pixel);
@@ -349,7 +325,7 @@ impl<const CN: usize> HorizontalSveStackBlurPassQ0_31<CN> {
                     if i <= wm {
                         src_ptr += CN;
                     }
-                    let stack_ptr = stacks0.get_unchecked_mut((i + radius) as usize * 4..);
+                    let stack_ptr = stacks.get_unchecked_mut((i + radius) as usize);
                     let src_pixel = svld1ub_s32(pv_cn, pixels.get_ptr(src_ptr).cast());
                     svst1_s32(pv_cn, stack_ptr.as_mut_ptr().cast(), src_pixel);
                     sums = svmla_n_s32_x(pv_cn, sums, src_pixel, radius as i32 + 1 - i as i32);
@@ -380,7 +356,7 @@ impl<const CN: usize> HorizontalSveStackBlurPassQ0_31<CN> {
                     if stack_start >= div {
                         stack_start -= div;
                     }
-                    let stack = stacks0.get_unchecked_mut(stack_start as usize * 4..);
+                    let stack = stacks.get_unchecked_mut(stack_start as usize);
 
                     let stack_val = svld1_s32(pv_cn, stack.as_ptr().cast());
 
@@ -401,7 +377,7 @@ impl<const CN: usize> HorizontalSveStackBlurPassQ0_31<CN> {
                     if sp >= div {
                         sp = 0;
                     }
-                    let stack = stacks0.get_unchecked(sp as usize * 4..);
+                    let stack = stacks.get_unchecked(sp as usize);
                     let stack_val = svld1_s32(pv_cn, stack.as_ptr().cast());
 
                     sum_out = svadd_s32_x(pv_cn, sum_out, stack_val);
