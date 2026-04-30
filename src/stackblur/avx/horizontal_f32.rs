@@ -240,8 +240,7 @@ fn horiz_f32_pass_stack_impl<const CN: usize>(
                     src_ptr += CN;
                 }
                 let stack_ptr = stacks.get_unchecked_mut((i + radius) as usize..);
-                let src_ld = pixels.get_ptr(src_ptr) as *const f32;
-                let src_pixel = load_f32::<CN>(src_ld);
+                let src_pixel = load_f32::<CN>(pixels.get_ptr(src_ptr));
                 _mm_store_ps(stack_ptr.as_mut_ptr().cast(), src_pixel);
                 sums = _mm_fmadd_ps(src_pixel, _mm_set1_ps((radius + 1 - i) as f32), sums);
 

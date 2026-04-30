@@ -12,7 +12,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         .unwrap();
     let dimensions = img.dimensions();
     let src_bytes = img.as_bytes();
-    /* c.bench_function("RGBA fast gaussian next", |b| {
+    c.bench_function("RGBA fast gaussian next", |b| {
         let mut dst_bytes: Vec<u8> = src_bytes.to_vec();
         let mut dst_image = BlurImageMut::borrow(
             &mut dst_bytes,
@@ -48,7 +48,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             )
             .unwrap();
         })
-    });*/
+    });
 
     let rgba_u16 = img.to_rgba16();
 

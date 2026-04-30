@@ -681,7 +681,7 @@ fn stack_blur_avx_vertical<const CN: usize, const VNNI: bool>(
                 }
 
                 let stack_ptr = stacks.get_unchecked_mut(stack_start as usize * 4..);
-                let stack_val = _mm_loadu_si128(stack_ptr.as_ptr().cast());
+                let stack_val = _mm_load_si128(stack_ptr.as_ptr().cast());
                 sum_out = _mm_sub_epi32(sum_out, stack_val);
 
                 if yp < hm {

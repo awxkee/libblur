@@ -223,8 +223,8 @@ fn avx_horiz_pass_impl<const CN: usize>(
                     sp = 0;
                 }
                 let stack = stacks.get_unchecked(sp as usize * 2..);
-                let stack_val0 = _mm256_loadu_si256(stack.as_ptr().cast());
-                let stack_val1 = _mm256_loadu_si256(stack.get_unchecked(1..).as_ptr().cast());
+                let stack_val0 = _mm256_load_si256(stack.as_ptr().cast());
+                let stack_val1 = _mm256_load_si256(stack.get_unchecked(1..).as_ptr().cast());
 
                 sum_out0 = _mm256_add_epi32(sum_out0, stack_val0);
                 sum_out1 = _mm256_add_epi32(sum_out1, stack_val1);

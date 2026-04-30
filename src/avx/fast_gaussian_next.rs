@@ -30,6 +30,7 @@ use crate::avx::utils::_mm256_mul_by_3_epi32;
 use crate::edge_mode::clamp_edge;
 use crate::sse::{_mm_mul_by_3_epi32, load_u8_s32_fast, store_u8_u32};
 use crate::unsafe_slice::UnsafeSlice;
+use crate::util::ScratchBuffer;
 use std::arch::x86_64::*;
 
 pub(crate) fn fgn_vertical_pass_avx_u8<const CN: usize>(
@@ -69,10 +70,8 @@ impl<const CN: usize> VerticalExecutionUnit<CN> {
         edge_mode: EdgeMode,
     ) {
         unsafe {
-            let mut full_buffer = [AvxSseI32x8::default(); 1024 * 3];
-
-            let (buffer0, rem) = full_buffer.split_at_mut(1024);
-            let (buffer1, buffer2) = rem.split_at_mut(1024);
+            let mut full_buffer = ScratchBuffer::<[AvxSseI32x8; 3], 1024>::new(1024);
+            let buffer = full_buffer.as_mut_slice();
 
             let height_wide = height as i64;
 
@@ -145,36 +144,25 @@ impl<const CN: usize> VerticalExecutionUnit<CN> {
                         let d_arr_index_2 = ((y - radius_64) & 1023) as usize;
                         let d_arr_index = (y & 1023) as usize;
 
-                        let stored0 =
-                            _mm256_load_si256(buffer0.get_unchecked(d_arr_index).0.as_ptr().cast());
-                        let stored1 =
-                            _mm256_load_si256(buffer1.get_unchecked(d_arr_index).0.as_ptr().cast());
-                        let stored2 =
-                            _mm256_load_si256(buffer2.get_unchecked(d_arr_index).0.as_ptr().cast());
+                        let da_b = buffer.get_unchecked(d_arr_index);
+                        let da_b1 = buffer.get_unchecked(d_arr_index_1);
+                        let da_b2 = buffer.get_unchecked(d_arr_index_2);
 
-                        let stored_10 = _mm256_load_si256(
-                            buffer0.get_unchecked(d_arr_index_1).0.as_ptr().cast(),
-                        );
-                        let stored_11 = _mm256_load_si256(
-                            buffer1.get_unchecked(d_arr_index_1).0.as_ptr().cast(),
-                        );
-                        let stored_12 = _mm256_load_si256(
-                            buffer2.get_unchecked(d_arr_index_1).0.as_ptr().cast(),
-                        );
+                        let stored0 = _mm256_load_si256(da_b.as_ptr().cast());
+                        let stored1 = _mm256_load_si256(da_b[1..].as_ptr().cast());
+                        let stored2 = _mm256_load_si256(da_b[2..].as_ptr().cast());
+
+                        let stored_10 = _mm256_load_si256(da_b1.as_ptr().cast());
+                        let stored_11 = _mm256_load_si256(da_b1[1..].as_ptr().cast());
+                        let stored_12 = _mm256_load_si256(da_b1[2..].as_ptr().cast());
 
                         let j0 = _mm256_sub_epi32(stored0, stored_10);
                         let j1 = _mm256_sub_epi32(stored1, stored_11);
                         let j2 = _mm256_sub_epi32(stored2, stored_12);
 
-                        let stored_20 = _mm256_load_si256(
-                            buffer0.get_unchecked(d_arr_index_2).0.as_ptr().cast(),
-                        );
-                        let stored_21 = _mm256_load_si256(
-                            buffer1.get_unchecked(d_arr_index_2).0.as_ptr().cast(),
-                        );
-                        let stored_22 = _mm256_load_si256(
-                            buffer2.get_unchecked(d_arr_index_2).0.as_ptr().cast(),
-                        );
+                        let stored_20 = _mm256_load_si256(da_b2.as_ptr().cast());
+                        let stored_21 = _mm256_load_si256(da_b2[1..].as_ptr().cast());
+                        let stored_22 = _mm256_load_si256(da_b2[2..].as_ptr().cast());
 
                         let k0 = _mm256_mul_by_3_epi32(j0);
                         let k1 = _mm256_mul_by_3_epi32(j1);
@@ -190,20 +178,16 @@ impl<const CN: usize> VerticalExecutionUnit<CN> {
                     } else if y + radius_64 >= 0 {
                         let arr_index = (y & 1023) as usize;
                         let arr_index_1 = ((y + radius_64) & 1023) as usize;
+                        let da_b = buffer.get_unchecked(arr_index);
+                        let da_b1 = buffer.get_unchecked(arr_index_1);
 
-                        let stored0 =
-                            _mm256_load_si256(buffer0.get_unchecked(arr_index).0.as_ptr().cast());
-                        let stored1 =
-                            _mm256_load_si256(buffer1.get_unchecked(arr_index).0.as_ptr().cast());
-                        let stored2 =
-                            _mm256_load_si256(buffer2.get_unchecked(arr_index).0.as_ptr().cast());
+                        let stored0 = _mm256_load_si256(da_b.as_ptr().cast());
+                        let stored1 = _mm256_load_si256(da_b[1..].as_ptr().cast());
+                        let stored2 = _mm256_load_si256(da_b[2..].as_ptr().cast());
 
-                        let stored_10 =
-                            _mm256_load_si256(buffer0.get_unchecked(arr_index_1).0.as_ptr().cast());
-                        let stored_11 =
-                            _mm256_load_si256(buffer1.get_unchecked(arr_index_1).0.as_ptr().cast());
-                        let stored_21 =
-                            _mm256_load_si256(buffer2.get_unchecked(arr_index_1).0.as_ptr().cast());
+                        let stored_10 = _mm256_load_si256(da_b1.as_ptr().cast());
+                        let stored_11 = _mm256_load_si256(da_b1[1..].as_ptr().cast());
+                        let stored_21 = _mm256_load_si256(da_b1[2..].as_ptr().cast());
 
                         let new_diff0 = _mm256_mul_by_3_epi32(_mm256_sub_epi32(stored0, stored_10));
                         let new_diff1 = _mm256_mul_by_3_epi32(_mm256_sub_epi32(stored1, stored_11));
@@ -214,13 +198,11 @@ impl<const CN: usize> VerticalExecutionUnit<CN> {
                         diffs2 = _mm256_add_epi32(diffs2, new_diff2);
                     } else if y + 2 * radius_64 >= 0 {
                         let arr_index = ((y + radius_64) & 1023) as usize;
+                        let da_b = buffer.get_unchecked(arr_index);
 
-                        let stored0 =
-                            _mm256_load_si256(buffer0.get_unchecked(arr_index).0.as_ptr().cast());
-                        let stored1 =
-                            _mm256_load_si256(buffer1.get_unchecked(arr_index).0.as_ptr().cast());
-                        let stored2 =
-                            _mm256_load_si256(buffer2.get_unchecked(arr_index).0.as_ptr().cast());
+                        let stored0 = _mm256_load_si256(da_b.as_ptr().cast());
+                        let stored1 = _mm256_load_si256(da_b[1..].as_ptr().cast());
+                        let stored2 = _mm256_load_si256(da_b[2..].as_ptr().cast());
 
                         diffs0 = _mm256_sub_epi32(diffs0, _mm256_mul_by_3_epi32(stored0));
                         diffs1 = _mm256_sub_epi32(diffs1, _mm256_mul_by_3_epi32(stored1));
@@ -259,18 +241,15 @@ impl<const CN: usize> VerticalExecutionUnit<CN> {
                     );
 
                     let arr_index = ((y + 2 * radius_64) & 1023) as usize;
-
-                    let buf_ptr0 = buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr();
-                    let buf_ptr1 = buffer1.get_unchecked_mut(arr_index).0.as_mut_ptr();
-                    let buf_ptr2 = buffer2.get_unchecked_mut(arr_index).0.as_mut_ptr();
+                    let da_b = buffer.get_unchecked_mut(arr_index);
 
                     diffs0 = _mm256_add_epi32(diffs0, px01);
                     diffs1 = _mm256_add_epi32(diffs1, px23);
                     diffs2 = _mm256_add_epi32(diffs2, px45);
 
-                    _mm256_store_si256(buf_ptr0 as *mut _, px01);
-                    _mm256_store_si256(buf_ptr1 as *mut _, px23);
-                    _mm256_store_si256(buf_ptr2 as *mut _, px45);
+                    _mm256_store_si256(da_b.as_mut_ptr().cast(), px01);
+                    _mm256_store_si256(da_b[1..].as_mut_ptr().cast(), px23);
+                    _mm256_store_si256(da_b[2..].as_mut_ptr().cast(), px45);
 
                     ders0 = _mm256_add_epi32(ders0, diffs0);
                     ders1 = _mm256_add_epi32(ders1, diffs1);
@@ -308,13 +287,13 @@ impl<const CN: usize> VerticalExecutionUnit<CN> {
                         let d_arr_index_2 = ((y - radius_64) & 1023) as usize;
                         let d_arr_index = (y & 1023) as usize;
 
-                        let buf_ptr = buffer0.get_unchecked(d_arr_index).0.as_ptr();
+                        let buf_ptr = buffer.get_unchecked(d_arr_index).as_ptr();
                         let stored = _mm_load_si128(buf_ptr.cast());
 
-                        let buf_ptr_1 = buffer0.get_unchecked(d_arr_index_1).0.as_ptr();
+                        let buf_ptr_1 = buffer.get_unchecked(d_arr_index_1).as_ptr();
                         let stored_1 = _mm_load_si128(buf_ptr_1.cast());
 
-                        let buf_ptr_2 = buffer0.get_unchecked(d_arr_index_2).0.as_ptr();
+                        let buf_ptr_2 = buffer.get_unchecked(d_arr_index_2).as_ptr();
                         let stored_2 = _mm_load_si128(buf_ptr_2.cast());
 
                         let new_diff = _mm_sub_epi32(
@@ -325,10 +304,10 @@ impl<const CN: usize> VerticalExecutionUnit<CN> {
                     } else if y + radius_64 >= 0 {
                         let arr_index = (y & 1023) as usize;
                         let arr_index_1 = ((y + radius_64) & 1023) as usize;
-                        let buf_ptr = buffer0.get_unchecked(arr_index).0.as_ptr();
+                        let buf_ptr = buffer.get_unchecked(arr_index).as_ptr();
                         let stored = _mm_load_si128(buf_ptr.cast());
 
-                        let buf_ptr_1 = buffer0.get_unchecked(arr_index_1).0.as_ptr();
+                        let buf_ptr_1 = buffer.get_unchecked(arr_index_1).as_ptr();
                         let stored_1 = _mm_load_si128(buf_ptr_1.cast());
 
                         let new_diff = _mm_mul_by_3_epi32(_mm_sub_epi32(stored, stored_1));
@@ -336,7 +315,7 @@ impl<const CN: usize> VerticalExecutionUnit<CN> {
                         diffs = _mm_add_epi32(diffs, new_diff);
                     } else if y + 2 * radius_64 >= 0 {
                         let arr_index = ((y + radius_64) & 1023) as usize;
-                        let buf_ptr = buffer0.get_unchecked(arr_index).0.as_ptr();
+                        let buf_ptr = buffer.get_unchecked(arr_index).as_ptr();
                         let stored = _mm_load_si128(buf_ptr.cast());
                         diffs = _mm_sub_epi32(diffs, _mm_mul_by_3_epi32(stored));
                     }
@@ -351,7 +330,7 @@ impl<const CN: usize> VerticalExecutionUnit<CN> {
                     let pixel_color = load_u8_s32_fast::<CN>(s_ptr);
 
                     let arr_index = ((y + 2 * radius_64) & 1023) as usize;
-                    let buf_ptr = buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr();
+                    let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr();
 
                     diffs = _mm_add_epi32(diffs, pixel_color);
                     ders = _mm_add_epi32(ders, diffs);
@@ -363,8 +342,8 @@ impl<const CN: usize> VerticalExecutionUnit<CN> {
     }
 }
 
-pub(crate) fn fgn_horizontal_pass_avx2_u8<T, const CHANNELS_COUNT: usize>(
-    undefined_slice: &UnsafeSlice<T>,
+pub(crate) fn fgn_horizontal_pass_avx2_u8<const CHANNELS_COUNT: usize>(
+    bytes: &UnsafeSlice<u8>,
     stride: u32,
     width: u32,
     height: u32,
@@ -374,7 +353,6 @@ pub(crate) fn fgn_horizontal_pass_avx2_u8<T, const CHANNELS_COUNT: usize>(
     edge_mode: EdgeMode,
 ) {
     unsafe {
-        let bytes: &UnsafeSlice<'_, u8> = std::mem::transmute(undefined_slice);
         let unit = HorizontalExecutionUnit::<CHANNELS_COUNT>::default();
         unit.pass(bytes, stride, width, height, radius, start, end, edge_mode);
     }
@@ -397,10 +375,8 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
         edge_mode: EdgeMode,
     ) {
         unsafe {
-            let mut full_buffer = [AvxSseI32x8::default(); 1024 * 3];
-
-            let (buffer0, rem) = full_buffer.split_at_mut(1024);
-            let (buffer1, buffer2) = rem.split_at_mut(1024);
+            let mut full_buffer = ScratchBuffer::<[AvxSseI32x8; 3], 1024>::new(1024);
+            let buffer = full_buffer.as_mut_slice();
 
             let width_wide = width as i64;
 
@@ -471,36 +447,25 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
                         let d_arr_index_2 = ((x - radius_64) & 1023) as usize;
                         let d_arr_index = (x & 1023) as usize;
 
-                        let stored0 =
-                            _mm256_load_si256(buffer0.get_unchecked(d_arr_index).0.as_ptr().cast());
-                        let stored1 =
-                            _mm256_load_si256(buffer1.get_unchecked(d_arr_index).0.as_ptr().cast());
-                        let stored2 =
-                            _mm256_load_si256(buffer2.get_unchecked(d_arr_index).0.as_ptr().cast());
+                        let da_b = buffer.get_unchecked(d_arr_index);
+                        let da_b1 = buffer.get_unchecked(d_arr_index_1);
+                        let da_b2 = buffer.get_unchecked(d_arr_index_2);
 
-                        let stored_10 = _mm256_load_si256(
-                            buffer0.get_unchecked(d_arr_index_1).0.as_ptr().cast(),
-                        );
-                        let stored_11 = _mm256_load_si256(
-                            buffer1.get_unchecked(d_arr_index_1).0.as_ptr().cast(),
-                        );
-                        let stored_12 = _mm256_load_si256(
-                            buffer2.get_unchecked(d_arr_index_1).0.as_ptr().cast(),
-                        );
+                        let stored0 = _mm256_load_si256(da_b.as_ptr().cast());
+                        let stored1 = _mm256_load_si256(da_b[1..].as_ptr().cast());
+                        let stored2 = _mm256_load_si256(da_b[2..].as_ptr().cast());
+
+                        let stored_10 = _mm256_load_si256(da_b1.as_ptr().cast());
+                        let stored_11 = _mm256_load_si256(da_b1[1..].as_ptr().cast());
+                        let stored_12 = _mm256_load_si256(da_b1[2..].as_ptr().cast());
 
                         let j0 = _mm256_sub_epi32(stored0, stored_10);
                         let j1 = _mm256_sub_epi32(stored1, stored_11);
                         let j2 = _mm256_sub_epi32(stored2, stored_12);
 
-                        let stored_20 = _mm256_load_si256(
-                            buffer0.get_unchecked(d_arr_index_2).0.as_ptr().cast(),
-                        );
-                        let stored_21 = _mm256_load_si256(
-                            buffer1.get_unchecked(d_arr_index_2).0.as_ptr().cast(),
-                        );
-                        let stored_22 = _mm256_load_si256(
-                            buffer2.get_unchecked(d_arr_index_2).0.as_ptr().cast(),
-                        );
+                        let stored_20 = _mm256_load_si256(da_b2.as_ptr().cast());
+                        let stored_21 = _mm256_load_si256(da_b2[1..].as_ptr().cast());
+                        let stored_22 = _mm256_load_si256(da_b2[2..].as_ptr().cast());
 
                         let k0 = _mm256_mul_by_3_epi32(j0);
                         let k1 = _mm256_mul_by_3_epi32(j1);
@@ -516,20 +481,16 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
                     } else if x + radius_64 >= 0 {
                         let arr_index = (x & 1023) as usize;
                         let arr_index_1 = ((x + radius_64) & 1023) as usize;
+                        let da_b = buffer.get_unchecked(arr_index);
+                        let da_b1 = buffer.get_unchecked(arr_index_1);
 
-                        let stored0 =
-                            _mm256_load_si256(buffer0.get_unchecked(arr_index).0.as_ptr().cast());
-                        let stored1 =
-                            _mm256_load_si256(buffer1.get_unchecked(arr_index).0.as_ptr().cast());
-                        let stored2 =
-                            _mm256_load_si256(buffer2.get_unchecked(arr_index).0.as_ptr().cast());
+                        let stored0 = _mm256_load_si256(da_b.as_ptr().cast());
+                        let stored1 = _mm256_load_si256(da_b[1..].as_ptr().cast());
+                        let stored2 = _mm256_load_si256(da_b[2..].as_ptr().cast());
 
-                        let stored_10 =
-                            _mm256_load_si256(buffer0.get_unchecked(arr_index_1).0.as_ptr().cast());
-                        let stored_11 =
-                            _mm256_load_si256(buffer1.get_unchecked(arr_index_1).0.as_ptr().cast());
-                        let stored_12 =
-                            _mm256_load_si256(buffer2.get_unchecked(arr_index_1).0.as_ptr().cast());
+                        let stored_10 = _mm256_load_si256(da_b1.as_ptr().cast());
+                        let stored_11 = _mm256_load_si256(da_b1[1..].as_ptr().cast());
+                        let stored_12 = _mm256_load_si256(da_b1[2..].as_ptr().cast());
 
                         let new_diff0 = _mm256_mul_by_3_epi32(_mm256_sub_epi32(stored0, stored_10));
                         let new_diff1 = _mm256_mul_by_3_epi32(_mm256_sub_epi32(stored1, stored_11));
@@ -540,12 +501,11 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
                         diffs2 = _mm256_add_epi32(diffs2, new_diff2);
                     } else if x + 2 * radius_64 >= 0 {
                         let arr_index = ((x + radius_64) & 1023) as usize;
-                        let stored0 =
-                            _mm256_load_si256(buffer0.get_unchecked(arr_index).0.as_ptr().cast());
-                        let stored1 =
-                            _mm256_load_si256(buffer1.get_unchecked(arr_index).0.as_ptr().cast());
-                        let stored2 =
-                            _mm256_load_si256(buffer2.get_unchecked(arr_index).0.as_ptr().cast());
+                        let da_b = buffer.get_unchecked(arr_index);
+
+                        let stored0 = _mm256_load_si256(da_b.as_ptr().cast());
+                        let stored1 = _mm256_load_si256(da_b[1..].as_ptr().cast());
+                        let stored2 = _mm256_load_si256(da_b[2..].as_ptr().cast());
 
                         diffs0 = _mm256_sub_epi32(diffs0, _mm256_mul_by_3_epi32(stored0));
                         diffs1 = _mm256_sub_epi32(diffs1, _mm256_mul_by_3_epi32(stored1));
@@ -570,9 +530,7 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
                     let pixel_color5 = load_u8_s32_fast::<CN>(s_ptr5);
 
                     let arr_index = ((x + 2 * radius_64) & 1023) as usize;
-                    let buf_ptr0 = buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr();
-                    let buf_ptr1 = buffer1.get_unchecked_mut(arr_index).0.as_mut_ptr();
-                    let buf_ptr2 = buffer2.get_unchecked_mut(arr_index).0.as_mut_ptr();
+                    let da_b = buffer.get_unchecked_mut(arr_index);
 
                     let px01 = _mm256_inserti128_si256::<1>(
                         _mm256_castsi128_si256(pixel_color0),
@@ -591,9 +549,9 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
                     diffs1 = _mm256_add_epi32(diffs1, px23);
                     diffs2 = _mm256_add_epi32(diffs2, px45);
 
-                    _mm256_store_si256(buf_ptr0 as *mut _, px01);
-                    _mm256_store_si256(buf_ptr1 as *mut _, px23);
-                    _mm256_store_si256(buf_ptr2 as *mut _, px45);
+                    _mm256_store_si256(da_b.as_mut_ptr().cast(), px01);
+                    _mm256_store_si256(da_b[1..].as_mut_ptr().cast(), px23);
+                    _mm256_store_si256(da_b[2..].as_mut_ptr().cast(), px45);
 
                     ders0 = _mm256_add_epi32(ders0, diffs0);
                     ders1 = _mm256_add_epi32(ders1, diffs1);
@@ -632,13 +590,13 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
                         let d_arr_index_2 = ((x - radius_64) & 1023) as usize;
                         let d_arr_index = (x & 1023) as usize;
 
-                        let buf_ptr = buffer0.get_unchecked(d_arr_index).0.as_ptr();
+                        let buf_ptr = buffer.get_unchecked(d_arr_index).as_ptr();
                         let stored = _mm_load_si128(buf_ptr.cast());
 
-                        let buf_ptr_1 = buffer0.get_unchecked(d_arr_index_1).0.as_ptr();
+                        let buf_ptr_1 = buffer.get_unchecked(d_arr_index_1).as_ptr();
                         let stored_1 = _mm_load_si128(buf_ptr_1.cast());
 
-                        let buf_ptr_2 = buffer0.get_unchecked(d_arr_index_2).0.as_ptr();
+                        let buf_ptr_2 = buffer.get_unchecked(d_arr_index_2).as_ptr();
                         let stored_2 = _mm_load_si128(buf_ptr_2.cast());
 
                         let new_diff = _mm_sub_epi32(
@@ -649,10 +607,10 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
                     } else if x + radius_64 >= 0 {
                         let arr_index = (x & 1023) as usize;
                         let arr_index_1 = ((x + radius_64) & 1023) as usize;
-                        let buf_ptr = buffer0.get_unchecked(arr_index).0.as_ptr();
+                        let buf_ptr = buffer.get_unchecked(arr_index).as_ptr();
                         let stored = _mm_load_si128(buf_ptr.cast());
 
-                        let buf_ptr_1 = buffer0.get_unchecked(arr_index_1).0.as_ptr();
+                        let buf_ptr_1 = buffer.get_unchecked(arr_index_1).as_ptr();
                         let stored_1 = _mm_load_si128(buf_ptr_1.cast());
 
                         let new_diff = _mm_mul_by_3_epi32(_mm_sub_epi32(stored, stored_1));
@@ -660,7 +618,7 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
                         diffs = _mm_add_epi32(diffs, new_diff);
                     } else if x + 2 * radius_64 >= 0 {
                         let arr_index = ((x + radius_64) & 1023) as usize;
-                        let buf_ptr = buffer0.get_unchecked(arr_index).0.as_ptr();
+                        let buf_ptr = buffer.get_unchecked(arr_index).as_ptr();
                         let stored = _mm_load_si128(buf_ptr.cast());
                         diffs = _mm_sub_epi32(diffs, _mm_mul_by_3_epi32(stored));
                     }
@@ -674,7 +632,7 @@ impl<const CN: usize> HorizontalExecutionUnit<CN> {
                     let pixel_color = load_u8_s32_fast::<CN>(s_ptr);
 
                     let arr_index = ((x + 2 * radius_64) & 1023) as usize;
-                    let buf_ptr = buffer0.get_unchecked_mut(arr_index).0.as_mut_ptr();
+                    let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr();
 
                     diffs = _mm_add_epi32(diffs, pixel_color);
                     ders = _mm_add_epi32(ders, diffs);

@@ -125,11 +125,11 @@ fn fgn_vertical_pass_neon_u16_large_r_impl<const CN: usize>(
                     let stored_1 = vld1q_s32(buffer.get_unchecked(arr_index_1..).as_ptr().cast());
 
                     let q = vsubq_s32(stored, stored_1);
-                    diffs = vmlaq_s32(diffs, q, vdupq_n_s32(3));
+                    diffs = vmlaq_n_s32(diffs, q, 3);
                 } else if y + 2 * radius_64 >= 0 {
                     let arr_index = ((y + radius_64) & 1023) as usize;
                     let stored = vld1q_s32(buffer.get_unchecked(arr_index).0.as_ptr().cast());
-                    diffs = vmlaq_s32(diffs, stored, vdupq_n_s32(-3));
+                    diffs = vmlaq_n_s32(diffs, stored, -3);
                 }
 
                 let next_row_y = clamp_edge!(edge_mode, y + ((3 * radius_64) >> 1), 0, height_wide)
@@ -237,11 +237,11 @@ fn fgn_horizontal_pass_neon_u16_large_r_impl<const CN: usize>(
                     let stored = vld1q_s32(buffer.get_unchecked(arr_index..).as_ptr().cast());
                     let stored_1 = vld1q_s32(buffer.get_unchecked(arr_index_1..).as_ptr().cast());
 
-                    diffs = vmlaq_s32(diffs, vsubq_s32(stored, stored_1), vdupq_n_s32(3));
+                    diffs = vmlaq_n_s32(diffs, vsubq_s32(stored, stored_1), 3);
                 } else if x + 2 * radius_64 >= 0 {
                     let arr_index = ((x + radius_64) & 1023) as usize;
                     let stored = vld1q_s32(buffer.get_unchecked(arr_index..).as_ptr().cast());
-                    diffs = vmlaq_s32(diffs, stored, vdupq_n_s32(-3));
+                    diffs = vmlaq_n_s32(diffs, stored, -3);
                 }
 
                 let next_row_x = clamp_edge!(edge_mode, x + 3 * radius_64 / 2, 0, width_wide);

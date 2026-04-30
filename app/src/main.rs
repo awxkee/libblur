@@ -34,12 +34,13 @@ use image::imageops::FilterType;
 use image::{EncodableLayout, FlatSamples, GenericImageView, ImageReader};
 use libblur::{
     bilateral_filter, complex_gaussian_kernel, fast_bilateral_filter, fast_bilateral_filter_u16,
-    fast_gaussian, fast_gaussian_next_u16, filter_1d_complex, filter_1d_complex_fixed_point,
-    filter_2d_fft_complex, filter_2d_rgb_fft, filter_2d_rgb_fft_complex, filter_2d_rgba_fft,
-    gaussian_blur, gaussian_kernel_1d, lens_kernel, sigma_size, stack_blur, stack_blur_f32,
-    stack_blur_u16, tent_blur, AnisotropicRadius, BilateralBlurParams, BlurImage, BlurImageMut,
-    BoxBlurParameters, CLTParameters, ConvolutionMode, EdgeMode, EdgeMode2D, FastBlurChannels,
-    GaussianBlurParams, ImageSize, KernelShape, Scalar, ThreadingPolicy, TransferFunction,
+    fast_gaussian, fast_gaussian_next, fast_gaussian_next_u16, filter_1d_complex,
+    filter_1d_complex_fixed_point, filter_2d_fft_complex, filter_2d_rgb_fft,
+    filter_2d_rgb_fft_complex, filter_2d_rgba_fft, gaussian_blur, gaussian_kernel_1d, lens_kernel,
+    sigma_size, stack_blur, stack_blur_f32, stack_blur_u16, tent_blur, AnisotropicRadius,
+    BilateralBlurParams, BlurImage, BlurImageMut, BoxBlurParameters, CLTParameters,
+    ConvolutionMode, EdgeMode, EdgeMode2D, FastBlurChannels, GaussianBlurParams, ImageSize,
+    KernelShape, Scalar, ThreadingPolicy, TransferFunction,
 };
 use num_complex::Complex;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
@@ -212,31 +213,31 @@ fn main() {
     // )
     // .unwrap();
 
-    // fast_gaussian_next_u16(
-    //     &mut cvt,
-    //     AnisotropicRadius::new(55),
-    //     ThreadingPolicy::Single,
-    //     EdgeMode::Clamp.as_2d(),
-    // )
-    // .unwrap();
+    fast_gaussian_next(
+        &mut cvt,
+        AnisotropicRadius::new(23),
+        ThreadingPolicy::Single,
+        EdgeMode::Clamp.as_2d(),
+    )
+    .unwrap();
 
-    for i in 0..10 {
-        let start_time = Instant::now();
-        filter_2d_rgb_fft::<u8, f32>(
-            &cvt.to_immutable_ref(),
-            &mut dst_image,
-            &gaussian_kernel,
-            KernelShape::new(115, 115),
-            EdgeMode::Clamp.as_2d(),
-            Scalar::default(),
-            ThreadingPolicy::Adaptive,
-        )
-        .unwrap();
-        println!(
-            "libblur::filter_2d_rgba_fft MultiThreading: {:?}",
-            start_time.elapsed()
-        );
-    }
+    // for i in 0..10 {
+    //     let start_time = Instant::now();
+    //     filter_2d_rgb_fft::<u8, f32>(
+    //         &cvt.to_immutable_ref(),
+    //         &mut dst_image,
+    //         &gaussian_kernel,
+    //         KernelShape::new(115, 115),
+    //         EdgeMode::Clamp.as_2d(),
+    //         Scalar::default(),
+    //         ThreadingPolicy::Adaptive,
+    //     )
+    //     .unwrap();
+    //     println!(
+    //         "libblur::filter_2d_rgba_fft MultiThreading: {:?}",
+    //         start_time.elapsed()
+    //     );
+    // }
     // for dst in dst_image.data.borrow_mut().chunks_exact_mut(4) {
     //     dst[3] = 255;
     // }
@@ -293,7 +294,7 @@ fn main() {
 
     // dst_image = vzd.gamma8(TransferFunction::Srgb, false).unwrap();
     //
-    dst_bytes = dst_image
+    dst_bytes = cvt
         .data
         .borrow_mut()
         .iter()

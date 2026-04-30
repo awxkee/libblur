@@ -90,8 +90,8 @@ fn sse_horiz_pass_impl<const CN: usize>(
 
             for i in 0..=radius {
                 let stack_value = stacks.as_mut_ptr().add(i as usize * 4 * 2);
-                _mm_storeu_si128(stack_value as *mut __m128i, src_pixel0);
-                _mm_storeu_si128(stack_value.add(4) as *mut __m128i, src_pixel1);
+                _mm_storeu_si128(stack_value.cast(), src_pixel0);
+                _mm_storeu_si128(stack_value.add(4).cast(), src_pixel1);
 
                 let w = _mm_set1_epi32(i as i32 + 1);
                 sums0 = _mm_add_epi32(sums0, _mm_madd_epi16(src_pixel0, w));
@@ -107,8 +107,8 @@ fn sse_horiz_pass_impl<const CN: usize>(
                     src_ptr1 += CN;
                 }
                 let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4 * 2);
-                let src_pixel0 = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr0) as *const u8);
-                let src_pixel1 = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr1) as *const u8);
+                let src_pixel0 = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr0).cast());
+                let src_pixel1 = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr1).cast());
 
                 _mm_storeu_si128(stack_ptr as *mut __m128i, src_pixel0);
                 _mm_storeu_si128(stack_ptr.add(4) as *mut __m128i, src_pixel1);

@@ -30,6 +30,7 @@ use crate::avx::utils::{_mm256_opt_fmlaf_ps, _mm256_opt_fnmlaf_ps, _mm256_opt_fn
 use crate::edge_mode::clamp_edge;
 use crate::sse::{_mm_opt_fmlaf_ps, _mm_opt_fnmlaf_ps, _mm_opt_fnmlsf_ps, load_f32, store_f32};
 use crate::unsafe_slice::UnsafeSlice;
+use crate::util::ScratchBuffer;
 use std::arch::x86_64::*;
 
 pub(crate) fn fgn_vertical_pass_avx_f32<const CN: usize>(
@@ -107,10 +108,8 @@ impl<const CN: usize, const FMA: bool> VerticalGaussianExecutorF32<CN, FMA> {
         edge_mode: EdgeMode,
     ) {
         unsafe {
-            let mut full_buffer = [AvxSseF32x8::default(); 1024 * 3];
-
-            let (bf0, rem) = full_buffer.split_at_mut(1024);
-            let (bf1, bf2) = rem.split_at_mut(1024);
+            let mut full_buffer = ScratchBuffer::<[AvxSseF32x8; 3], 1024>::new(1024);
+            let buffer = full_buffer.as_mut_slice();
 
             let height_wide = height as i64;
 
@@ -169,21 +168,25 @@ impl<const CN: usize, const FMA: bool> VerticalGaussianExecutorF32<CN, FMA> {
                         let d_a_2 = ((y - radius_64) & 1023) as usize;
                         let d_i = (y & 1023) as usize;
 
-                        let sd0 = _mm256_load_ps(bf0.get_unchecked(d_i).0.as_ptr());
-                        let sd1 = _mm256_load_ps(bf1.get_unchecked(d_i).0.as_ptr());
-                        let sd2 = _mm256_load_ps(bf2.get_unchecked(d_i).0.as_ptr());
+                        let da_b = buffer.get_unchecked(d_i);
+                        let da_b1 = buffer.get_unchecked(d_a_1);
+                        let da_b2 = buffer.get_unchecked(d_a_2);
 
-                        let sd_1_0 = _mm256_load_ps(bf0.get_unchecked(d_a_1).0.as_ptr());
-                        let sd_1_1 = _mm256_load_ps(bf1.get_unchecked(d_a_1).0.as_ptr());
-                        let sd_1_2 = _mm256_load_ps(bf2.get_unchecked(d_a_1).0.as_ptr());
+                        let sd0 = _mm256_load_ps(da_b.as_ptr().cast());
+                        let sd1 = _mm256_load_ps(da_b[1..].as_ptr().cast());
+                        let sd2 = _mm256_load_ps(da_b[2..].as_ptr().cast());
+
+                        let sd_1_0 = _mm256_load_ps(da_b1.as_ptr().cast());
+                        let sd_1_1 = _mm256_load_ps(da_b1[1..].as_ptr().cast());
+                        let sd_1_2 = _mm256_load_ps(da_b1[2..].as_ptr().cast());
 
                         let j0 = _mm256_sub_ps(sd0, sd_1_0);
                         let j1 = _mm256_sub_ps(sd1, sd_1_1);
                         let j2 = _mm256_sub_ps(sd2, sd_1_2);
 
-                        let sd_2_0 = _mm256_load_ps(bf0.get_unchecked(d_a_2).0.as_ptr());
-                        let sd_2_1 = _mm256_load_ps(bf1.get_unchecked(d_a_2).0.as_ptr());
-                        let sd_2_2 = _mm256_load_ps(bf2.get_unchecked(d_a_2).0.as_ptr());
+                        let sd_2_0 = _mm256_load_ps(da_b2.as_ptr().cast());
+                        let sd_2_1 = _mm256_load_ps(da_b2[1..].as_ptr().cast());
+                        let sd_2_2 = _mm256_load_ps(da_b2[2..].as_ptr().cast());
 
                         let new_diff0 = _mm256_opt_fnmlsf_ps::<FMA>(sd_2_0, j0, threes);
                         let new_diff1 = _mm256_opt_fnmlsf_ps::<FMA>(sd_2_1, j1, threes);
@@ -195,13 +198,16 @@ impl<const CN: usize, const FMA: bool> VerticalGaussianExecutorF32<CN, FMA> {
                     } else if y + radius_64 >= 0 {
                         let a_i = (y & 1023) as usize;
                         let a_i_1 = ((y + radius_64) & 1023) as usize;
-                        let sd0 = _mm256_load_ps(bf0.get_unchecked(a_i).0.as_ptr());
-                        let sd1 = _mm256_load_ps(bf1.get_unchecked(a_i).0.as_ptr());
-                        let sd2 = _mm256_load_ps(bf2.get_unchecked(a_i).0.as_ptr());
+                        let da_b = buffer.get_unchecked(a_i);
+                        let da_b1 = buffer.get_unchecked(a_i_1);
 
-                        let sd_1_0 = _mm256_load_ps(bf0.get_unchecked(a_i_1).0.as_ptr().cast());
-                        let sd_1_1 = _mm256_load_ps(bf1.get_unchecked(a_i_1).0.as_ptr().cast());
-                        let sd_1_2 = _mm256_load_ps(bf2.get_unchecked(a_i_1).0.as_ptr().cast());
+                        let sd0 = _mm256_load_ps(da_b.as_ptr().cast());
+                        let sd1 = _mm256_load_ps(da_b[1..].as_ptr().cast());
+                        let sd2 = _mm256_load_ps(da_b[2..].as_ptr().cast());
+
+                        let sd_1_0 = _mm256_load_ps(da_b1.as_ptr().cast());
+                        let sd_1_1 = _mm256_load_ps(da_b1[1..].as_ptr().cast());
+                        let sd_1_2 = _mm256_load_ps(da_b1[2..].as_ptr().cast());
 
                         diffs0 =
                             _mm256_opt_fmlaf_ps::<FMA>(diffs0, _mm256_sub_ps(sd0, sd_1_0), threes);
@@ -211,9 +217,11 @@ impl<const CN: usize, const FMA: bool> VerticalGaussianExecutorF32<CN, FMA> {
                             _mm256_opt_fmlaf_ps::<FMA>(diffs2, _mm256_sub_ps(sd2, sd_1_2), threes);
                     } else if y + 2 * radius_64 >= 0 {
                         let arr_index = ((y + radius_64) & 1023) as usize;
-                        let sd0 = _mm256_load_ps(bf0.get_unchecked(arr_index).0.as_ptr().cast());
-                        let sd1 = _mm256_load_ps(bf1.get_unchecked(arr_index).0.as_ptr().cast());
-                        let sd2 = _mm256_load_ps(bf2.get_unchecked(arr_index).0.as_ptr().cast());
+                        let da_b = buffer.get_unchecked(arr_index);
+
+                        let sd0 = _mm256_load_ps(da_b.as_ptr().cast());
+                        let sd1 = _mm256_load_ps(da_b[1..].as_ptr().cast());
+                        let sd2 = _mm256_load_ps(da_b[2..].as_ptr().cast());
 
                         diffs0 = _mm256_opt_fnmlaf_ps::<FMA>(diffs0, sd0, threes);
                         diffs1 = _mm256_opt_fnmlaf_ps::<FMA>(diffs1, sd1, threes);
@@ -239,6 +247,7 @@ impl<const CN: usize, const FMA: bool> VerticalGaussianExecutorF32<CN, FMA> {
                     let pixel_color5 = load_f32::<CN>(s_ptr5);
 
                     let a_i = ((y + 2 * radius_64) & 1023) as usize;
+                    let da_b = buffer.get_unchecked_mut(a_i);
 
                     let px01 = _mm256_insertf128_ps::<1>(
                         _mm256_castps128_ps256(pixel_color0),
@@ -253,9 +262,9 @@ impl<const CN: usize, const FMA: bool> VerticalGaussianExecutorF32<CN, FMA> {
                         pixel_color5,
                     );
 
-                    _mm256_store_ps(bf0.get_unchecked_mut(a_i..).as_mut_ptr().cast(), px01);
-                    _mm256_store_ps(bf1.get_unchecked_mut(a_i..).as_mut_ptr().cast(), px23);
-                    _mm256_store_ps(bf2.get_unchecked_mut(a_i..).as_mut_ptr().cast(), px45);
+                    _mm256_store_ps(da_b.as_mut_ptr().cast(), px01);
+                    _mm256_store_ps(da_b[1..].as_mut_ptr().cast(), px23);
+                    _mm256_store_ps(da_b[2..].as_mut_ptr().cast(), px45);
 
                     diffs0 = _mm256_add_ps(diffs0, px01);
                     diffs1 = _mm256_add_ps(diffs1, px23);
@@ -294,14 +303,14 @@ impl<const CN: usize, const FMA: bool> VerticalGaussianExecutorF32<CN, FMA> {
                         let d_arr_index_2 = ((y - radius_64) & 1023) as usize;
                         let d_arr_index = (y & 1023) as usize;
 
-                        let buf_ptr = bf0.get_unchecked(d_arr_index).0.as_ptr();
-                        let stored = _mm_load_ps(buf_ptr);
+                        let buf_ptr = buffer.get_unchecked(d_arr_index).as_ptr();
+                        let stored = _mm_load_ps(buf_ptr.cast());
 
-                        let buf_ptr_1 = bf0.get_unchecked(d_arr_index_1).0.as_ptr();
-                        let stored_1 = _mm_load_ps(buf_ptr_1);
+                        let buf_ptr_1 = buffer.get_unchecked(d_arr_index_1).as_ptr();
+                        let stored_1 = _mm_load_ps(buf_ptr_1.cast());
 
-                        let buf_ptr_2 = bf0.get_unchecked(d_arr_index_2).0.as_ptr();
-                        let stored_2 = _mm_load_ps(buf_ptr_2);
+                        let buf_ptr_2 = buffer.get_unchecked(d_arr_index_2).as_ptr();
+                        let stored_2 = _mm_load_ps(buf_ptr_2.cast());
 
                         let new_diff = _mm_opt_fnmlsf_ps::<FMA>(
                             stored_2,
@@ -312,11 +321,11 @@ impl<const CN: usize, const FMA: bool> VerticalGaussianExecutorF32<CN, FMA> {
                     } else if y + radius_64 >= 0 {
                         let arr_index = (y & 1023) as usize;
                         let arr_index_1 = ((y + radius_64) & 1023) as usize;
-                        let buf_ptr = bf0.get_unchecked(arr_index).0.as_ptr();
-                        let stored = _mm_load_ps(buf_ptr);
+                        let buf_ptr = buffer.get_unchecked(arr_index).as_ptr();
+                        let stored = _mm_load_ps(buf_ptr.cast());
 
-                        let buf_ptr_1 = bf0.get_unchecked(arr_index_1).0.as_ptr();
-                        let stored_1 = _mm_load_ps(buf_ptr_1);
+                        let buf_ptr_1 = buffer.get_unchecked(arr_index_1).as_ptr();
+                        let stored_1 = _mm_load_ps(buf_ptr_1.cast());
 
                         diffs = _mm_opt_fmlaf_ps::<FMA>(
                             diffs,
@@ -325,8 +334,8 @@ impl<const CN: usize, const FMA: bool> VerticalGaussianExecutorF32<CN, FMA> {
                         );
                     } else if y + 2 * radius_64 >= 0 {
                         let arr_index = ((y + radius_64) & 1023) as usize;
-                        let buf_ptr = bf0.get_unchecked(arr_index).0.as_ptr();
-                        let stored = _mm_load_ps(buf_ptr);
+                        let buf_ptr = buffer.get_unchecked(arr_index).as_ptr();
+                        let stored = _mm_load_ps(buf_ptr.cast());
                         diffs =
                             _mm_opt_fnmlaf_ps::<FMA>(diffs, stored, _mm256_castps256_ps128(threes));
                     }
@@ -341,12 +350,12 @@ impl<const CN: usize, const FMA: bool> VerticalGaussianExecutorF32<CN, FMA> {
                     let pixel_color = load_f32::<CN>(s_ptr);
 
                     let arr_index = ((y + 2 * radius_64) & 1023) as usize;
-                    let buf_ptr = bf0.get_unchecked_mut(arr_index).0.as_mut_ptr();
+                    let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr();
 
                     diffs = _mm_add_ps(diffs, pixel_color);
                     ders = _mm_add_ps(ders, diffs);
                     summs = _mm_add_ps(summs, ders);
-                    _mm_store_ps(buf_ptr, pixel_color);
+                    _mm_store_ps(buf_ptr.cast(), pixel_color);
                 }
             }
         }
@@ -423,8 +432,8 @@ impl<const CN: usize, const FMA: bool> HorizontalAvxF32Executor<CN, FMA> {
         edge_mode: EdgeMode,
     ) {
         unsafe {
-            let mut full_scratch = [AvxSseF32x8::default(); 2048];
-            let (bf0, bf1) = full_scratch.split_at_mut(1024);
+            let mut full_buffer = ScratchBuffer::<[AvxSseF32x8; 2], 1024>::new(1024);
+            let buffer = full_buffer.as_mut_slice();
 
             let width_wide = width as i64;
 
@@ -474,17 +483,21 @@ impl<const CN: usize, const FMA: bool> HorizontalAvxF32Executor<CN, FMA> {
                         let d_a_2 = ((x - radius_64) & 1023) as usize;
                         let d_i = (x & 1023) as usize;
 
-                        let sd0 = _mm256_load_ps(bf0.get_unchecked(d_i).0.as_ptr());
-                        let sd1 = _mm256_load_ps(bf1.get_unchecked(d_i).0.as_ptr());
+                        let da_b = buffer.get_unchecked(d_i);
+                        let da_b1 = buffer.get_unchecked(d_a_1);
+                        let da_b2 = buffer.get_unchecked(d_a_2);
 
-                        let sd_1_0 = _mm256_load_ps(bf0.get_unchecked(d_a_1).0.as_ptr());
-                        let sd_1_1 = _mm256_load_ps(bf1.get_unchecked(d_a_1).0.as_ptr());
+                        let sd0 = _mm256_load_ps(da_b.as_ptr().cast());
+                        let sd1 = _mm256_load_ps(da_b[1..].as_ptr().cast());
+
+                        let sd_1_0 = _mm256_load_ps(da_b1.as_ptr().cast());
+                        let sd_1_1 = _mm256_load_ps(da_b1[1..].as_ptr().cast());
 
                         let j0 = _mm256_sub_ps(sd0, sd_1_0);
                         let j1 = _mm256_sub_ps(sd1, sd_1_1);
 
-                        let sd_2_0 = _mm256_load_ps(bf0.get_unchecked(d_a_2).0.as_ptr());
-                        let sd_2_1 = _mm256_load_ps(bf1.get_unchecked(d_a_2).0.as_ptr());
+                        let sd_2_0 = _mm256_load_ps(da_b2.as_ptr().cast());
+                        let sd_2_1 = _mm256_load_ps(da_b2[1..].as_ptr().cast());
 
                         let new_diff0 = _mm256_opt_fnmlsf_ps::<FMA>(sd_2_0, j0, threes);
                         let new_diff1 = _mm256_opt_fnmlsf_ps::<FMA>(sd_2_1, j1, threes);
@@ -494,11 +507,14 @@ impl<const CN: usize, const FMA: bool> HorizontalAvxF32Executor<CN, FMA> {
                     } else if x + radius_64 >= 0 {
                         let a_i = (x & 1023) as usize;
                         let a_i_1 = ((x + radius_64) & 1023) as usize;
-                        let sd0 = _mm256_load_ps(bf0.get_unchecked(a_i).0.as_ptr());
-                        let sd1 = _mm256_load_ps(bf1.get_unchecked(a_i).0.as_ptr());
+                        let da_b = buffer.get_unchecked(a_i);
+                        let da_b1 = buffer.get_unchecked(a_i_1);
 
-                        let sd_1_0 = _mm256_load_ps(bf0.get_unchecked(a_i_1).0.as_ptr());
-                        let sd_1_1 = _mm256_load_ps(bf1.get_unchecked(a_i_1).0.as_ptr());
+                        let sd0 = _mm256_load_ps(da_b.as_ptr().cast());
+                        let sd1 = _mm256_load_ps(da_b[1..].as_ptr().cast());
+
+                        let sd_1_0 = _mm256_load_ps(da_b1.as_ptr().cast());
+                        let sd_1_1 = _mm256_load_ps(da_b1[1..].as_ptr().cast());
 
                         diffs0 =
                             _mm256_opt_fmlaf_ps::<FMA>(diffs0, _mm256_sub_ps(sd0, sd_1_0), threes);
@@ -506,8 +522,10 @@ impl<const CN: usize, const FMA: bool> HorizontalAvxF32Executor<CN, FMA> {
                             _mm256_opt_fmlaf_ps::<FMA>(diffs1, _mm256_sub_ps(sd1, sd_1_1), threes);
                     } else if x + 2 * radius_64 >= 0 {
                         let arr_index = ((x + radius_64) & 1023) as usize;
-                        let sd0 = _mm256_load_ps(bf0.get_unchecked(arr_index).0.as_ptr());
-                        let sd1 = _mm256_load_ps(bf1.get_unchecked(arr_index).0.as_ptr());
+                        let da_b = buffer.get_unchecked(arr_index);
+
+                        let sd0 = _mm256_load_ps(da_b.as_ptr().cast());
+                        let sd1 = _mm256_load_ps(da_b[1..].as_ptr().cast());
 
                         diffs0 = _mm256_opt_fnmlaf_ps::<FMA>(diffs0, sd0, threes);
                         diffs1 = _mm256_opt_fnmlaf_ps::<FMA>(diffs1, sd1, threes);
@@ -527,6 +545,7 @@ impl<const CN: usize, const FMA: bool> HorizontalAvxF32Executor<CN, FMA> {
                     let pixel_color3 = load_f32::<CN>(s_ptr3);
 
                     let a_i = ((x + 2 * radius_64) & 1023) as usize;
+                    let da_b = buffer.get_unchecked_mut(a_i);
 
                     let px01 = _mm256_insertf128_ps::<1>(
                         _mm256_castps128_ps256(pixel_color0),
@@ -537,8 +556,8 @@ impl<const CN: usize, const FMA: bool> HorizontalAvxF32Executor<CN, FMA> {
                         pixel_color3,
                     );
 
-                    _mm256_store_ps(bf0.get_unchecked_mut(a_i..).as_mut_ptr().cast(), px01);
-                    _mm256_store_ps(bf1.get_unchecked_mut(a_i..).as_mut_ptr().cast(), px23);
+                    _mm256_store_ps(da_b.as_mut_ptr().cast(), px01);
+                    _mm256_store_ps(da_b[1..].as_mut_ptr().cast(), px23);
 
                     diffs0 = _mm256_add_ps(diffs0, px01);
                     diffs1 = _mm256_add_ps(diffs1, px23);
@@ -574,14 +593,14 @@ impl<const CN: usize, const FMA: bool> HorizontalAvxF32Executor<CN, FMA> {
                         let d_arr_index_2 = ((x - radius_64) & 1023) as usize;
                         let d_arr_index = (x & 1023) as usize;
 
-                        let buf_ptr = bf0.get_unchecked(d_arr_index).0.as_ptr();
-                        let stored = _mm_load_ps(buf_ptr);
+                        let buf_ptr = buffer.get_unchecked(d_arr_index).as_ptr();
+                        let stored = _mm_load_ps(buf_ptr.cast());
 
-                        let buf_ptr_1 = bf0.get_unchecked(d_arr_index_1).0.as_ptr();
-                        let stored_1 = _mm_load_ps(buf_ptr_1);
+                        let buf_ptr_1 = buffer.get_unchecked(d_arr_index_1).as_ptr();
+                        let stored_1 = _mm_load_ps(buf_ptr_1.cast());
 
-                        let buf_ptr_2 = bf0.get_unchecked(d_arr_index_2).0.as_ptr();
-                        let stored_2 = _mm_load_ps(buf_ptr_2);
+                        let buf_ptr_2 = buffer.get_unchecked(d_arr_index_2).as_ptr();
+                        let stored_2 = _mm_load_ps(buf_ptr_2.cast());
 
                         let new_diff = _mm_opt_fnmlsf_ps::<FMA>(
                             stored_2,
@@ -592,10 +611,10 @@ impl<const CN: usize, const FMA: bool> HorizontalAvxF32Executor<CN, FMA> {
                     } else if x + radius_64 >= 0 {
                         let arr_index = (x & 1023) as usize;
                         let arr_index_1 = ((x + radius_64) & 1023) as usize;
-                        let buf_ptr = bf0.get_unchecked(arr_index).0.as_ptr();
+                        let buf_ptr = buffer.get_unchecked(arr_index).as_ptr();
                         let stored = _mm_load_ps(buf_ptr.cast());
 
-                        let buf_ptr_1 = bf0.get_unchecked(arr_index_1).0.as_ptr();
+                        let buf_ptr_1 = buffer.get_unchecked(arr_index_1).as_ptr();
                         let stored_1 = _mm_load_ps(buf_ptr_1.cast());
 
                         diffs = _mm_opt_fmlaf_ps::<FMA>(
@@ -605,7 +624,7 @@ impl<const CN: usize, const FMA: bool> HorizontalAvxF32Executor<CN, FMA> {
                         );
                     } else if x + 2 * radius_64 >= 0 {
                         let arr_index = ((x + radius_64) & 1023) as usize;
-                        let buf_ptr = bf0.get_unchecked(arr_index).0.as_ptr();
+                        let buf_ptr = buffer.get_unchecked(arr_index).as_ptr();
                         let stored = _mm_load_ps(buf_ptr.cast());
                         diffs =
                             _mm_opt_fnmlaf_ps::<FMA>(diffs, stored, _mm256_castps256_ps128(threes));
@@ -620,12 +639,12 @@ impl<const CN: usize, const FMA: bool> HorizontalAvxF32Executor<CN, FMA> {
                     let pixel_color = load_f32::<CN>(s_ptr);
 
                     let arr_index = ((x + 2 * radius_64) & 1023) as usize;
-                    let buf_ptr = bf0.get_unchecked_mut(arr_index).0.as_mut_ptr();
+                    let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr();
 
                     diffs = _mm_add_ps(diffs, pixel_color);
                     ders = _mm_add_ps(ders, diffs);
                     summs = _mm_add_ps(summs, ders);
-                    _mm_store_ps(buf_ptr, pixel_color);
+                    _mm_store_ps(buf_ptr.cast(), pixel_color);
                 }
             }
         }

@@ -74,8 +74,7 @@ impl<const CN: usize> HorizontalWasmStackBlurPass<CN> {
 
                 let mut src_ptr = stride as usize * y;
 
-                let src_ld = pixels.get_ptr(src_ptr) as *const i32;
-                let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
+                let src_pixel = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr));
 
                 for i in 0..=radius {
                     let stack_value = stacks.as_mut_ptr().add(i as usize * 4);
@@ -89,8 +88,7 @@ impl<const CN: usize> HorizontalWasmStackBlurPass<CN> {
                         src_ptr += CN;
                     }
                     let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4);
-                    let src_ld = pixels.get_ptr(src_ptr) as *const i32;
-                    let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
+                    let src_pixel = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr));
                     v128_store(stack_ptr as *mut v128, src_pixel);
                     sums = i32x4_add(
                         sums,
@@ -134,9 +132,8 @@ impl<const CN: usize> HorizontalWasmStackBlurPass<CN> {
                         _xp += 1;
                     }
 
-                    let src_ld = pixels.get_ptr(src_ptr);
-                    let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
-                    v128_store(stack as *mut v128, src_pixel);
+                    let src_pixel = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr));
+                    v128_store(stack.cast(), src_pixel);
 
                     sum_in = i32x4_add(sum_in, src_pixel);
                     sums = i32x4_add(sums, sum_in);
@@ -145,8 +142,8 @@ impl<const CN: usize> HorizontalWasmStackBlurPass<CN> {
                     if sp >= div {
                         sp = 0;
                     }
-                    let stack = stacks.as_mut_ptr().add(sp as usize * 4);
-                    let stack_val = v128_load(stack as *const v128);
+                    let stack = stacks.as_ptr().add(sp as usize * 4);
+                    let stack_val = v128_load(stack.cast());
 
                     sum_out = i32x4_add(sum_out, stack_val);
                     sum_in = i32x4_add(sum_in, stack_val);

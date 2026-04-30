@@ -27,6 +27,7 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::neon::{load_f32_f16, store_f32_f16};
+use crate::stackblur::neon::horizontal_f32::NeonVectorF32x4;
 use crate::stackblur::stack_blur_pass::StackBlurWorkingPass;
 use crate::unsafe_slice::UnsafeSlice;
 use crate::util::ScratchBuffer;
@@ -59,7 +60,8 @@ impl<const CN: usize> HorizontalNeonStackBlurPassFloat16<CN> {
             let mut xp;
             let mut sp;
             let mut stack_start;
-            let mut scratch_buffer = ScratchBuffer::<f32, 2048>::new(4 * div);
+
+            let mut scratch_buffer = ScratchBuffer::<[NeonVectorF32x4; 1], 2048>::new(div);
             let stacks = scratch_buffer.as_mut_slice();
 
             let wm = width - 1;
@@ -82,8 +84,8 @@ impl<const CN: usize> HorizontalNeonStackBlurPassFloat16<CN> {
                 let src_pixel = load_f32_f16::<CN>(pixels.get_ptr(src_ptr));
 
                 for i in 0..=radius {
-                    let stack_value = stacks.as_mut_ptr().add(i as usize * 4);
-                    vst1q_f32(stack_value, src_pixel);
+                    let stack_value = stacks.get_unchecked_mut(i as usize);
+                    vst1q_f32(stack_value.as_mut_ptr().cast(), src_pixel);
                     sums = vfmaq_n_f32(sums, src_pixel, i as f32 + 1.);
                     sum_out = vaddq_f32(sum_out, src_pixel);
                 }
@@ -92,10 +94,10 @@ impl<const CN: usize> HorizontalNeonStackBlurPassFloat16<CN> {
                     if i <= wm {
                         src_ptr += CN;
                     }
-                    let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4);
+                    let stack_ptr = stacks.get_unchecked_mut((i + radius) as usize);
                     let src_pixel = load_f32_f16::<CN>(pixels.get_ptr(src_ptr));
-                    vst1q_f32(stack_ptr, src_pixel);
-                    sums = vfmaq_n_f32(sums, src_pixel, radius as f32 + 1f32 - i as f32);
+                    vst1q_f32(stack_ptr.as_mut_ptr().cast(), src_pixel);
+                    sums = vfmaq_n_f32(sums, src_pixel, (radius as i32 + 1 - i as i32) as f32);
 
                     sum_in = vaddq_f32(sum_in, src_pixel);
                 }
@@ -119,9 +121,9 @@ impl<const CN: usize> HorizontalNeonStackBlurPassFloat16<CN> {
                     if stack_start >= div {
                         stack_start -= div;
                     }
-                    let stack = stacks.as_mut_ptr().add(stack_start as usize * 4);
+                    let stack = stacks.get_unchecked_mut(stack_start as usize);
 
-                    let stack_val = vld1q_f32(stack);
+                    let stack_val = vld1q_f32(stack.as_ptr().cast());
 
                     sum_out = vsubq_f32(sum_out, stack_val);
 
@@ -131,7 +133,7 @@ impl<const CN: usize> HorizontalNeonStackBlurPassFloat16<CN> {
                     }
 
                     let src_pixel = load_f32_f16::<CN>(pixels.get_ptr(src_ptr));
-                    vst1q_f32(stack, src_pixel);
+                    vst1q_f32(stack.as_mut_ptr().cast(), src_pixel);
 
                     sum_in = vaddq_f32(sum_in, src_pixel);
                     sums = vaddq_f32(sums, sum_in);
@@ -141,7 +143,7 @@ impl<const CN: usize> HorizontalNeonStackBlurPassFloat16<CN> {
                         sp = 0;
                     }
                     let stack = stacks.as_mut_ptr().add(sp as usize * 4);
-                    let stack_val = vld1q_f32(stack);
+                    let stack_val = vld1q_f32(stack.cast());
 
                     sum_out = vaddq_f32(sum_out, stack_val);
                     sum_in = vsubq_f32(sum_in, stack_val);

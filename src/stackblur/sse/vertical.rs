@@ -88,10 +88,8 @@ impl<const CN: usize> VerticalSseStackBlurPass<CN> {
 
                 let mut src_ptr = cx; // x,0
 
-                let src_ld = pixels.get_ptr(src_ptr) as *const i32;
-
                 {
-                    let src_pixel0 = _mm_loadu_si64(src_ld as *const _);
+                    let src_pixel0 = _mm_loadu_si64(pixels.get_ptr(src_ptr).cast());
                     let lo0 = _mm_unpacklo_epi8(src_pixel0, _mm_setzero_si128());
 
                     let i16_l0 = _mm_unpacklo_epi16(lo0, _mm_setzero_si128());
@@ -191,9 +189,7 @@ impl<const CN: usize> VerticalSseStackBlurPass<CN> {
                         yp += 1;
                     }
 
-                    let src_ld = pixels.get_ptr(src_ptr);
-
-                    let src_pixel0 = _mm_loadu_si64(src_ld as *const u8);
+                    let src_pixel0 = _mm_loadu_si64(pixels.get_ptr(src_ptr));
                     let lo0 = _mm_unpacklo_epi8(src_pixel0, _mm_setzero_si128());
 
                     let i16_l0 = _mm_unpacklo_epi16(lo0, _mm_setzero_si128());
@@ -235,9 +231,7 @@ impl<const CN: usize> VerticalSseStackBlurPass<CN> {
 
                 src_ptr = cx; // x,0
 
-                let src_ld = pixels.get_ptr(src_ptr) as *const i32;
-
-                let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
+                let src_pixel = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr));
 
                 for i in 0..=radius {
                     let stack_ptr = stacks.as_mut_ptr().add(i as usize * 4);
@@ -255,9 +249,8 @@ impl<const CN: usize> VerticalSseStackBlurPass<CN> {
                     }
 
                     let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4);
-                    let src_ld = pixels.get_ptr(src_ptr) as *const i32;
-                    let src_pixel = load_u8_s32_fast::<CN>(src_ld as *const u8);
-                    _mm_storeu_si128(stack_ptr as *mut __m128i, src_pixel);
+                    let src_pixel = load_u8_s32_fast::<CN>(pixels.get_ptr(src_ptr));
+                    _mm_storeu_si128(stack_ptr.cast(), src_pixel);
                     sums = _mm_add_epi32(
                         sums,
                         _mm_madd_epi16(src_pixel, _mm_set1_epi32(radius as i32 + 1 - i as i32)),
@@ -326,9 +319,7 @@ impl<const CN: usize> VerticalSseStackBlurPass<CN> {
 
                 src_ptr = cx; // x,0
 
-                let src_ld = pixels.get_ptr(src_ptr) as *const i32;
-
-                let src_pixel = load_u8_s32_fast::<TAIL>(src_ld as *const u8);
+                let src_pixel = load_u8_s32_fast::<TAIL>(pixels.get_ptr(src_ptr));
 
                 for i in 0..=radius {
                     let stack_ptr = stacks.as_mut_ptr().add(i as usize * 4);
@@ -346,8 +337,7 @@ impl<const CN: usize> VerticalSseStackBlurPass<CN> {
                     }
 
                     let stack_ptr = stacks.as_mut_ptr().add((i + radius) as usize * 4);
-                    let src_ld = pixels.get_ptr(src_ptr) as *const i32;
-                    let src_pixel = load_u8_s32_fast::<TAIL>(src_ld as *const u8);
+                    let src_pixel = load_u8_s32_fast::<TAIL>(pixels.get_ptr(src_ptr));
                     _mm_storeu_si128(stack_ptr as *mut __m128i, src_pixel);
                     sums = _mm_add_epi32(
                         sums,
@@ -386,8 +376,7 @@ impl<const CN: usize> VerticalSseStackBlurPass<CN> {
                         yp += 1;
                     }
 
-                    let src_ld = pixels.get_ptr(src_ptr);
-                    let src_pixel = load_u8_s32_fast::<TAIL>(src_ld as *const u8);
+                    let src_pixel = load_u8_s32_fast::<TAIL>(pixels.get_ptr(src_ptr));
                     _mm_storeu_si128(stack_ptr as *mut __m128i, src_pixel);
 
                     sum_in = _mm_add_epi32(sum_in, src_pixel);

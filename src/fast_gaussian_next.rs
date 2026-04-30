@@ -577,7 +577,7 @@ impl FastGaussianNextPassProvider<u8> for u8 {
 
             if BASE_RADIUS_I64_CUTOFF > radius && is_avx_available {
                 use crate::avx::fgn_horizontal_pass_avx2_u8;
-                return fgn_horizontal_pass_avx2_u8::<u8, CN>;
+                return fgn_horizontal_pass_avx2_u8::<CN>;
             }
         }
 
@@ -586,7 +586,7 @@ impl FastGaussianNextPassProvider<u8> for u8 {
             let is_sse_available = std::arch::is_x86_feature_detected!("sse4.1");
 
             if BASE_RADIUS_I64_CUTOFF > radius && is_sse_available {
-                _dispatcher_horizontal = fgn_horizontal_pass_sse_u8::<u8, CN>;
+                _dispatcher_horizontal = fgn_horizontal_pass_sse_u8::<CN>;
             }
         }
         #[cfg(all(target_arch = "aarch64", feature = "sve"))]

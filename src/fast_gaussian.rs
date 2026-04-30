@@ -1023,10 +1023,28 @@ pub fn fast_gaussian_f16(
 mod tests {
     use super::*;
 
+    fn lcg_rand(state: &mut u64) -> u64 {
+        *state = state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        *state
+    }
+
+    fn rand_dimension(state: &mut u64, min: usize, max: usize) -> usize {
+        min + (lcg_rand(state) as usize % (max - min + 1))
+    }
+
     #[test]
     fn test_fast_gaussian_u8_q_k5() {
-        let width: usize = 148;
-        let height: usize = 148;
+        let mut rng = 0xdeadbeef_u64
+            ^ std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .subsec_nanos() as u64;
+
+        let width = rand_dimension(&mut rng, 16, 512);
+        let height = rand_dimension(&mut rng, 16, 512);
+
         let mut dst = vec![126; width * height * 3];
         let mut dst_image = BlurImageMut::borrow(
             &mut dst,
@@ -1052,8 +1070,15 @@ mod tests {
 
     #[test]
     fn test_fast_gaussian_u16_fp_k25() {
-        let width: usize = 148;
-        let height: usize = 148;
+        let mut rng = 0xdeadbeef_u64
+            ^ std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .subsec_nanos() as u64;
+
+        let width = rand_dimension(&mut rng, 16, 512);
+        let height = rand_dimension(&mut rng, 16, 512);
+
         let mut dst = vec![17234u16; width * height * 3];
         let mut dst_image = BlurImageMut::borrow(
             &mut dst,
@@ -1079,8 +1104,15 @@ mod tests {
 
     #[test]
     fn test_fast_gaussian_f32_k25() {
-        let width: usize = 148;
-        let height: usize = 148;
+        let mut rng = 0xdeadbeef_u64
+            ^ std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .subsec_nanos() as u64;
+
+        let width = rand_dimension(&mut rng, 16, 512);
+        let height = rand_dimension(&mut rng, 16, 512);
+
         let mut dst = vec![0.432; width * height * 3];
         let mut dst_image = BlurImageMut::borrow(
             &mut dst,
