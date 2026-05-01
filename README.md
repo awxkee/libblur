@@ -307,11 +307,11 @@ let mut dst_image = BlurImageMut::default();
 libblur::fast_bilateral_filter(&image, &mut dst_image, 25, 7f32, 7f32).unwrap();
 ```
 
-### Common speed chain
+### Speed overview
 
-This is arbitrary example for blurring speed for all methods in descending order. 
+The following shows the approximate relative speed of all methods in descending order:
 
-box_blur -> stack_blur -> fast_gaussian_next -> fast_gaussian -> fast_gaussian_superior -> tent_blur -> gaussian_box_blur -> gaussian_blur -> bilateral -> median
+box_blur → stack_blur → fast_gaussian_next → fast_gaussian → fast_gaussian_superior → tent_blur → gaussian_box_blur → gaussian_blur → bilateral → median
 
 This project is licensed under either of
 

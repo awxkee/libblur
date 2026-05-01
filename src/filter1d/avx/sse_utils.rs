@@ -633,7 +633,7 @@ pub(crate) fn _mm_mul_add_symm_epi8_by_epi16_x2(
 }
 
 #[inline(always)]
-pub(crate) unsafe fn _mm_pack_epi32_x2_epi8(store: (__m128i, __m128i)) -> __m128i {
+pub(crate) fn _mm_pack_epi32_x2_epi8(store: (__m128i, __m128i)) -> __m128i {
     unsafe {
         let rnd = _mm_set1_epi16((1 << 5) - 1);
         _mm_packus_epi16(
