@@ -86,24 +86,24 @@ fn fast_gaussian_horizontal_pass_impl<const CN: usize>(
                     let prepared_u8 = u16x8_pack_trunc_u8x16(prepared_u16, prepared_u16);
 
                     let bytes_offset = current_y + current_px;
-                    let dst_ptr = (bytes.slice.as_ptr() as *mut u8).add(bytes_offset);
+                    let dst_ptr = bytes.get_ptr(bytes_offset);
                     w_store_u8x8_m4::<CN>(dst_ptr, prepared_u8);
 
                     let arr_index = ((x - radius_64) & 1023) as usize;
                     let d_arr_index = (x & 1023) as usize;
 
-                    let d_buf_ptr = buffer.get_unchecked_mut(d_arr_index).as_mut_ptr();
-                    let mut d_stored = v128_load(d_buf_ptr as *const v128);
+                    let d_buf_ptr = buffer.get_unchecked(d_arr_index);
+                    let mut d_stored = v128_load(d_buf_ptr.as_ptr().cast());
                     d_stored = i32x4_shr(d_stored, 1);
 
-                    let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr();
-                    let a_stored = v128_load(buf_ptr as *const v128);
+                    let buf_ptr = buffer.get_unchecked(arr_index);
+                    let a_stored = v128_load(buf_ptr.as_ptr().cast());
 
                     diffs = i32x4_add(diffs, i32x4_sub(a_stored, d_stored));
                 } else if x + radius_64 >= 0 {
                     let arr_index = (x & 1023) as usize;
-                    let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr();
-                    let mut stored = v128_load(buf_ptr as *const v128);
+                    let buf_ptr = buffer.get_unchecked(arr_index);
+                    let mut stored = v128_load(buf_ptr.as_ptr().cast());
                     stored = i32x4_shr(stored, 1);
                     diffs = i32x4_sub(diffs, stored);
                 }
@@ -112,7 +112,7 @@ fn fast_gaussian_horizontal_pass_impl<const CN: usize>(
                 let next_row_x = clamp_edge!(edge_mode, x + radius_64, 0, width_wide);
                 let next_row_px = next_row_x * CN;
 
-                let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_px) as *mut u8;
+                let s_ptr = bytes.get_ptr(next_row_y + next_row_px);
                 let pixel_color = load_u8_s32_fast::<CN>(s_ptr);
 
                 let arr_index = ((x + radius_64) & 1023) as usize;
@@ -120,7 +120,7 @@ fn fast_gaussian_horizontal_pass_impl<const CN: usize>(
 
                 diffs = i32x4_add(diffs, pixel_color);
                 summs = i32x4_add(summs, diffs);
-                v128_store(buf_ptr as *mut v128, pixel_color);
+                v128_store(buf_ptr.cast(), pixel_color);
             }
         }
     }
@@ -181,24 +181,23 @@ fn fast_gaussian_vertical_pass_wasm<const CN: usize>(
 
                     let bytes_offset = current_y + current_px;
 
-                    let dst_ptr = (bytes.slice.as_ptr() as *mut u8).add(bytes_offset);
-                    w_store_u8x8_m4::<CN>(dst_ptr, prepared_u8);
+                    w_store_u8x8_m4::<CN>(bytes.get_ptr(bytes_offset), prepared_u8);
 
                     let arr_index = ((y - radius_64) & 1023) as usize;
                     let d_arr_index = (y & 1023) as usize;
 
-                    let d_buf_ptr = buffer.get_unchecked_mut(d_arr_index).as_mut_ptr();
-                    let mut d_stored = v128_load(d_buf_ptr as *const v128);
+                    let d_buf_ptr = buffer.get_unchecked(d_arr_index);
+                    let mut d_stored = v128_load(d_buf_ptr.as_ptr().cast());
                     d_stored = i32x4_shr(d_stored, 1);
 
-                    let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr();
-                    let a_stored = v128_load(buf_ptr as *const v128);
+                    let buf_ptr = buffer.get_unchecked(arr_index);
+                    let a_stored = v128_load(buf_ptr.as_ptr().cast());
 
                     diffs = i32x4_add(diffs, i32x4_sub(a_stored, d_stored));
                 } else if y + radius_64 >= 0 {
                     let arr_index = (y & 1023) as usize;
-                    let buf_ptr = buffer.get_unchecked_mut(arr_index).as_mut_ptr();
-                    let mut stored = v128_load(buf_ptr as *const v128);
+                    let buf_ptr = buffer.get_unchecked(arr_index);
+                    let mut stored = v128_load(buf_ptr.as_ptr().cast());
                     stored = i32x4_shr(stored, 1);
                     diffs = i32x4_sub(diffs, stored);
                 }
@@ -207,7 +206,7 @@ fn fast_gaussian_vertical_pass_wasm<const CN: usize>(
                     clamp_edge!(edge_mode, y + radius_64, 0, height_wide) * (stride as usize);
                 let next_row_x = (x * CN as u32) as usize;
 
-                let s_ptr = bytes.slice.as_ptr().add(next_row_y + next_row_x) as *mut u8;
+                let s_ptr = bytes.get_ptr(next_row_y + next_row_x);
                 let pixel_color = load_u8_s32_fast::<CN>(s_ptr);
 
                 let arr_index = ((y + radius_64) & 1023) as usize;
@@ -215,7 +214,7 @@ fn fast_gaussian_vertical_pass_wasm<const CN: usize>(
 
                 diffs = i32x4_add(diffs, pixel_color);
                 summs = i32x4_add(summs, diffs);
-                v128_store(buf_ptr as *mut v128, pixel_color);
+                v128_store(buf_ptr.cast(), pixel_color);
             }
         }
     }

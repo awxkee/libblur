@@ -144,12 +144,17 @@ impl BuildRowHandlerBInter<u8, i32> for u8 {
                 );
             }
             if kernel.len() < 9 && _all_positive {
+                let uq07_weights = make_q07_weights(kernel);
+                let v_prepared = uq07_weights
+                    .iter()
+                    .map(|&x| {
+                        let z = x.to_ne_bytes();
+                        i32::from_ne_bytes([z[0], z[0], z[0], z[0]])
+                    })
+                    .collect::<Vec<_>>();
                 use crate::filter1d::avx::filter_row_avx_symm_u8_uq0_7_any;
                 use crate::filter1d::filter_1d_column_handler_approx::make_q07_weights;
-                return wrap_binter(
-                    filter_row_avx_symm_u8_uq0_7_any::<N>,
-                    make_q07_weights(kernel),
-                );
+                return wrap_binter(filter_row_avx_symm_u8_uq0_7_any::<N>, v_prepared);
             }
             use crate::filter1d::avx::filter_row_avx_symm_u8_i32_app_binter;
             let v_prepared = kernel

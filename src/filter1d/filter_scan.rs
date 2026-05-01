@@ -53,6 +53,19 @@ where
     left_front
 }
 
+pub(crate) fn scan_se_1d_flat<F>(kernel: &[F]) -> Vec<F>
+where
+    F: Copy + PartialEq + 'static + Default,
+    i32: PrimitiveCast<F>,
+{
+    let mut left_front = vec![F::default(); kernel.len()];
+
+    for (dst, src) in left_front.iter_mut().zip(kernel.iter()) {
+        *dst = *src;
+    }
+    left_front
+}
+
 pub(crate) fn is_symmetric_1d<F>(kernel: &[F]) -> bool
 where
     F: Copy + PartialEq + 'static,

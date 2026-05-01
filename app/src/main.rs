@@ -195,15 +195,15 @@ fn main() {
 
     // let mut dst_image = BlurImageMut::default(); //cvt.clone_as_mut();
 
-    // gaussian_blur(
-    //     &cvt,
-    //     &mut dst_image,
-    //     GaussianBlurParams::new_from_kernel(10.),
-    //     EdgeMode::Clamp.as_2d(),
-    //     ThreadingPolicy::Single,
-    //     ConvolutionMode::FixedPoint,
-    // )
-    //     .unwrap();
+    gaussian_blur(
+        &cvt.to_immutable_ref(),
+        &mut dst_image,
+        GaussianBlurParams::new_from_kernel(13.),
+        EdgeMode::Clamp.as_2d(),
+        ThreadingPolicy::Single,
+        ConvolutionMode::FixedPoint,
+    )
+    .unwrap();
 
     // tent_blur(
     //     &cvt.to_immutable_ref(),
@@ -213,13 +213,17 @@ fn main() {
     // )
     // .unwrap();
 
-    fast_gaussian_next(
-        &mut cvt,
-        AnisotropicRadius::new(23),
-        ThreadingPolicy::Single,
-        EdgeMode::Clamp.as_2d(),
-    )
-    .unwrap();
+    // let mut qq = cvt.linearize(TransferFunction::Srgb, false).unwrap();
+
+    // fast_gaussian_next(
+    //     &mut cvt,
+    //     AnisotropicRadius::new(44),
+    //     ThreadingPolicy::Single,
+    //     EdgeMode::Clamp.as_2d(),
+    // )
+    // .unwrap();
+
+    // cvt = qq.gamma8(TransferFunction::Srgb, false).unwrap();
 
     // for i in 0..10 {
     //     let start_time = Instant::now();
@@ -319,7 +323,7 @@ fn main() {
 
     if components == 3 {
         image::save_buffer(
-            "blurred_stack_next.jpg",
+            "blurred_stack_next1.jpg",
             bytes.as_bytes(),
             dimensions.0,
             dimensions.1,

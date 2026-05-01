@@ -96,7 +96,7 @@ pub(crate) fn filter_row_symmetric_approx_binter<T, I, const N: usize>(
 
         let mut f_cx = cx * N;
 
-        while f_cx + 4 < flat_max {
+        while f_cx + 4 <= flat_max {
             let mx = f_cx - half_len * N;
             let shifted_src = src.get_unchecked(mx..);
             let mut k0 = shifted_src.get_unchecked(half_len * N).as_() * coeff.weight;

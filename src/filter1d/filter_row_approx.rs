@@ -27,8 +27,6 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter1d::arena::Arena;
-use crate::filter1d::filter_scan::ScanPoint1d;
-use crate::filter1d::region::FilterRegion;
 use crate::filter1d::to_approx_storage::ToApproxStorage;
 use crate::img_size::ImageSize;
 use num_traits::AsPrimitive;
@@ -39,8 +37,7 @@ pub(crate) fn filter_row_approx<T, I, const N: usize>(
     arena_src: &[T],
     dst: &mut [T],
     image_size: ImageSize,
-    _: FilterRegion,
-    scanned_kernel: &[ScanPoint1d<I>],
+    scanned_kernel: &[I],
 ) where
     T: Copy + AsPrimitive<I> + Default,
     I: Copy
@@ -67,17 +64,17 @@ pub(crate) fn filter_row_approx<T, I, const N: usize>(
         while cx + 4 <= max_width {
             let coeff = *scanned_kernel.get_unchecked(0);
             let shifted_src = local_src.get_unchecked(cx..);
-            let mut k0 = shifted_src.get_unchecked(0).as_() * coeff.weight;
-            let mut k1 = shifted_src.get_unchecked(1).as_() * coeff.weight;
-            let mut k2 = shifted_src.get_unchecked(2).as_() * coeff.weight;
-            let mut k3 = shifted_src.get_unchecked(3).as_() * coeff.weight;
+            let mut k0 = shifted_src.get_unchecked(0).as_() * coeff;
+            let mut k1 = shifted_src.get_unchecked(1).as_() * coeff;
+            let mut k2 = shifted_src.get_unchecked(2).as_() * coeff;
+            let mut k3 = shifted_src.get_unchecked(3).as_() * coeff;
 
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
-                k0 = k0 + shifted_src.get_unchecked(i * N).as_() * coeff.weight;
-                k1 = k1 + shifted_src.get_unchecked(i * N + 1).as_() * coeff.weight;
-                k2 = k2 + shifted_src.get_unchecked(i * N + 2).as_() * coeff.weight;
-                k3 = k3 + shifted_src.get_unchecked(i * N + 3).as_() * coeff.weight;
+                k0 = k0 + shifted_src.get_unchecked(i * N).as_() * coeff;
+                k1 = k1 + shifted_src.get_unchecked(i * N + 1).as_() * coeff;
+                k2 = k2 + shifted_src.get_unchecked(i * N + 2).as_() * coeff;
+                k3 = k3 + shifted_src.get_unchecked(i * N + 3).as_() * coeff;
             }
 
             *dst.get_unchecked_mut(cx) = k0.to_approx_();
@@ -90,11 +87,11 @@ pub(crate) fn filter_row_approx<T, I, const N: usize>(
         for x in cx..max_width {
             let coeff = *scanned_kernel.get_unchecked(0);
             let shifted_src = local_src.get_unchecked(x..);
-            let mut k0 = shifted_src.get_unchecked(0).as_() * coeff.weight;
+            let mut k0 = shifted_src.get_unchecked(0).as_() * coeff;
 
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
-                k0 = k0 + shifted_src.get_unchecked(i * N).as_() * coeff.weight;
+                k0 = k0 + shifted_src.get_unchecked(i * N).as_() * coeff;
             }
 
             *dst.get_unchecked_mut(x) = k0.to_approx_();

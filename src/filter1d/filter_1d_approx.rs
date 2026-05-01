@@ -33,7 +33,7 @@ use crate::filter1d::filter::create_brows;
 use crate::filter1d::filter_1d_column_handler_approx::BuildColumnHandlerApprox;
 use crate::filter1d::filter_1d_row_handler_approx::Filter1DRowHandlerApprox;
 use crate::filter1d::filter_element::KernelShape;
-use crate::filter1d::filter_scan::{is_symmetric_1d, scan_se_1d};
+use crate::filter1d::filter_scan::{is_symmetric_1d, scan_se_1d, scan_se_1d_flat};
 use crate::filter1d::region::FilterRegion;
 use crate::filter1d::row_handler_small_approx::{BuildRowHandlerBInter, RowsHolder, RowsHolderMut};
 use crate::filter1d::to_approx_storage::{ApproxLevel, ToApproxStorage};
@@ -162,8 +162,7 @@ where
         .map(|&x| (x * initial_scale).cast_())
         .collect::<Vec<I>>();
 
-    let scanned_row_kernel = scan_se_1d::<I>(&scaled_row_kernel);
-    let scanned_row_kernel_slice = scanned_row_kernel.as_slice();
+    let scanned_row_kernel = scan_se_1d_flat::<I>(&scaled_row_kernel);
     let scanned_column_kernel = scan_se_1d::<I>(&scaled_column_kernel);
     let scanned_column_kernel_slice = scanned_column_kernel.as_slice();
     let is_column_kernel_symmetric = is_symmetric_1d(column_kernel);
@@ -177,7 +176,8 @@ where
 
     let mut transient_image = vec![T::default(); image_size.width * image_size.height * N];
 
-    let row_handler = T::get_row_handler_apr::<N>(is_row_kernel_symmetric);
+    let row_handler =
+        T::get_row_handler_apr::<N>(is_row_kernel_symmetric, scanned_row_kernel.as_slice());
     transient_image
         .tb_par_chunks_exact_mut(image_size.width * N)
         .for_each_enumerated_with_context(
@@ -202,13 +202,11 @@ where
                 )
                 .unwrap();
 
-                row_handler(
+                row_handler.single_row(
                     Arena::new(ctx.arena_width, 1, pad_w, 0, N),
                     &ctx.arena,
                     dst_row,
                     image_size,
-                    FilterRegion::new(y, y + 1),
-                    scanned_row_kernel_slice,
                 );
             },
         );
@@ -451,8 +449,7 @@ where
         .map(|&x| (x * initial_scale).cast_())
         .collect::<Vec<I>>();
 
-    let scanned_row_kernel = scan_se_1d::<I>(&scaled_row_kernel);
-    let scanned_row_kernel_slice = scanned_row_kernel.as_slice();
+    let scanned_row_kernel = scan_se_1d_flat::<I>(&scaled_row_kernel);
     let is_column_kernel_symmetric = is_symmetric_1d(column_kernel);
     let is_row_kernel_symmetric = is_symmetric_1d(row_kernel);
 
@@ -466,7 +463,8 @@ where
 
     let row_handler_binter =
         T::build_row_handler_binter::<N>(is_row_kernel_symmetric, &scaled_row_kernel);
-    let row_handler = T::get_row_handler_apr::<N>(is_row_kernel_symmetric);
+    let row_handler =
+        T::get_row_handler_apr::<N>(is_row_kernel_symmetric, scanned_row_kernel.as_slice());
     let column_handler = T::build_column_handler(is_column_kernel_symmetric, &scaled_column_kernel);
 
     let row_stride = image_size.width * N;
@@ -525,13 +523,11 @@ where
                                 border_constant,
                             )
                             .unwrap();
-                            row_handler(
+                            row_handler.single_row(
                                 Arena::new(image_size.width, 1, row_kernel.len() / 2, 0, N),
                                 row,
                                 &mut buffer[..row_stride],
                                 image_size,
-                                FilterRegion::new(0, 1),
-                                scanned_row_kernel_slice,
                             );
                         }
 
@@ -581,13 +577,11 @@ where
                                     border_constant,
                                 )
                                 .unwrap();
-                                row_handler(
+                                row_handler.single_row(
                                     Arena::new(image_size.width, 1, row_kernel.len() / 2, 0, N),
                                     row,
                                     &mut buffer[src_y * row_stride..(src_y + 1) * row_stride],
                                     image_size,
-                                    FilterRegion::new(0, 1),
-                                    scanned_row_kernel_slice,
                                 );
                             }
                         }
@@ -643,13 +637,11 @@ where
                                 border_constant,
                             )
                             .unwrap();
-                            row_handler(
+                            row_handler.single_row(
                                 Arena::new(image_size.width, 1, row_kernel.len() / 2, 0, N),
                                 row,
                                 &mut buffer[start_ky * row_stride..(start_ky + 1) * row_stride],
                                 image_size,
-                                FilterRegion::new(0, 1),
-                                scanned_row_kernel_slice,
                             );
                         }
 
@@ -716,13 +708,11 @@ where
                 edge_modes.horizontal,
                 border_constant,
             )?;
-            row_handler(
+            row_handler.single_row(
                 Arena::new(image_size.width, 1, row_kernel.len() / 2, 0, N),
                 row,
                 &mut buffer[..row_stride],
                 image_size,
-                FilterRegion::new(0, 1),
-                scanned_row_kernel_slice,
             );
         }
 
@@ -781,13 +771,11 @@ where
                     edge_modes.horizontal,
                     border_constant,
                 )?;
-                row_handler(
+                row_handler.single_row(
                     Arena::new(image_size.width, 1, row_kernel.len() / 2, 0, N),
                     row,
                     &mut buffer[start_ky * row_stride..(start_ky + 1) * row_stride],
                     image_size,
-                    FilterRegion::new(0, 1),
-                    scanned_row_kernel_slice,
                 );
             }
 

@@ -28,8 +28,6 @@
  */
 
 use crate::filter1d::arena::Arena;
-use crate::filter1d::filter_scan::ScanPoint1d;
-use crate::filter1d::region::FilterRegion;
 use crate::filter1d::sse::utils::{
     _mm_mul_add_symm_epu16_by_epu16_x4, _mm_mul_epu16_widen, _mm_pack_epi32_x2_epu16,
 };
@@ -45,18 +43,10 @@ pub(crate) fn filter_row_sse_symm_uq15_u16<const N: usize>(
     arena_src: &[u16],
     dst: &mut [u16],
     image_size: ImageSize,
-    filter_region: FilterRegion,
-    scanned_kernel: &[ScanPoint1d<u32>],
+    scanned_kernel: &[u32],
 ) {
     unsafe {
-        filter_row_sse_symm_uq15_u16_impl::<N>(
-            arena,
-            arena_src,
-            dst,
-            image_size,
-            filter_region,
-            scanned_kernel,
-        );
+        filter_row_sse_symm_uq15_u16_impl::<N>(arena, arena_src, dst, image_size, scanned_kernel);
     }
 }
 
@@ -66,8 +56,7 @@ fn filter_row_sse_symm_uq15_u16_impl<const N: usize>(
     arena_src: &[u16],
     dst: &mut [u16],
     image_size: ImageSize,
-    _: FilterRegion,
-    scanned_kernel: &[ScanPoint1d<u32>],
+    scanned_kernel: &[u32],
 ) {
     unsafe {
         let width = image_size.width;
@@ -83,7 +72,7 @@ fn filter_row_sse_symm_uq15_u16_impl<const N: usize>(
 
         let max_width = width * arena.components;
 
-        let coeff = _mm_set1_epi32(scanned_kernel.get_unchecked(half_len).weight as i32);
+        let coeff = _mm_set1_epi32(*scanned_kernel.get_unchecked(half_len) as i32);
 
         while cx + 16 <= max_width {
             let shifted_src = local_src.get_unchecked(cx..);
@@ -98,7 +87,7 @@ fn filter_row_sse_symm_uq15_u16_impl<const N: usize>(
 
             for i in 0..half_len {
                 let rollback = length - i - 1;
-                let coeff = _mm_set1_epi32(scanned_kernel.get_unchecked(i).weight as i32);
+                let coeff = _mm_set1_epi32(*scanned_kernel.get_unchecked(i) as i32);
 
                 let src0 = shifted_src.get_unchecked((i * N)..);
                 let r_src0 = shifted_src.get_unchecked((rollback * N)..);
@@ -128,7 +117,7 @@ fn filter_row_sse_symm_uq15_u16_impl<const N: usize>(
 
             for i in 0..half_len {
                 let rollback = length - i - 1;
-                let coeff = _mm_set1_epi32(scanned_kernel.get_unchecked(i).weight as i32);
+                let coeff = _mm_set1_epi32(*scanned_kernel.get_unchecked(i) as i32);
                 let v_source0 =
                     _mm_loadu_si128(shifted_src.get_unchecked((i * N)..).as_ptr() as *const _);
                 let v_source1 = _mm_loadu_si128(
@@ -151,7 +140,7 @@ fn filter_row_sse_symm_uq15_u16_impl<const N: usize>(
 
             for i in 0..half_len {
                 let rollback = length - i - 1;
-                let coeff = _mm_set1_epi32(scanned_kernel.get_unchecked(i).weight as i32);
+                let coeff = _mm_set1_epi32(*scanned_kernel.get_unchecked(i) as i32);
                 let v_source0 =
                     _mm_loadu_si64(shifted_src.get_unchecked((i * N)..).as_ptr() as *const _);
                 let v_source1 = _mm_loadu_si64(
@@ -185,7 +174,7 @@ fn filter_row_sse_symm_uq15_u16_impl<const N: usize>(
         for x in cx..max_width {
             let coeff = *scanned_kernel.get_unchecked(half_len);
             let shifted_src = local_src.get_unchecked(x..);
-            let mut k0 = *shifted_src.get_unchecked(half_len * N) as u32 * coeff.weight;
+            let mut k0 = *shifted_src.get_unchecked(half_len * N) as u32 * coeff;
 
             for i in 0..half_len {
                 let coeff = *scanned_kernel.get_unchecked(i);
@@ -193,7 +182,7 @@ fn filter_row_sse_symm_uq15_u16_impl<const N: usize>(
 
                 k0 += (*shifted_src.get_unchecked(i * N) as u32
                     + *shifted_src.get_unchecked(rollback * N) as u32)
-                    * coeff.weight;
+                    * coeff;
             }
 
             *dst.get_unchecked_mut(x) = k0.to_approx_();

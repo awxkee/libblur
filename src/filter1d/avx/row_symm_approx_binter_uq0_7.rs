@@ -37,7 +37,7 @@ pub(crate) fn filter_row_avx_symm_u8_uq0_7_any<const N: usize>(
     m_src: &RowsHolder<u8>,
     m_dst: &mut RowsHolderMut<u8>,
     image_size: ImageSize,
-    scanned_kernel: &[i8],
+    scanned_kernel: &[i32],
 ) {
     unsafe {
         let unit = ExecutionUnit::<N>::default();
@@ -56,20 +56,12 @@ impl<const N: usize> ExecutionUnit<N> {
         m_src: &RowsHolder<u8>,
         m_dst: &mut RowsHolderMut<u8>,
         image_size: ImageSize,
-        scanned_kernel: &[i8],
+        kernel: &[i32],
     ) {
         unsafe {
             let width = image_size.width;
 
-            let v_prepared = scanned_kernel
-                .iter()
-                .map(|&x| {
-                    let z = x.to_ne_bytes();
-                    i32::from_ne_bytes([z[0], z[0], z[0], z[0]])
-                })
-                .collect::<Vec<_>>();
-
-            let length = scanned_kernel.len();
+            let length = kernel.len();
             let half_len = length / 2;
 
             let min_left = half_len.min(width);
@@ -79,15 +71,17 @@ impl<const N: usize> ExecutionUnit<N> {
                 let dst = &mut **dst;
                 let mut f_cx = 0usize;
 
-                let coeff = *scanned_kernel.get_unchecked(half_len);
+                let center_coeff = kernel.get_unchecked(half_len).to_ne_bytes();
+                let coeff = center_coeff[0] as u16;
 
                 while f_cx < min_left {
                     for c in 0..N {
                         let mx = f_cx as i64 - s_kernel;
-                        let mut k0: u16 = *src.get_unchecked(f_cx * N + c) as u16 * coeff as u16;
+                        let mut k0: u16 = *src.get_unchecked(f_cx * N + c) as u16 * coeff;
 
                         for i in 0..half_len {
-                            let coeff = *scanned_kernel.get_unchecked(i);
+                            let c_coeff = kernel.get_unchecked(i).to_ne_bytes();
+                            let coeff = c_coeff[0] as u16;
                             let rollback = length - i - 1;
 
                             let src0 = border_interpolate!(
@@ -109,7 +103,7 @@ impl<const N: usize> ExecutionUnit<N> {
                                 c
                             );
 
-                            k0 += (src0 as u16 + src1 as u16) * coeff as u16;
+                            k0 += (src0 as u16 + src1 as u16) * coeff;
                         }
 
                         *dst.get_unchecked_mut(f_cx * N + c) =
@@ -124,7 +118,7 @@ impl<const N: usize> ExecutionUnit<N> {
                 let m_right = width.saturating_sub(half_len);
                 let max_width = m_right * N;
 
-                let coeff = _mm256_set1_epi32(*v_prepared.get_unchecked(half_len));
+                let coeff = _mm256_set1_epi32(*kernel.get_unchecked(half_len));
                 let rnd = _mm256_set1_epi16(1 << 6);
 
                 while m_cx + 32 <= max_width {
@@ -151,7 +145,7 @@ impl<const N: usize> ExecutionUnit<N> {
 
                     for i in 0..half_len {
                         let rollback = length - i - 1;
-                        let coeff = _mm256_set1_epi32(*v_prepared.get_unchecked(i));
+                        let coeff = _mm256_set1_epi32(*kernel.get_unchecked(i));
                         let v_source0 = _mm256_loadu_si256(
                             shifted_src.get_unchecked((i * N)..).as_ptr() as *const _,
                         );
@@ -200,7 +194,7 @@ impl<const N: usize> ExecutionUnit<N> {
 
                     for i in 0..half_len {
                         let rollback = length - i - 1;
-                        let coeff = _mm_set1_epi32(*v_prepared.get_unchecked(i));
+                        let coeff = _mm_set1_epi32(*kernel.get_unchecked(i));
                         let v_source0 = _mm_loadu_si128(
                             shifted_src.get_unchecked((i * N)..).as_ptr() as *const _,
                         );
@@ -242,7 +236,7 @@ impl<const N: usize> ExecutionUnit<N> {
 
                     for i in 0..half_len {
                         let rollback = length - i - 1;
-                        let coeff = _mm_set1_epi32(*v_prepared.get_unchecked(i));
+                        let coeff = _mm_set1_epi32(*kernel.get_unchecked(i));
                         let v_source0 = _mm_loadu_si64(
                             shifted_src.get_unchecked((i * N)..).as_ptr() as *const _,
                         );
@@ -282,7 +276,7 @@ impl<const N: usize> ExecutionUnit<N> {
 
                     for i in 0..half_len {
                         let rollback = length - i - 1;
-                        let coeff = _mm_set1_epi32(*v_prepared.get_unchecked(i));
+                        let coeff = _mm_set1_epi32(*kernel.get_unchecked(i));
                         let v_source0 = _mm_loadu_si32(
                             shifted_src.get_unchecked((i * N)..).as_ptr() as *const _,
                         );
@@ -305,21 +299,23 @@ impl<const N: usize> ExecutionUnit<N> {
                     m_cx += 4;
                 }
 
-                let coeff = *scanned_kernel.get_unchecked(half_len);
+                let c_coeff = kernel.get_unchecked(half_len).to_ne_bytes();
+                let coeff = c_coeff[0] as u16;
 
                 for zx in m_cx..max_width {
                     let x = zx - s_half;
 
                     let shifted_src = src.get_unchecked(x..);
-                    let mut k0 = *shifted_src.get_unchecked(half_len * N) as u16 * coeff as u16;
+                    let mut k0 = *shifted_src.get_unchecked(half_len * N) as u16 * coeff;
 
                     for i in 0..half_len {
-                        let coeff = *scanned_kernel.get_unchecked(i);
+                        let c_coeff = kernel.get_unchecked(i).to_ne_bytes();
+                        let coeff = c_coeff[0] as u16;
                         let rollback = length - i - 1;
 
                         k0 += (*shifted_src.get_unchecked(i * N) as u16
                             + *shifted_src.get_unchecked(rollback * N) as u16)
-                            * coeff as u16;
+                            * coeff;
                     }
 
                     *dst.get_unchecked_mut(zx) = ((k0 + (1 << 6)) >> 7).min(255) as u8;
@@ -330,10 +326,11 @@ impl<const N: usize> ExecutionUnit<N> {
                 while f_cx < width {
                     for c in 0..N {
                         let mx = f_cx as i64 - s_kernel;
-                        let mut k0: u16 = *src.get_unchecked(f_cx * N + c) as u16 * coeff as u16;
+                        let mut k0: u16 = *src.get_unchecked(f_cx * N + c) as u16 * coeff;
 
                         for i in 0..half_len {
-                            let coeff = *scanned_kernel.get_unchecked(i);
+                            let c_coeff = kernel.get_unchecked(i).to_ne_bytes();
+                            let coeff = c_coeff[0] as u16;
                             let rollback = length - i - 1;
 
                             let src0 = border_interpolate!(
@@ -355,7 +352,7 @@ impl<const N: usize> ExecutionUnit<N> {
                                 c
                             );
 
-                            k0 += (src0 as u16 + src1 as u16) * coeff as u16;
+                            k0 += (src0 as u16 + src1 as u16) * coeff;
                         }
 
                         *dst.get_unchecked_mut(f_cx * N + c) =
