@@ -27,7 +27,6 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter1d::arena::Arena;
-use crate::filter1d::region::FilterRegion;
 use crate::filter1d::sse::utils::{
     _mm_mul_add_symm_epu16_by_epu16_x4, _mm_mul_epu16_widen, _mm_pack_epi32_x2_epu16,
 };
@@ -44,28 +43,19 @@ pub(crate) fn filter_column_sse_symm_uq15_u16(
     arena_src: &[&[u16]],
     dst: &mut [u16],
     image_size: ImageSize,
-    filter_region: FilterRegion,
     scanned_kernel: &[u32],
 ) {
     unsafe {
-        filter_column_sse_symm_uq15_u16_impl(
-            arena,
-            arena_src,
-            dst,
-            image_size,
-            filter_region,
-            scanned_kernel,
-        );
+        filter_column_sse_symm_uq15_u16_impl(arena, arena_src, dst, image_size, scanned_kernel);
     }
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn filter_column_sse_symm_uq15_u16_impl(
+fn filter_column_sse_symm_uq15_u16_impl(
     arena: Arena,
     arena_src: &[&[u16]],
     dst: &mut [u16],
     image_size: ImageSize,
-    _: FilterRegion,
     scanned_kernel: &[u32],
 ) {
     unsafe {
@@ -78,7 +68,7 @@ unsafe fn filter_column_sse_symm_uq15_u16_impl(
 
         let coeff = _mm_set1_epi32(*scanned_kernel.get_unchecked(half_len) as i32);
 
-        while cx + 16 < image_width {
+        while cx + 16 <= image_width {
             let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
 
             let source0 = _mm_loadu_si128(v_src.as_ptr() as *const __m128i);
@@ -112,7 +102,7 @@ unsafe fn filter_column_sse_symm_uq15_u16_impl(
             cx += 16;
         }
 
-        while cx + 8 < image_width {
+        while cx + 8 <= image_width {
             let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
 
             let source = _mm_loadu_si128(v_src.as_ptr() as *const __m128i);
@@ -138,7 +128,7 @@ unsafe fn filter_column_sse_symm_uq15_u16_impl(
             cx += 8;
         }
 
-        while cx + 4 < image_width {
+        while cx + 4 <= image_width {
             let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
 
             let source = _mm_loadu_si64(v_src.as_ptr() as *const _);

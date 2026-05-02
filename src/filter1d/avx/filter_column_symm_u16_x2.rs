@@ -143,11 +143,11 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
                 let source0 = _mm256_load_pack_x2(v_src0.as_ptr() as *const _);
                 let source1 = _mm256_load_pack_x2(v_src1.as_ptr() as *const _);
 
-                let mut k0_0 = _mm256_mul_epi16_by_ps_x2::<FMA>(source0.0, coeff);
-                let mut k1_0 = _mm256_mul_epi16_by_ps_x2::<FMA>(source0.1, coeff);
+                let mut k0_0 = _mm256_mul_epi16_by_ps_x2(source0.0, coeff);
+                let mut k1_0 = _mm256_mul_epi16_by_ps_x2(source0.1, coeff);
 
-                let mut k0_1 = _mm256_mul_epi16_by_ps_x2::<FMA>(source1.0, coeff);
-                let mut k1_1 = _mm256_mul_epi16_by_ps_x2::<FMA>(source1.1, coeff);
+                let mut k0_1 = _mm256_mul_epi16_by_ps_x2(source1.0, coeff);
+                let mut k1_1 = _mm256_mul_epi16_by_ps_x2(source1.1, coeff);
 
                 for i in 0..half_len {
                     let rollback = length - i - 1;
@@ -215,8 +215,8 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
                 let source0 = _mm256_loadu_si256(v_src0.as_ptr() as *const __m256i);
                 let source1 = _mm256_loadu_si256(v_src1.as_ptr() as *const __m256i);
 
-                let mut k0 = _mm256_mul_epi16_by_ps_x2::<FMA>(source0, coeff);
-                let mut k1 = _mm256_mul_epi16_by_ps_x2::<FMA>(source1, coeff);
+                let mut k0 = _mm256_mul_epi16_by_ps_x2(source0, coeff);
+                let mut k1 = _mm256_mul_epi16_by_ps_x2(source1, coeff);
 
                 for i in 0..half_len {
                     let rollback = length - i - 1;
@@ -265,8 +265,8 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
                 let source_0 = _mm_loadu_si128(v_src0.as_ptr() as *const __m128i);
                 let source_1 = _mm_loadu_si128(v_src1.as_ptr() as *const __m128i);
 
-                let mut k0 = _mm_mul_epi16_by_ps_x2::<FMA>(source_0, _mm256_castps256_ps128(coeff));
-                let mut k1 = _mm_mul_epi16_by_ps_x2::<FMA>(source_1, _mm256_castps256_ps128(coeff));
+                let mut k0 = _mm_mul_epi16_by_ps_x2(source_0, _mm256_castps256_ps128(coeff));
+                let mut k1 = _mm_mul_epi16_by_ps_x2(source_1, _mm256_castps256_ps128(coeff));
 
                 for i in 0..half_len {
                     let coeff = *scanned_kernel.get_unchecked(i);

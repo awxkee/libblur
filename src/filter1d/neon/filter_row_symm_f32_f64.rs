@@ -29,7 +29,6 @@
 use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::neon::utils::{xvld1q_f32_x2, xvld1q_f32_x4, xvst1q_f32_x2, xvst1q_f32_x4};
-use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
 use std::arch::aarch64::*;
 
@@ -38,7 +37,6 @@ pub(crate) fn filter_row_neon_symm_f32_f64<const N: usize>(
     arena_src: &[f32],
     dst: &mut [f32],
     image_size: ImageSize,
-    _: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f64>],
 ) {
     unsafe {
@@ -54,7 +52,7 @@ pub(crate) fn filter_row_neon_symm_f32_f64<const N: usize>(
 
         let coeff = vdupq_n_f64(scanned_kernel.get_unchecked(half_len).weight);
 
-        while cx + 16 < max_width {
+        while cx + 16 <= max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source = xvld1q_f32_x4(shifted_src.get_unchecked(half_len * N..).as_ptr());
@@ -152,7 +150,7 @@ pub(crate) fn filter_row_neon_symm_f32_f64<const N: usize>(
             cx += 16;
         }
 
-        while cx + 8 < max_width {
+        while cx + 8 <= max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source = xvld1q_f32_x2(shifted_src.get_unchecked(half_len * N..).as_ptr());
@@ -211,7 +209,7 @@ pub(crate) fn filter_row_neon_symm_f32_f64<const N: usize>(
             cx += 8;
         }
 
-        while cx + 4 < max_width {
+        while cx + 4 <= max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source = vld1q_f32(shifted_src.get_unchecked(half_len * N..).as_ptr());

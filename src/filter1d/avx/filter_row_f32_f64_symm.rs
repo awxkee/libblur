@@ -31,7 +31,6 @@ use crate::filter1d::arena::Arena;
 use crate::filter1d::avx::sse_utils::_mm_opt_fmla_pd;
 use crate::filter1d::avx::utils::_mm256_opt_fmla_pd;
 use crate::filter1d::filter_scan::ScanPoint1d;
-use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
 use std::arch::x86_64::*;
 
@@ -40,29 +39,14 @@ pub(crate) fn filter_row_avx_f32_f64_symm<const N: usize>(
     arena_src: &[f32],
     dst: &mut [f32],
     image_size: ImageSize,
-    filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f64>],
 ) {
     unsafe {
         let has_fma = std::arch::is_x86_feature_detected!("fma");
         if has_fma {
-            filter_row_avx_f32_f64_fma_symm::<N>(
-                arena,
-                arena_src,
-                dst,
-                image_size,
-                filter_region,
-                scanned_kernel,
-            );
+            filter_row_avx_f32_f64_fma_symm::<N>(arena, arena_src, dst, image_size, scanned_kernel);
         } else {
-            filter_row_avx_f32_f64_def_symm::<N>(
-                arena,
-                arena_src,
-                dst,
-                image_size,
-                filter_region,
-                scanned_kernel,
-            );
+            filter_row_avx_f32_f64_def_symm::<N>(arena, arena_src, dst, image_size, scanned_kernel);
         }
     }
 }
@@ -73,18 +57,10 @@ fn filter_row_avx_f32_f64_def_symm<const N: usize>(
     arena_src: &[f32],
     dst: &mut [f32],
     image_size: ImageSize,
-    filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f64>],
 ) {
     let unit = ExecutionUnit::<false, N>::default();
-    unit.pass(
-        arena,
-        arena_src,
-        dst,
-        image_size,
-        filter_region,
-        scanned_kernel,
-    );
+    unit.pass(arena, arena_src, dst, image_size, scanned_kernel);
 }
 
 #[target_feature(enable = "avx2", enable = "fma")]
@@ -93,18 +69,10 @@ fn filter_row_avx_f32_f64_fma_symm<const N: usize>(
     arena_src: &[f32],
     dst: &mut [f32],
     image_size: ImageSize,
-    filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f64>],
 ) {
     let unit = ExecutionUnit::<true, N>::default();
-    unit.pass(
-        arena,
-        arena_src,
-        dst,
-        image_size,
-        filter_region,
-        scanned_kernel,
-    );
+    unit.pass(arena, arena_src, dst, image_size, scanned_kernel);
 }
 
 #[derive(Debug, Default, Copy, Clone)]
@@ -118,7 +86,6 @@ impl<const FMA: bool, const N: usize> ExecutionUnit<FMA, N> {
         arena_src: &[f32],
         dst: &mut [f32],
         image_size: ImageSize,
-        _: FilterRegion,
         scanned_kernel: &[ScanPoint1d<f64>],
     ) {
         unsafe {

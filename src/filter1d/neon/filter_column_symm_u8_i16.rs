@@ -32,7 +32,6 @@ use crate::filter1d::neon::utils::{
     vdotq_exact_symm_s16, vmulq_u8_by_i16, xvld1q_u8_x2, xvld1q_u8_x3, xvld1q_u8_x4, xvst1q_u8_x2,
     xvst1q_u8_x3, xvst1q_u8_x4,
 };
-use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
 use crate::to_storage::ToStorage;
@@ -44,7 +43,6 @@ pub(crate) fn filter_column_symm_neon_u8_i16(
     arena_src: &[&[u8]],
     dst: &mut [u8],
     image_size: ImageSize,
-    _: FilterRegion,
     scanned_kernel: &[ScanPoint1d<i16>],
 ) {
     unsafe {
@@ -57,7 +55,7 @@ pub(crate) fn filter_column_symm_neon_u8_i16(
 
         let coeff = vdupq_n_s16(scanned_kernel.get_unchecked(half_len).weight);
 
-        while cx + 64 < max_width {
+        while cx + 64 <= max_width {
             let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
 
             let source = xvld1q_u8_x4(v_src.as_ptr());
@@ -96,7 +94,7 @@ pub(crate) fn filter_column_symm_neon_u8_i16(
             cx += 64;
         }
 
-        while cx + 48 < max_width {
+        while cx + 48 <= max_width {
             let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
 
             let source = xvld1q_u8_x3(v_src.as_ptr());
@@ -132,7 +130,7 @@ pub(crate) fn filter_column_symm_neon_u8_i16(
             cx += 48;
         }
 
-        while cx + 32 < max_width {
+        while cx + 32 <= max_width {
             let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
 
             let source = xvld1q_u8_x2(v_src.as_ptr());
@@ -166,7 +164,7 @@ pub(crate) fn filter_column_symm_neon_u8_i16(
             cx += 32;
         }
 
-        while cx + 16 < max_width {
+        while cx + 16 <= max_width {
             let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
 
             let source_0 = vld1q_u8(v_src.as_ptr());
@@ -192,7 +190,7 @@ pub(crate) fn filter_column_symm_neon_u8_i16(
 
         let coeff = *scanned_kernel.get_unchecked(half_len);
 
-        while cx + 4 < max_width {
+        while cx + 4 <= max_width {
             let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
 
             let mut k0 = (*v_src.get_unchecked(0) as i16).mul(coeff.weight);

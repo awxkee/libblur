@@ -31,18 +31,10 @@ use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_1d_column_handler::FilterBrows;
 use crate::filter1d::filter_column_approx::filter_column_approx;
 use crate::filter1d::filter_column_approx_symmetric::filter_column_symmetric_approx;
-use crate::filter1d::region::FilterRegion;
 use std::sync::Arc;
 
 pub trait ResolveColumnHandlerApprox<T>: Send + Sync {
-    fn single_row(
-        &self,
-        arena: Arena,
-        rows: &[&[T]],
-        dst: &mut [T],
-        image_size: ImageSize,
-        region: FilterRegion,
-    );
+    fn single_row(&self, arena: Arena, rows: &[&[T]], dst: &mut [T], image_size: ImageSize);
 
     fn multiple_rows(
         &self,
@@ -103,21 +95,14 @@ pub(crate) fn make_uq07_weights(weights: &[i32]) -> Vec<u8> {
 }
 
 struct ColumnHandlerApprox<T, F> {
-    single_row: fn(Arena, &[&[T]], &mut [T], ImageSize, FilterRegion, &[F]),
+    single_row: fn(Arena, &[&[T]], &mut [T], ImageSize, &[F]),
     multiple_rows: Option<fn(Arena, FilterBrows<T>, &mut [T], ImageSize, usize, &[F])>,
     kernel: Vec<F>,
 }
 
 impl<T: Send + Sync, F: Send + Sync> ResolveColumnHandlerApprox<T> for ColumnHandlerApprox<T, F> {
-    fn single_row(
-        &self,
-        arena: Arena,
-        rows: &[&[T]],
-        dst: &mut [T],
-        image_size: ImageSize,
-        region: FilterRegion,
-    ) {
-        (self.single_row)(arena, rows, dst, image_size, region, &self.kernel)
+    fn single_row(&self, arena: Arena, rows: &[&[T]], dst: &mut [T], image_size: ImageSize) {
+        (self.single_row)(arena, rows, dst, image_size, &self.kernel)
     }
 
     fn multiple_rows(
@@ -175,7 +160,7 @@ impl BuildColumnHandlerApprox<u8, i32> for u8 {
         is_kernel_symmetric: bool,
         kernel: &[i32],
     ) -> Arc<dyn ResolveColumnHandlerApprox<u8> + Send + Sync> {
-        let _single_row: fn(Arena, &[&[u8]], &mut [u8], ImageSize, FilterRegion, &[i32]);
+        let _single_row: fn(Arena, &[&[u8]], &mut [u8], ImageSize, &[i32]);
         let _multiple_rows: Option<
             fn(Arena, FilterBrows<u8>, &mut [u8], ImageSize, usize, &[i32]),
         >;

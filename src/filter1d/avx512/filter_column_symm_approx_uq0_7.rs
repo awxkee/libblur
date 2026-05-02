@@ -27,7 +27,6 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter1d::arena::Arena;
-use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
 use std::arch::x86_64::*;
 use std::ops::{Add, Mul};
@@ -37,28 +36,19 @@ pub(crate) fn filter_column_avx512_symm_u8_uq0_7(
     arena_src: &[&[u8]],
     dst: &mut [u8],
     image_size: ImageSize,
-    filter_region: FilterRegion,
     kernel: &[i32],
 ) {
     unsafe {
-        filter_column_avx512_symm_u8_i32_impl(
-            arena,
-            arena_src,
-            dst,
-            image_size,
-            filter_region,
-            kernel,
-        );
+        filter_column_avx512_symm_u8_i32_impl(arena, arena_src, dst, image_size, kernel);
     }
 }
 
 #[target_feature(enable = "avx512bw")]
-unsafe fn filter_column_avx512_symm_u8_i32_impl(
+fn filter_column_avx512_symm_u8_i32_impl(
     arena: Arena,
     arena_src: &[&[u8]],
     dst: &mut [u8],
     image_size: ImageSize,
-    _: FilterRegion,
     kernel: &[i32],
 ) {
     unsafe {

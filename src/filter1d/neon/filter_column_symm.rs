@@ -32,7 +32,6 @@ use crate::filter1d::neon::utils::{
     vfmlaq_symm_u8_f32, vmulq_u8_by_f32, vqmovnq_f32_u8, xvld1q_u8_x2, xvld1q_u8_x3, xvld1q_u8_x4,
     xvst1q_u8_x2, xvst1q_u8_x3, xvst1q_u8_x4,
 };
-use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
 use crate::to_storage::ToStorage;
@@ -44,7 +43,6 @@ pub(crate) fn filter_symm_column_neon_u8_f32(
     brows: &[&[u8]],
     dst: &mut [u8],
     image_size: ImageSize,
-    _: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
     unsafe {
@@ -57,7 +55,7 @@ pub(crate) fn filter_symm_column_neon_u8_f32(
 
         let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(half_len).weight);
 
-        while cx + 64 < image_width {
+        while cx + 64 <= image_width {
             let shifted_src = brows.get_unchecked(half_len).get_unchecked(cx..);
 
             let source = xvld1q_u8_x4(shifted_src.as_ptr());
@@ -91,7 +89,7 @@ pub(crate) fn filter_symm_column_neon_u8_f32(
             cx += 64;
         }
 
-        while cx + 48 < image_width {
+        while cx + 48 <= image_width {
             let shifted_src = brows.get_unchecked(half_len).get_unchecked(cx..);
 
             let source = xvld1q_u8_x3(shifted_src.as_ptr());
@@ -118,7 +116,7 @@ pub(crate) fn filter_symm_column_neon_u8_f32(
             cx += 48;
         }
 
-        while cx + 32 < image_width {
+        while cx + 32 <= image_width {
             let shifted_src = brows.get_unchecked(half_len).get_unchecked(cx..);
 
             let source = xvld1q_u8_x2(shifted_src.as_ptr());
@@ -144,7 +142,7 @@ pub(crate) fn filter_symm_column_neon_u8_f32(
             cx += 32;
         }
 
-        while cx + 16 < image_width {
+        while cx + 16 <= image_width {
             let shifted_src = brows.get_unchecked(half_len).get_unchecked(cx..);
 
             let source = vld1q_u8(shifted_src.as_ptr());
@@ -167,7 +165,7 @@ pub(crate) fn filter_symm_column_neon_u8_f32(
 
         let coeff = scanned_kernel.get_unchecked(half_len).weight;
 
-        while cx + 4 < image_width {
+        while cx + 4 <= image_width {
             let mut k0 = (*brows.get_unchecked(half_len).get_unchecked(cx) as f32).mul(coeff);
             let mut k1 = (*brows.get_unchecked(half_len).get_unchecked(cx + 1) as f32).mul(coeff);
             let mut k2 = (*brows.get_unchecked(half_len).get_unchecked(cx + 2) as f32).mul(coeff);

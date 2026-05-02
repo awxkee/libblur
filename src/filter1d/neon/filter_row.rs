@@ -32,7 +32,6 @@ use crate::filter1d::neon::utils::{
     vfmlaq_u8_f32, vmulq_u8_by_f32, vqmovnq_f32_u8, xvld1q_u8_x2, xvld1q_u8_x4, xvst1q_u8_x2,
     xvst1q_u8_x4,
 };
-use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
 use crate::to_storage::ToStorage;
@@ -44,7 +43,6 @@ pub(crate) fn filter_row_neon_u8_f32<const N: usize>(
     arena_src: &[u8],
     dst: &mut [u8],
     image_size: ImageSize,
-    _: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
     unsafe {
@@ -60,7 +58,7 @@ pub(crate) fn filter_row_neon_u8_f32<const N: usize>(
 
         let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(0).weight);
 
-        while cx + 64 < max_width {
+        while cx + 64 <= max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source = xvld1q_u8_x4(shifted_src.as_ptr());
@@ -91,7 +89,7 @@ pub(crate) fn filter_row_neon_u8_f32<const N: usize>(
             cx += 64;
         }
 
-        while cx + 32 < max_width {
+        while cx + 32 <= max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source = xvld1q_u8_x2(shifted_src.as_ptr());
@@ -113,7 +111,7 @@ pub(crate) fn filter_row_neon_u8_f32<const N: usize>(
             cx += 32;
         }
 
-        while cx + 16 < max_width {
+        while cx + 16 <= max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source_0 = vld1q_u8(shifted_src.as_ptr());
@@ -132,7 +130,7 @@ pub(crate) fn filter_row_neon_u8_f32<const N: usize>(
 
         let coeff = *scanned_kernel.get_unchecked(0);
 
-        while cx + 4 < max_width {
+        while cx + 4 <= max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let mut k0 = ((*shifted_src.get_unchecked(0)) as f32).mul(coeff.weight);

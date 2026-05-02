@@ -27,7 +27,6 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter1d::arena::Arena;
-use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
 #[cfg(target_arch = "x86")]
 use std::arch::x86::*;
@@ -40,28 +39,19 @@ pub(crate) fn filter_column_sse_symm_u8_uq0_7(
     arena_src: &[&[u8]],
     dst: &mut [u8],
     image_size: ImageSize,
-    filter_region: FilterRegion,
     kernel: &[i32],
 ) {
     unsafe {
-        filter_column_sse_symm_u8_i32_impl(
-            arena,
-            arena_src,
-            dst,
-            image_size,
-            filter_region,
-            kernel,
-        );
+        filter_column_sse_symm_u8_i32_impl(arena, arena_src, dst, image_size, kernel);
     }
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn filter_column_sse_symm_u8_i32_impl(
+fn filter_column_sse_symm_u8_i32_impl(
     arena: Arena,
     arena_src: &[&[u8]],
     dst: &mut [u8],
     image_size: ImageSize,
-    _: FilterRegion,
     kernel: &[i32],
 ) {
     unsafe {
@@ -78,7 +68,7 @@ unsafe fn filter_column_sse_symm_u8_i32_impl(
 
         let rnd = _mm_set1_epi16(1 << 6);
 
-        while cx + 16 < image_width {
+        while cx + 16 <= image_width {
             let v_src = ref0.get_unchecked(cx..);
 
             let source = _mm_loadu_si128(v_src.as_ptr() as *const __m128i);
@@ -121,7 +111,7 @@ unsafe fn filter_column_sse_symm_u8_i32_impl(
             cx += 16;
         }
 
-        while cx + 8 < image_width {
+        while cx + 8 <= image_width {
             let v_src = ref0.get_unchecked(cx..);
 
             let source = _mm_loadu_si64(v_src.as_ptr() as *const _);

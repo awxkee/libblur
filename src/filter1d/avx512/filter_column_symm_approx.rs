@@ -34,7 +34,6 @@ use crate::filter1d::avx512::utils::{
 };
 use crate::filter1d::avx512::v_load::_mm512_load_pack_x2;
 use crate::filter1d::avx512::v_store::_mm512_store_pack_x2;
-use crate::filter1d::region::FilterRegion;
 use crate::filter1d::to_approx_storage::ToApproxStorage;
 use crate::img_size::ImageSize;
 use std::arch::x86_64::*;
@@ -45,28 +44,19 @@ pub(crate) fn filter_column_avx512_symm_u8_i32_app(
     arena_src: &[&[u8]],
     dst: &mut [u8],
     image_size: ImageSize,
-    filter_region: FilterRegion,
     kernel: &[i32],
 ) {
     unsafe {
-        filter_column_avx512_symm_u8_i32_impl(
-            arena,
-            arena_src,
-            dst,
-            image_size,
-            filter_region,
-            kernel,
-        );
+        filter_column_avx512_symm_u8_i32_impl(arena, arena_src, dst, image_size, kernel);
     }
 }
 
 #[target_feature(enable = "avx512bw")]
-unsafe fn filter_column_avx512_symm_u8_i32_impl(
+fn filter_column_avx512_symm_u8_i32_impl(
     arena: Arena,
     arena_src: &[&[u8]],
     dst: &mut [u8],
     image_size: ImageSize,
-    _: FilterRegion,
     kernel: &[i32],
 ) {
     unsafe {

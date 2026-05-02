@@ -29,7 +29,6 @@
 
 use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_scan::ScanPoint1d;
-use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
 use crate::primitives::PrimitiveCast;
@@ -42,15 +41,12 @@ pub(crate) fn filter_symmetric_column<T, F>(
     arena_src: &[&[T]],
     dst: &mut [T],
     image_size: ImageSize,
-    region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<F>],
 ) where
     T: Copy + PrimitiveCast<F>,
     F: ToStorage<T> + Mul<F, Output = F> + MulAdd<F, Output = F> + Add<F, Output = F> + Default,
 {
     unsafe {
-        let _yy = region.start;
-
         let dst_stride = image_size.width * arena.components;
 
         let length = scanned_kernel.len();

@@ -28,7 +28,6 @@
  */
 use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_scan::ScanPoint1d;
-use crate::filter1d::region::FilterRegion;
 use crate::filter1d::sse::utils::_mm_opt_fmlaf_ps;
 use crate::img_size::ImageSize;
 use crate::sse::{
@@ -44,19 +43,11 @@ pub(crate) fn filter_row_sse_f32_f32<const N: usize>(
     arena_src: &[f32],
     dst: &mut [f32],
     image_size: ImageSize,
-    filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
     unsafe {
         let unit = ExecutionUnit::<N>::default();
-        unit.pass(
-            arena,
-            arena_src,
-            dst,
-            image_size,
-            filter_region,
-            scanned_kernel,
-        );
+        unit.pass(arena, arena_src, dst, image_size, scanned_kernel);
     }
 }
 
@@ -71,7 +62,6 @@ impl<const N: usize> ExecutionUnit<N> {
         arena_src: &[f32],
         dst: &mut [f32],
         image_size: ImageSize,
-        _: FilterRegion,
         scanned_kernel: &[ScanPoint1d<f32>],
     ) {
         unsafe {

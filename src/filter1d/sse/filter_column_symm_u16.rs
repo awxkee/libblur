@@ -28,7 +28,6 @@
  */
 use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_scan::ScanPoint1d;
-use crate::filter1d::region::FilterRegion;
 use crate::filter1d::sse::utils::{
     _mm_mul_add_symm_epi16_by_ps, _mm_mul_add_symm_epi16_by_ps_x2, _mm_mul_epi16_by_ps,
     _mm_mul_epi16_by_ps_x2, _mm_pack_ps_epi16, _mm_pack_ps_x2_epi16,
@@ -51,29 +50,14 @@ pub(crate) fn filter_column_symm_sse_u16_f32(
     arena_src: &[&[u16]],
     dst: &mut [u16],
     image_size: ImageSize,
-    filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
     let has_fma = std::arch::is_x86_feature_detected!("fma");
     unsafe {
         if has_fma {
-            filter_column_symm_sse_u16_f32_fma(
-                arena,
-                arena_src,
-                dst,
-                image_size,
-                filter_region,
-                scanned_kernel,
-            );
+            filter_column_symm_sse_u16_f32_fma(arena, arena_src, dst, image_size, scanned_kernel);
         } else {
-            filter_column_symm_sse_u16_f32_def(
-                arena,
-                arena_src,
-                dst,
-                image_size,
-                filter_region,
-                scanned_kernel,
-            );
+            filter_column_symm_sse_u16_f32_def(arena, arena_src, dst, image_size, scanned_kernel);
         }
     }
 }
@@ -84,17 +68,9 @@ fn filter_column_symm_sse_u16_f32_fma(
     arena_src: &[&[u16]],
     dst: &mut [u16],
     image_size: ImageSize,
-    filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
-    filter_column_symm_sse_u16_f32_impl::<true>(
-        arena,
-        arena_src,
-        dst,
-        image_size,
-        filter_region,
-        scanned_kernel,
-    );
+    filter_column_symm_sse_u16_f32_impl::<true>(arena, arena_src, dst, image_size, scanned_kernel);
 }
 
 #[target_feature(enable = "sse4.1")]
@@ -103,17 +79,9 @@ fn filter_column_symm_sse_u16_f32_def(
     arena_src: &[&[u16]],
     dst: &mut [u16],
     image_size: ImageSize,
-    filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
-    filter_column_symm_sse_u16_f32_impl::<false>(
-        arena,
-        arena_src,
-        dst,
-        image_size,
-        filter_region,
-        scanned_kernel,
-    );
+    filter_column_symm_sse_u16_f32_impl::<false>(arena, arena_src, dst, image_size, scanned_kernel);
 }
 
 #[inline(always)]
@@ -122,7 +90,6 @@ fn filter_column_symm_sse_u16_f32_impl<const FMA: bool>(
     arena_src: &[&[u16]],
     dst: &mut [u16],
     image_size: ImageSize,
-    _: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
     unsafe {

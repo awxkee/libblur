@@ -32,7 +32,6 @@ use crate::filter1d::neon::utils::{
     vfmlaq_symm_u16_f32, vmulq_u16_by_f32, vqmovnq_f32_u16, xvld1q_u16_x2, xvld1q_u16_x4,
     xvst1q_u16_x2, xvst1q_u16_x4,
 };
-use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
 use crate::to_storage::ToStorage;
@@ -43,7 +42,6 @@ pub(crate) fn filter_row_symm_neon_u16_f32<const N: usize>(
     arena_src: &[u16],
     dst: &mut [u16],
     image_size: ImageSize,
-    _: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
     unsafe {
@@ -62,7 +60,7 @@ pub(crate) fn filter_row_symm_neon_u16_f32<const N: usize>(
 
         let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(half_len).weight);
 
-        while cx + 32 < max_width {
+        while cx + 32 <= max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source = xvld1q_u16_x4(shifted_src.get_unchecked(half_len * N..).as_ptr());
@@ -95,7 +93,7 @@ pub(crate) fn filter_row_symm_neon_u16_f32<const N: usize>(
             cx += 32;
         }
 
-        while cx + 16 < max_width {
+        while cx + 16 <= max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source = xvld1q_u16_x2(shifted_src.get_unchecked(half_len * N..).as_ptr());
@@ -119,7 +117,7 @@ pub(crate) fn filter_row_symm_neon_u16_f32<const N: usize>(
             cx += 16;
         }
 
-        while cx + 8 < max_width {
+        while cx + 8 <= max_width {
             let shifted_src = local_src.get_unchecked(cx..);
 
             let source = vld1q_u16(shifted_src.get_unchecked(half_len * N..).as_ptr());
@@ -140,7 +138,7 @@ pub(crate) fn filter_row_symm_neon_u16_f32<const N: usize>(
 
         let coeff = *scanned_kernel.get_unchecked(half_len);
 
-        while cx + 4 < max_width {
+        while cx + 4 <= max_width {
             let shifted_src = local_src.get_unchecked(cx..);
             let mut k0 = *shifted_src.get_unchecked(half_len * N) as f32 * coeff.weight;
             let mut k1 = *shifted_src.get_unchecked(half_len * N + 1) as f32 * coeff.weight;

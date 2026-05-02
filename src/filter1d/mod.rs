@@ -59,7 +59,6 @@ mod filter_row_symmetric_approx;
 mod filter_scan;
 #[cfg(all(target_arch = "aarch64", feature = "neon"))]
 pub(crate) mod neon;
-mod region;
 mod row_handler_small_approx;
 mod row_symm_approx_binter;
 #[cfg(all(any(target_arch = "x86_64", target_arch = "x86"), feature = "sse"))]

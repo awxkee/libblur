@@ -31,7 +31,6 @@ use crate::filter1d::neon::utils::{
     vfmlaq_u8_s16, vmullq_u8_by_i16, vqmovnq_s32_u8, xvld1q_u8_x2, xvld1q_u8_x3, xvld1q_u8_x4,
     xvst1q_u8_x2, xvst1q_u8_x3, xvst1q_u8_x4,
 };
-use crate::filter1d::region::FilterRegion;
 use crate::filter1d::to_approx_storage::ToApproxStorage;
 use crate::img_size::ImageSize;
 use std::arch::aarch64::*;
@@ -42,7 +41,6 @@ pub(crate) fn filter_column_neon_u8_i32_app(
     arena_src: &[&[u8]],
     dst: &mut [u8],
     image_size: ImageSize,
-    _: FilterRegion,
     scanned_kernel: &[i32],
 ) {
     unsafe {

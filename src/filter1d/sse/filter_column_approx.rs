@@ -27,7 +27,6 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter1d::arena::Arena;
-use crate::filter1d::region::FilterRegion;
 use crate::filter1d::sse::utils::{
     _mm_mul_add_epi8_by_epi16_x4, _mm_mul_epi8_by_epi16_x4, _mm_pack_epi32_x2_epi8,
 };
@@ -48,28 +47,19 @@ pub(crate) fn filter_column_sse_u8_i32_app(
     arena_src: &[&[u8]],
     dst: &mut [u8],
     image_size: ImageSize,
-    filter_region: FilterRegion,
     scanned_kernel: &[i32],
 ) {
     unsafe {
-        filter_column_sse_u8_i32_impl(
-            arena,
-            arena_src,
-            dst,
-            image_size,
-            filter_region,
-            scanned_kernel,
-        );
+        filter_column_sse_u8_i32_impl(arena, arena_src, dst, image_size, scanned_kernel);
     }
 }
 
 #[target_feature(enable = "sse4.1")]
-unsafe fn filter_column_sse_u8_i32_impl(
+fn filter_column_sse_u8_i32_impl(
     arena: Arena,
     arena_src: &[&[u8]],
     dst: &mut [u8],
     image_size: ImageSize,
-    _: FilterRegion,
     scanned_kernel: &[i32],
 ) {
     unsafe {
@@ -81,7 +71,7 @@ unsafe fn filter_column_sse_u8_i32_impl(
 
         let coeff = _mm_set1_epi16(*scanned_kernel.get_unchecked(0) as i16);
 
-        while cx + 64 < image_width {
+        while cx + 64 <= image_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let source = _mm_load_pack_x4(v_src.as_ptr());
@@ -113,7 +103,7 @@ unsafe fn filter_column_sse_u8_i32_impl(
             cx += 64;
         }
 
-        while cx + 48 < image_width {
+        while cx + 48 <= image_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let source = _mm_load_pack_x3(v_src.as_ptr());
@@ -142,7 +132,7 @@ unsafe fn filter_column_sse_u8_i32_impl(
             cx += 48;
         }
 
-        while cx + 32 < image_width {
+        while cx + 32 <= image_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let source = _mm_load_pack_x2(v_src.as_ptr());
@@ -165,7 +155,7 @@ unsafe fn filter_column_sse_u8_i32_impl(
             cx += 32;
         }
 
-        while cx + 16 < image_width {
+        while cx + 16 <= image_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let source = _mm_loadu_si128(v_src.as_ptr() as *const __m128i);
@@ -186,7 +176,7 @@ unsafe fn filter_column_sse_u8_i32_impl(
 
         let coeff = *scanned_kernel.get_unchecked(0);
 
-        while cx + 4 < image_width {
+        while cx + 4 <= image_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let mut k0 = (*v_src.get_unchecked(0) as i32).mul(coeff);
