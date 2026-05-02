@@ -28,7 +28,6 @@
  */
 use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_scan::ScanPoint1d;
-use crate::filter1d::region::FilterRegion;
 use crate::filter1d::sse::utils::{
     _mm_mul_add_epi8_by_ps_x4, _mm_mul_epi8_by_ps_x4, _mm_pack_ps_x4_epi8,
 };
@@ -47,19 +46,11 @@ pub(crate) fn filter_row_sse_u8_f32<const N: usize>(
     arena_src: &[u8],
     dst: &mut [u8],
     image_size: ImageSize,
-    filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
     unsafe {
         let unit = ExecutionUnit::<N>::default();
-        unit.pass(
-            arena,
-            arena_src,
-            dst,
-            image_size,
-            filter_region,
-            scanned_kernel,
-        );
+        unit.pass(arena, arena_src, dst, image_size, scanned_kernel);
     }
 }
 
@@ -74,7 +65,6 @@ impl<const N: usize> ExecutionUnit<N> {
         arena_src: &[u8],
         dst: &mut [u8],
         image_size: ImageSize,
-        _: FilterRegion,
         scanned_kernel: &[ScanPoint1d<f32>],
     ) {
         unsafe {
@@ -90,7 +80,7 @@ impl<const N: usize> ExecutionUnit<N> {
 
             let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(0).weight);
 
-            while cx + 64 < max_width {
+            while cx + 64 <= max_width {
                 let shifted_src = local_src.get_unchecked(cx..);
 
                 let source = _mm_load_pack_x4(shifted_src.as_ptr());
@@ -121,7 +111,7 @@ impl<const N: usize> ExecutionUnit<N> {
                 cx += 64;
             }
 
-            while cx + 32 < max_width {
+            while cx + 32 <= max_width {
                 let shifted_src = local_src.get_unchecked(cx..);
 
                 let source = _mm_load_pack_x2(shifted_src.as_ptr());
@@ -140,7 +130,7 @@ impl<const N: usize> ExecutionUnit<N> {
                 cx += 32;
             }
 
-            while cx + 16 < max_width {
+            while cx + 16 <= max_width {
                 let shifted_src = local_src.get_unchecked(cx..);
 
                 let source_0 = _mm_loadu_si128(shifted_src.as_ptr() as *const __m128i);
@@ -161,7 +151,7 @@ impl<const N: usize> ExecutionUnit<N> {
 
             let coeff = *scanned_kernel.get_unchecked(0);
 
-            while cx + 4 < max_width {
+            while cx + 4 <= max_width {
                 let shifted_src = local_src.get_unchecked(cx..);
 
                 let mut k0 = ((*shifted_src.get_unchecked(0)) as f32).mul(coeff.weight);

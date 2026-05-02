@@ -28,7 +28,6 @@
  */
 
 use crate::filter1d::arena::Arena;
-use crate::filter1d::region::FilterRegion;
 use crate::filter1d::to_approx_storage::ToApproxStorage;
 use crate::img_size::ImageSize;
 use num_traits::AsPrimitive;
@@ -39,7 +38,6 @@ pub(crate) fn filter_column_symmetric_approx<T, I>(
     arena_src: &[&[T]],
     dst: &mut [T],
     image_size: ImageSize,
-    _: FilterRegion,
     scanned_kernel: &[I],
 ) where
     T: Copy + AsPrimitive<I> + Default,

@@ -28,7 +28,6 @@
  */
 use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_scan::ScanPoint1d;
-use crate::filter1d::region::FilterRegion;
 use crate::filter1d::sse::utils::_mm_opt_fmlaf_ps;
 use crate::img_size::ImageSize;
 use crate::sse::{
@@ -44,19 +43,11 @@ pub(crate) fn filter_column_sse_f32_f32(
     arena_src: &[&[f32]],
     dst: &mut [f32],
     image_size: ImageSize,
-    filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
     unsafe {
         let unit = ExecutionUnit::default();
-        unit.pass(
-            arena,
-            arena_src,
-            dst,
-            image_size,
-            filter_region,
-            scanned_kernel,
-        );
+        unit.pass(arena, arena_src, dst, image_size, scanned_kernel);
     }
 }
 
@@ -65,13 +56,12 @@ struct ExecutionUnit {}
 
 impl ExecutionUnit {
     #[target_feature(enable = "sse4.1")]
-    unsafe fn pass(
+    fn pass(
         &self,
         arena: Arena,
         arena_src: &[&[f32]],
         dst: &mut [f32],
         image_size: ImageSize,
-        _: FilterRegion,
         scanned_kernel: &[ScanPoint1d<f32>],
     ) {
         unsafe {
@@ -83,7 +73,7 @@ impl ExecutionUnit {
 
             let mut cx = 0usize;
 
-            while cx + 16 < dst_stride {
+            while cx + 16 <= dst_stride {
                 let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
                 let source = _mm_load_pack_ps_x4(v_src.as_ptr());
@@ -108,7 +98,7 @@ impl ExecutionUnit {
                 cx += 16;
             }
 
-            while cx + 8 < dst_stride {
+            while cx + 8 <= dst_stride {
                 let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
                 let source = _mm_load_pack_ps_x2(v_src.as_ptr());
@@ -130,7 +120,7 @@ impl ExecutionUnit {
                 cx += 8;
             }
 
-            while cx + 4 < dst_stride {
+            while cx + 4 <= dst_stride {
                 let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
                 let source_0 = _mm_loadu_ps(v_src.as_ptr());

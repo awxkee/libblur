@@ -39,7 +39,6 @@ use crate::filter1d::avx::utils::{
     _mm256_mul_add_symm_epi16_by_ps_x2, _mm256_mul_epi16_by_ps_x2, _mm256_pack_ps_x2_epi16,
 };
 use crate::filter1d::filter_scan::ScanPoint1d;
-use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
 use crate::to_storage::ToStorage;
@@ -54,7 +53,6 @@ pub(crate) fn filter_column_avx_symm_u16_f32(
     arena_src: &[&[u16]],
     dst: &mut [u16],
     image_size: ImageSize,
-    filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
     let has_fma = std::arch::is_x86_feature_detected!("fma");
@@ -65,7 +63,6 @@ pub(crate) fn filter_column_avx_symm_u16_f32(
                 arena_src,
                 dst,
                 image_size,
-                filter_region,
                 scanned_kernel,
             );
         } else {
@@ -74,7 +71,6 @@ pub(crate) fn filter_column_avx_symm_u16_f32(
                 arena_src,
                 dst,
                 image_size,
-                filter_region,
                 scanned_kernel,
             );
         }
@@ -87,18 +83,10 @@ fn filter_column_avx_symm_u16_f32_impl_def(
     arena_src: &[&[u16]],
     dst: &mut [u16],
     image_size: ImageSize,
-    filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
     let unit = ExecutionUnit::<false>::default();
-    unit.pass(
-        arena,
-        arena_src,
-        dst,
-        image_size,
-        filter_region,
-        scanned_kernel,
-    );
+    unit.pass(arena, arena_src, dst, image_size, scanned_kernel);
 }
 
 #[target_feature(enable = "avx2", enable = "fma")]
@@ -107,18 +95,10 @@ fn filter_column_avx_symm_u16_f32_impl_fma(
     arena_src: &[&[u16]],
     dst: &mut [u16],
     image_size: ImageSize,
-    filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
     let unit = ExecutionUnit::<true>::default();
-    unit.pass(
-        arena,
-        arena_src,
-        dst,
-        image_size,
-        filter_region,
-        scanned_kernel,
-    );
+    unit.pass(arena, arena_src, dst, image_size, scanned_kernel);
 }
 
 #[derive(Copy, Clone, Default)]
@@ -132,7 +112,6 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
         arena_src: &[&[u16]],
         dst: &mut [u16],
         image_size: ImageSize,
-        _: FilterRegion,
         scanned_kernel: &[ScanPoint1d<f32>],
     ) {
         unsafe {
@@ -151,10 +130,10 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
                 let v_src = ref0.get_unchecked(cx..);
 
                 let source = _mm256_load_pack_x4(v_src.as_ptr() as *const _);
-                let mut k0 = _mm256_mul_epi16_by_ps_x2::<FMA>(source.0, coeff);
-                let mut k1 = _mm256_mul_epi16_by_ps_x2::<FMA>(source.1, coeff);
-                let mut k2 = _mm256_mul_epi16_by_ps_x2::<FMA>(source.2, coeff);
-                let mut k3 = _mm256_mul_epi16_by_ps_x2::<FMA>(source.3, coeff);
+                let mut k0 = _mm256_mul_epi16_by_ps_x2(source.0, coeff);
+                let mut k1 = _mm256_mul_epi16_by_ps_x2(source.1, coeff);
+                let mut k2 = _mm256_mul_epi16_by_ps_x2(source.2, coeff);
+                let mut k3 = _mm256_mul_epi16_by_ps_x2(source.3, coeff);
 
                 for i in 0..half_len {
                     let rollback = length - i - 1;
@@ -211,9 +190,9 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
                 let v_src = ref0.get_unchecked(cx..);
 
                 let source = _mm256_load_pack_x3(v_src.as_ptr() as *const _);
-                let mut k0 = _mm256_mul_epi16_by_ps_x2::<FMA>(source.0, coeff);
-                let mut k1 = _mm256_mul_epi16_by_ps_x2::<FMA>(source.1, coeff);
-                let mut k2 = _mm256_mul_epi16_by_ps_x2::<FMA>(source.2, coeff);
+                let mut k0 = _mm256_mul_epi16_by_ps_x2(source.0, coeff);
+                let mut k1 = _mm256_mul_epi16_by_ps_x2(source.1, coeff);
+                let mut k2 = _mm256_mul_epi16_by_ps_x2(source.2, coeff);
 
                 for i in 0..half_len {
                     let rollback = length - i - 1;
@@ -263,8 +242,8 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
                 let v_src = ref0.get_unchecked(cx..);
 
                 let source = _mm256_load_pack_x2(v_src.as_ptr() as *const _);
-                let mut k0 = _mm256_mul_epi16_by_ps_x2::<FMA>(source.0, coeff);
-                let mut k1 = _mm256_mul_epi16_by_ps_x2::<FMA>(source.1, coeff);
+                let mut k0 = _mm256_mul_epi16_by_ps_x2(source.0, coeff);
+                let mut k1 = _mm256_mul_epi16_by_ps_x2(source.1, coeff);
 
                 for i in 0..half_len {
                     let rollback = length - i - 1;
@@ -304,7 +283,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
                 let v_src = ref0.get_unchecked(cx..);
 
                 let source = _mm256_loadu_si256(v_src.as_ptr() as *const __m256i);
-                let mut k0 = _mm256_mul_epi16_by_ps_x2::<FMA>(source, coeff);
+                let mut k0 = _mm256_mul_epi16_by_ps_x2(source, coeff);
 
                 for i in 0..half_len {
                     let rollback = length - i - 1;
@@ -330,7 +309,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
                 let v_src = ref0.get_unchecked(cx..);
 
                 let source_0 = _mm_loadu_si128(v_src.as_ptr() as *const __m128i);
-                let mut k0 = _mm_mul_epi16_by_ps_x2::<FMA>(source_0, _mm256_castps256_ps128(coeff));
+                let mut k0 = _mm_mul_epi16_by_ps_x2(source_0, _mm256_castps256_ps128(coeff));
 
                 for i in 0..half_len {
                     let coeff = *scanned_kernel.get_unchecked(i);

@@ -29,7 +29,6 @@
 use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::neon::utils::{xvld1q_f32_x2, xvld1q_f32_x4, xvst1q_f32_x2, xvst1q_f32_x4};
-use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
 use crate::neon::{p_vfmaq_f32, prefer_vfma_f32};
@@ -42,7 +41,6 @@ pub(crate) fn filter_column_neon_f32_f32(
     arena_src: &[&[f32]],
     dst: &mut [f32],
     image_size: ImageSize,
-    _: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
     unsafe {
@@ -54,7 +52,7 @@ pub(crate) fn filter_column_neon_f32_f32(
 
         let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(0).weight);
 
-        while cx + 16 < dst_stride {
+        while cx + 16 <= dst_stride {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let source = xvld1q_f32_x4(v_src.as_ptr());
@@ -78,7 +76,7 @@ pub(crate) fn filter_column_neon_f32_f32(
             cx += 16;
         }
 
-        while cx + 8 < dst_stride {
+        while cx + 8 <= dst_stride {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let source = xvld1q_f32_x2(v_src.as_ptr());
@@ -99,7 +97,7 @@ pub(crate) fn filter_column_neon_f32_f32(
             cx += 8;
         }
 
-        while cx + 4 < dst_stride {
+        while cx + 4 <= dst_stride {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let source_0 = vld1q_f32(v_src.as_ptr());
@@ -116,7 +114,7 @@ pub(crate) fn filter_column_neon_f32_f32(
             cx += 4;
         }
 
-        while cx + 2 < dst_stride {
+        while cx + 2 <= dst_stride {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let source_0 = vld1_f32(v_src.as_ptr());

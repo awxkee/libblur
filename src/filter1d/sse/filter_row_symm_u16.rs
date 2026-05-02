@@ -28,7 +28,6 @@
  */
 use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_scan::ScanPoint1d;
-use crate::filter1d::region::FilterRegion;
 use crate::filter1d::sse::utils::{
     _mm_mul_add_symm_epi16_by_ps, _mm_mul_add_symm_epi16_by_ps_x2, _mm_mul_epi16_by_ps,
     _mm_mul_epi16_by_ps_x2, _mm_pack_ps_epi16, _mm_pack_ps_x2_epi16,
@@ -47,29 +46,14 @@ pub(crate) fn filter_row_sse_symm_u16_f32<const N: usize>(
     arena_src: &[u16],
     dst: &mut [u16],
     image_size: ImageSize,
-    filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
     unsafe {
         let has_fma = std::arch::is_x86_feature_detected!("fma");
         if has_fma {
-            filter_row_sse_symm_u16_f32_fma::<N>(
-                arena,
-                arena_src,
-                dst,
-                image_size,
-                filter_region,
-                scanned_kernel,
-            );
+            filter_row_sse_symm_u16_f32_fma::<N>(arena, arena_src, dst, image_size, scanned_kernel);
         } else {
-            filter_row_sse_symm_u16_f32_def::<N>(
-                arena,
-                arena_src,
-                dst,
-                image_size,
-                filter_region,
-                scanned_kernel,
-            );
+            filter_row_sse_symm_u16_f32_def::<N>(arena, arena_src, dst, image_size, scanned_kernel);
         }
     }
 }
@@ -80,17 +64,9 @@ fn filter_row_sse_symm_u16_f32_fma<const N: usize>(
     arena_src: &[u16],
     dst: &mut [u16],
     image_size: ImageSize,
-    filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
-    filter_row_sse_symm_u16_f32_impl::<true, N>(
-        arena,
-        arena_src,
-        dst,
-        image_size,
-        filter_region,
-        scanned_kernel,
-    );
+    filter_row_sse_symm_u16_f32_impl::<true, N>(arena, arena_src, dst, image_size, scanned_kernel);
 }
 
 #[target_feature(enable = "sse4.1")]
@@ -99,17 +75,9 @@ fn filter_row_sse_symm_u16_f32_def<const N: usize>(
     arena_src: &[u16],
     dst: &mut [u16],
     image_size: ImageSize,
-    filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
-    filter_row_sse_symm_u16_f32_impl::<false, N>(
-        arena,
-        arena_src,
-        dst,
-        image_size,
-        filter_region,
-        scanned_kernel,
-    );
+    filter_row_sse_symm_u16_f32_impl::<false, N>(arena, arena_src, dst, image_size, scanned_kernel);
 }
 
 #[inline(always)]
@@ -118,7 +86,6 @@ fn filter_row_sse_symm_u16_f32_impl<const FMA: bool, const N: usize>(
     arena_src: &[u16],
     dst: &mut [u16],
     image_size: ImageSize,
-    _: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
     unsafe {

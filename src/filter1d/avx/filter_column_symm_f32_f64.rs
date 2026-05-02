@@ -31,7 +31,6 @@ use crate::filter1d::arena::Arena;
 use crate::filter1d::avx::sse_utils::_mm_opt_fmla_pd;
 use crate::filter1d::avx::utils::_mm256_opt_fmla_pd;
 use crate::filter1d::filter_scan::ScanPoint1d;
-use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
 use std::arch::x86_64::*;
 
@@ -40,7 +39,6 @@ pub(crate) fn filter_column_avx_symm_f32_f64(
     arena_src: &[&[f32]],
     dst: &mut [f32],
     image_size: ImageSize,
-    filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f64>],
 ) {
     unsafe {
@@ -51,7 +49,6 @@ pub(crate) fn filter_column_avx_symm_f32_f64(
                 arena_src,
                 dst,
                 image_size,
-                filter_region,
                 scanned_kernel,
             );
         } else {
@@ -60,7 +57,6 @@ pub(crate) fn filter_column_avx_symm_f32_f64(
                 arena_src,
                 dst,
                 image_size,
-                filter_region,
                 scanned_kernel,
             );
         }
@@ -73,18 +69,10 @@ fn filter_column_avx_symm_f32_f64_impl_fma(
     arena_src: &[&[f32]],
     dst: &mut [f32],
     image_size: ImageSize,
-    filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f64>],
 ) {
     let unit = ExecutionUnit::<true>::default();
-    unit.pass(
-        arena,
-        arena_src,
-        dst,
-        image_size,
-        filter_region,
-        scanned_kernel,
-    );
+    unit.pass(arena, arena_src, dst, image_size, scanned_kernel);
 }
 
 #[target_feature(enable = "avx2")]
@@ -93,18 +81,10 @@ fn filter_column_avx_symm_f32_f64_impl_def(
     arena_src: &[&[f32]],
     dst: &mut [f32],
     image_size: ImageSize,
-    filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f64>],
 ) {
     let unit = ExecutionUnit::<false>::default();
-    unit.pass(
-        arena,
-        arena_src,
-        dst,
-        image_size,
-        filter_region,
-        scanned_kernel,
-    );
+    unit.pass(arena, arena_src, dst, image_size, scanned_kernel);
 }
 
 #[derive(Debug, Default, Copy, Clone)]
@@ -118,7 +98,6 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
         arena_src: &[&[f32]],
         dst: &mut [f32],
         image_size: ImageSize,
-        _: FilterRegion,
         scanned_kernel: &[ScanPoint1d<f64>],
     ) {
         unsafe {

@@ -58,10 +58,7 @@ pub(crate) fn _mm256_mul_epi8_by_ps_x4<const FMA: bool>(
 }
 
 #[inline(always)]
-pub(crate) fn _mm256_mul_epi16_by_ps_x2<const FMA: bool>(
-    input: __m256i,
-    weight: __m256,
-) -> (__m256, __m256) {
+pub(crate) fn _mm256_mul_epi16_by_ps_x2(input: __m256i, weight: __m256) -> (__m256, __m256) {
     unsafe {
         let j0 = _mm256_unpacklo_epi16(input, _mm256_setzero_si256());
         let j1 = _mm256_unpackhi_epi16(input, _mm256_setzero_si256());

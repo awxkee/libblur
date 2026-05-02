@@ -32,7 +32,6 @@ use crate::filter1d::neon::utils::{
     vqmovnq_s16x2_u8, xvld1q_u8_x2, xvld1q_u8_x3, xvld1q_u8_x4, xvld4u8, xvst_u8x4_q15,
     xvst1q_u8_x2, xvst1q_u8_x3, xvst1q_u8_x4,
 };
-use crate::filter1d::region::FilterRegion;
 use crate::filter1d::to_approx_storage::ToApproxStorage;
 use crate::img_size::ImageSize;
 use std::arch::aarch64::*;
@@ -43,21 +42,19 @@ pub(crate) fn filter_column_symm_neon_u8_i32_rdm(
     arena_src: &[&[u8]],
     dst: &mut [u8],
     image_size: ImageSize,
-    r: FilterRegion,
     scanned_kernel: &[i32],
 ) {
     unsafe {
-        executor_unit(arena, arena_src, dst, image_size, r, scanned_kernel);
+        executor_unit(arena, arena_src, dst, image_size, scanned_kernel);
     }
 }
 
 #[target_feature(enable = "rdm")]
-unsafe fn executor_unit(
+fn executor_unit(
     arena: Arena,
     arena_src: &[&[u8]],
     dst: &mut [u8],
     image_size: ImageSize,
-    _: FilterRegion,
     scanned_kernel: &[i32],
 ) {
     unsafe {
@@ -71,7 +68,7 @@ unsafe fn executor_unit(
         let ref0 = arena_src.get_unchecked(half_len);
         let coeff = vdupq_n_s16(*scanned_kernel.get_unchecked(half_len) as i16);
 
-        while cx + 64 < image_width {
+        while cx + 64 <= image_width {
             let v_src = ref0.get_unchecked(cx..);
 
             let source = xvld1q_u8_x4(v_src.as_ptr());
@@ -110,7 +107,7 @@ unsafe fn executor_unit(
             cx += 64;
         }
 
-        while cx + 48 < image_width {
+        while cx + 48 <= image_width {
             let v_src = ref0.get_unchecked(cx..);
 
             let source = xvld1q_u8_x3(v_src.as_ptr());
@@ -176,7 +173,7 @@ unsafe fn executor_unit(
             cx += 32;
         }
 
-        while cx + 16 < image_width {
+        while cx + 16 <= image_width {
             let v_src = ref0.get_unchecked(cx..);
 
             let source = vld1q_u8(v_src.as_ptr());

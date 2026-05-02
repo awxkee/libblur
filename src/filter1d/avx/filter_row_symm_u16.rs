@@ -38,7 +38,6 @@ use crate::filter1d::avx::utils::{
     _mm256_mul_add_symm_epi16_by_ps_x2, _mm256_mul_epi16_by_ps_x2, _mm256_pack_ps_x2_epi16,
 };
 use crate::filter1d::filter_scan::ScanPoint1d;
-use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
 #[cfg(target_arch = "x86")]
@@ -51,29 +50,14 @@ pub(crate) fn filter_row_avx_symm_u16_f32<const N: usize>(
     arena_src: &[u16],
     dst: &mut [u16],
     image_size: ImageSize,
-    filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
     unsafe {
         let has_fma = std::arch::is_x86_feature_detected!("fma");
         if has_fma {
-            filter_row_avx_symm_u16_f32_fma::<N>(
-                arena,
-                arena_src,
-                dst,
-                image_size,
-                filter_region,
-                scanned_kernel,
-            );
+            filter_row_avx_symm_u16_f32_fma::<N>(arena, arena_src, dst, image_size, scanned_kernel);
         } else {
-            filter_row_avx_u16_f32_def::<N>(
-                arena,
-                arena_src,
-                dst,
-                image_size,
-                filter_region,
-                scanned_kernel,
-            );
+            filter_row_avx_u16_f32_def::<N>(arena, arena_src, dst, image_size, scanned_kernel);
         }
     }
 }
@@ -84,18 +68,10 @@ fn filter_row_avx_symm_u16_f32_fma<const N: usize>(
     arena_src: &[u16],
     dst: &mut [u16],
     image_size: ImageSize,
-    filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
     let execution = RowSymmExecutionUnit::<true, N>::default();
-    execution.pass(
-        arena,
-        arena_src,
-        dst,
-        image_size,
-        filter_region,
-        scanned_kernel,
-    );
+    execution.pass(arena, arena_src, dst, image_size, scanned_kernel);
 }
 
 #[target_feature(enable = "avx2")]
@@ -104,18 +80,10 @@ fn filter_row_avx_u16_f32_def<const N: usize>(
     arena_src: &[u16],
     dst: &mut [u16],
     image_size: ImageSize,
-    filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<f32>],
 ) {
     let execution = RowSymmExecutionUnit::<false, N>::default();
-    execution.pass(
-        arena,
-        arena_src,
-        dst,
-        image_size,
-        filter_region,
-        scanned_kernel,
-    );
+    execution.pass(arena, arena_src, dst, image_size, scanned_kernel);
 }
 
 #[derive(Debug, Default, Copy, Clone)]
@@ -129,7 +97,6 @@ impl<const FMA: bool, const N: usize> RowSymmExecutionUnit<FMA, N> {
         arena_src: &[u16],
         dst: &mut [u16],
         image_size: ImageSize,
-        _: FilterRegion,
         scanned_kernel: &[ScanPoint1d<f32>],
     ) {
         unsafe {
@@ -154,10 +121,10 @@ impl<const FMA: bool, const N: usize> RowSymmExecutionUnit<FMA, N> {
                 let source = _mm256_load_pack_x4(
                     shifted_src.get_unchecked(half_len * N..).as_ptr() as *const _,
                 );
-                let mut k0 = _mm256_mul_epi16_by_ps_x2::<FMA>(source.0, coeff);
-                let mut k1 = _mm256_mul_epi16_by_ps_x2::<FMA>(source.1, coeff);
-                let mut k2 = _mm256_mul_epi16_by_ps_x2::<FMA>(source.2, coeff);
-                let mut k3 = _mm256_mul_epi16_by_ps_x2::<FMA>(source.3, coeff);
+                let mut k0 = _mm256_mul_epi16_by_ps_x2(source.0, coeff);
+                let mut k1 = _mm256_mul_epi16_by_ps_x2(source.1, coeff);
+                let mut k2 = _mm256_mul_epi16_by_ps_x2(source.2, coeff);
+                let mut k3 = _mm256_mul_epi16_by_ps_x2(source.3, coeff);
 
                 for i in 0..half_len {
                     let rollback = length - i - 1;
@@ -213,8 +180,8 @@ impl<const FMA: bool, const N: usize> RowSymmExecutionUnit<FMA, N> {
                 let source = _mm256_load_pack_x2(
                     shifted_src.get_unchecked(half_len * N..).as_ptr() as *const _,
                 );
-                let mut k0 = _mm256_mul_epi16_by_ps_x2::<FMA>(source.0, coeff);
-                let mut k1 = _mm256_mul_epi16_by_ps_x2::<FMA>(source.1, coeff);
+                let mut k0 = _mm256_mul_epi16_by_ps_x2(source.0, coeff);
+                let mut k1 = _mm256_mul_epi16_by_ps_x2(source.1, coeff);
 
                 for i in 0..half_len {
                     let rollback = length - i - 1;
@@ -253,7 +220,7 @@ impl<const FMA: bool, const N: usize> RowSymmExecutionUnit<FMA, N> {
                 let source = _mm256_loadu_si256(
                     shifted_src.get_unchecked(half_len * N..).as_ptr() as *const _
                 );
-                let mut k0 = _mm256_mul_epi16_by_ps_x2::<FMA>(source, coeff);
+                let mut k0 = _mm256_mul_epi16_by_ps_x2(source, coeff);
 
                 for i in 0..half_len {
                     let rollback = length - i - 1;
@@ -277,7 +244,7 @@ impl<const FMA: bool, const N: usize> RowSymmExecutionUnit<FMA, N> {
 
                 let source =
                     _mm_loadu_si128(shifted_src.get_unchecked(half_len * N..).as_ptr() as *const _);
-                let mut k0 = _mm_mul_epi16_by_ps_x2::<FMA>(source, _mm256_castps256_ps128(coeff));
+                let mut k0 = _mm_mul_epi16_by_ps_x2(source, _mm256_castps256_ps128(coeff));
 
                 for i in 0..half_len {
                     let rollback = length - i - 1;

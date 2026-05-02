@@ -34,7 +34,6 @@ use crate::filter1d::filter_1d_column_handler::{
 use crate::filter1d::filter_1d_row_handler::Filter1DRowHandler;
 use crate::filter1d::filter_element::KernelShape;
 use crate::filter1d::filter_scan::{is_symmetric_1d, scan_se_1d};
-use crate::filter1d::region::FilterRegion;
 use crate::primitives::PrimitiveCast;
 use crate::safe_math::{SafeAdd, SafeMul};
 use crate::to_storage::ToStorage;
@@ -158,7 +157,6 @@ where
                 &row,
                 dst_row,
                 image_size,
-                FilterRegion::new(y, y + 1),
                 scanned_row_kernel_slice,
             );
         });
@@ -330,7 +328,6 @@ where
                 brows_slice,
                 row,
                 image_size,
-                FilterRegion::new(y, y + 1),
                 scanned_column_kernel_slice,
             );
         });
@@ -441,7 +438,6 @@ where
                         &row_buffer,
                         &mut buffer[..row_stride],
                         image_size,
-                        FilterRegion::new(0, 1),
                         scanned_row_kernel_slice,
                     );
 
@@ -477,7 +473,6 @@ where
                             &row_buffer,
                             &mut buffer[src_y * row_stride..(src_y + 1) * row_stride],
                             image_size,
-                            FilterRegion::new(0, 1),
                             scanned_row_kernel_slice,
                         );
                     }
@@ -513,7 +508,6 @@ where
                         &row_buffer,
                         &mut buffer[start_ky * row_stride..(start_ky + 1) * row_stride],
                         image_size,
-                        FilterRegion::new(0, 1),
                         scanned_row_kernel_slice,
                     );
 
@@ -534,7 +528,6 @@ where
                             &brows,
                             dst,
                             image_size,
-                            FilterRegion::new(0, 1),
                             scanned_column_kernel_slice,
                         );
                     }
@@ -563,7 +556,6 @@ where
             &row_buffer,
             &mut buffer[..row_stride],
             image_size,
-            FilterRegion::new(0, 1),
             scanned_row_kernel_slice,
         );
 
@@ -607,7 +599,6 @@ where
                 &row_buffer,
                 &mut buffer[start_ky * row_stride..(start_ky + 1) * row_stride],
                 image_size,
-                FilterRegion::new(0, 1),
                 scanned_row_kernel_slice,
             );
 
@@ -629,7 +620,6 @@ where
                     &brows,
                     dst,
                     image_size,
-                    FilterRegion::new(0, 1),
                     scanned_column_kernel_slice,
                 );
             }

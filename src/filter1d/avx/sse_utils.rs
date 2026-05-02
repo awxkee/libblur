@@ -84,21 +84,17 @@ pub(crate) unsafe fn _mm_mul_epi8_by_ps_x4<const FMA: bool>(
     }
 }
 
-#[inline(always)]
-pub(crate) fn _mm_mul_epi16_by_ps_x2<const FMA: bool>(
-    input: __m128i,
-    weight: __m128,
-) -> (__m128, __m128) {
-    unsafe {
-        let zeros = _mm_setzero_si128();
-        let a0 = _mm_unpacklo_epi16(input, zeros);
-        let a1 = _mm_unpackhi_epi16(input, zeros);
+#[inline]
+#[target_feature(enable = "avx2")]
+pub(crate) fn _mm_mul_epi16_by_ps_x2(input: __m128i, weight: __m128) -> (__m128, __m128) {
+    let zeros = _mm_setzero_si128();
+    let a0 = _mm_unpacklo_epi16(input, zeros);
+    let a1 = _mm_unpackhi_epi16(input, zeros);
 
-        let v0 = _mm_cvtepi32_ps(a0);
-        let v1 = _mm_cvtepi32_ps(a1);
+    let v0 = _mm_cvtepi32_ps(a0);
+    let v1 = _mm_cvtepi32_ps(a1);
 
-        (_mm_mul_ps(v0, weight), _mm_mul_ps(v1, weight))
-    }
+    (_mm_mul_ps(v0, weight), _mm_mul_ps(v1, weight))
 }
 
 #[inline(always)]

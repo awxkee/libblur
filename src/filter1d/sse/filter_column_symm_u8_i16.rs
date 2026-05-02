@@ -28,7 +28,6 @@
  */
 use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_scan::ScanPoint1d;
-use crate::filter1d::region::FilterRegion;
 use crate::filter1d::sse::utils::{_mm_madd_epi8_by_epi16_x4, _mm_madd_symm_epi8_by_epi16_x4};
 use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
@@ -48,18 +47,10 @@ pub(crate) fn filter_column_symm_sse_u8_i16(
     arena_src: &[&[u8]],
     dst: &mut [u8],
     image_size: ImageSize,
-    filter_region: FilterRegion,
     scanned_kernel: &[ScanPoint1d<i16>],
 ) {
     unsafe {
-        filter_column_symm_sse_u8_i16_impl(
-            arena,
-            arena_src,
-            dst,
-            image_size,
-            filter_region,
-            scanned_kernel,
-        );
+        filter_column_symm_sse_u8_i16_impl(arena, arena_src, dst, image_size, scanned_kernel);
     }
 }
 
@@ -69,7 +60,6 @@ fn filter_column_symm_sse_u8_i16_impl(
     arena_src: &[&[u8]],
     dst: &mut [u8],
     image_size: ImageSize,
-    _: FilterRegion,
     scanned_kernel: &[ScanPoint1d<i16>],
 ) {
     unsafe {

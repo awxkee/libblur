@@ -34,7 +34,6 @@ use crate::filter1d::filter_1d_column_handler_approx::BuildColumnHandlerApprox;
 use crate::filter1d::filter_1d_row_handler_approx::Filter1DRowHandlerApprox;
 use crate::filter1d::filter_element::KernelShape;
 use crate::filter1d::filter_scan::{is_symmetric_1d, scan_se_1d, scan_se_1d_flat};
-use crate::filter1d::region::FilterRegion;
 use crate::filter1d::row_handler_small_approx::{BuildRowHandlerBInter, RowsHolder, RowsHolderMut};
 use crate::filter1d::to_approx_storage::{ApproxLevel, ToApproxStorage};
 use crate::primitives::PrimitiveCast;
@@ -372,7 +371,6 @@ where
                 brows_slice,
                 row,
                 image_size,
-                FilterRegion::new(y, y + 1),
             );
         });
 
@@ -663,7 +661,6 @@ where
                                 brows_storage,
                                 dst,
                                 image_size,
-                                FilterRegion::new(0, 1),
                             );
                         }
 
@@ -798,7 +795,6 @@ where
                     brows_storage,
                     dst,
                     image_size,
-                    FilterRegion::new(0, 1),
                 );
             }
 

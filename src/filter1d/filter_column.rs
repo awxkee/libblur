@@ -28,7 +28,6 @@
  */
 use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_scan::ScanPoint1d;
-use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
 use crate::primitives::PrimitiveCast;
@@ -41,7 +40,6 @@ pub(crate) fn filter_column<T, F>(
     arena_src: &[&[T]],
     dst: &mut [T],
     image_size: ImageSize,
-    _: FilterRegion,
     scanned_kernel: &[ScanPoint1d<F>],
 ) where
     T: Copy + PrimitiveCast<F>,
@@ -56,7 +54,7 @@ pub(crate) fn filter_column<T, F>(
 
         let coeff = *scanned_kernel.get_unchecked(0);
 
-        while cx + 4 < full_width {
+        while cx + 4 <= full_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let mut k0 = v_src.get_unchecked(0).cast_().mul(coeff.weight);

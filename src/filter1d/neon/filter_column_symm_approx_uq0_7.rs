@@ -28,7 +28,6 @@
  */
 use crate::filter1d::arena::Arena;
 use crate::filter1d::neon::utils::{xvld1q_u8_x2, xvst1q_u8_x2};
-use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
 use std::arch::aarch64::*;
 use std::ops::{Add, Mul};
@@ -38,11 +37,10 @@ pub(crate) fn filter_column_symm_neon_u8_uq0_7(
     arena_src: &[&[u8]],
     dst: &mut [u8],
     image_size: ImageSize,
-    zf: FilterRegion,
     kernel: &[u8],
 ) {
     unsafe {
-        executor_unit(arena, arena_src, dst, image_size, zf, kernel);
+        executor_unit(arena, arena_src, dst, image_size, kernel);
     }
 }
 
@@ -52,7 +50,6 @@ fn executor_unit(
     arena_src: &[&[u8]],
     dst: &mut [u8],
     image_size: ImageSize,
-    _: FilterRegion,
     kernel: &[u8],
 ) {
     unsafe {

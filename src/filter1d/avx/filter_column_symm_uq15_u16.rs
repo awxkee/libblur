@@ -36,7 +36,6 @@ use crate::filter1d::avx::sse_utils::{
 use crate::filter1d::avx::utils::{
     _mm256_mul_add_symm_epu16_by_epu16_x4, _mm256_mul_epu16_widen, _mm256_pack_epi32_x4_epu16,
 };
-use crate::filter1d::region::FilterRegion;
 use crate::filter1d::to_approx_storage::ToApproxStorage;
 use crate::img_size::ImageSize;
 use std::arch::x86_64::*;
@@ -47,28 +46,19 @@ pub(crate) fn filter_column_avx_symm_uq15_u16(
     arena_src: &[&[u16]],
     dst: &mut [u16],
     image_size: ImageSize,
-    filter_region: FilterRegion,
     scanned_kernel: &[u32],
 ) {
     unsafe {
-        filter_column_avx_symm_uq15_u16_impl(
-            arena,
-            arena_src,
-            dst,
-            image_size,
-            filter_region,
-            scanned_kernel,
-        );
+        filter_column_avx_symm_uq15_u16_impl(arena, arena_src, dst, image_size, scanned_kernel);
     }
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn filter_column_avx_symm_uq15_u16_impl(
+fn filter_column_avx_symm_uq15_u16_impl(
     arena: Arena,
     arena_src: &[&[u16]],
     dst: &mut [u16],
     image_size: ImageSize,
-    _: FilterRegion,
     scanned_kernel: &[u32],
 ) {
     unsafe {

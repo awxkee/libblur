@@ -28,7 +28,6 @@
  */
 use crate::avx::{_mm256_load_pack_x2, _mm256_store_pack_x2};
 use crate::filter1d::arena::Arena;
-use crate::filter1d::region::FilterRegion;
 use crate::img_size::ImageSize;
 use std::arch::x86_64::*;
 use std::ops::{Add, Mul};
@@ -38,18 +37,10 @@ pub(crate) fn filter_column_avx_symm_u8_uq0_7(
     arena_src: &[&[u8]],
     dst: &mut [u8],
     image_size: ImageSize,
-    filter_region: FilterRegion,
     kernel: &[i32],
 ) {
     unsafe {
-        filter_column_avx_symm_u8_i32_impl(
-            arena,
-            arena_src,
-            dst,
-            image_size,
-            filter_region,
-            kernel,
-        );
+        filter_column_avx_symm_u8_i32_impl(arena, arena_src, dst, image_size, kernel);
     }
 }
 
@@ -59,7 +50,6 @@ fn filter_column_avx_symm_u8_i32_impl(
     arena_src: &[&[u8]],
     dst: &mut [u8],
     image_size: ImageSize,
-    _: FilterRegion,
     kernel: &[i32],
 ) {
     unsafe {
