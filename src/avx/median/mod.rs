@@ -1,5 +1,5 @@
 /*
- * // Copyright (c) Radzivon Bartoshyk. All rights reserved.
+ * // Copyright (c) Radzivon Bartoshyk 5/2026. All rights reserved.
  * //
  * // Redistribution and use in source and binary forms, with or without modification,
  * // are permitted provided that the following conditions are met:
@@ -26,30 +26,10 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#![deny(unreachable_pub)]
-mod fast_gaussian;
-mod fast_gaussian_f32;
-mod fast_gaussian_next;
-mod fast_gaussian_next_f32;
-mod fast_gaussian_next_u16;
-mod fast_gaussian_next_u16_large;
-mod fast_gaussian_u16;
-mod median;
-mod pack;
-mod utils;
-mod v_load;
-mod v_store;
+mod median_3;
+mod median_5;
+mod median_7;
 
-pub(crate) use fast_gaussian::{fg_horizontal_pass_sse_u8, fg_vertical_pass_avx_u8};
-pub(crate) use fast_gaussian_f32::{fg_horizontal_pass_avx_f32, fg_vertical_pass_avx_f32};
-pub(crate) use fast_gaussian_next::{fgn_horizontal_pass_avx2_u8, fgn_vertical_pass_avx_u8};
-pub(crate) use fast_gaussian_next_f32::{fgn_horizontal_pass_avx_f32, fgn_vertical_pass_avx_f32};
-pub(crate) use fast_gaussian_next_u16::{fgn_horizontal_pass_avx_u16, fgn_vertical_pass_avx_u16};
-pub(crate) use fast_gaussian_next_u16_large::{
-    fgn_horizontal_pass_avx_u16_large, fgn_vertical_pass_avx_u16_large,
-};
-pub(crate) use fast_gaussian_u16::{fg_horizontal_pass_avx_u16, fg_vertical_pass_avx_u16};
-pub(crate) use median::{avx_median_blur_3x3, avx_median_blur_5x5, avx_median_blur_7x7};
-pub(crate) use pack::*;
-pub(crate) use v_load::*;
-pub(crate) use v_store::*;
+pub(crate) use median_3::avx_median_blur_3x3;
+pub(crate) use median_5::avx_median_blur_5x5;
+pub(crate) use median_7::avx_median_blur_7x7;

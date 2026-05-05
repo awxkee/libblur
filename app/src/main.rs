@@ -37,10 +37,10 @@ use libblur::{
     fast_gaussian, fast_gaussian_next, fast_gaussian_next_u16, filter_1d_complex,
     filter_1d_complex_fixed_point, filter_2d_fft_complex, filter_2d_rgb_fft,
     filter_2d_rgb_fft_complex, filter_2d_rgba_fft, gaussian_blur, gaussian_kernel_1d, lens_kernel,
-    sigma_size, stack_blur, stack_blur_f32, stack_blur_u16, tent_blur, AnisotropicRadius,
-    BilateralBlurParams, BlurImage, BlurImageMut, BoxBlurParameters, CLTParameters,
-    ConvolutionMode, EdgeMode, EdgeMode2D, FastBlurChannels, GaussianBlurParams, ImageSize,
-    KernelShape, Scalar, ThreadingPolicy, TransferFunction,
+    median_blur, sigma_size, stack_blur, stack_blur_f32, stack_blur_u16, tent_blur,
+    AnisotropicRadius, BilateralBlurParams, BlurImage, BlurImageMut, BoxBlurParameters,
+    CLTParameters, ConvolutionMode, EdgeMode, EdgeMode2D, FastBlurChannels, GaussianBlurParams,
+    ImageSize, KernelShape, Scalar, ThreadingPolicy, TransferFunction,
 };
 use num_complex::Complex;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
@@ -127,6 +127,15 @@ fn main() {
         .unwrap()
         .decode()
         .unwrap();
+    // //
+    // let src = imread(
+    //     &find_file("./assets/sonderland.jpg", false, false).unwrap(),
+    //     IMREAD_COLOR,
+    // )
+    //     .unwrap();
+    // let mut dst = Mat::default();
+    // opencv::imgproc::median_blur(&src, &mut dst, 9).unwrap();
+    // imwrite("./opencv_ref9.jpg", &dst, &Vector::new()).unwrap();
 
     let dimensions = dyn_image.dimensions();
     println!("dimensions {:?}", dyn_image.dimensions());
@@ -195,13 +204,21 @@ fn main() {
 
     // let mut dst_image = BlurImageMut::default(); //cvt.clone_as_mut();
 
-    gaussian_blur(
+    // gaussian_blur(
+    //     &cvt.to_immutable_ref(),
+    //     &mut dst_image,
+    //     GaussianBlurParams::new_from_kernel(13.),
+    //     EdgeMode::Clamp.as_2d(),
+    //     ThreadingPolicy::Single,
+    //     ConvolutionMode::FixedPoint,
+    // )
+    // .unwrap();
+
+    median_blur(
         &cvt.to_immutable_ref(),
         &mut dst_image,
-        GaussianBlurParams::new_from_kernel(13.),
-        EdgeMode::Clamp.as_2d(),
+        7,
         ThreadingPolicy::Single,
-        ConvolutionMode::FixedPoint,
     )
     .unwrap();
 
@@ -298,7 +315,7 @@ fn main() {
 
     // dst_image = vzd.gamma8(TransferFunction::Srgb, false).unwrap();
     //
-    dst_bytes = cvt
+    dst_bytes = dst_image
         .data
         .borrow_mut()
         .iter()
@@ -323,7 +340,7 @@ fn main() {
 
     if components == 3 {
         image::save_buffer(
-            "blurred_stack_next1.jpg",
+            "blurred_stack_next15_2.jpg",
             bytes.as_bytes(),
             dimensions.0,
             dimensions.1,
