@@ -27,7 +27,6 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter1d::arena::Arena;
-use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::sse::utils::{
     _mm_mul_add_symm_epi16_by_ps, _mm_mul_add_symm_epi16_by_ps_x2, _mm_mul_epi16_by_ps,
     _mm_mul_epi16_by_ps_x2, _mm_pack_ps_epi16, _mm_pack_ps_x2_epi16,
@@ -50,7 +49,7 @@ pub(crate) fn filter_column_symm_sse_u16_f32(
     arena_src: &[&[u16]],
     dst: &mut [u16],
     image_size: ImageSize,
-    scanned_kernel: &[ScanPoint1d<f32>],
+    scanned_kernel: &[f32],
 ) {
     let has_fma = std::arch::is_x86_feature_detected!("fma");
     unsafe {
@@ -68,7 +67,7 @@ fn filter_column_symm_sse_u16_f32_fma(
     arena_src: &[&[u16]],
     dst: &mut [u16],
     image_size: ImageSize,
-    scanned_kernel: &[ScanPoint1d<f32>],
+    scanned_kernel: &[f32],
 ) {
     filter_column_symm_sse_u16_f32_impl::<true>(arena, arena_src, dst, image_size, scanned_kernel);
 }
@@ -79,7 +78,7 @@ fn filter_column_symm_sse_u16_f32_def(
     arena_src: &[&[u16]],
     dst: &mut [u16],
     image_size: ImageSize,
-    scanned_kernel: &[ScanPoint1d<f32>],
+    scanned_kernel: &[f32],
 ) {
     filter_column_symm_sse_u16_f32_impl::<false>(arena, arena_src, dst, image_size, scanned_kernel);
 }
@@ -90,7 +89,7 @@ fn filter_column_symm_sse_u16_f32_impl<const FMA: bool>(
     arena_src: &[&[u16]],
     dst: &mut [u16],
     image_size: ImageSize,
-    scanned_kernel: &[ScanPoint1d<f32>],
+    scanned_kernel: &[f32],
 ) {
     unsafe {
         let image_width = image_size.width * arena.components;
@@ -100,7 +99,7 @@ fn filter_column_symm_sse_u16_f32_impl<const FMA: bool>(
 
         let mut cx = 0usize;
 
-        let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
+        let coeff = _mm_set1_ps(*scanned_kernel.get_unchecked(half_len));
 
         while cx + 32 <= image_width {
             let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
@@ -112,7 +111,7 @@ fn filter_column_symm_sse_u16_f32_impl<const FMA: bool>(
             let mut k3 = _mm_mul_epi16_by_ps_x2::<FMA>(source.3, coeff);
 
             for i in 0..half_len {
-                let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(i).weight);
+                let coeff = _mm_set1_ps(*scanned_kernel.get_unchecked(i));
                 let rollback = length - i - 1;
                 let v_source0 = _mm_load_pack_x4(
                     arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr() as *const _,
@@ -151,7 +150,7 @@ fn filter_column_symm_sse_u16_f32_impl<const FMA: bool>(
             let mut k2 = _mm_mul_epi16_by_ps_x2::<FMA>(source.2, coeff);
 
             for i in 0..half_len {
-                let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(i).weight);
+                let coeff = _mm_set1_ps(*scanned_kernel.get_unchecked(i));
                 let rollback = length - i - 1;
                 let v_source0 = _mm_load_pack_x3(
                     arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr() as *const _,
@@ -187,7 +186,7 @@ fn filter_column_symm_sse_u16_f32_impl<const FMA: bool>(
             let mut k1 = _mm_mul_epi16_by_ps_x2::<FMA>(source.1, coeff);
 
             for i in 0..half_len {
-                let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(i).weight);
+                let coeff = _mm_set1_ps(*scanned_kernel.get_unchecked(i));
                 let rollback = length - i - 1;
                 let v_source0 = _mm_load_pack_x2(
                     arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr() as *const _,
@@ -233,7 +232,7 @@ fn filter_column_symm_sse_u16_f32_impl<const FMA: bool>(
                     k0,
                     v_source_0,
                     v_source_1,
-                    _mm_set1_ps(coeff.weight),
+                    _mm_set1_ps(coeff),
                 );
             }
 
@@ -248,7 +247,7 @@ fn filter_column_symm_sse_u16_f32_impl<const FMA: bool>(
             let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
 
             let source_0 = _mm_loadu_si64(v_src.as_ptr() as *const _);
-            let mut k0 = _mm_mul_epi16_by_ps::<FMA>(source_0, _mm_set1_ps(coeff.weight));
+            let mut k0 = _mm_mul_epi16_by_ps::<FMA>(source_0, _mm_set1_ps(coeff));
 
             for i in 0..half_len {
                 let coeff = *scanned_kernel.get_unchecked(i);
@@ -266,7 +265,7 @@ fn filter_column_symm_sse_u16_f32_impl<const FMA: bool>(
                     k0,
                     v_source_0,
                     v_source_1,
-                    _mm_set1_ps(coeff.weight),
+                    _mm_set1_ps(coeff),
                 );
             }
 
@@ -278,7 +277,7 @@ fn filter_column_symm_sse_u16_f32_impl<const FMA: bool>(
         for x in cx..image_width {
             let v_src = arena_src.get_unchecked(half_len).get_unchecked(x..);
 
-            let mut k0 = (*v_src.get_unchecked(0) as f32).mul(coeff.weight);
+            let mut k0 = (*v_src.get_unchecked(0) as f32).mul(coeff);
 
             for i in 0..half_len {
                 let coeff = *scanned_kernel.get_unchecked(i);
@@ -287,7 +286,7 @@ fn filter_column_symm_sse_u16_f32_impl<const FMA: bool>(
                     k0,
                     ((*arena_src.get_unchecked(i).get_unchecked(x)) as f32)
                         .add(*arena_src.get_unchecked(rollback).get_unchecked(x) as f32),
-                    coeff.weight,
+                    coeff,
                 );
             }
 

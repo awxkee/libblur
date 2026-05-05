@@ -27,7 +27,6 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter1d::arena::Arena;
-use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::sse::utils::_mm_fmla_pd;
 use crate::img_size::ImageSize;
 use crate::sse::{_mm_load_pack_ps_x2, _mm_store_pack_ps_x2};
@@ -41,7 +40,7 @@ pub(crate) fn filter_column_sse_f32_f64(
     arena_src: &[&[f32]],
     dst: &mut [f32],
     image_size: ImageSize,
-    scanned_kernel: &[ScanPoint1d<f64>],
+    scanned_kernel: &[f64],
 ) {
     unsafe {
         let unit = ExecutionUnit::default();
@@ -60,7 +59,7 @@ impl ExecutionUnit {
         arena_src: &[&[f32]],
         dst: &mut [f32],
         image_size: ImageSize,
-        scanned_kernel: &[ScanPoint1d<f64>],
+        scanned_kernel: &[f64],
     ) {
         unsafe {
             let dst_stride = image_size.width * arena.components;
@@ -69,11 +68,11 @@ impl ExecutionUnit {
 
             let mut cx = 0usize;
 
-            let coeff = _mm_set1_pd(scanned_kernel.get_unchecked(0).weight);
+            let coeff = _mm_set1_pd(*scanned_kernel.get_unchecked(0));
 
             let off0 = arena_src.get_unchecked(0);
 
-            while cx + 8 < dst_stride {
+            while cx + 8 <= dst_stride {
                 let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
                 let source = _mm_load_pack_ps_x2(v_src.as_ptr());
@@ -83,7 +82,7 @@ impl ExecutionUnit {
                 let mut k3 = _mm_mul_pd(_mm_cvtps_pd(_mm_movehl_ps(source.1, source.1)), coeff);
 
                 for i in 1..length {
-                    let coeff = _mm_set1_pd(scanned_kernel.get_unchecked(i).weight);
+                    let coeff = _mm_set1_pd(*scanned_kernel.get_unchecked(i));
                     let v_source = _mm_load_pack_ps_x2(
                         arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr(),
                     );
@@ -112,7 +111,7 @@ impl ExecutionUnit {
                 cx += 8;
             }
 
-            while cx + 4 < dst_stride {
+            while cx + 4 <= dst_stride {
                 let v_src = off0.get_unchecked(cx..);
 
                 let source_0 = _mm_loadu_ps(v_src.as_ptr());
@@ -120,7 +119,7 @@ impl ExecutionUnit {
                 let mut k1 = _mm_mul_pd(_mm_cvtps_pd(_mm_movehl_ps(source_0, source_0)), coeff);
 
                 for i in 1..length {
-                    let coeff = _mm_set1_pd(scanned_kernel.get_unchecked(i).weight);
+                    let coeff = _mm_set1_pd(*scanned_kernel.get_unchecked(i));
                     let v_source_0 =
                         _mm_loadu_ps(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
                     k0 = _mm_fmla_pd(k0, _mm_cvtps_pd(v_source_0), coeff);
@@ -149,7 +148,7 @@ impl ExecutionUnit {
                     let coeff = *scanned_kernel.get_unchecked(i);
                     let v_source_0 =
                         _mm_load_ss(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
-                    k0 = _mm_fmla_pd(k0, _mm_cvtps_pd(v_source_0), _mm_set1_pd(coeff.weight));
+                    k0 = _mm_fmla_pd(k0, _mm_cvtps_pd(v_source_0), _mm_set1_pd(coeff));
                 }
 
                 let z0 = _mm_cvtpd_ps(k0);

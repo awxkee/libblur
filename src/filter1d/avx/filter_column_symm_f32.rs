@@ -33,7 +33,6 @@ use crate::avx::{
 use crate::filter1d::arena::Arena;
 use crate::filter1d::avx::sse_utils::_mm_opt_fmlaf_ps;
 use crate::filter1d::avx::utils::_mm256_opt_fmlaf_ps;
-use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::img_size::ImageSize;
 use std::arch::x86_64::*;
 
@@ -42,7 +41,7 @@ pub(crate) fn filter_column_avx_symm_f32_f32(
     arena_src: &[&[f32]],
     dst: &mut [f32],
     image_size: ImageSize,
-    scanned_kernel: &[ScanPoint1d<f32>],
+    scanned_kernel: &[f32],
 ) {
     unsafe {
         let has_fma = std::arch::is_x86_feature_detected!("fma");
@@ -72,7 +71,7 @@ fn filter_column_avx_symm_f32_f32_impl_fma(
     arena_src: &[&[f32]],
     dst: &mut [f32],
     image_size: ImageSize,
-    scanned_kernel: &[ScanPoint1d<f32>],
+    scanned_kernel: &[f32],
 ) {
     let unit = ExecutionUnit::<true>::default();
     unit.pass(arena, arena_src, dst, image_size, scanned_kernel);
@@ -84,7 +83,7 @@ fn filter_column_avx_symm_f32_f32_impl_def(
     arena_src: &[&[f32]],
     dst: &mut [f32],
     image_size: ImageSize,
-    scanned_kernel: &[ScanPoint1d<f32>],
+    scanned_kernel: &[f32],
 ) {
     let unit = ExecutionUnit::<false>::default();
     unit.pass(arena, arena_src, dst, image_size, scanned_kernel);
@@ -101,7 +100,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
         arena_src: &[&[f32]],
         dst: &mut [f32],
         image_size: ImageSize,
-        scanned_kernel: &[ScanPoint1d<f32>],
+        scanned_kernel: &[f32],
     ) {
         unsafe {
             let dst_stride = image_size.width * arena.components;
@@ -111,7 +110,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
 
             let ref0 = arena_src.get_unchecked(half_len);
 
-            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
+            let coeff = _mm256_set1_ps(*scanned_kernel.get_unchecked(half_len));
 
             let mut cx = 0usize;
 
@@ -126,7 +125,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
 
                 for i in 0..half_len {
                     let rollback = length - i - 1;
-                    let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(i).weight);
+                    let coeff = _mm256_set1_ps(*scanned_kernel.get_unchecked(i));
                     let v_source = _mm256_load_pack_ps_x4(
                         arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr(),
                     );
@@ -172,7 +171,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
 
                 for i in 0..half_len {
                     let rollback = length - i - 1;
-                    let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(i).weight);
+                    let coeff = _mm256_set1_ps(*scanned_kernel.get_unchecked(i));
                     let v_source = _mm256_load_pack_ps_x2(
                         arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr(),
                     );
@@ -207,7 +206,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
 
                 for i in 0..half_len {
                     let rollback = length - i - 1;
-                    let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(i).weight);
+                    let coeff = _mm256_set1_ps(*scanned_kernel.get_unchecked(i));
                     let v_source =
                         _mm256_loadu_ps(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
                     let v_source_r = _mm256_loadu_ps(
@@ -245,7 +244,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
                     k0 = _mm_opt_fmlaf_ps::<FMA>(
                         k0,
                         _mm_add_ps(v_source_0, v_source_1),
-                        _mm_set1_ps(coeff.weight),
+                        _mm_set1_ps(coeff),
                     );
                 }
 
@@ -260,7 +259,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
                 let v_src = ref0.get_unchecked(cx..);
 
                 let source_0 = _mm_load_ss(v_src.as_ptr());
-                let mut k0 = _mm_mul_ps(source_0, _mm_set1_ps(coeff.weight));
+                let mut k0 = _mm_mul_ps(source_0, _mm_set1_ps(coeff));
 
                 for i in 0..half_len {
                     let rollback = length - i - 1;
@@ -276,7 +275,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
                     k0 = _mm_opt_fmlaf_ps::<FMA>(
                         k0,
                         _mm_add_ps(v_source_0, v_source_1),
-                        _mm_set1_ps(coeff.weight),
+                        _mm_set1_ps(coeff),
                     );
                 }
 

@@ -27,7 +27,6 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter1d::arena::Arena;
-use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::neon::utils::{xvld1q_f32_x2, xvld1q_f32_x4, xvst1q_f32_x2, xvst1q_f32_x4};
 use crate::img_size::ImageSize;
 use std::arch::aarch64::*;
@@ -37,7 +36,7 @@ pub(crate) fn filter_column_neon_symm_f32_f64(
     arena_src: &[&[f32]],
     dst: &mut [f32],
     image_size: ImageSize,
-    scanned_kernel: &[ScanPoint1d<f64>],
+    scanned_kernel: &[f64],
 ) {
     unsafe {
         let dst_stride = image_size.width * arena.components;
@@ -47,7 +46,7 @@ pub(crate) fn filter_column_neon_symm_f32_f64(
 
         let mut cx = 0usize;
 
-        let coeff = vdupq_n_f64(scanned_kernel.get_unchecked(half_len).weight);
+        let coeff = vld1q_dup_f64(scanned_kernel.get_unchecked(half_len));
 
         while cx + 16 <= dst_stride {
             let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
@@ -65,7 +64,7 @@ pub(crate) fn filter_column_neon_symm_f32_f64(
 
             for i in 0..half_len {
                 let rollback = length - i - 1;
-                let coeff = vdupq_n_f64(scanned_kernel.get_unchecked(i).weight);
+                let coeff = vld1q_dup_f64(scanned_kernel.get_unchecked(i));
                 let v_source0 =
                     xvld1q_f32_x4(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 let v_source1 = xvld1q_f32_x4(
@@ -164,7 +163,7 @@ pub(crate) fn filter_column_neon_symm_f32_f64(
 
             for i in 0..half_len {
                 let rollback = length - i - 1;
-                let coeff = vdupq_n_f64(scanned_kernel.get_unchecked(i).weight);
+                let coeff = vld1q_dup_f64(scanned_kernel.get_unchecked(i));
                 let v_source0 =
                     xvld1q_f32_x2(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 let v_source1 = xvld1q_f32_x2(
@@ -228,7 +227,7 @@ pub(crate) fn filter_column_neon_symm_f32_f64(
 
             for i in 0..half_len {
                 let rollback = length - i - 1;
-                let coeff = vdupq_n_f64(scanned_kernel.get_unchecked(i).weight);
+                let coeff = vld1q_dup_f64(scanned_kernel.get_unchecked(i));
                 let v_source_0 = vld1q_f32(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 let v_source_1 = vld1q_f32(
                     arena_src
@@ -264,7 +263,7 @@ pub(crate) fn filter_column_neon_symm_f32_f64(
 
             for i in 0..half_len {
                 let rollback = length - i - 1;
-                let coeff = vdupq_n_f64(scanned_kernel.get_unchecked(i).weight);
+                let coeff = vld1q_dup_f64(scanned_kernel.get_unchecked(i));
                 let v_source_0 = vld1_f32(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 let v_source_1 = vld1_f32(
                     arena_src
@@ -294,7 +293,7 @@ pub(crate) fn filter_column_neon_symm_f32_f64(
 
             for i in 0..half_len {
                 let rollback = length - i - 1;
-                let coeff = vdupq_n_f64(scanned_kernel.get_unchecked(i).weight);
+                let coeff = vld1q_dup_f64(scanned_kernel.get_unchecked(i));
 
                 let z0 = vld1_lane_f32::<0>(
                     arena_src.get_unchecked(i).get_unchecked(x..).as_ptr(),

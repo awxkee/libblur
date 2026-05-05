@@ -33,7 +33,7 @@ use crate::filter1d::filter_1d_column_handler::{
 };
 use crate::filter1d::filter_1d_row_handler::Filter1DRowHandler;
 use crate::filter1d::filter_element::KernelShape;
-use crate::filter1d::filter_scan::{is_symmetric_1d, scan_se_1d};
+use crate::filter1d::filter_scan::{is_symmetric_1d, scan_se_1d_flat};
 use crate::primitives::PrimitiveCast;
 use crate::safe_math::{SafeAdd, SafeMul};
 use crate::to_storage::ToStorage;
@@ -122,10 +122,8 @@ where
 
     _ = (destination.stride as usize).safe_mul(3)?;
 
-    let scanned_row_kernel = scan_se_1d(row_kernel);
-    let scanned_row_kernel_slice = scanned_row_kernel.as_slice();
-    let scanned_column_kernel = scan_se_1d(column_kernel);
-    let scanned_column_kernel_slice = scanned_column_kernel.as_slice();
+    let scanned_row_kernel = scan_se_1d_flat(row_kernel);
+    let scanned_column_kernel = scan_se_1d_flat(column_kernel);
     let is_column_kernel_symmetrical = is_symmetric_1d(column_kernel);
     let is_row_kernel_symmetrical = is_symmetric_1d(row_kernel);
 
@@ -157,11 +155,11 @@ where
                 &row,
                 dst_row,
                 image_size,
-                scanned_row_kernel_slice,
+                scanned_row_kernel.as_slice(),
             );
         });
 
-    let column_kernel_shape = KernelShape::new(0, scanned_column_kernel_slice.len());
+    let column_kernel_shape = KernelShape::new(0, scanned_column_kernel.len());
 
     let column_arena_k = make_arena_columns::<T, N>(
         transient_image.as_slice(),
@@ -246,7 +244,7 @@ where
                     row,
                     image_size,
                     dst_stride,
-                    scanned_column_kernel_slice,
+                    &scanned_column_kernel,
                 );
             });
         _processed_y = _dest_slice.chunks_exact_mut(dst_stride * 3).len() * 3;
@@ -297,7 +295,7 @@ where
                     row,
                     image_size,
                     dst_stride,
-                    scanned_column_kernel_slice,
+                    &scanned_column_kernel,
                 );
             });
         _processed_y = _dest_slice.chunks_exact_mut(dst_stride * 2).len() * 2;
@@ -328,7 +326,7 @@ where
                 brows_slice,
                 row,
                 image_size,
-                scanned_column_kernel_slice,
+                &scanned_column_kernel,
             );
         });
 
@@ -375,10 +373,8 @@ where
         .safe_mul(N)?
         .safe_add(pad_w.safe_mul(2 * N)?);
 
-    let scanned_row_kernel = scan_se_1d(row_kernel);
-    let scanned_row_kernel_slice = scanned_row_kernel.as_slice();
-    let scanned_column_kernel = scan_se_1d(column_kernel);
-    let scanned_column_kernel_slice = scanned_column_kernel.as_slice();
+    let scanned_row_kernel = scan_se_1d_flat(row_kernel);
+    let scanned_column_kernel = scan_se_1d_flat(column_kernel);
     let is_column_kernel_symmetrical = is_symmetric_1d(column_kernel);
     let is_row_kernel_symmetrical = is_symmetric_1d(row_kernel);
 
@@ -438,7 +434,7 @@ where
                         &row_buffer,
                         &mut buffer[..row_stride],
                         image_size,
-                        scanned_row_kernel_slice,
+                        &scanned_row_kernel,
                     );
 
                     let (src_row, rest) = buffer.split_at_mut(row_stride);
@@ -473,7 +469,7 @@ where
                             &row_buffer,
                             &mut buffer[src_y * row_stride..(src_y + 1) * row_stride],
                             image_size,
-                            scanned_row_kernel_slice,
+                            &scanned_row_kernel,
                         );
                     }
                 }
@@ -508,7 +504,7 @@ where
                         &row_buffer,
                         &mut buffer[start_ky * row_stride..(start_ky + 1) * row_stride],
                         image_size,
-                        scanned_row_kernel_slice,
+                        &scanned_row_kernel,
                     );
 
                     if dy >= half_kernel {
@@ -528,7 +524,7 @@ where
                             &brows,
                             dst,
                             image_size,
-                            scanned_column_kernel_slice,
+                            &scanned_column_kernel,
                         );
                     }
 
@@ -556,7 +552,7 @@ where
             &row_buffer,
             &mut buffer[..row_stride],
             image_size,
-            scanned_row_kernel_slice,
+            &scanned_row_kernel,
         );
 
         let column_kernel_len = scanned_column_kernel.len();
@@ -599,7 +595,7 @@ where
                 &row_buffer,
                 &mut buffer[start_ky * row_stride..(start_ky + 1) * row_stride],
                 image_size,
-                scanned_row_kernel_slice,
+                &scanned_row_kernel,
             );
 
             if y >= half_kernel {
@@ -620,7 +616,7 @@ where
                     &brows,
                     dst,
                     image_size,
-                    scanned_column_kernel_slice,
+                    &scanned_column_kernel,
                 );
             }
 

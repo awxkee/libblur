@@ -30,10 +30,7 @@ use crate::unsafe_slice::UnsafeSlice;
 use crate::{BlurError, BlurImage, BlurImageMut, ThreadingPolicy};
 
 struct MedianHistogram {
-    r: [i32; 256],
-    g: [i32; 256],
-    b: [i32; 256],
-    a: [i32; 256],
+    rgba: [[i32; 256]; 4],
     n: i32,
 }
 
@@ -61,27 +58,9 @@ fn add_rgb_pixels<const CN: usize>(
         }
         let y_shift = i as usize * src_stride as usize;
         let bytes_offset = y_shift + px;
-        let v0 = unsafe { *src.get_unchecked(bytes_offset) };
-        unsafe {
-            *histogram.r.get_unchecked_mut(v0 as usize) += 1;
-        }
-        if CN > 1 {
-            let v1 = unsafe { *src.get_unchecked(bytes_offset + 1) };
-            unsafe {
-                *histogram.g.get_unchecked_mut(v1 as usize) += 1;
-            }
-        }
-        if CN > 2 {
-            let v2 = unsafe { *src.get_unchecked(bytes_offset + 2) };
-            unsafe {
-                *histogram.b.get_unchecked_mut(v2 as usize) += 1;
-            }
-        }
-        if CN == 4 {
-            unsafe {
-                let v3 = *src.get_unchecked(bytes_offset + 3);
-                *histogram.a.get_unchecked_mut(v3 as usize) += 1;
-            }
+        for i in 0..CN {
+            let v0 = unsafe { *src.get_unchecked(bytes_offset + i) };
+            histogram.rgba[i][v0 as usize] += 1;
         }
         histogram.n += 1;
     }
@@ -110,24 +89,9 @@ fn remove_rgb_pixels<const CN: usize>(
         }
         let y_shift = i as usize * src_stride as usize;
         let bytes_offset = y_shift + px;
-        let v0 = unsafe { *src.get_unchecked(bytes_offset) };
-        let x = histogram.r[v0 as usize] - 1;
-        histogram.r[v0 as usize] = x;
-        if CN > 1 {
-            let v1 = unsafe { *src.get_unchecked(bytes_offset + 1) };
-            unsafe {
-                *histogram.g.get_unchecked_mut(v1 as usize) -= 1;
-            }
-        }
-        if CN > 2 {
-            let v2 = unsafe { *src.get_unchecked(bytes_offset + 2) };
-            unsafe {
-                *histogram.b.get_unchecked_mut(v2 as usize) -= 1;
-            }
-        }
-        if CN == 4 {
-            let v3 = unsafe { *src.get_unchecked(bytes_offset + 3) };
-            *unsafe { histogram.a.get_unchecked_mut(v3 as usize) } -= 1;
+        for i in 0..CN {
+            let v0 = unsafe { *src.get_unchecked(bytes_offset + i) };
+            histogram.rgba[i][v0 as usize] -= 1;
         }
         histogram.n -= 1;
     }
@@ -143,13 +107,10 @@ fn init_histogram<const CN: usize>(
     radius: u32,
     histogram: &mut MedianHistogram,
 ) {
-    histogram.r = [0; 256];
-    histogram.g = [0; 256];
-    histogram.b = [0; 256];
-    histogram.a = [0; 256];
+    histogram.rgba = [[0; 256]; 4];
     histogram.n = 0;
 
-    for j in 0..radius.min(width) {
+    for j in 0..=radius.min(width - 1) {
         add_rgb_pixels::<CN>(
             src, src_stride, y as i64, j as i64, width, height, radius, histogram,
         );
@@ -157,21 +118,18 @@ fn init_histogram<const CN: usize>(
 }
 
 #[inline(always)]
-fn median_filter(x: [i32; 256], n: i32) -> i32 {
-    let mut n = n / 2;
+fn median_filter(x: [i32; 256], n: i32) -> u8 {
+    let mut remaining = n / 2 + 1; // want the (n/2+1)-th element = index n/2
     let mut i = 0i64;
-    #[allow(clippy::manual_range_contains)]
-    while i < 256 && i >= 0 {
-        unsafe {
-            n -= *x.get_unchecked(i as usize);
-        }
-        if n > 0 {
+    while i < 256 {
+        remaining -= unsafe { *x.get_unchecked(i as usize) };
+        if remaining > 0 {
             i += 1;
         } else {
             break;
         }
     }
-    i as i32
+    i as u8
 }
 
 fn median_blur_impl<const CN: usize>(
@@ -260,10 +218,7 @@ fn median_blur_impl_exec<const CN: usize>(
 ) {
     for y in start_y..end_y {
         let mut histogram = MedianHistogram {
-            r: [0; 256],
-            g: [0; 256],
-            b: [0; 256],
-            a: [0; 256],
+            rgba: [[0; 256]; 4],
             n: 0,
         };
         for x in 0..width {
@@ -275,7 +230,7 @@ fn median_blur_impl_exec<const CN: usize>(
                     src,
                     src_stride,
                     y as i64,
-                    x as i64 - radius as i64,
+                    x as i64 - radius as i64 - 1,
                     width,
                     height,
                     radius,
@@ -313,23 +268,10 @@ fn push_hist<const CN: usize>(
     if histogram.n > 0 {
         unsafe {
             let bytes_offset = y_dst_offset + px;
-            unsafe_dst.write(bytes_offset, median_filter(histogram.r, histogram.n) as u8);
-            if CN > 1 {
+            for i in 0..CN {
                 unsafe_dst.write(
-                    bytes_offset + 1,
-                    median_filter(histogram.g, histogram.n) as u8,
-                );
-            }
-            if CN > 2 {
-                unsafe_dst.write(
-                    bytes_offset + 2,
-                    median_filter(histogram.b, histogram.n) as u8,
-                );
-            }
-            if CN == 4 {
-                unsafe_dst.write(
-                    bytes_offset + 3,
-                    median_filter(histogram.a, histogram.n) as u8,
+                    bytes_offset + i,
+                    median_filter(histogram.rgba[i], histogram.n),
                 );
             }
         }
@@ -337,15 +279,8 @@ fn push_hist<const CN: usize>(
         unsafe {
             let bytes_offset = y_dst_offset + px;
             let src_offset = y_src_offset + px;
-            unsafe_dst.write(bytes_offset, *src.get_unchecked(src_offset));
-            if CN > 1 {
-                unsafe_dst.write(bytes_offset + 1, *src.get_unchecked(src_offset + 1));
-            }
-            if CN > 2 {
-                unsafe_dst.write(bytes_offset + 2, *src.get_unchecked(src_offset + 2));
-            }
-            if CN == 4 {
-                unsafe_dst.write(bytes_offset + 3, *src.get_unchecked(src_offset + 3));
+            for i in 0..CN {
+                unsafe_dst.write(bytes_offset + i, *src.get_unchecked(src_offset + i));
             }
         }
     }
@@ -376,6 +311,39 @@ pub fn median_blur(
     src_image.check_layout()?;
     dst_image.check_layout(Some(src_image))?;
     src_image.size_matches_mut(dst_image)?;
+
+    #[cfg(all(target_arch = "aarch64", feature = "neon"))]
+    {
+        if radius == 1 {
+            use crate::neon::median_blur_3x3;
+            median_blur_3x3(
+                src_image,
+                dst_image,
+                src_image.channels as usize,
+                threading_policy,
+            );
+            return Ok(());
+        } else if radius == 2 {
+            use crate::neon::median_blur_5x5;
+            median_blur_5x5(
+                src_image,
+                dst_image,
+                src_image.channels as usize,
+                threading_policy,
+            );
+            return Ok(());
+        } else if radius == 3 {
+            use crate::neon::median_blur_7x7;
+            median_blur_7x7(
+                src_image,
+                dst_image,
+                src_image.channels as usize,
+                threading_policy,
+            );
+            return Ok(());
+        }
+    }
+
     let _dispatcher = match src_image.channels {
         FastBlurChannels::Plane => median_blur_impl::<1>,
         FastBlurChannels::Channels3 => median_blur_impl::<3>,

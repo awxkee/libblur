@@ -33,7 +33,7 @@ use crate::filter1d::filter::create_brows;
 use crate::filter1d::filter_1d_column_handler_approx::BuildColumnHandlerApprox;
 use crate::filter1d::filter_1d_row_handler_approx::Filter1DRowHandlerApprox;
 use crate::filter1d::filter_element::KernelShape;
-use crate::filter1d::filter_scan::{is_symmetric_1d, scan_se_1d, scan_se_1d_flat};
+use crate::filter1d::filter_scan::{is_symmetric_1d, scan_se_1d_flat};
 use crate::filter1d::row_handler_small_approx::{BuildRowHandlerBInter, RowsHolder, RowsHolderMut};
 use crate::filter1d::to_approx_storage::{ApproxLevel, ToApproxStorage};
 use crate::primitives::PrimitiveCast;
@@ -162,7 +162,7 @@ where
         .collect::<Vec<I>>();
 
     let scanned_row_kernel = scan_se_1d_flat::<I>(&scaled_row_kernel);
-    let scanned_column_kernel = scan_se_1d::<I>(&scaled_column_kernel);
+    let scanned_column_kernel = scan_se_1d_flat::<I>(&scaled_column_kernel);
     let scanned_column_kernel_slice = scanned_column_kernel.as_slice();
     let is_column_kernel_symmetric = is_symmetric_1d(column_kernel);
     let is_row_kernel_symmetric = is_symmetric_1d(row_kernel);

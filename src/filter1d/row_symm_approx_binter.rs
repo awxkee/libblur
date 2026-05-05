@@ -28,7 +28,6 @@
  */
 #![allow(dead_code)]
 use crate::edge_mode::{BorderHandle, border_interpolate};
-use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::to_approx_storage::ToApproxStorage;
 use crate::img_size::ImageSize;
 use num_traits::AsPrimitive;
@@ -39,7 +38,7 @@ pub(crate) fn filter_row_symmetric_approx_binter<T, I, const N: usize>(
     src: &[T],
     dst: &mut [T],
     image_size: ImageSize,
-    scanned_kernel: &[ScanPoint1d<I>],
+    scanned_kernel: &[I],
 ) where
     T: Copy + AsPrimitive<I> + Default,
     I: Copy
@@ -71,7 +70,7 @@ pub(crate) fn filter_row_symmetric_approx_binter<T, I, const N: usize>(
         while cx < min_left {
             for c in 0..N {
                 let mx = cx as i64 - s_kernel;
-                let mut k0 = src.get_unchecked(cx * N + c).as_() * coeff.weight;
+                let mut k0 = src.get_unchecked(cx * N + c).as_() * coeff;
 
                 for i in 0..half_len {
                     let coeff = *scanned_kernel.get_unchecked(i);
@@ -81,7 +80,7 @@ pub(crate) fn filter_row_symmetric_approx_binter<T, I, const N: usize>(
                     let src1 =
                         border_interpolate!(src, edge_mode, rollback as i64 + mx, 0, width, N, c);
 
-                    k0 = k0 + (src0.as_() + src1.as_()) * coeff.weight;
+                    k0 = k0 + (src0.as_() + src1.as_()) * coeff;
                 }
 
                 *dst.get_unchecked_mut(cx * N + c) = k0.to_approx_();
@@ -99,10 +98,10 @@ pub(crate) fn filter_row_symmetric_approx_binter<T, I, const N: usize>(
         while f_cx + 4 <= flat_max {
             let mx = f_cx - half_len * N;
             let shifted_src = src.get_unchecked(mx..);
-            let mut k0 = shifted_src.get_unchecked(half_len * N).as_() * coeff.weight;
-            let mut k1 = shifted_src.get_unchecked(half_len * N + 1).as_() * coeff.weight;
-            let mut k2 = shifted_src.get_unchecked(half_len * N + 2).as_() * coeff.weight;
-            let mut k3 = shifted_src.get_unchecked(half_len * N + 3).as_() * coeff.weight;
+            let mut k0 = shifted_src.get_unchecked(half_len * N).as_() * coeff;
+            let mut k1 = shifted_src.get_unchecked(half_len * N + 1).as_() * coeff;
+            let mut k2 = shifted_src.get_unchecked(half_len * N + 2).as_() * coeff;
+            let mut k3 = shifted_src.get_unchecked(half_len * N + 3).as_() * coeff;
 
             for i in 0..half_len {
                 let coeff = *scanned_kernel.get_unchecked(i);
@@ -111,22 +110,22 @@ pub(crate) fn filter_row_symmetric_approx_binter<T, I, const N: usize>(
                 k0 = k0
                     + (shifted_src.get_unchecked(i * N).as_()
                         + shifted_src.get_unchecked(rollback * N).as_())
-                        * coeff.weight;
+                        * coeff;
 
                 k1 = k1
                     + (shifted_src.get_unchecked(i * N + 1).as_()
                         + shifted_src.get_unchecked(rollback * N + 1).as_())
-                        * coeff.weight;
+                        * coeff;
 
                 k2 = k2
                     + (shifted_src.get_unchecked(i * N + 2).as_()
                         + shifted_src.get_unchecked(rollback * N + 2).as_())
-                        * coeff.weight;
+                        * coeff;
 
                 k3 = k3
                     + (shifted_src.get_unchecked(i * N + 3).as_()
                         + shifted_src.get_unchecked(rollback * N + 3).as_())
-                        * coeff.weight;
+                        * coeff;
             }
 
             *dst.get_unchecked_mut(f_cx) = k0.to_approx_();
@@ -139,7 +138,7 @@ pub(crate) fn filter_row_symmetric_approx_binter<T, I, const N: usize>(
         while f_cx < flat_max {
             let mx = f_cx - half_len * N;
             let shifted_src = src.get_unchecked(mx..);
-            let mut k0 = shifted_src.get_unchecked(half_len * N).as_() * coeff.weight;
+            let mut k0 = shifted_src.get_unchecked(half_len * N).as_() * coeff;
 
             for i in 0..half_len {
                 let coeff = *scanned_kernel.get_unchecked(i);
@@ -148,7 +147,7 @@ pub(crate) fn filter_row_symmetric_approx_binter<T, I, const N: usize>(
                 k0 = k0
                     + (shifted_src.get_unchecked(i * N).as_()
                         + shifted_src.get_unchecked(rollback * N).as_())
-                        * coeff.weight;
+                        * coeff;
             }
 
             *dst.get_unchecked_mut(f_cx) = k0.to_approx_();
@@ -161,7 +160,7 @@ pub(crate) fn filter_row_symmetric_approx_binter<T, I, const N: usize>(
             for c in 0..N {
                 let coeff = *scanned_kernel.get_unchecked(half_len);
                 let mx = f_cx as i64 - s_kernel;
-                let mut k0 = src.get_unchecked(f_cx * N + c).as_() * coeff.weight;
+                let mut k0 = src.get_unchecked(f_cx * N + c).as_() * coeff;
 
                 for i in 0..half_len {
                     let coeff = *scanned_kernel.get_unchecked(i);
@@ -171,7 +170,7 @@ pub(crate) fn filter_row_symmetric_approx_binter<T, I, const N: usize>(
                     let src1 =
                         border_interpolate!(src, edge_mode, rollback as i64 + mx, 0, width, N, c);
 
-                    k0 = k0 + (src0.as_() + src1.as_()) * coeff.weight;
+                    k0 = k0 + (src0.as_() + src1.as_()) * coeff;
                 }
 
                 *dst.get_unchecked_mut(f_cx * N + c) = k0.to_approx_();

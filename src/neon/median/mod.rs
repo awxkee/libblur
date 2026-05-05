@@ -1,5 +1,5 @@
 /*
- * // Copyright (c) Radzivon Bartoshyk. All rights reserved.
+ * // Copyright (c) Radzivon Bartoshyk 5/2026. All rights reserved.
  * //
  * // Redistribution and use in source and binary forms, with or without modification,
  * // are permitted provided that the following conditions are met:
@@ -26,32 +26,10 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-use crate::primitives::PrimitiveCast;
+mod median_3;
+mod median_5;
+mod median_7;
 
-pub(crate) fn scan_se_1d_flat<F>(kernel: &[F]) -> Vec<F>
-where
-    F: Copy + PartialEq + 'static + Default,
-    i32: PrimitiveCast<F>,
-{
-    let mut left_front = vec![F::default(); kernel.len()];
-
-    for (dst, src) in left_front.iter_mut().zip(kernel.iter()) {
-        *dst = *src;
-    }
-    left_front
-}
-
-pub(crate) fn is_symmetric_1d<F>(kernel: &[F]) -> bool
-where
-    F: Copy + PartialEq + 'static,
-{
-    let len = kernel.len();
-    let fw = kernel.iter().take(len / 2);
-    let bw = kernel.iter().rev().take(len / 2);
-    for (&f, w) in fw.rev().zip(bw.rev()) {
-        if f.ne(w) {
-            return false;
-        }
-    }
-    true
-}
+pub(crate) use median_3::median_blur_3x3;
+pub(crate) use median_5::median_blur_5x5;
+pub(crate) use median_7::median_blur_7x7;

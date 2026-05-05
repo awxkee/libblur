@@ -579,43 +579,43 @@ fn fast_bilateral_filter_impl<
 }
 
 pub trait BilinearWorkingItem<T> {
-    fn to_bi_linear_f32(&self) -> f32;
-    fn from_bi_linear_f32(value: f32) -> T;
+    fn to_bilinear_f32(&self) -> f32;
+    fn from_bilinear_f32(value: f32) -> T;
 }
 
 impl BilinearWorkingItem<u8> for u8 {
     #[inline]
     #[allow(clippy::manual_clamp)]
-    fn from_bi_linear_f32(value: f32) -> u8 {
+    fn from_bilinear_f32(value: f32) -> u8 {
         (value * 255.).min(255.).max(0.).round() as u8
     }
     #[inline]
-    fn to_bi_linear_f32(&self) -> f32 {
+    fn to_bilinear_f32(&self) -> f32 {
         (*self as f32) * (1. / 255.)
     }
 }
 
 impl BilinearWorkingItem<u16> for u16 {
     #[inline]
-    fn from_bi_linear_f32(value: f32) -> u16 {
+    fn from_bilinear_f32(value: f32) -> u16 {
         (value * u16::MAX as f32)
             .round()
             .min(u16::MAX as f32)
             .max(0.) as u16
     }
     #[inline]
-    fn to_bi_linear_f32(&self) -> f32 {
+    fn to_bilinear_f32(&self) -> f32 {
         (*self as f32) * (1. / u16::MAX as f32)
     }
 }
 
 impl BilinearWorkingItem<f32> for f32 {
     #[inline]
-    fn from_bi_linear_f32(value: f32) -> f32 {
+    fn from_bilinear_f32(value: f32) -> f32 {
         value
     }
     #[inline]
-    fn to_bi_linear_f32(&self) -> f32 {
+    fn to_bilinear_f32(&self) -> f32 {
         *self
     }
 }
@@ -647,7 +647,7 @@ fn fast_bilateral_filter_plane_impl<
             .zip(img.data.chunks_exact(img.row_stride() as usize))
         {
             for (r, &src) in dst.iter_mut().zip(src.iter()) {
-                *r = src.to_bi_linear_f32();
+                *r = src.to_bilinear_f32();
             }
         }
         let in_image = BlurImage::borrow(&chan0, width, height, FastBlurChannels::Plane);
@@ -670,7 +670,7 @@ fn fast_bilateral_filter_plane_impl<
                 .chunks_exact(working_dst.row_stride() as usize),
         ) {
             for (r, &src) in dst.iter_mut().zip(src.iter()) {
-                *r = V::from_bi_linear_f32(src);
+                *r = V::from_bilinear_f32(src);
             }
         }
         Ok(())
@@ -719,8 +719,8 @@ pub(crate) fn fast_bilateral_filter_gray_alpha_impl<
                 .zip(dst1.iter_mut())
                 .zip(src.chunks_exact(2))
             {
-                *r = src[0].to_bi_linear_f32();
-                *g = src[1].to_bi_linear_f32();
+                *r = src[0].to_bilinear_f32();
+                *g = src[1].to_bilinear_f32();
             }
         }
 
@@ -761,8 +761,8 @@ pub(crate) fn fast_bilateral_filter_gray_alpha_impl<
             .for_each(|((dst, src0), src1)| {
                 for ((dst, src0), src1) in dst.chunks_exact_mut(2).zip(src0.iter()).zip(src1.iter())
                 {
-                    dst[0] = V::from_bi_linear_f32(*src0);
-                    dst[1] = V::from_bi_linear_f32(*src1);
+                    dst[0] = V::from_bilinear_f32(*src0);
+                    dst[1] = V::from_bilinear_f32(*src1);
                 }
             });
         Ok(())
@@ -807,9 +807,9 @@ fn fast_bilateral_filter_rgb_impl<
                 .zip(dst2.iter_mut())
                 .zip(src.chunks_exact(3))
             {
-                *r = src[0].to_bi_linear_f32();
-                *g = src[1].to_bi_linear_f32();
-                *b = src[2].to_bi_linear_f32();
+                *r = src[0].to_bilinear_f32();
+                *g = src[1].to_bilinear_f32();
+                *b = src[2].to_bilinear_f32();
             }
         }
 
@@ -866,9 +866,9 @@ fn fast_bilateral_filter_rgb_impl<
                     .zip(src1.iter())
                     .zip(src2)
                 {
-                    dst[0] = V::from_bi_linear_f32(*src0);
-                    dst[1] = V::from_bi_linear_f32(*src1);
-                    dst[2] = V::from_bi_linear_f32(*src2);
+                    dst[0] = V::from_bilinear_f32(*src0);
+                    dst[1] = V::from_bilinear_f32(*src1);
+                    dst[2] = V::from_bilinear_f32(*src2);
                 }
             });
 
@@ -917,10 +917,10 @@ fn fast_bilateral_filter_rgba_impl<
                 .zip(dst3.iter_mut())
                 .zip(src.chunks_exact(4))
             {
-                *r = src[0].to_bi_linear_f32();
-                *g = src[1].to_bi_linear_f32();
-                *b = src[2].to_bi_linear_f32();
-                *a = src[3].to_bi_linear_f32();
+                *r = src[0].to_bilinear_f32();
+                *g = src[1].to_bilinear_f32();
+                *b = src[2].to_bilinear_f32();
+                *a = src[3].to_bilinear_f32();
             }
         }
 
@@ -993,10 +993,10 @@ fn fast_bilateral_filter_rgba_impl<
                     .zip(src2.iter())
                     .zip(src3.iter())
                 {
-                    dst[0] = V::from_bi_linear_f32(*src0);
-                    dst[1] = V::from_bi_linear_f32(*src1);
-                    dst[2] = V::from_bi_linear_f32(*src2);
-                    dst[3] = V::from_bi_linear_f32(*src3);
+                    dst[0] = V::from_bilinear_f32(*src0);
+                    dst[1] = V::from_bilinear_f32(*src1);
+                    dst[2] = V::from_bilinear_f32(*src2);
+                    dst[3] = V::from_bilinear_f32(*src3);
                 }
             });
 

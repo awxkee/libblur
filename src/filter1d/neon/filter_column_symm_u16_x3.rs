@@ -28,7 +28,6 @@
  */
 use crate::filter1d::arena::Arena;
 use crate::filter1d::filter_1d_column_handler::FilterBrows;
-use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::neon::utils::{
     vfmlaq_symm_u16_f32, vmulq_u16_by_f32, vqmovnq_f32_u16, xvld1q_u16_x2, xvst1q_u16_x2,
 };
@@ -44,7 +43,7 @@ pub(crate) fn filter_symm_column_neon_u16_f32_x3(
     dst: &mut [u16],
     image_size: ImageSize,
     dst_stride: usize,
-    scanned_kernel: &[ScanPoint1d<f32>],
+    scanned_kernel: &[f32],
 ) {
     unsafe {
         let image_width = image_size.width * arena.components;
@@ -65,9 +64,9 @@ pub(crate) fn filter_symm_column_neon_u16_f32_x3(
 
         let mut cx = 0usize;
 
-        let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(half_len).weight);
+        let coeff = vld1q_dup_f32(scanned_kernel.get_unchecked(half_len));
 
-        while cx + 16 < image_width {
+        while cx + 16 <= image_width {
             let v_src0 = ref0.get_unchecked(cx..);
             let v_src1 = ref1.get_unchecked(cx..);
             let v_src2 = ref2.get_unchecked(cx..);
@@ -86,7 +85,7 @@ pub(crate) fn filter_symm_column_neon_u16_f32_x3(
             let mut k1_2 = vmulq_u16_by_f32(source2.1, coeff);
 
             for i in 0..half_len {
-                let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(i).weight);
+                let coeff = vld1q_dup_f32(scanned_kernel.get_unchecked(i));
                 let rollback = length - i - 1;
 
                 let v_source0_0 =
@@ -147,7 +146,7 @@ pub(crate) fn filter_symm_column_neon_u16_f32_x3(
             let mut k2 = vmulq_u16_by_f32(source2, coeff);
 
             for i in 0..half_len {
-                let coeff = vdupq_n_f32(scanned_kernel.get_unchecked(i).weight);
+                let coeff = vld1q_dup_f32(scanned_kernel.get_unchecked(i));
                 let rollback = length - i - 1;
                 let v_source0_0 = vld1q_u16(brows0.get_unchecked(i).get_unchecked(cx..).as_ptr());
                 let v_source1_0 =
@@ -177,7 +176,7 @@ pub(crate) fn filter_symm_column_neon_u16_f32_x3(
             cx += 8;
         }
 
-        let coeff = scanned_kernel.get_unchecked(half_len).weight;
+        let coeff = scanned_kernel.get_unchecked(half_len);
 
         while cx + 4 < image_width {
             let mut k0_0 = (*ref0.get_unchecked(cx) as f32).mul(coeff);
@@ -202,75 +201,75 @@ pub(crate) fn filter_symm_column_neon_u16_f32_x3(
                     k0_0,
                     ((*brows0.get_unchecked(i).get_unchecked(cx)) as f32)
                         .add(*brows0.get_unchecked(rollback).get_unchecked(cx) as f32),
-                    coeff.weight,
+                    coeff,
                 );
                 k1_0 = mlaf(
                     k1_0,
                     ((*brows0.get_unchecked(i).get_unchecked(cx + 1)) as f32)
                         .add((*brows0.get_unchecked(rollback).get_unchecked(cx + 1)) as f32),
-                    coeff.weight,
+                    coeff,
                 );
                 k2_0 = mlaf(
                     k2_0,
                     ((*brows0.get_unchecked(i).get_unchecked(cx + 2)) as f32)
                         .add((*brows0.get_unchecked(rollback).get_unchecked(cx + 2)) as f32),
-                    coeff.weight,
+                    coeff,
                 );
                 k3_0 = mlaf(
                     k3_0,
                     ((*brows0.get_unchecked(i).get_unchecked(cx + 3)) as f32)
                         .add((*brows0.get_unchecked(rollback).get_unchecked(cx + 3)) as f32),
-                    coeff.weight,
+                    coeff,
                 );
 
                 k0_1 = mlaf(
                     k0_1,
                     ((*brows1.get_unchecked(i).get_unchecked(cx)) as f32)
                         .add(*brows1.get_unchecked(rollback).get_unchecked(cx) as f32),
-                    coeff.weight,
+                    coeff,
                 );
                 k1_1 = mlaf(
                     k1_1,
                     ((*brows1.get_unchecked(i).get_unchecked(cx + 1)) as f32)
                         .add((*brows1.get_unchecked(rollback).get_unchecked(cx + 1)) as f32),
-                    coeff.weight,
+                    coeff,
                 );
                 k2_1 = mlaf(
                     k2_1,
                     ((*brows1.get_unchecked(i).get_unchecked(cx + 2)) as f32)
                         .add((*brows1.get_unchecked(rollback).get_unchecked(cx + 2)) as f32),
-                    coeff.weight,
+                    coeff,
                 );
                 k3_1 = mlaf(
                     k3_1,
                     ((*brows1.get_unchecked(i).get_unchecked(cx + 3)) as f32)
                         .add((*brows1.get_unchecked(rollback).get_unchecked(cx + 3)) as f32),
-                    coeff.weight,
+                    coeff,
                 );
 
                 k0_2 = mlaf(
                     k0_2,
                     ((*brows2.get_unchecked(i).get_unchecked(cx)) as f32)
                         .add(*brows2.get_unchecked(rollback).get_unchecked(cx) as f32),
-                    coeff.weight,
+                    coeff,
                 );
                 k1_2 = mlaf(
                     k1_2,
                     ((*brows2.get_unchecked(i).get_unchecked(cx + 1)) as f32)
                         .add((*brows2.get_unchecked(rollback).get_unchecked(cx + 1)) as f32),
-                    coeff.weight,
+                    coeff,
                 );
                 k2_2 = mlaf(
                     k2_2,
                     ((*brows2.get_unchecked(i).get_unchecked(cx + 2)) as f32)
                         .add((*brows2.get_unchecked(rollback).get_unchecked(cx + 2)) as f32),
-                    coeff.weight,
+                    coeff,
                 );
                 k3_2 = mlaf(
                     k3_2,
                     ((*brows2.get_unchecked(i).get_unchecked(cx + 3)) as f32)
                         .add((*brows2.get_unchecked(rollback).get_unchecked(cx + 3)) as f32),
-                    coeff.weight,
+                    coeff,
                 );
             }
 
@@ -303,21 +302,21 @@ pub(crate) fn filter_symm_column_neon_u16_f32_x3(
                     k0,
                     ((*brows0.get_unchecked(i).get_unchecked(x)) as f32)
                         .add(*brows0.get_unchecked(rollback).get_unchecked(x) as f32),
-                    coeff.weight,
+                    coeff,
                 );
 
                 k1 = mlaf(
                     k1,
                     ((*brows1.get_unchecked(i).get_unchecked(x)) as f32)
                         .add(*brows1.get_unchecked(rollback).get_unchecked(x) as f32),
-                    coeff.weight,
+                    coeff,
                 );
 
                 k2 = mlaf(
                     k2,
                     ((*brows2.get_unchecked(i).get_unchecked(x)) as f32)
                         .add(*brows2.get_unchecked(rollback).get_unchecked(x) as f32),
-                    coeff.weight,
+                    coeff,
                 );
             }
 

@@ -28,7 +28,6 @@
  */
 
 use crate::filter1d::arena::Arena;
-use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
 use crate::primitives::PrimitiveCast;
@@ -41,7 +40,7 @@ pub(crate) fn filter_symmetric_column<T, F>(
     arena_src: &[&[T]],
     dst: &mut [T],
     image_size: ImageSize,
-    scanned_kernel: &[ScanPoint1d<F>],
+    scanned_kernel: &[F],
 ) where
     T: Copy + PrimitiveCast<F>,
     F: ToStorage<T> + Mul<F, Output = F> + MulAdd<F, Output = F> + Add<F, Output = F> + Default,
@@ -54,7 +53,7 @@ pub(crate) fn filter_symmetric_column<T, F>(
 
         let mut cx = 0usize;
 
-        let coeff = scanned_kernel[half_len].weight;
+        let coeff = scanned_kernel[half_len];
 
         while cx + 32 <= dst_stride {
             let mut store: [F; 32] = [F::default(); 32];
@@ -65,13 +64,13 @@ pub(crate) fn filter_symmetric_column<T, F>(
                 *dst = src.cast_().mul(coeff);
             }
 
-            for (i, coeff) in scanned_kernel.iter().take(half_len).enumerate() {
+            for (i, &coeff) in scanned_kernel.iter().take(half_len).enumerate() {
                 let rollback = length - i - 1;
                 let fw = &arena_src[i][cx..(cx + 32)];
                 let bw = &arena_src[rollback][cx..(cx + 32)];
 
                 for ((dst, fw), bw) in store.iter_mut().zip(fw).zip(bw) {
-                    *dst = mlaf(*dst, fw.cast_().add(bw.cast_()), coeff.weight);
+                    *dst = mlaf(*dst, fw.cast_().add(bw.cast_()), coeff);
                 }
             }
 
@@ -91,13 +90,13 @@ pub(crate) fn filter_symmetric_column<T, F>(
                 *dst = src.cast_().mul(coeff);
             }
 
-            for (i, coeff) in scanned_kernel.iter().take(half_len).enumerate() {
+            for (i, &coeff) in scanned_kernel.iter().take(half_len).enumerate() {
                 let rollback = length - i - 1;
                 let fw = &arena_src[i][cx..(cx + 16)];
                 let bw = &arena_src[rollback][cx..(cx + 16)];
 
                 for ((dst, fw), bw) in store.iter_mut().zip(fw).zip(bw) {
-                    *dst = mlaf(*dst, fw.cast_().add(bw.cast_()), coeff.weight);
+                    *dst = mlaf(*dst, fw.cast_().add(bw.cast_()), coeff);
                 }
             }
 
@@ -116,14 +115,14 @@ pub(crate) fn filter_symmetric_column<T, F>(
             let mut k2 = v_src[2].cast_().mul(coeff);
             let mut k3 = v_src[3].cast_().mul(coeff);
 
-            for (i, coeff) in scanned_kernel.iter().take(half_len).enumerate() {
+            for (i, &coeff) in scanned_kernel.iter().take(half_len).enumerate() {
                 let rollback = length - i - 1;
                 let fw = &arena_src[i][cx..(cx + 4)];
                 let bw = &arena_src[rollback][cx..(cx + 4)];
-                k0 = mlaf(k0, fw[0].cast_().add(bw[0].cast_()), coeff.weight);
-                k1 = mlaf(k1, fw[1].cast_().add(bw[1].cast_()), coeff.weight);
-                k2 = mlaf(k2, fw[2].cast_().add(bw[2].cast_()), coeff.weight);
-                k3 = mlaf(k3, fw[3].cast_().add(bw[3].cast_()), coeff.weight);
+                k0 = mlaf(k0, fw[0].cast_().add(bw[0].cast_()), coeff);
+                k1 = mlaf(k1, fw[1].cast_().add(bw[1].cast_()), coeff);
+                k2 = mlaf(k2, fw[2].cast_().add(bw[2].cast_()), coeff);
+                k3 = mlaf(k3, fw[3].cast_().add(bw[3].cast_()), coeff);
             }
 
             *dst.get_unchecked_mut(cx) = k0.to_();
@@ -138,11 +137,11 @@ pub(crate) fn filter_symmetric_column<T, F>(
 
             let mut k0 = v_src[0].cast_().mul(coeff);
 
-            for (i, coeff) in scanned_kernel.iter().take(half_len).enumerate() {
+            for (i, &coeff) in scanned_kernel.iter().take(half_len).enumerate() {
                 let rollback = length - i - 1;
                 let fw = &arena_src[i][x..(x + 1)];
                 let bw = &arena_src[rollback][x..(x + 1)];
-                k0 = mlaf(k0, fw[0].cast_().add(bw[0].cast_()), coeff.weight);
+                k0 = mlaf(k0, fw[0].cast_().add(bw[0].cast_()), coeff);
             }
 
             *dst.get_unchecked_mut(x) = k0.to_();

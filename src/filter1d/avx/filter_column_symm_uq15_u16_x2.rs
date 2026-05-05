@@ -61,7 +61,7 @@ pub(crate) fn filter_column_avx_symm_uq15_u16_x2(
 }
 
 #[target_feature(enable = "avx2")]
-unsafe fn filter_column_avx_symm_u8_i32_impl_x2(
+fn filter_column_avx_symm_u8_i32_impl_x2(
     arena: Arena,
     brows: FilterBrows<u16>,
     dst: &mut [u16],

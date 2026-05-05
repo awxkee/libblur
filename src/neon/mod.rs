@@ -44,6 +44,7 @@ mod fast_gaussian_next_u16_q0_31;
 #[cfg(feature = "rdm")]
 mod fast_gaussian_q0_31;
 mod fast_gaussian_u16;
+mod median;
 mod utils;
 
 pub(crate) use fast_gaussian::{fg_horizontal_pass_neon_u8, fg_vertical_pass_neon_u8};
@@ -71,4 +72,5 @@ pub(crate) use fast_gaussian_q0_31::{
     fg_horizontal_pass_neon_u8_rdm, fg_vertical_pass_neon_u8_rdm,
 };
 pub(crate) use fast_gaussian_u16::{fg_horizontal_pass_neon_u16, fg_vertical_pass_neon_u16};
+pub(crate) use median::{median_blur_3x3, median_blur_5x5, median_blur_7x7};
 pub(crate) use utils::*;
