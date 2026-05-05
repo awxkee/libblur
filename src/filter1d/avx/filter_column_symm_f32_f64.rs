@@ -30,7 +30,6 @@ use crate::avx::{_mm256_load_pack_ps_x2, _mm256_store_pack_ps_x2};
 use crate::filter1d::arena::Arena;
 use crate::filter1d::avx::sse_utils::_mm_opt_fmla_pd;
 use crate::filter1d::avx::utils::_mm256_opt_fmla_pd;
-use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::img_size::ImageSize;
 use std::arch::x86_64::*;
 
@@ -39,7 +38,7 @@ pub(crate) fn filter_column_avx_symm_f32_f64(
     arena_src: &[&[f32]],
     dst: &mut [f32],
     image_size: ImageSize,
-    scanned_kernel: &[ScanPoint1d<f64>],
+    scanned_kernel: &[f64],
 ) {
     unsafe {
         let has_fma = std::arch::is_x86_feature_detected!("fma");
@@ -69,7 +68,7 @@ fn filter_column_avx_symm_f32_f64_impl_fma(
     arena_src: &[&[f32]],
     dst: &mut [f32],
     image_size: ImageSize,
-    scanned_kernel: &[ScanPoint1d<f64>],
+    scanned_kernel: &[f64],
 ) {
     let unit = ExecutionUnit::<true>::default();
     unit.pass(arena, arena_src, dst, image_size, scanned_kernel);
@@ -81,7 +80,7 @@ fn filter_column_avx_symm_f32_f64_impl_def(
     arena_src: &[&[f32]],
     dst: &mut [f32],
     image_size: ImageSize,
-    scanned_kernel: &[ScanPoint1d<f64>],
+    scanned_kernel: &[f64],
 ) {
     let unit = ExecutionUnit::<false>::default();
     unit.pass(arena, arena_src, dst, image_size, scanned_kernel);
@@ -98,7 +97,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
         arena_src: &[&[f32]],
         dst: &mut [f32],
         image_size: ImageSize,
-        scanned_kernel: &[ScanPoint1d<f64>],
+        scanned_kernel: &[f64],
     ) {
         unsafe {
             let dst_stride = image_size.width * arena.components;
@@ -108,7 +107,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
 
             let ref0 = arena_src.get_unchecked(half_len);
 
-            let coeff = _mm256_set1_pd(scanned_kernel.get_unchecked(half_len).weight);
+            let coeff = _mm256_set1_pd(*scanned_kernel.get_unchecked(half_len));
 
             let mut cx = 0usize;
 
@@ -127,7 +126,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
 
                 for i in 0..half_len {
                     let rollback = length - i - 1;
-                    let coeff = _mm256_set1_pd(scanned_kernel.get_unchecked(i).weight);
+                    let coeff = _mm256_set1_pd(*scanned_kernel.get_unchecked(i));
                     let v_source = _mm256_load_pack_ps_x2(
                         arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr(),
                     );
@@ -198,7 +197,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
 
                 for i in 0..half_len {
                     let rollback = length - i - 1;
-                    let coeff = _mm256_set1_pd(scanned_kernel.get_unchecked(i).weight);
+                    let coeff = _mm256_set1_pd(*scanned_kernel.get_unchecked(i));
                     let v_source =
                         _mm256_loadu_ps(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
                     let v_source_r = _mm256_loadu_ps(
@@ -245,7 +244,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
 
                 for i in 0..half_len {
                     let rollback = length - i - 1;
-                    let coeff = _mm256_set1_pd(scanned_kernel.get_unchecked(i).weight);
+                    let coeff = _mm256_set1_pd(*scanned_kernel.get_unchecked(i));
                     let v_source_0 =
                         _mm_loadu_ps(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
                     let v_source_1 = _mm_loadu_ps(
@@ -274,7 +273,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
 
                 for i in 0..half_len {
                     let rollback = length - i - 1;
-                    let coeff = _mm_set_pd1(scanned_kernel.get_unchecked(i).weight);
+                    let coeff = _mm_set_pd1(*scanned_kernel.get_unchecked(i));
                     let v_source_0 =
                         _mm_load_ss(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
                     let v_source_1 = _mm_load_ss(

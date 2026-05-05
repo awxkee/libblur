@@ -37,7 +37,6 @@ use crate::filter1d::avx::sse_utils::{
 use crate::filter1d::avx::utils::{
     _mm256_mul_add_epi8_by_ps_x4, _mm256_mul_epi8_by_ps_x4, _mm256_pack_ps_x4_epi8,
 };
-use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
 use crate::to_storage::ToStorage;
@@ -52,7 +51,7 @@ pub(crate) fn filter_column_avx_u8_f32(
     arena_src: &[&[u8]],
     dst: &mut [u8],
     image_size: ImageSize,
-    scanned_kernel: &[ScanPoint1d<f32>],
+    scanned_kernel: &[f32],
 ) {
     let has_fma = std::arch::is_x86_feature_detected!("fma");
     unsafe {
@@ -70,7 +69,7 @@ fn filter_column_avx_u8_f32_impl_def(
     arena_src: &[&[u8]],
     dst: &mut [u8],
     image_size: ImageSize,
-    scanned_kernel: &[ScanPoint1d<f32>],
+    scanned_kernel: &[f32],
 ) {
     let unit = ExecutionUnit::<false>::default();
     unit.pass(arena, arena_src, dst, image_size, scanned_kernel);
@@ -82,7 +81,7 @@ fn filter_column_avx_u8_f32_impl_fma(
     arena_src: &[&[u8]],
     dst: &mut [u8],
     image_size: ImageSize,
-    scanned_kernel: &[ScanPoint1d<f32>],
+    scanned_kernel: &[f32],
 ) {
     let unit = ExecutionUnit::<true>::default();
     unit.pass(arena, arena_src, dst, image_size, scanned_kernel);
@@ -99,7 +98,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
         arena_src: &[&[u8]],
         dst: &mut [u8],
         image_size: ImageSize,
-        scanned_kernel: &[ScanPoint1d<f32>],
+        scanned_kernel: &[f32],
     ) {
         unsafe {
             let image_width = image_size.width * arena.components;
@@ -108,7 +107,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
 
             let mut cx = 0usize;
 
-            let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(0).weight);
+            let coeff = _mm256_set1_ps(*scanned_kernel.get_unchecked(0));
 
             while cx + 128 <= image_width {
                 let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
@@ -120,7 +119,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
                 let mut k3 = _mm256_mul_epi8_by_ps_x4::<FMA>(source.3, coeff);
 
                 for i in 1..length {
-                    let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(i).weight);
+                    let coeff = _mm256_set1_ps(*scanned_kernel.get_unchecked(i));
                     let v_source = _mm256_load_pack_x4(
                         arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr(),
                     );
@@ -152,7 +151,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
                 let mut k2 = _mm256_mul_epi8_by_ps_x4::<FMA>(source.2, coeff);
 
                 for i in 1..length {
-                    let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(i).weight);
+                    let coeff = _mm256_set1_ps(*scanned_kernel.get_unchecked(i));
                     let v_source = _mm256_load_pack_x3(
                         arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr(),
                     );
@@ -181,7 +180,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
                 let mut k1 = _mm256_mul_epi8_by_ps_x4::<FMA>(source.1, coeff);
 
                 for i in 1..length {
-                    let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(i).weight);
+                    let coeff = _mm256_set1_ps(*scanned_kernel.get_unchecked(i));
                     let v_source = _mm256_load_pack_x2(
                         arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr(),
                     );
@@ -204,7 +203,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
                 let mut k0 = _mm256_mul_epi8_by_ps_x4::<FMA>(source, coeff);
 
                 for i in 1..length {
-                    let coeff = _mm256_set1_ps(scanned_kernel.get_unchecked(i).weight);
+                    let coeff = _mm256_set1_ps(*scanned_kernel.get_unchecked(i));
                     let v_source =
                         _mm256_loadu_si256(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr()
                             as *const __m256i);
@@ -227,8 +226,7 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
                     let v_source_0 =
                         _mm_loadu_si128(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr()
                             as *const __m128i);
-                    k0 =
-                        _mm_mul_add_epi8_by_ps_x4::<FMA>(k0, v_source_0, _mm_set1_ps(coeff.weight));
+                    k0 = _mm_mul_add_epi8_by_ps_x4::<FMA>(k0, v_source_0, _mm_set1_ps(coeff));
                 }
 
                 let dst_ptr = dst.get_unchecked_mut(cx..).as_mut_ptr();
@@ -241,32 +239,32 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
             while cx + 4 <= image_width {
                 let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
-                let mut k0 = (*v_src.get_unchecked(0) as f32).mul(coeff.weight);
-                let mut k1 = (*v_src.get_unchecked(1) as f32).mul(coeff.weight);
-                let mut k2 = (*v_src.get_unchecked(2) as f32).mul(coeff.weight);
-                let mut k3 = (*v_src.get_unchecked(3) as f32).mul(coeff.weight);
+                let mut k0 = (*v_src.get_unchecked(0) as f32).mul(coeff);
+                let mut k1 = (*v_src.get_unchecked(1) as f32).mul(coeff);
+                let mut k2 = (*v_src.get_unchecked(2) as f32).mul(coeff);
+                let mut k3 = (*v_src.get_unchecked(3) as f32).mul(coeff);
 
                 for i in 1..length {
                     let coeff = *scanned_kernel.get_unchecked(i);
                     k0 = mlaf(
                         k0,
                         (*arena_src.get_unchecked(i).get_unchecked(cx)) as f32,
-                        coeff.weight,
+                        coeff,
                     );
                     k1 = mlaf(
                         k1,
                         (*arena_src.get_unchecked(i).get_unchecked(cx + 1)) as f32,
-                        coeff.weight,
+                        coeff,
                     );
                     k2 = mlaf(
                         k2,
                         (*arena_src.get_unchecked(i).get_unchecked(cx + 2)) as f32,
-                        coeff.weight,
+                        coeff,
                     );
                     k3 = mlaf(
                         k3,
                         (*arena_src.get_unchecked(i).get_unchecked(cx + 3)) as f32,
-                        coeff.weight,
+                        coeff,
                     );
                 }
 
@@ -280,14 +278,14 @@ impl<const FMA: bool> ExecutionUnit<FMA> {
             for x in cx..image_width {
                 let v_src = arena_src.get_unchecked(0).get_unchecked(x..);
 
-                let mut k0 = ((*v_src.get_unchecked(0)) as f32).mul(coeff.weight);
+                let mut k0 = ((*v_src.get_unchecked(0)) as f32).mul(coeff);
 
                 for i in 1..length {
                     let coeff = *scanned_kernel.get_unchecked(i);
                     k0 = mlaf(
                         k0,
                         (*arena_src.get_unchecked(i).get_unchecked(x)) as f32,
-                        coeff.weight,
+                        coeff,
                     );
                 }
 

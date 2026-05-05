@@ -27,7 +27,6 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter1d::arena::Arena;
-use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::sse::utils::_mm_opt_fmlaf_ps;
 use crate::img_size::ImageSize;
 use crate::sse::{
@@ -43,7 +42,7 @@ pub(crate) fn filter_column_sse_f32_f32(
     arena_src: &[&[f32]],
     dst: &mut [f32],
     image_size: ImageSize,
-    scanned_kernel: &[ScanPoint1d<f32>],
+    scanned_kernel: &[f32],
 ) {
     unsafe {
         let unit = ExecutionUnit::default();
@@ -62,14 +61,14 @@ impl ExecutionUnit {
         arena_src: &[&[f32]],
         dst: &mut [f32],
         image_size: ImageSize,
-        scanned_kernel: &[ScanPoint1d<f32>],
+        scanned_kernel: &[f32],
     ) {
         unsafe {
             let dst_stride = image_size.width * arena.components;
 
             let length = scanned_kernel.len();
 
-            let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(0).weight);
+            let coeff = _mm_set1_ps(*scanned_kernel.get_unchecked(0));
 
             let mut cx = 0usize;
 
@@ -83,7 +82,7 @@ impl ExecutionUnit {
                 let mut k3 = _mm_mul_ps(source.3, coeff);
 
                 for i in 1..length {
-                    let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(i).weight);
+                    let coeff = _mm_set1_ps(*scanned_kernel.get_unchecked(i));
                     let v_source = _mm_load_pack_ps_x4(
                         arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr(),
                     );
@@ -106,7 +105,7 @@ impl ExecutionUnit {
                 let mut k1 = _mm_mul_ps(source.1, coeff);
 
                 for i in 1..length {
-                    let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(i).weight);
+                    let coeff = _mm_set1_ps(*scanned_kernel.get_unchecked(i));
                     let v_source = _mm_load_pack_ps_x2(
                         arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr(),
                     );
@@ -130,7 +129,7 @@ impl ExecutionUnit {
                     let coeff = *scanned_kernel.get_unchecked(i);
                     let v_source_0 =
                         _mm_loadu_ps(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
-                    k0 = _mm_opt_fmlaf_ps(k0, v_source_0, _mm_set1_ps(coeff.weight));
+                    k0 = _mm_opt_fmlaf_ps(k0, v_source_0, _mm_set1_ps(coeff));
                 }
 
                 let dst_ptr = dst.get_unchecked_mut(cx..).as_mut_ptr();
@@ -148,7 +147,7 @@ impl ExecutionUnit {
                     let coeff = *scanned_kernel.get_unchecked(i);
                     let v_source_0 =
                         _mm_load_ss(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
-                    k0 = _mm_opt_fmlaf_ps(k0, v_source_0, _mm_set1_ps(coeff.weight));
+                    k0 = _mm_opt_fmlaf_ps(k0, v_source_0, _mm_set1_ps(coeff));
                 }
 
                 let dst_ptr = dst.get_unchecked_mut(cx..).as_mut_ptr();

@@ -27,7 +27,6 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter1d::arena::Arena;
-use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::sse::utils::{_mm_madd_epi8_by_epi16_x4, _mm_madd_symm_epi8_by_epi16_x4};
 use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
@@ -47,7 +46,7 @@ pub(crate) fn filter_column_symm_sse_u8_i16(
     arena_src: &[&[u8]],
     dst: &mut [u8],
     image_size: ImageSize,
-    scanned_kernel: &[ScanPoint1d<i16>],
+    scanned_kernel: &[i16],
 ) {
     unsafe {
         filter_column_symm_sse_u8_i16_impl(arena, arena_src, dst, image_size, scanned_kernel);
@@ -60,7 +59,7 @@ fn filter_column_symm_sse_u8_i16_impl(
     arena_src: &[&[u8]],
     dst: &mut [u8],
     image_size: ImageSize,
-    scanned_kernel: &[ScanPoint1d<i16>],
+    scanned_kernel: &[i16],
 ) {
     unsafe {
         let image_width = image_size.width * arena.components;
@@ -70,9 +69,9 @@ fn filter_column_symm_sse_u8_i16_impl(
 
         let mut cx = 0usize;
 
-        let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(half_len).weight);
+        let coeff = _mm_set1_epi16(*scanned_kernel.get_unchecked(half_len));
 
-        while cx + 64 < image_width {
+        while cx + 64 <= image_width {
             let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
 
             let source = _mm_load_pack_x4(v_src.as_ptr());
@@ -82,7 +81,7 @@ fn filter_column_symm_sse_u8_i16_impl(
             let mut k3 = _mm_madd_epi8_by_epi16_x4(source.3, coeff);
 
             for i in 0..half_len {
-                let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(i).weight);
+                let coeff = _mm_set1_epi16(*scanned_kernel.get_unchecked(i));
                 let rollback = length - i - 1;
                 let v_source0 =
                     _mm_load_pack_x4(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
@@ -111,7 +110,7 @@ fn filter_column_symm_sse_u8_i16_impl(
             cx += 64;
         }
 
-        while cx + 48 < image_width {
+        while cx + 48 <= image_width {
             let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
 
             let source = _mm_load_pack_x3(v_src.as_ptr());
@@ -120,7 +119,7 @@ fn filter_column_symm_sse_u8_i16_impl(
             let mut k2 = _mm_madd_epi8_by_epi16_x4(source.2, coeff);
 
             for i in 0..half_len {
-                let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(i).weight);
+                let coeff = _mm_set1_epi16(*scanned_kernel.get_unchecked(i));
                 let rollback = length - i - 1;
                 let v_source0 =
                     _mm_load_pack_x3(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
@@ -147,7 +146,7 @@ fn filter_column_symm_sse_u8_i16_impl(
             cx += 48;
         }
 
-        while cx + 32 < image_width {
+        while cx + 32 <= image_width {
             let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
 
             let source = _mm_load_pack_x2(v_src.as_ptr());
@@ -155,7 +154,7 @@ fn filter_column_symm_sse_u8_i16_impl(
             let mut k1 = _mm_madd_epi8_by_epi16_x4(source.1, coeff);
 
             for i in 0..half_len {
-                let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(i).weight);
+                let coeff = _mm_set1_epi16(*scanned_kernel.get_unchecked(i));
                 let rollback = length - i - 1;
                 let v_source0 =
                     _mm_load_pack_x2(arena_src.get_unchecked(i).get_unchecked(cx..).as_ptr());
@@ -178,7 +177,7 @@ fn filter_column_symm_sse_u8_i16_impl(
             cx += 32;
         }
 
-        while cx + 16 < image_width {
+        while cx + 16 <= image_width {
             let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
 
             let source_0 = _mm_loadu_si128(v_src.as_ptr() as *const __m128i);
@@ -200,7 +199,7 @@ fn filter_column_symm_sse_u8_i16_impl(
                     k0,
                     v_source_0,
                     v_source_1,
-                    _mm_set1_epi16(coeff.weight),
+                    _mm_set1_epi16(coeff),
                 );
             }
 
@@ -209,9 +208,9 @@ fn filter_column_symm_sse_u8_i16_impl(
             cx += 16;
         }
 
-        let coeff = scanned_kernel.get_unchecked(half_len).weight;
+        let coeff = scanned_kernel.get_unchecked(half_len);
 
-        while cx + 4 < image_width {
+        while cx + 4 <= image_width {
             let v_src = arena_src.get_unchecked(half_len).get_unchecked(cx..);
 
             let mut k0 = (*v_src.get_unchecked(0) as i16).mul(coeff);
@@ -226,25 +225,25 @@ fn filter_column_symm_sse_u8_i16_impl(
                     k0,
                     ((*arena_src.get_unchecked(i).get_unchecked(cx)) as i16)
                         .add(*arena_src.get_unchecked(rollback).get_unchecked(cx) as i16),
-                    coeff.weight,
+                    coeff,
                 );
                 k1 = mlaf(
                     k1,
                     ((*arena_src.get_unchecked(i).get_unchecked(cx + 1)) as i16)
                         .add(*arena_src.get_unchecked(rollback).get_unchecked(cx + 1) as i16),
-                    coeff.weight,
+                    coeff,
                 );
                 k2 = mlaf(
                     k2,
                     ((*arena_src.get_unchecked(i).get_unchecked(cx + 2)) as i16)
                         .add(*arena_src.get_unchecked(rollback).get_unchecked(cx + 2) as i16),
-                    coeff.weight,
+                    coeff,
                 );
                 k3 = mlaf(
                     k3,
                     ((*arena_src.get_unchecked(i).get_unchecked(cx + 3)) as i16)
                         .add(*arena_src.get_unchecked(rollback).get_unchecked(cx + 3) as i16),
-                    coeff.weight,
+                    coeff,
                 );
             }
 
@@ -267,7 +266,7 @@ fn filter_column_symm_sse_u8_i16_impl(
                     k0,
                     ((*arena_src.get_unchecked(i).get_unchecked(x)) as i16)
                         .add(*arena_src.get_unchecked(rollback).get_unchecked(x) as i16),
-                    coeff.weight,
+                    coeff,
                 );
             }
 

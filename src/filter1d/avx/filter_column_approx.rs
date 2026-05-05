@@ -69,7 +69,7 @@ fn filter_column_avx_u8_i32_impl(
 
         let coeff = _mm256_set1_epi32(*v_prepared.get_unchecked(0));
 
-        while cx + 64 < image_width {
+        while cx + 64 <= image_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let source = _mm256_load_pack_x2(v_src.as_ptr());
@@ -92,7 +92,7 @@ fn filter_column_avx_u8_i32_impl(
             cx += 64;
         }
 
-        while cx + 32 < image_width {
+        while cx + 32 <= image_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let source = _mm256_loadu_si256(v_src.as_ptr() as *const __m256i);
@@ -111,7 +111,7 @@ fn filter_column_avx_u8_i32_impl(
             cx += 32;
         }
 
-        while cx + 16 < image_width {
+        while cx + 16 <= image_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let source = _mm_loadu_si128(v_src.as_ptr() as *const __m128i);
@@ -130,7 +130,7 @@ fn filter_column_avx_u8_i32_impl(
             cx += 16;
         }
 
-        while cx + 4 < image_width {
+        while cx + 4 <= image_width {
             let v_src = arena_src.get_unchecked(0).get_unchecked(cx..);
 
             let source = _mm_loadu_si32(v_src.as_ptr() as *const _);

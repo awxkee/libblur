@@ -27,7 +27,6 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter1d::arena::Arena;
-use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::img_size::ImageSize;
 use crate::mlaf::mlaf;
 use crate::primitives::PrimitiveCast;
@@ -40,7 +39,7 @@ pub(crate) fn filter_row<T, F, const N: usize>(
     arena_src: &[T],
     dst: &mut [T],
     image_size: ImageSize,
-    scanned_kernel: &[ScanPoint1d<F>],
+    scanned_kernel: &[F],
 ) where
     T: Copy + PrimitiveCast<F>,
     F: ToStorage<T> + Mul<Output = F> + MulAdd<F, Output = F> + Add<F, Output = F>,
@@ -63,33 +62,17 @@ pub(crate) fn filter_row<T, F, const N: usize>(
 
             let shifted_src = local_src.get_unchecked(cx..);
 
-            let mut k0 = (*shifted_src.get_unchecked(0)).cast_().mul(coeff.weight);
-            let mut k1 = (*shifted_src.get_unchecked(1)).cast_().mul(coeff.weight);
-            let mut k2 = (*shifted_src.get_unchecked(2)).cast_().mul(coeff.weight);
-            let mut k3 = (*shifted_src.get_unchecked(3)).cast_().mul(coeff.weight);
+            let mut k0 = (*shifted_src.get_unchecked(0)).cast_().mul(coeff);
+            let mut k1 = (*shifted_src.get_unchecked(1)).cast_().mul(coeff);
+            let mut k2 = (*shifted_src.get_unchecked(2)).cast_().mul(coeff);
+            let mut k3 = (*shifted_src.get_unchecked(3)).cast_().mul(coeff);
 
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
-                k0 = mlaf(
-                    k0,
-                    (*shifted_src.get_unchecked(i * N)).cast_(),
-                    coeff.weight,
-                );
-                k1 = mlaf(
-                    k1,
-                    (*shifted_src.get_unchecked(i * N + 1)).cast_(),
-                    coeff.weight,
-                );
-                k2 = mlaf(
-                    k2,
-                    (*shifted_src.get_unchecked(i * N + 2)).cast_(),
-                    coeff.weight,
-                );
-                k3 = mlaf(
-                    k3,
-                    (*shifted_src.get_unchecked(i * N + 3)).cast_(),
-                    coeff.weight,
-                );
+                k0 = mlaf(k0, (*shifted_src.get_unchecked(i * N)).cast_(), coeff);
+                k1 = mlaf(k1, (*shifted_src.get_unchecked(i * N + 1)).cast_(), coeff);
+                k2 = mlaf(k2, (*shifted_src.get_unchecked(i * N + 2)).cast_(), coeff);
+                k3 = mlaf(k3, (*shifted_src.get_unchecked(i * N + 3)).cast_(), coeff);
             }
 
             *dst.get_unchecked_mut(cx) = k0.to_();
@@ -102,15 +85,11 @@ pub(crate) fn filter_row<T, F, const N: usize>(
         for x in cx..max_width {
             let coeff = *scanned_kernel.get_unchecked(0);
             let shifted_src = local_src.get_unchecked(x..);
-            let mut k0 = (*shifted_src.get_unchecked(0)).cast_().mul(coeff.weight);
+            let mut k0 = (*shifted_src.get_unchecked(0)).cast_().mul(coeff);
 
             for i in 1..length {
                 let coeff = *scanned_kernel.get_unchecked(i);
-                k0 = mlaf(
-                    k0,
-                    (*shifted_src.get_unchecked(i * N)).cast_(),
-                    coeff.weight,
-                );
+                k0 = mlaf(k0, (*shifted_src.get_unchecked(i * N)).cast_(), coeff);
             }
             *dst.get_unchecked_mut(x) = k0.to_();
         }

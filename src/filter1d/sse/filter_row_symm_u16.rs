@@ -27,7 +27,6 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter1d::arena::Arena;
-use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::sse::utils::{
     _mm_mul_add_symm_epi16_by_ps, _mm_mul_add_symm_epi16_by_ps_x2, _mm_mul_epi16_by_ps,
     _mm_mul_epi16_by_ps_x2, _mm_pack_ps_epi16, _mm_pack_ps_x2_epi16,
@@ -46,7 +45,7 @@ pub(crate) fn filter_row_sse_symm_u16_f32<const N: usize>(
     arena_src: &[u16],
     dst: &mut [u16],
     image_size: ImageSize,
-    scanned_kernel: &[ScanPoint1d<f32>],
+    scanned_kernel: &[f32],
 ) {
     unsafe {
         let has_fma = std::arch::is_x86_feature_detected!("fma");
@@ -64,7 +63,7 @@ fn filter_row_sse_symm_u16_f32_fma<const N: usize>(
     arena_src: &[u16],
     dst: &mut [u16],
     image_size: ImageSize,
-    scanned_kernel: &[ScanPoint1d<f32>],
+    scanned_kernel: &[f32],
 ) {
     filter_row_sse_symm_u16_f32_impl::<true, N>(arena, arena_src, dst, image_size, scanned_kernel);
 }
@@ -75,7 +74,7 @@ fn filter_row_sse_symm_u16_f32_def<const N: usize>(
     arena_src: &[u16],
     dst: &mut [u16],
     image_size: ImageSize,
-    scanned_kernel: &[ScanPoint1d<f32>],
+    scanned_kernel: &[f32],
 ) {
     filter_row_sse_symm_u16_f32_impl::<false, N>(arena, arena_src, dst, image_size, scanned_kernel);
 }
@@ -86,7 +85,7 @@ fn filter_row_sse_symm_u16_f32_impl<const FMA: bool, const N: usize>(
     arena_src: &[u16],
     dst: &mut [u16],
     image_size: ImageSize,
-    scanned_kernel: &[ScanPoint1d<f32>],
+    scanned_kernel: &[f32],
 ) {
     unsafe {
         let width = image_size.width;
@@ -101,7 +100,7 @@ fn filter_row_sse_symm_u16_f32_impl<const FMA: bool, const N: usize>(
 
         let max_width = width * N;
 
-        let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(half_len).weight);
+        let coeff = _mm_set1_ps(*scanned_kernel.get_unchecked(half_len));
 
         while cx + 32 <= max_width {
             let shifted_src = local_src.get_unchecked(cx..);
@@ -115,7 +114,7 @@ fn filter_row_sse_symm_u16_f32_impl<const FMA: bool, const N: usize>(
 
             for i in 0..half_len {
                 let rollback = length - i - 1;
-                let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(i).weight);
+                let coeff = _mm_set1_ps(*scanned_kernel.get_unchecked(i));
                 let v_source0 =
                     _mm_load_pack_x4(shifted_src.get_unchecked((i * N)..).as_ptr() as *const _);
                 let v_source1 = _mm_load_pack_x4(
@@ -150,7 +149,7 @@ fn filter_row_sse_symm_u16_f32_impl<const FMA: bool, const N: usize>(
 
             for i in 0..half_len {
                 let rollback = length - i - 1;
-                let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(i).weight);
+                let coeff = _mm_set1_ps(*scanned_kernel.get_unchecked(i));
                 let v_source0 =
                     _mm_load_pack_x2(shifted_src.get_unchecked((i * N)..).as_ptr() as *const _);
                 let v_source1 = _mm_load_pack_x2(
@@ -177,7 +176,7 @@ fn filter_row_sse_symm_u16_f32_impl<const FMA: bool, const N: usize>(
 
             for i in 0..half_len {
                 let rollback = length - i - 1;
-                let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(i).weight);
+                let coeff = _mm_set1_ps(*scanned_kernel.get_unchecked(i));
                 let v_source0 =
                     _mm_loadu_si128(shifted_src.get_unchecked((i * N)..).as_ptr() as *const _);
                 let v_source1 = _mm_loadu_si128(
@@ -200,7 +199,7 @@ fn filter_row_sse_symm_u16_f32_impl<const FMA: bool, const N: usize>(
 
             for i in 0..half_len {
                 let rollback = length - i - 1;
-                let coeff = _mm_set1_ps(scanned_kernel.get_unchecked(i).weight);
+                let coeff = _mm_set1_ps(*scanned_kernel.get_unchecked(i));
                 let v_source0 =
                     _mm_loadu_si64(shifted_src.get_unchecked((i * N)..).as_ptr() as *const _);
                 let v_source1 = _mm_loadu_si64(
@@ -218,7 +217,7 @@ fn filter_row_sse_symm_u16_f32_impl<const FMA: bool, const N: usize>(
 
         for x in cx..max_width {
             let shifted_src = local_src.get_unchecked(x..);
-            let mut k0 = *shifted_src.get_unchecked(half_len * N) as f32 * coeff.weight;
+            let mut k0 = *shifted_src.get_unchecked(half_len * N) as f32 * coeff;
 
             for i in 0..half_len {
                 let coeff = *scanned_kernel.get_unchecked(i);
@@ -228,7 +227,7 @@ fn filter_row_sse_symm_u16_f32_impl<const FMA: bool, const N: usize>(
                     k0,
                     *shifted_src.get_unchecked(i * N) as f32
                         + *shifted_src.get_unchecked(rollback * N) as f32,
-                    coeff.weight,
+                    coeff,
                 );
             }
 

@@ -27,7 +27,6 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 use crate::filter1d::arena::Arena;
-use crate::filter1d::filter_scan::ScanPoint1d;
 use crate::filter1d::sse::utils::{_mm_madd_epi8_by_epi16_x4, _mm_madd_symm_epi8_by_epi16_x4};
 use crate::img_size::ImageSize;
 use crate::sse::{_mm_load_pack_x3, _mm_store_pack_x3};
@@ -42,7 +41,7 @@ pub(crate) fn filter_row_sse_symm_u8_i16<const N: usize>(
     arena_src: &[u8],
     dst: &mut [u8],
     image_size: ImageSize,
-    scanned_kernel: &[ScanPoint1d<i16>],
+    scanned_kernel: &[i16],
 ) {
     unsafe {
         filter_row_sse_symm_u8_i16_impl::<N>(arena, arena_src, dst, image_size, scanned_kernel);
@@ -55,7 +54,7 @@ fn filter_row_sse_symm_u8_i16_impl<const N: usize>(
     arena_src: &[u8],
     dst: &mut [u8],
     image_size: ImageSize,
-    scanned_kernel: &[ScanPoint1d<i16>],
+    scanned_kernel: &[i16],
 ) {
     unsafe {
         let width = image_size.width;
@@ -71,7 +70,7 @@ fn filter_row_sse_symm_u8_i16_impl<const N: usize>(
 
         let max_width = width * N;
 
-        let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(half_len).weight);
+        let coeff = _mm_set1_epi16(*scanned_kernel.get_unchecked(half_len));
 
         while cx + 48 <= max_width {
             let shifted_src = local_src.get_unchecked(cx..);
@@ -83,7 +82,7 @@ fn filter_row_sse_symm_u8_i16_impl<const N: usize>(
 
             for i in 0..half_len {
                 let rollback = length - i - 1;
-                let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(i).weight);
+                let coeff = _mm_set1_epi16(*scanned_kernel.get_unchecked(i));
                 let v_source0 = _mm_load_pack_x3(shifted_src.get_unchecked((i * N)..).as_ptr());
                 let v_source1 =
                     _mm_load_pack_x3(shifted_src.get_unchecked((rollback * N)..).as_ptr());
@@ -113,7 +112,7 @@ fn filter_row_sse_symm_u8_i16_impl<const N: usize>(
 
             for i in 0..half_len {
                 let rollback = length - i - 1;
-                let coeff = _mm_set1_epi16(scanned_kernel.get_unchecked(i).weight);
+                let coeff = _mm_set1_epi16(*scanned_kernel.get_unchecked(i));
                 let v_source0 =
                     _mm_loadu_si128(shifted_src.get_unchecked((i * N)..).as_ptr() as *const _);
                 let v_source1 = _mm_loadu_si128(
@@ -131,10 +130,10 @@ fn filter_row_sse_symm_u8_i16_impl<const N: usize>(
 
         while cx + 4 <= max_width {
             let shifted_src = local_src.get_unchecked(cx..);
-            let mut k0 = *shifted_src.get_unchecked(half_len * N) as i16 * coeff.weight;
-            let mut k1 = *shifted_src.get_unchecked(half_len * N + 1) as i16 * coeff.weight;
-            let mut k2 = *shifted_src.get_unchecked(half_len * N + 2) as i16 * coeff.weight;
-            let mut k3 = *shifted_src.get_unchecked(half_len * N + 3) as i16 * coeff.weight;
+            let mut k0 = *shifted_src.get_unchecked(half_len * N) as i16 * coeff;
+            let mut k1 = *shifted_src.get_unchecked(half_len * N + 1) as i16 * coeff;
+            let mut k2 = *shifted_src.get_unchecked(half_len * N + 2) as i16 * coeff;
+            let mut k3 = *shifted_src.get_unchecked(half_len * N + 3) as i16 * coeff;
 
             for i in 0..half_len {
                 let coeff = *scanned_kernel.get_unchecked(i);
@@ -142,19 +141,19 @@ fn filter_row_sse_symm_u8_i16_impl<const N: usize>(
 
                 k0 += (*shifted_src.get_unchecked(i * N) as i16
                     + *shifted_src.get_unchecked(rollback * N) as i16)
-                    * coeff.weight;
+                    * coeff;
 
                 k1 += (*shifted_src.get_unchecked(i * N + 1) as i16
                     + *shifted_src.get_unchecked(rollback * N + 1) as i16)
-                    * coeff.weight;
+                    * coeff;
 
                 k2 += (*shifted_src.get_unchecked(i * N + 2) as i16
                     + *shifted_src.get_unchecked(rollback * N + 2) as i16)
-                    * coeff.weight;
+                    * coeff;
 
                 k3 += (*shifted_src.get_unchecked(i * N + 3) as i16
                     + *shifted_src.get_unchecked(rollback * N + 3) as i16)
-                    * coeff.weight;
+                    * coeff;
             }
 
             *dst.get_unchecked_mut(cx) = k0.to_();
@@ -166,7 +165,7 @@ fn filter_row_sse_symm_u8_i16_impl<const N: usize>(
 
         for x in cx..max_width {
             let shifted_src = local_src.get_unchecked(x..);
-            let mut k0 = *shifted_src.get_unchecked(half_len * N) as i16 * coeff.weight;
+            let mut k0 = *shifted_src.get_unchecked(half_len * N) as i16 * coeff;
 
             for i in 0..half_len {
                 let coeff = *scanned_kernel.get_unchecked(i);
@@ -174,7 +173,7 @@ fn filter_row_sse_symm_u8_i16_impl<const N: usize>(
 
                 k0 += (*shifted_src.get_unchecked(i * N) as i16
                     + *shifted_src.get_unchecked(rollback * N) as i16)
-                    * coeff.weight;
+                    * coeff;
             }
 
             *dst.get_unchecked_mut(x) = k0.to_();

@@ -28,31 +28,6 @@
  */
 use crate::primitives::PrimitiveCast;
 
-#[repr(C)]
-#[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
-pub struct ScanPoint1d<F> {
-    pub weight: F,
-}
-
-impl<F> ScanPoint1d<F> {
-    pub fn new(weight: F) -> ScanPoint1d<F> {
-        ScanPoint1d { weight }
-    }
-}
-
-pub(crate) fn scan_se_1d<F>(kernel: &[F]) -> Vec<ScanPoint1d<F>>
-where
-    F: Copy + PartialEq + 'static + Default,
-    i32: PrimitiveCast<F>,
-{
-    let mut left_front = vec![ScanPoint1d::new(F::default()); kernel.len()];
-
-    for (dst, src) in left_front.iter_mut().zip(kernel.iter()) {
-        *dst = ScanPoint1d::new(*src);
-    }
-    left_front
-}
-
 pub(crate) fn scan_se_1d_flat<F>(kernel: &[F]) -> Vec<F>
 where
     F: Copy + PartialEq + 'static + Default,
