@@ -27,10 +27,13 @@
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #![allow(clippy::needless_range_loop)]
-use crate::neon::median::median_3::{SimdU8, load, load8};
+
+use crate::avx::median::median_3::{SimdU8, load8, load16, load32};
 use crate::{BlurImage, BlurImageMut, ThreadingPolicy};
 use novtb::{ParallelZonedIterator, TbSliceMut};
-use std::arch::aarch64::*;
+use std::arch::x86_64::{
+    _mm_storeu_si64, _mm_storeu_si128, _mm256_castsi256_si128, _mm256_storeu_si256,
+};
 
 fn load_scalar_7x7<const CN: usize>(rows: [&[u8]; 7], x: usize, width: usize) -> [u8; CN] {
     let x0 = x.saturating_sub(3 * CN);
@@ -174,7 +177,7 @@ fn median_network_7x7<S: SimdU8>(
     v[24]
 }
 
-pub(crate) fn median_blur_7x7(
+pub(crate) fn avx_median_blur_7x7(
     src: &BlurImage<u8>,
     dst: &mut BlurImageMut<u8>,
     channels: usize,
@@ -228,7 +231,7 @@ fn write_scalar_7x7(dst: &mut [u8], rows: [&[u8]; 7], x: usize, width: usize, ch
     }
 }
 
-#[target_feature(enable = "neon")]
+#[target_feature(enable = "avx2")]
 fn median_blur_7x7_impl(dst: &mut [u8], rows: [&[u8]; 7], width: usize, channels: usize) {
     // Left border: 3 pixels need clamped left neighbors
     for bx in 0..3 {
@@ -238,66 +241,125 @@ fn median_blur_7x7_impl(dst: &mut [u8], rows: [&[u8]; 7], width: usize, channels
 
     let mut x = 3 * channels;
 
-    // SIMD 16-wide loop
-    while x + 3 * channels + 16 <= width {
+    while x + 3 * channels + 32 <= width {
         let med = median_network_7x7(
-            load(rows[0], x - 3 * channels),
-            load(rows[0], x - 2 * channels),
-            load(rows[0], x - channels),
-            load(rows[0], x),
-            load(rows[0], x + channels),
-            load(rows[0], x + 2 * channels),
-            load(rows[0], x + 3 * channels),
-            load(rows[1], x - 3 * channels),
-            load(rows[1], x - 2 * channels),
-            load(rows[1], x - channels),
-            load(rows[1], x),
-            load(rows[1], x + channels),
-            load(rows[1], x + 2 * channels),
-            load(rows[1], x + 3 * channels),
-            load(rows[2], x - 3 * channels),
-            load(rows[2], x - 2 * channels),
-            load(rows[2], x - channels),
-            load(rows[2], x),
-            load(rows[2], x + channels),
-            load(rows[2], x + 2 * channels),
-            load(rows[2], x + 3 * channels),
-            load(rows[3], x - 3 * channels),
-            load(rows[3], x - 2 * channels),
-            load(rows[3], x - channels),
-            load(rows[3], x),
-            load(rows[3], x + channels),
-            load(rows[3], x + 2 * channels),
-            load(rows[3], x + 3 * channels),
-            load(rows[4], x - 3 * channels),
-            load(rows[4], x - 2 * channels),
-            load(rows[4], x - channels),
-            load(rows[4], x),
-            load(rows[4], x + channels),
-            load(rows[4], x + 2 * channels),
-            load(rows[4], x + 3 * channels),
-            load(rows[5], x - 3 * channels),
-            load(rows[5], x - 2 * channels),
-            load(rows[5], x - channels),
-            load(rows[5], x),
-            load(rows[5], x + channels),
-            load(rows[5], x + 2 * channels),
-            load(rows[5], x + 3 * channels),
-            load(rows[6], x - 3 * channels),
-            load(rows[6], x - 2 * channels),
-            load(rows[6], x - channels),
-            load(rows[6], x),
-            load(rows[6], x + channels),
-            load(rows[6], x + 2 * channels),
-            load(rows[6], x + 3 * channels),
+            load32(rows[0], x - 3 * channels),
+            load32(rows[0], x - 2 * channels),
+            load32(rows[0], x - channels),
+            load32(rows[0], x),
+            load32(rows[0], x + channels),
+            load32(rows[0], x + 2 * channels),
+            load32(rows[0], x + 3 * channels),
+            load32(rows[1], x - 3 * channels),
+            load32(rows[1], x - 2 * channels),
+            load32(rows[1], x - channels),
+            load32(rows[1], x),
+            load32(rows[1], x + channels),
+            load32(rows[1], x + 2 * channels),
+            load32(rows[1], x + 3 * channels),
+            load32(rows[2], x - 3 * channels),
+            load32(rows[2], x - 2 * channels),
+            load32(rows[2], x - channels),
+            load32(rows[2], x),
+            load32(rows[2], x + channels),
+            load32(rows[2], x + 2 * channels),
+            load32(rows[2], x + 3 * channels),
+            load32(rows[3], x - 3 * channels),
+            load32(rows[3], x - 2 * channels),
+            load32(rows[3], x - channels),
+            load32(rows[3], x),
+            load32(rows[3], x + channels),
+            load32(rows[3], x + 2 * channels),
+            load32(rows[3], x + 3 * channels),
+            load32(rows[4], x - 3 * channels),
+            load32(rows[4], x - 2 * channels),
+            load32(rows[4], x - channels),
+            load32(rows[4], x),
+            load32(rows[4], x + channels),
+            load32(rows[4], x + 2 * channels),
+            load32(rows[4], x + 3 * channels),
+            load32(rows[5], x - 3 * channels),
+            load32(rows[5], x - 2 * channels),
+            load32(rows[5], x - channels),
+            load32(rows[5], x),
+            load32(rows[5], x + channels),
+            load32(rows[5], x + 2 * channels),
+            load32(rows[5], x + 3 * channels),
+            load32(rows[6], x - 3 * channels),
+            load32(rows[6], x - 2 * channels),
+            load32(rows[6], x - channels),
+            load32(rows[6], x),
+            load32(rows[6], x + channels),
+            load32(rows[6], x + 2 * channels),
+            load32(rows[6], x + 3 * channels),
         );
         unsafe {
-            vst1q_u8(dst.get_unchecked_mut(x..).as_mut_ptr().cast(), med.0);
+            _mm256_storeu_si256(dst.get_unchecked_mut(x..).as_mut_ptr().cast(), med.0);
+        }
+        x += 32;
+    }
+
+    while x + 3 * channels + 16 <= width {
+        let med = median_network_7x7(
+            load16(rows[0], x - 3 * channels),
+            load16(rows[0], x - 2 * channels),
+            load16(rows[0], x - channels),
+            load16(rows[0], x),
+            load16(rows[0], x + channels),
+            load16(rows[0], x + 2 * channels),
+            load16(rows[0], x + 3 * channels),
+            load16(rows[1], x - 3 * channels),
+            load16(rows[1], x - 2 * channels),
+            load16(rows[1], x - channels),
+            load16(rows[1], x),
+            load16(rows[1], x + channels),
+            load16(rows[1], x + 2 * channels),
+            load16(rows[1], x + 3 * channels),
+            load16(rows[2], x - 3 * channels),
+            load16(rows[2], x - 2 * channels),
+            load16(rows[2], x - channels),
+            load16(rows[2], x),
+            load16(rows[2], x + channels),
+            load16(rows[2], x + 2 * channels),
+            load16(rows[2], x + 3 * channels),
+            load16(rows[3], x - 3 * channels),
+            load16(rows[3], x - 2 * channels),
+            load16(rows[3], x - channels),
+            load16(rows[3], x),
+            load16(rows[3], x + channels),
+            load16(rows[3], x + 2 * channels),
+            load16(rows[3], x + 3 * channels),
+            load16(rows[4], x - 3 * channels),
+            load16(rows[4], x - 2 * channels),
+            load16(rows[4], x - channels),
+            load16(rows[4], x),
+            load16(rows[4], x + channels),
+            load16(rows[4], x + 2 * channels),
+            load16(rows[4], x + 3 * channels),
+            load16(rows[5], x - 3 * channels),
+            load16(rows[5], x - 2 * channels),
+            load16(rows[5], x - channels),
+            load16(rows[5], x),
+            load16(rows[5], x + channels),
+            load16(rows[5], x + 2 * channels),
+            load16(rows[5], x + 3 * channels),
+            load16(rows[6], x - 3 * channels),
+            load16(rows[6], x - 2 * channels),
+            load16(rows[6], x - channels),
+            load16(rows[6], x),
+            load16(rows[6], x + channels),
+            load16(rows[6], x + 2 * channels),
+            load16(rows[6], x + 3 * channels),
+        );
+        unsafe {
+            _mm_storeu_si128(
+                dst.get_unchecked_mut(x..).as_mut_ptr().cast(),
+                _mm256_castsi256_si128(med.0),
+            );
         }
         x += 16;
     }
 
-    // SIMD 8-wide loop
     while x + 3 * channels + 8 <= width {
         let med = median_network_7x7(
             load8(rows[0], x - 3 * channels),
@@ -351,9 +413,9 @@ fn median_blur_7x7_impl(dst: &mut [u8], rows: [&[u8]; 7], width: usize, channels
             load8(rows[6], x + 3 * channels),
         );
         unsafe {
-            vst1_u8(
+            _mm_storeu_si64(
                 dst.get_unchecked_mut(x..).as_mut_ptr().cast(),
-                vget_low_u8(med.0),
+                _mm256_castsi256_si128(med.0),
             );
         }
         x += 8;

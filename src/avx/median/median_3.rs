@@ -30,7 +30,7 @@
 
 use crate::{BlurImage, BlurImageMut, ThreadingPolicy};
 use novtb::{ParallelZonedIterator, TbSliceMut};
-use std::arch::aarch64::*;
+use std::arch::x86_64::*;
 
 pub(crate) trait SimdU8: Copy {
     fn min(a: Self, b: Self) -> Self;
@@ -103,16 +103,16 @@ fn load_scalar_3x3<const CN: usize>(
 }
 
 #[derive(Clone, Copy)]
-pub(crate) struct NeonU8(pub(crate) uint8x16_t);
+pub(crate) struct AvxU8(pub(crate) __m256i);
 
-impl SimdU8 for NeonU8 {
+impl SimdU8 for AvxU8 {
     #[inline(always)]
     fn min(a: Self, b: Self) -> Self {
-        unsafe { NeonU8(vminq_u8(a.0, b.0)) }
+        unsafe { AvxU8(_mm256_min_epu8(a.0, b.0)) }
     }
     #[inline(always)]
     fn max(a: Self, b: Self) -> Self {
-        unsafe { NeonU8(vmaxq_u8(a.0, b.0)) }
+        unsafe { AvxU8(_mm256_max_epu8(a.0, b.0)) }
     }
 }
 
@@ -174,7 +174,7 @@ fn median_network<S: SimdU8>(
     p4
 }
 
-pub(crate) fn median_blur_3x3(
+pub(crate) fn avx_median_blur_3x3(
     src: &BlurImage<u8>,
     dst: &mut BlurImageMut<u8>,
     channels: usize,
@@ -199,23 +199,32 @@ pub(crate) fn median_blur_3x3(
 }
 
 #[inline]
-#[target_feature(enable = "neon")]
-pub(crate) fn load(row: &[u8], col: usize) -> NeonU8 {
-    unsafe { NeonU8(vld1q_u8(row.get_unchecked(col..).as_ptr().cast())) }
+#[target_feature(enable = "avx2")]
+pub(crate) fn load32(row: &[u8], col: usize) -> AvxU8 {
+    unsafe { AvxU8(_mm256_loadu_si256(row.get_unchecked(col..).as_ptr().cast())) }
 }
 
 #[inline]
-#[target_feature(enable = "neon")]
-pub(crate) fn load8(row: &[u8], col: usize) -> NeonU8 {
+#[target_feature(enable = "avx2")]
+pub(crate) fn load16(row: &[u8], col: usize) -> AvxU8 {
     unsafe {
-        NeonU8(vcombine_u8(
-            vld1_u8(row.get_unchecked(col..).as_ptr().cast()),
-            vdup_n_u8(0),
-        ))
+        AvxU8(_mm256_castsi128_si256(_mm_loadu_si128(
+            row.get_unchecked(col..).as_ptr().cast(),
+        )))
     }
 }
 
-#[target_feature(enable = "neon")]
+#[inline]
+#[target_feature(enable = "avx2")]
+pub(crate) fn load8(row: &[u8], col: usize) -> AvxU8 {
+    unsafe {
+        AvxU8(_mm256_castsi128_si256(_mm_loadu_si64(
+            row.get_unchecked(col..).as_ptr().cast(),
+        )))
+    }
+}
+
+#[target_feature(enable = "avx2")]
 fn median_blur_3x3_impl_16(
     dst: &mut [u8],
     r0: &[u8],
@@ -246,20 +255,42 @@ fn median_blur_3x3_impl_16(
     }
 
     let mut x = channels;
-    while x + 16 <= width - channels {
+
+    while x + 32 <= width - channels {
         let med = median_network(
-            load(r0, x - channels),
-            load(r0, x),
-            load(r0, x + channels),
-            load(r1, x - channels),
-            load(r1, x),
-            load(r1, x + channels),
-            load(r2, x - channels),
-            load(r2, x),
-            load(r2, x + channels),
+            load32(r0, x - channels),
+            load32(r0, x),
+            load32(r0, x + channels),
+            load32(r1, x - channels),
+            load32(r1, x),
+            load32(r1, x + channels),
+            load32(r2, x - channels),
+            load32(r2, x),
+            load32(r2, x + channels),
         );
         unsafe {
-            vst1q_u8(dst.get_unchecked_mut(x..).as_mut_ptr().cast(), med.0);
+            _mm256_storeu_si256(dst.get_unchecked_mut(x..).as_mut_ptr().cast(), med.0);
+        }
+        x += 32;
+    }
+
+    while x + 16 <= width - channels {
+        let med = median_network(
+            load16(r0, x - channels),
+            load16(r0, x),
+            load16(r0, x + channels),
+            load16(r1, x - channels),
+            load16(r1, x),
+            load16(r1, x + channels),
+            load16(r2, x - channels),
+            load16(r2, x),
+            load16(r2, x + channels),
+        );
+        unsafe {
+            _mm_storeu_si128(
+                dst.get_unchecked_mut(x..).as_mut_ptr().cast(),
+                _mm256_castsi256_si128(med.0),
+            );
         }
         x += 16;
     }
@@ -277,9 +308,9 @@ fn median_blur_3x3_impl_16(
             load8(r2, x + channels),
         );
         unsafe {
-            vst1_u8(
+            _mm_storeu_si64(
                 dst.get_unchecked_mut(x..).as_mut_ptr().cast(),
-                vget_low_u8(med.0),
+                _mm256_castsi256_si128(med.0),
             );
         }
         x += 8;

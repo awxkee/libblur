@@ -117,17 +117,48 @@ fn init_histogram<const CN: usize>(
     }
 }
 
-#[inline(always)]
 fn median_filter(x: [i32; 256], n: i32) -> u8 {
-    let mut remaining = n / 2 + 1; // want the (n/2+1)-th element = index n/2
-    let mut i = 0i64;
-    while i < 256 {
-        remaining -= unsafe { *x.get_unchecked(i as usize) };
-        if remaining > 0 {
-            i += 1;
-        } else {
+    let mut remaining = n / 2 + 1;
+
+    // Coarse pass: sum groups of 16 bins to find which group contains median
+    let mut coarse_idx = 0usize;
+    loop {
+        let sum = x[coarse_idx]
+            + x[coarse_idx + 1]
+            + x[coarse_idx + 2]
+            + x[coarse_idx + 3]
+            + x[coarse_idx + 4]
+            + x[coarse_idx + 5]
+            + x[coarse_idx + 6]
+            + x[coarse_idx + 7]
+            + x[coarse_idx + 8]
+            + x[coarse_idx + 9]
+            + x[coarse_idx + 10]
+            + x[coarse_idx + 11]
+            + x[coarse_idx + 12]
+            + x[coarse_idx + 13]
+            + x[coarse_idx + 14]
+            + x[coarse_idx + 15];
+        remaining -= sum;
+        if remaining <= 0 {
+            remaining += sum; // undo — refine within this group
             break;
         }
+        coarse_idx += 16;
+        if coarse_idx >= 256 {
+            return 255;
+        }
+    }
+
+    // Fine pass: scan individual bins within the 16-bin group
+    let end = coarse_idx + 16;
+    let mut i = coarse_idx;
+    while i < end {
+        remaining -= unsafe { *x.get_unchecked(i) };
+        if remaining <= 0 {
+            break;
+        }
+        i += 1;
     }
     i as u8
 }
@@ -341,6 +372,39 @@ pub fn median_blur(
                 threading_policy,
             );
             return Ok(());
+        }
+    }
+    #[cfg(all(target_arch = "x86_64", feature = "avx"))]
+    {
+        if std::arch::is_x86_feature_detected!("avx2") {
+            if radius == 1 {
+                use crate::avx::avx_median_blur_3x3;
+                avx_median_blur_3x3(
+                    src_image,
+                    dst_image,
+                    src_image.channels as usize,
+                    threading_policy,
+                );
+                return Ok(());
+            } else if radius == 2 {
+                use crate::avx::avx_median_blur_5x5;
+                avx_median_blur_5x5(
+                    src_image,
+                    dst_image,
+                    src_image.channels as usize,
+                    threading_policy,
+                );
+                return Ok(());
+            } else if radius == 3 {
+                use crate::avx::avx_median_blur_7x7;
+                avx_median_blur_7x7(
+                    src_image,
+                    dst_image,
+                    src_image.channels as usize,
+                    threading_policy,
+                );
+                return Ok(());
+            }
         }
     }
 
