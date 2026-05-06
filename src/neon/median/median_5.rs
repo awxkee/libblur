@@ -26,6 +26,8 @@
  * // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#![allow(clippy::needless_range_loop)]
+
 use crate::neon::median::median_3::{SimdU8, load, load8};
 use crate::{BlurImage, BlurImageMut, ThreadingPolicy};
 use novtb::{ParallelZonedIterator, TbSliceMut};
