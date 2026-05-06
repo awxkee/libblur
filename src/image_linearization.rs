@@ -281,7 +281,12 @@ fn linearize8<Z, F: FinalImageFactory<Z, u16>>(
         {
             let src = &src[..src_ref.width as usize * src_ref.channels.channels()];
             let dst = &mut dst[..src_ref.width as usize * src_ref.channels.channels()];
-            for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
+            for (dst, src) in dst
+                .as_chunks_mut::<4>()
+                .0
+                .iter_mut()
+                .zip(src.as_chunks::<4>().0.iter())
+            {
                 dst[0] = linearization.linearization[src[0] as usize];
                 dst[1] = linearization.linearization[src[1] as usize];
                 dst[2] = linearization.linearization[src[2] as usize];
@@ -335,7 +340,12 @@ fn gen_gamma8<Z, F: FinalImageFactory<Z, u8>>(
         {
             let src = &src[..src_ref.width as usize * src_ref.channels.channels()];
             let dst = &mut dst[..src_ref.width as usize * src_ref.channels.channels()];
-            for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
+            for (dst, src) in dst
+                .as_chunks_mut::<4>()
+                .0
+                .iter_mut()
+                .zip(src.as_chunks::<4>().0.iter())
+            {
                 dst[0] = gamma.gamma[src[0] as usize];
                 dst[1] = gamma.gamma[src[1] as usize];
                 dst[2] = gamma.gamma[src[2] as usize];
@@ -389,7 +399,12 @@ fn linearize16<Z, F: FinalImageFactory<Z, u16>>(
         {
             let src = &src[..src_ref.width as usize * src_ref.channels.channels()];
             let dst = &mut dst[..src_ref.width as usize * src_ref.channels.channels()];
-            for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
+            for (dst, src) in dst
+                .as_chunks_mut::<4>()
+                .0
+                .iter_mut()
+                .zip(src.as_chunks::<4>().0.iter())
+            {
                 dst[0] = linearization.linearization[src[0] as usize];
                 dst[1] = linearization.linearization[src[1] as usize];
                 dst[2] = linearization.linearization[src[2] as usize];
@@ -443,7 +458,12 @@ fn gen_gamma16<Z, F: FinalImageFactory<Z, u16>>(
         {
             let src = &src[..src_ref.width as usize * src_ref.channels.channels()];
             let dst = &mut dst[..src_ref.width as usize * src_ref.channels.channels()];
-            for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
+            for (dst, src) in dst
+                .as_chunks_mut::<4>()
+                .0
+                .iter_mut()
+                .zip(src.as_chunks::<4>().0.iter())
+            {
                 dst[0] = gamma.gamma[src[0] as usize];
                 dst[1] = gamma.gamma[src[1] as usize];
                 dst[2] = gamma.gamma[src[2] as usize];
@@ -496,7 +516,12 @@ fn linearize_f32<Z, F: FinalImageFactory<Z, f32>>(
         {
             let src = &src[..src_ref.width as usize * src_ref.channels.channels()];
             let dst = &mut dst[..src_ref.width as usize * src_ref.channels.channels()];
-            for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
+            for (dst, src) in dst
+                .as_chunks_mut::<4>()
+                .0
+                .iter_mut()
+                .zip(src.as_chunks::<4>().0.iter())
+            {
                 dst[0] = transfer_function.linearize(src[0]);
                 dst[1] = transfer_function.linearize(src[1]);
                 dst[2] = transfer_function.linearize(src[2]);
@@ -549,7 +574,12 @@ fn gamma_f32<Z, F: FinalImageFactory<Z, f32>>(
         {
             let src = &src[..src_ref.width as usize * src_ref.channels.channels()];
             let dst = &mut dst[..src_ref.width as usize * src_ref.channels.channels()];
-            for (dst, src) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
+            for (dst, src) in dst
+                .as_chunks_mut::<4>()
+                .0
+                .iter_mut()
+                .zip(src.as_chunks::<4>().0.iter())
+            {
                 dst[0] = transfer_function.gamma(src[0]);
                 dst[1] = transfer_function.gamma(src[1]);
                 dst[2] = transfer_function.gamma(src[2]);

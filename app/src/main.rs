@@ -217,7 +217,7 @@ fn main() {
     median_blur(
         &cvt.to_immutable_ref(),
         &mut dst_image,
-        7,
+        25,
         ThreadingPolicy::Single,
     )
     .unwrap();
