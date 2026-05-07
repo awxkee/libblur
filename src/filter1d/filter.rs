@@ -186,7 +186,7 @@ where
     let src_stride = image_size.width * N;
     let dst_stride = destination.row_stride() as usize;
 
-    let mut _dest_slice = destination.data.borrow_mut();
+    let mut _dest_slice = destination.projected();
 
     let mut _processed_y = 0usize;
 
@@ -305,7 +305,7 @@ where
     }
 
     _dest_slice
-        .tb_par_chunks_exact_mut(dst_stride)
+        .tb_par_chunks_mut(dst_stride)
         .for_each_enumerated(&pool, |y, row| {
             let brows = create_brows(
                 image_size,
@@ -396,8 +396,7 @@ where
 
     if thread_count > 1 {
         destination
-            .data
-            .borrow_mut()
+            .projected()
             .tb_par_chunks_mut(dest_stride * tile_size as usize)
             .for_each_enumerated(&pool, |cy, dst_rows| {
                 let source_y = cy * tile_size as usize;
@@ -517,7 +516,8 @@ where
 
                         let dy = dy - half_kernel;
 
-                        let dst = &mut dst_rows[dy * dest_stride..(dy + 1) * dest_stride];
+                        let dst = &mut dst_rows
+                            [dy * dest_stride..dy * dest_stride + image_size.width * N];
 
                         column_handler(
                             Arena::new(image_size.width, half_kernel, 0, half_kernel, N),
@@ -608,8 +608,8 @@ where
 
                 let dy = y - half_kernel;
 
-                let dst =
-                    &mut destination.data.borrow_mut()[dy * dest_stride..(dy + 1) * dest_stride];
+                let dst = &mut destination.data.borrow_mut()
+                    [dy * dest_stride..dy * dest_stride + image_size.width * N];
 
                 column_handler(
                     Arena::new(image_size.width, half_kernel, 0, half_kernel, N),
@@ -648,7 +648,7 @@ pub(crate) fn create_brows<'a, T>(
         } else {
             let fy = (y as i64 + k as i64 - pad_h as i64) as usize;
             let start_offset = src_stride * fy;
-            *row = &transient_image_slice[start_offset..(start_offset + src_stride)];
+            *row = &transient_image_slice[start_offset..];
         }
     }
     brows

@@ -217,7 +217,7 @@ fn main() {
     median_blur(
         &cvt.to_immutable_ref(),
         &mut dst_image,
-        25,
+        35,
         ThreadingPolicy::Single,
     )
     .unwrap();
@@ -340,7 +340,7 @@ fn main() {
 
     if components == 3 {
         image::save_buffer(
-            "blurred_stack_next15_2.jpg",
+            "blurred_stack_next35_2.jpg",
             bytes.as_bytes(),
             dimensions.0,
             dimensions.1,

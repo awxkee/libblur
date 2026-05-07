@@ -160,7 +160,7 @@ fn box_blur_horizontal_pass_neon_impl_low_rad<const CN: usize>(
 
     let mut yy = start_y;
 
-    while yy + 4 < end_y {
+    while yy + 4 <= end_y {
         let y = yy;
         let y_src_shift = y as usize * src_stride as usize;
         let y_dst_shift = y as usize * dst_stride as usize;
@@ -442,7 +442,7 @@ fn box_blur_horizontal_pass_neon_impl<const CN: usize>(
 
     let mut yy = start_y;
 
-    while yy + 4 < end_y {
+    while yy + 4 <= end_y {
         let y = yy;
         let y_src_shift = y as usize * src_stride as usize;
         let y_dst_shift = y as usize * dst_stride as usize;

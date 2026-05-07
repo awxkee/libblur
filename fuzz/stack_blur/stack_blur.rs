@@ -30,7 +30,9 @@
 #![no_main]
 
 use arbitrary::Arbitrary;
-use libblur::{stack_blur, AnisotropicRadius, BlurImageMut, FastBlurChannels, ThreadingPolicy};
+use libblur::{
+    stack_blur, AnisotropicRadius, BlurImageMut, BufferStore, FastBlurChannels, ThreadingPolicy,
+};
 use libfuzzer_sys::fuzz_target;
 
 #[derive(Clone, Debug, Arbitrary)]
@@ -42,6 +44,7 @@ pub struct SrcImage {
     pub x_radius: u8,
     pub y_radius: u8,
     pub threading: bool,
+    pub additional_padding: u8,
 }
 
 fuzz_target!(|data: SrcImage| {
@@ -60,6 +63,7 @@ fuzz_target!(|data: SrcImage| {
         data.y_radius as usize,
         FastBlurChannels::Channels4,
         mp,
+        data.additional_padding as usize % 50,
     );
     fuzz_image(
         data.src_width as usize,
@@ -68,6 +72,7 @@ fuzz_target!(|data: SrcImage| {
         data.y_radius as usize,
         FastBlurChannels::Channels3,
         mp,
+        data.additional_padding as usize % 50,
     );
     fuzz_image(
         data.src_width as usize,
@@ -76,6 +81,7 @@ fuzz_target!(|data: SrcImage| {
         data.y_radius as usize,
         FastBlurChannels::Plane,
         mp,
+        data.additional_padding as usize % 50,
     );
 });
 
@@ -86,12 +92,22 @@ fn fuzz_image(
     y_radius: usize,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
+    additional_padding: usize,
 ) {
     if width == 0 || height == 0 {
         return;
     }
 
-    let mut dst_image = BlurImageMut::alloc(width as u32, height as u32, channels);
+    let stride = (width as u32 + additional_padding as u32) * channels.channels() as u32;
+    let dst_image = vec![0u8; stride as usize * (height - 1) + width * channels.channels()];
+
+    let mut dst_image = BlurImageMut {
+        data: BufferStore::Owned(dst_image),
+        width: width as u32,
+        height: height as u32,
+        stride,
+        channels,
+    };
 
     stack_blur(
         &mut dst_image,
