@@ -646,6 +646,7 @@ fn box_blur_vertical_pass<
         if thread_index == thread_count as usize - 1 {
             end_x = total_width;
         }
+        end_x = end_x.min(total_width);
         _dispatcher_vertical(
             src,
             src_stride,
@@ -987,11 +988,11 @@ where
 
                     if source_y == 0 {
                         let dst0 = UnsafeSlice::new(&mut buffer[..working_stride]);
-                        let src0 = &src
-                            [source_y * src_stride as usize..(source_y + 1) * src_stride as usize];
+                        let src0 = &src[source_y * src_stride as usize
+                            ..source_y * src_stride as usize + width as usize * CN];
 
                         horizontal_handler(
-                            &src0[..width as usize * CN],
+                            src0,
                             src_stride,
                             &dst0,
                             working_stride as u32,
@@ -1016,8 +1017,8 @@ where
                             let dst0 = UnsafeSlice::new(
                                 &mut buffer[src_y * working_stride..(src_y + 1) * working_stride],
                             );
-                            let src0 =
-                                &src[s_y * src_stride as usize..(s_y + 1) * src_stride as usize];
+                            let src0 = &src[s_y * src_stride as usize
+                                ..s_y * src_stride as usize + width as usize * CN];
 
                             horizontal_handler(
                                 &src0[..width as usize * CN],
@@ -1045,15 +1046,15 @@ where
                     {
                         let new_y = y.min(height as usize - 1);
 
-                        let src0 =
-                            &src[new_y * src_stride as usize..(new_y + 1) * src_stride as usize];
+                        let src0 = &src[new_y * src_stride as usize
+                            ..new_y * src_stride as usize + width as usize * CN];
 
                         let dst0 = UnsafeSlice::new(
                             &mut buffer[start_ky * working_stride..(start_ky + 1) * working_stride],
                         );
 
                         horizontal_handler(
-                            &src0[..width as usize * CN],
+                            src0,
                             src_stride,
                             &dst0,
                             working_stride as u32,
@@ -1083,15 +1084,10 @@ where
 
                             let dy = dy - half_kernel - 1;
 
-                            let dst0 = &mut dst_rows
-                                [dy * dst_stride as usize..(dy + 1) * dst_stride as usize];
+                            let dst0 = &mut dst_rows[dy * dst_stride as usize
+                                ..dy * dst_stride as usize + width as usize * CN];
 
-                            ring_vsum(
-                                &capture,
-                                &mut dst0[..width as usize * CN],
-                                working_row,
-                                y_radius,
-                            );
+                            ring_vsum(&capture, dst0, working_row, y_radius);
                         }
 
                         start_ky += 1;
@@ -1136,14 +1132,15 @@ where
         for y in 1..height as usize + half_kernel + 1 {
             let new_y = y.min(height as usize - 1);
 
-            let src0 = &src[new_y * src_stride as usize..(new_y + 1) * src_stride as usize];
+            let src0 = &src
+                [new_y * src_stride as usize..new_y * src_stride as usize + width as usize * CN];
 
             let dst0 = UnsafeSlice::new(
                 &mut buffer[start_ky * working_stride..(start_ky + 1) * working_stride],
             );
 
             horizontal_handler(
-                &src0[..width as usize * CN],
+                src0,
                 src_stride,
                 &dst0,
                 working_stride as u32,
@@ -1173,14 +1170,10 @@ where
 
                 let dy = y - half_kernel - 1;
 
-                let dst0 = &mut dst[dy * dst_stride as usize..(dy + 1) * dst_stride as usize];
+                let dst0 = &mut dst
+                    [dy * dst_stride as usize..dy * dst_stride as usize + width as usize * CN];
 
-                ring_vsum(
-                    &capture,
-                    &mut dst0[..width as usize * CN],
-                    working_row,
-                    y_radius,
-                );
+                ring_vsum(&capture, dst0, working_row, y_radius);
             }
 
             start_ky += 1;
@@ -1248,7 +1241,8 @@ where
             thread_count,
         );
     }
-    let mut transient: Vec<T> = vec![T::default(); dst_stride as usize * height as usize];
+    let working_stride = width as usize * CN;
+    let mut transient: Vec<T> = vec![T::default(); working_stride * height as usize];
     box_blur_horizontal_pass::<T, CN>(
         src,
         src_stride,
@@ -1262,7 +1256,7 @@ where
 
     box_blur_vertical_pass::<T, CN>(
         &transient,
-        src_stride,
+        working_stride as u32,
         dst,
         dst_stride,
         width,
@@ -1359,9 +1353,9 @@ pub fn box_blur_u16(
         FastBlurChannels::Channels4 => box_blur_impl::<u16, 4>,
     };
     let dst_stride = dst_image.row_stride();
-    let dst = dst_image.data.borrow_mut();
+    let dst = dst_image.projected();
     dispatcher(
-        image.data.as_ref(),
+        image.projected(),
         image.row_stride(),
         dst,
         dst_stride,
@@ -1409,9 +1403,9 @@ pub fn box_blur_f32(
         FastBlurChannels::Channels4 => box_blur_impl::<f32, 4>,
     };
     let dst_stride = dst_image.row_stride();
-    let dst = dst_image.data.borrow_mut();
+    let dst = dst_image.projected();
     dispatcher(
-        image.data.as_ref(),
+        image.projected(),
         image.row_stride(),
         dst,
         dst_stride,
@@ -1561,10 +1555,10 @@ pub fn tent_blur(
         FastBlurChannels::Channels3 => tent_blur_impl::<u8, 3>,
         FastBlurChannels::Channels4 => tent_blur_impl::<u8, 4>,
     };
-    let src = image.data.as_ref();
+    let src = image.projected();
     let src_stride = image.row_stride();
     let dst_stride = dst_image.row_stride();
-    let dst = dst_image.data.borrow_mut();
+    let dst = dst_image.projected();
     let width = image.width;
     let height = image.height;
     dispatcher(
@@ -1611,10 +1605,10 @@ pub fn tent_blur_u16(
         FastBlurChannels::Channels3 => tent_blur_impl::<u16, 3>,
         FastBlurChannels::Channels4 => tent_blur_impl::<u16, 4>,
     };
-    let src = image.data.as_ref();
+    let src = image.projected();
     let src_stride = image.row_stride();
     let dst_stride = dst_image.row_stride();
-    let dst = dst_image.data.borrow_mut();
+    let dst = dst_image.projected();
     let width = image.width;
     let height = image.height;
     dispatcher(
@@ -1659,10 +1653,10 @@ pub fn tent_blur_f32(
         FastBlurChannels::Channels3 => tent_blur_impl::<f32, 3>,
         FastBlurChannels::Channels4 => tent_blur_impl::<f32, 4>,
     };
-    let src = image.data.as_ref();
+    let src = image.projected();
     let src_stride = image.row_stride();
     let dst_stride = dst_image.row_stride();
-    let dst = dst_image.data.borrow_mut();
+    let dst = dst_image.projected();
     let width = image.width;
     let height = image.height;
     dispatcher(
@@ -1709,7 +1703,8 @@ where
 {
     parameters.validate()?;
     let thread_count = threading_policy.thread_count(width, height) as u32;
-    let mut transient: Vec<T> = vec![T::default(); dst_stride as usize * height as usize];
+    let working_stride = width as usize * CN;
+    let mut transient: Vec<T> = vec![T::default(); working_stride * height as usize];
     let boxes_horizontal = create_box_gauss(parameters.x_sigma, 3);
     let boxes_vertical = create_box_gauss(parameters.y_sigma, 3);
     box_blur_impl::<T, CN>(
@@ -1729,7 +1724,7 @@ where
         dst,
         dst_stride,
         &mut transient,
-        dst_stride,
+        working_stride as u32,
         width,
         height,
         BoxBlurParameters {
@@ -1740,7 +1735,7 @@ where
     )?;
     box_blur_impl::<T, CN>(
         &transient,
-        dst_stride,
+        working_stride as u32,
         dst,
         dst_stride,
         width,
@@ -1786,10 +1781,10 @@ pub fn gaussian_box_blur(
         FastBlurChannels::Channels3 => gaussian_box_blur_impl::<u8, 3>,
         FastBlurChannels::Channels4 => gaussian_box_blur_impl::<u8, 4>,
     };
-    let src = image.data.as_ref();
+    let src = image.projected();
     let src_stride = image.row_stride();
     let dst_stride = dst_image.row_stride();
-    let dst = dst_image.data.borrow_mut();
+    let dst = dst_image.projected();
     let width = image.width;
     let height = image.height;
     dispatcher(
@@ -1839,10 +1834,10 @@ pub fn gaussian_box_blur_u16(
         FastBlurChannels::Channels3 => gaussian_box_blur_impl::<u16, 3>,
         FastBlurChannels::Channels4 => gaussian_box_blur_impl::<u16, 4>,
     };
-    let src = image.data.as_ref();
+    let src = image.projected();
     let src_stride = image.row_stride();
     let dst_stride = dst_image.row_stride();
-    let dst = dst_image.data.borrow_mut();
+    let dst = dst_image.projected();
     let width = image.width;
     let height = image.height;
     executor(
@@ -1892,10 +1887,10 @@ pub fn gaussian_box_blur_f32(
         FastBlurChannels::Channels3 => gaussian_box_blur_impl::<f32, 3>,
         FastBlurChannels::Channels4 => gaussian_box_blur_impl::<f32, 4>,
     };
-    let src = image.data.as_ref();
+    let src = image.projected();
     let src_stride = image.row_stride();
     let dst_stride = dst_image.row_stride();
-    let dst = dst_image.data.borrow_mut();
+    let dst = dst_image.projected();
     let width = image.width;
     let height = image.height;
     dispatcher(

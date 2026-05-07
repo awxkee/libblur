@@ -257,14 +257,14 @@ fn linearize8<Z, F: FinalImageFactory<Z, u16>>(
     factory: F,
 ) -> Result<Z, BlurError> {
     src_ref.check_layout()?;
-    let mut new_image =
-        vec![0u16; src_ref.width as usize * src_ref.height as usize * src_ref.channels.channels()];
-    let row_stride = src_ref.width as usize * src_ref.channels.channels();
+    let mut new_image = vec![0u16; src_ref.row_stride() as usize * src_ref.height as usize];
+    let row_stride = src_ref.row_stride() as usize;
     let linearization = make_linearization(transfer_function);
     if !may_have_alpha || (src_ref.channels != FastBlurChannels::Channels4) {
+        let src_data = src_ref.projected();
         for (dst, src) in new_image
-            .chunks_exact_mut(row_stride)
-            .zip(src_ref.data.chunks_exact(src_ref.row_stride() as usize))
+            .chunks_mut(row_stride)
+            .zip(src_data.chunks(row_stride))
         {
             let src = &src[..src_ref.width as usize * src_ref.channels.channels()];
             let dst = &mut dst[..src_ref.width as usize * src_ref.channels.channels()];
@@ -275,9 +275,10 @@ fn linearize8<Z, F: FinalImageFactory<Z, u16>>(
         }
     } else {
         // ATM only 4 channels here possible, so hardcoded 4
+        let src_data = src_ref.projected();
         for (dst, src) in new_image
-            .chunks_exact_mut(row_stride)
-            .zip(src_ref.data.chunks_exact(src_ref.row_stride() as usize))
+            .chunks_mut(row_stride)
+            .zip(src_data.chunks(row_stride))
         {
             let src = &src[..src_ref.width as usize * src_ref.channels.channels()];
             let dst = &mut dst[..src_ref.width as usize * src_ref.channels.channels()];
@@ -317,14 +318,14 @@ fn gen_gamma8<Z, F: FinalImageFactory<Z, u8>>(
     factory: F,
 ) -> Result<Z, BlurError> {
     src_ref.check_layout()?;
-    let mut new_image =
-        vec![0u8; src_ref.width as usize * src_ref.height as usize * src_ref.channels.channels()];
-    let row_stride = src_ref.width as usize * src_ref.channels.channels();
+    let mut new_image = vec![0u8; src_ref.row_stride() as usize * src_ref.height as usize];
+    let row_stride = src_ref.row_stride() as usize;
     let gamma = make_gamma(transfer_function);
     if !may_have_alpha || (src_ref.channels != FastBlurChannels::Channels4) {
+        let src_data = src_ref.projected();
         for (dst, src) in new_image
-            .chunks_exact_mut(row_stride)
-            .zip(src_ref.data.chunks_exact(src_ref.row_stride() as usize))
+            .chunks_mut(row_stride)
+            .zip(src_data.chunks(row_stride))
         {
             let src = &src[..src_ref.width as usize * src_ref.channels.channels()];
             let dst = &mut dst[..src_ref.width as usize * src_ref.channels.channels()];
@@ -334,9 +335,10 @@ fn gen_gamma8<Z, F: FinalImageFactory<Z, u8>>(
         }
     } else {
         // ATM only 4 channels here possible, so hardcoded 4
+        let src_data = src_ref.projected();
         for (dst, src) in new_image
-            .chunks_exact_mut(row_stride)
-            .zip(src_ref.data.chunks_exact(src_ref.row_stride() as usize))
+            .chunks_mut(row_stride)
+            .zip(src_data.chunks(row_stride))
         {
             let src = &src[..src_ref.width as usize * src_ref.channels.channels()];
             let dst = &mut dst[..src_ref.width as usize * src_ref.channels.channels()];
@@ -376,14 +378,14 @@ fn linearize16<Z, F: FinalImageFactory<Z, u16>>(
     factory: F,
 ) -> Result<Z, BlurError> {
     src_ref.check_layout()?;
-    let mut new_image =
-        vec![0u16; src_ref.width as usize * src_ref.height as usize * src_ref.channels.channels()];
-    let row_stride = src_ref.width as usize * src_ref.channels.channels();
+    let mut new_image = vec![0u16; src_ref.row_stride() as usize * src_ref.height as usize];
+    let row_stride = src_ref.row_stride() as usize;
     let linearization = make_linearization16(transfer_function);
     if !may_have_alpha || (src_ref.channels != FastBlurChannels::Channels4) {
+        let src_data = src_ref.projected();
         for (dst, src) in new_image
-            .chunks_exact_mut(row_stride)
-            .zip(src_ref.data.chunks_exact(src_ref.row_stride() as usize))
+            .chunks_mut(row_stride)
+            .zip(src_data.chunks(row_stride))
         {
             let src = &src[..src_ref.width as usize * src_ref.channels.channels()];
             let dst = &mut dst[..src_ref.width as usize * src_ref.channels.channels()];
@@ -393,9 +395,10 @@ fn linearize16<Z, F: FinalImageFactory<Z, u16>>(
         }
     } else {
         // ATM only 4 channels here possible, so hardcoded 4
+        let src_data = src_ref.projected();
         for (dst, src) in new_image
-            .chunks_exact_mut(row_stride)
-            .zip(src_ref.data.chunks_exact(src_ref.row_stride() as usize))
+            .chunks_mut(row_stride)
+            .zip(src_data.chunks(row_stride))
         {
             let src = &src[..src_ref.width as usize * src_ref.channels.channels()];
             let dst = &mut dst[..src_ref.width as usize * src_ref.channels.channels()];
@@ -435,14 +438,14 @@ fn gen_gamma16<Z, F: FinalImageFactory<Z, u16>>(
     factory: F,
 ) -> Result<Z, BlurError> {
     src_ref.check_layout()?;
-    let mut new_image =
-        vec![0u16; src_ref.width as usize * src_ref.height as usize * src_ref.channels.channels()];
-    let row_stride = src_ref.width as usize * src_ref.channels.channels();
+    let mut new_image = vec![0u16; src_ref.row_stride() as usize * src_ref.height as usize];
+    let row_stride = src_ref.row_stride() as usize;
     let gamma = make_gamma16(transfer_function);
     if !may_have_alpha || (src_ref.channels != FastBlurChannels::Channels4) {
+        let src_data = src_ref.projected();
         for (dst, src) in new_image
-            .chunks_exact_mut(row_stride)
-            .zip(src_ref.data.chunks_exact(src_ref.row_stride() as usize))
+            .chunks_mut(row_stride)
+            .zip(src_data.chunks(row_stride))
         {
             let src = &src[..src_ref.width as usize * src_ref.channels.channels()];
             let dst = &mut dst[..src_ref.width as usize * src_ref.channels.channels()];
@@ -452,9 +455,10 @@ fn gen_gamma16<Z, F: FinalImageFactory<Z, u16>>(
         }
     } else {
         // ATM only 4 channels here possible, so hardcoded 4
+        let src_data = src_ref.projected();
         for (dst, src) in new_image
-            .chunks_exact_mut(row_stride)
-            .zip(src_ref.data.chunks_exact(src_ref.row_stride() as usize))
+            .chunks_mut(row_stride)
+            .zip(src_data.chunks(row_stride))
         {
             let src = &src[..src_ref.width as usize * src_ref.channels.channels()];
             let dst = &mut dst[..src_ref.width as usize * src_ref.channels.channels()];
@@ -494,13 +498,13 @@ fn linearize_f32<Z, F: FinalImageFactory<Z, f32>>(
     factory: F,
 ) -> Result<Z, BlurError> {
     src_ref.check_layout()?;
-    let mut new_image =
-        vec![0.; src_ref.width as usize * src_ref.height as usize * src_ref.channels.channels()];
-    let row_stride = src_ref.width as usize * src_ref.channels.channels();
+    let mut new_image = vec![0.; src_ref.row_stride() as usize * src_ref.height as usize];
+    let row_stride = src_ref.row_stride() as usize;
     if !may_have_alpha || (src_ref.channels != FastBlurChannels::Channels4) {
+        let src_data = src_ref.projected();
         for (dst, src) in new_image
-            .chunks_exact_mut(row_stride)
-            .zip(src_ref.data.chunks_exact(src_ref.row_stride() as usize))
+            .chunks_mut(row_stride)
+            .zip(src_data.chunks(row_stride))
         {
             let src = &src[..src_ref.width as usize * src_ref.channels.channels()];
             let dst = &mut dst[..src_ref.width as usize * src_ref.channels.channels()];
@@ -510,9 +514,10 @@ fn linearize_f32<Z, F: FinalImageFactory<Z, f32>>(
         }
     } else {
         // ATM only 4 channels here possible, so hardcoded 4
+        let src_data = src_ref.projected();
         for (dst, src) in new_image
-            .chunks_exact_mut(row_stride)
-            .zip(src_ref.data.chunks_exact(src_ref.row_stride() as usize))
+            .chunks_mut(row_stride)
+            .zip(src_data.chunks(row_stride))
         {
             let src = &src[..src_ref.width as usize * src_ref.channels.channels()];
             let dst = &mut dst[..src_ref.width as usize * src_ref.channels.channels()];
@@ -552,13 +557,13 @@ fn gamma_f32<Z, F: FinalImageFactory<Z, f32>>(
     factory: F,
 ) -> Result<Z, BlurError> {
     src_ref.check_layout()?;
-    let mut new_image =
-        vec![0.; src_ref.width as usize * src_ref.height as usize * src_ref.channels.channels()];
-    let row_stride = src_ref.width as usize * src_ref.channels.channels();
+    let mut new_image = vec![0.; src_ref.row_stride() as usize * src_ref.height as usize];
+    let row_stride = src_ref.row_stride() as usize;
     if !may_have_alpha || (src_ref.channels != FastBlurChannels::Channels4) {
+        let src_data = src_ref.projected();
         for (dst, src) in new_image
-            .chunks_exact_mut(row_stride)
-            .zip(src_ref.data.chunks_exact(src_ref.row_stride() as usize))
+            .chunks_mut(row_stride)
+            .zip(src_data.chunks(row_stride))
         {
             let src = &src[..src_ref.width as usize * src_ref.channels.channels()];
             let dst = &mut dst[..src_ref.width as usize * src_ref.channels.channels()];
@@ -568,9 +573,10 @@ fn gamma_f32<Z, F: FinalImageFactory<Z, f32>>(
         }
     } else {
         // ATM only 4 channels here possible, so hardcoded 4
+        let src_data = src_ref.projected();
         for (dst, src) in new_image
-            .chunks_exact_mut(row_stride)
-            .zip(src_ref.data.chunks_exact(src_ref.row_stride() as usize))
+            .chunks_mut(row_stride)
+            .zip(src_data.chunks(row_stride))
         {
             let src = &src[..src_ref.width as usize * src_ref.channels.channels()];
             let dst = &mut dst[..src_ref.width as usize * src_ref.channels.channels()];

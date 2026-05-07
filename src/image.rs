@@ -29,6 +29,41 @@
 use crate::{BlurError, FastBlurChannels, ImageSize, MismatchedSize};
 use std::fmt::Debug;
 
+pub(crate) fn check_image_size_overflow_with_stride(
+    width: u32,
+    height: u32,
+    stride: u32,
+    chan: usize,
+    t_size: isize,
+) -> bool {
+    let Ok(w) = isize::try_from(width) else {
+        return true;
+    };
+    let Ok(h) = isize::try_from(height) else {
+        return true;
+    };
+    let Ok(n) = isize::try_from(chan) else {
+        return true;
+    };
+    let Ok(stride) = isize::try_from(stride) else {
+        return true;
+    };
+
+    // stride * (height - 1) + width * N
+    let Some(h_minus_1) = h.checked_sub(1) else {
+        return true;
+    };
+    let Some(lhs) = stride.checked_mul(h_minus_1) else {
+        return true;
+    };
+    let Some(rhs) = w.checked_mul(n) else {
+        return true;
+    };
+    lhs.checked_add(rhs)
+        .and_then(|x| x.checked_mul(t_size))
+        .is_none()
+}
+
 #[derive(Debug)]
 pub enum BufferStore<'a, T: Copy + Debug> {
     Borrowed(&'a mut [T]),
@@ -128,15 +163,12 @@ impl<'a, T: Clone + Copy + Default + Debug> BlurImage<'a, T> {
         self.check_layout()?;
         dst.check_layout(Some(self))?;
         self.size_matches_mut(dst)?;
-        for (src, dst) in self
-            .data
-            .as_ref()
-            .chunks_exact(self.row_stride() as usize)
-            .zip(
-                dst.data
-                    .borrow_mut()
-                    .chunks_exact_mut(self.row_stride() as usize),
-            )
+        let src_data = self.projected();
+        let dst_stride = dst.row_stride() as usize;
+        let dst_data = dst.projected();
+        for (src, dst) in src_data
+            .chunks(self.row_stride() as usize)
+            .zip(dst_data.chunks_mut(dst_stride))
         {
             let src = &src[..self.width as usize * self.channels.channels()];
             let dst = &mut dst[..self.width as usize * self.channels.channels()];
@@ -145,6 +177,13 @@ impl<'a, T: Clone + Copy + Default + Debug> BlurImage<'a, T> {
             }
         }
         Ok(())
+    }
+
+    pub fn projected(&self) -> &[T] {
+        let cn = self.channels.channels();
+        let total_size =
+            self.row_stride() as usize * (self.height as usize - 1) + self.width as usize * cn;
+        &self.data.as_ref()[..total_size]
     }
 
     /// Checks if it is matches the size of the other image
@@ -186,22 +225,23 @@ impl<'a, T: Clone + Copy + Default + Debug> BlurImage<'a, T> {
     }
 
     /// Checks if layout matches necessary requirements by using external channels count
-    #[inline]
     pub fn check_layout_channels(&self, cn: usize) -> Result<(), BlurError> {
         if self.width == 0 || self.height == 0 {
             return Err(BlurError::ZeroBaseSize);
         }
         let data_len = self.data.as_ref().len();
-        if data_len < self.stride as usize * (self.height as usize - 1) + self.width as usize * cn {
+        if data_len
+            < self.row_stride() as usize * (self.height as usize - 1) + self.width as usize * cn
+        {
             return Err(BlurError::MinimumSliceSizeMismatch(MismatchedSize {
-                expected: self.stride as usize * self.height as usize,
+                expected: self.row_stride() as usize * self.height as usize,
                 received: data_len,
             }));
         }
-        if (self.stride as usize) < (self.width as usize * cn) {
+        if (self.row_stride() as usize) < (self.width as usize * cn) {
             return Err(BlurError::MinimumStrideSizeMismatch(MismatchedSize {
                 expected: self.width as usize * cn,
-                received: self.stride as usize,
+                received: self.row_stride() as usize,
             }));
         }
         Ok(())
@@ -217,24 +257,32 @@ impl<'a, T: Clone + Copy + Default + Debug> BlurImage<'a, T> {
         }
     }
 
-    #[inline]
     pub fn check_layout(&self) -> Result<(), BlurError> {
         if self.width == 0 || self.height == 0 {
             return Err(BlurError::ZeroBaseSize);
         }
         let cn = self.channels.channels();
+        if check_image_size_overflow_with_stride(
+            self.width,
+            self.height,
+            self.row_stride(),
+            cn,
+            size_of::<T>() as isize,
+        ) {
+            return Err(BlurError::ExceedingPointerSize);
+        }
         if self.data.len()
-            < self.stride as usize * (self.height as usize - 1) + self.width as usize * cn
+            < self.row_stride() as usize * (self.height as usize - 1) + self.width as usize * cn
         {
             return Err(BlurError::MinimumSliceSizeMismatch(MismatchedSize {
-                expected: self.stride as usize * self.height as usize,
+                expected: self.row_stride() as usize * self.height as usize,
                 received: self.data.len(),
             }));
         }
-        if (self.stride as usize) < (self.width as usize * cn) {
+        if (self.row_stride() as usize) < (self.width as usize * cn) {
             return Err(BlurError::MinimumStrideSizeMismatch(MismatchedSize {
                 expected: self.width as usize * cn,
-                received: self.stride as usize,
+                received: self.row_stride() as usize,
             }));
         }
         Ok(())
@@ -289,16 +337,33 @@ impl<'a, T: Clone + Copy + Default + Debug> BlurImageMut<'a, T> {
         }
     }
 
-    #[inline]
+    pub fn projected(&mut self) -> &mut [T] {
+        let cn = self.channels.channels();
+        let total_size =
+            self.row_stride() as usize * (self.height as usize - 1) + self.width as usize * cn;
+        &mut self.data.borrow_mut()[..total_size]
+    }
+
     pub fn layout_test(&self) -> Result<(), BlurError> {
         if self.width == 0 || self.height == 0 {
             return Err(BlurError::ZeroBaseSize);
         }
         let cn = self.channels.channels();
+        if check_image_size_overflow_with_stride(
+            self.width,
+            self.height,
+            self.row_stride(),
+            cn,
+            size_of::<T>() as isize,
+        ) {
+            return Err(BlurError::ExceedingPointerSize);
+        }
         let data_len = self.data.borrow().len();
-        if data_len < self.stride as usize * (self.height as usize - 1) + self.width as usize * cn {
+        if data_len
+            < self.row_stride() as usize * (self.height as usize - 1) + self.width as usize * cn
+        {
             return Err(BlurError::MinimumSliceSizeMismatch(MismatchedSize {
-                expected: self.stride as usize * self.height as usize,
+                expected: self.row_stride() as usize * self.height as usize,
                 received: data_len,
             }));
         }
@@ -324,24 +389,34 @@ impl<'a, T: Clone + Copy + Default + Debug> BlurImageMut<'a, T> {
             return Err(BlurError::ZeroBaseSize);
         }
         let cn = self.channels.channels();
+        if check_image_size_overflow_with_stride(
+            self.width,
+            self.height,
+            self.row_stride(),
+            cn,
+            size_of::<T>() as isize,
+        ) {
+            return Err(BlurError::ExceedingPointerSize);
+        }
         let data_len = self.data.borrow().len();
-        if data_len < self.stride as usize * (self.height as usize - 1) + self.width as usize * cn {
+        if data_len
+            < self.row_stride() as usize * (self.height as usize - 1) + self.width as usize * cn
+        {
             return Err(BlurError::MinimumSliceSizeMismatch(MismatchedSize {
-                expected: self.stride as usize * self.height as usize,
+                expected: self.row_stride() as usize * self.height as usize,
                 received: data_len,
             }));
         }
-        if (self.stride as usize) < (self.width as usize * cn) {
+        if (self.row_stride() as usize) < (self.width as usize * cn) {
             return Err(BlurError::MinimumStrideSizeMismatch(MismatchedSize {
                 expected: self.width as usize * cn,
-                received: self.stride as usize,
+                received: self.row_stride() as usize,
             }));
         }
         Ok(())
     }
 
     /// Checks if layout matches necessary requirements by using external channels count
-    #[inline]
     pub fn check_layout_channels(
         &mut self,
         cn: usize,
@@ -356,17 +431,28 @@ impl<'a, T: Clone + Copy + Default + Debug> BlurImageMut<'a, T> {
         if self.width == 0 || self.height == 0 {
             return Err(BlurError::ZeroBaseSize);
         }
+        if check_image_size_overflow_with_stride(
+            self.width,
+            self.height,
+            self.row_stride(),
+            cn,
+            size_of::<T>() as isize,
+        ) {
+            return Err(BlurError::ExceedingPointerSize);
+        }
         let data_len = self.data.borrow().len();
-        if data_len < self.stride as usize * (self.height as usize - 1) + self.width as usize * cn {
+        if data_len
+            < self.row_stride() as usize * (self.height as usize - 1) + self.width as usize * cn
+        {
             return Err(BlurError::MinimumSliceSizeMismatch(MismatchedSize {
-                expected: self.stride as usize * self.height as usize,
+                expected: self.row_stride() as usize * self.height as usize,
                 received: data_len,
             }));
         }
-        if (self.stride as usize) < (self.width as usize * cn) {
+        if (self.row_stride() as usize) < (self.width as usize * cn) {
             return Err(BlurError::MinimumStrideSizeMismatch(MismatchedSize {
                 expected: self.width as usize * cn,
-                received: self.stride as usize,
+                received: self.row_stride() as usize,
             }));
         }
         Ok(())
