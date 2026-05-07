@@ -71,7 +71,7 @@ pub fn gaussian_blur_image(
                 threading_policy,
                 precise_level,
             )
-            .unwrap();
+            .ok()?;
             let new_gray_image = GrayImage::from_raw(
                 gray.width(),
                 gray.height(),
@@ -125,7 +125,7 @@ pub fn gaussian_blur_image(
                 threading_policy,
                 precise_level,
             )
-            .unwrap();
+            .ok()?;
 
             gaussian_blur(
                 &alp,
@@ -135,7 +135,7 @@ pub fn gaussian_blur_image(
                 threading_policy,
                 precise_level,
             )
-            .unwrap();
+            .ok()?;
 
             let mut new_raw_buffer =
                 vec![
@@ -175,7 +175,7 @@ pub fn gaussian_blur_image(
                 threading_policy,
                 precise_level,
             )
-            .unwrap();
+            .ok()?;
 
             let new_rgb_image =
                 RgbImage::from_raw(img.width(), img.height(), new_image.data.borrow().to_vec())?;
@@ -194,7 +194,7 @@ pub fn gaussian_blur_image(
                 threading_policy,
                 precise_level,
             )
-            .unwrap();
+            .ok()?;
             let new_rgba_image =
                 RgbaImage::from_raw(img.width(), img.height(), new_image.data.borrow().to_vec())?;
             Some(DynamicImage::ImageRgba8(new_rgba_image))
@@ -213,7 +213,7 @@ pub fn gaussian_blur_image(
                 threading_policy,
                 precise_level,
             )
-            .unwrap();
+            .ok()?;
 
             let new_rgb_image = ImageBuffer::<Luma<u16>, Vec<u16>>::from_raw(
                 img.width(),
@@ -268,7 +268,7 @@ pub fn gaussian_blur_image(
                 threading_policy,
                 precise_level,
             )
-            .unwrap();
+            .ok()?;
 
             gaussian_blur_u16(
                 &alp,
@@ -278,7 +278,7 @@ pub fn gaussian_blur_image(
                 threading_policy,
                 precise_level,
             )
-            .unwrap();
+            .ok()?;
 
             let mut new_raw_buffer =
                 vec![
@@ -318,7 +318,7 @@ pub fn gaussian_blur_image(
                 threading_policy,
                 precise_level,
             )
-            .unwrap();
+            .ok()?;
 
             let new_rgb_image = ImageBuffer::<Rgb<u16>, Vec<u16>>::from_raw(
                 img.width(),
@@ -340,7 +340,7 @@ pub fn gaussian_blur_image(
                 threading_policy,
                 precise_level,
             )
-            .unwrap();
+            .ok()?;
 
             let new_rgb_image = ImageBuffer::<Rgba<u16>, Vec<u16>>::from_raw(
                 img.width(),
@@ -362,7 +362,7 @@ pub fn gaussian_blur_image(
                 threading_policy,
                 IeeeBinaryConvolutionMode::Normal,
             )
-            .unwrap();
+            .ok()?;
             let new_rgb_image =
                 Rgb32FImage::from_raw(img.width(), img.height(), new_image.data.borrow().to_vec())?;
             Some(DynamicImage::ImageRgb32F(new_rgb_image))
@@ -380,7 +380,7 @@ pub fn gaussian_blur_image(
                 threading_policy,
                 IeeeBinaryConvolutionMode::Normal,
             )
-            .unwrap();
+            .ok()?;
             let new_rgb_image = Rgba32FImage::from_raw(
                 img.width(),
                 img.height(),
