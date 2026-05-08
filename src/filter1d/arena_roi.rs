@@ -32,14 +32,16 @@
 /// Copies ROI from one image to another
 #[allow(clippy::type_complexity)]
 #[inline(always)]
-pub fn copy_roi<T>(arena: &mut [T], roi: &[T], arena_stride: usize, stride: usize)
+pub fn copy_roi<T>(arena: &mut [T], roi: &[T], arena_stride: usize, stride: usize, size: usize)
 where
     T: Copy,
 {
     arena
-        .chunks_exact_mut(arena_stride)
+        .chunks_mut(arena_stride)
         .zip(roi.chunks(stride))
         .for_each(|(dst, src)| {
+            let dst = &mut dst[..size];
+            let src = &src[..size];
             for (dst, src) in dst.iter_mut().zip(src.iter()) {
                 *dst = *src;
             }
