@@ -30,7 +30,9 @@
 #![no_main]
 
 use arbitrary::Arbitrary;
-use libblur::{BlurImage, BlurImageMut, BoxBlurParameters, FastBlurChannels, ThreadingPolicy};
+use libblur::{
+    BlurImage, BlurImageMut, BoxBlurParameters, BufferStore, FastBlurChannels, ThreadingPolicy,
+};
 use libfuzzer_sys::fuzz_target;
 
 #[derive(Clone, Debug, Arbitrary)]
@@ -43,6 +45,7 @@ pub struct SrcImage {
     pub y_kernel_size: u8,
     pub plane: u8,
     pub threading: bool,
+    pub additional_padding: u8,
 }
 
 fuzz_target!(|data: SrcImage| {
@@ -71,6 +74,7 @@ fuzz_target!(|data: SrcImage| {
         } else {
             ThreadingPolicy::Single
         },
+        data.additional_padding as usize % 50,
     );
 });
 
@@ -81,12 +85,30 @@ fn fuzz_16bit(
     y_kernel_size: usize,
     channels: FastBlurChannels,
     threading_policy: ThreadingPolicy,
+    additional_padding: usize,
 ) {
     if width == 0 || height == 0 || x_kernel_size == 0 || y_kernel_size == 0 {
         return;
     }
-    let mut dst_image = BlurImageMut::alloc(width as u32, height as u32, channels);
-    let src_image = BlurImage::alloc(width as u32, height as u32, channels);
+
+    let stride = (width as u32 + additional_padding as u32) * channels.channels() as u32;
+    let src_image = vec![1u16; stride as usize * (height - 1) + width * channels.channels()];
+    let dst_image = vec![0u16; stride as usize * (height - 1) + width * channels.channels()];
+
+    let src_image = BlurImage {
+        data: std::borrow::Cow::Borrowed(&src_image),
+        width: width as u32,
+        height: height as u32,
+        stride,
+        channels,
+    };
+    let mut dst_image = BlurImageMut {
+        data: BufferStore::Owned(dst_image),
+        width: width as u32,
+        height: height as u32,
+        stride,
+        channels,
+    };
 
     libblur::box_blur_u16(
         &src_image,

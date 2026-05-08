@@ -31,7 +31,7 @@
 
 use arbitrary::Arbitrary;
 use libblur::{
-    fast_gaussian_next_u16, AnisotropicRadius, BlurImageMut, EdgeMode, EdgeMode2D,
+    fast_gaussian_next_u16, AnisotropicRadius, BlurImageMut, BufferStore, EdgeMode, EdgeMode2D,
     FastBlurChannels, ThreadingPolicy,
 };
 use libfuzzer_sys::fuzz_target;
@@ -45,6 +45,7 @@ pub struct SrcImage {
     pub x_radius: u8,
     pub y_radius: u8,
     pub plane: u8,
+    pub additional_padding: u8,
 }
 
 fuzz_target!(|data: SrcImage| {
@@ -70,6 +71,7 @@ fuzz_target!(|data: SrcImage| {
         plane_match,
         edge_mode,
         data.value,
+        data.additional_padding as usize % 50,
     );
 });
 
@@ -81,12 +83,22 @@ fn fuzz_image(
     channels: FastBlurChannels,
     edge_mode: EdgeMode,
     value: u16,
+    additional_padding: usize,
 ) {
     if width == 0 || height == 0 {
         return;
     }
-    let mut dst_image = BlurImageMut::alloc(width as u32, height as u32, channels);
-    dst_image.data.borrow_mut().fill(value);
+
+    let stride = (width as u32 + additional_padding as u32) * channels.channels() as u32;
+    let dst_image = vec![value; stride as usize * (height - 1) + width * channels.channels()];
+
+    let mut dst_image = BlurImageMut {
+        data: BufferStore::Owned(dst_image),
+        width: width as u32,
+        height: height as u32,
+        stride,
+        channels,
+    };
 
     fast_gaussian_next_u16(
         &mut dst_image,
