@@ -33,7 +33,7 @@ use num_traits::AsPrimitive;
 use num_traits::real::Real;
 use rayon::ThreadPool;
 use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-use rayon::prelude::{IntoParallelIterator, ParallelSliceMut};
+use rayon::prelude::{IntoParallelIterator, ParallelSlice, ParallelSliceMut};
 use std::fmt::{Debug, Display};
 use std::ops::{Add, AddAssign, Div, Index, Mul, MulAssign, Sub};
 
@@ -315,7 +315,6 @@ fn fast_bilateral_filter_impl<
 >(
     img: &BlurImage<T>,
     dst: &mut [T],
-    kernel_size: u32,
     spatial_sigma: f32,
     range_sigma: f32,
 ) where
@@ -335,18 +334,8 @@ fn fast_bilateral_filter_impl<
     let padding_xy = 2.;
     let padding_z = 2.;
 
-    let spatial_sigma_scale = if spatial_sigma > 1. {
-        (1. / spatial_sigma * (if spatial_sigma > 1.3 { 1.3 } else { 1. }))
-            .min(1. / 1.2f32)
-            .max(1. / 5f32)
-    } else {
-        1.
-    };
-    let range_sigma_scale = if range_sigma > 1. {
-        (1. / range_sigma).min(1. / 1.1f32).max(1. / 5f32)
-    } else {
-        1.
-    };
+    let spatial_sigma_scale = 1. / spatial_sigma;
+    let range_sigma_scale = 1. / range_sigma;
 
     let small_width = (((width - 1) as f32 * spatial_sigma_scale) + 1. + 2. * padding_xy) as usize;
     let small_height =
@@ -380,9 +369,9 @@ fn fast_bilateral_filter_impl<
 
     let mut buffer = Array3D::<T>::new(&mut target2, small_width, small_height, small_depth);
 
-    let preferred_sigma = (spatial_sigma * spatial_sigma + range_sigma * range_sigma).sqrt();
-
-    let gaussian_kernel = gaussian_kernel_1d(kernel_size, preferred_sigma);
+    let preferred_sigma = 1.0f32;
+    let grid_kernel_size = 7u32; // 6*sigma+1, fixed
+    let gaussian_kernel = gaussian_kernel_1d(grid_kernel_size, preferred_sigma);
     let half_kernel = gaussian_kernel.len() / 2;
 
     // Unrolled 3D convolution
@@ -477,7 +466,7 @@ fn fast_bilateral_filter_impl<
                 buffer.set(x, y, z, sum);
             }
 
-            for z in small_depth.saturating_sub(small_depth)..small_depth {
+            for z in small_depth.saturating_sub(half_kernel)..small_depth {
                 let mut sum = data
                     .get(x, y, z)
                     .mul(unsafe { *gaussian_kernel.get_unchecked(half_kernel) }.as_());
@@ -555,15 +544,12 @@ fn fast_bilateral_filter_impl<
 
     std::mem::swap(&mut buffer, &mut data);
 
-    for (src, dst) in img.iter().zip(dst.iter_mut()) {
-        *dst = *src;
-    }
-
     dst.par_chunks_exact_mut(width as usize)
+        .zip(img.par_chunks_exact(width as usize))
         .enumerate()
-        .for_each(|(y, row)| {
-            for (x, t) in row.iter_mut().enumerate() {
-                let z = (*t - base_min).as_();
+        .for_each(|(y, (row, src_row))| {
+            for (x, (t, s)) in row.iter_mut().zip(src_row.iter()).enumerate() {
+                let z = (*s - base_min).as_();
                 let d = data.trilinear_interpolation(
                     (x as f32) * spatial_sigma_scale + padding_xy,
                     (y as f32) * spatial_sigma_scale + padding_xy,
@@ -625,7 +611,6 @@ fn fast_bilateral_filter_plane_impl<
 >(
     img: &BlurImage<V>,
     dst: &mut BlurImageMut<V>,
-    kernel_size: u32,
     spatial_sigma: f32,
     range_sigma: f32,
     pool: &ThreadPool,
@@ -636,7 +621,6 @@ fn fast_bilateral_filter_plane_impl<
         img.size_matches_mut(dst)?;
         let width = img.width;
         let height = img.height;
-        assert_ne!(kernel_size & 1, 0, "kernel size must be odd");
         assert!(
             !(spatial_sigma <= 0. || range_sigma <= 0.0),
             "Spatial sigma and range sigma must be more than 0"
@@ -656,7 +640,6 @@ fn fast_bilateral_filter_plane_impl<
         fast_bilateral_filter_impl(
             &in_image,
             working_dst.data.borrow_mut(),
-            kernel_size,
             spatial_sigma,
             range_sigma,
         );
@@ -683,14 +666,12 @@ pub(crate) fn fast_bilateral_filter_gray_alpha_impl<
 >(
     img: &BlurImage<V>,
     dst: &mut BlurImageMut<V>,
-    kernel_size: u32,
     spatial_sigma: f32,
     range_sigma: f32,
     threading_policy: ThreadingPolicy,
 ) -> Result<(), BlurError> {
     img.check_layout_channels(2)?;
     dst.check_layout_channels(2, Some(img))?;
-    assert_ne!(kernel_size & 1, 0, "kernel size must be odd");
     assert!(
         !(spatial_sigma <= 0. || range_sigma <= 0.0),
         "Spatial sigma and range sigma must be more than 0"
@@ -717,7 +698,7 @@ pub(crate) fn fast_bilateral_filter_gray_alpha_impl<
             for ((r, g), src) in dst0
                 .iter_mut()
                 .zip(dst1.iter_mut())
-                .zip(src.chunks_exact(2))
+                .zip(src.as_chunks::<2>().0.iter())
             {
                 *r = src[0].to_bilinear_f32();
                 *g = src[1].to_bilinear_f32();
@@ -735,7 +716,6 @@ pub(crate) fn fast_bilateral_filter_gray_alpha_impl<
                 fast_bilateral_filter_impl(
                     &ref0,
                     working_dst0.data.borrow_mut(),
-                    kernel_size,
                     spatial_sigma,
                     range_sigma,
                 );
@@ -744,7 +724,6 @@ pub(crate) fn fast_bilateral_filter_gray_alpha_impl<
                 fast_bilateral_filter_impl(
                     &ref1,
                     working_dst1.data.borrow_mut(),
-                    kernel_size,
                     spatial_sigma,
                     range_sigma,
                 );
@@ -759,7 +738,12 @@ pub(crate) fn fast_bilateral_filter_gray_alpha_impl<
             .zip(working_dst0.data.borrow().chunks_exact(width as usize))
             .zip(working_dst1.data.borrow().chunks_exact(width as usize))
             .for_each(|((dst, src0), src1)| {
-                for ((dst, src0), src1) in dst.chunks_exact_mut(2).zip(src0.iter()).zip(src1.iter())
+                for ((dst, src0), src1) in dst
+                    .as_chunks_mut::<2>()
+                    .0
+                    .iter_mut()
+                    .zip(src0.iter())
+                    .zip(src1.iter())
                 {
                     dst[0] = V::from_bilinear_f32(*src0);
                     dst[1] = V::from_bilinear_f32(*src1);
@@ -774,7 +758,6 @@ fn fast_bilateral_filter_rgb_impl<
 >(
     img: &BlurImage<V>,
     dst: &mut BlurImageMut<V>,
-    kernel_size: u32,
     spatial_sigma: f32,
     range_sigma: f32,
     pool: &ThreadPool,
@@ -785,7 +768,6 @@ fn fast_bilateral_filter_rgb_impl<
         img.size_matches_mut(dst)?;
         let width = img.width;
         let height = img.height;
-        assert_ne!(kernel_size & 1, 0, "kernel size must be odd");
         assert!(
             !(spatial_sigma <= 0. || range_sigma <= 0.0),
             "Spatial sigma and range sigma must be more than 0"
@@ -805,7 +787,7 @@ fn fast_bilateral_filter_rgb_impl<
                 .iter_mut()
                 .zip(dst1.iter_mut())
                 .zip(dst2.iter_mut())
-                .zip(src.chunks_exact(3))
+                .zip(src.as_chunks::<3>().0.iter())
             {
                 *r = src[0].to_bilinear_f32();
                 *g = src[1].to_bilinear_f32();
@@ -826,7 +808,6 @@ fn fast_bilateral_filter_rgb_impl<
                 fast_bilateral_filter_impl(
                     &ref0,
                     working_dst0.data.borrow_mut(),
-                    kernel_size,
                     spatial_sigma,
                     range_sigma,
                 );
@@ -835,7 +816,6 @@ fn fast_bilateral_filter_rgb_impl<
                 fast_bilateral_filter_impl(
                     &ref1,
                     working_dst1.data.borrow_mut(),
-                    kernel_size,
                     spatial_sigma,
                     range_sigma,
                 );
@@ -844,7 +824,6 @@ fn fast_bilateral_filter_rgb_impl<
                 fast_bilateral_filter_impl(
                     &ref2,
                     working_dst2.data.borrow_mut(),
-                    kernel_size,
                     spatial_sigma,
                     range_sigma,
                 );
@@ -861,7 +840,9 @@ fn fast_bilateral_filter_rgb_impl<
             .zip(working_dst2.data.borrow().chunks_exact(width as usize))
             .for_each(|(((dst, src0), src1), src2)| {
                 for (((dst, src0), src1), src2) in dst
-                    .chunks_exact_mut(3)
+                    .as_chunks_mut::<3>()
+                    .0
+                    .iter_mut()
                     .zip(src0.iter())
                     .zip(src1.iter())
                     .zip(src2)
@@ -881,7 +862,6 @@ fn fast_bilateral_filter_rgba_impl<
 >(
     img: &BlurImage<V>,
     dst: &mut BlurImageMut<V>,
-    kernel_size: u32,
     spatial_sigma: f32,
     range_sigma: f32,
     pool: &ThreadPool,
@@ -892,7 +872,6 @@ fn fast_bilateral_filter_rgba_impl<
         img.size_matches_mut(dst)?;
         let width = img.width;
         let height = img.height;
-        assert_ne!(kernel_size & 1, 0, "kernel size must be odd");
         assert!(
             !(spatial_sigma <= 0. || range_sigma <= 0.0),
             "Spatial sigma and range sigma must be more than 0"
@@ -915,7 +894,7 @@ fn fast_bilateral_filter_rgba_impl<
                 .zip(dst1.iter_mut())
                 .zip(dst2.iter_mut())
                 .zip(dst3.iter_mut())
-                .zip(src.chunks_exact(4))
+                .zip(src.as_chunks::<4>().0.iter())
             {
                 *r = src[0].to_bilinear_f32();
                 *g = src[1].to_bilinear_f32();
@@ -939,7 +918,6 @@ fn fast_bilateral_filter_rgba_impl<
                 fast_bilateral_filter_impl(
                     &ref0,
                     working_dst0.data.borrow_mut(),
-                    kernel_size,
                     spatial_sigma,
                     range_sigma,
                 );
@@ -949,7 +927,6 @@ fn fast_bilateral_filter_rgba_impl<
                 fast_bilateral_filter_impl(
                     &ref1,
                     working_dst1.data.borrow_mut(),
-                    kernel_size,
                     spatial_sigma,
                     range_sigma,
                 );
@@ -959,7 +936,6 @@ fn fast_bilateral_filter_rgba_impl<
                 fast_bilateral_filter_impl(
                     &ref2,
                     working_dst2.data.borrow_mut(),
-                    kernel_size,
                     spatial_sigma,
                     range_sigma,
                 );
@@ -969,7 +945,6 @@ fn fast_bilateral_filter_rgba_impl<
                 fast_bilateral_filter_impl(
                     &ref3,
                     working_dst3.data.borrow_mut(),
-                    kernel_size,
                     spatial_sigma,
                     range_sigma,
                 );
@@ -987,7 +962,9 @@ fn fast_bilateral_filter_rgba_impl<
             .zip(working_dst3.data.borrow().chunks_exact(width as usize))
             .for_each(|((((dst, src0), src1), src2), src3)| {
                 for ((((dst, src0), src1), src2), src3) in dst
-                    .chunks_exact_mut(4)
+                    .as_chunks_mut::<4>()
+                    .0
+                    .iter_mut()
                     .zip(src0.iter())
                     .zip(src1.iter())
                     .zip(src2.iter())
@@ -1021,7 +998,6 @@ fn fast_bilateral_filter_rgba_impl<
 pub fn fast_bilateral_filter(
     src: &BlurImage<u8>,
     dst: &mut BlurImageMut<u8>,
-    kernel_size: u32,
     spatial_sigma: f32,
     range_sigma: f32,
     threading_policy: ThreadingPolicy,
@@ -1030,7 +1006,6 @@ pub fn fast_bilateral_filter(
     dst.check_layout(Some(src))?;
     src.size_matches_mut(dst)?;
     let channels = src.channels;
-    assert_ne!(kernel_size & 1, 0, "kernel_size must be odd");
 
     let thread_count = threading_policy.thread_count(src.width, src.height) as u32;
     let pool = rayon::ThreadPoolBuilder::new()
@@ -1040,34 +1015,13 @@ pub fn fast_bilateral_filter(
 
     match channels {
         FastBlurChannels::Plane => {
-            fast_bilateral_filter_plane_impl(
-                src,
-                dst,
-                kernel_size,
-                spatial_sigma,
-                range_sigma,
-                &pool,
-            )?;
+            fast_bilateral_filter_plane_impl(src, dst, spatial_sigma, range_sigma, &pool)?;
         }
         FastBlurChannels::Channels3 => {
-            fast_bilateral_filter_rgb_impl(
-                src,
-                dst,
-                kernel_size,
-                spatial_sigma,
-                range_sigma,
-                &pool,
-            )?;
+            fast_bilateral_filter_rgb_impl(src, dst, spatial_sigma, range_sigma, &pool)?;
         }
         FastBlurChannels::Channels4 => {
-            fast_bilateral_filter_rgba_impl(
-                src,
-                dst,
-                kernel_size,
-                spatial_sigma,
-                range_sigma,
-                &pool,
-            )?;
+            fast_bilateral_filter_rgba_impl(src, dst, spatial_sigma, range_sigma, &pool)?;
         }
     }
     Ok(())
@@ -1075,7 +1029,7 @@ pub fn fast_bilateral_filter(
 
 /// Performs fast bilateral filter on the up to 16-bit image
 ///
-/// This is fast bilateral approximation, note this behaviour significantly differs from OpenCV.
+/// This is fast bilateral approximation, note this behavior differs from OpenCV.
 /// This method has high convergence and will completely blur an image very fast with increasing spatial sigma
 /// By the nature of this filter the more spatial sigma are the faster method is.
 ///
@@ -1093,7 +1047,6 @@ pub fn fast_bilateral_filter(
 pub fn fast_bilateral_filter_u16(
     src: &BlurImage<u16>,
     dst: &mut BlurImageMut<u16>,
-    kernel_size: u32,
     spatial_sigma: f32,
     range_sigma: f32,
     threading_policy: ThreadingPolicy,
@@ -1102,7 +1055,6 @@ pub fn fast_bilateral_filter_u16(
     dst.check_layout(Some(src))?;
     src.size_matches_mut(dst)?;
     let channels = src.channels;
-    assert_ne!(kernel_size & 1, 0, "kernel_size must be odd");
 
     let thread_count = threading_policy.thread_count(src.width, src.height) as u32;
     let pool = rayon::ThreadPoolBuilder::new()
@@ -1112,34 +1064,13 @@ pub fn fast_bilateral_filter_u16(
 
     match channels {
         FastBlurChannels::Plane => {
-            fast_bilateral_filter_plane_impl(
-                src,
-                dst,
-                kernel_size,
-                spatial_sigma,
-                range_sigma,
-                &pool,
-            )?;
+            fast_bilateral_filter_plane_impl(src, dst, spatial_sigma, range_sigma, &pool)?;
         }
         FastBlurChannels::Channels3 => {
-            fast_bilateral_filter_rgb_impl(
-                src,
-                dst,
-                kernel_size,
-                spatial_sigma,
-                range_sigma,
-                &pool,
-            )?;
+            fast_bilateral_filter_rgb_impl(src, dst, spatial_sigma, range_sigma, &pool)?;
         }
         FastBlurChannels::Channels4 => {
-            fast_bilateral_filter_rgba_impl(
-                src,
-                dst,
-                kernel_size,
-                spatial_sigma,
-                range_sigma,
-                &pool,
-            )?;
+            fast_bilateral_filter_rgba_impl(src, dst, spatial_sigma, range_sigma, &pool)?;
         }
     }
     Ok(())
@@ -1147,7 +1078,7 @@ pub fn fast_bilateral_filter_u16(
 
 /// Performs fast bilateral filter on the f32 image
 ///
-/// This is fast bilateral approximation, note this behaviour significantly differs from OpenCV.
+/// This is fast bilateral approximation, note this behavior differs from OpenCV.
 /// This method has high convergence and will completely blur an image very fast with increasing spatial sigma
 /// By the nature of this filter the more spatial sigma are the faster method is.
 ///
@@ -1165,7 +1096,6 @@ pub fn fast_bilateral_filter_u16(
 pub fn fast_bilateral_filter_f32(
     src: &BlurImage<f32>,
     dst: &mut BlurImageMut<f32>,
-    kernel_size: u32,
     spatial_sigma: f32,
     range_sigma: f32,
     threading_policy: ThreadingPolicy,
@@ -1181,37 +1111,15 @@ pub fn fast_bilateral_filter_f32(
         .build()
         .unwrap();
 
-    assert_ne!(kernel_size & 1, 0, "kernel_size must be odd");
     match channels {
         FastBlurChannels::Plane => {
-            fast_bilateral_filter_plane_impl(
-                src,
-                dst,
-                kernel_size,
-                spatial_sigma,
-                range_sigma,
-                &pool,
-            )?;
+            fast_bilateral_filter_plane_impl(src, dst, spatial_sigma, range_sigma, &pool)?;
         }
         FastBlurChannels::Channels3 => {
-            fast_bilateral_filter_rgb_impl(
-                src,
-                dst,
-                kernel_size,
-                spatial_sigma,
-                range_sigma,
-                &pool,
-            )?;
+            fast_bilateral_filter_rgb_impl(src, dst, spatial_sigma, range_sigma, &pool)?;
         }
         FastBlurChannels::Channels4 => {
-            fast_bilateral_filter_rgba_impl(
-                src,
-                dst,
-                kernel_size,
-                spatial_sigma,
-                range_sigma,
-                &pool,
-            )?;
+            fast_bilateral_filter_rgba_impl(src, dst, spatial_sigma, range_sigma, &pool)?;
         }
     }
     Ok(())

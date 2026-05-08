@@ -214,13 +214,35 @@ fn main() {
     // )
     // .unwrap();
 
-    median_blur(
+    fast_bilateral_filter(
         &cvt.to_immutable_ref(),
         &mut dst_image,
-        35,
+        7.,
+        5.,
         ThreadingPolicy::Single,
     )
     .unwrap();
+
+    // bilateral_filter(
+    //     &cvt.to_immutable_ref(),
+    //     &mut dst_image,
+    //     BilateralBlurParams {
+    //         kernel_size: 35,
+    //         spatial_sigma: 7.,
+    //         range_sigma: 5.,
+    //     },
+    //     EdgeMode2D::new(EdgeMode::Clamp),
+    //     Scalar::default(),
+    //     ThreadingPolicy::Adaptive,
+    // )
+    // .unwrap();
+    // median_blur(
+    //     &cvt.to_immutable_ref(),
+    //     &mut dst_image,
+    //     35,
+    //     ThreadingPolicy::Single,
+    // )
+    // .unwrap();
 
     // tent_blur(
     //     &cvt.to_immutable_ref(),
@@ -340,7 +362,7 @@ fn main() {
 
     if components == 3 {
         image::save_buffer(
-            "blurred_stack_next35_2.jpg",
+            "blurred_stack_next_fbil.jpg",
             bytes.as_bytes(),
             dimensions.0,
             dimensions.1,
@@ -349,7 +371,7 @@ fn main() {
         .unwrap();
     } else {
         image::save_buffer(
-            "blurred_stack_next_f1.png",
+            "blurred_stack_next_bil.png",
             bytes.as_bytes(),
             dimensions.0,
             dimensions.1,

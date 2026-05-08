@@ -53,14 +53,10 @@ use image::{
 #[must_use]
 pub fn fast_bilateral_filter_image(
     image: DynamicImage,
-    kernel_size: u32,
     spatial_sigma: f32,
     range_sigma: f32,
     threading_policy: ThreadingPolicy,
 ) -> Option<DynamicImage> {
-    if kernel_size & 1 == 0 {
-        return None;
-    }
     match image {
         DynamicImage::ImageLuma8(gray) => {
             let mut new_image =
@@ -72,7 +68,6 @@ pub fn fast_bilateral_filter_image(
             fast_bilateral_filter(
                 &blur_image,
                 &mut new_image,
-                kernel_size,
                 spatial_sigma,
                 range_sigma,
                 threading_policy,
@@ -111,7 +106,6 @@ pub fn fast_bilateral_filter_image(
             fast_bilateral_filter_gray_alpha_impl(
                 &captured_image,
                 &mut new_image,
-                kernel_size,
                 spatial_sigma,
                 range_sigma,
                 threading_policy,
@@ -142,7 +136,6 @@ pub fn fast_bilateral_filter_image(
             fast_bilateral_filter(
                 &blur_image,
                 &mut new_image,
-                kernel_size,
                 spatial_sigma,
                 range_sigma,
                 threading_policy,
@@ -173,7 +166,6 @@ pub fn fast_bilateral_filter_image(
             fast_bilateral_filter(
                 &blur_image,
                 &mut new_image,
-                kernel_size,
                 spatial_sigma,
                 range_sigma,
                 threading_policy,
@@ -200,7 +192,6 @@ pub fn fast_bilateral_filter_image(
             fast_bilateral_filter_u16(
                 &blur_image,
                 &mut new_image,
-                kernel_size,
                 spatial_sigma,
                 range_sigma,
                 threading_policy,
@@ -239,7 +230,6 @@ pub fn fast_bilateral_filter_image(
             fast_bilateral_filter_gray_alpha_impl(
                 &captured_image,
                 &mut new_image,
-                kernel_size,
                 spatial_sigma,
                 range_sigma,
                 threading_policy,
@@ -270,7 +260,6 @@ pub fn fast_bilateral_filter_image(
             fast_bilateral_filter_u16(
                 &blur_image,
                 &mut new_image,
-                kernel_size,
                 spatial_sigma,
                 range_sigma,
                 threading_policy,
@@ -301,7 +290,6 @@ pub fn fast_bilateral_filter_image(
             fast_bilateral_filter_u16(
                 &blur_image,
                 &mut new_image,
-                kernel_size,
                 spatial_sigma,
                 range_sigma,
                 threading_policy,
@@ -332,7 +320,6 @@ pub fn fast_bilateral_filter_image(
             fast_bilateral_filter_f32(
                 &blur_image,
                 &mut new_image,
-                kernel_size,
                 spatial_sigma,
                 range_sigma,
                 threading_policy,
@@ -363,7 +350,6 @@ pub fn fast_bilateral_filter_image(
             fast_bilateral_filter_f32(
                 &blur_image,
                 &mut new_image,
-                kernel_size,
                 spatial_sigma,
                 range_sigma,
                 threading_policy,

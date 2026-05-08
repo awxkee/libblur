@@ -77,6 +77,7 @@ impl<const N: usize> BilateralUnit<u8> for BilateralExecutionUnitNeon<'_, N> {
         let a_stride = self.arena.width * self.arena.components;
         let mut dst_row = &mut dst_row[..useful_width];
         let mut src_row = &src_row[..useful_width];
+        let mut offset = 0usize;
 
         unsafe {
             for (wx, (dst, center)) in dst_row
@@ -164,6 +165,7 @@ impl<const N: usize> BilateralUnit<u8> for BilateralExecutionUnitNeon<'_, N> {
                 let vss0 = vqmovn_u16(vcombine_u16(ss0, ss1));
                 let vss1 = vqmovn_u16(vcombine_u16(ss2, ss3));
                 vst1q_u8(dst.as_mut_ptr().cast(), vcombine_u8(vss0, vss1));
+                offset += 16;
             }
 
             dst_row = dst_row.chunks_exact_mut(16).into_remainder();
@@ -184,7 +186,7 @@ impl<const N: usize> BilateralUnit<u8> for BilateralExecutionUnitNeon<'_, N> {
 
                 let cx = vshll_n_u8::<8>(vld1_u8(center.as_ptr().cast()));
 
-                let x = wx * 8;
+                let x = offset + wx * 8;
 
                 for (ky, ky_row) in sliced_range
                     .chunks_exact(self.params.kernel_size)
@@ -230,6 +232,7 @@ impl<const N: usize> BilateralUnit<u8> for BilateralExecutionUnitNeon<'_, N> {
 
                 let vss0 = vqmovn_u16(vcombine_u16(ss0, ss1));
                 vst1_u8(dst.as_mut_ptr().cast(), vss0);
+                offset += 8;
             }
         }
 
@@ -239,6 +242,8 @@ impl<const N: usize> BilateralUnit<u8> for BilateralExecutionUnitNeon<'_, N> {
         for (x, (dst, &center)) in dst_row.iter_mut().zip(src_row.iter()).enumerate() {
             let mut sum0 = 0f32;
             let mut iw0 = 0f32;
+
+            let x = x + offset;
 
             let sx = x % N;
             for (ky, ky_row) in sliced_range
@@ -258,6 +263,7 @@ impl<const N: usize> BilateralUnit<u8> for BilateralExecutionUnitNeon<'_, N> {
             iw0 = if iw0 == 0. { 1. } else { iw0 };
 
             *dst = (sum0 / iw0).round().min(255.).max(0.) as u8;
+            offset += 1;
         }
     }
 }

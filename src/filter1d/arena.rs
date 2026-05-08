@@ -199,7 +199,13 @@ where
     let new_stride = new_width * CN;
 
     let offset = pads.pad_top * new_stride + pads.pad_left * CN;
-    copy_roi(&mut padded_image[offset..], image, new_stride, old_stride);
+    copy_roi(
+        &mut padded_image[offset..],
+        image,
+        new_stride,
+        old_stride,
+        width * CN,
+    );
 
     let filling_ranges = [
         (0..pads.pad_top, 0..new_width), // Top outer
@@ -227,7 +233,7 @@ where
                 for (j, dst) in ranges
                     .1
                     .clone()
-                    .zip(dst.chunks_exact_mut(CN).skip(ranges.1.start))
+                    .zip(dst.as_chunks_mut::<CN>().0.iter_mut().skip(ranges.1.start))
                 {
                     let y = clamp_edge!(
                         edge_modes.vertical,
@@ -263,7 +269,7 @@ where
                 for (j, dst) in ranges
                     .1
                     .clone()
-                    .zip(dst.chunks_exact_mut(CN).skip(ranges.1.start))
+                    .zip(dst.as_chunks_mut::<CN>().0.iter_mut().skip(ranges.1.start))
                 {
                     let y = clamp_edge!(
                         edge_modes.vertical,
@@ -299,7 +305,7 @@ where
                 for (j, dst) in ranges
                     .1
                     .clone()
-                    .zip(dst.chunks_exact_mut(CN).skip(ranges.1.start))
+                    .zip(dst.as_chunks_mut::<CN>().0.iter_mut().skip(ranges.1.start))
                 {
                     let y = i as i64 - pad_h as i64;
                     let x = clamp_edge!(
@@ -334,7 +340,7 @@ where
                 for (_, dst) in ranges
                     .1
                     .clone()
-                    .zip(dst.chunks_exact_mut(CN).skip(ranges.1.start))
+                    .zip(dst.as_chunks_mut::<CN>().0.iter_mut().skip(ranges.1.start))
                 {
                     for (y, dst) in dst.iter_mut().enumerate() {
                         *dst = scalar[y].as_();

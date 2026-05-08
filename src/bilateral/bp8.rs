@@ -119,8 +119,10 @@ impl BilateralUnit<u8> for ExecutionUnit4<'_> {
         let dst_row = &mut dst_row[..useful_width];
         let src_row = &src_row[..useful_width];
         for (x, (dst, center)) in dst_row
-            .chunks_exact_mut(N)
-            .zip(src_row.chunks_exact(N))
+            .as_chunks_mut::<N>()
+            .0
+            .iter_mut()
+            .zip(src_row.as_chunks::<N>().0.iter())
             .enumerate()
         {
             let mut sum0 = 0f32;
@@ -139,7 +141,7 @@ impl BilateralUnit<u8> for ExecutionUnit4<'_> {
             {
                 let c_slice = (y + ky) * a_stride + x * N;
                 let c_px_slice = &a_src[c_slice..(c_slice + N * self.params.kernel_size)];
-                for (c_px, &rwz) in c_px_slice.chunks_exact(N).zip(ky_row.iter()) {
+                for (c_px, &rwz) in c_px_slice.as_chunks::<N>().0.iter().zip(ky_row.iter()) {
                     let z0 = rwz * ss[(center[0] as u16 * 256 + c_px[0] as u16) as usize];
                     let z1 = rwz * ss[(center[1] as u16 * 256 + c_px[1] as u16) as usize];
                     let z2 = rwz * ss[(center[2] as u16 * 256 + c_px[2] as u16) as usize];
@@ -178,8 +180,10 @@ impl BilateralUnit<u8> for ExecutionUnit3<'_> {
         let dst_row = &mut dst_row[..useful_width];
         let src_row = &src_row[..useful_width];
         for (x, (dst, center)) in dst_row
-            .chunks_exact_mut(N)
-            .zip(src_row.chunks_exact(N))
+            .as_chunks_mut::<N>()
+            .0
+            .iter_mut()
+            .zip(src_row.as_chunks::<N>().0.iter())
             .enumerate()
         {
             let mut sum0 = 0f32;
@@ -196,7 +200,7 @@ impl BilateralUnit<u8> for ExecutionUnit3<'_> {
             {
                 let c_slice = (y + ky) * a_stride + x * N;
                 let c_px_slice = &a_src[c_slice..(c_slice + N * self.params.kernel_size)];
-                for (c_px, &rwz) in c_px_slice.chunks_exact(N).zip(ky_row.iter()) {
+                for (c_px, &rwz) in c_px_slice.as_chunks::<N>().0.iter().zip(ky_row.iter()) {
                     let z0 = rwz * ss[(center[0] as u16 * 256 + c_px[0] as u16) as usize];
                     let z1 = rwz * ss[(center[1] as u16 * 256 + c_px[1] as u16) as usize];
                     let z2 = rwz * ss[(center[2] as u16 * 256 + c_px[2] as u16) as usize];
@@ -230,8 +234,10 @@ impl BilateralUnit<u8> for ExecutionUnitPlane<'_> {
         let dst_row = &mut dst_row[..useful_width];
         let src_row = &src_row[..useful_width];
         for (x, (dst, center)) in dst_row
-            .chunks_exact_mut(N)
-            .zip(src_row.chunks_exact(N))
+            .as_chunks_mut::<N>()
+            .0
+            .iter_mut()
+            .zip(src_row.as_chunks::<N>().0.iter())
             .enumerate()
         {
             let mut sum0 = 0f32;
@@ -243,7 +249,7 @@ impl BilateralUnit<u8> for ExecutionUnitPlane<'_> {
             {
                 let c_slice = (y + ky) * a_stride + x * N;
                 let c_px_slice = &a_src[c_slice..(c_slice + N * self.params.kernel_size)];
-                for (c_px, &rwz) in c_px_slice.chunks_exact(N).zip(ky_row.iter()) {
+                for (c_px, &rwz) in c_px_slice.as_chunks::<N>().0.iter().zip(ky_row.iter()) {
                     let z0 = rwz * ss[(center[0] as u16 * 256 + c_px[0] as u16) as usize];
                     sum0 += z0 * c_px[0] as f32;
                     iw0 += z0;
@@ -271,7 +277,7 @@ fn bilateral_filter_impl<const N: usize>(
     src.size_matches_mut(dst)?;
 
     let arena = make_arena::<u8, N>(
-        src.data.as_ref(),
+        src.projected(),
         src.row_stride() as usize,
         src.size(),
         ArenaPads::constant(params.kernel_size / 2),
@@ -320,12 +326,11 @@ fn bilateral_filter_impl<const N: usize>(
 
     let thread_count = threading_policy.thread_count(src.width, src.height) as u32;
     let thread_pool = novtb::ThreadPool::new(thread_count as usize);
-    dst.data
-        .borrow_mut()
+    dst.projected()
         .tb_par_chunks_exact_mut(dst_row_stride)
         .for_each_enumerated(&thread_pool, |y, dst| {
-            let src_row = &src.data.as_ref()
-                [y * src.row_stride() as usize..(y + 1) * src.row_stride() as usize];
+            let src_row = &src.data.as_ref()[y * src.row_stride() as usize
+                ..y * src.row_stride() as usize + src.width as usize * src.channels.channels()];
             _unit.execute(arena_src, y, dst, src_row)
         });
 
