@@ -31,7 +31,8 @@
 
 use arbitrary::Arbitrary;
 use libblur::{
-    BlurImage, BlurImageMut, EdgeMode, EdgeMode2D, FastBlurChannels, Scalar, ThreadingPolicy,
+    BlurImage, BlurImageMut, BufferStore, EdgeMode, EdgeMode2D, FastBlurChannels, Scalar,
+    ThreadingPolicy,
 };
 use libfuzzer_sys::fuzz_target;
 
@@ -45,6 +46,7 @@ pub struct SrcImage {
     pub kernel_size: u8,
     pub angle: f32,
     pub threading: bool,
+    pub additional_padding: u8,
 }
 
 fuzz_target!(|data: SrcImage| {
@@ -84,6 +86,7 @@ fuzz_target!(|data: SrcImage| {
         channels,
         EdgeMode2D::anisotropy(edge_mode_horizontal, edge_mode_vertical),
         mp,
+        data.additional_padding as usize % 50,
     );
 });
 
@@ -95,12 +98,30 @@ fn fuzz_8bit(
     channels: FastBlurChannels,
     edge_mode: EdgeMode2D,
     threading_policy: ThreadingPolicy,
+    additional_padding: usize,
 ) {
     if width == 0 || height == 0 || radius == 0 {
         return;
     }
-    let src_image = BlurImage::alloc(width as u32, height as u32, channels);
-    let mut dst_image = BlurImageMut::alloc(width as u32, height as u32, channels);
+
+    let stride = (width as u32 + additional_padding as u32) * channels.channels() as u32;
+    let src_image = vec![0u8; stride as usize * (height - 1) + width * channels.channels()];
+    let dst_image = vec![0u8; stride as usize * (height - 1) + width * channels.channels()];
+
+    let src_image = BlurImage {
+        data: std::borrow::Cow::Borrowed(&src_image),
+        width: width as u32,
+        height: height as u32,
+        stride,
+        channels,
+    };
+    let mut dst_image = BlurImageMut {
+        data: BufferStore::Owned(dst_image),
+        width: width as u32,
+        height: height as u32,
+        stride,
+        channels,
+    };
 
     libblur::motion_blur(
         &src_image,

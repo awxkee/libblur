@@ -30,7 +30,9 @@
 #![no_main]
 
 use arbitrary::Arbitrary;
-use libblur::{stack_blur_u16, AnisotropicRadius, BlurImageMut, FastBlurChannels, ThreadingPolicy};
+use libblur::{
+    stack_blur_u16, AnisotropicRadius, BlurImageMut, BufferStore, FastBlurChannels, ThreadingPolicy,
+};
 use libfuzzer_sys::fuzz_target;
 
 #[derive(Clone, Debug, Arbitrary)]
@@ -43,6 +45,7 @@ pub struct SrcImage {
     pub y_radius: u8,
     pub plane: u8,
     pub threading: bool,
+    pub additional_padding: u8,
 }
 
 fuzz_target!(|data: SrcImage| {
@@ -69,6 +72,7 @@ fuzz_target!(|data: SrcImage| {
                 FastBlurChannels::Plane,
                 data.value,
                 mp,
+                data.additional_padding as usize % 50,
             );
         }
         FastBlurChannels::Channels3 => {
@@ -80,6 +84,7 @@ fuzz_target!(|data: SrcImage| {
                 FastBlurChannels::Channels3,
                 data.value,
                 mp,
+                data.additional_padding as usize % 50,
             );
         }
         FastBlurChannels::Channels4 => {
@@ -91,6 +96,7 @@ fuzz_target!(|data: SrcImage| {
                 FastBlurChannels::Channels4,
                 data.value,
                 mp,
+                data.additional_padding as usize % 50,
             );
         }
     }
@@ -104,12 +110,21 @@ fn fuzz_image(
     channels: FastBlurChannels,
     value: u16,
     threading_policy: ThreadingPolicy,
+    additional_padding: usize,
 ) {
     if width == 0 || height == 0 {
         return;
     }
-    let mut dst_image = BlurImageMut::alloc(width as u32, height as u32, channels);
-    dst_image.data.borrow_mut().fill(value);
+
+    let stride = (width as u32 + additional_padding as u32) * channels.channels() as u32;
+    let dst_image = vec![value; stride as usize * (height - 1) + width * channels.channels()];
+    let mut dst_image = BlurImageMut {
+        data: BufferStore::Owned(dst_image),
+        width: width as u32,
+        height: height as u32,
+        stride,
+        channels,
+    };
 
     stack_blur_u16(
         &mut dst_image,
